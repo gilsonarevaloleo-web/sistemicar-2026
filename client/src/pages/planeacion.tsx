@@ -257,15 +257,9 @@ import {
 } from "@/lib/situacionAlerts";
 import {
   RING_COPY,
-  RING_ENFOQUE_GRACIA_APERTURA_MS,
-  RING_ENFOQUE_INACTIVIDAD_MS,
   RING_SOBRA_INVITACION_MIN,
-  buildSituacionCronometroPausaInactividad,
-  filtrarRingPendientes,
-  getRingLastActivity,
   quitarSubsPorId,
   reanudarSituacionCronometroRing,
-  touchRingActivity,
   ringSessionOperable,
 } from "@/lib/ringEnfoqueReal";
 import {
@@ -5208,46 +5202,6 @@ export default function Planeacion() {
     }
   };
 
-  const handleCerrarRingPorInactividad = async (vehicleId: string) => {
-    if (!user) return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
-    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
-      return;
-    }
-    const sc = vehicle.situacionCronometro!;
-    const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? Date.now();
-    if (Date.now() - bloqueInicio < RING_ENFOQUE_GRACIA_APERTURA_MS) return;
-    if (!filtrarRingPendientes(vehicle.subTareas).length) return;
-
-    beginLocalVehicleMutation("sub-situacion");
-    const subTareas = vehicle.subTareas;
-    const situacionCronometro = buildSituacionCronometroPausaInactividad(sc);
-    startTransition(() => {
-      setVehicles(prev =>
-        prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor: null } : v))
-      );
-    });
-    vehiclesRef.current = vehiclesRef.current.map(v =>
-      v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor: null } : v
-    );
-    teardownSituacionSession(vehicleId);
-    persistVehiclesRef();
-    extendLocalVehicleMutation("sub-situacion");
-    void updateVehicle(user.uid, vehicleId, {
-      subTareas,
-      situacionCronometro,
-      situacionCupoAnchor: null,
-    })
-      .then(() => {
-        toast.info(RING_COPY.inactividadToast, {
-          description: RING_COPY.inactividadCrisolHint,
-          duration: 4500,
-        });
-      })
-      .catch(e => console.error("[handleCerrarRingPorInactividad]", e));
-  };
-
   const handleDesglosadorCierreDeGolpe = async (vehicleId: string) => {
     if (!user) return;
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
@@ -5347,7 +5301,6 @@ export default function Planeacion() {
       return false;
     }
 
-    touchRingActivity(vehicleId);
     const segProy = segmentoActivo?.proyectoVinculadoId;
     const enfoqueHeredado =
       opts?.proyectoEnfoqueId?.trim() ||
@@ -5524,7 +5477,6 @@ export default function Planeacion() {
         };
       }
     }
-    touchRingActivity(vehicleId);
     beginLocalVehicleMutation("ring");
     setVehicles(prev =>
       prev.map(v =>
@@ -5632,7 +5584,6 @@ export default function Planeacion() {
     const list = vehicle.subTareas;
     const targetSub = list.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
-    touchRingActivity(vehicleId);
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
@@ -5750,7 +5701,6 @@ export default function Planeacion() {
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
-    touchRingActivity(vehicleId);
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -8407,7 +8357,7 @@ export default function Planeacion() {
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preparando flota activa…</p>
                   </div>
                 ) : [...sortedOperativaActivos, ...panoramicaActivos.filter(v => !sortedOperativaActivos.includes(v)), ...activeVehicles.filter(v => !v.tipoTerminoRapido)].filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i).map((v) => (
-                  <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} onOpenCierreEnergia={handleOpenCierreEnergiaStable} onCompleteVehicle={handleVehicleComplete} onArchiveVehicle={handleVehicleArchive} segmentoNumero={segmentoNumero} planilla={planilla} onAddSubTarea={handleAddSubTarea} onAddSubTareaUrgenteACola={handleAddSubTareaUrgenteACola} onToggleSubTarea={handleToggleSubTarea} onSetSubTareaMinutosCupo={handleSetSubTareaMinutosCupo} onExtendSituacionCupo={handleExtendSituacionCupo} onSyncSituacionCupoAnchor={handleSyncSituacionCupoAnchor} onMoveSubTareasToCronometro={handleMoveSubTareasToCronometro} onSituacionCronometroSetHoraFin={handleSituacionCronometroSetHoraFin} onSituacionCronometroCumplido={handleSituacionCronometroCumplido} onSituacionCronometroFallado={handleSituacionCronometroFallado} onSituacionCronometroReservar={handleSituacionCronometroReservar} onQuitarSituacionCupo={handleQuitarSituacionCupo} onCerrarSituacionDesgloseBloque={handleCerrarSituacionDesgloseBloque} onCerrarSituacionDesglosadorDeGolpe={handleCerrarSituacionDesglosadorDeGolpe} onCerrarRingPorInactividad={handleCerrarRingPorInactividad} situacionBloquePsTotal={situacionBloqueSummaries[v.id]?.psTotal} situacionDesgloseSummary={situacionBloqueSummaries[v.id]} onVerSituacionBloquePs={handleVerSituacionBloquePsStable} onAddDetalle={handleAddDetalle} onEntregarDetalle={handleEntregarDetalle} onAddCasaItem={handleAddCasaItem} onToggleCasaItem={handleToggleCasaItem} arquitectoUnlocked={soberaniaDiaUnlocked} onInvestigadorClose={handleInvestigadorClose} onDesglosadorUpdate={handleDesglosadorUpdate} onDesglosadorGlobalClose={handleDesglosadorGlobalClose} onDesglosadorCierreDeGolpe={handleDesglosadorCierreDeGolpe} onDesglosadorDepthTick={handleDesglosadorDepthTick} onDesglosadorPausaInterrupcion={handleDesglosadorPausaInterrupcion} onResumeDesglosador={resumeDesglosadorTrasInterrupcion} onDesglosadorReorderSubs={handleDesglosadorReorderSubs} onDesglosadorAddSub={handleDesglosadorAddSub} onDesglosadorActivatePendingSub={handleDesglosadorActivatePendingSub} onReorderSubTareasCronometro={handleReorderSubTareasCronometro} onDescansoClose={handleDescansoClose} onMicroPasoToggle={handleMicroPasoToggle} onEtapaPuntoCeroToggle={handleEtapaPuntoCeroToggle} onPuntoCeroSessionUpdate={handlePuntoCeroSessionUpdate} onPuntoCeroColorConfirm={handlePuntoCeroColorConfirm} onPuntoCeroAutoClose={handlePuntoCeroAutoClose} onRutaBandCross={recordRutaBandCross} onBloqueCierre={recordBloqueCierre} />
+                  <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} onOpenCierreEnergia={handleOpenCierreEnergiaStable} onCompleteVehicle={handleVehicleComplete} onArchiveVehicle={handleVehicleArchive} segmentoNumero={segmentoNumero} planilla={planilla} onAddSubTarea={handleAddSubTarea} onAddSubTareaUrgenteACola={handleAddSubTareaUrgenteACola} onToggleSubTarea={handleToggleSubTarea} onSetSubTareaMinutosCupo={handleSetSubTareaMinutosCupo} onExtendSituacionCupo={handleExtendSituacionCupo} onSyncSituacionCupoAnchor={handleSyncSituacionCupoAnchor} onMoveSubTareasToCronometro={handleMoveSubTareasToCronometro} onSituacionCronometroSetHoraFin={handleSituacionCronometroSetHoraFin} onSituacionCronometroCumplido={handleSituacionCronometroCumplido} onSituacionCronometroFallado={handleSituacionCronometroFallado} onSituacionCronometroReservar={handleSituacionCronometroReservar} onQuitarSituacionCupo={handleQuitarSituacionCupo} onCerrarSituacionDesgloseBloque={handleCerrarSituacionDesgloseBloque} onCerrarSituacionDesglosadorDeGolpe={handleCerrarSituacionDesglosadorDeGolpe} situacionBloquePsTotal={situacionBloqueSummaries[v.id]?.psTotal} situacionDesgloseSummary={situacionBloqueSummaries[v.id]} onVerSituacionBloquePs={handleVerSituacionBloquePsStable} onAddDetalle={handleAddDetalle} onEntregarDetalle={handleEntregarDetalle} onAddCasaItem={handleAddCasaItem} onToggleCasaItem={handleToggleCasaItem} arquitectoUnlocked={soberaniaDiaUnlocked} onInvestigadorClose={handleInvestigadorClose} onDesglosadorUpdate={handleDesglosadorUpdate} onDesglosadorGlobalClose={handleDesglosadorGlobalClose} onDesglosadorCierreDeGolpe={handleDesglosadorCierreDeGolpe} onDesglosadorDepthTick={handleDesglosadorDepthTick} onDesglosadorPausaInterrupcion={handleDesglosadorPausaInterrupcion} onResumeDesglosador={resumeDesglosadorTrasInterrupcion} onDesglosadorReorderSubs={handleDesglosadorReorderSubs} onDesglosadorAddSub={handleDesglosadorAddSub} onDesglosadorActivatePendingSub={handleDesglosadorActivatePendingSub} onReorderSubTareasCronometro={handleReorderSubTareasCronometro} onDescansoClose={handleDescansoClose} onMicroPasoToggle={handleMicroPasoToggle} onEtapaPuntoCeroToggle={handleEtapaPuntoCeroToggle} onPuntoCeroSessionUpdate={handlePuntoCeroSessionUpdate} onPuntoCeroColorConfirm={handlePuntoCeroColorConfirm} onPuntoCeroAutoClose={handlePuntoCeroAutoClose} onRutaBandCross={recordRutaBandCross} onBloqueCierre={recordBloqueCierre} />
                 ))}
               </AccordionSection>
               </div>
@@ -10125,7 +10075,7 @@ function VehicleCard({
   segmentoNumero,
   planilla,
   onAddSubTarea, onAddSubTareaUrgenteACola, onToggleSubTarea, onSetSubTareaMinutosCupo, onExtendSituacionCupo, onSyncSituacionCupoAnchor, onAddDetalle, onEntregarDetalle, onAddCasaItem, onToggleCasaItem, arquitectoUnlocked,
-  onMoveSubTareasToCronometro, onSituacionCronometroSetHoraFin, onSituacionCronometroCumplido, onSituacionCronometroFallado, onSituacionCronometroReservar, onQuitarSituacionCupo, onCerrarSituacionDesgloseBloque, onCerrarSituacionDesglosadorDeGolpe, onCerrarRingPorInactividad, situacionBloquePsTotal, situacionDesgloseSummary, onVerSituacionBloquePs,
+  onMoveSubTareasToCronometro, onSituacionCronometroSetHoraFin, onSituacionCronometroCumplido, onSituacionCronometroFallado, onSituacionCronometroReservar, onQuitarSituacionCupo, onCerrarSituacionDesgloseBloque, onCerrarSituacionDesglosadorDeGolpe, situacionBloquePsTotal, situacionDesgloseSummary, onVerSituacionBloquePs,
   onInvestigadorClose, onDesglosadorUpdate, onDesglosadorGlobalClose, onDesglosadorCierreDeGolpe, onDesglosadorDepthTick, onDesglosadorPausaInterrupcion, onResumeDesglosador, onDesglosadorReorderSubs, onDesglosadorAddSub, onDesglosadorActivatePendingSub,
   onReorderSubTareasCronometro,
   onDescansoClose, onMicroPasoToggle, onEtapaPuntoCeroToggle,
@@ -10153,7 +10103,6 @@ function VehicleCard({
   onQuitarSituacionCupo?: (vehicleId: string, subTareaId: string, minutos: number) => void;
   onCerrarSituacionDesgloseBloque?: (vehicleId: string) => void;
   onCerrarSituacionDesglosadorDeGolpe?: (vehicleId: string) => void;
-  onCerrarRingPorInactividad?: (vehicleId: string) => void;
   onDesglosadorCierreDeGolpe?: (vehicleId: string) => void;
   situacionBloquePsTotal?: number;
   situacionDesgloseSummary?: SituacionDesgloseSummary;
@@ -10245,8 +10194,7 @@ function VehicleCard({
   const situacion2MinWarnKeyRef = useRef<string | null>(null);
   const situacionFilaVoiceKeysRef = useRef<Set<string>>(new Set());
   const situacionFilaVoicePendingRef = useRef<Set<string>>(new Set());
-  const ringInactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ringInactivityBloqueRef = useRef<string | null>(null);
+  const ringSobraBloqueRef = useRef<string | null>(null);
   const ringSobraVoiceKeyRef = useRef<string | null>(null);
   const ringSobraVoicePendingRef = useRef<string | null>(null);
   const situacionCupoEscalationRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -10295,11 +10243,8 @@ function VehicleCard({
   const runLiveTimerTick = useCallback(() => {
     computeTimerRef.current();
     desglosadorUpdateRef.current();
-    if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) {
-      touchRingActivity(vehicle.id);
-    }
     setLiveUiTick(t => t + 1);
-  }, [vehicle.id, vehicle.tipoFlota, vehicle.situacionCronometro?.activo]);
+  }, []);
 
   const playChime = useCallback(() => {
     if (!isTikSoundEnabled()) return;
@@ -11133,18 +11078,10 @@ function VehicleCard({
     if (situacionCronActivo) setSubTasksCollapsed(false);
   }, [situacionCronActivo]);
 
-  const clearRingInactivityTimer = useCallback(() => {
-    if (ringInactivityTimerRef.current) {
-      clearTimeout(ringInactivityTimerRef.current);
-      ringInactivityTimerRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     if (vehicle.tipoFlota !== "situacion") return;
     resetSituacionSessionTeardownGate(vehicle.id);
     return registerSituacionSessionCleanup(vehicle.id, () => {
-      clearRingInactivityTimer();
       if (situacionCupoEscalationRef.current) {
         clearInterval(situacionCupoEscalationRef.current);
         situacionCupoEscalationRef.current = null;
@@ -11152,56 +11089,16 @@ function VehicleCard({
       cancelUbicacionVoiceForVehicle(vehicle.id);
       resetDesglosadorVoiceRefs();
     });
-  }, [vehicle.id, vehicle.tipoFlota, clearRingInactivityTimer, resetDesglosadorVoiceRefs]);
-
-  const armRingInactivityTimer = useCallback(() => {
-    if (!onCerrarRingPorInactividad) return;
-    if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return;
-    if (vehicle.situacionCronometro?.activo !== true) return;
-    if (situacionBloqueListo) return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    const bloqueInicio = vehicle.situacionCronometro?.bloqueInicioAt ?? 0;
-    if (Date.now() - bloqueInicio < RING_ENFOQUE_GRACIA_APERTURA_MS) return;
-    clearRingInactivityTimer();
-    const idleMs = Date.now() - getRingLastActivity(vehicle.id);
-    const delay = Math.max(1000, RING_ENFOQUE_INACTIVIDAD_MS - idleMs);
-    ringInactivityTimerRef.current = setTimeout(() => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      if (Date.now() - getRingLastActivity(vehicle.id) < RING_ENFOQUE_INACTIVIDAD_MS) {
-        armRingInactivityTimer();
-        return;
-      }
-      onCerrarRingPorInactividad(vehicle.id);
-    }, delay);
-  }, [
-    onCerrarRingPorInactividad,
-    vehicle.tipoFlota,
-    vehicle.status,
-    vehicle.situacionCronometro?.activo,
-    vehicle.situacionCronometro?.bloqueInicioAt,
-    vehicle.id,
-    situacionBloqueListo,
-    clearRingInactivityTimer,
-  ]);
-
-  const touchRingInteraction = useCallback(() => {
-    touchRingActivity(vehicle.id);
-    clearRingInactivityTimer();
-    if (situacionCronActivo && !situacionBloqueListo) {
-      armRingInactivityTimer();
-    }
-  }, [clearRingInactivityTimer, situacionCronActivo, situacionBloqueListo, armRingInactivityTimer, vehicle.id]);
+  }, [vehicle.id, vehicle.tipoFlota, resetDesglosadorVoiceRefs]);
 
   useEffect(() => {
     if (vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
-      clearRingInactivityTimer();
-      ringInactivityBloqueRef.current = null;
+      ringSobraBloqueRef.current = null;
       return;
     }
     const bloqueKey = `${vehicle.id}-${vehicle.situacionCronometro?.bloqueInicioAt ?? 0}`;
-    if (ringInactivityBloqueRef.current !== bloqueKey) {
-      ringInactivityBloqueRef.current = bloqueKey;
-      touchRingActivity(vehicle.id);
+    if (ringSobraBloqueRef.current !== bloqueKey) {
+      ringSobraBloqueRef.current = bloqueKey;
       ringSobraVoiceKeyRef.current = null;
       ringSobraVoicePendingRef.current = null;
     }
@@ -11210,22 +11107,6 @@ function VehicleCard({
     vehicle.id,
     vehicle.situacionCronometro?.activo,
     vehicle.situacionCronometro?.bloqueInicioAt,
-    clearRingInactivityTimer,
-  ]);
-
-  useEffect(() => {
-    if (!situacionCronActivo || situacionBloqueListo) {
-      clearRingInactivityTimer();
-      return;
-    }
-    armRingInactivityTimer();
-    return clearRingInactivityTimer;
-  }, [
-    situacionCronActivo,
-    situacionBloqueListo,
-    situacionAnchorKey,
-    armRingInactivityTimer,
-    clearRingInactivityTimer,
   ]);
 
   useEffect(() => {
@@ -11435,7 +11316,6 @@ function VehicleCard({
       layout
       className="rounded-xl border overflow-hidden"
       style={{ backgroundColor: "#0a0a0a", borderColor: `${statusColors[vehicle.status]}30` }}
-      onPointerDown={situacionCronActivo ? touchRingInteraction : undefined}
     >
       {needsLiveTick && <VehicleCardLiveClock onTick={runLiveTimerTick} />}
 
@@ -12817,9 +12697,9 @@ function VehicleCard({
                                           )}
                                           {pend && ringOperable && (
                                             <div className="flex gap-1 flex-shrink-0">
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
                                             </div>
                                           )}
                                           {pend && situacionCronActivo && !enFoco && !ringOperable && (

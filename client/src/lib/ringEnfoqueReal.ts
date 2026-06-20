@@ -1,26 +1,5 @@
 import type { SubTarea, Vehicle } from "./persistence";
 
-/** Inactividad tras última interacción en el ring antes de pausarlo (subs permanecen selladas). */
-export const RING_ENFOQUE_INACTIVIDAD_MS = 300_000;
-
-const ringLastActivityByVehicle = new Map<string, number>();
-
-/** Marca actividad reciente en el ring — evita pausa por inactividad. */
-export function touchRingActivity(vehicleId: string, atMs: number = Date.now()): void {
-  ringLastActivityByVehicle.set(vehicleId, atMs);
-}
-
-export function getRingLastActivity(vehicleId: string, fallbackMs: number = Date.now()): number {
-  return ringLastActivityByVehicle.get(vehicleId) ?? fallbackMs;
-}
-
-export function clearRingActivity(vehicleId: string): void {
-  ringLastActivityByVehicle.delete(vehicleId);
-}
-
-/** Gracia mínima tras abrir ring antes de evaluar inactividad (evita cierre con TTS roto). */
-export const RING_ENFOQUE_GRACIA_APERTURA_MS = 180_000;
-
 /** Minutos de holgura en meta para invitar a nueva ronda o vehículo. */
 export const RING_SOBRA_INVITACION_MIN = 20;
 
@@ -35,9 +14,6 @@ export const RING_COPY = {
   anadirAlRing: "Añadir al ring de enfoque",
   sellarDirectoRing: "Sellar en ring",
   rondaLista: "Ronda lista — cierra el ring cuando quieras",
-  inactividadToast: "Ring pausado por inactividad",
-  inactividadCrisolHint:
-    "Tus filas siguen selladas en el ring. Tocá Cumplido/Fallado o reanudá cuando quieras — no se movieron al Taller.",
   tallerHint:
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",
   ringHint:
@@ -67,7 +43,7 @@ export function ringTiempoSobraParts(minutosSobra: number): string[] {
   ];
 }
 
-/** Cierra el cronómetro sin contar reto completado ni bolsa (inactividad). */
+/** Cierra el cronómetro sin contar reto completado ni bolsa (solo cierre manual legacy). */
 export function buildSituacionCronometroPausaInactividad(
   sc: NonNullable<Vehicle["situacionCronometro"]>
 ): NonNullable<Vehicle["situacionCronometro"]> {
@@ -111,7 +87,7 @@ export function ringSessionOperable(
   return ringTieneFilasPendientes(subTareas);
 }
 
-/** Reanuda cronómetro pausado por inactividad (mismo bloque). */
+/** Reanuda cronómetro pausado (mismo bloque). */
 export function reanudarSituacionCronometroRing(
   sc: NonNullable<Vehicle["situacionCronometro"]>
 ): NonNullable<Vehicle["situacionCronometro"]> {
