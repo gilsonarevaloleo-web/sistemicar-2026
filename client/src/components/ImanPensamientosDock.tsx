@@ -295,7 +295,7 @@ function ImanPensamientosDock({
                 </button>
               </div>
 
-              <div className="max-h-56 overflow-y-auto space-y-2">
+              <div className="max-h-[min(40dvh,16rem)] overflow-y-auto overscroll-contain space-y-2">
                 {nidos.length === 0 ? (
                   <div
                     className="rounded-lg p-2 text-center"

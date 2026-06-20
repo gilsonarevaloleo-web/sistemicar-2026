@@ -127,6 +127,65 @@ function reservaPendingMatch(
   return Math.abs((local.reservadaAt ?? 0) - (remote.reservadaAt ?? 0)) < RESERVA_PENDING_MATCH_MS;
 }
 
+function reservaTextoKey(texto: string): string {
+  return texto.trim().toLowerCase();
+}
+
+/** Misma fila en inbox y en nido proyecto — no son dos tareas distintas. */
+function reservaSemanticDuplicate(a: SituacionReservaItem, b: SituacionReservaItem): boolean {
+  if (a.userId !== b.userId) return false;
+  if (a.estado !== "activa" || b.estado !== "activa") return false;
+  if (reservaTextoKey(a.texto) !== reservaTextoKey(b.texto)) return false;
+  const aProy = a.proyectoId?.trim();
+  const bProy = b.proyectoId?.trim();
+  if (aProy && bProy && aProy !== bProy) return false;
+  return true;
+}
+
+function preferReservaRow(a: SituacionReservaItem, b: SituacionReservaItem): SituacionReservaItem {
+  const aProy = !!a.proyectoId?.trim();
+  const bProy = !!b.proyectoId?.trim();
+  if (aProy && !bProy) return mergeReservaRows(a, b);
+  if (bProy && !aProy) return mergeReservaRows(b, a);
+  if (!a.id.startsWith("reserva_") && b.id.startsWith("reserva_")) return mergeReservaRows(a, b);
+  if (a.id.startsWith("reserva_") && !b.id.startsWith("reserva_")) return mergeReservaRows(b, a);
+  return (a.reservadaAt ?? 0) >= (b.reservadaAt ?? 0) ? mergeReservaRows(a, b) : mergeReservaRows(b, a);
+}
+
+function mergeReservaRows(
+  primary: SituacionReservaItem,
+  secondary: SituacionReservaItem
+): SituacionReservaItem {
+  return {
+    ...primary,
+    proyectoId: primary.proyectoId?.trim() || secondary.proyectoId,
+    proyectoTitulo: primary.proyectoTitulo || secondary.proyectoTitulo,
+    proyectoEtiqueta: primary.proyectoEtiqueta || secondary.proyectoEtiqueta,
+    origenVehiculoId: primary.origenVehiculoId || secondary.origenVehiculoId,
+    origenVehiculoTitulo: primary.origenVehiculoTitulo || secondary.origenVehiculoTitulo,
+    minutosCupo: primary.minutosCupo ?? secondary.minutosCupo,
+    detalles: primary.detalles?.length ? primary.detalles : secondary.detalles,
+    rutaSeguimientoPaso: primary.rutaSeguimientoPaso ?? secondary.rutaSeguimientoPaso,
+    segmentoId: primary.segmentoId || secondary.segmentoId,
+    segmentoNombre: primary.segmentoNombre || secondary.segmentoNombre,
+  };
+}
+
+/** Colapsa activas con el mismo texto (inbox + proyecto) en una sola fila. */
+function dedupeActiveReservasByTexto(items: SituacionReservaItem[]): SituacionReservaItem[] {
+  const inactivas = items.filter(i => i.estado !== "activa");
+  const kept: SituacionReservaItem[] = [];
+  for (const item of sortReservasTacticas(items.filter(i => i.estado === "activa"))) {
+    const dupIdx = kept.findIndex(prev => reservaSemanticDuplicate(prev, item));
+    if (dupIdx === -1) {
+      kept.push(item);
+      continue;
+    }
+    kept[dupIdx] = preferReservaRow(kept[dupIdx], item);
+  }
+  return [...kept, ...inactivas];
+}
+
 /** Elimina duplicados por id y apuntes locales `reserva_*` ya reflejados en Firebase. */
 export function dedupeReservasItems(items: SituacionReservaItem[]): SituacionReservaItem[] {
   const byId = new Map<string, SituacionReservaItem>();
@@ -164,7 +223,7 @@ export function dedupeReservasItems(items: SituacionReservaItem[]): SituacionRes
           : prev;
     kept[dupIdx] = preferItem;
   }
-  return kept;
+  return dedupeActiveReservasByTexto(kept);
 }
 
 function normalizeItem(raw: SituacionReservaItem): SituacionReservaItem {
@@ -277,7 +336,7 @@ export function getLocalSituacionReserva(userId: string): SituacionReservaItem[]
 }
 
 export function getReservaActivas(items: SituacionReservaItem[]): SituacionReservaItem[] {
-  return sortReservasTacticas(items.filter(i => i.estado === "activa"));
+  return dedupeReservasItems(items.filter(i => i.estado === "activa"));
 }
 
 export function subscribeToSituacionReserva(
@@ -404,20 +463,38 @@ export async function addSituacionReserva(
   if (!trimmed) return { id: "", localSaved: false };
 
   const now = Date.now();
+  const ruta = item.ruta ?? inferRutaFromRow(item);
+  const estado = (item.estado ?? "activa") as SituacionReservaEstado;
+
   const recentDup = getAllLocalReserva().find(
     i =>
       i.userId === userId &&
       i.estado === "activa" &&
-      i.texto.trim().toLowerCase() === trimmed.toLowerCase() &&
-      now - (i.reservadaAt ?? 0) < RESERVA_SUBMIT_DEDUP_MS
+      reservaTextoKey(i.texto) === reservaTextoKey(trimmed)
   );
   if (recentDup) {
+    const incoming: SituacionReservaItem = {
+      ...recentDup,
+      texto: trimmed,
+      ruta,
+      ...(item.origenVehiculoTitulo ? { origenVehiculoTitulo: item.origenVehiculoTitulo } : {}),
+      ...(item.origenVehiculoId ? { origenVehiculoId: item.origenVehiculoId } : {}),
+      ...(item.minutosCupo != null && item.minutosCupo > 0 ? { minutosCupo: item.minutosCupo } : {}),
+      ...(item.detalles?.length ? { detalles: item.detalles } : {}),
+      ...(item.proyectoId ? { proyectoId: item.proyectoId } : {}),
+      ...(item.proyectoTitulo ? { proyectoTitulo: item.proyectoTitulo } : {}),
+      ...(item.proyectoEtiqueta ? { proyectoEtiqueta: item.proyectoEtiqueta } : {}),
+      ...(item.segmentoId ? { segmentoId: item.segmentoId } : {}),
+      ...(item.segmentoNombre ? { segmentoNombre: item.segmentoNombre } : {}),
+      ...(item.rutaSeguimientoPaso ? { rutaSeguimientoPaso: item.rutaSeguimientoPaso } : {}),
+    };
+    const merged = preferReservaRow(recentDup, incoming);
+    const all = getAllLocalReserva().map(i => (i.id === recentDup.id ? merged : i));
+    saveAllLocalReserva(all);
     return { id: recentDup.id, localSaved: true, duplicate: true };
   }
 
-  const ruta = item.ruta ?? inferRutaFromRow(item);
   const reservadaAt = now;
-  const estado = (item.estado ?? "activa") as SituacionReservaEstado;
   const tempId = `reserva_${reservadaAt}_${Math.random().toString(36).slice(2, 6)}`;
 
   const created: SituacionReservaItem = {
