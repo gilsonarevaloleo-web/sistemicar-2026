@@ -65,6 +65,7 @@ import { DoctorIAChat } from "@/components/doctor-ia-chat";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { runStartupStorageHygiene } from "@/lib/storageHygiene";
 import { unlockSpeechSynthesis } from "@/lib/speechQueue";
+import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speechRecovery";
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 
 interface AuthContextType {
@@ -403,15 +404,25 @@ function SovereigntyListener() {
 function VoiceBootstrap() {
   useEffect(() => {
     ensureUbicacionVoiceRetryHub();
+    const stopWatchdog = installSpeechStuckWatchdog();
     const unlock = () => {
       unlockSpeechSynthesis(true);
       retryAllPendingUbicacionVoice();
     };
+    const onRecoveryShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        hardResetSpeechSystems(true);
+      }
+    };
     window.addEventListener("pointerdown", unlock, { capture: true });
     window.addEventListener("keydown", unlock, { capture: true });
+    window.addEventListener("keydown", onRecoveryShortcut, { capture: true });
     return () => {
+      stopWatchdog();
       window.removeEventListener("pointerdown", unlock, { capture: true });
       window.removeEventListener("keydown", unlock, { capture: true });
+      window.removeEventListener("keydown", onRecoveryShortcut, { capture: true });
     };
   }, []);
   return null;

@@ -10,12 +10,14 @@ import {
 } from "@/lib/situacionRepair";
 import { flushLocalVehicles } from "@/lib/persistence";
 import { teardownAllSituacionSessions } from "@/lib/situacionSessionTeardown";
+import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; message: string; crashCount: number };
 
 export class AppErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, message: "", crashCount: 0 };
+  private nativeRecoveryAttached = false;
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return {
@@ -29,6 +31,38 @@ export class AppErrorBoundary extends Component<Props, State> {
     console.error("[AppErrorBoundary]", error, info.componentStack);
   }
 
+  componentDidUpdate(_prevProps: Props, prevState: State) {
+    if (this.state.hasError && !prevState.hasError) {
+      this.attachNativeRecoveryHandlers();
+    }
+  }
+
+  componentWillUnmount() {
+    this.detachNativeRecoveryHandlers();
+  }
+
+  private attachNativeRecoveryHandlers() {
+    if (this.nativeRecoveryAttached || typeof document === "undefined") return;
+    const recover = document.getElementById("app-error-recover");
+    const force = document.getElementById("app-error-force-situacion");
+    const menu = document.getElementById("app-error-menu");
+    recover?.addEventListener("click", this.handleRecover, true);
+    force?.addEventListener("click", this.handleForceSituacion, true);
+    menu?.addEventListener("click", this.handleGoMenu, true);
+    this.nativeRecoveryAttached = true;
+  }
+
+  private detachNativeRecoveryHandlers() {
+    if (!this.nativeRecoveryAttached || typeof document === "undefined") return;
+    const recover = document.getElementById("app-error-recover");
+    const force = document.getElementById("app-error-force-situacion");
+    const menu = document.getElementById("app-error-menu");
+    recover?.removeEventListener("click", this.handleRecover, true);
+    force?.removeEventListener("click", this.handleForceSituacion, true);
+    menu?.removeEventListener("click", this.handleGoMenu, true);
+    this.nativeRecoveryAttached = false;
+  }
+
   private reloadTo(path: string) {
     this.setState({ hasError: false, message: "", crashCount: 0 });
     window.location.href = path;
@@ -36,6 +70,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   private runPlaneacionRecovery(archiveSituacion: boolean) {
     try {
+      hardResetSpeechSystems(true);
       teardownAllSituacionSessions();
       repairStuckSituacionVehicles();
       emergencyPruneStorage({ aggressive: true });
@@ -104,6 +139,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           )}
           <button
             type="button"
+            id="app-error-recover"
             onClick={this.handleRecover}
             className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider"
             style={{ backgroundColor: "#D4AF37", color: "#000" }}
@@ -112,6 +148,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           </button>
           <button
             type="button"
+            id="app-error-force-situacion"
             onClick={this.handleForceSituacion}
             className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider"
             style={{ backgroundColor: "rgba(239,68,68,0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.45)" }}
@@ -120,6 +157,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           </button>
           <button
             type="button"
+            id="app-error-menu"
             onClick={this.handleGoMenu}
             className="w-full py-2 rounded-xl text-xs text-slate-500 hover:text-slate-300"
           >

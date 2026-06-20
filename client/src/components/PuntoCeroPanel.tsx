@@ -296,8 +296,12 @@ export function PuntoCeroPanel({
     },
   });
 
+  const sessionInitAttemptRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (vehicle.status !== "activo" || vehicle.tipoDescanso !== "punto_cero" || session) return;
+    if (sessionInitAttemptRef.current === vehicle.id) return;
+    sessionInitAttemptRef.current = vehicle.id;
     onSessionPersist(
       vehicle.id,
       initPuntoCeroSession("dia", parsePuntoCeroDuracionMin(vehicle.criterioDetalle), vehicle.aperturaAt ?? Date.now())
@@ -620,10 +624,14 @@ export function PuntoCeroPanel({
                       unlockPuntoCeroSpeechFromGesture();
                       const intro = primeraGuiaVozRef.current;
                       if (intro) primeraGuiaVozRef.current = false;
-                      speakEtapaPuntoCero(key, {
-                        intro,
-                        transicionEtapa4: key === "etapa3",
-                      });
+                      try {
+                        speakEtapaPuntoCero(key, {
+                          intro,
+                          transicionEtapa4: key === "etapa3",
+                        });
+                      } catch (e) {
+                        console.warn("[PuntoCeroPanel] speakEtapaPuntoCero", e);
+                      }
                       onEtapaToggle(vehicle.id, key);
                     }}
                     disabled={checked || isLocked || isColorEtapa}

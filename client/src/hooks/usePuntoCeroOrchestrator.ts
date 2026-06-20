@@ -19,6 +19,20 @@ export type PuntoCeroOrchestratorCallbacks = {
   onCompletada?: (mensaje: string) => void;
 };
 
+function puntoCeroSessionChanged(a: PuntoCeroSession, b: PuntoCeroSession): boolean {
+  return (
+    a.fase !== b.fase ||
+    a.faseInicioAt !== b.faseInicioAt ||
+    a.sesionInicioAt !== b.sesionInicioAt ||
+    a.ultimoSusurroAt !== b.ultimoSusurroAt ||
+    a.autoCierreDisparado !== b.autoCierreDisparado ||
+    a.duracionTotalMin !== b.duracionTotalMin ||
+    a.modo !== b.modo ||
+    a.coloresConfirmados.length !== b.coloresConfirmados.length ||
+    a.coloresConfirmados.some((c, i) => c !== b.coloresConfirmados[i])
+  );
+}
+
 /**
  * Tick cada 1s: transiciones de fase, susurros nocturnos y cierre automático.
  */
@@ -39,7 +53,7 @@ export function usePuntoCeroOrchestrator(
     if (!s || s.fase === "completada") return;
     const now = Date.now();
     const { session: next, events } = tickPuntoCero(s, now);
-    if (JSON.stringify(next) !== JSON.stringify(s)) {
+    if (puntoCeroSessionChanged(s, next)) {
       cbRef.current.onSessionUpdate(next);
     }
     for (const ev of events) {

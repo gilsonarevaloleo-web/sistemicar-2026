@@ -100,6 +100,12 @@ function resetPuntoCeroQueueLocal(): void {
   clearPuntoCeroPauseTimer();
   pcQueue = [];
   pcSpeaking = false;
+  pcVoicesLoadBypass = false;
+}
+
+/** Recuperación de emergencia — expuesto para speechRecovery. */
+export function resetPuntoCeroVoiceQueue(): void {
+  resetPuntoCeroQueueLocal();
 }
 
 function processPuntoCeroQueue(opts?: { force?: boolean }): void {
@@ -180,7 +186,8 @@ export function speakPuntoCeroSequence(
     resetPuntoCeroQueueLocal();
   }
 
-  pcQueue.push(...filtered);
+  const MAX_PC_PHRASES = 12;
+  pcQueue.push(...filtered.slice(0, MAX_PC_PHRASES));
   processPuntoCeroQueue({ force: true });
 }
 

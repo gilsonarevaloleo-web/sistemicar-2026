@@ -212,6 +212,7 @@ import {
   rutaSeguimientoPickerCanConfirm,
 } from "@/components/RutaSeguimientoPicker";
 import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue, subscribeSpeechQueueIdle } from "@/lib/speechQueue";
+import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
   speakDesglosadorVoiceReliable,
@@ -1248,7 +1249,9 @@ export default function Planeacion() {
   );
   const puntoCeroUnlocked = hasPuntoCeroAccess(
     progression?.subscriptionPlan,
-    user?.email
+    user?.email,
+    progression?.rank,
+    progression?.activeModules
   );
   const [dailyPS, setDailyPS] = useState(0);
   const [journalDayKey, setJournalDayKey] = useState(() => getJournalDayStartMs());
@@ -2831,10 +2834,12 @@ export default function Planeacion() {
       };
       optimisticVehiclesRef.current = [...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId), optimisticVehicle];
       vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== newVehicleId)];
-      setVehicles(prev => {
-        const withoutDupe = prev.filter(v => v.id !== newVehicleId);
-        console.log(`[handleFlotaSave] OPTIMISTIC UPDATE: Agregando "${titulo}" al estado. Antes: ${withoutDupe.length}, Después: ${withoutDupe.length + 1}`);
-        return [optimisticVehicle, ...withoutDupe];
+      startTransition(() => {
+        setVehicles(prev => {
+          const withoutDupe = prev.filter(v => v.id !== newVehicleId);
+          console.log(`[handleFlotaSave] OPTIMISTIC UPDATE: Agregando "${titulo}" al estado. Antes: ${withoutDupe.length}, Después: ${withoutDupe.length + 1}`);
+          return [optimisticVehicle, ...withoutDupe];
+        });
       });
       if (!saveLocalVehicles(vehiclesRef.current)) {
         console.warn("[handleFlotaSave] Vehículo en memoria; localStorage lleno o bloqueado");
@@ -3525,9 +3530,16 @@ export default function Planeacion() {
     toast.success(`+1 PS · ${ETAPA_LABELS[etapa]}`, { description: "Etapa Punto Cero completada", style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD_PC}`, color: GOLD_PC }, duration: 2500 });
   };
 
+  const puntoCeroSessionSigRef = useRef<Record<string, string>>({});
+
   const handlePuntoCeroSessionUpdate = (vehicleId: string, session: PuntoCeroSession) => {
     if (!user) return;
-    setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, puntoCero: session } : v)));
+    const sig = `${session.fase}|${session.faseInicioAt}|${session.ultimoSusurroAt ?? 0}|${session.coloresConfirmados.join("")}`;
+    if (puntoCeroSessionSigRef.current[vehicleId] === sig) return;
+    puntoCeroSessionSigRef.current[vehicleId] = sig;
+    startTransition(() => {
+      setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, puntoCero: session } : v)));
+    });
     vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? { ...v, puntoCero: session } : v));
     updateVehicle(user.uid, vehicleId, { puntoCero: session }).catch(() => {});
   };
@@ -6628,6 +6640,33 @@ export default function Planeacion() {
       </button>
   );
 
+  const renderSpeechResetButton = (compact?: boolean) => (
+    <button
+      type="button"
+      onPointerDown={() => hardResetSpeechSystems(true)}
+      onClick={() => {
+        hardResetSpeechSystems(true);
+        toast.info("Voz restablecida", {
+          description: "Cola TTS y Punto Cero reiniciados. Tocá Probar voz si hace falta.",
+          style: { backgroundColor: PIZARRA, border: "1px solid rgba(239,68,68,0.45)", color: "#fca5a5" },
+          duration: 4000,
+        });
+      }}
+      className={`flex items-center gap-1 rounded-md border transition-all ${compact ? "px-2 py-1" : "px-2 py-1"}`}
+      style={{
+        borderColor: "rgba(239,68,68,0.45)",
+        backgroundColor: "rgba(239,68,68,0.12)",
+      }}
+      title="Restablecer voz si se congeló (Ctrl+Shift+V)"
+      data-testid="button-speech-reset"
+    >
+      <VolumeX size={10} style={{ color: "#fca5a5" }} />
+      <span className="text-[8px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: "#fca5a5" }}>
+        Reset voz
+      </span>
+    </button>
+  );
+
   const soundChannelsSummary = `Alertas ${situacionAlertsEnabled ? "ON" : "OFF"} · Puerta ${puertaVozEnabled ? "ON" : "OFF"} · DSG ${desglosadorVozEnabled ? "ON" : "OFF"} · Tick ${tikSoundEnabled ? "ON" : "OFF"}`;
 
   const getSegIcon = (icono: string) => {
@@ -7282,6 +7321,7 @@ export default function Planeacion() {
               </p>
             </button>
             {renderSoundProbeButton(true)}
+            {renderSpeechResetButton(true)}
             <button
               type="button"
               onClick={() => setSoundPanelOpen(v => !v)}
@@ -9035,7 +9075,21 @@ export default function Planeacion() {
                               {(Object.entries(TIPO_DESCANSO_CONFIG) as ["intercepcion" | "microcarga" | "reset_profundo" | "punto_cero", typeof TIPO_DESCANSO_CONFIG["intercepcion"]][]).map(([key, conf]) => {
                                 const active = tipoActivo === key;
                                 const isPuntoCero = key === "punto_cero";
-                                if (isPuntoCero && !puntoCeroUnlocked) return null;
+                                if (isPuntoCero && progression != null && !puntoCeroUnlocked) {
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="p-2 rounded-xl border text-center opacity-60"
+                                      style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
+                                      title="Requiere acceso operativo (Planificación). Si ya lo tenías, recarga tras iniciar sesión."
+                                      data-testid={`button-tipo-descanso-${key}-locked`}
+                                    >
+                                      <conf.Icon size={14} style={{ color: "#64748b", margin: "0 auto 4px" }} />
+                                      <p className="text-[8px] font-black uppercase tracking-wider text-slate-600">{conf.label}</p>
+                                      <p className="text-[7px] text-slate-600 mt-1">Acceso operativo</p>
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <button
                                     key={key}
