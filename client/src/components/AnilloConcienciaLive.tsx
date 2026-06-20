@@ -230,10 +230,15 @@ function AnilloConcienciaLiveInner({
             <p
               className="text-xs font-black"
               style={{
-                color: model.dayStats.entropiaMin > 0 ? BLOOD : "rgba(148,163,184,0.5)",
+                color:
+                  (model.metricas.terrenoRestanteMin ?? model.dayStats.entropiaMin) > 0
+                    ? BLOOD
+                    : "rgba(148,163,184,0.5)",
               }}
             >
-              {formatMinutosJornada(model.dayStats.entropiaMin)}
+              {formatMinutosJornada(
+                model.metricas.terrenoRestanteMin ?? model.dayStats.entropiaMin
+              )}
             </p>
           </div>
           <div>

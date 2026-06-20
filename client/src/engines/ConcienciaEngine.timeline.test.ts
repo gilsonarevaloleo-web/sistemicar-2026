@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import {
+  buildConcienciaTimeline,
   calcularBalanceConquistaJornada,
   clockMinutesToDeg,
   computeAnilloEstado,
@@ -856,6 +857,50 @@ describe("computeAnilloEstado", () => {
       now,
     });
     assert.equal(st.mode, "conquista");
+  });
+});
+
+describe("inner ring battle metrics", () => {
+  it("inicio: terreno restante = plan completo (118 min)", () => {
+    const now = limaAt(2026, 4, 18, 21, 2);
+    const segmentos = [{ horaInicio: "21:02", horaFin: "23:00" }];
+    const tl = buildConcienciaTimeline({ segmentos, vehiculos: [], now });
+    assert.equal(tl.metricas.jornadaMin, 118);
+    assert.equal(tl.metricas.conquistaArcPct, 0);
+    assert.equal(tl.metricas.entropiaArcPct, 100);
+    assert.equal(tl.metricas.terrenoRestanteMin, 118);
+    assert.equal(tl.metricas.fillPct, 100);
+    assert.ok(tl.dayStats.entropiaMin >= 0, "entropía contable independiente del arco");
+  });
+
+  it("2 min conquista: morado crece y terreno restante baja", () => {
+    const now = limaAt(2026, 4, 18, 21, 4);
+    const segStart = limaAt(2026, 4, 18, 21, 2);
+    const segmentos = [{ horaInicio: "21:02", horaFin: "23:00" }];
+    const vehiculos = [{
+      autoVerdad: false,
+      tipoFlota: "tiempo",
+      status: "activo",
+      aperturaAt: segStart,
+    }];
+    const tl = buildConcienciaTimeline({ segmentos, vehiculos, now });
+    assert.ok(tl.metricas.conquistaMin >= 1.9 && tl.metricas.conquistaMin <= 2.1);
+    assert.equal(
+      tl.metricas.terrenoRestanteMin,
+      Math.round((118 - tl.metricas.conquistaMin) * 10) / 10
+    );
+    assert.ok(tl.metricas.conquistaArcPct >= 1.6 && tl.metricas.conquistaArcPct <= 1.8);
+    assert.ok(tl.metricas.entropiaArcPct >= 98.2 && tl.metricas.entropiaArcPct <= 98.4);
+  });
+
+  it("patchTimelineEntropy no infla arco interior en modo batalla", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 4, 18, 21, 16);
+    const segmentos = [{ horaInicio: "21:02", horaFin: "23:00" }];
+    const base = buildConcienciaTimeline({ segmentos, vehiculos: [], now });
+    const live = computeLiveEntropy({ segmentos, vehiculos: [], now });
+    assert.equal(live.metricas.entropiaArcPct, base.metricas.entropiaArcPct);
+    assert.ok(live.dayStats.entropiaMin > 0, "entropía contable sigue creciendo en gaps");
   });
 });
 

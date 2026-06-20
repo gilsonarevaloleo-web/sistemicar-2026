@@ -152,12 +152,12 @@ export default function AnilloConciencia({
   const planLabel = Math.round(planificacionPct);
   const conquLabel = Math.round(resolvedConquista);
   const entropiaLabel = Math.round(resolvedEntropia);
-  const fillLabel = Math.round(Math.min(100, resolvedConquista + resolvedEntropia));
   const ampm = pointerLap === 1 ? "PM" : "AM";
 
   const planColor = planLabel >= 70 ? CYAN : planLabel >= 40 ? GOLD : "#6b7280";
   const showEntropia = resolvedEntropia > 0;
   const showConquista = resolvedConquista > 0;
+  const holeInPlannedSegment = pointerMode === "libre" && segmentos.length > 0;
 
   const fondoArcs = timelineArcs.filter(a => a.kind === "fondo");
   const entropiaTimelineArcs = timelineArcs.filter(a => a.kind === "entropia");
@@ -541,7 +541,7 @@ export default function AnilloConciencia({
               strokeWidth={conquistaPulse ? strokeW * 1.35 : strokeW}
               strokeLinecap="round"
               strokeDasharray={`${conquistaDash} ${innerCirc}`}
-              transform={`rotate(-90 ${cx} ${cy})`}
+              transform={`rotate(90 ${cx} ${cy})`}
               animate={{
                 strokeDasharray: `${conquistaDash} ${innerCirc}`,
                 opacity: conquistaPulse ? [1, 0.65, 1] : 1,
@@ -566,15 +566,18 @@ export default function AnilloConciencia({
             x2={cx + needleLen * Math.cos(needleRad)}
             y2={cy + needleLen * Math.sin(needleRad)}
             stroke={needleColor}
-            strokeWidth={1.1}
+            strokeWidth={holeInPlannedSegment ? 1.6 : 1.1}
             strokeLinecap="round"
+            strokeDasharray={holeInPlannedSegment ? "3 2" : undefined}
             style={{
               filter: svgDropShadowFilter(
                 pointerMode === "conquista"
                   ? `drop-shadow(0 0 4px ${PURPLE})`
                   : pointerMode === "entropia"
                     ? `drop-shadow(0 0 4px ${BLOOD})`
-                    : undefined
+                    : holeInPlannedSegment
+                      ? "drop-shadow(0 0 4px rgba(148,163,184,0.6))"
+                      : undefined
               ),
             }}
           />
@@ -582,11 +585,17 @@ export default function AnilloConciencia({
           <circle
             cx={cx + pointerRailR * Math.cos(needleRad)}
             cy={cy + pointerRailR * Math.sin(needleRad)}
-            r={pointerRailSW * 0.55}
-            fill="none"
+            r={pointerRailSW * (holeInPlannedSegment ? 0.72 : 0.55)}
+            fill={holeInPlannedSegment ? "rgba(148, 163, 184, 0.12)" : "none"}
             stroke={needleColor}
-            strokeWidth={0.8}
-            opacity={0.35}
+            strokeWidth={holeInPlannedSegment ? 1.4 : 0.8}
+            strokeDasharray={holeInPlannedSegment ? "2 2" : undefined}
+            opacity={holeInPlannedSegment ? 0.92 : 0.35}
+            style={
+              holeInPlannedSegment
+                ? { filter: svgDropShadowFilter("drop-shadow(0 0 5px rgba(148,163,184,0.55))") }
+                : undefined
+            }
           />
 
           <circle cx={cx} cy={cy} r={2.5} fill={needleColor} opacity={0.85} />
@@ -645,7 +654,7 @@ export default function AnilloConciencia({
               fontFamily="JetBrains Mono, monospace"
               fontWeight="bold"
             >
-              {showEntropia && showConquista ? fillLabel : showEntropia ? entropiaLabel : conquLabel}%
+              {showConquista ? conquLabel : showEntropia ? entropiaLabel : 0}%
             </text>
           </g>
         </svg>

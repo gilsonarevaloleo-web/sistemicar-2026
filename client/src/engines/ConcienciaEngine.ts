@@ -175,6 +175,38 @@ export interface MetricasAnilloConciencia {
   entropiaArcPct: number;
   fillPct: number;
   horasCubiertas: number;
+  /** Terreno planificado aún no conquistado (solo anillo interior en modo batalla). */
+  terrenoRestanteMin?: number;
+}
+
+function roundArcPct(value: number): number {
+  return Math.min(100, Math.round(value * 10) / 10);
+}
+
+/** Arcos del anillo interior: complementarios (batalla) o independientes (sin segmentos). */
+function computeInnerRingMetrics(params: {
+  jornadaMin: number;
+  conquistaMin: number;
+  entropiaMin: number;
+  modoBatallaAnillo: boolean;
+}): Pick<MetricasAnilloConciencia, "conquistaArcPct" | "entropiaArcPct" | "fillPct" | "terrenoRestanteMin"> {
+  const { jornadaMin, conquistaMin, entropiaMin, modoBatallaAnillo } = params;
+  const conquistaArcPct = jornadaMin > 0 ? roundArcPct((conquistaMin / jornadaMin) * 100) : 0;
+
+  if (modoBatallaAnillo) {
+    const terrenoRestanteMin = Math.round(Math.max(0, jornadaMin - conquistaMin) * 10) / 10;
+    const entropiaArcPct =
+      jornadaMin > 0 ? roundArcPct((terrenoRestanteMin / jornadaMin) * 100) : 0;
+    return { conquistaArcPct, entropiaArcPct, fillPct: 100, terrenoRestanteMin };
+  }
+
+  const entropiaArcPct = jornadaMin > 0 ? roundArcPct((entropiaMin / jornadaMin) * 100) : 0;
+  return {
+    conquistaArcPct,
+    entropiaArcPct,
+    fillPct: Math.min(100, conquistaArcPct + entropiaArcPct),
+    terrenoRestanteMin: undefined,
+  };
 }
 
 function sumMinutosPlaneados(segmentos: SegmentoAnilloLite[]): number {
@@ -738,16 +770,21 @@ export function buildConcienciaTimeline(params: {
   if (!core) {
     const deg = limaNowToClockDeg(now);
     const hasSegments = params.segmentos.length > 0;
+    const modoBatallaAnillo = hasSegments && minutosPlaneados > 0;
+    const innerRing = computeInnerRingMetrics({
+      jornadaMin,
+      conquistaMin: 0,
+      entropiaMin: 0,
+      modoBatallaAnillo,
+    });
     return {
       metricas: {
         planificacionPct,
         conquistaMin: 0,
         entropiaMin: 0,
         jornadaMin,
-        conquistaArcPct: 0,
-        entropiaArcPct: 0,
-        fillPct: 0,
         horasCubiertas: Math.round(minutosPlaneados / 60),
+        ...innerRing,
       },
       dayStats: { conquistaMin: 0, entropiaMin: 0, vacioMin: 0, centinelaMin: 0 },
       timelineArcs: [
@@ -777,11 +814,14 @@ export function buildConcienciaTimeline(params: {
   const centinelaMin = Math.round(centinelaMinRaw * 10) / 10;
   const vacioMin = Math.round(vacioMinRaw * 10) / 10;
 
-  // Anillo interior: morado = conquista / plan del día; rojo = entropía vivida / plan.
-  // Opción B: antes del primer segmento (core null) queda en 0; al entrar en segmentos crece la lucha.
-  const conquistaArcPct = jornadaMin > 0 ? Math.min(100, (conquistaMin / jornadaMin) * 100) : 0;
-  const entropiaArcPct = jornadaMin > 0 ? Math.min(100, (entropiaMin / jornadaMin) * 100) : 0;
-  const fillPct = Math.min(100, conquistaArcPct + entropiaArcPct);
+  // Anillo interior con segmentos: rojo = terreno restante (plan − conquista); morado crece desde abajo.
+  const innerRing = computeInnerRingMetrics({
+    jornadaMin,
+    conquistaMin,
+    entropiaMin,
+    modoBatallaAnillo: core.hasSegments && minutosPlaneados > 0,
+  });
+  const { conquistaArcPct, entropiaArcPct, fillPct, terrenoRestanteMin } = innerRing;
 
   const arcs: TimelineClockArc[] = [
     { startDeg: 0, endDeg: 360, kind: "fondo", lap: 0 },
@@ -811,6 +851,7 @@ export function buildConcienciaTimeline(params: {
       entropiaArcPct,
       fillPct,
       horasCubiertas: Math.round(minutosPlaneados / 60),
+      terrenoRestanteMin,
     },
     dayStats: { conquistaMin, entropiaMin, vacioMin, centinelaMin },
     timelineArcs: arcs,
@@ -1486,17 +1527,22 @@ function readNoVehicleSinceMs(): number | null {
 }
 
 function patchTimelineEntropy(timeline: ConcienciaTimeline, entropiaMin: number): ConcienciaTimeline {
-  const jornadaMin = timeline.metricas.jornadaMin;
-  const conquistaMin = timeline.metricas.conquistaMin;
-  const conquistaArcPct =
-    jornadaMin > 0 ? Math.min(100, Math.round((conquistaMin / jornadaMin) * 1000) / 10) : 0;
-  const entropiaArcPct =
-    jornadaMin > 0 ? Math.min(100, Math.round((entropiaMin / jornadaMin) * 1000) / 10) : 0;
-  const fillPct = Math.min(100, conquistaArcPct + entropiaArcPct);
+  const { jornadaMin, conquistaMin } = timeline.metricas;
+  const modoBatallaAnillo = timeline.metricas.terrenoRestanteMin !== undefined;
+  const innerRing = computeInnerRingMetrics({
+    jornadaMin,
+    conquistaMin,
+    entropiaMin,
+    modoBatallaAnillo,
+  });
   return {
     ...timeline,
     dayStats: { ...timeline.dayStats, entropiaMin },
-    metricas: { ...timeline.metricas, entropiaMin, entropiaArcPct, conquistaArcPct, fillPct },
+    metricas: {
+      ...timeline.metricas,
+      entropiaMin,
+      ...innerRing,
+    },
   };
 }
 

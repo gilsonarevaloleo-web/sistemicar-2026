@@ -162,7 +162,7 @@ export default function AnilloConcienciaHorizon({
               strokeWidth={strokeW}
               strokeLinecap="round"
               strokeDasharray={`${conquistaDash} ${innerCirc}`}
-              transform={`rotate(-90 ${cx} ${cy})`}
+              transform={`rotate(90 ${cx} ${cy})`}
             />
           )}
 
