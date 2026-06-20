@@ -262,9 +262,10 @@ import {
   RING_SOBRA_INVITACION_MIN,
   buildSituacionCronometroPausaInactividad,
   filtrarRingPendientes,
-  liberarRingPendientesAlTaller,
+  getRingLastActivity,
   quitarSubsPorId,
   reanudarSituacionCronometroRing,
+  touchRingActivity,
   ringSessionOperable,
 } from "@/lib/ringEnfoqueReal";
 import {
@@ -5220,7 +5221,7 @@ export default function Planeacion() {
     if (!filtrarRingPendientes(vehicle.subTareas).length) return;
 
     beginLocalVehicleMutation("sub-situacion");
-    const subTareas = liberarRingPendientesAlTaller(vehicle.subTareas);
+    const subTareas = vehicle.subTareas;
     const situacionCronometro = buildSituacionCronometroPausaInactividad(sc);
     startTransition(() => {
       setVehicles(prev =>
@@ -5346,6 +5347,7 @@ export default function Planeacion() {
       return false;
     }
 
+    touchRingActivity(vehicleId);
     const segProy = segmentoActivo?.proyectoVinculadoId;
     const enfoqueHeredado =
       opts?.proyectoEnfoqueId?.trim() ||
@@ -5522,6 +5524,7 @@ export default function Planeacion() {
         };
       }
     }
+    touchRingActivity(vehicleId);
     beginLocalVehicleMutation("ring");
     setVehicles(prev =>
       prev.map(v =>
@@ -5629,6 +5632,7 @@ export default function Planeacion() {
     const list = vehicle.subTareas;
     const targetSub = list.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
+    touchRingActivity(vehicleId);
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
@@ -5746,6 +5750,7 @@ export default function Planeacion() {
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
+    touchRingActivity(vehicleId);
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -10241,7 +10246,6 @@ function VehicleCard({
   const situacionFilaVoiceKeysRef = useRef<Set<string>>(new Set());
   const situacionFilaVoicePendingRef = useRef<Set<string>>(new Set());
   const ringInactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ringLastInteractionRef = useRef(Date.now());
   const ringInactivityBloqueRef = useRef<string | null>(null);
   const ringSobraVoiceKeyRef = useRef<string | null>(null);
   const ringSobraVoicePendingRef = useRef<string | null>(null);
@@ -10291,8 +10295,11 @@ function VehicleCard({
   const runLiveTimerTick = useCallback(() => {
     computeTimerRef.current();
     desglosadorUpdateRef.current();
+    if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) {
+      touchRingActivity(vehicle.id);
+    }
     setLiveUiTick(t => t + 1);
-  }, []);
+  }, [vehicle.id, vehicle.tipoFlota, vehicle.situacionCronometro?.activo]);
 
   const playChime = useCallback(() => {
     if (!isTikSoundEnabled()) return;
@@ -11156,11 +11163,11 @@ function VehicleCard({
     const bloqueInicio = vehicle.situacionCronometro?.bloqueInicioAt ?? 0;
     if (Date.now() - bloqueInicio < RING_ENFOQUE_GRACIA_APERTURA_MS) return;
     clearRingInactivityTimer();
-    const idleMs = Date.now() - ringLastInteractionRef.current;
+    const idleMs = Date.now() - getRingLastActivity(vehicle.id);
     const delay = Math.max(1000, RING_ENFOQUE_INACTIVIDAD_MS - idleMs);
     ringInactivityTimerRef.current = setTimeout(() => {
       if (typeof document !== "undefined" && document.hidden) return;
-      if (Date.now() - ringLastInteractionRef.current < RING_ENFOQUE_INACTIVIDAD_MS) {
+      if (Date.now() - getRingLastActivity(vehicle.id) < RING_ENFOQUE_INACTIVIDAD_MS) {
         armRingInactivityTimer();
         return;
       }
@@ -11178,12 +11185,12 @@ function VehicleCard({
   ]);
 
   const touchRingInteraction = useCallback(() => {
-    ringLastInteractionRef.current = Date.now();
+    touchRingActivity(vehicle.id);
     clearRingInactivityTimer();
     if (situacionCronActivo && !situacionBloqueListo) {
       armRingInactivityTimer();
     }
-  }, [clearRingInactivityTimer, situacionCronActivo, situacionBloqueListo, armRingInactivityTimer]);
+  }, [clearRingInactivityTimer, situacionCronActivo, situacionBloqueListo, armRingInactivityTimer, vehicle.id]);
 
   useEffect(() => {
     if (vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
@@ -11194,7 +11201,7 @@ function VehicleCard({
     const bloqueKey = `${vehicle.id}-${vehicle.situacionCronometro?.bloqueInicioAt ?? 0}`;
     if (ringInactivityBloqueRef.current !== bloqueKey) {
       ringInactivityBloqueRef.current = bloqueKey;
-      ringLastInteractionRef.current = Date.now();
+      touchRingActivity(vehicle.id);
       ringSobraVoiceKeyRef.current = null;
       ringSobraVoicePendingRef.current = null;
     }

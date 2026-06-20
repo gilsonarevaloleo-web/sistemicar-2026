@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { SubTarea } from "./persistence";
 import {
   buildSituacionCronometroPausaInactividad,
+  clearRingActivity,
   filtrarRingPendientes,
+  getRingLastActivity,
   liberarRingPendientesAlTaller,
   quitarSubsPorId,
   ringBienvenidaParts,
   ringSessionOperable,
   ringTiempoSobraParts,
+  touchRingActivity,
 } from "./ringEnfoqueReal";
 
 describe("ringEnfoqueReal", () => {
@@ -76,6 +79,14 @@ describe("ringEnfoqueReal", () => {
     expect(out[0].minutosCupo).toBeUndefined();
     expect(out[1].enDesgloseCronometro).toBe(true);
     expect(out[1].resultadoSituacion).toBe("cumplido");
+  });
+
+  it("touchRingActivity registra actividad por vehículo", () => {
+    clearRingActivity("v1");
+    touchRingActivity("v1", 5000);
+    expect(getRingLastActivity("v1", 0)).toBe(5000);
+    clearRingActivity("v1");
+    expect(getRingLastActivity("v1", 999)).toBe(999);
   });
 
   it("buildSituacionCronometroPausaInactividad no incrementa retos completados", () => {
