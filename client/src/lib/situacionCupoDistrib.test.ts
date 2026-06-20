@@ -21,6 +21,7 @@ import {
   sumMinutosCronometroPendientes,
   repartirDeltaMinutosEnCola,
   registrarCierreFalladoCronometro,
+  vehicleNeedsCupoAnchorSync,
 } from "./situacionCupoDistrib.ts";
 
 function st(id: string, minutosCupo: number, cupoFijo?: boolean): SubTarea {
@@ -372,5 +373,28 @@ describe("extraerSubTareaAReserva", () => {
     const { subTareas: out, extraido } = extraerSubTareaAReserva(subs, "a");
     assert.equal(extraido, null);
     assert.equal(out.length, 1);
+  });
+});
+
+describe("vehicleNeedsCupoAnchorSync", () => {
+  it("false para subtarea libre sin ring ni minutos", () => {
+    const v = {
+      id: "v1",
+      tipoFlota: "situacion",
+      status: "activo",
+      subTareas: [{ id: "s1", texto: "t", completada: false, creadaAt: 1 }],
+    } as import("./persistence.ts").Vehicle;
+    assert.equal(vehicleNeedsCupoAnchorSync(v), false);
+  });
+
+  it("true con ring activo", () => {
+    const v = {
+      id: "v1",
+      tipoFlota: "situacion",
+      status: "activo",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1, horaFinMs: 2 },
+      subTareas: [],
+    } as import("./persistence.ts").Vehicle;
+    assert.equal(vehicleNeedsCupoAnchorSync(v), true);
   });
 });

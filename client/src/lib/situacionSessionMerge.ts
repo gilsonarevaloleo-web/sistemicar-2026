@@ -197,6 +197,21 @@ function countSubTareasCerradas(subs: SubTarea[] | undefined): number {
 }
 
 /** Conserva subtareas locales cuando Firebase pierde filas (sync parcial). */
+/** Tras reconcile Firebase, conserva subtareas locales si el snapshot remoto va atrás. */
+export function preferLocalSubTareasInVehicleList(
+  merged: Vehicle[],
+  localSources: Vehicle[]
+): Vehicle[] {
+  let changed = false;
+  const out = merged.map(m => {
+    const local = localSources.find(l => l.id === m.id);
+    if (!local || !shouldPreferLocalSubTareas(m, local)) return m;
+    changed = true;
+    return { ...m, subTareas: mergeSubTareasById(m.subTareas, local.subTareas) };
+  });
+  return changed ? out : merged;
+}
+
 export function shouldPreferLocalSubTareas(firebaseV: Vehicle, localV: Vehicle): boolean {
   if (firebaseV.tipoFlota !== "situacion" && localV.tipoFlota !== "situacion") return false;
   const localSubs = localV.subTareas ?? [];

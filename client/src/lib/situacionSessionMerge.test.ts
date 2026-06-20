@@ -10,6 +10,7 @@ import {
   mergeSubTareasById,
   mergeSubVehiculosById,
   pickMergedAperturaAt,
+  preferLocalSubTareasInVehicleList,
   shouldPreferLocalSubTareas,
   shouldPreferLocalSubVehiculos,
 } from "./situacionSessionMerge.ts";
@@ -456,5 +457,27 @@ describe("pickMergedAperturaAt", () => {
   it("usa el disponible si falta uno", () => {
     assert.equal(pickMergedAperturaAt({} as Vehicle, { aperturaAt: 200 } as Vehicle), 200);
     assert.equal(pickMergedAperturaAt({ aperturaAt: 100 } as Vehicle, {} as Vehicle), 100);
+  });
+});
+
+describe("preferLocalSubTareasInVehicleList", () => {
+  it("fusiona subtareas locales cuando Firebase va atrás", () => {
+    const local: Vehicle = {
+      id: "v1",
+      tipoFlota: "situacion",
+      status: "activo",
+      subTareas: [st("a"), st("b")],
+    } as Vehicle;
+    const merged: Vehicle[] = [
+      {
+        id: "v1",
+        tipoFlota: "situacion",
+        status: "activo",
+        subTareas: [st("a")],
+      } as Vehicle,
+    ];
+    const out = preferLocalSubTareasInVehicleList(merged, [local]);
+    assert.equal(out[0]?.subTareas?.length, 2);
+    assert.ok(out[0]?.subTareas?.some(s => s.id === "b"));
   });
 });

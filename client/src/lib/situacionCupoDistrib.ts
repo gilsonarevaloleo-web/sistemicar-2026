@@ -6,6 +6,13 @@ export function situacionFilaCronometroPendiente(st: SubTarea): boolean {
   return !!st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") === "pendiente";
 }
 
+/** Solo sincronizar ancla de cupo cuando hay ring activo o filas con minutos asignados. */
+export function vehicleNeedsCupoAnchorSync(v: Vehicle): boolean {
+  if (v.tipoFlota !== "situacion" || v.status !== "activo") return false;
+  if (v.situacionCronometro?.activo === true) return true;
+  return (v.subTareas || []).some(st => (st.minutosCupo ?? 0) > 0);
+}
+
 export function situacionFilaEnFocoPendiente(st: SubTarea): boolean {
   if ((st.minutosCupo ?? 0) <= 0) return false;
   if (st.enDesgloseCronometro) return situacionFilaCronometroPendiente(st);

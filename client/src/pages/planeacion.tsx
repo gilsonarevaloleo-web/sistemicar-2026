@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo, useDeferredValue, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -189,7 +189,7 @@ import {
   resetCentinelaLaunchGate,
   isInvisibleCentinelaVehicle,
 } from "@/lib/centinelaEngine";
-import { clearStuckDesglosadorPause, archiveOrphanDesglosadorInterrupts } from "@/lib/situacionSessionMerge";
+import { clearStuckDesglosadorPause, archiveOrphanDesglosadorInterrupts, preferLocalSubTareasInVehicleList } from "@/lib/situacionSessionMerge";
 import {
   createRutaEnfoqueState,
   applyRutaThresholdCrossing,
@@ -298,6 +298,7 @@ import {
   sumBonusPreviewEnColaPendiente,
   minutosGanadosEnVivoFoco,
   totalBudgetMinFromCronometro,
+  vehicleNeedsCupoAnchorSync,
 } from "@/lib/situacionCupoDistrib";
 import {
   bolsaDisponibleSegundoReto,
@@ -1148,6 +1149,8 @@ export default function Planeacion() {
       return getLocalVehicles();
     } catch { return []; }
   });
+  /** Métricas pesadas — no bloquean tap + subtarea en flota. */
+  const deferredVehicles = useDeferredValue(vehicles);
   const optimisticVehiclesRef = useRef<Vehicle[]>([]);
   const closingInProgressRef = useRef<Map<string, number>>(new Map());
   const CLOSING_STALE_MS = 45_000;
@@ -1675,12 +1678,12 @@ export default function Planeacion() {
 
   const anilloSnapshotForEscalera = useMemo(() => {
     const segs = planilla?.segmentos || [];
-    const model = getSharedAnilloLiveModel(segs, vehicles, Date.now());
+    const model = getSharedAnilloLiveModel(segs, deferredVehicles, Date.now());
     return {
       dayStats: model.dayStats,
       metricas: model.metricas,
     };
-  }, [planilla?.segmentos, vehicles, heavyMetricsBucket]);
+  }, [planilla?.segmentos, deferredVehicles, heavyMetricsBucket]);
 
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
 
@@ -1703,17 +1706,20 @@ export default function Planeacion() {
       optimisticVehiclesRef.current = optimisticVehiclesRef.current.filter(ov => !firebaseIds.has(ov.id));
       const pending = optimisticVehiclesRef.current;
       const localSources = [...getLocalVehicles(), ...vehiclesRef.current];
-      const merged = reconcileVehicleListView({
+      const mergedRaw = reconcileVehicleListView({
         incoming: data,
         localSources,
         optimisticPending: pending,
         isCloseInFlight,
       });
+      const merged = preferLocalSubTareasInVehicleList(mergedRaw, vehiclesRef.current);
       const sig = vehiclesReactiveSignature(merged);
       if (merged.length > 0 && sig !== mergedVehiclesSigRef.current) {
         saveLocalVehicles(merged);
       }
       if (sig === mergedVehiclesSigRef.current) return;
+      const localSig = vehiclesReactiveSignature(vehiclesRef.current);
+      if (sig !== localSig && localSig === mergedVehiclesSigRef.current) return;
       mergedVehiclesSigRef.current = sig;
       setVehicles(merged);
       scheduleDeferredVehicleCleanup(() => {
@@ -1831,7 +1837,7 @@ export default function Planeacion() {
   const todayTermoLive = useMemo(() => {
     const nowMs = Date.now();
     const dayStartMs = getJournalDayStartMs(nowMs);
-    const jornadaVehicles = vehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
+    const jornadaVehicles = deferredVehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
     const ledger = user ? getDecisionLedger(user.uid, dayStartMs) : [];
     const balance = calcularBalanceConquistaJornada({
       segmentos: planilla?.segmentos || [],
@@ -1851,7 +1857,7 @@ export default function Planeacion() {
       entropiaMin: balance.entropiaMin,
       vacioMin: balance.vacioMin,
     });
-  }, [planilla, vehicles, focusEventsToday, heavyMetricsBucket, user]);
+  }, [planilla, deferredVehicles, focusEventsToday, heavyMetricsBucket, user]);
 
   const termoCompare = useMemo(
     () => computeTermodinamicaCompareV2(yesterdayTermoSnapshot, todayTermoLive),
@@ -1860,15 +1866,15 @@ export default function Planeacion() {
 
   const combustibleLive = useMemo(() => {
     const dayStartMs = getJournalDayStartMs();
-    const jornadaVehicles = vehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
+    const jornadaVehicles = deferredVehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
     const ledger = user ? getDecisionLedger(user.uid, dayStartMs) : [];
     return computeCombustibleDia(jornadaVehicles, dayStartMs, ledger);
-  }, [vehicles, user]);
+  }, [deferredVehicles, user]);
 
   const disciplinaLive = useMemo(() => {
     const dayStartMs = getLimaDayStartMs();
     const jornadaStart = getJournalDayStartMs();
-    const jornadaVehicles = vehicles.filter(v => {
+    const jornadaVehicles = deferredVehicles.filter(v => {
       const ts = v.cierreAt || v.aperturaAt || v.createdAt?.getTime?.() || 0;
       return ts >= jornadaStart;
     });
@@ -1877,7 +1883,7 @@ export default function Planeacion() {
       vehicles: jornadaVehicles,
       dayStartMs,
     });
-  }, [planilla, vehicles]);
+  }, [planilla, deferredVehicles]);
 
   const atencionLive = useMemo(() => {
     const dayStartMs = getLimaDayStartMs();
@@ -4823,6 +4829,7 @@ export default function Planeacion() {
     if (!user) return undefined;
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return undefined;
+    if (showEntropyDebug) performance.mark("add-subtarea-start");
     beginLocalVehicleMutation("sub-situacion");
     const proyectoId = resolveProyectoIdEnfoqueSituacion(vehicle, segmentoActivo?.proyectoVinculadoId);
     const newSubTarea = {
@@ -4833,16 +4840,21 @@ export default function Planeacion() {
       ...(proyectoId ? { proyectoId } : {}),
     };
     const subTareas = [...(vehicle.subTareas || []), newSubTarea];
-    setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
     vehiclesRef.current = vehiclesRef.current.map(v => v.id === vehicleId ? { ...v, subTareas } : v);
     persistVehiclesRef();
-    try {
-      extendLocalVehicleMutation("sub-situacion");
-      await updateVehicle(user.uid, vehicleId, { subTareas });
-      queueMicrotask(() => { void handleSyncSituacionCupoAnchor(vehicleId); });
-    } catch (e) {
-      console.error("[handleAddSubTarea]", e);
-    }
+    startTransition(() => {
+      setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
+    });
+    extendLocalVehicleMutation("sub-situacion");
+    void updateVehicle(user.uid, vehicleId, { subTareas })
+      .then(() => {
+        const live = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (live && vehicleNeedsCupoAnchorSync(live)) {
+          queueMicrotask(() => { void handleSyncSituacionCupoAnchor(vehicleId); });
+        }
+      })
+      .catch(e => console.error("[handleAddSubTarea]", e));
+    if (showEntropyDebug) performance.mark("add-subtarea-end");
     return newSubTarea.id;
   };
 
@@ -4889,7 +4901,10 @@ export default function Planeacion() {
     try {
       extendLocalVehicleMutation("sub-situacion");
       await updateVehicle(user.uid, vehicleId, { subTareas });
-      queueMicrotask(() => { void handleSyncSituacionCupoAnchor(vehicleId); });
+      const live = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (live && vehicleNeedsCupoAnchorSync(live)) {
+        queueMicrotask(() => { void handleSyncSituacionCupoAnchor(vehicleId); });
+      }
       if (chimesOnComplete > 0) void playSituacionChimes(chimesOnComplete);
       if (isChecking && vehicle.tipoFlota === "situacion" && targetSub) {
         recordDecision(user.uid, {
@@ -6245,15 +6260,15 @@ export default function Planeacion() {
     const subTareas = (vehicle.subTareas || []).map(st =>
       st.id === subTareaId ? { ...st, detalles: [...(st.detalles || []), nuevo] } : st
     );
-    setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subTareas } : v)));
     vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? { ...v, subTareas } : v));
     persistVehiclesRef();
-    try {
-      extendLocalVehicleMutation("sub-situacion");
-      await updateVehicle(user.uid, vehicleId, { subTareas });
-    } catch (e) {
+    startTransition(() => {
+      setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subTareas } : v)));
+    });
+    extendLocalVehicleMutation("sub-situacion");
+    void updateVehicle(user.uid, vehicleId, { subTareas }).catch(e => {
       console.error("[handleAddCasaItem]", e);
-    }
+    });
   };
 
   const handleToggleCasaItem = async (vehicleId: string, subTareaId: string, detalleId: string) => {
@@ -6292,13 +6307,15 @@ export default function Planeacion() {
     const subTareas = (vehicle.subTareas || []).map(st =>
       st.id === subTareaId ? { ...st, detalles: [...(st.detalles || []), nuevoDetalle] } : st
     );
-    setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
     vehiclesRef.current = vehiclesRef.current.map(v => v.id === vehicleId ? { ...v, subTareas } : v);
     persistVehiclesRef();
-    try {
-      extendLocalVehicleMutation("sub-situacion");
-      await updateVehicle(user.uid, vehicleId, { subTareas });
-    } catch (e) { console.error("[handleAddDetalle]", e); }
+    startTransition(() => {
+      setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
+    });
+    extendLocalVehicleMutation("sub-situacion");
+    void updateVehicle(user.uid, vehicleId, { subTareas }).catch(e => {
+      console.error("[handleAddDetalle]", e);
+    });
   };
 
   const handleEntregarDetalle = async (vehicleId: string, subTareaId: string, detalleId: string) => {
