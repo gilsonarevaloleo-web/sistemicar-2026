@@ -5623,6 +5623,7 @@ export default function Planeacion() {
 
   const handleSituacionCronometroCumplido = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
+    extendLocalVehicleMutation("ring");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const list = vehicle.subTareas;
@@ -5740,6 +5741,7 @@ export default function Planeacion() {
 
   const handleSituacionCronometroFallado = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
+    extendLocalVehicleMutation("ring");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
@@ -5787,6 +5789,7 @@ export default function Planeacion() {
 
   const handleSituacionCronometroReservar = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
+    extendLocalVehicleMutation("ring");
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const { subTareas, extraido } = extraerSubTareaAReserva(vehicle.subTareas, subTareaId);

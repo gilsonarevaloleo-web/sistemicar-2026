@@ -24,6 +24,37 @@ export type VehicleCardMemoProps = {
   situacionDesgloseSummary?: { vehicleId?: string; psTotal?: number };
 };
 
+/** Campos del ring que vehiclesReactiveSignature omite — sin esto Cumplido/Fallado no re-renderiza. */
+export function vehicleRingUiSignature(vehicle: Vehicle): string {
+  if (vehicle.tipoFlota !== "situacion") return "";
+  const sc = vehicle.situacionCronometro;
+  const anchor = vehicle.situacionCupoAnchor;
+  const cron = (vehicle.subTareas ?? [])
+    .filter(st => st.enDesgloseCronometro)
+    .map(st =>
+      [
+        st.id,
+        st.resultadoSituacion ?? "pendiente",
+        st.minutosCupo ?? 0,
+        st.cupoFijo ? 1 : 0,
+        st.cerradaAt ?? 0,
+      ].join(".")
+    )
+    .sort()
+    .join(",");
+  return [
+    sc?.activo ? 1 : 0,
+    sc?.bloqueInicioAt ?? 0,
+    sc?.saldoAdelantoMin ?? 0,
+    sc?.minutosGanadosReto ?? 0,
+    sc?.horaFinMs ?? 0,
+    sc?.horaFinContratoMs ?? 0,
+    anchor?.subTareaId ?? "",
+    anchor?.startedAt ?? 0,
+    cron,
+  ].join("|");
+}
+
 export function areVehicleCardPropsEqual(
   prev: VehicleCardMemoProps,
   next: VehicleCardMemoProps
@@ -36,6 +67,9 @@ export function areVehicleCardPropsEqual(
   if (prev.situacionDesgloseSummary?.vehicleId !== next.situacionDesgloseSummary?.vehicleId) return false;
   if (prev.situacionDesgloseSummary?.psTotal !== next.situacionDesgloseSummary?.psTotal) return false;
   if (prev.planilla?.fecha !== next.planilla?.fecha) return false;
+  if (vehicleRingUiSignature(prev.vehicle) !== vehicleRingUiSignature(next.vehicle)) {
+    return false;
+  }
   if (vehiclesReactiveSignature([prev.vehicle]) !== vehiclesReactiveSignature([next.vehicle])) {
     return false;
   }

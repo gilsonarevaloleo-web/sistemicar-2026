@@ -66,4 +66,28 @@ describe("areVehicleCardPropsEqual", () => {
       false
     );
   });
+
+  it("detecta cumplido/fallado en filas del ring", () => {
+    const base = baseVehicle({
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1000 },
+      subTareas: [
+        {
+          id: "st1",
+          texto: "Bolsillo",
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 24,
+        },
+      ],
+    } as Partial<Vehicle>);
+    const cumplido = {
+      ...base,
+      subTareas: [{ ...base.subTareas![0]!, resultadoSituacion: "cumplido" as const, cerradaAt: 2000 }],
+    };
+    assert.equal(
+      areVehicleCardPropsEqual({ vehicle: base, expanded: true }, { vehicle: cumplido, expanded: true }),
+      false
+    );
+  });
 });
