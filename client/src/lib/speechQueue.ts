@@ -188,6 +188,25 @@ class VoiceEngine {
     notifySpeechQueueIdle();
   }
 
+  /** Detiene utterance en curso y vacía cola/pausa de los canales indicados. */
+  haltSpeechOnChannels(channels: readonly VoiceChannel[]): void {
+    this.clearPauseTimer();
+    const channelSet = new Set(channels);
+    if (this.currentItem && channelSet.has(this.currentItem.channel)) {
+      if (this.currentItem.releaseKey) this.activeKeys.delete(this.currentItem.releaseKey);
+      if (this.currentItem.key) this.activeKeys.delete(this.currentItem.key);
+      try {
+        getSynth()?.cancel();
+      } catch {
+        /* noop */
+      }
+      this.releaseAfterExternalCancel();
+    }
+    for (const channel of channels) {
+      this.stopChannel(channel);
+    }
+  }
+
   stopAllPending(): void {
     this.clearPauseTimer();
     for (const item of this.queue) {
