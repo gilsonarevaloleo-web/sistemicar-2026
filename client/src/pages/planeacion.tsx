@@ -9333,13 +9333,14 @@ export default function Planeacion() {
           };
           return (
           <motion.div
-            className="fixed inset-0 z-[220] flex items-center justify-center p-4"
+            className="sistemicar-modal-overlay z-[220]"
             style={{ backgroundColor: "rgba(0,0,0,0.82)" }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="cierre-energia-titulo"
             onClick={resetCierreModal}
           >
+            <div className="sistemicar-modal-shell">
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -9355,7 +9356,7 @@ export default function Planeacion() {
                   resetCierreModal();
                 }
               }}
-              className="w-full max-w-sm rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto outline-none"
+              className="sistemicar-modal-panel max-w-sm rounded-2xl border p-5 space-y-4 outline-none"
               style={{ backgroundColor: PIZARRA, borderColor: "rgba(139,92,246,0.35)" }}
             >
               <div className="text-center space-y-1">
@@ -9420,6 +9421,7 @@ export default function Planeacion() {
                 </button>
               </div>
             </motion.div>
+            </div>
           </motion.div>
           );
         })()}
@@ -9436,18 +9438,19 @@ export default function Planeacion() {
             : 0;
           return (
             <motion.div
-              className="fixed inset-0 z-[225] flex items-center justify-center p-4"
+              className="sistemicar-modal-overlay z-[225]"
               style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="situacion-desglose-celebracion-titulo"
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="sistemicar-modal-shell">
               <motion.div
                 initial={{ opacity: 0, scale: 0.88, y: 24 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ type: "spring", stiffness: 220, damping: 22 }}
-                className="w-full max-w-md rounded-2xl border p-5 space-y-4 relative overflow-hidden"
+                className="sistemicar-modal-panel max-w-md rounded-2xl border p-5 space-y-4"
                 style={{ backgroundColor: PIZARRA, borderColor: `${GOLD}55`, boxShadow: `0 0 40px ${GOLD}25, inset 0 0 60px ${GOLD}08` }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -9627,6 +9630,10 @@ export default function Planeacion() {
                   </div>
                 </div>
 
+                <div
+                  className="sticky bottom-0 z-10 pt-3 -mx-1 px-1 space-y-2"
+                  style={{ background: `linear-gradient(to top, ${PIZARRA} 72%, ${PIZARRA}00)` }}
+                >
                 <button
                   type="button"
                   onClick={() => {
@@ -9642,7 +9649,9 @@ export default function Planeacion() {
                 <p className="relative text-[7px] text-center text-slate-600 leading-snug">
                   El desglose permanece en el vehículo con «Ver PS del bloque» si cierras antes de leer.
                 </p>
+                </div>
               </motion.div>
+              </div>
             </motion.div>
           );
         })()}
@@ -9663,18 +9672,19 @@ export default function Planeacion() {
             : 0;
           return (
             <motion.div
-              className="fixed inset-0 z-[225] flex items-center justify-center p-4"
+              className="sistemicar-modal-overlay z-[225]"
               style={{ backgroundColor: "rgba(0,0,0,0.88)" }}
               role="dialog"
               aria-modal="true"
               aria-labelledby="desglosador-tiempo-celebracion-titulo"
               onClick={(e) => e.stopPropagation()}
             >
+              <div className="sistemicar-modal-shell">
               <motion.div
                 initial={{ opacity: 0, scale: 0.88, y: 24 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ type: "spring", stiffness: 220, damping: 22 }}
-                className="w-full max-w-md rounded-2xl border p-5 space-y-4 relative overflow-hidden max-h-[90vh] overflow-y-auto"
+                className="sistemicar-modal-panel max-w-md rounded-2xl border p-5 space-y-4"
                 style={{ backgroundColor: PIZARRA, borderColor: `${GOLD}55`, boxShadow: `0 0 40px ${GOLD}25, inset 0 0 60px ${GOLD}08` }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -9868,6 +9878,10 @@ export default function Planeacion() {
                   </div>
                 </div>
 
+                <div
+                  className="sticky bottom-0 z-10 pt-3 -mx-1 px-1"
+                  style={{ background: `linear-gradient(to top, ${PIZARRA} 72%, ${PIZARRA}00)` }}
+                >
                 <button
                   type="button"
                   onClick={() => {
@@ -9879,7 +9893,9 @@ export default function Planeacion() {
                 >
                   Absorber victoria
                 </button>
+                </div>
               </motion.div>
+              </div>
             </motion.div>
           );
         })()}
@@ -13504,8 +13520,9 @@ function VehicleCard({
         const cruzada = subForModal?.rutaEnfoque?.cruzado ?? null;
         const canConfirm = rutaSeguimientoPickerCanConfirm(subRutaSinUso, subRutaSel);
         return (
-          <motion.div className="fixed inset-0 z-[230] flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.85)" }} role="dialog" aria-modal="true">
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm rounded-2xl border p-4 space-y-3 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: PIZARRA, borderColor: "rgba(139,92,246,0.35)" }}>
+          <motion.div className="sistemicar-modal-overlay z-[230]" style={{ backgroundColor: "rgba(0,0,0,0.85)" }} role="dialog" aria-modal="true">
+            <div className="sistemicar-modal-shell">
+            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="sistemicar-modal-panel max-w-sm rounded-2xl border p-4 space-y-3" style={{ backgroundColor: PIZARRA, borderColor: "rgba(139,92,246,0.35)" }}>
               <RutaSeguimientoPicker
                 tituloContexto={cleanSubTitulo(subForModal?.titulo || "")}
                 cruzadaReferencia={cruzada}
@@ -13534,6 +13551,7 @@ function VehicleCard({
                 </button>
               </div>
             </motion.div>
+            </div>
           </motion.div>
         );
       })()}
@@ -13833,8 +13851,9 @@ function CierreJornadaModal({
   };
 
   return createPortal(
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[240] flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.95)" }} data-testid="cierre-jornada-modal">
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border p-4 space-y-3" style={{ backgroundColor: "#0a0a0a", borderColor: `${GOLD}30` }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="sistemicar-modal-overlay z-[240]" style={{ backgroundColor: "rgba(0,0,0,0.95)" }} data-testid="cierre-jornada-modal">
+      <div className="sistemicar-modal-shell">
+      <div className="sistemicar-modal-panel max-w-lg rounded-2xl border p-4 space-y-3" style={{ backgroundColor: "#0a0a0a", borderColor: `${GOLD}30` }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-base font-black uppercase tracking-wider" style={{ color: GOLD, fontFamily: "'Playfair Display', Georgia, serif" }}>Cierre de Jornada</h2>
@@ -13950,6 +13969,7 @@ function CierreJornadaModal({
             {isSealing ? "Sellando…" : alreadySealed ? "Sellada" : "Sellar Jornada"}
           </button>
         </div>
+      </div>
       </div>
     </motion.div>,
     document.body

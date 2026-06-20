@@ -101,4 +101,20 @@
   .font-serif {
     font-family: var(--font-serif);
   }
+
+  /** Modales full-screen en móvil — overlay scrolleable + panel con tope dvh. */
+  .sistemicar-modal-overlay {
+    @apply fixed inset-0 overflow-y-auto overscroll-contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sistemicar-modal-shell {
+    @apply flex min-h-full w-full items-start justify-center p-4 pt-6 pb-24 sm:items-center sm:py-8;
+    padding-bottom: max(6rem, calc(env(safe-area-inset-bottom, 0px) + 5rem));
+  }
+
+  .sistemicar-modal-panel {
+    @apply relative my-auto w-full max-h-[calc(100dvh-5.5rem)] overflow-y-auto overscroll-contain sm:max-h-[90dvh];
+    -webkit-overflow-scrolling: touch;
+  }
 }
