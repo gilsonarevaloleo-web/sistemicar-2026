@@ -227,7 +227,6 @@ import {
   flushMissedPuertaVoiceOnVisible,
 } from "@/lib/backgroundAttentionAlerts";
 import {
-  SEGMENT_ATTENTION_TICK_EVENT,
   SEGMENT_DAY_ROLLOVER_EVENT,
   clearCruceWarnedIds,
   runSegmentAttentionTickNow,
@@ -474,8 +473,8 @@ import { PuntoCeroPanel } from "@/components/PuntoCeroPanel";
 import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice } from "@/lib/concienciaClock";
-import { getSharedAnilloLiveModel } from "@/lib/anilloLiveModelCache";
+import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
+import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import {
@@ -1407,12 +1406,8 @@ export default function Planeacion() {
   const [rutinaResaltadaId, setRutinaResaltadaId] = useState<string | null>(null);
   const rutinaItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
-  const [segmentTick, setSegmentTick] = useState(0);
-  const heavyMetricsBucket = useMemo(() => {
-    if (!isMobilePerfMode()) return segmentTick;
-    const stepSec = Math.max(1, Math.round(MOBILE_PERF.ATTENTION_TICK_MS / 1000));
-    return Math.floor(segmentTick / stepSec);
-  }, [segmentTick]);
+  /** Refresco ligero de UI de segmentos (puertas/ventanas) sin recomputar métricas pesadas en render. */
+  const segmentUiTick = useConcienciaClockTick();
   const [flotaUiReady, setFlotaUiReady] = useState(false);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
   const [cerrandoSegId, setCerrandoSegId] = useState<string | null>(null);
@@ -1679,15 +1674,6 @@ export default function Planeacion() {
     return null;
   }, [planilla, segmentoActivo]);
 
-  const anilloSnapshotForEscalera = useMemo(() => {
-    const segs = planilla?.segmentos || [];
-    const model = getSharedAnilloLiveModel(segs, deferredVehicles, Date.now());
-    return {
-      dayStats: model.dayStats,
-      metricas: model.metricas,
-    };
-  }, [planilla?.segmentos, deferredVehicles, heavyMetricsBucket]);
-
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
 
   useEffect(() => {
@@ -1837,115 +1823,27 @@ export default function Planeacion() {
       .catch(() => setDisciplinaSnapshots([]));
   }, [user, planillaFecha, dailyPS]);
 
-  const todayTermoLive = useMemo(() => {
-    const nowMs = Date.now();
-    const dayStartMs = getJournalDayStartMs(nowMs);
-    const jornadaVehicles = deferredVehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
-    const ledger = user ? getDecisionLedger(user.uid, dayStartMs) : [];
-    const balance = calcularBalanceConquistaJornada({
-      segmentos: planilla?.segmentos || [],
-      vehiculos: filterVehiclesForAnilloCoverage(jornadaVehicles, nowMs),
-      now: nowMs,
-      dayStartMs,
-    });
-    return buildDailySnapshot({
-      fecha: getJournalDateString(),
-      segmentos: planilla?.segmentos || [],
-      vehicles: jornadaVehicles,
-      dayStartMs,
-      logs: [],
-      events: focusEventsToday,
-      ledgerEntries: ledger,
-      conquistaMin: balance.conquistaMin,
-      entropiaMin: balance.entropiaMin,
-      vacioMin: balance.vacioMin,
-    });
-  }, [planilla, deferredVehicles, focusEventsToday, heavyMetricsBucket, user]);
-
-  const termoCompare = useMemo(
-    () => computeTermodinamicaCompareV2(yesterdayTermoSnapshot, todayTermoLive),
-    [yesterdayTermoSnapshot, todayTermoLive]
-  );
-
-  const combustibleLive = useMemo(() => {
-    const dayStartMs = getJournalDayStartMs();
-    const jornadaVehicles = deferredVehicles.filter(v => vehicleEnTermoJornada(v, dayStartMs));
-    const ledger = user ? getDecisionLedger(user.uid, dayStartMs) : [];
-    return computeCombustibleDia(jornadaVehicles, dayStartMs, ledger);
-  }, [deferredVehicles, user]);
-
-  const disciplinaLive = useMemo(() => {
-    const dayStartMs = getLimaDayStartMs();
-    const jornadaStart = getJournalDayStartMs();
-    const jornadaVehicles = deferredVehicles.filter(v => {
-      const ts = v.cierreAt || v.aperturaAt || v.createdAt?.getTime?.() || 0;
-      return ts >= jornadaStart;
-    });
-    return computeDisciplinaDia({
-      segmentos: planilla?.segmentos || [],
-      vehicles: jornadaVehicles,
-      dayStartMs,
-    });
-  }, [planilla, deferredVehicles]);
-
-  const atencionLive = useMemo(() => {
-    const dayStartMs = getLimaDayStartMs();
-    return computeAtencionPanoramicaDia({
-      segmentos: planilla?.segmentos || [],
-      nowMs: Date.now(),
-      dayStartMs,
-    });
-  }, [planilla, heavyMetricsBucket]);
-
-  const atencionCompare = useMemo(
-    () => computeAtencionCompare(null, atencionLive),
-    [atencionLive]
-  );
-
-  const atencionBySegmentId = useMemo(
-    () => new Map(atencionLive.segmentos.map(s => [s.segmentoId, s])),
-    [atencionLive]
-  );
-
-  const disciplinaCompare = useMemo(
-    () => computeDisciplinaCompare(yesterdayTermoSnapshot?.disciplina, disciplinaLive),
-    [yesterdayTermoSnapshot, disciplinaLive]
-  );
-
-  const disciplinaBySegmentId = useMemo(
-    () => new Map(disciplinaLive.segmentos.map(s => [s.segmentoId, s])),
-    [disciplinaLive]
-  );
-
-  const disciplinaSerie = useMemo(
-    () =>
-      buildDisciplinaSerie(disciplinaSnapshots, disciplinaLive, getJournalDateString()),
-    [disciplinaSnapshots, disciplinaLive]
-  );
-
-  const escaleraConciencia = useMemo(() => {
-    const nowMs = Date.now();
-    const dayStartMs = getJournalDayStartMs(nowMs);
-    const ledger = user ? getDecisionLedger(user.uid, dayStartMs) : [];
-    return buildEscaleraConciencia({
-      dayStats: anilloSnapshotForEscalera.dayStats,
-      conquistaArcPct: anilloSnapshotForEscalera.metricas.conquistaArcPct,
-      disciplina: disciplinaLive,
-      combustible: combustibleLive,
-      ledger,
-      dayStartMs,
-      nowMs,
-      snapshots: disciplinaSnapshots,
-      todayFecha: getJournalDateString(),
-    });
-  }, [
+  const {
     anilloSnapshotForEscalera,
-    disciplinaLive,
+    todayTermoLive,
+    termoCompare,
     combustibleLive,
+    disciplinaLive,
+    atencionLive,
+    atencionCompare,
+    atencionBySegmentId,
+    disciplinaCompare,
+    disciplinaBySegmentId,
+    disciplinaSerie,
+    escaleraConciencia,
+  } = usePlaneacionHeavyMetrics({
+    userId: user?.uid,
+    segmentos: planilla?.segmentos ?? [],
+    vehicles: deferredVehicles,
+    focusEventsToday,
+    yesterdayTermoSnapshot,
     disciplinaSnapshots,
-    user,
-    heavyMetricsBucket,
-  ]);
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -2084,16 +1982,13 @@ export default function Planeacion() {
   }, [user?.uid]);
 
   useEffect(() => {
-    const onTick = () => setSegmentTick(t => t + 1);
     const onDayRollover = (e: Event) => {
       const fecha = (e as CustomEvent<{ fecha: string }>).detail?.fecha;
       if (fecha) setPlanillaFecha(fecha);
     };
-    window.addEventListener(SEGMENT_ATTENTION_TICK_EVENT, onTick);
     window.addEventListener(SEGMENT_DAY_ROLLOVER_EVENT, onDayRollover);
     checkPuertaAtencionRef.current = runSegmentAttentionTickNow;
     return () => {
-      window.removeEventListener(SEGMENT_ATTENTION_TICK_EVENT, onTick);
       window.removeEventListener(SEGMENT_DAY_ROLLOVER_EVENT, onDayRollover);
       if (checkPuertaAtencionRef.current === runSegmentAttentionTickNow) {
         checkPuertaAtencionRef.current = null;
@@ -3133,7 +3028,6 @@ export default function Planeacion() {
     };
     setActivandoSegId(segId);
     setPlanilla(optimisticPlanilla);
-    setSegmentTick(t => t + 1);
     const rollbackSegmento = () =>
       setPlanilla(prev =>
         prev
@@ -3226,7 +3120,6 @@ export default function Planeacion() {
     };
     setCerrandoSegId(segId);
     setPlanilla(optimisticPlanilla);
-    setSegmentTick(t => t + 1);
 
     const rollbackSegmento = () =>
       setPlanilla(prev =>
@@ -8065,7 +7958,7 @@ export default function Planeacion() {
                   {planilla && planilla.segmentos.length > 0 ? (
                     <div className="space-y-2">
                       {planilla.segmentos.map((seg) => {
-                        void segmentTick;
+                        void segmentUiTick;
                         const isActive = seg.estado === "activo";
                         const isPuertaSistema = isActive && !!seg.puertaSistema;
                         const isEntropia = seg.estado === "entropia";
