@@ -137,6 +137,36 @@ export function filasCronometroOrdenadas(subTareas: SubTarea[]): SubTarea[] {
   return (subTareas || []).filter(st => st.enDesgloseCronometro);
 }
 
+export type SituacionCupoAnchorRef = { subTareaId: string; startedAt: number };
+
+/** Ancla de foco en ring: avanza a la siguiente fila cuando la actual agotó cupo sin cerrarse. */
+export function resolveCronometroCupoAnchor(
+  subTareas: SubTarea[],
+  cur: SituacionCupoAnchorRef | null | undefined,
+  opts?: { forceResetSameRow?: boolean; now?: number }
+): SituacionCupoAnchorRef | null | "unchanged" {
+  const now = opts?.now ?? Date.now();
+  const cronPending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
+  if (cronPending.length === 0) return null;
+
+  if (cur?.subTareaId && !opts?.forceResetSameRow) {
+    const curSub = subTareas.find(s => s.id === cur.subTareaId);
+    if (curSub && situacionFilaCronometroPendiente(curSub) && (curSub.minutosCupo ?? 0) > 0) {
+      const limitMs = (curSub.minutosCupo ?? 0) * 60000;
+      if (now - cur.startedAt <= limitMs) return "unchanged";
+      const idx = cronPending.findIndex(s => s.id === cur.subTareaId);
+      const nextSub = idx >= 0 ? cronPending[idx + 1] : undefined;
+      if (nextSub) return { subTareaId: nextSub.id, startedAt: now };
+      return "unchanged";
+    }
+  }
+
+  const first = cronPending.find(st => (st.minutosCupo ?? 0) > 0) ?? cronPending[0];
+  if (!first) return null;
+  if (cur?.subTareaId === first.id && !opts?.forceResetSameRow) return "unchanged";
+  return { subTareaId: first.id, startedAt: now };
+}
+
 /** Reparte `total` entre slots con pesos (mín. `minPerSlot` por slot). */
 function repartirProporcional(weights: number[], total: number, minPerSlot = 1): number[] {
   const n = weights.length;

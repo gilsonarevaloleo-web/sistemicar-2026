@@ -258,8 +258,26 @@ export async function devolverRingPendientesAlIman(
 ): Promise<{ quitadosIds: string[]; devueltos: number }> {
   const quitadosIds: string[] = [];
   let devueltos = 0;
+  const seenIman = new Set<string>();
+  const seenTexto = new Set<string>();
 
   for (const sub of pendingSubs) {
+    const textoKey = sub.texto.trim().toLowerCase();
+    if (sub.origenImanId) {
+      if (seenIman.has(sub.origenImanId)) {
+        quitadosIds.push(sub.id);
+        devueltos++;
+        continue;
+      }
+      seenIman.add(sub.origenImanId);
+    } else if (seenTexto.has(textoKey)) {
+      quitadosIds.push(sub.id);
+      devueltos++;
+      continue;
+    } else {
+      seenTexto.add(textoKey);
+    }
+
     const proyectoMeta = proyectoMetaParaReservaDesdeSub(
       sub,
       vehicle,

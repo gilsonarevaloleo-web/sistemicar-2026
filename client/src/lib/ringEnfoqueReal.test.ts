@@ -6,6 +6,7 @@ import {
   liberarRingPendientesAlTaller,
   quitarSubsPorId,
   ringBienvenidaParts,
+  ringSessionOperable,
   ringTiempoSobraParts,
 } from "./ringEnfoqueReal";
 
@@ -89,5 +90,22 @@ describe("ringEnfoqueReal", () => {
     const pausa = buildSituacionCronometroPausaInactividad(sc);
     expect(pausa.activo).toBe(false);
     expect(pausa.retosCompletados).toBe(2);
+  });
+
+  it("ringSessionOperable true con ring activo o pausado con pendientes", () => {
+    const subs: SubTarea[] = [
+      {
+        id: "a",
+        texto: "Pendiente",
+        enDesgloseCronometro: true,
+        resultadoSituacion: "pendiente",
+        completada: false,
+        creadaAt: 1,
+      },
+    ];
+    expect(ringSessionOperable({ activo: true, bloqueInicioAt: 1 }, subs)).toBe(true);
+    expect(ringSessionOperable({ activo: false, bloqueInicioAt: 1 }, subs)).toBe(true);
+    expect(ringSessionOperable({ activo: false, bloqueInicioAt: 1 }, [])).toBe(false);
+    expect(ringSessionOperable(null, subs)).toBe(false);
   });
 });

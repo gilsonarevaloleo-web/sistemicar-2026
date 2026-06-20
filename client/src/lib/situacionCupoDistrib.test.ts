@@ -21,6 +21,7 @@ import {
   sumMinutosCronometroPendientes,
   repartirDeltaMinutosEnCola,
   registrarCierreFalladoCronometro,
+  resolveCronometroCupoAnchor,
   vehicleNeedsCupoAnchorSync,
 } from "./situacionCupoDistrib.ts";
 
@@ -373,6 +374,24 @@ describe("extraerSubTareaAReserva", () => {
     const { subTareas: out, extraido } = extraerSubTareaAReserva(subs, "a");
     assert.equal(extraido, null);
     assert.equal(out.length, 1);
+  });
+});
+
+describe("resolveCronometroCupoAnchor", () => {
+  it("avanza a la siguiente fila cuando la actual agotó cupo", () => {
+    const now = 1_000_000;
+    const subs = [st("a", 5), st("b", 10), st("c", 10)];
+    const cur = { subTareaId: "a", startedAt: now - 5 * 60000 - 1 };
+    const next = resolveCronometroCupoAnchor(subs, cur, { now });
+    assert.notEqual(next, "unchanged");
+    assert.equal((next as { subTareaId: string }).subTareaId, "b");
+  });
+
+  it("no cambia si la fila actual aún tiene cupo", () => {
+    const now = 1_000_000;
+    const subs = [st("a", 5), st("b", 10)];
+    const cur = { subTareaId: "a", startedAt: now - 2 * 60000 };
+    assert.equal(resolveCronometroCupoAnchor(subs, cur, { now }), "unchanged");
   });
 });
 

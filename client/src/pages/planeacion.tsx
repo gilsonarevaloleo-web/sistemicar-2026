@@ -256,12 +256,15 @@ import {
 } from "@/lib/situacionAlerts";
 import {
   RING_COPY,
+  RING_ENFOQUE_GRACIA_APERTURA_MS,
   RING_ENFOQUE_INACTIVIDAD_MS,
   RING_SOBRA_INVITACION_MIN,
   buildSituacionCronometroPausaInactividad,
   filtrarRingPendientes,
   liberarRingPendientesAlTaller,
   quitarSubsPorId,
+  reanudarSituacionCronometroRing,
+  ringSessionOperable,
 } from "@/lib/ringEnfoqueReal";
 import {
   computeDesglosadorClocks,
@@ -285,6 +288,8 @@ import {
   reacomodarColaCronometroAMeta,
   remainingCronometroBudgetMin,
   cerrarCronometroDeGolpe,
+  filasCronometroOrdenadas,
+  resolveCronometroCupoAnchor,
   registrarCierreFalladoCronometro,
   extraerSubTareaAReserva,
   isCupoFijo,
@@ -4794,35 +4799,54 @@ export default function Planeacion() {
     if (!v || v.tipoFlota !== "situacion" || v.status !== "activo") return;
     const list = v.subTareas || [];
     const cronActivo = v.situacionCronometro?.activo === true;
-    const first = list.find(st => {
-      if (!((st.minutosCupo ?? 0) > 0)) return false;
-      if (cronActivo) return situacionFilaCronometroPendiente(st);
-      return !st.enDesgloseCronometro && !st.completada;
-    });
     const cur = v.situacionCupoAnchor;
-    if (!first) {
+
+    let next: { subTareaId: string; startedAt: number } | null | undefined;
+    if (cronActivo) {
+      const resolved = resolveCronometroCupoAnchor(list, cur, opts);
+      if (resolved === "unchanged") return;
+      next = resolved;
+    } else {
+      const first = list.find(st => {
+        if (!((st.minutosCupo ?? 0) > 0)) return false;
+        return !st.enDesgloseCronometro && !st.completada;
+      });
+      if (!first) {
+        next = null;
+      } else if (cur?.subTareaId === first.id && !opts?.forceResetSameRow) {
+        return;
+      } else {
+        next = { subTareaId: first.id, startedAt: Date.now() };
+      }
+    }
+
+    if (next === undefined) return;
+    if (next === null) {
       if (cur != null) {
-        setVehicles(prev => prev.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: undefined } : x)));
-        vehiclesRef.current = vehiclesRef.current.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: undefined } : x));
+        vehiclesRef.current = vehiclesRef.current.map(x =>
+          x.id === vehicleId ? { ...x, situacionCupoAnchor: undefined } : x
+        );
         persistVehiclesRef();
-        try {
-          await updateVehicle(user.uid, vehicleId, { situacionCupoAnchor: null });
-        } catch (err) {
+        startTransition(() => {
+          setVehicles(prev => prev.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: undefined } : x)));
+        });
+        void updateVehicle(user.uid, vehicleId, { situacionCupoAnchor: null }).catch(err => {
           console.error("[handleSyncSituacionCupoAnchor] clear", err);
-        }
+        });
       }
       return;
     }
-    if (cur?.subTareaId === first.id && !opts?.forceResetSameRow) return;
-    const next = { subTareaId: first.id, startedAt: Date.now() };
-    setVehicles(prev => prev.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: next } : x)));
-    vehiclesRef.current = vehiclesRef.current.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: next } : x));
+
+    vehiclesRef.current = vehiclesRef.current.map(x =>
+      x.id === vehicleId ? { ...x, situacionCupoAnchor: next } : x
+    );
     persistVehiclesRef();
-    try {
-      await updateVehicle(user.uid, vehicleId, { situacionCupoAnchor: next });
-    } catch (err) {
+    startTransition(() => {
+      setVehicles(prev => prev.map(x => (x.id === vehicleId ? { ...x, situacionCupoAnchor: next } : x)));
+    });
+    void updateVehicle(user.uid, vehicleId, { situacionCupoAnchor: next }).catch(err => {
       console.error("[handleSyncSituacionCupoAnchor] set", err);
-    }
+    });
   }, [user]);
 
   const handleAddSubTarea = async (vehicleId: string, texto: string): Promise<string | undefined> => {
@@ -5173,54 +5197,42 @@ export default function Planeacion() {
 
   const handleCerrarRingPorInactividad = async (vehicleId: string) => {
     if (!user) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
       return;
     }
     const sc = vehicle.situacionCronometro!;
-    const pendingRing = filtrarRingPendientes(vehicle.subTareas);
-    const { quitadosIds, devueltos } = await devolverRingPendientesAlIman(
-      user.uid,
-      vehicle,
-      pendingRing,
-      {
-        segmentoProyectoId: segmentoActivo?.proyectoVinculadoId,
-        proyectos: imanProyectos,
-        ...(segmentoActivo
-          ? { segmento: { id: segmentoActivo.id, nombre: segmentoActivo.nombre } }
-          : {}),
-      }
-    );
-    const quitados = new Set(quitadosIds);
-    let subTareas = quitarSubsPorId(vehicle.subTareas, quitados);
-    if (devueltos < pendingRing.length) {
-      subTareas = liberarRingPendientesAlTaller(subTareas);
-    }
+    const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? Date.now();
+    if (Date.now() - bloqueInicio < RING_ENFOQUE_GRACIA_APERTURA_MS) return;
+    if (!filtrarRingPendientes(vehicle.subTareas).length) return;
+
+    beginLocalVehicleMutation("sub-situacion");
+    const subTareas = liberarRingPendientesAlTaller(vehicle.subTareas);
     const situacionCronometro = buildSituacionCronometroPausaInactividad(sc);
-    setVehicles(prev =>
-      prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor: null } : v))
-    );
+    startTransition(() => {
+      setVehicles(prev =>
+        prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor: null } : v))
+      );
+    });
     vehiclesRef.current = vehiclesRef.current.map(v =>
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor: null } : v
     );
     teardownSituacionSession(vehicleId);
     persistVehiclesRef();
-    try {
-      await updateVehicle(user.uid, vehicleId, {
-        subTareas,
-        situacionCronometro,
-        situacionCupoAnchor: null,
-      });
-      toast.info(RING_COPY.inactividadToast, {
-        description:
-          devueltos > 0
-            ? `${devueltos} fila${devueltos !== 1 ? "s" : ""} devuelta${devueltos !== 1 ? "s" : ""} al Crisol · ${RING_COPY.inactividadCrisolHint}`
-            : RING_COPY.inactividadCrisolHint,
-        duration: 4500,
-      });
-    } catch (e) {
-      console.error("[handleCerrarRingPorInactividad]", e);
-    }
+    extendLocalVehicleMutation("sub-situacion");
+    void updateVehicle(user.uid, vehicleId, {
+      subTareas,
+      situacionCronometro,
+      situacionCupoAnchor: null,
+    })
+      .then(() => {
+        toast.info(RING_COPY.inactividadToast, {
+          description: RING_COPY.inactividadCrisolHint,
+          duration: 4500,
+        });
+      })
+      .catch(e => console.error("[handleCerrarRingPorInactividad]", e));
   };
 
   const handleDesglosadorCierreDeGolpe = async (vehicleId: string) => {
@@ -5514,6 +5526,7 @@ export default function Planeacion() {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor: situacionCupoAnchor ?? null });
       if (firstActivation) {
         void requestNotificationPermission();
+        unlockSpeechSynthesis(true);
         queueMicrotask(() =>
           speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
         );
@@ -5537,7 +5550,7 @@ export default function Planeacion() {
   ) => {
     if (!user) return;
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
-    if (!vehicle?.subTareas || vehicle.situacionCronometro?.activo !== true) return;
+    if (!vehicle?.subTareas || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const next = reorderSubTareasCronometro(vehicle.subTareas, movedId, direction);
     if (!next) return;
     setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subTareas: next } : v)));
@@ -5561,7 +5574,7 @@ export default function Planeacion() {
     const m = hhmm.trim().match(/^(\d{1,2}):(\d{2})$/);
     if (!m) return;
     const vehicle = vehicleById(vehicleId);
-    if (!vehicle?.subTareas || vehicle.situacionCronometro?.activo !== true) return;
+    if (!vehicle?.subTareas || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     if (vehicle.situacionCronometro.horaFinContratoMs != null || vehicle.situacionCronometro.horaFinMs != null) {
       toast.info("Meta del reto sellada", {
         description: "Cierra el bloque y abre el siguiente reto para cambiar el horario.",
@@ -5599,7 +5612,7 @@ export default function Planeacion() {
   const handleSituacionCronometroCumplido = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
     const vehicle = vehicleById(vehicleId);
-    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) return;
+    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const list = vehicle.subTareas;
     const targetSub = list.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
@@ -5651,7 +5664,10 @@ export default function Planeacion() {
       retoNumero: sc.retoNumero ?? 1,
       retosCompletados: sc.retosCompletados ?? 0,
     };
-    const situacionCronometro = scActivo;
+    let situacionCronometro =
+      !bloqueListo && scActivo.activo !== true
+        ? reanudarSituacionCronometroRing(scActivo)
+        : scActivo;
     const situacionCupoAnchor = bloqueListo ? null : vehicle.situacionCupoAnchor;
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
@@ -5713,7 +5729,7 @@ export default function Planeacion() {
   const handleSituacionCronometroFallado = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
     const vehicle = vehicleById(vehicleId);
-    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) return;
+    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     const now = Date.now();
@@ -5728,7 +5744,8 @@ export default function Planeacion() {
     );
     const { subTareas, minutosPerdidos } = subTareasRaw;
     const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
-    const situacionCronometro = sc;
+    let situacionCronometro =
+      !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
     const situacionCupoAnchor = bloqueListo ? null : vehicle.situacionCupoAnchor;
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
@@ -5759,7 +5776,7 @@ export default function Planeacion() {
   const handleSituacionCronometroReservar = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
-    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) return;
+    if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const { subTareas, extraido } = extraerSubTareaAReserva(vehicle.subTareas, subTareaId);
     if (!extraido) return;
     const now = Date.now();
@@ -10151,6 +10168,7 @@ function VehicleCard({
   const situacionFilaVoiceKeysRef = useRef<Set<string>>(new Set());
   const situacionFilaVoicePendingRef = useRef<Set<string>>(new Set());
   const ringInactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ringLastInteractionRef = useRef(Date.now());
   const ringInactivityBloqueRef = useRef<string | null>(null);
   const ringSobraVoiceKeyRef = useRef<string | null>(null);
   const ringSobraVoicePendingRef = useRef<string | null>(null);
@@ -10998,6 +11016,7 @@ function VehicleCard({
     0
   );
   const situacionCronActivo = vehicle.situacionCronometro?.activo === true;
+  const ringOperable = ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas ?? []);
   const situacionBolsaSegundo = bolsaDisponibleSegundoReto(vehicle.situacionCronometro);
   const situacionProximoReto = nextRetoNumero(vehicle.situacionCronometro);
   const situacionLibrePendientes = (vehicle.subTareas || []).filter(
@@ -11060,19 +11079,38 @@ function VehicleCard({
     if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return;
     if (vehicle.situacionCronometro?.activo !== true) return;
     if (situacionBloqueListo) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const bloqueInicio = vehicle.situacionCronometro?.bloqueInicioAt ?? 0;
+    if (Date.now() - bloqueInicio < RING_ENFOQUE_GRACIA_APERTURA_MS) return;
     clearRingInactivityTimer();
+    const idleMs = Date.now() - ringLastInteractionRef.current;
+    const delay = Math.max(1000, RING_ENFOQUE_INACTIVIDAD_MS - idleMs);
     ringInactivityTimerRef.current = setTimeout(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (Date.now() - ringLastInteractionRef.current < RING_ENFOQUE_INACTIVIDAD_MS) {
+        armRingInactivityTimer();
+        return;
+      }
       onCerrarRingPorInactividad(vehicle.id);
-    }, RING_ENFOQUE_INACTIVIDAD_MS);
+    }, delay);
   }, [
     onCerrarRingPorInactividad,
     vehicle.tipoFlota,
     vehicle.status,
     vehicle.situacionCronometro?.activo,
+    vehicle.situacionCronometro?.bloqueInicioAt,
     vehicle.id,
     situacionBloqueListo,
     clearRingInactivityTimer,
   ]);
+
+  const touchRingInteraction = useCallback(() => {
+    ringLastInteractionRef.current = Date.now();
+    clearRingInactivityTimer();
+    if (situacionCronActivo && !situacionBloqueListo) {
+      armRingInactivityTimer();
+    }
+  }, [clearRingInactivityTimer, situacionCronActivo, situacionBloqueListo, armRingInactivityTimer]);
 
   useEffect(() => {
     if (vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
@@ -11083,33 +11121,31 @@ function VehicleCard({
     const bloqueKey = `${vehicle.id}-${vehicle.situacionCronometro?.bloqueInicioAt ?? 0}`;
     if (ringInactivityBloqueRef.current !== bloqueKey) {
       ringInactivityBloqueRef.current = bloqueKey;
+      ringLastInteractionRef.current = Date.now();
       ringSobraVoiceKeyRef.current = null;
       ringSobraVoicePendingRef.current = null;
     }
-    const unsubIdle = subscribeSpeechQueueIdle(() => {
-      armRingInactivityTimer();
-    });
-    return () => {
-      unsubIdle();
-      clearRingInactivityTimer();
-    };
   }, [
     vehicle.tipoFlota,
     vehicle.id,
     vehicle.situacionCronometro?.activo,
     vehicle.situacionCronometro?.bloqueInicioAt,
-    armRingInactivityTimer,
     clearRingInactivityTimer,
   ]);
 
   useEffect(() => {
-    if (!situacionCronActivo || situacionBloqueListo) return;
+    if (!situacionCronActivo || situacionBloqueListo) {
+      clearRingInactivityTimer();
+      return;
+    }
     armRingInactivityTimer();
+    return clearRingInactivityTimer;
   }, [
     situacionCronActivo,
     situacionBloqueListo,
     situacionAnchorKey,
     armRingInactivityTimer,
+    clearRingInactivityTimer,
   ]);
 
   useEffect(() => {
@@ -11315,7 +11351,12 @@ function VehicleCard({
   };
 
   return (
-    <motion.div layout className="rounded-xl border overflow-hidden" style={{ backgroundColor: "#0a0a0a", borderColor: `${statusColors[vehicle.status]}30` }}>
+    <motion.div
+      layout
+      className="rounded-xl border overflow-hidden"
+      style={{ backgroundColor: "#0a0a0a", borderColor: `${statusColors[vehicle.status]}30` }}
+      onPointerDown={situacionCronActivo ? touchRingInteraction : undefined}
+    >
       {needsLiveTick && <VehicleCardLiveClock onTick={runLiveTimerTick} />}
 
       <button onClick={() => onToggleVehicle(vehicle.id)} className="w-full p-3 text-left" data-testid={`card-vehicle-${vehicle.id}`}>
@@ -12694,14 +12735,14 @@ function VehicleCard({
                                               {ok ? "✓" : "✗"} {finLabel}
                                             </span>
                                           )}
-                                          {pend && enFoco && (
+                                          {pend && ringOperable && (
                                             <div className="flex gap-1 flex-shrink-0">
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); touchRingInteraction(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
                                             </div>
                                           )}
-                                          {pend && !enFoco && (
+                                          {pend && situacionCronActivo && !enFoco && !ringOperable && (
                                             <span className="text-[7px] text-slate-600 flex-shrink-0">en cola</span>
                                           )}
                                           {showSituacionDetallesUi && detallesCron.length > 0 && (

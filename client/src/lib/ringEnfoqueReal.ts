@@ -1,7 +1,10 @@
 import type { SubTarea, Vehicle } from "./persistence";
 
-/** Inactividad tras última voz o interacción antes de cerrar solo el ring. */
+/** Inactividad tras última interacción en el ring antes de pausarlo (no vaciar al Crisol). */
 export const RING_ENFOQUE_INACTIVIDAD_MS = 120_000;
+
+/** Gracia mínima tras abrir ring antes de evaluar inactividad (evita cierre con TTS roto). */
+export const RING_ENFOQUE_GRACIA_APERTURA_MS = 180_000;
 
 /** Minutos de holgura en meta para invitar a nueva ronda o vehículo. */
 export const RING_SOBRA_INVITACION_MIN = 20;
@@ -17,8 +20,8 @@ export const RING_COPY = {
   anadirAlRing: "Añadir al ring de enfoque",
   sellarDirectoRing: "Sellar en ring",
   rondaLista: "Ronda lista — cierra el ring cuando quieras",
-  inactividadToast: "Ring cerrado por inactividad — sin registro de ganancia",
-  inactividadCrisolHint: "Las filas pendientes volvieron al Crisol. El vehículo sigue activo.",
+  inactividadToast: "Ring pausado por inactividad — sin registro de ganancia",
+  inactividadCrisolHint: "Las filas volvieron al Taller del vehículo. Podés reanudar el ring o enviar al Crisol manualmente.",
   tallerHint:
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",
   ringHint:
@@ -76,6 +79,27 @@ export function filtrarRingPendientes(subTareas: SubTarea[]): SubTarea[] {
   return subTareas.filter(
     st => st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") === "pendiente"
   );
+}
+
+export function ringTieneFilasPendientes(subTareas: SubTarea[]): boolean {
+  return filtrarRingPendientes(subTareas).length > 0;
+}
+
+/** Ring activo o pausado con filas pendientes — permite cumplido/fallado tras pausa. */
+export function ringSessionOperable(
+  sc: Vehicle["situacionCronometro"] | null | undefined,
+  subTareas: SubTarea[]
+): boolean {
+  if (!sc) return false;
+  if (sc.activo === true) return true;
+  return ringTieneFilasPendientes(subTareas);
+}
+
+/** Reanuda cronómetro pausado por inactividad (mismo bloque). */
+export function reanudarSituacionCronometroRing(
+  sc: NonNullable<Vehicle["situacionCronometro"]>
+): NonNullable<Vehicle["situacionCronometro"]> {
+  return { ...sc, activo: true };
 }
 
 export function quitarSubsPorId(subTareas: SubTarea[], ids: Set<string>): SubTarea[] {
