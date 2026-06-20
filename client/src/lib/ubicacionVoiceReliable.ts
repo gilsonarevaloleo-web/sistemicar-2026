@@ -11,6 +11,7 @@ import {
   isUbicacionPhraseQueued,
   isUbicacionSpeechActive,
   isSpeechSynthesisUnlocked,
+  voiceEngine,
   type UbicacionVoiceSource,
 } from "./speechQueue";
 import {
@@ -80,6 +81,10 @@ function trySpeak(key: string): void {
     return;
   }
 
+  if (voiceEngine.isKeyActive(key)) {
+    return;
+  }
+
   if (entry.attempts > 0 && isUbicacionSpeechActive()) {
     return;
   }
@@ -92,9 +97,15 @@ function trySpeak(key: string): void {
   }
   recoverSpeechQueue();
 
-  speakUbicacionQueue(entry.phrases, entry.cancelPrevious, entry.source, () => {
-    markVoiceDelivered(key);
-  });
+  speakUbicacionQueue(
+    entry.phrases,
+    entry.cancelPrevious,
+    entry.source,
+    () => {
+      markVoiceDelivered(key);
+    },
+    key
+  );
 }
 
 /** Hub global visibility/focus — pointerdown vive en VoiceBootstrap (App.tsx). */

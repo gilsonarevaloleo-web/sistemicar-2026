@@ -1,16 +1,14 @@
 import {
-  interruptAllSpeechSynth,
-  speakUtterance,
+  speakVoiceEngine,
   subscribeSpeechExternalCancel,
   unlockSpeechSynthesis,
   warmupSpeechSynthesis,
-  isSpeechSynthesisUnlocked,
+  voiceEngine,
 } from "./speechQueue";
 import { isPuntoCeroVoiceEnabled } from "./tikSound";
 import {
   pickCalmDeepSpanishVoice,
   pickPleasantSpanishVoice,
-  primeSpanishVoices,
 } from "./spanishTtsVoice";
 
 export { pickCalmDeepSpanishVoice, pickCalmDeepSpanishVoice as pickPleasantSpanishVoice } from "./spanishTtsVoice";
@@ -63,27 +61,13 @@ const VOICE_PROFILES: Record<
   reactivation: { rate: 0.86, pitch: 0.96, volume: 0.56, pauseMs: 520 },
 };
 
-let pcQueue: string[] = [];
-let pcSpeaking = false;
-let pcPauseTimer: ReturnType<typeof setTimeout> | null = null;
 let pcProfile: PuntoCeroVoiceProfile = "calm";
-let pcVoicesLoadBypass = false;
-
-const PC_VOICES_LOAD_WAIT_MS = 450;
+let pcSequenceKey: string | null = null;
 
 if (typeof window !== "undefined") {
   subscribeSpeechExternalCancel(() => {
-    clearPuntoCeroPauseTimer();
-    pcQueue = [];
-    pcSpeaking = false;
+    pcSequenceKey = null;
   });
-}
-
-function clearPuntoCeroPauseTimer(): void {
-  if (pcPauseTimer) {
-    clearTimeout(pcPauseTimer);
-    pcPauseTimer = null;
-  }
 }
 
 function applyCalmVoice(u: SpeechSynthesisUtterance, profile: PuntoCeroVoiceProfile): void {
@@ -96,75 +80,51 @@ function applyCalmVoice(u: SpeechSynthesisUtterance, profile: PuntoCeroVoiceProf
   if (voice) u.voice = voice;
 }
 
-function resetPuntoCeroQueueLocal(): void {
-  clearPuntoCeroPauseTimer();
-  pcQueue = [];
-  pcSpeaking = false;
-  pcVoicesLoadBypass = false;
-}
-
 /** Recuperación de emergencia — expuesto para speechRecovery. */
 export function resetPuntoCeroVoiceQueue(): void {
-  resetPuntoCeroQueueLocal();
+  voiceEngine.stopChannel("puntocero");
+  pcSequenceKey = null;
 }
 
-function processPuntoCeroQueue(opts?: { force?: boolean }): void {
-  if (pcSpeaking || pcQueue.length === 0) return;
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    pcQueue = [];
+function enqueuePuntoCeroPhrases(
+  phrases: readonly string[],
+  profile: PuntoCeroVoiceProfile,
+  cancelPrevious: boolean
+): void {
+  const filtered = phrases.map(p => p.trim()).filter(Boolean);
+  if (filtered.length === 0) return;
+
+  unlockSpeechSynthesis(true);
+  warmupSpeechSynthesis(true);
+  pcProfile = profile;
+
+  if (cancelPrevious) {
+    voiceEngine.stopChannel("puntocero");
+    pcSequenceKey = null;
+  }
+
+  const batchKey = `pc-${Date.now()}-${filtered[0]!.slice(0, 24)}`;
+  if (pcSequenceKey && voiceEngine.isKeyActive(pcSequenceKey)) {
     return;
   }
-  if (!opts?.force && !isSpeechSynthesisUnlocked()) return;
+  pcSequenceKey = batchKey;
+  voiceEngine.markKeyActive(batchKey);
 
-  primeSpanishVoices();
-  const voiceCount = window.speechSynthesis.getVoices().length;
-  if (voiceCount === 0) {
-    if (!pcVoicesLoadBypass) {
-      pcVoicesLoadBypass = true;
-      const retry = () => processPuntoCeroQueue(opts);
-      window.speechSynthesis.addEventListener(
-        "voiceschanged",
-        () => {
-          pcVoicesLoadBypass = false;
-          retry();
-        },
-        { once: true }
-      );
-      window.setTimeout(retry, PC_VOICES_LOAD_WAIT_MS);
-      return;
-    }
-  } else {
-    pcVoicesLoadBypass = false;
-  }
-
-  if (voiceCount === 0 && pcVoicesLoadBypass) {
-    if (typeof console !== "undefined" && console.debug) {
-      console.debug("[puntoCeroVoice] sin voces TTS — fallback lang es-ES");
-    }
-  }
-
-  const text = pcQueue.shift()!;
-  pcSpeaking = true;
-  const profile = pcProfile;
   const pauseMs = VOICE_PROFILES[profile].pauseMs;
+  const items = filtered.slice(0, 12);
+  const batchItems = items.map((text, i) => {
+    const isLast = i === items.length - 1;
+    return {
+      text,
+      channel: "puntocero" as const,
+      priority: 100,
+      pauseAfterMs: isLast ? 0 : pauseMs,
+      configure: (u: SpeechSynthesisUtterance) => applyCalmVoice(u, profile),
+      releaseKey: isLast ? batchKey : undefined,
+    };
+  });
 
-  const ok = speakUtterance(text, {
-    onend: () => {
-      pcSpeaking = false;
-      if (pcQueue.length > 0) {
-        pcPauseTimer = setTimeout(() => processPuntoCeroQueue(opts), pauseMs);
-      }
-    },
-    onerror: () => {
-      pcSpeaking = false;
-      processPuntoCeroQueue(opts);
-    },
-  }, u => applyCalmVoice(u, profile));
-
-  if (!ok) {
-    pcSpeaking = false;
-    processPuntoCeroQueue(opts);
-  }
+  voiceEngine.enqueueBatch(batchItems);
 }
 
 /** Encola frases con pausas — fluidez meditativa, sin cortes bruscos. */
@@ -173,22 +133,13 @@ export function speakPuntoCeroSequence(
   profile: PuntoCeroVoiceProfile = "calm",
   cancelPrevious = true
 ): void {
-  const filtered = phrases.map(p => p.trim()).filter(Boolean);
-  if (filtered.length === 0 || !isPuntoCeroVoiceEnabled()) return;
+  if (filteredEmpty(phrases) || !isPuntoCeroVoiceEnabled()) return;
   if (typeof window === "undefined" || !window.speechSynthesis) return;
+  enqueuePuntoCeroPhrases(phrases, profile, cancelPrevious);
+}
 
-  unlockSpeechSynthesis(true);
-  warmupSpeechSynthesis(true);
-  pcProfile = profile;
-
-  if (cancelPrevious) {
-    interruptAllSpeechSynth(true);
-    resetPuntoCeroQueueLocal();
-  }
-
-  const MAX_PC_PHRASES = 12;
-  pcQueue.push(...filtered.slice(0, MAX_PC_PHRASES));
-  processPuntoCeroQueue({ force: true });
+function filteredEmpty(phrases: readonly string[]): boolean {
+  return phrases.map(p => p.trim()).filter(Boolean).length === 0;
 }
 
 /** Desbloqueo TTS en el mismo gesto del usuario (pointerdown en etapa/color). */
@@ -207,22 +158,26 @@ export function speakPleasant(
   opts?: { rate?: number; pitch?: number; volume?: number }
 ): void {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
-  interruptAllSpeechSynth(false);
-  resetPuntoCeroQueueLocal();
-  speakUtterance(text, {}, u => {
-    u.lang = "es-ES";
-    u.rate = opts?.rate ?? VOICE_PROFILES.calm.rate;
-    u.pitch = opts?.pitch ?? VOICE_PROFILES.calm.pitch;
-    u.volume = opts?.volume ?? VOICE_PROFILES.calm.volume;
-    const voice = pickPleasantSpanishVoice();
-    if (voice) u.voice = voice;
+  voiceEngine.stopChannel("puntocero");
+  pcSequenceKey = null;
+  unlockSpeechSynthesis(true);
+  warmupSpeechSynthesis(true);
+  speakVoiceEngine(text, "puntocero", `pc-pleasant-${Date.now()}`, {
+    priority: 100,
+    configure: u => {
+      u.lang = "es-ES";
+      u.rate = opts?.rate ?? VOICE_PROFILES.calm.rate;
+      u.pitch = opts?.pitch ?? VOICE_PROFILES.calm.pitch;
+      u.volume = opts?.volume ?? VOICE_PROFILES.calm.volume;
+      const voice = pickPleasantSpanishVoice();
+      if (voice) u.voice = voice;
+    },
   });
 }
 
 export function stopPleasantVoice(): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  interruptAllSpeechSynth(false);
-  resetPuntoCeroQueueLocal();
+  voiceEngine.stopChannel("puntocero");
+  pcSequenceKey = null;
 }
 
 /** TTS de Punto Cero con warmup (requerido en móvil tras gesto del usuario). */
@@ -233,8 +188,6 @@ export function speakPuntoCeroGuide(
   if (!text.trim() || !isPuntoCeroVoiceEnabled()) return;
   const profile = opts?.profile ?? "calm";
   if (opts?.rate != null || opts?.pitch != null || opts?.volume != null) {
-    unlockSpeechSynthesis(true);
-    warmupSpeechSynthesis(true);
     speakPleasant(text, opts);
     return;
   }

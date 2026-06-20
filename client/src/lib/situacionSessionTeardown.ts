@@ -8,7 +8,7 @@ import {
   cancelUbicacionVoiceForVehicle,
 } from "./ubicacionVoiceReliable";
 import { flushLocalVehicles } from "./persistence";
-import { cancelSpeechSynthesisHard } from "./speechQueue";
+import { voiceEngine } from "./speechQueue";
 import { extendLocalVehicleMutation } from "./localMutationLock";
 import {
   listSituacionSessionVehicleIds,
@@ -35,7 +35,8 @@ export function teardownAllSituacionSessions(): void {
     tornDownIdsResetAndTeardown(vehicleId);
   }
   cancelAllUbicacionVoice();
-  cancelSpeechSynthesisHard();
+  voiceEngine.stopChannel("situacion");
+  voiceEngine.stopChannel("conquista");
   flushLocalVehicles();
 }
 

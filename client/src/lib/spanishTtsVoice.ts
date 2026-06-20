@@ -2,6 +2,8 @@
 
 let voicesCache: SpeechSynthesisVoice[] | null = null;
 
+export type TtsVoiceChannel = "conquista" | "situacion" | "puntocero";
+
 function loadVoices(): SpeechSynthesisVoice[] {
   if (typeof window === "undefined" || !window.speechSynthesis) return [];
   if (voicesCache?.length) return voicesCache;
@@ -30,34 +32,98 @@ function scoreSpanishVoice(v: SpeechSynthesisVoice): number {
   return score;
 }
 
+function scoreFirmSpanishVoice(v: SpeechSynthesisVoice): number {
+  let score = scoreSpanishVoice(v);
+  const blob = `${v.name} ${v.voiceURI} ${v.lang}`.toLowerCase();
+  if (/male|hombre|diego|jorge|pablo|enrique|carlos|daniel|antonio|david/i.test(blob)) score += 22;
+  if (/female|mujer|helena|laura|sabina|elena|monica|paulina|soledad|paloma/i.test(blob)) score -= 12;
+  return score;
+}
+
+function scoreDeepSpanishVoice(v: SpeechSynthesisVoice): number {
+  let score = scoreSpanishVoice(v);
+  const blob = `${v.name} ${v.voiceURI} ${v.lang}`.toLowerCase();
+  if (/male|hombre|diego|jorge|pablo|enrique|carlos|daniel|antonio|david/i.test(blob)) score += 18;
+  return score;
+}
+
+function pickBestVoice(scorer: (v: SpeechSynthesisVoice) => number): SpeechSynthesisVoice | null {
+  const voices = loadVoices();
+  if (!voices.length) return null;
+  const es = voices.filter(v => /^es/i.test(v.lang));
+  const pool = es.length ? es : voices;
+  const ranked = [...pool].sort((a, b) => scorer(b) - scorer(a));
+  return ranked[0] ?? voices[0] ?? null;
+}
+
 export function primeSpanishVoices(): void {
   loadVoices();
 }
 
 /** Voz en español clara — prioriza es-ES, neurales y timbre femenino del sistema. */
 export function pickCalmDeepSpanishVoice(): SpeechSynthesisVoice | null {
-  const voices = loadVoices();
-  if (!voices.length) return null;
-  const es = voices.filter(v => /^es/i.test(v.lang));
-  const pool = es.length ? es : voices;
-  const ranked = [...pool].sort((a, b) => scoreSpanishVoice(b) - scoreSpanishVoice(a));
-  return ranked[0] ?? voices[0] ?? null;
+  return pickBestVoice(scoreSpanishVoice);
 }
 
 /** Alias histórico — misma selección calmada es-ES. */
 export const pickPleasantSpanishVoice = pickCalmDeepSpanishVoice;
 
-/** Alertas operativas (puerta, situación, desglosador) — ritmo natural, sin ronquera. */
-export function applyAlertSpanishUtterance(u: SpeechSynthesisUtterance): void {
-  const voice = pickCalmDeepSpanishVoice();
+function pickFirmSpanishVoice(): SpeechSynthesisVoice | null {
+  return pickBestVoice(scoreFirmSpanishVoice);
+}
+
+function pickNeutralSpanishVoice(): SpeechSynthesisVoice | null {
+  return pickBestVoice(scoreSpanishVoice);
+}
+
+function pickGraveSpanishVoice(): SpeechSynthesisVoice | null {
+  return pickBestVoice(scoreDeepSpanishVoice);
+}
+
+/** Alertas operativas (puerta, situación) — ritmo natural, neutro. */
+export function applySituacionSpanishUtterance(u: SpeechSynthesisUtterance): void {
+  const voice = pickNeutralSpanishVoice();
   if (voice) u.voice = voice;
   u.lang = "es-ES";
-  u.rate = 0.96;
-  u.pitch = 1.02;
+  u.rate = 0.95;
+  u.pitch = 1.0;
   u.volume = 0.94;
 }
 
-/** Alias histórico — alertas de ubicación. */
-export function applyCalmSpanishUtterance(u: SpeechSynthesisUtterance): void {
-  applyAlertSpanishUtterance(u);
+/** Desglosador conquista — ritmo firme, timbre más decidido. */
+export function applyConquistaSpanishUtterance(u: SpeechSynthesisUtterance): void {
+  const voice = pickFirmSpanishVoice();
+  if (voice) u.voice = voice;
+  u.lang = "es-ES";
+  u.rate = 1.05;
+  u.pitch = 1.1;
+  u.volume = 0.94;
+}
+
+/** Fallback Punto Cero cuando no hay configure externo. */
+export function applyPuntoCeroDefaultUtterance(u: SpeechSynthesisUtterance): void {
+  const voice = pickGraveSpanishVoice();
+  if (voice) u.voice = voice;
+  u.lang = "es-ES";
+  u.rate = 0.9;
+  u.pitch = 0.8;
+  u.volume = 0.52;
+}
+
+/** Personalidad por canal — conquista / situación / puntocero. */
+export function applyCalmSpanishUtterance(u: SpeechSynthesisUtterance, channel?: TtsVoiceChannel): void {
+  if (channel === "conquista") {
+    applyConquistaSpanishUtterance(u);
+    return;
+  }
+  if (channel === "puntocero") {
+    applyPuntoCeroDefaultUtterance(u);
+    return;
+  }
+  applySituacionSpanishUtterance(u);
+}
+
+/** Alias histórico — alertas de ubicación (situación). */
+export function applyAlertSpanishUtterance(u: SpeechSynthesisUtterance): void {
+  applySituacionSpanishUtterance(u);
 }

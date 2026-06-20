@@ -50,7 +50,7 @@ export function setDesglosadorVoiceEnabled(on: boolean): void {
   try {
     localStorage.setItem(DESGLOSADOR_VOZ_KEY, on ? "on" : "off");
     if (!on && typeof window !== "undefined") {
-      void import("./speechQueue").then(m => m.interruptAllSpeechSynth(false));
+      void import("./speechQueue").then(m => m.voiceEngine.stopChannel("conquista"));
     }
     window.dispatchEvent(new CustomEvent("sistemicar-desglosador-voz-changed", { detail: { on } }));
   } catch {
@@ -71,7 +71,7 @@ export function setPuntoCeroVoiceEnabled(on: boolean): void {
   try {
     localStorage.setItem(PUNTO_CERO_VOZ_KEY, on ? "on" : "off");
     if (!on && typeof window !== "undefined") {
-      void import("./speechQueue").then(m => m.interruptAllSpeechSynth(false));
+      void import("./speechQueue").then(m => m.voiceEngine.stopChannel("puntocero"));
     }
     window.dispatchEvent(new CustomEvent("sistemicar-punto-cero-voz-changed", { detail: { on } }));
   } catch {
@@ -92,7 +92,10 @@ export function setTikSoundEnabled(on: boolean): void {
   try {
     localStorage.setItem(TIK_SOUND_KEY, on ? "on" : "off");
     if (!on && typeof window !== "undefined") {
-      void import("./speechQueue").then(m => m.interruptAllSpeechSynth(false));
+      void import("./speechQueue").then(m => {
+        m.voiceEngine.stopChannel("situacion");
+        m.voiceEngine.stopChannel("conquista");
+      });
     }
     window.dispatchEvent(new CustomEvent("sistemicar-tik-sound-changed", { detail: { on } }));
   } catch {
@@ -104,7 +107,7 @@ export function setSituacionAlertsEnabled(on: boolean): void {
   try {
     localStorage.setItem(SITUACION_ALERTS_KEY, on ? "on" : "off");
     if (!on && typeof window !== "undefined") {
-      void import("./speechQueue").then(m => m.interruptAllSpeechSynth(false));
+      void import("./speechQueue").then(m => m.voiceEngine.stopChannel("situacion"));
     }
     window.dispatchEvent(new CustomEvent("sistemicar-situacion-alerts-changed", { detail: { on } }));
   } catch {
