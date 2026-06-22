@@ -21,6 +21,7 @@ import {
 } from "@/engines/PuntoCeroEngine";
 import { usePuntoCeroOrchestrator } from "@/hooks/usePuntoCeroOrchestrator";
 import { usePuntoCeroAudio } from "@/hooks/usePuntoCeroAudio";
+import { usePuntoCeroSteps } from "@/hooks/usePuntoCeroSteps";
 import {
   MENSAJE_PASIVA_DIA,
   MENSAJE_PASIVA_NOCHE,
@@ -30,11 +31,11 @@ import {
 } from "@/lib/puntoCeroGuides";
 import {
   speakColorInmersion,
-  speakEtapaPuntoCero,
   speakPuntoCeroSequence,
   stopPleasantVoice,
   unlockPuntoCeroSpeechFromGesture,
 } from "@/lib/puntoCeroVoice";
+import { cancelPuntoCeroStepVoice } from "@/lib/puntoCeroStepVoice";
 import { toast } from "sonner";
 
 const PIZARRA = "#0a0a0a";
@@ -47,51 +48,120 @@ function PuntoCeroPortal({ children }: { children: React.ReactNode }) {
 function PuntoCeroStepRail({
   ep,
   colores,
-  pasoActual,
+  pasoInfoNum,
+  pasoGuia,
+  leyendo,
+  remountBlocked,
   flotaColor,
   modo,
+  onStepClick,
+  onPaso5Click,
 }: {
   ep: ReturnType<typeof etapasPuntoCeroVacias>;
   colores: boolean[];
-  pasoActual: number;
+  pasoInfoNum: number;
+  pasoGuia: number;
+  leyendo: boolean;
+  remountBlocked: boolean;
   flotaColor: string;
   modo: "dia" | "noche";
+  onStepClick: (index: 0 | 1 | 2 | 3) => void;
+  onPaso5Click?: () => void;
 }) {
   const colorCount = colores.filter(Boolean).length;
+  const VERDE = "#00C851";
+  const AMARILLO = "#fbbf24";
+  const GRIS = "rgba(255,255,255,0.35)";
+
   return (
     <div className="space-y-2" data-testid="punto-cero-step-rail">
       <div className="flex items-center gap-1">
         {PUNTO_CERO_PASOS_UI.map(({ n, short }) => {
-          const done =
-            n <= 3
-              ? ep[`etapa${n}` as "etapa1" | "etapa2" | "etapa3"]
+          const uiIndex = n - 1;
+          const isGuiaStep = n <= 4;
+          const etapaKey = n === 1 ? "etapa1" : n === 2 ? "etapa2" : n === 3 ? "etapa3" : n === 4 ? "etapa4" : null;
+          const doneByEp =
+            etapaKey != null
+              ? ep[etapaKey as "etapa1" | "etapa2" | "etapa3" | "etapa4"]
               : n === 4
                 ? todosColoresConfirmados(colores)
-                : pasoActual >= 5;
-          const current = pasoActual === n;
-          const partial = n === 4 && ep.etapa3 && !done && colorCount > 0;
-          return (
-            <div key={n} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-              <div
-                className="w-full h-1.5 rounded-full transition-all"
-                style={{
-                  backgroundColor: done
-                    ? flotaColor
-                    : current || partial
-                      ? `${flotaColor}88`
-                      : "rgba(255,255,255,0.08)",
-                  boxShadow: current ? `0 0 8px ${flotaColor}80` : undefined,
+                : pasoInfoNum >= 5;
+          const done = doneByEp || (isGuiaStep && pasoGuia > uiIndex);
+          const current = isGuiaStep && leyendo && pasoGuia === uiIndex;
+          const partial = n === 4 && ep.etapa3 && !doneByEp && colorCount > 0;
+          const statusLabel = current
+            ? "leyendo…"
+            : done
+              ? "completado"
+              : "activar";
+          const circleColor = done ? VERDE : current ? AMARILLO : GRIS;
+
+          if (n === 5) {
+            return (
+              <button
+                key={n}
+                type="button"
+                disabled={remountBlocked || pasoInfoNum < 5}
+                onClick={e => {
+                  e.stopPropagation();
+                  onPaso5Click?.();
                 }}
-              />
+                className="flex-1 flex flex-col items-center gap-0.5 min-w-0 touch-manipulation disabled:opacity-40"
+                data-testid={`punto-cero-rail-paso-${n}`}
+              >
+                <div
+                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all"
+                  style={{
+                    borderColor: pasoInfoNum >= 5 ? flotaColor : GRIS,
+                    backgroundColor: pasoInfoNum >= 5 ? `${flotaColor}30` : "transparent",
+                  }}
+                >
+                  <span className="text-[6px] font-black" style={{ color: pasoInfoNum >= 5 ? flotaColor : GRIS }}>5</span>
+                </div>
+                <span className="text-[6px] font-black uppercase tracking-wider truncate w-full text-center" style={{ color: pasoInfoNum >= 5 ? flotaColor : GRIS }}>
+                  {short}
+                </span>
+              </button>
+            );
+          }
+
+          return (
+            <button
+              key={n}
+              type="button"
+              disabled={remountBlocked || (n === 4 && !ep.etapa3)}
+              onClick={e => {
+                e.stopPropagation();
+                unlockPuntoCeroSpeechFromGesture();
+                onStepClick(uiIndex as 0 | 1 | 2 | 3);
+              }}
+              className="flex-1 flex flex-col items-center gap-0.5 min-w-0 touch-manipulation disabled:opacity-40"
+              data-testid={`punto-cero-rail-paso-${n}`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${current ? "animate-pulse" : ""}`}
+                style={{
+                  borderColor: circleColor,
+                  backgroundColor: done ? `${VERDE}25` : current ? `${AMARILLO}20` : "transparent",
+                  boxShadow: current ? `0 0 8px ${AMARILLO}80` : undefined,
+                }}
+              >
+                {done ? (
+                  <Check size={8} style={{ color: VERDE }} />
+                ) : (
+                  <span className="text-[6px] font-black" style={{ color: current ? AMARILLO : GRIS }}>{n}</span>
+                )}
+              </div>
               <span
                 className="text-[6px] font-black uppercase tracking-wider truncate w-full text-center"
-                style={{
-                  color: current ? flotaColor : done ? `${flotaColor}99` : "rgba(255,255,255,0.35)",
-                }}
+                style={{ color: current ? AMARILLO : done ? `${VERDE}99` : partial ? `${flotaColor}88` : GRIS }}
               >
                 {n}. {short}
               </span>
-            </div>
+              <span className="text-[5px] uppercase tracking-wider" style={{ color: current ? AMARILLO : GRIS }}>
+                {statusLabel}
+              </span>
+            </button>
           );
         })}
       </div>
@@ -103,14 +173,14 @@ function PuntoCeroStepRail({
               className="flex-1 transition-all"
               style={{
                 backgroundColor: colores[idx] ? color : `${color}35`,
-                opacity: colores[idx] ? 1 : pasoActual === 4 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? 1 : 0.55,
-                boxShadow: pasoActual === 4 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? `0 0 6px ${color}` : undefined,
+                opacity: colores[idx] ? 1 : pasoGuia === 3 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? 1 : 0.55,
+                boxShadow: pasoGuia === 3 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? `0 0 6px ${color}` : undefined,
               }}
             />
           ))}
         </div>
       )}
-      {pasoActual < 5 && (
+      {pasoInfoNum < 5 && (
         <p className="text-[7px] text-center leading-snug" style={{ color: modo === "noche" ? "#a5b4fc" : "#94a3b8" }}>
           Después del paso 4 viene el <span className="font-bold" style={{ color: flotaColor }}>paso 5</span>:{" "}
           {modo === "noche" ? PUNTO_CERO_PASO5.labelNoche : PUNTO_CERO_PASO5.labelDia} — el más profundo para{" "}
@@ -309,7 +379,6 @@ export function PuntoCeroPanel({
 
   const [colorInmersion, setColorInmersion] = useState<{ color: string; zona: string; idx: number } | null>(null);
   const [inmersionCount, setInmersionCount] = useState(3);
-  const primeraGuiaVozRef = useRef(true);
 
   const primerAccionMs = vehicle.primerAccionAt;
   const aperturaMs = vehicle.aperturaAt || Date.now();
@@ -338,8 +407,14 @@ export function PuntoCeroPanel({
   const audioEnabled = vehicle.status === "activo" && !!session;
   const puntoCeroAudio = usePuntoCeroAudio(audioEnabled, session?.modo, fase);
 
+  const puntoCeroSteps = usePuntoCeroSteps({
+    onEtapaCompletada: etapa => onEtapaToggle(vehicle.id, etapa),
+    onUnlockAudio: () => puntoCeroAudio.unlockAudio(),
+  });
+
   const stopPuntoCeroMedia = useCallback(() => {
     stopPleasantVoice();
+    cancelPuntoCeroStepVoice();
     puntoCeroAudio.stopAll();
   }, [puntoCeroAudio]);
 
@@ -665,14 +740,49 @@ export function PuntoCeroPanel({
             </p>
             <p className="text-[11px] font-bold text-white mt-0.5">{pasoInfo.titulo}</p>
             <p className="text-[8px] text-slate-500 mt-0.5 leading-snug">{pasoInfo.subtitulo}</p>
+            {!enPasiva && !puntoCeroSteps.leyendo && puntoCeroSteps.pasoActual === -1 && (
+              <button
+                type="button"
+                disabled={puntoCeroSteps.remountBlocked}
+                onClick={e => {
+                  e.stopPropagation();
+                  void puntoCeroSteps.iniciar();
+                }}
+                className="mt-2 w-full min-h-[2.5rem] py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border transition-all touch-manipulation disabled:opacity-40"
+                style={{
+                  backgroundColor: `${flotaColor}18`,
+                  borderColor: flotaColor,
+                  color: flotaColor,
+                  boxShadow: `0 0 12px ${flotaColor}25`,
+                }}
+                data-testid={`punto-cero-iniciar-${vehicle.id}`}
+              >
+                Iniciar Punto Cero
+              </button>
+            )}
+            {puntoCeroSteps.leyendo && (
+              <p className="text-[7px] mt-1 text-center font-bold uppercase tracking-wider animate-pulse" style={{ color: "#fbbf24" }}>
+                Leyendo paso {(puntoCeroSteps.pasoActual + 1)}…
+              </p>
+            )}
+            {puntoCeroSteps.remountBlocked && (
+              <p className="text-[7px] mt-1 text-center" style={{ color: "#94a3b8" }}>
+                Voz en pausa — tocá un paso o Reanudar para continuar
+              </p>
+            )}
             {session && (
               <div className="mt-2">
                 <PuntoCeroStepRail
                   ep={ep}
                   colores={colores}
-                  pasoActual={pasoInfo.paso}
+                  pasoInfoNum={pasoInfo.paso}
+                  pasoGuia={puntoCeroSteps.pasoActual}
+                  leyendo={puntoCeroSteps.leyendo}
+                  remountBlocked={puntoCeroSteps.remountBlocked}
                   flotaColor={flotaColor}
                   modo={session.modo}
+                  onStepClick={idx => void puntoCeroSteps.irAPaso(idx)}
+                  onPaso5Click={enterPasivaManual}
                 />
               </div>
             )}
@@ -775,22 +885,11 @@ export function PuntoCeroPanel({
                       unlockPuntoCeroSpeechFromGesture();
                     }}
                     onClick={() => {
-                      if (checked || isLocked || isColorEtapa) return;
-                      void puntoCeroAudio.unlockAudio();
-                      unlockPuntoCeroSpeechFromGesture();
-                      const intro = primeraGuiaVozRef.current;
-                      if (intro) primeraGuiaVozRef.current = false;
-                      try {
-                        speakEtapaPuntoCero(key, {
-                          intro,
-                          transicionEtapa4: key === "etapa3",
-                        });
-                      } catch (e) {
-                        console.warn("[PuntoCeroPanel] speakEtapaPuntoCero", e);
-                      }
-                      onEtapaToggle(vehicle.id, key);
+                      if (isLocked || isColorEtapa) return;
+                      if (puntoCeroSteps.remountBlocked) return;
+                      void puntoCeroSteps.irAPaso((pasoNum - 1) as 0 | 1 | 2 | 3);
                     }}
-                    disabled={checked || isLocked || isColorEtapa}
+                    disabled={isLocked || isColorEtapa || puntoCeroSteps.remountBlocked}
                     className="w-full flex items-start gap-3 p-2.5 rounded-xl border transition-all text-left"
                     style={{
                       backgroundColor: checked ? `${flotaColor}10` : isCurrent ? `${flotaColor}14` : "rgba(255,255,255,0.03)",

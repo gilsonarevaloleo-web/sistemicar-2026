@@ -19,6 +19,10 @@ import {
   PLANEACION_IDLE_DEFER_MS,
   setPlaneacionHeavyMetricsSnapshot,
 } from "@/lib/planeacionCache";
+import {
+  isJornadaHeavyComputeAllowed,
+  msUntilJornadaHeavyComputeAllowed,
+} from "@/lib/jornadaRemount";
 import type { PlanillaDailySnapshot, SegmentoV5, Vehicle } from "@/lib/persistence";
 import { SEGMENT_ATTENTION_TICK_EVENT } from "@/lib/segmentAttentionCycle";
 
@@ -85,8 +89,29 @@ export function usePlaneacionHeavyMetrics(
 
   const runCompute = useCallback((urgent: boolean, idleTimeoutMs?: number) => {
     const generation = ++generationRef.current;
+    const inputSigNow = planeacionHeavyMetricsInputSig(paramsRef.current);
+
+    if (!isJornadaHeavyComputeAllowed()) {
+      const cached = getPlaneacionHeavyMetricsSnapshot(inputSigNow);
+      if (cached) setMetrics(cached);
+      const waitMs = msUntilJornadaHeavyComputeAllowed();
+      if (waitMs > 0) {
+        const deferId = globalThis.setTimeout(() => {
+          if (generation !== generationRef.current) return;
+          runCompute(false, idleTimeoutMs ?? PLANEACION_IDLE_DEFER_MS);
+        }, waitMs);
+        return () => clearTimeout(deferId);
+      }
+      return () => {};
+    }
+
     const cancelSchedule = scheduleHeavyCompute(() => {
       if (generation !== generationRef.current) return;
+      if (!isJornadaHeavyComputeAllowed()) {
+        const cached = getPlaneacionHeavyMetricsSnapshot(inputSigNow);
+        if (cached) setMetrics(cached);
+        return;
+      }
       const next = computePlaneacionHeavyMetrics(paramsRef.current);
       setMetrics(next);
       setPlaneacionHeavyMetricsSnapshot(

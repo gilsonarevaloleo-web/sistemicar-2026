@@ -6,6 +6,7 @@ import {
   voiceEngine,
   isSpeechSynthesisUnlocked,
 } from "./speechQueue";
+import { deferJornadaVoice, shouldDeferJornadaVoice } from "./jornadaRemount";
 import { isPuntoCeroVoiceEnabled } from "./tikSound";
 import {
   pickCalmDeepSpanishVoice,
@@ -118,6 +119,10 @@ function preemptOtherChannelsForPuntoCero(): void {
 
 function processPuntoCeroQueue(opts?: { force?: boolean }): void {
   if (pcSpeaking || pcQueue.length === 0) return;
+  if (shouldDeferJornadaVoice()) {
+    deferJornadaVoice(() => processPuntoCeroQueue(opts));
+    return;
+  }
   if (typeof window === "undefined" || !window.speechSynthesis) {
     pcQueue = [];
     return;
@@ -180,6 +185,11 @@ function enqueuePuntoCeroPhrases(
 ): void {
   const filtered = phrases.map(p => p.trim()).filter(Boolean);
   if (filtered.length === 0) return;
+
+  if (shouldDeferJornadaVoice()) {
+    deferJornadaVoice(() => enqueuePuntoCeroPhrases(phrases, profile, cancelPrevious));
+    return;
+  }
 
   unlockSpeechSynthesis(true);
   warmupSpeechSynthesis(true);

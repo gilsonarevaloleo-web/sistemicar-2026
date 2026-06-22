@@ -211,7 +211,9 @@ import {
   RutaSeguimientoPicker,
   rutaSeguimientoPickerCanConfirm,
 } from "@/components/RutaSeguimientoPicker";
-import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue, subscribeSpeechQueueIdle } from "@/lib/speechQueue";
+import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue, subscribeSpeechQueueIdle, beginJornadaRemount, endJornadaRemount, pauseVoice, resumeVoice, cancelJornadaRemountGuard } from "@/lib/speechQueue";
+import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
+import { pausePuntoCeroStepVoiceForRemount } from "@/lib/puntoCeroStepVoice";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
@@ -1863,22 +1865,54 @@ export default function Planeacion() {
     return () => window.removeEventListener("sovereignty-points-awarded", onAward);
   }, [user]);
 
+  /** Montaje / retorno desde background: TTS y heavy metrics no compiten con el primer paint. */
+  const scheduleJornadaForegroundResume = useCallback((afterReady?: () => void) => {
+    beginJornadaRemount();
+    pauseVoice();
+    resetPuntoCeroVoiceQueue();
+    pausePuntoCeroStepVoiceForRemount();
+    requestAnimationFrame(() => {
+      const finish = () => {
+        resumeVoice();
+        endJornadaRemount();
+        if (afterReady) {
+          window.setTimeout(afterReady, 1500);
+        }
+      };
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(finish, { timeout: 3000 });
+      } else {
+        finish();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    scheduleJornadaForegroundResume();
+    return () => {
+      cancelJornadaRemountGuard();
+      resumeVoice();
+    };
+  }, [scheduleJornadaForegroundResume]);
+
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      warmupSpeechSynthesis();
-      recoverSpeechQueue();
-      const flushed = flushMissedPuertaVoiceOnVisible();
-      if (flushed > 0) {
-        console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
-      }
-      runSegmentAttentionTickNow();
+      scheduleJornadaForegroundResume(() => {
+        warmupSpeechSynthesis();
+        recoverSpeechQueue();
+        const flushed = flushMissedPuertaVoiceOnVisible();
+        if (flushed > 0) {
+          console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
+        }
+        runSegmentAttentionTickNow();
+      });
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [scheduleJornadaForegroundResume]);
 
   useEffect(() => {
     if (!user) return;

@@ -13,6 +13,10 @@ import {
   isPuertaVozEnabled,
   isSituacionAlertsEnabled,
 } from "./tikSound";
+import {
+  deferJornadaVoice,
+  shouldDeferJornadaVoice,
+} from "./jornadaRemount";
 
 export type UbicacionVoiceSource = "situacion" | "desglosador" | "puerta";
 export type VoiceChannel = TtsVoiceChannel;
@@ -249,12 +253,20 @@ class VoiceEngine {
       ...item,
       priority: item.priority ?? channelPriority(item.channel),
     };
+    if (shouldDeferJornadaVoice()) {
+      deferJornadaVoice(() => this.enqueue(item));
+      return;
+    }
     this.queue.push(full);
     this.sortQueue();
     this.processQueue();
   }
 
   enqueueBatch(items: QueueItem[]): void {
+    if (shouldDeferJornadaVoice()) {
+      deferJornadaVoice(() => this.enqueueBatch(items));
+      return;
+    }
     for (const item of items) {
       this.queue.push(item);
     }
@@ -522,6 +534,12 @@ export function speakUtterance(
   handlers: UtteranceHandlers = {},
   configure?: (u: SpeechSynthesisUtterance) => void
 ): boolean {
+  if (shouldDeferJornadaVoice()) {
+    deferJornadaVoice(() => {
+      speakUtterance(text, handlers, configure);
+    });
+    return true;
+  }
   const synth = getSynth();
   if (!synth || !text.trim()) return false;
 
@@ -581,6 +599,7 @@ export function isUbicacionSpeechActive(): boolean {
 }
 
 export function recoverSpeechQueue(): void {
+  if (shouldDeferJornadaVoice()) return;
   voiceEngine.recover();
 }
 
@@ -664,6 +683,7 @@ export function warmupSpeechSynthesis(force = false, fromUserGesture = false): v
     unlockSpeechSynthesis(true);
     return;
   }
+  if (shouldDeferJornadaVoice()) return;
   const synth = getSynth();
   if (!synth) return;
   const now = Date.now();
@@ -699,6 +719,31 @@ export function speakVoiceProbe(source: UbicacionVoiceSource = "puerta"): SpeakV
   }
   return { ok: true };
 }
+
+/** Corta TTS activo al remontar Jornada (no vacía unlock del usuario). */
+export function pauseVoice(): void {
+  voiceEngine.haltSpeechOnChannels(["conquista", "situacion", "puntocero"]);
+  try {
+    getSynth()?.cancel();
+  } catch {
+    /* noop */
+  }
+  voiceEngine.releaseAfterExternalCancel();
+}
+
+export function resumeVoice(): void {
+  resumeSynthIfPaused();
+}
+
+export {
+  beginJornadaRemount,
+  cancelJornadaRemountGuard,
+  endJornadaRemount,
+  flushJornadaVoiceQueue,
+  getIsRemountingJornada,
+  isJornadaHeavyComputeAllowed,
+  msUntilJornadaHeavyComputeAllowed,
+} from "./jornadaRemount";
 
 /**
  * Encola frases y las reproduce en orden.
