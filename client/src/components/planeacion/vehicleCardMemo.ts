@@ -55,6 +55,24 @@ export function vehicleRingUiSignature(vehicle: Vehicle): string {
   ].join("|");
 }
 
+/** Firma de subs desglosador — sin esto MemoVehicleCard no re-renderiza al cerrar Cumplido/Fallado. */
+export function desglosadorSubUiSignature(vehicle: Vehicle): string {
+  if (vehicle.tipoReloj !== "desglosador") return "";
+  return (vehicle.subVehiculos ?? [])
+    .map(s =>
+      [
+        s.id,
+        s.status,
+        s.aperturaAt ?? 0,
+        s.cierreAt ?? 0,
+        s.cantidadLograda ?? "",
+        s.cantidadObjetivo ?? "",
+        s.rutaEnfoque?.activa ? 1 : 0,
+      ].join(".")
+    )
+    .join(",");
+}
+
 export function areVehicleCardPropsEqual(
   prev: VehicleCardMemoProps,
   next: VehicleCardMemoProps
@@ -68,6 +86,9 @@ export function areVehicleCardPropsEqual(
   if (prev.situacionDesgloseSummary?.psTotal !== next.situacionDesgloseSummary?.psTotal) return false;
   if (prev.planilla?.fecha !== next.planilla?.fecha) return false;
   if (vehicleRingUiSignature(prev.vehicle) !== vehicleRingUiSignature(next.vehicle)) {
+    return false;
+  }
+  if (desglosadorSubUiSignature(prev.vehicle) !== desglosadorSubUiSignature(next.vehicle)) {
     return false;
   }
   if (vehiclesReactiveSignature([prev.vehicle]) !== vehiclesReactiveSignature([next.vehicle])) {

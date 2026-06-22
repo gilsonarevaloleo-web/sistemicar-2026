@@ -472,6 +472,11 @@ import { SituacionCasaPanel } from "@/components/SituacionCasaPanel";
 import { PuntoCeroPanel } from "@/components/PuntoCeroPanel";
 import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
 import { PlanTabPanel } from "@/components/planeacion/PlanTabPanel";
+import {
+  DesglosadorSubCloseButtons,
+  type DesglosadorSubClosePayload,
+} from "@/components/planeacion/DesglosadorSubCloseButtons";
+import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
 import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
@@ -4243,7 +4248,11 @@ export default function Planeacion() {
       return acc;
     }, 0);
 
-  const handleDesglosadorUpdate = (vehicleId: string, updatedSubs: SubVehiculo[], opts?: { resetDepth?: boolean; silentDepth?: boolean }) => {
+  const handleDesglosadorUpdate = useCallback((
+    vehicleId: string,
+    updatedSubs: SubVehiculo[],
+    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean }
+  ) => {
     if (!user) return;
     const prevVehicle = vehiclesRef.current.find(v => v.id === vehicleId);
     if (!prevVehicle) return;
@@ -4254,7 +4263,7 @@ export default function Planeacion() {
 
     const prevProgress = desglosadorProgressScore(prevVehicle.subVehiculos);
     const nextProgress = desglosadorProgressScore(updatedSubs);
-    if (nextProgress < prevProgress) {
+    if (!opts?.force && nextProgress < prevProgress) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
       return;
     }
@@ -4308,7 +4317,7 @@ export default function Planeacion() {
     } else {
       void reconcileDesglosadorDepthPS(vehicleId, { silent: false });
     }
-  };
+  }, [user]);
 
   const handleDesglosadorReorderSubs = (vehicleId: string, movedId: string, direction: ReorderDirection) => {
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -10654,11 +10663,62 @@ function VehicleCard({
     return cleanup;
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj]);
 
-  const attemptCloseActiveSub = (
-    activeSub: SubVehiculo,
+  const finalizeSubClose = useCallback((
+    activeSubId: string,
+    status: "cumplido" | "fallado",
+    cantidad: number,
+    duracionCompletado: number | undefined,
+    rutaDeclarada?: RutaBandaId[]
+  ) => {
+    if (!onDesglosadorUpdate) return;
+    const now = Date.now();
+    const sourceSubs = subVehiculosRef.current ?? vehicle.subVehiculos ?? [];
+    const built = buildDesglosadorSubClose(
+      sourceSubs,
+      activeSubId,
+      status,
+      cantidad,
+      duracionCompletado,
+      rutaDeclarada,
+      now
+    );
+    if (!built) return;
+    const { subs: allSubs, closedSub, nextActiveSubId } = built;
+
+    onBloqueCierre?.({ vehicleId: vehicle.id, sub: closedSub, status });
+    const veredicto = computeSubCloseVerdict(closedSub);
+    setUltimoCierreSub({
+      subId: closedSub.id,
+      titulo: cleanSubTitulo(closedSub.titulo),
+      status,
+      verdict: veredicto.verdict,
+      deltaSec: veredicto.deltaSec,
+      conquistaFluidezAbsoluta: closedSub.conquistaFluidezAbsoluta,
+    });
+    if (nextActiveSubId) {
+      activeSubIdForRutaRef.current = null;
+      prevSubRestanteRutaRef.current = null;
+      rutaUmbralAlertKeysRef.current.clear();
+    }
+    onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
+    const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
+    if (allDone) setDesglosadorSummary(true);
+    setCantidadRealizada("");
+    setSubRutaModal(null);
+    setSubRutaSel(new Set());
+    setSubRutaSinUso(false);
+    setSubRutaPatron(null);
+  }, [onBloqueCierre, onDesglosadorUpdate, vehicle.id, vehicle.subVehiculos]);
+
+  const attemptCloseActiveSubById = useCallback((
+    subId: string,
     status: "cumplido" | "fallado",
     duracionCompletado: number | undefined
   ) => {
+    const subsNow = subVehiculosRef.current ?? vehicle.subVehiculos ?? [];
+    const activeSub = subsNow.find(s => s.id === subId && s.status === "activo");
+    if (!activeSub) return;
+
     const validation = validateSubCloseCantidad(activeSub, cantidadRealizada, status);
     if (!validation.ok) {
       toast.warning(validation.message, {
@@ -10678,61 +10738,15 @@ function VehicleCard({
       return;
     }
     finalizeSubClose(activeSub.id, status, validation.cantidad, duracionCompletado);
-  };
+  }, [cantidadRealizada, finalizeSubClose, vehicle.subVehiculos]);
 
-  const finalizeSubClose = (
-    activeSubId: string,
-    status: "cumplido" | "fallado",
-    cantidad: number,
-    duracionCompletado: number | undefined,
-    rutaDeclarada?: RutaBandaId[]
-  ) => {
-    if (!onDesglosadorUpdate) return;
-    const now = Date.now();
-    const allSubs = [...(subVehiculosRef.current ?? vehicle.subVehiculos ?? [])];
-    const idx = allSubs.findIndex(s => s.id === activeSubId);
-    if (idx === -1) return;
-    const cantidadCheck = validateSubCloseCantidad(allSubs[idx], String(cantidad), status);
-    if (!cantidadCheck.ok) return;
-    const cantidadFinal = cantidadCheck.cantidad;
-    const baseSub: SubVehiculo = {
-      ...allSubs[idx],
-      status,
-      cierreAt: now,
-      duracionFinal: duracionCompletado,
-      ...(allSubs[idx].cantidadObjetivo ? { cantidadLograda: cantidadFinal } : {}),
-    };
-    allSubs[idx] =
-      baseSub.rutaEnfoque?.activa
-        ? enrichSubRutaCierre(baseSub, rutaDeclarada ?? [])
-        : baseSub;
-    onBloqueCierre?.({ vehicleId: vehicle.id, sub: allSubs[idx], status });
-    const closed = allSubs[idx];
-    const veredicto = computeSubCloseVerdict(closed);
-    setUltimoCierreSub({
-      subId: closed.id,
-      titulo: cleanSubTitulo(closed.titulo),
-      status: status,
-      verdict: veredicto.verdict,
-      deltaSec: veredicto.deltaSec,
-      conquistaFluidezAbsoluta: closed.conquistaFluidezAbsoluta,
-    });
-    const nextPending = allSubs.findIndex((s, i) => i > idx && s.status === "pendiente");
-    if (nextPending !== -1) {
-      allSubs[nextPending] = { ...allSubs[nextPending], status: "activo", aperturaAt: now };
-      activeSubIdForRutaRef.current = null;
-      prevSubRestanteRutaRef.current = null;
-      rutaUmbralAlertKeysRef.current.clear();
-    }
-    onDesglosadorUpdate(vehicle.id, allSubs);
-    const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
-    if (allDone) setDesglosadorSummary(true);
-    setCantidadRealizada("");
-    setSubRutaModal(null);
-    setSubRutaSel(new Set());
-    setSubRutaSinUso(false);
-    setSubRutaPatron(null);
-  };
+  const handleDesglosadorSubCloseFromButton = useCallback(
+    (payload: DesglosadorSubClosePayload) => {
+      if (payload.vehicleId !== vehicle.id) return;
+      attemptCloseActiveSubById(payload.subId, payload.status, payload.duracionSec);
+    },
+    [attemptCloseActiveSubById, vehicle.id]
+  );
 
   const tipoFlota = vehicle.tipoFlota;
   const flotaConfig = tipoFlota ? FLOTA_CONFIG[tipoFlota] : null;
@@ -11802,66 +11816,16 @@ function VehicleCard({
                                     </button>
                                   </div>
                                 )}
-                                {/* Cumplido / Fallado buttons */}
-                                {(() => {
-                                  const needsCantidad = Boolean(activeSub.cantidadObjetivo && activeSub.cantidadObjetivo > 0);
-                                  const cumplidoOk = validateSubCloseCantidad(activeSub, cantidadRealizada, "cumplido").ok;
-                                  const falladoOk = validateSubCloseCantidad(activeSub, cantidadRealizada, "fallado").ok;
-                                  const blockedByInterrupt = vehicle.interrupcionActiva;
-                                  return (
-                                    <div className="space-y-1.5">
-                                      {needsCantidad && (!cumplidoOk || !falladoOk) && (
-                                        <p className="text-[8px] text-center font-bold uppercase tracking-wider" style={{ color: NARANJA }}>
-                                          Registra cant. lograda para cerrar
-                                        </p>
-                                      )}
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (blockedByInterrupt) return;
-                                            playWarDrum();
-                                            const now = Date.now();
-                                            const allSubs = [...(subVehiculosRef.current ?? vehicle.subVehiculos ?? [])];
-                                            const idx = allSubs.findIndex(s => s.id === activeSub.id);
-                                            if (idx === -1) return;
-                                            const duracionCompletado = allSubs[idx].aperturaAt
-                                              ? Math.floor((now - allSubs[idx].aperturaAt!) / 1000)
-                                              : undefined;
-                                            attemptCloseActiveSub(activeSub, "cumplido", duracionCompletado);
-                                          }}
-                                          disabled={blockedByInterrupt || !cumplidoOk}
-                                          className="py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all disabled:opacity-35 disabled:cursor-not-allowed"
-                                          style={{ backgroundColor: "rgba(0,200,81,0.15)", color: "#00C851", border: "1px solid rgba(0,200,81,0.3)" }}
-                                          data-testid={`button-sub-cumplido-${activeSub.id}`}
-                                        >
-                                          <CheckCircle2 size={12} /> Cumplido
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (blockedByInterrupt) return;
-                                            playWarDrum();
-                                            const now = Date.now();
-                                            const allSubs = [...(subVehiculosRef.current ?? vehicle.subVehiculos ?? [])];
-                                            const idx = allSubs.findIndex(s => s.id === activeSub.id);
-                                            if (idx === -1) return;
-                                            const duracionFallado = allSubs[idx].aperturaAt
-                                              ? Math.floor((now - allSubs[idx].aperturaAt!) / 1000)
-                                              : undefined;
-                                            attemptCloseActiveSub(activeSub, "fallado", duracionFallado);
-                                          }}
-                                          disabled={blockedByInterrupt || !falladoOk}
-                                          className="py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all disabled:opacity-35 disabled:cursor-not-allowed"
-                                          style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
-                                          data-testid={`button-sub-fallado-${activeSub.id}`}
-                                        >
-                                          <XCircle size={12} /> Fallado
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+                                {activeSub && (
+                                  <DesglosadorSubCloseButtons
+                                    vehicleId={vehicle.id}
+                                    activeSub={activeSub}
+                                    cantidadRealizada={cantidadRealizada}
+                                    blockedByInterrupt={!!vehicle.interrupcionActiva}
+                                    onCloseSub={handleDesglosadorSubCloseFromButton}
+                                    onWarDrum={playWarDrum}
+                                  />
+                                )}
                               </div>
                             </div>
                           )}

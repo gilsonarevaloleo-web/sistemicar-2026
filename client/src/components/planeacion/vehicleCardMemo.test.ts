@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Vehicle } from "@/lib/persistence";
 import {
   areVehicleCardPropsEqual,
+  desglosadorSubUiSignature,
   vehicleCardNeedsLiveTick,
 } from "./vehicleCardMemo";
 
@@ -87,6 +88,30 @@ describe("areVehicleCardPropsEqual", () => {
     };
     assert.equal(
       areVehicleCardPropsEqual({ vehicle: base, expanded: true }, { vehicle: cumplido, expanded: true }),
+      false
+    );
+  });
+
+  it("detecta cierre de sub desglosador aunque siga habiendo 1 activo", () => {
+    const base = baseVehicle({
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "cumplido" },
+        { id: "s2", titulo: "B", status: "activo", aperturaAt: 100 },
+        { id: "s3", titulo: "C", status: "pendiente" },
+      ],
+    } as Partial<Vehicle>);
+    const afterClose = {
+      ...base,
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "cumplido" },
+        { id: "s2", titulo: "B", status: "cumplido", cierreAt: 200 },
+        { id: "s3", titulo: "C", status: "activo", aperturaAt: 200 },
+      ],
+    };
+    assert.notEqual(desglosadorSubUiSignature(base), desglosadorSubUiSignature(afterClose));
+    assert.equal(
+      areVehicleCardPropsEqual({ vehicle: base, expanded: true }, { vehicle: afterClose, expanded: true }),
       false
     );
   });
