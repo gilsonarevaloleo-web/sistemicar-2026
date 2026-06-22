@@ -14,6 +14,11 @@ import {
   type PlaneacionHeavyMetrics,
   type PlaneacionHeavyMetricsInput,
 } from "@/lib/planeacionHeavyMetricsCompute";
+import {
+  getPlaneacionHeavyMetricsSnapshot,
+  PLANEACION_IDLE_DEFER_MS,
+  setPlaneacionHeavyMetricsSnapshot,
+} from "@/lib/planeacionCache";
 import type { PlanillaDailySnapshot, SegmentoV5, Vehicle } from "@/lib/persistence";
 import { SEGMENT_ATTENTION_TICK_EVENT } from "@/lib/segmentAttentionCycle";
 
@@ -24,15 +29,20 @@ export type UsePlaneacionHeavyMetricsParams = {
   focusEventsToday: FocusBandEvent[];
   yesterdayTermoSnapshot: PlanillaDailySnapshot | null;
   disciplinaSnapshots: PlanillaDailySnapshot[];
+  planTab?: "operar" | "metricas" | "meta";
 };
 
-function scheduleHeavyCompute(run: () => void, urgent: boolean): () => void {
+function scheduleHeavyCompute(
+  run: () => void,
+  urgent: boolean,
+  idleTimeoutMs = 900
+): () => void {
   if (urgent) {
     run();
     return () => {};
   }
   if (typeof requestIdleCallback !== "undefined") {
-    const id = requestIdleCallback(run, { timeout: 900 });
+    const id = requestIdleCallback(run, { timeout: idleTimeoutMs });
     return () => cancelIdleCallback(id);
   }
   const id = globalThis.setTimeout(run, 0);
@@ -42,10 +52,6 @@ function scheduleHeavyCompute(run: () => void, urgent: boolean): () => void {
 export function usePlaneacionHeavyMetrics(
   params: UsePlaneacionHeavyMetricsParams
 ): PlaneacionHeavyMetrics {
-  const [metrics, setMetrics] = useState<PlaneacionHeavyMetrics>(() =>
-    createEmptyPlaneacionHeavyMetrics(params.yesterdayTermoSnapshot)
-  );
-
   const paramsRef = useRef<PlaneacionHeavyMetricsInput>({
     userId: params.userId,
     segmentos: params.segmentos,
@@ -64,27 +70,50 @@ export function usePlaneacionHeavyMetrics(
   };
 
   const inputSig = planeacionHeavyMetricsInputSig(paramsRef.current);
+
+  const [metrics, setMetrics] = useState<PlaneacionHeavyMetrics>(() => {
+    const cached = getPlaneacionHeavyMetricsSnapshot(inputSig);
+    if (cached) return cached;
+    return createEmptyPlaneacionHeavyMetrics(params.yesterdayTermoSnapshot);
+  });
+
   const inputSigRef = useRef(inputSig);
   const firstRunRef = useRef(true);
+  const prevPlanTabRef = useRef(params.planTab ?? "operar");
   const generationRef = useRef(0);
   const metricSkipRef = useRef(0);
 
-  const runCompute = useCallback((urgent: boolean) => {
+  const runCompute = useCallback((urgent: boolean, idleTimeoutMs?: number) => {
     const generation = ++generationRef.current;
     const cancelSchedule = scheduleHeavyCompute(() => {
       if (generation !== generationRef.current) return;
       const next = computePlaneacionHeavyMetrics(paramsRef.current);
       setMetrics(next);
-    }, urgent);
+      setPlaneacionHeavyMetricsSnapshot(
+        planeacionHeavyMetricsInputSig(paramsRef.current),
+        next
+      );
+    }, urgent, idleTimeoutMs);
     return cancelSchedule;
   }, []);
 
   useEffect(() => {
-    const urgent = firstRunRef.current;
+    const cached = getPlaneacionHeavyMetricsSnapshot(inputSig);
+    if (cached) setMetrics(cached);
+    const urgent = firstRunRef.current && !cached;
     firstRunRef.current = false;
     inputSigRef.current = inputSig;
-    return runCompute(urgent);
+    const idleMs = cached ? PLANEACION_IDLE_DEFER_MS : undefined;
+    return runCompute(urgent, idleMs);
   }, [inputSig, runCompute]);
+
+  useEffect(() => {
+    const prev = prevPlanTabRef.current;
+    prevPlanTabRef.current = params.planTab ?? "operar";
+    if ((params.planTab ?? "operar") !== "operar" || prev === "operar") return;
+    if (!getPlaneacionHeavyMetricsSnapshot(inputSigRef.current)) return;
+    return runCompute(false, PLANEACION_IDLE_DEFER_MS);
+  }, [params.planTab, runCompute]);
 
   useEffect(() => {
     const onAttentionTick = () => runCompute(false);

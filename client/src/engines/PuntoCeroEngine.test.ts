@@ -9,7 +9,9 @@ import {
   shouldComplete,
   tickPuntoCero,
   todosColoresConfirmados,
+  getPuntoCeroPasoActual,
 } from "./PuntoCeroEngine.ts";
+import { etapasPuntoCeroVacias } from "../lib/puntoCeroTypes.ts";
 
 describe("PuntoCeroEngine", () => {
   it("faseDuracionesMin reparte 1/3 activa y 2/3 pasiva", () => {
@@ -67,5 +69,13 @@ describe("PuntoCeroEngine", () => {
     const cols = [true, true, true, true, true, true, false];
     assert.equal(todosColoresConfirmados(cols), false);
     assert.equal(todosColoresConfirmados([...cols.slice(0, 6), true]), true);
+  });
+
+  it("getPuntoCeroPasoActual expone paso 5 tras colores", () => {
+    const ep = { ...etapasPuntoCeroVacias(), etapa1: true, etapa2: true, etapa3: true };
+    const cols = Array(7).fill(true);
+    const paso = getPuntoCeroPasoActual(ep, cols, "activa", "noche");
+    assert.equal(paso.paso, 5);
+    assert.match(paso.titulo, /Apagón|sueño/i);
   });
 });

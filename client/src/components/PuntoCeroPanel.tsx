@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Brain, Check, Circle, Clock, Power, Sparkles, Sun, Moon, Volume2, VolumeX, Wind, X } from "lucide-react";
+import { Check, Circle, Clock, Moon, Power, Sun, Volume2, VolumeX, X } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import type { PuntoCeroSession } from "@/lib/puntoCeroTypes";
 import {
@@ -11,6 +12,7 @@ import {
   confirmColor,
   faseDuracionesMin,
   getFaseEfectiva,
+  getPuntoCeroPasoActual,
   initPuntoCeroSession,
   parsePuntoCeroDuracionMin,
   shouldSuggestPasivaByTime,
@@ -23,6 +25,8 @@ import {
   MENSAJE_PASIVA_DIA,
   MENSAJE_PASIVA_NOCHE,
   PUNTO_CERO_ETAPAS_LIST,
+  PUNTO_CERO_PASO5,
+  PUNTO_CERO_PASOS_UI,
   speakColorInmersion,
   speakEtapaPuntoCero,
   speakPuntoCeroSequence,
@@ -32,6 +36,88 @@ import { unlockPuntoCeroSpeechFromGesture } from "@/lib/puntoCeroVoice";
 import { toast } from "sonner";
 
 const PIZARRA = "#0a0a0a";
+
+function PuntoCeroPortal({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
+
+function PuntoCeroStepRail({
+  ep,
+  colores,
+  pasoActual,
+  flotaColor,
+  modo,
+}: {
+  ep: ReturnType<typeof etapasPuntoCeroVacias>;
+  colores: boolean[];
+  pasoActual: number;
+  flotaColor: string;
+  modo: "dia" | "noche";
+}) {
+  const colorCount = colores.filter(Boolean).length;
+  return (
+    <div className="space-y-2" data-testid="punto-cero-step-rail">
+      <div className="flex items-center gap-1">
+        {PUNTO_CERO_PASOS_UI.map(({ n, short }) => {
+          const done =
+            n <= 3
+              ? ep[`etapa${n}` as "etapa1" | "etapa2" | "etapa3"]
+              : n === 4
+                ? todosColoresConfirmados(colores)
+                : pasoActual >= 5;
+          const current = pasoActual === n;
+          const partial = n === 4 && ep.etapa3 && !done && colorCount > 0;
+          return (
+            <div key={n} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+              <div
+                className="w-full h-1.5 rounded-full transition-all"
+                style={{
+                  backgroundColor: done
+                    ? flotaColor
+                    : current || partial
+                      ? `${flotaColor}88`
+                      : "rgba(255,255,255,0.08)",
+                  boxShadow: current ? `0 0 8px ${flotaColor}80` : undefined,
+                }}
+              />
+              <span
+                className="text-[6px] font-black uppercase tracking-wider truncate w-full text-center"
+                style={{
+                  color: current ? flotaColor : done ? `${flotaColor}99` : "rgba(255,255,255,0.35)",
+                }}
+              >
+                {n}. {short}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {ep.etapa3 && !todosColoresConfirmados(colores) && (
+        <div className="flex gap-0.5 h-2 rounded-full overflow-hidden">
+          {PUNTO_CERO_ARCOIRIS.map(({ color }, idx) => (
+            <div
+              key={idx}
+              className="flex-1 transition-all"
+              style={{
+                backgroundColor: colores[idx] ? color : `${color}35`,
+                opacity: colores[idx] ? 1 : pasoActual === 4 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? 1 : 0.55,
+                boxShadow: pasoActual === 4 && !colores[idx] && colores.slice(0, idx).every(Boolean) ? `0 0 6px ${color}` : undefined,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {pasoActual < 5 && (
+        <p className="text-[7px] text-center leading-snug" style={{ color: modo === "noche" ? "#a5b4fc" : "#94a3b8" }}>
+          Después del paso 4 viene el <span className="font-bold" style={{ color: flotaColor }}>paso 5</span>:{" "}
+          {modo === "noche" ? PUNTO_CERO_PASO5.labelNoche : PUNTO_CERO_PASO5.labelDia} — el más profundo para{" "}
+          {modo === "noche" ? "dormir" : "soltar"}.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function PuntoCeroAudioControls({
   vehicleId,
@@ -130,7 +216,7 @@ function PuntoCeroSalirButton({
         e.stopPropagation();
         onClick();
       }}
-      className="fixed top-4 right-4 z-[210] flex items-center gap-1.5 min-h-[2.75rem] px-3.5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.16em] border backdrop-blur-sm transition-transform active:scale-[0.98]"
+      className="fixed top-4 right-4 z-[260] flex items-center gap-1.5 min-h-[3rem] px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-[0.14em] border backdrop-blur-md transition-transform active:scale-[0.98] touch-manipulation"
       style={{
         backgroundColor: dark ? "rgba(0,0,0,0.55)" : "rgba(10,10,10,0.92)",
         borderColor: dark ? "rgba(255,255,255,0.22)" : "rgba(212,175,55,0.45)",
@@ -161,8 +247,11 @@ function PuntoCeroCloseButton({
   return (
     <button
       type="button"
-      onClick={onClick}
-      className="flex items-center justify-center gap-1.5 w-full min-h-[2.75rem] px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.18em] border transition-transform active:scale-[0.98]"
+      onClick={e => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex items-center justify-center gap-1.5 w-full min-h-[3rem] px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-[0.14em] border transition-transform active:scale-[0.98] touch-manipulation"
       style={{
         backgroundColor: dark ? "rgba(255,255,255,0.06)" : `${flotaColor}12`,
         borderColor: dark ? "rgba(255,255,255,0.18)" : `${flotaColor}45`,
@@ -322,6 +411,10 @@ export function PuntoCeroPanel({
 
   const epCompletados = [ep.etapa1, ep.etapa2, ep.etapa3, ep.etapa4].filter(Boolean).length;
   const coronaCompletada = todosColoresConfirmados(colores);
+  const pasoInfo = session
+    ? getPuntoCeroPasoActual(ep, colores, fase, session.modo)
+    : { paso: 1 as const, titulo: "Punto Cero", subtitulo: "Iniciando…" };
+  const nextColorIdx = colores.findIndex(c => !c);
   const { activaMin, pasivaMin } = session
     ? faseDuracionesMin(session.duracionTotalMin)
     : { activaMin: 5, pasivaMin: 10 };
@@ -330,16 +423,25 @@ export function PuntoCeroPanel({
     key,
     label,
     instruccion,
-    Icon: key === "etapa1" ? Circle : key === "etapa2" ? Brain : key === "etapa3" ? Wind : Sparkles,
   }));
 
   const closeEtiquetaOverlay = closeFlow ? (
+    <PuntoCeroPortal>
     <div
-      className="fixed inset-0 z-[205] flex items-end sm:items-center justify-center p-4"
+      className="fixed inset-0 z-[270] flex items-end sm:items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
       data-testid={`punto-cero-cierre-${vehicle.id}`}
+      onClick={() => {
+        setCloseFlow(false);
+        setEtiquetaLocal(null);
+        setNotaLocal("");
+      }}
     >
-      <div className="w-full max-w-sm rounded-2xl border p-4 space-y-3" style={{ backgroundColor: PIZARRA, borderColor: `${flotaColor}35` }}>
+      <div
+        className="w-full max-w-sm rounded-2xl border p-4 space-y-3"
+        style={{ backgroundColor: PIZARRA, borderColor: `${flotaColor}35` }}
+        onClick={e => e.stopPropagation()}
+      >
         <p className="text-[10px] font-black uppercase tracking-wider text-center" style={{ color: flotaColor }}>
           ¿Cómo saliste del Punto Cero?
         </p>
@@ -405,17 +507,32 @@ export function PuntoCeroPanel({
         </div>
       </div>
     </div>
+    </PuntoCeroPortal>
   ) : null;
 
   if (enPasiva && session) {
     return (
       <>
         {closeEtiquetaOverlay}
+        <PuntoCeroPortal>
         {!closeFlow && (
-          <PuntoCeroSalirButton vehicleId={vehicle.id} dark onClick={openCloseFlow} />
+          <>
+            <PuntoCeroSalirButton vehicleId={vehicle.id} dark onClick={openCloseFlow} />
+            <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 right-4 z-[260] max-w-xs mx-auto pointer-events-none">
+              <div className="pointer-events-auto">
+                <PuntoCeroCloseButton
+                  vehicleId={vehicle.id}
+                  flotaColor={flotaColor}
+                  dark
+                  label={enCompletada ? "Cerrar y retomar jornada" : "Terminar y cerrar"}
+                  onClick={openCloseFlow}
+                />
+              </div>
+            </div>
+          </>
         )}
         <div
-          className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"
+          className="fixed inset-0 z-[250] flex flex-col items-center justify-center px-6 pb-24"
           style={{ backgroundColor: "#000000" }}
           data-testid={`punto-cero-pasiva-${vehicle.id}`}
         >
@@ -439,12 +556,15 @@ export function PuntoCeroPanel({
               <Moon size={20} className="mx-auto text-indigo-400/30" />
             )}
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/25">
-              {session.modo === "dia" ? "Ancla del alivio" : "Apagón nocturno"}
+              Paso 5 · {session.modo === "dia" ? "Ancla del alivio" : "Apagón nocturno"}
+            </p>
+            <p className="text-[8px] font-bold uppercase tracking-widest" style={{ color: flotaColor }}>
+              {session.modo === "noche" ? PUNTO_CERO_PASO5.labelNoche : PUNTO_CERO_PASO5.labelDia}
             </p>
             <p className="text-sm text-white/50 leading-relaxed font-light">
               {session.modo === "dia"
-                ? "Rastreá la fricción corporal. Dejá ir con cada exhalación."
-                : "Silencio profundo. Solo la respiración."}
+                ? PUNTO_CERO_PASO5.instruccionDia
+                : PUNTO_CERO_PASO5.instruccionNoche}
             </p>
             {!enCompletada && (
               <p className="text-[9px] text-white/20 font-mono">
@@ -457,16 +577,8 @@ export function PuntoCeroPanel({
               </p>
             )}
           </div>
-          <div className="absolute bottom-6 left-4 right-4 max-w-xs mx-auto space-y-2">
-            <PuntoCeroCloseButton
-              vehicleId={vehicle.id}
-              flotaColor={flotaColor}
-              dark
-              label={enCompletada ? "Cerrar y retomar jornada" : "Terminar y cerrar"}
-              onClick={openCloseFlow}
-            />
-          </div>
         </div>
+        </PuntoCeroPortal>
       </>
     );
   }
@@ -474,6 +586,7 @@ export function PuntoCeroPanel({
   return (
     <>
       {closeEtiquetaOverlay}
+      <PuntoCeroPortal>
       {!closeFlow && !colorInmersion && (
         <PuntoCeroSalirButton vehicleId={vehicle.id} onClick={openCloseFlow} />
       )}
@@ -486,7 +599,7 @@ export function PuntoCeroPanel({
             exit={{ opacity: 0, transition: { duration: 0.8 } }}
             transition={{ duration: 0.25 }}
             onClick={() => confirmColorInmersion(colorInmersion.idx)}
-            className="fixed inset-0 z-[205] flex flex-col items-center justify-center"
+            className="fixed inset-0 z-[255] flex flex-col items-center justify-center"
             style={{ backgroundColor: `${colorInmersion.color}E0`, cursor: "pointer" }}
             data-testid={`overlay-inmersion-${vehicle.id}`}
           >
@@ -536,9 +649,32 @@ export function PuntoCeroPanel({
           </motion.div>
         )}
       </AnimatePresence>
+      </PuntoCeroPortal>
 
       <div className="space-y-2" data-testid={`descanso-msg-${vehicle.id}`}>
         <div className="p-3 rounded-xl border" style={{ backgroundColor: `${flotaColor}08`, borderColor: `${flotaColor}30` }}>
+          <div
+            className="mb-2.5 p-2.5 rounded-xl border"
+            style={{ backgroundColor: "rgba(0,0,0,0.35)", borderColor: `${flotaColor}40` }}
+            data-testid={`punto-cero-paso-actual-${vehicle.id}`}
+          >
+            <p className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: flotaColor }}>
+              Paso {pasoInfo.paso} de 5
+            </p>
+            <p className="text-[11px] font-bold text-white mt-0.5">{pasoInfo.titulo}</p>
+            <p className="text-[8px] text-slate-500 mt-0.5 leading-snug">{pasoInfo.subtitulo}</p>
+            {session && (
+              <div className="mt-2">
+                <PuntoCeroStepRail
+                  ep={ep}
+                  colores={colores}
+                  pasoActual={pasoInfo.paso}
+                  flotaColor={flotaColor}
+                  modo={session.modo}
+                />
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Circle size={14} style={{ color: flotaColor }} />
             <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: flotaColor }}>PUNTO CERO</span>
@@ -588,15 +724,31 @@ export function PuntoCeroPanel({
               <button
                 type="button"
                 onClick={enterPasivaManual}
-                className="w-full min-h-[2.5rem] px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider border transition-all"
+                className="w-full min-h-[2.75rem] px-3 py-2.5 rounded-xl text-[9px] font-bold uppercase tracking-wider border transition-all"
                 style={{
-                  backgroundColor: "rgba(255,255,255,0.04)",
-                  borderColor: `${flotaColor}35`,
-                  color: flotaColor,
+                  backgroundColor: "rgba(99,102,241,0.12)",
+                  borderColor: "rgba(99,102,241,0.35)",
+                  color: session?.modo === "noche" ? "#a5b4fc" : flotaColor,
                 }}
                 data-testid={`punto-cero-pasiva-manual-${vehicle.id}`}
               >
-                Entrar en silencio (fase pasiva)
+                Ir al paso 5 · {session?.modo === "noche" ? "Apagón / sueño" : "Silencio profundo"}
+              </button>
+            )}
+            {coronaCompletada && !enPasiva && (
+              <button
+                type="button"
+                onClick={enterPasivaManual}
+                className="w-full min-h-[2.75rem] px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all"
+                style={{
+                  backgroundColor: `${flotaColor}18`,
+                  borderColor: flotaColor,
+                  color: flotaColor,
+                  boxShadow: `0 0 16px ${flotaColor}25`,
+                }}
+                data-testid={`punto-cero-paso5-cta-${vehicle.id}`}
+              >
+                Entrar al paso 5 · {session?.modo === "noche" ? PUNTO_CERO_PASO5.labelNoche : PUNTO_CERO_PASO5.labelDia}
               </button>
             )}
           </div>
@@ -604,12 +756,14 @@ export function PuntoCeroPanel({
 
         {showMicroPasos ? (
           <div className="space-y-1.5">
-            {etapasCfg.map(({ key, label, instruccion, Icon: EtapaIcon }) => {
+            {etapasCfg.map(({ key, label, instruccion }) => {
               const checked = ep[key];
               const isColorEtapa = key === "etapa4";
               const colorCount = colores.filter(Boolean).length;
-              const prevRequired = key === "etapa2" ? !ep.etapa1 : key === "etapa3" ? !ep.etapa2 : key === "etapa4" ? (!ep.etapa3 || !coronaCompletada) : false;
+              const prevRequired = key === "etapa2" ? !ep.etapa1 : key === "etapa3" ? !ep.etapa2 : key === "etapa4" ? !ep.etapa3 : false;
               const isLocked = !checked && prevRequired;
+              const pasoNum = key === "etapa1" ? 1 : key === "etapa2" ? 2 : key === "etapa3" ? 3 : 4;
+              const isCurrent = !checked && pasoInfo.paso === pasoNum;
               return (
                 <div key={key}>
                   <button
@@ -636,14 +790,22 @@ export function PuntoCeroPanel({
                     }}
                     disabled={checked || isLocked || isColorEtapa}
                     className="w-full flex items-start gap-3 p-2.5 rounded-xl border transition-all text-left"
-                    style={{ backgroundColor: checked ? `${flotaColor}10` : "rgba(255,255,255,0.03)", borderColor: checked ? flotaColor : (isLocked ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)"), cursor: (checked || isLocked || isColorEtapa) ? "default" : "pointer", opacity: isLocked ? 0.4 : 1 }}
+                    style={{
+                      backgroundColor: checked ? `${flotaColor}10` : isCurrent ? `${flotaColor}14` : "rgba(255,255,255,0.03)",
+                      borderColor: checked ? flotaColor : isCurrent ? flotaColor : isLocked ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)",
+                      boxShadow: isCurrent ? `0 0 14px ${flotaColor}30` : undefined,
+                      cursor: (checked || isLocked || isColorEtapa) ? "default" : "pointer",
+                      opacity: isLocked ? 0.4 : 1,
+                    }}
                     data-testid={`etapa-pc-${key}-${vehicle.id}`}
                   >
-                    <div className="w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5" style={{ borderColor: checked ? flotaColor : "rgba(255,255,255,0.2)", backgroundColor: checked ? `${flotaColor}20` : "transparent" }}>
-                      {checked ? <Check size={9} style={{ color: flotaColor }} /> : <EtapaIcon size={9} style={{ color: isLocked ? "#334155" : "#64748b" }} />}
+                    <div className="w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 mt-0.5" style={{ borderColor: checked || isCurrent ? flotaColor : "rgba(255,255,255,0.2)", backgroundColor: checked || isCurrent ? `${flotaColor}20` : "transparent" }}>
+                      {checked ? <Check size={9} style={{ color: flotaColor }} /> : <span className="text-[7px] font-black" style={{ color: isCurrent ? flotaColor : "#64748b" }}>{pasoNum}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-bold" style={{ color: checked ? flotaColor : "#64748b" }}>{label}</p>
+                      <p className="text-[9px] font-bold" style={{ color: checked || isCurrent ? flotaColor : "#64748b" }}>
+                        {isCurrent ? "▶ " : ""}{label}
+                      </p>
                       <p className="text-[8px] text-slate-600 mt-0.5">{instruccion}</p>
                     </div>
                     {checked
@@ -654,9 +816,14 @@ export function PuntoCeroPanel({
                     }
                   </button>
                   {isColorEtapa && !checked && ep.etapa3 && (
-                    <div className="grid grid-cols-4 gap-2 mt-2 px-1">
+                    <div className="mt-2 px-1 space-y-2">
+                      <p className="text-[8px] font-bold uppercase tracking-wider text-center" style={{ color: flotaColor }}>
+                        Paso 4 · Tocá cada color en orden · {colorCount}/7
+                      </p>
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                       {PUNTO_CERO_ARCOIRIS.map(({ color, zona }, idx) => {
                         const confirmado = colores[idx];
+                        const esSiguiente = idx === nextColorIdx && !confirmado;
                         return (
                           <button
                             key={zona}
@@ -675,17 +842,35 @@ export function PuntoCeroPanel({
                               }
                             }}
                             disabled={confirmado || !session}
-                            className="flex flex-col items-center gap-1 py-2 px-1 rounded-xl border transition-all"
-                            style={{ backgroundColor: confirmado ? `${color}25` : `${color}12`, borderColor: confirmado ? color : `${color}35`, cursor: confirmado ? "default" : "pointer", boxShadow: confirmado ? `0 0 10px ${color}50` : `0 0 4px ${color}20` }}
+                            className="flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl border transition-all"
+                            style={{
+                              backgroundColor: confirmado ? `${color}30` : `${color}18`,
+                              borderColor: confirmado ? color : esSiguiente ? "#fff" : `${color}55`,
+                              cursor: confirmado ? "default" : "pointer",
+                              boxShadow: confirmado
+                                ? `0 0 14px ${color}60`
+                                : esSiguiente
+                                  ? `0 0 18px ${color}, 0 0 6px #fff`
+                                  : `0 0 6px ${color}35`,
+                              transform: esSiguiente ? "scale(1.04)" : undefined,
+                            }}
                             data-testid={`color-pc-${idx}-${vehicle.id}`}
                           >
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: confirmado ? color : `${color}40`, boxShadow: confirmado ? `0 0 8px ${color}` : "none" }}>
-                              {confirmado && <Check size={10} color="#fff" />}
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center"
+                              style={{
+                                backgroundColor: confirmado ? color : color,
+                                opacity: confirmado ? 1 : 0.85,
+                                boxShadow: confirmado ? `0 0 12px ${color}` : `inset 0 0 0 3px rgba(0,0,0,0.25)`,
+                              }}
+                            >
+                              {confirmado ? <Check size={14} color="#fff" /> : <span className="text-[9px] font-black text-white/90">{idx + 1}</span>}
                             </div>
-                            <span className="text-[7px] font-bold text-center leading-tight" style={{ color: confirmado ? color : `${color}90` }}>{zona}</span>
+                            <span className="text-[7px] font-bold text-center leading-tight" style={{ color: confirmado ? color : "#fff" }}>{zona}</span>
                           </button>
                         );
                       })}
+                      </div>
                     </div>
                   )}
                   {isColorEtapa && checked && (
@@ -698,6 +883,29 @@ export function PuntoCeroPanel({
                 </div>
               );
             })}
+            <div
+              className="p-3 rounded-xl border mt-2"
+              style={{
+                backgroundColor: pasoInfo.paso >= 5 ? `${flotaColor}12` : "rgba(99,102,241,0.06)",
+                borderColor: pasoInfo.paso >= 5 ? flotaColor : "rgba(99,102,241,0.25)",
+                opacity: ep.etapa3 ? 1 : 0.55,
+              }}
+              data-testid={`punto-cero-paso5-preview-${vehicle.id}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Moon size={12} style={{ color: session?.modo === "noche" ? "#a5b4fc" : flotaColor }} />
+                <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: session?.modo === "noche" ? "#a5b4fc" : flotaColor }}>
+                  Paso 5 · {session?.modo === "noche" ? PUNTO_CERO_PASO5.labelNoche : PUNTO_CERO_PASO5.labelDia}
+                </p>
+                {!ep.etapa3 && <span className="text-[7px] text-slate-600 ml-auto">después del paso 4</span>}
+              </div>
+              <p className="text-[8px] text-slate-500 leading-snug">
+                {session?.modo === "noche" ? PUNTO_CERO_PASO5.instruccionNoche : PUNTO_CERO_PASO5.instruccionDia}
+              </p>
+              <p className="text-[7px] text-slate-600 mt-1">
+                No suma PS · es el paso más profundo · pantalla negra + ondas {session?.modo === "noche" ? "delta (sueño)" : "theta (alivio)"}
+              </p>
+            </div>
           </div>
         ) : (
           <p className="text-[8px] text-center text-slate-600">Cargando etapas del protocolo…</p>

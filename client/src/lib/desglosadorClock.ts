@@ -167,7 +167,15 @@ export function validateSubCloseCantidad(
     return { ok: true, cantidad: Math.max(0, Number(cantidadInput) || 0) };
   }
   const trimmed = cantidadInput.trim();
+  const hasRecord = Boolean(sub.tiempoRecordMinPerUnit && sub.tiempoRecordMinPerUnit > 0);
   if (trimmed === "") {
+    // Primer ciclo sin récord: no hay voz ni ruta; permitir cerrar sin fricción.
+    if (!hasRecord) {
+      return {
+        ok: true,
+        cantidad: status === "cumplido" ? sub.cantidadObjetivo : 0,
+      };
+    }
     return { ok: false, message: "Indica la cantidad lograda antes de cerrar este sub." };
   }
   const cantidad = Number(trimmed);

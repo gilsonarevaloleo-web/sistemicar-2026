@@ -215,3 +215,51 @@ export function mensajeCompletado(modo: ModoPuntoCero): string {
     ? "Fase Punto Cero completada. Energía restaurada. Retoma el vehículo."
     : "Apagón completado. Silencio absoluto. Buen descanso.";
 }
+
+export type PuntoCeroPasoInfo = {
+  paso: 1 | 2 | 3 | 4 | 5;
+  titulo: string;
+  subtitulo: string;
+};
+
+/** Paso visible en UI (1–4 etapas + 5 fase pasiva / sueño). */
+export function getPuntoCeroPasoActual(
+  ep: EtapasPuntoCero,
+  colores: boolean[],
+  fase: FasePuntoCero,
+  modo: ModoPuntoCero
+): PuntoCeroPasoInfo {
+  const pasivaTitulo = modo === "noche" ? "Apagón · sueño profundo" : "Ancla del alivio";
+  if (fase === "pasiva") {
+    return {
+      paso: 5,
+      titulo: pasivaTitulo,
+      subtitulo: "Paso 5 · el más profundo — solo respiración",
+    };
+  }
+  if (fase === "completada") {
+    return { paso: 5, titulo: "Bloque completado", subtitulo: "Salí cuando quieras retomar" };
+  }
+  if (!ep.etapa1) {
+    return { paso: 1, titulo: "Tensión y quietud del cuerpo", subtitulo: "Paso 1 de 5 · activá para empezar" };
+  }
+  if (!ep.etapa2) {
+    return { paso: 2, titulo: "Identificación del pensamiento", subtitulo: "Paso 2 de 5 · apagá el movimiento mental" };
+  }
+  if (!ep.etapa3) {
+    return { paso: 3, titulo: "Ritmo, polos y apnea", subtitulo: "Paso 3 de 5 · respiración consciente" };
+  }
+  if (!todosColoresConfirmados(colores)) {
+    const n = colores.filter(Boolean).length;
+    return {
+      paso: 4,
+      titulo: "Alimento de colores",
+      subtitulo: `Paso 4 de 5 · ${n}/7 colores · tocá cada uno`,
+    };
+  }
+  return {
+    paso: 5,
+    titulo: pasivaTitulo,
+    subtitulo: "Colores listos — entrá al paso 5 (silencio profundo)",
+  };
+}

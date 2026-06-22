@@ -471,6 +471,7 @@ import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR, flotaLabelUpper, flotaLabels
 import { SituacionCasaPanel } from "@/components/SituacionCasaPanel";
 import { PuntoCeroPanel } from "@/components/PuntoCeroPanel";
 import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import { PlanTabPanel } from "@/components/planeacion/PlanTabPanel";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
 import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
@@ -1843,6 +1844,7 @@ export default function Planeacion() {
     focusEventsToday,
     yesterdayTermoSnapshot,
     disciplinaSnapshots,
+    planTab,
   });
 
   useEffect(() => {
@@ -6605,15 +6607,17 @@ export default function Planeacion() {
                 {formatCombustibleResumen(combustibleLive)}
               </p>
             )}
-            anillo={planTab !== "metricas" ? (
-              <AnilloConcienciaLive
-                segmentos={planilla?.segmentos || []}
-                vehicles={vehicles}
-                conquistaPulse={conquistaPulse}
-                ringOnly
-                size={72}
-              />
-            ) : null}
+            anillo={(
+              <div hidden={compactLayout && planTab === "metricas" ? true : undefined} aria-hidden={compactLayout && planTab === "metricas" ? true : undefined}>
+                <AnilloConcienciaLive
+                  segmentos={planilla?.segmentos || []}
+                  vehicles={vehicles}
+                  conquistaPulse={conquistaPulse}
+                  ringOnly
+                  size={72}
+                />
+              </div>
+            )}
             segmentoChip={(
               segmentoActivo ? (
                 <div className="rounded-xl border px-3 py-2" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }} data-testid="cockpit-segmento-activo">
@@ -6630,7 +6634,8 @@ export default function Planeacion() {
           />
 
         {/* MONITOR DE ESTADOS */}
-        {(planLayout === "full" || planTab === "meta") && monitorState && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
+        {monitorState && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-4 rounded-xl border-2" style={{ backgroundColor: `${MONITOR_STATES[monitorState].color}10`, borderColor: MONITOR_STATES[monitorState].color }}>
             <div className="flex items-center gap-3">
               {(() => { const Icon = MONITOR_STATES[monitorState].icon; return <Icon size={20} style={{ color: MONITOR_STATES[monitorState].color }} />; })()}
@@ -6641,9 +6646,10 @@ export default function Planeacion() {
             </div>
           </motion.div>
         )}
+        </PlanTabPanel>
 
         {/* BARRA PS — total + día */}
-        {(planLayout === "full" || planTab === "meta") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl border relative overflow-hidden" style={{ backgroundColor: PIZARRA, borderColor: goldenFlash ? GOLD : `${GOLD}20`, boxShadow: goldenFlash ? `0 0 30px ${GOLD}50, 0 0 60px ${GOLD}20` : "none", transition: "all 0.5s ease" }}>
           <AnimatePresence>
             {goldenFlash && (
@@ -6713,10 +6719,10 @@ export default function Planeacion() {
             <span className="absolute right-0 top-0 text-[7px] text-slate-600">120%</span>
           </div>
         </motion.div>
-        )}
+        </PlanTabPanel>
 
         {/* Escalera de Conciencia — presencia · entrada · producción */}
-        {(planLayout === "full" || planTab === "metricas") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="metricas">
           <PlaneacionMetricsEscalera
             visible
             model={escaleraConciencia}
@@ -6724,10 +6730,10 @@ export default function Planeacion() {
             compact={compactLayout}
             detalleOpen={metricasDetalleOpen}
           />
-        )}
+        </PlanTabPanel>
 
         {/* Termodinámica — frente a ayer (tu referencia) */}
-        {(planLayout === "full" || planTab === "metricas") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="metricas">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -6867,10 +6873,11 @@ export default function Planeacion() {
               })}
           </div>
         </motion.div>
-        )}
+        </PlanTabPanel>
 
         {/* Atención Panorámica — puertas conscientes */}
-        {(planLayout === "full" || planTab === "metricas") && planilla && planilla.segmentos.length > 0 && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="metricas">
+        {planilla && planilla.segmentos.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -6967,9 +6974,11 @@ export default function Planeacion() {
             </div>
           </motion.div>
         )}
+        </PlanTabPanel>
 
         {/* Disciplina — vehículos conscientes en segmento */}
-        {(planLayout === "full" || planTab === "metricas") && planilla && planilla.segmentos.length > 0 && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="metricas">
+        {planilla && planilla.segmentos.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -7150,6 +7159,7 @@ export default function Planeacion() {
             </div>
           </motion.div>
         )}
+        </PlanTabPanel>
 
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -7191,7 +7201,8 @@ export default function Planeacion() {
         </motion.div>
 
         {/* RADIOGRAFÍA DEL OPERADOR — mini barra de progreso de tokens */}
-        {(planLayout === "full" || planTab === "meta") && (() => {
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
+        {(() => {
           const ps = progression?.sovereigntyPoints || 0;
           const STEP = 350;
           const nextMilestone = (Math.floor(ps / STEP) + 1) * STEP;
@@ -7234,14 +7245,15 @@ export default function Planeacion() {
             </motion.div>
           );
         })()}
+        </PlanTabPanel>
 
         {/* BÓVEDA DE LOGROS — HITO PLANIFICACIÓN */}
-        {(planLayout === "full" || planTab === "meta") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
           <PlanModuleMilestoneBar pts={progression?.ptsPlanificacion || 0} />
-        )}
+        </PlanTabPanel>
 
         {/* ANILLO DE CONCIENCIA */}
-        {(planLayout === "full" || planTab === "metricas") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="metricas">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -7279,7 +7291,7 @@ export default function Planeacion() {
               </p>
             </div>
           </motion.div>
-        )}
+        </PlanTabPanel>
 
         <AnimatePresence>
           {recordBanner && (
@@ -7582,7 +7594,8 @@ export default function Planeacion() {
         </AnimatePresence>
 
         {/* BANNER: AUTO-CARGA DE RUTINA */}
-        {(planLayout === "full" || planTab === "operar") && rutinaBanner && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="operar">
+        {rutinaBanner && (
           <motion.div
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
             className="rounded-2xl border border-amber-700/30 shadow-[0_0_12px_rgba(245,158,11,0.08)] p-4 flex items-center justify-between gap-3 bg-gradient-to-br from-zinc-950 via-[#141416] to-zinc-950"
@@ -7616,9 +7629,10 @@ export default function Planeacion() {
             </div>
           </motion.div>
         )}
+        </PlanTabPanel>
 
         {/* ACORDEÓN: SEGMENTOS DEL DÍA (Puerta de Atención) */}
-        {(planLayout === "full" || planTab === "operar") && (
+        <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="operar">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border overflow-hidden" style={{ backgroundColor: PIZARRA, borderColor: `${BLOOD}25` }}>
           <button onClick={() => setExpandedSegId(expandedSegId === "segmentos" ? null : "segmentos")} className="w-full p-4 flex items-center justify-between" data-testid="accordion-segmentos">
             <div className="flex items-center gap-2">
@@ -8179,9 +8193,8 @@ export default function Planeacion() {
             )}
           </AnimatePresence>
         </motion.div>
-        )}
 
-        {(planLayout === "full" || planTab === "operar") && (!isCreating ? (
+        {!isCreating ? (
           <>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
               <div className="mb-2">
@@ -9154,7 +9167,8 @@ export default function Planeacion() {
               Volver a La Flota
             </button>
           </div>
-        ) : null)}
+        ) : null}
+        </PlanTabPanel>
 
         {cierreEnergiaPending && (() => {
           const showRuta = cierrePayloadHasRutaEnfoque(cierreEnergiaPending);
@@ -10114,6 +10128,17 @@ function VehicleCard({
   const [subRutaSel, setSubRutaSel] = useState<Set<RutaBandaId>>(new Set());
   const [subRutaSinUso, setSubRutaSinUso] = useState(false);
   const [subRutaPatron, setSubRutaPatron] = useState<RutaSeguimientoPatron | null>(null);
+  const prevActiveSubIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (vehicle.tipoReloj !== "desglosador") return;
+    const activeSub = (vehicle.subVehiculos || []).find(s => s.status === "activo");
+    const nextId = activeSub?.id ?? null;
+    if (prevActiveSubIdRef.current !== nextId) {
+      prevActiveSubIdRef.current = nextId;
+      setCantidadRealizada("");
+    }
+  }, [vehicle.subVehiculos, vehicle.tipoReloj]);
 
   const openSubRutaModal = (payload: NonNullable<typeof subRutaModal>) => {
     setSubRutaSel(new Set());
@@ -11712,7 +11737,7 @@ function VehicleCard({
                                           {Math.max(0, activeSub.cantidadObjetivo - (Number(cantidadRealizada) || 0))}
                                         </span>
                                         <p className="text-[8px] mt-0.5 font-mono" style={{ color: "rgba(255,255,255,0.62)" }}>
-                                          Sin récord · primer ciclo
+                                          Sin récord · primer ciclo · Cumplido asume todo el objetivo
                                         </p>
                                       </div>
                                     )}

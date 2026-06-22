@@ -67,9 +67,26 @@ describe("validateSubCloseCantidad", () => {
     if (r.ok) assert.equal(r.cantidad, 0);
   });
 
-  it("bloquea cierre con objetivo y cantidad vacía", () => {
-    const r = validateSubCloseCantidad(withObj, "", "fallado");
+  it("bloquea cierre con objetivo y récord si cantidad vacía", () => {
+    const conRecord = sub({ id: "o", cantidadObjetivo: 3, tiempoRecordMinPerUnit: 2 });
+    const r = validateSubCloseCantidad(conRecord, "", "fallado");
     assert.equal(r.ok, false);
+  });
+
+  it("primer ciclo sin récord: cumplido infiere objetivo y fallado infiere 0", () => {
+    const sinRecord = sub({ id: "sr", cantidadObjetivo: 4 });
+    const cumplido = validateSubCloseCantidad(sinRecord, "", "cumplido");
+    assert.equal(cumplido.ok, true);
+    if (cumplido.ok) assert.equal(cumplido.cantidad, 4);
+    const fallado = validateSubCloseCantidad(sinRecord, "", "fallado");
+    assert.equal(fallado.ok, true);
+    if (fallado.ok) assert.equal(fallado.cantidad, 0);
+  });
+
+  it("con récord sigue exigiendo cantidad explícita", () => {
+    const conRecord = sub({ id: "cr", cantidadObjetivo: 4, tiempoRecordMinPerUnit: 2 });
+    assert.equal(validateSubCloseCantidad(conRecord, "", "cumplido").ok, false);
+    assert.equal(validateSubCloseCantidad(conRecord, "", "fallado").ok, false);
   });
 
   it("permite fallado con cantidad 0 explícita", () => {

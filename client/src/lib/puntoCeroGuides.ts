@@ -127,3 +127,22 @@ export function mensajePasivaNoche(): string {
 export const PUNTO_CERO_ETAPAS_LIST = (
   ["etapa1", "etapa2", "etapa3", "etapa4"] as const
 ).map(key => ({ key, ...PUNTO_CERO_ETAPAS[key] }));
+
+/** Paso 5 — no suma PS; es la fase más profunda tras los 7 colores. */
+export const PUNTO_CERO_PASO5 = {
+  label: "Fase pasiva",
+  labelDia: "Ancla del alivio",
+  labelNoche: "Apagón · sueño profundo",
+  instruccionDia:
+    "Después de los colores entras al paso más profundo: silencio, solo respiración y ondas theta. Dejá ir la fricción corporal.",
+  instruccionNoche:
+    "Después de los colores entras al paso más profundo para dormir: silencio total, ondas delta. Nadie te apura — aquí es donde el sistema se apaga.",
+} as const;
+
+export const PUNTO_CERO_PASOS_UI = [
+  { n: 1, short: "Cuerpo", etapa: "etapa1" as const },
+  { n: 2, short: "Mente", etapa: "etapa2" as const },
+  { n: 3, short: "Respiración", etapa: "etapa3" as const },
+  { n: 4, short: "Colores", etapa: "etapa4" as const },
+  { n: 5, short: "Sueño", etapa: null },
+] as const;
