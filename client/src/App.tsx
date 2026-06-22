@@ -1,7 +1,11 @@
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout";
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode, lazy, Suspense } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode, Suspense } from "react";
+import { lazyWithRetry, prefetchJornadaChunk } from "@/lib/lazyWithRetry";
+import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
+import { JornadaShell } from "@/components/jornada/JornadaShell";
+import { JornadaSuspenseFallback } from "@/components/jornada/JornadaSuspenseFallback";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
 import type { ModuleId } from "@shared/moduleAccess";
@@ -16,7 +20,7 @@ interface AppUser {
 import MenuPrincipal from "@/pages/menu-principal";
 import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
-const Planeacion = lazy(() => import("@/pages/planeacion"));
+const Planeacion = lazyWithRetry(() => import("@/pages/planeacion"));
 import Esperanza from "@/pages/esperanza";
 import Rewards from "@/pages/rewards";
 import Analytics from "@/pages/analytics";
@@ -130,9 +134,11 @@ const isOwnerEmail = (email: string | null | undefined): boolean => {
 function ModuleRoute({
   component: Component,
   requiredModule,
+  loadingFallback,
 }: {
   component: React.ComponentType;
   requiredModule: ModuleId;
+  loadingFallback?: ReactNode;
 }) {
   const { user, loading } = useAuthContext();
   const [, navigate] = useLocation();
@@ -179,19 +185,27 @@ function ModuleRoute({
     }
   }, [user, loading, navigate, ownerBypass, requiredModule]);
 
+  useEffect(() => {
+    if (!checkingTier) return;
+    const id = window.setTimeout(() => setCheckingTier(false), 8000);
+    return () => clearTimeout(id);
+  }, [checkingTier]);
+
+  const tierLoadingUi = loadingFallback ?? (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>
+      <div className="text-center">
+        <div className="w-12 h-12 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-slate-400 text-sm">Verificando acceso...</p>
+      </div>
+    </div>
+  );
+
   if (ownerBypass && !loading) {
     return <Component />;
   }
 
   if (loading || checkingTier) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Verificando acceso...</p>
-        </div>
-      </div>
-    );
+    return tierLoadingUi;
   }
 
   if (!user || !hasAccess(progression)) {
@@ -291,18 +305,15 @@ function Router() {
           {() => { window.location.replace("/espejo"); return null; }}
         </Route>
         <Route path="/planeacion">
-          <Suspense
-            fallback={(
-              <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>
-                <div className="text-center">
-                  <div className="w-12 h-12 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-slate-400 text-sm">Cargando Jornada…</p>
-                </div>
-              </div>
-            )}
-          >
-            <ModuleRoute component={Planeacion} requiredModule="planificacion_base" />
-          </Suspense>
+          <JornadaErrorBoundary>
+            <Suspense fallback={<JornadaSuspenseFallback />}>
+              <ModuleRoute
+                component={Planeacion}
+                requiredModule="planificacion_base"
+                loadingFallback={<JornadaShell statusLine="Verificando acceso…" />}
+              />
+            </Suspense>
+          </JornadaErrorBoundary>
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />

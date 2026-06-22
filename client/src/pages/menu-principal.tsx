@@ -60,6 +60,7 @@ import logoSistemicar from "@/assets/logo-sistemicar.png";
 import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
 
 // ESPECTRO CROMÁTICO DE CONCIENCIA
 const SPECTRUM = {
@@ -234,6 +235,19 @@ export default function MenuPrincipal() {
     );
     return () => unsub();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const args = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
+    if (!hasPlanificacionBaseAccess(...args)) return;
+    const run = () => prefetchJornadaChunk();
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(run, { timeout: 2500 });
+      return () => cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(run, 400);
+    return () => clearTimeout(t);
+  }, [user?.uid, userEmail, progression?.subscriptionPlan, progression?.rank, progression?.activeModules]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -684,6 +698,9 @@ export default function MenuPrincipal() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
                     onClick={() => item.id !== "proximo" && navigate(item.route)}
+                    onPointerEnter={() => {
+                      if (item.id === "planificacion" || item.route === "/planeacion") prefetchJornadaChunk();
+                    }}
                     className={`group relative p-4 rounded-xl border text-center transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] ${item.enCamino ? "opacity-80" : ""}`}
                     style={{ 
                       backgroundColor: "#0a0a0a",
