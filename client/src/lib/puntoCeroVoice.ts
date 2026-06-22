@@ -34,6 +34,8 @@ export {
   mensajeReactivacionDia,
   PUNTO_CERO_ETAPAS,
   PUNTO_CERO_ETAPAS_LIST,
+  PUNTO_CERO_PASO5,
+  PUNTO_CERO_PASOS_UI,
 } from "./puntoCeroGuides";
 import type { PuntoCeroEtapaKey } from "./puntoCeroGuides";
 

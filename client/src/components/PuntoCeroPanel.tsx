@@ -27,12 +27,14 @@ import {
   PUNTO_CERO_ETAPAS_LIST,
   PUNTO_CERO_PASO5,
   PUNTO_CERO_PASOS_UI,
+} from "@/lib/puntoCeroGuides";
+import {
   speakColorInmersion,
   speakEtapaPuntoCero,
   speakPuntoCeroSequence,
   stopPleasantVoice,
+  unlockPuntoCeroSpeechFromGesture,
 } from "@/lib/puntoCeroVoice";
-import { unlockPuntoCeroSpeechFromGesture } from "@/lib/puntoCeroVoice";
 import { toast } from "sonner";
 
 const PIZARRA = "#0a0a0a";
