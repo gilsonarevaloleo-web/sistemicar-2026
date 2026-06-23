@@ -485,6 +485,7 @@ import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienc
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
+import { BotonRepararJornada } from "@/components/jornada/BotonRepararJornada";
 import {
   JORNADA_BACKUP_INTERVAL_MS,
   saveJornadaBackup,
@@ -493,6 +494,18 @@ import {
   vehiclesForJornadaBackup,
 } from "@/services/jornadaBackup";
 import { setJornadaFatalError } from "@/lib/jornadaFatalError";
+import {
+  armFlotaFetchTimeout,
+  beginFlotaFetch,
+  cancelFlotaFetch,
+  completeFlotaFetch,
+  getFlotaFetchStatus,
+  isFlotaFetchCurrent,
+  onJornadaVisibilityReturn,
+  retryFlotaFetch,
+  subscribeFlotaFetchStatus,
+  type FlotaFetchStatus,
+} from "@/services/jornadaFlotaFetch";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import {
@@ -1426,7 +1439,11 @@ export default function Planeacion() {
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
   /** Refresco ligero de UI de segmentos (puertas/ventanas) sin recomputar métricas pesadas en render. */
   const segmentUiTick = useConcienciaClockTick();
-  const [flotaUiReady, setFlotaUiReady] = useState(false);
+  const [flotaFetchStatus, setFlotaFetchStatus] = useState<FlotaFetchStatus>(() => getFlotaFetchStatus());
+  const flotaFetchGenRef = useRef(0);
+  const unsubVehiclesRef = useRef<(() => void) | null>(null);
+  const resumeGenRef = useRef(0);
+  const rehydrateFlotaFromLocalRef = useRef<(() => void) | null>(null);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
   const [cerrandoSegId, setCerrandoSegId] = useState<string | null>(null);
   const [showCierreJornada, setShowCierreJornada] = useState(false);
@@ -1694,8 +1711,15 @@ export default function Planeacion() {
 
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
 
-  useEffect(() => {
+  const setupFlotaSubscription = useCallback(() => {
     if (!user) return;
+    const { generation } = beginFlotaFetch();
+    flotaFetchGenRef.current = generation;
+    armFlotaFetchTimeout(generation);
+
+    unsubVehiclesRef.current?.();
+    unsubVehiclesRef.current = null;
+
     const isCloseInFlight = (vehicleId: string): boolean => {
       const started = closingInProgressRef.current.get(vehicleId);
       if (started == null) return false;
@@ -1705,10 +1729,11 @@ export default function Planeacion() {
       }
       return true;
     };
-    const unsub1 = subscribeToVehicles(user.uid, (data) => {
-      if (isLocalVehicleMutationLocked()) {
-        return;
-      }
+
+    unsubVehiclesRef.current = subscribeToVehicles(user.uid, (data) => {
+      if (!isFlotaFetchCurrent(generation)) return;
+      if (isLocalVehicleMutationLocked()) return;
+
       const firebaseIds = new Set(data.map(v => v.id));
       optimisticVehiclesRef.current = optimisticVehiclesRef.current.filter(ov => !firebaseIds.has(ov.id));
       const pending = optimisticVehiclesRef.current;
@@ -1724,12 +1749,19 @@ export default function Planeacion() {
       if (merged.length > 0 && sig !== mergedVehiclesSigRef.current) {
         saveLocalVehicles(merged);
       }
-      if (sig === mergedVehiclesSigRef.current) return;
+      if (sig === mergedVehiclesSigRef.current) {
+        completeFlotaFetch(generation);
+        return;
+      }
       const localSig = vehiclesReactiveSignature(vehiclesRef.current);
-      if (sig !== localSig && localSig === mergedVehiclesSigRef.current) return;
+      if (sig !== localSig && localSig === mergedVehiclesSigRef.current) {
+        completeFlotaFetch(generation);
+        return;
+      }
       mergedVehiclesSigRef.current = sig;
       setVehicles(merged);
       scheduleDeferredVehicleCleanup(() => {
+        if (!isFlotaFetchCurrent(generation)) return;
         if (isLocalVehicleMutationLocked()) return;
         const archived = archiveOrphanDesglosadorInterrupts(vehiclesRef.current, Date.now());
         const archivedSig = vehiclesReactiveSignature(archived);
@@ -1739,12 +1771,29 @@ export default function Planeacion() {
         setVehicles(archived);
         saveLocalVehicles(archived);
       });
-    }, (e) => console.error(e), { isCloseInFlight });
+      completeFlotaFetch(generation);
+    }, (e) => {
+      if (!isFlotaFetchCurrent(generation)) return;
+      console.error(e);
+      completeFlotaFetch(generation);
+    }, { isCloseInFlight });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    setupFlotaSubscription();
     const unsub2 = subscribeToProgression(user.uid, (prog) => setProgression(prog), (e) => console.error(e));
     const unsub3 = subscribeToEnergyLogs(user.uid, (data) => setEnergyLogs(data), (e) => console.error(e));
     const unsub4 = subscribeToSituacionReserva(user.uid, setSituacionReserva, e => console.error(e));
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
-  }, [user]);
+    return () => {
+      unsubVehiclesRef.current?.();
+      unsubVehiclesRef.current = null;
+      cancelFlotaFetch();
+      unsub2();
+      unsub3();
+      unsub4();
+    };
+  }, [user, setupFlotaSubscription]);
 
   useEffect(() => {
     if (!user) return;
@@ -1873,14 +1922,14 @@ export default function Planeacion() {
     jornadaBootingRef.current = jornadaBooting;
   }, [jornadaBooting]);
 
-  /** Watchdog 5s: nunca skeleton eterno en "Preparando Jornada…". */
+  /** Watchdog 6s alineado con flota — quita overlay si flota ya resolvió o expiró. */
   useEffect(() => {
     if (!jornadaBooting) return;
     const id = window.setTimeout(() => {
       if (jornadaBootingRef.current) {
-        setJornadaFatalError("jornada-boot-watchdog");
+        setJornadaBooting(false);
       }
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(id);
   }, [jornadaBooting]);
 
@@ -1923,31 +1972,69 @@ export default function Planeacion() {
     return () => window.removeEventListener("sovereignty-points-awarded", onAward);
   }, [user]);
 
+  useEffect(() => {
+    return subscribeFlotaFetchStatus(() => {
+      const status = getFlotaFetchStatus();
+      setFlotaFetchStatus(status);
+      if (status === "ready" || status === "timeout") {
+        setJornadaBooting(false);
+      }
+    });
+  }, []);
+
+  const handleRetryFlotaFetch = useCallback(() => {
+    if (!user) return;
+    setJornadaBooting(true);
+    retryFlotaFetch();
+    setupFlotaSubscription();
+  }, [user, setupFlotaSubscription]);
+
   /** Montaje / retorno desde background: TTS y heavy metrics no compiten con el primer paint. */
   const scheduleJornadaForegroundResume = useCallback((afterReady?: () => void) => {
+    const gen = ++resumeGenRef.current;
     beginJornadaRemount();
     pauseVoice();
     resetPuntoCeroVoiceQueue();
     pausePuntoCeroStepVoiceForRemount();
     requestAnimationFrame(() => {
       const finish = () => {
+        if (gen !== resumeGenRef.current) return;
         resumeVoice();
         endJornadaRemount();
         if (afterReady) {
-          window.setTimeout(afterReady, 1500);
+          window.setTimeout(() => {
+            if (gen !== resumeGenRef.current) return;
+            afterReady();
+          }, 300);
         }
       };
       if (typeof requestIdleCallback !== "undefined") {
-        requestIdleCallback(finish, { timeout: 3000 });
+        requestIdleCallback(finish, { timeout: 2000 });
       } else {
         finish();
       }
     });
   }, []);
 
+  const handleJornadaVisibilityReturn = useCallback(() => {
+    if (!user || document.visibilityState !== "visible") return;
+    setJornadaBooting(true);
+    rehydrateFlotaFromLocalRef.current?.();
+    setupFlotaSubscription();
+    scheduleJornadaForegroundResume(() => {
+      warmupSpeechSynthesis();
+      recoverSpeechQueue();
+      const flushed = flushMissedPuertaVoiceOnVisible();
+      if (flushed > 0) {
+        console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
+      }
+      runSegmentAttentionTickNow();
+    });
+  }, [user, setupFlotaSubscription, scheduleJornadaForegroundResume]);
+
   useEffect(() => {
     setJornadaBooting(true);
-    scheduleJornadaForegroundResume(() => setJornadaBooting(false));
+    scheduleJornadaForegroundResume();
     return () => {
       cancelJornadaRemountGuard();
       resumeVoice();
@@ -1955,25 +2042,8 @@ export default function Planeacion() {
   }, [scheduleJornadaForegroundResume]);
 
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      setJornadaBooting(true);
-      scheduleJornadaForegroundResume(() => {
-        setJornadaBooting(false);
-        warmupSpeechSynthesis();
-        recoverSpeechQueue();
-        const flushed = flushMissedPuertaVoiceOnVisible();
-        if (flushed > 0) {
-          console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
-        }
-        runSegmentAttentionTickNow();
-      });
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [scheduleJornadaForegroundResume]);
+    return onJornadaVisibilityReturn(handleJornadaVisibilityReturn);
+  }, [handleJornadaVisibilityReturn]);
 
   useEffect(() => {
     if (!user) return;
@@ -2069,19 +2139,6 @@ export default function Planeacion() {
     }
     prevSegmentoIdRef.current = currentSegId;
   }, [segmentoActivo?.id, user]);
-
-  useEffect(() => {
-    setFlotaUiReady(false);
-    const done = () => setFlotaUiReady(true);
-    if (typeof requestIdleCallback !== "undefined") {
-      const id = requestIdleCallback(done, {
-        timeout: isMobilePerfMode() ? 2200 : 900,
-      });
-      return () => cancelIdleCallback(id);
-    }
-    const t = window.setTimeout(done, 50);
-    return () => clearTimeout(t);
-  }, [user?.uid]);
 
   useEffect(() => {
     const onDayRollover = (e: Event) => {
@@ -2236,18 +2293,17 @@ export default function Planeacion() {
         return next;
       });
     };
+    rehydrateFlotaFromLocalRef.current = rehydrateFromLocal;
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
         flushToLocal();
         return;
       }
-      if (document.visibilityState === "visible") {
-        rehydrateFromLocal();
-      }
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flushToLocal);
     return () => {
+      rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushToLocal);
     };
@@ -6643,9 +6699,24 @@ export default function Planeacion() {
   return (
     <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
       <JornadaStuckProbe />
-      {jornadaBooting && (
+      {jornadaBooting && flotaFetchStatus !== "timeout" && (
         <div className="fixed inset-0 z-[60] pointer-events-none" aria-hidden>
           <JornadaShell statusLine="Preparando Jornada…" />
+        </div>
+      )}
+      {jornadaBooting && flotaFetchStatus === "timeout" && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center p-4 pb-24 bg-black/70">
+          <div className="w-full max-w-lg space-y-2">
+            <BotonRepararJornada title="Reparar Jornada" />
+            <button
+              type="button"
+              onClick={handleRetryFlotaFetch}
+              className="w-full py-3 rounded-xl text-sm font-black uppercase tracking-wider"
+              style={{ backgroundColor: "rgba(212,175,55,0.12)", color: "#D4AF37", border: "1px solid rgba(212,175,55,0.35)" }}
+            >
+              Reintentar
+            </button>
+          </div>
         </div>
       )}
       <div className="max-w-lg mx-auto space-y-4">
@@ -8367,7 +8438,26 @@ export default function Planeacion() {
             {activeVehicles.length > 0 ? (
               <div ref={flotaActivosRef} className="scroll-mt-4">
               <AccordionSection title="VEHÍCULOS ACTIVOS" icon={Zap} color={BLOOD} count={activeVehicles.length} defaultOpen>
-                {!flotaUiReady ? (
+                {flotaFetchStatus === "timeout" ? (
+                  <div className="p-4 rounded-xl border text-center space-y-3" style={{ backgroundColor: PIZARRA, borderColor: "rgba(239,68,68,0.35)" }}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-red-300">
+                      La flota no respondió a tiempo
+                    </p>
+                    <p className="text-[9px] text-slate-500 leading-snug">
+                      Varios cambios de app pueden acumular solicitudes. Reintenta o repara la jornada.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetryFlotaFetch}
+                      className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                      style={{ backgroundColor: "rgba(212,175,55,0.15)", color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)" }}
+                      data-testid="button-retry-flota-fetch"
+                    >
+                      Reintentar
+                    </button>
+                    <BotonRepararJornada compact title="Reparar Jornada" />
+                  </div>
+                ) : flotaFetchStatus !== "ready" ? (
                   <div className="p-4 rounded-xl border text-center space-y-2" style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.06)" }}>
                     <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto" />
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preparando flota activa…</p>
