@@ -2,7 +2,7 @@
  * Recuperación compartida para Jornada / Planificación atascada.
  */
 import { resetAnilloViewModeStorage } from "@/lib/anilloViewMode";
-import { invalidatePlaneacionHeavyMetricsCache } from "@/lib/planeacionCache";
+import { clearPlaneacionCache } from "@/lib/planeacionCache";
 import { emergencyPruneStorage } from "@/lib/storageHygiene";
 import {
   clearPlaneacionCrashCount,
@@ -23,9 +23,14 @@ export function runJornadaRecovery(opts?: { archiveSituacion?: boolean }): void 
     emergencyPruneStorage({ aggressive: true });
     resetAnilloViewModeStorage();
     flushLocalVehicles();
-    invalidatePlaneacionHeavyMetricsCache();
+    clearPlaneacionCache();
     cancelPuntoCeroStepVoice();
     cancelJornadaRemountGuard();
+    try {
+      localStorage.removeItem("planeacion_cache_v2");
+    } catch {
+      /* noop */
+    }
   } catch {
     /* noop */
   }

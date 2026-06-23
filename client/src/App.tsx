@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout";
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode, Suspense } from "react";
 import { lazyWithRetry, prefetchJornadaChunk } from "@/lib/lazyWithRetry";
-import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaSuspenseFallback } from "@/components/jornada/JornadaSuspenseFallback";
 import { useAuth } from "@/hooks/useAuth";
@@ -305,7 +305,7 @@ function Router() {
           {() => { window.location.replace("/espejo"); return null; }}
         </Route>
         <Route path="/planeacion">
-          <JornadaErrorBoundary>
+          <ErrorBoundary>
             <Suspense fallback={<JornadaSuspenseFallback />}>
               <ModuleRoute
                 component={Planeacion}
@@ -313,7 +313,7 @@ function Router() {
                 loadingFallback={<JornadaShell statusLine="Verificando acceso…" />}
               />
             </Suspense>
-          </JornadaErrorBoundary>
+          </ErrorBoundary>
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />

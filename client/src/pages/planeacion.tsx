@@ -483,6 +483,16 @@ import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
 import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
+import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
+import { JornadaShell } from "@/components/jornada/JornadaShell";
+import {
+  JORNADA_BACKUP_INTERVAL_MS,
+  saveJornadaBackup,
+  segundosFromMetrics,
+  tryRestoreMetricsFromJornadaBackup,
+  vehiclesForJornadaBackup,
+} from "@/services/jornadaBackup";
+import { setJornadaFatalError } from "@/lib/jornadaFatalError";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import {
@@ -1831,6 +1841,16 @@ export default function Planeacion() {
       .catch(() => setDisciplinaSnapshots([]));
   }, [user, planillaFecha, dailyPS]);
 
+  const heavyMetrics = usePlaneacionHeavyMetrics({
+    userId: user?.uid,
+    segmentos: planilla?.segmentos ?? [],
+    vehicles: deferredVehicles,
+    focusEventsToday,
+    yesterdayTermoSnapshot,
+    disciplinaSnapshots,
+    planTab,
+  });
+
   const {
     anilloSnapshotForEscalera,
     todayTermoLive,
@@ -1844,15 +1864,53 @@ export default function Planeacion() {
     disciplinaBySegmentId,
     disciplinaSerie,
     escaleraConciencia,
-  } = usePlaneacionHeavyMetrics({
-    userId: user?.uid,
-    segmentos: planilla?.segmentos ?? [],
-    vehicles: deferredVehicles,
-    focusEventsToday,
-    yesterdayTermoSnapshot,
-    disciplinaSnapshots,
-    planTab,
-  });
+  } = heavyMetrics;
+
+  const [jornadaBooting, setJornadaBooting] = useState(true);
+  const jornadaBootingRef = useRef(true);
+
+  useEffect(() => {
+    jornadaBootingRef.current = jornadaBooting;
+  }, [jornadaBooting]);
+
+  /** Watchdog 5s: nunca skeleton eterno en "Preparando Jornada…". */
+  useEffect(() => {
+    if (!jornadaBooting) return;
+    const id = window.setTimeout(() => {
+      if (jornadaBootingRef.current) {
+        setJornadaFatalError("jornada-boot-watchdog");
+      }
+    }, 5000);
+    return () => clearTimeout(id);
+  }, [jornadaBooting]);
+
+  useEffect(() => {
+    if (!user) return;
+    const restored = tryRestoreMetricsFromJornadaBackup(yesterdayTermoSnapshot);
+    if (restored) {
+      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(restored);
+      saveJornadaBackup(
+        conquistaDiaSeg,
+        entropiaDiaSeg,
+        vehiclesForJornadaBackup(vehicles)
+      );
+    }
+  }, [user, yesterdayTermoSnapshot, vehicles]);
+
+  useEffect(() => {
+    if (!user) return;
+    const tick = () => {
+      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(heavyMetrics);
+      saveJornadaBackup(
+        conquistaDiaSeg,
+        entropiaDiaSeg,
+        vehiclesForJornadaBackup(vehicles)
+      );
+    };
+    tick();
+    const id = window.setInterval(tick, JORNADA_BACKUP_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [user, vehicles, heavyMetrics]);
 
   useEffect(() => {
     if (!user) return;
@@ -1888,7 +1946,8 @@ export default function Planeacion() {
   }, []);
 
   useEffect(() => {
-    scheduleJornadaForegroundResume();
+    setJornadaBooting(true);
+    scheduleJornadaForegroundResume(() => setJornadaBooting(false));
     return () => {
       cancelJornadaRemountGuard();
       resumeVoice();
@@ -1898,7 +1957,9 @@ export default function Planeacion() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      setJornadaBooting(true);
       scheduleJornadaForegroundResume(() => {
+        setJornadaBooting(false);
         warmupSpeechSynthesis();
         recoverSpeechQueue();
         const flushed = flushMissedPuertaVoiceOnVisible();
@@ -6581,6 +6642,12 @@ export default function Planeacion() {
 
   return (
     <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
+      <JornadaStuckProbe />
+      {jornadaBooting && (
+        <div className="fixed inset-0 z-[60] pointer-events-none" aria-hidden>
+          <JornadaShell statusLine="Preparando Jornada…" />
+        </div>
+      )}
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">

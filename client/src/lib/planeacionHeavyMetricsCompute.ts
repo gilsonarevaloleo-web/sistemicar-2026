@@ -191,7 +191,13 @@ export function computePlaneacionHeavyMetrics(
 ): PlaneacionHeavyMetrics {
   const nowMs = input.nowMs ?? Date.now();
   const segmentos = input.segmentos;
-  const vehicles = input.vehicles;
+  const vehicles = input.vehicles.map(v => ({
+    ...v,
+    aperturaAt:
+      typeof v.aperturaAt === "number" && Number.isFinite(v.aperturaAt)
+        ? v.aperturaAt
+        : undefined,
+  }));
   const dayStartMs = getJournalDayStartMs(nowMs);
 
   const model = getSharedAnilloLiveModel(segmentos, vehicles, nowMs);

@@ -104,3 +104,4 @@ Sirve frontend + functions como en producciùn.
 2. Netlify build automùtico
 3. Revisar **Deploy log** ? Build succeeded ? Functions bundled
 4. Probar `/api/health`
+VITE_BREVO_API_KEY=tu_clave_aqui
