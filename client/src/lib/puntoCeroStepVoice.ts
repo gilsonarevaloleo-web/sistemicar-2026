@@ -1,6 +1,6 @@
 /**
- * Orquestador TTS solo Punto Cero — pasos 1→4 con auto-avance.
- * Usa speechSynthesis directo (no speechQueue global).
+ * Orquestador TTS Punto Cero — pasos 1→4 con auto-avance.
+ * Emite por canal `puntocero` del VoiceEngine (speechQueue unificado).
  */
 import { getIsRemountingJornada } from "./jornadaRemount";
 import type { PuntoCeroEtapaKey } from "./puntoCeroGuides";
@@ -9,12 +9,20 @@ import {
   PUNTO_CERO_ETAPA4_TRANSICION,
   PUNTO_CERO_INTRO_VOZ,
 } from "./puntoCeroGuides";
+import { resetPuntoCeroVoiceQueue } from "./puntoCeroVoice";
 import { pickCalmDeepSpanishVoice, primeSpanishVoices } from "./spanishTtsVoice";
+import {
+  isSpeechSynthesisUnlocked,
+  unlockSpeechSynthesis,
+  voiceEngine,
+} from "./speechQueue";
 import { isPuntoCeroVoiceEnabled } from "./tikSound";
 
 export const PUNTO_CERO_GUIA_STEP_COUNT = 4;
 const STEP_ADVANCE_PAUSE_MS = 800;
 const PHRASE_GAP_MS = 820;
+const PC_STEP_VOICE_KEY = "pc-step-guia";
+const PC_STEP_LOG = "[PC-StepVoice]";
 
 export type PuntoCeroPasoDef = {
   index: 0 | 1 | 2 | 3;
@@ -30,15 +38,63 @@ export type PuntoCeroStepVoiceCallbacks = {
   onSequenceIdle?: () => void;
 };
 
+export type PuntoCeroStepVoiceDiagnostics = {
+  speakingToken: number;
+  activePasoIndex: number;
+  phraseQueueLen: number;
+  pausedByRemount: boolean;
+  hasRemountSnapshot: boolean;
+  speechUnlocked: boolean;
+  synthSpeaking: boolean;
+  synthPending: boolean;
+  engineSpeaking: boolean;
+  engineQueueLen: number;
+  engineChannel: string | null;
+};
+
+type RemountSnapshot = {
+  activePasoIndex: number;
+  phraseQueue: string[];
+  token: number;
+  callbacks: PuntoCeroStepVoiceCallbacks;
+  pasos: PuntoCeroPasoDef[];
+};
+
 let speakingToken = 0;
 let activePasoIndex = -1;
 let phraseQueue: string[] = [];
 let userCancelled = false;
 let pausedByRemount = false;
+let remountSnapshot: RemountSnapshot | null = null;
 let callbacksRef: PuntoCeroStepVoiceCallbacks = {};
 let pasosRef: PuntoCeroPasoDef[] = [];
 let gapTimer: ReturnType<typeof setTimeout> | null = null;
 let advanceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getSynth(): SpeechSynthesis | null {
+  if (typeof window === "undefined") return null;
+  return window.speechSynthesis ?? null;
+}
+
+function logPcStepDiagnostics(event: string, extra?: Record<string, unknown>): void {
+  if (typeof console === "undefined") return;
+  const synth = getSynth();
+  console.log(PC_STEP_LOG, {
+    event,
+    speakingToken,
+    activePasoIndex,
+    phraseQueueLen: phraseQueue.length,
+    pausedByRemount,
+    hasRemountSnapshot: remountSnapshot != null,
+    speechUnlocked: isSpeechSynthesisUnlocked(),
+    synthSpeaking: synth?.speaking ?? false,
+    synthPending: synth?.pending ?? false,
+    engineSpeaking: voiceEngine.isSpeaking(),
+    engineQueueLen: voiceEngine.queueLength(),
+    engineChannel: voiceEngine.currentChannel(),
+    ...extra,
+  });
+}
 
 function clearStepTimers(): void {
   if (gapTimer) {
@@ -51,9 +107,8 @@ function clearStepTimers(): void {
   }
 }
 
-function getSynth(): SpeechSynthesis | null {
-  if (typeof window === "undefined") return null;
-  return window.speechSynthesis ?? null;
+function haltPuntoCeroStepChannel(): void {
+  voiceEngine.haltSpeechOnChannels(["puntocero"]);
 }
 
 export function buildPuntoCeroPasos(includeIntro: boolean): PuntoCeroPasoDef[] {
@@ -88,26 +143,95 @@ export function isPuntoCeroStepVoicePausedByRemount(): boolean {
   return pausedByRemount;
 }
 
+export function getPuntoCeroStepVoiceDiagnostics(): PuntoCeroStepVoiceDiagnostics {
+  const synth = getSynth();
+  return {
+    speakingToken,
+    activePasoIndex,
+    phraseQueueLen: phraseQueue.length,
+    pausedByRemount,
+    hasRemountSnapshot: remountSnapshot != null,
+    speechUnlocked: isSpeechSynthesisUnlocked(),
+    synthSpeaking: synth?.speaking ?? false,
+    synthPending: synth?.pending ?? false,
+    engineSpeaking: voiceEngine.isSpeaking(),
+    engineQueueLen: voiceEngine.queueLength(),
+    engineChannel: voiceEngine.currentChannel(),
+  };
+}
+
 export function cancelPuntoCeroStepVoice(): void {
   userCancelled = true;
   speakingToken += 1;
   activePasoIndex = -1;
   phraseQueue = [];
+  remountSnapshot = null;
   clearStepTimers();
-  try {
-    getSynth()?.cancel();
-  } catch {
-    /* noop */
-  }
+  voiceEngine.stopChannel("puntocero");
+  logPcStepDiagnostics("cancel");
 }
 
+/** Pausa con snapshot para reanudar tras remontaje Jornada (no incrementa token). */
 export function pausePuntoCeroStepVoiceForRemount(): void {
+  if (activePasoIndex >= 0 || phraseQueue.length > 0) {
+    remountSnapshot = {
+      activePasoIndex,
+      phraseQueue: [...phraseQueue],
+      token: speakingToken,
+      callbacks: { ...callbacksRef },
+      pasos: [...pasosRef],
+    };
+  }
   pausedByRemount = true;
-  cancelPuntoCeroStepVoice();
+  clearStepTimers();
+  haltPuntoCeroStepChannel();
+  logPcStepDiagnostics("pause-remount");
+}
+
+/** Reanuda guía pasos tras foreground si había snapshot de remount. */
+export function resumeStepVoiceAfterRemount(): void {
+  if (!pausedByRemount) return;
+
+  const snap = remountSnapshot;
+  pausedByRemount = false;
+  remountSnapshot = null;
+
+  if (!snap || !isPuntoCeroVoiceEnabled()) {
+    logPcStepDiagnostics("resume-remount-skip", { hadSnapshot: !!snap });
+    return;
+  }
+
+  if (getIsRemountingJornada()) {
+    remountSnapshot = snap;
+    pausedByRemount = true;
+    return;
+  }
+
+  callbacksRef = snap.callbacks;
+  pasosRef = snap.pasos;
+  activePasoIndex = snap.activePasoIndex;
+  phraseQueue = [...snap.phraseQueue];
+  userCancelled = false;
+  speakingToken = snap.token;
+
+  unlockSpeechSynthesis(true);
+  primeSpanishVoices();
+
+  logPcStepDiagnostics("resume-remount", {
+    token: speakingToken,
+    queueLen: phraseQueue.length,
+  });
+
+  if (phraseQueue.length > 0) {
+    drainPhrases(speakingToken);
+  } else if (activePasoIndex >= 0) {
+    scheduleAutoAdvance(speakingToken, activePasoIndex);
+  }
 }
 
 export function clearPuntoCeroStepVoiceRemountPause(): void {
   pausedByRemount = false;
+  remountSnapshot = null;
 }
 
 function applyStepUtterance(u: SpeechSynthesisUtterance): void {
@@ -124,6 +248,7 @@ function finishSequenceIdle(): void {
   phraseQueue = [];
   clearStepTimers();
   callbacksRef.onSequenceIdle?.();
+  logPcStepDiagnostics("sequence-idle");
 }
 
 function scheduleAutoAdvance(token: number, completedIndex: number): void {
@@ -148,10 +273,17 @@ function drainPhrases(token: number): void {
     finishSequenceIdle();
     return;
   }
-  const synth = getSynth();
-  if (!synth) {
+  if (!getSynth()) {
     finishSequenceIdle();
     return;
+  }
+  if (!isSpeechSynthesisUnlocked()) {
+    unlockSpeechSynthesis(true);
+    if (!isSpeechSynthesisUnlocked()) {
+      logPcStepDiagnostics("speak-blocked-unlock");
+      finishSequenceIdle();
+      return;
+    }
   }
 
   if (phraseQueue.length === 0) {
@@ -161,24 +293,33 @@ function drainPhrases(token: number): void {
     return;
   }
 
-  const text = phraseQueue.shift()!;
+  const text = phraseQueue[0]!;
+  const isLastInStep = phraseQueue.length === 1;
   primeSpanishVoices();
-  const utt = new SpeechSynthesisUtterance(text);
-  applyStepUtterance(utt);
-  utt.onend = () => {
-    gapTimer = setTimeout(() => {
-      gapTimer = null;
-      drainPhrases(token);
-    }, PHRASE_GAP_MS);
-  };
-  utt.onerror = () => {
-    drainPhrases(token);
-  };
-  try {
-    synth.speak(utt);
-  } catch {
-    drainPhrases(token);
-  }
+
+  logPcStepDiagnostics("enqueue-phrase", { textLen: text.length, isLastInStep });
+
+  voiceEngine.enqueue({
+    text,
+    channel: "puntocero",
+    key: PC_STEP_VOICE_KEY,
+    pauseAfterMs: isLastInStep ? 0 : PHRASE_GAP_MS,
+    configure: applyStepUtterance,
+    onItemEnd: () => {
+      if (token !== speakingToken || userCancelled || pausedByRemount || getIsRemountingJornada()) {
+        finishSequenceIdle();
+        return;
+      }
+      phraseQueue.shift();
+      if (phraseQueue.length === 0) {
+        const idx = activePasoIndex;
+        if (idx >= 0) callbacksRef.onPasoComplete?.(idx);
+        scheduleAutoAdvance(token, idx);
+      } else {
+        drainPhrases(token);
+      }
+    },
+  });
 }
 
 function startPasoInternal(index: 0 | 1 | 2 | 3, token: number): void {
@@ -190,6 +331,7 @@ function startPasoInternal(index: 0 | 1 | 2 | 3, token: number): void {
   activePasoIndex = index;
   phraseQueue = [...paso.frases];
   callbacksRef.onPasoStart?.(index);
+  logPcStepDiagnostics("paso-start", { index });
   drainPhrases(token);
 }
 
@@ -202,17 +344,15 @@ export function speakPuntoCeroPaso(
   if (!isPuntoCeroVoiceEnabled()) return;
   if (getIsRemountingJornada() || pausedByRemount) return;
 
+  unlockSpeechSynthesis(true);
   userCancelled = false;
   callbacksRef = callbacks;
   pasosRef = pasos;
   clearStepTimers();
-  try {
-    getSynth()?.cancel();
-  } catch {
-    /* noop */
-  }
+  resetPuntoCeroVoiceQueue();
 
   const token = ++speakingToken;
+  logPcStepDiagnostics("speak-paso", { index, token });
   startPasoInternal(index, token);
 }
 
@@ -230,6 +370,7 @@ export function startPuntoCeroGuiaPasos(
 /** Solo tests — reinicia estado interno. */
 export function resetPuntoCeroStepVoiceForTests(): void {
   pausedByRemount = false;
+  remountSnapshot = null;
   cancelPuntoCeroStepVoice();
   callbacksRef = {};
   pasosRef = [];

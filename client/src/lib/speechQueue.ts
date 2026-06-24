@@ -46,6 +46,8 @@ type QueueItem = {
   pauseAfterMs?: number;
   configure?: (u: SpeechSynthesisUtterance) => void;
   onPhraseStarted?: () => void;
+  /** Tras onend/error y pauseAfterMs — orquestación por frase (p. ej. guía pasos PC). */
+  onItemEnd?: () => void;
   releaseKey?: string;
 };
 
@@ -393,15 +395,23 @@ class VoiceEngine {
       this.clearStuckTimer();
 
       const pauseMs = item.pauseAfterMs ?? 0;
-      if (pauseMs > 0 && this.queue.length > 0) {
-        this.pauseTimer = setTimeout(() => {
-          this.pauseTimer = null;
-          this.processQueue();
-          notifySpeechQueueIdle();
-        }, pauseMs);
-      } else {
+      const afterPause = () => {
+        try {
+          item.onItemEnd?.();
+        } catch {
+          /* noop */
+        }
         this.processQueue();
         notifySpeechQueueIdle();
+      };
+
+      if (pauseMs > 0) {
+        this.pauseTimer = setTimeout(() => {
+          this.pauseTimer = null;
+          afterPause();
+        }, pauseMs);
+      } else {
+        afterPause();
       }
     };
 
@@ -526,17 +536,24 @@ export type SpeakVoiceProbeResult = {
   reason?: string;
 };
 
+export type SpeakUtteranceOptions = {
+  /** Solo true al interrumpir otro TTS activo (emergencia / preempt canal). */
+  cancelPrevious?: boolean;
+};
+
 /**
- * Emisión TTS de bajo nivel — solo voiceEngine y unlock warmup.
+ * Emisión TTS de bajo nivel — voiceEngine y cola meditativa PC.
+ * Por defecto no hace cancel global (evita cortar guía pasos u otro canal en cola).
  */
 export function speakUtterance(
   text: string,
   handlers: UtteranceHandlers = {},
-  configure?: (u: SpeechSynthesisUtterance) => void
+  configure?: (u: SpeechSynthesisUtterance) => void,
+  options?: SpeakUtteranceOptions
 ): boolean {
   if (shouldDeferJornadaVoice()) {
     deferJornadaVoice(() => {
-      speakUtterance(text, handlers, configure);
+      speakUtterance(text, handlers, configure, options);
     });
     return true;
   }
@@ -546,7 +563,9 @@ export function speakUtterance(
   resumeSynthIfPaused();
 
   try {
-    synth.cancel();
+    if (options?.cancelPrevious) {
+      synth.cancel();
+    }
     const u = new SpeechSynthesisUtterance(text);
     if (configure) {
       configure(u);
@@ -780,11 +799,6 @@ export function speakUbicacionQueue(
   if (cancelPrevious) {
     voiceEngine.stopChannel(channel);
   } else if (source === "desglosador") {
-    try {
-      getSynth()?.cancel();
-    } catch {
-      /* noop */
-    }
     voiceEngine.stopChannel(channel);
   }
 

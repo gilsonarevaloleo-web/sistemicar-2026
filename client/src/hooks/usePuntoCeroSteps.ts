@@ -5,7 +5,9 @@ import {
   buildPuntoCeroPasos,
   cancelPuntoCeroStepVoice,
   clearPuntoCeroStepVoiceRemountPause,
+  getPuntoCeroStepVoicePaso,
   isPuntoCeroStepVoicePausedByRemount,
+  resumeStepVoiceAfterRemount,
   speakPuntoCeroPaso,
   startPuntoCeroGuiaPasos,
   type PuntoCeroPasoDef,
@@ -109,6 +111,15 @@ export function usePuntoCeroSteps(opts: UsePuntoCeroStepsOptions = {}) {
       if (getIsRemountingJornada()) {
         cancelPuntoCeroStepVoice();
         setLeyendo(false);
+        return;
+      }
+      if (isPuntoCeroStepVoicePausedByRemount()) {
+        resumeStepVoiceAfterRemount();
+        const paso = getPuntoCeroStepVoicePaso();
+        if (paso >= 0) {
+          setPasoActual(paso as PuntoCeroPasoGuiaIndex);
+          setLeyendo(true);
+        }
       }
     };
     document.addEventListener("visibilitychange", onVis);

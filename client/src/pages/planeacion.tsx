@@ -213,7 +213,7 @@ import {
 } from "@/components/RutaSeguimientoPicker";
 import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue, subscribeSpeechQueueIdle, beginJornadaRemount, endJornadaRemount, pauseVoice, resumeVoice, cancelJornadaRemountGuard } from "@/lib/speechQueue";
 import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
-import { pausePuntoCeroStepVoiceForRemount } from "@/lib/puntoCeroStepVoice";
+import { pausePuntoCeroStepVoiceForRemount, resumeStepVoiceAfterRemount } from "@/lib/puntoCeroStepVoice";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
@@ -2017,14 +2017,15 @@ export default function Planeacion() {
   const scheduleJornadaForegroundResume = useCallback((afterReady?: () => void) => {
     const gen = ++resumeGenRef.current;
     beginJornadaRemount();
+    pausePuntoCeroStepVoiceForRemount();
     pauseVoice();
     resetPuntoCeroVoiceQueue();
-    pausePuntoCeroStepVoiceForRemount();
     requestAnimationFrame(() => {
       const finish = () => {
         if (gen !== resumeGenRef.current) return;
-        resumeVoice();
         endJornadaRemount();
+        resumeVoice();
+        resumeStepVoiceAfterRemount();
         if (afterReady) {
           window.setTimeout(() => {
             if (gen !== resumeGenRef.current) return;
