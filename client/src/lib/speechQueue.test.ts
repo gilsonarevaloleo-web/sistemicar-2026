@@ -226,4 +226,16 @@ describe("speechQueue", () => {
     assert.ok(utterances.some(u => u.text.includes("Segunda frase")));
     assert.ok(speakCount >= 2);
   });
+
+  it("pauseVoice no hace cancel global redundante si no hay utterance activo", async () => {
+    const synthMock = installDomMocks();
+    const mod = await import("./speechQueue.ts");
+    mod.resetSpeechQueueForTests();
+    mod.unlockSpeechSynthesis(true);
+    await flushMicrotasks();
+
+    const cancelsBefore = synthMock.cancelCount;
+    mod.pauseVoice();
+    assert.equal(synthMock.cancelCount, cancelsBefore);
+  });
 });

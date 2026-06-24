@@ -1,16 +1,15 @@
 import { useEffect, useRef } from "react";
 import { useAuthContext } from "@/App";
 import {
-  getLocalVehicles,
   getPlanillaHoy,
   hasPlanificacionBaseAccess,
   subscribeToPlanilla,
   subscribeToProgression,
-  subscribeToVehicles,
   type Planilla,
   type UserProgression,
   type Vehicle,
 } from "@/lib/persistence";
+import { acquireFlotaStore, getFlotaVehicles, subscribeFlotaStore } from "@/flota/flotaStore";
 import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
@@ -32,7 +31,7 @@ import {
 import { registerNotificationStateProvider } from "@/lib/notificationState";
 import { dispatchConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
-import { recoverSpeechQueue, warmupSpeechSynthesis } from "@/lib/speechQueue";
+import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -104,16 +103,14 @@ export function SegmentAttentionBackground() {
       e => console.error("[SegmentAttentionBackground] planilla", e)
     );
 
-    const unsubVehicles = subscribeToVehicles(
-      user.uid,
-      data => {
-        vehiclesRef.current = data.length > 0 ? data : getLocalVehicles();
-        if (planillaRef.current && hasAccessRef.current) {
-          scheduleCrossEntropyNotifications(planillaRef.current.segmentos, vehiclesRef.current);
-        }
-      },
-      e => console.error("[SegmentAttentionBackground] vehicles", e)
-    );
+    const releaseFlota = acquireFlotaStore(user.uid);
+    vehiclesRef.current = getFlotaVehicles();
+    const unsubFlota = subscribeFlotaStore(() => {
+      vehiclesRef.current = getFlotaVehicles();
+      if (planillaRef.current && hasAccessRef.current) {
+        scheduleCrossEntropyNotifications(planillaRef.current.segmentos, vehiclesRef.current);
+      }
+    });
 
     const runTick = async (opts?: { force?: boolean }) => {
       if (!hasAccessRef.current || tickingRef.current) return;
@@ -169,9 +166,7 @@ export function SegmentAttentionBackground() {
       dispatchConcienciaClockTick();
     };
 
-    const onVisible = () => {
-      warmupSpeechSynthesis();
-      recoverSpeechQueue();
+    const unregisterVoiceVisible = registerVoiceVisibleHandler(() => {
       const flushed = flushMissedPuertaVoiceOnVisible();
       if (flushed > 0) {
         console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
@@ -180,25 +175,20 @@ export function SegmentAttentionBackground() {
       burstConcienciaClockTick(isMobilePerfMode() ? 1 : 3, isMobilePerfMode() ? 200 : 120);
       void runTick({ force: true });
       if (user) requestGhostReconcileAfterVehicleAction(user.uid);
-    };
-
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    window.addEventListener("pageshow", onVisible);
+    });
 
     return () => {
       unsubProg();
       unsubNotificationState();
       unsubPlanilla();
-      unsubVehicles();
+      unsubFlota();
+      releaseFlota();
       unregisterForce();
+      unregisterVoiceVisible();
       clearTimeout(initialTickId);
       clearInterval(intervalId);
       clearInterval(clockId);
       cancelAllNotifications();
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-      window.removeEventListener("pageshow", onVisible);
     };
   }, [user]);
 

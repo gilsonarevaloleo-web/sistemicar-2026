@@ -1,4 +1,5 @@
 import { formatHHMM } from "./desglosadorClock";
+import { aplicarProyectoHeredadoASub, dominanteProyectoIdEnSubs } from "./imanPensamientos";
 import type { SubTarea, Vehicle } from "./persistence";
 import { situacionContratoFinMs } from "./situacionGanancia";
 
@@ -944,5 +945,108 @@ export function absorberSaldoAdelantoEnFoco(
   return {
     subTareas: transferirMinutosAlFoco(subTareas, focusId, saldoAdelantoMin),
     saldoRestante: 0,
+  };
+}
+
+function resolveRingCupoAnchorAfterEnqueue(
+  subTareas: SubTarea[],
+  curAnchor: Vehicle["situacionCupoAnchor"],
+  nowMs: number
+): { situacionCupoAnchor: { subTareaId: string; startedAt: number } | undefined; anchorStillValid: boolean } {
+  const curSub = curAnchor ? subTareas.find(s => s.id === curAnchor.subTareaId) : undefined;
+  const anchorStillValid =
+    !!curSub &&
+    situacionFilaCronometroPendiente(curSub) &&
+    (curSub.minutosCupo ?? 0) > 0;
+  if (anchorStillValid) {
+    return { situacionCupoAnchor: curAnchor ?? undefined, anchorStillValid: true };
+  }
+  const firstCron = subTareas.find(st => situacionFilaCronometroPendiente(st) && (st.minutosCupo ?? 0) > 0);
+  return {
+    situacionCupoAnchor: firstCron ? { subTareaId: firstCron.id, startedAt: nowMs } : undefined,
+    anchorStillValid: false,
+  };
+}
+
+export type SellarDirectoEnRingOpts = {
+  nowMs?: number;
+  newSubId?: string;
+  proyectoIdNuevaSub?: string;
+  enfoqueHeredado?: string;
+  segProyectoVinculadoId?: string;
+};
+
+export type SellarDirectoEnRingResult =
+  | {
+      ok: true;
+      subTareas: SubTarea[];
+      situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
+      situacionCupoAnchor: { subTareaId: string; startedAt: number } | undefined;
+      newSubId: string;
+      anchorStillValid: boolean;
+    }
+  | { ok: false; reason: "empty_text" | "ring_inactive" | "invalid_vehicle" | "invalid_budget" };
+
+/** Crea subtarea y la sella en el ring en un solo paso (sin doble mutación). */
+export function buildSellarDirectoEnRingState(
+  vehicle: Vehicle,
+  texto: string,
+  opts?: SellarDirectoEnRingOpts
+): SellarDirectoEnRingResult {
+  const trimmed = texto.trim();
+  if (!trimmed) return { ok: false, reason: "empty_text" };
+  if (vehicle.tipoFlota !== "situacion" || !vehicle.subTareas) {
+    return { ok: false, reason: "invalid_vehicle" };
+  }
+  const sc = vehicle.situacionCronometro;
+  if (sc?.activo !== true) return { ok: false, reason: "ring_inactive" };
+
+  const nowMs = opts?.nowMs ?? Date.now();
+  const newSubId = opts?.newSubId ?? `st_${nowMs}`;
+  const enfoqueHeredado =
+    opts?.enfoqueHeredado?.trim() ||
+    sc.proyectoEnfoqueId?.trim() ||
+    opts?.segProyectoVinculadoId?.trim();
+
+  const newSubRaw: SubTarea = {
+    id: newSubId,
+    texto: trimmed,
+    completada: false,
+    creadaAt: nowMs,
+    enDesgloseCronometro: true,
+    resultadoSituacion: "pendiente",
+    ...(opts?.proyectoIdNuevaSub ? { proyectoId: opts.proyectoIdNuevaSub } : {}),
+  };
+  const newSub = aplicarProyectoHeredadoASub(newSubRaw, enfoqueHeredado);
+
+  let subTareas = [...vehicle.subTareas, newSub];
+  const budgetMin = remainingCronometroBudgetMin(sc, subTareas, nowMs);
+  if (budgetMin == null) return { ok: false, reason: "invalid_budget" };
+
+  subTareas = redistribuirMinutosSituacionCronometro(subTareas, budgetMin);
+
+  const proyectoEnfoqueId =
+    sc.proyectoEnfoqueId?.trim() ||
+    dominanteProyectoIdEnSubs(subTareas.filter(st => st.enDesgloseCronometro)) ||
+    vehicle.proyectoId?.trim() ||
+    opts?.segProyectoVinculadoId?.trim();
+  const situacionCronometro = {
+    ...sc,
+    ...(proyectoEnfoqueId && !sc.proyectoEnfoqueId?.trim() ? { proyectoEnfoqueId } : {}),
+  };
+
+  const { situacionCupoAnchor, anchorStillValid } = resolveRingCupoAnchorAfterEnqueue(
+    subTareas,
+    vehicle.situacionCupoAnchor,
+    nowMs
+  );
+
+  return {
+    ok: true,
+    subTareas,
+    situacionCronometro,
+    situacionCupoAnchor,
+    newSubId,
+    anchorStillValid,
   };
 }

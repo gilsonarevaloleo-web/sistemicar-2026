@@ -23,6 +23,7 @@ import {
   registrarCierreFalladoCronometro,
   resolveCronometroCupoAnchor,
   vehicleNeedsCupoAnchorSync,
+  buildSellarDirectoEnRingState,
 } from "./situacionCupoDistrib.ts";
 
 function st(id: string, minutosCupo: number, cupoFijo?: boolean): SubTarea {
@@ -415,5 +416,74 @@ describe("vehicleNeedsCupoAnchorSync", () => {
       subTareas: [],
     } as import("./persistence.ts").Vehicle;
     assert.equal(vehicleNeedsCupoAnchorSync(v), true);
+  });
+});
+
+describe("buildSellarDirectoEnRingState", () => {
+  const now = 1_500_000;
+
+  function situacionVehicle(
+    overrides?: Partial<import("./persistence.ts").Vehicle>
+  ): import("./persistence.ts").Vehicle {
+    return {
+      id: "v1",
+      titulo: "Situación test",
+      status: "activo",
+      tipoFlota: "situacion",
+      subTareas: [],
+      situacionCronometro: {
+        activo: true,
+        bloqueInicioAt: 1_000_000,
+        horaFinContratoMs: now + 30 * 60_000,
+      },
+      ...overrides,
+    } as import("./persistence.ts").Vehicle;
+  }
+
+  it("rechaza texto vacío", () => {
+    const r = buildSellarDirectoEnRingState(situacionVehicle(), "   ");
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.reason, "empty_text");
+  });
+
+  it("rechaza ring inactivo", () => {
+    const r = buildSellarDirectoEnRingState(
+      situacionVehicle({ situacionCronometro: { activo: false } }),
+      "Tarea"
+    );
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.reason, "ring_inactive");
+  });
+
+  it("crea subtarea sellada en ring con cupo y anchor", () => {
+    const r = buildSellarDirectoEnRingState(situacionVehicle(), "Urgente", {
+      nowMs: now,
+      newSubId: "st_ring",
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.newSubId, "st_ring");
+    assert.equal(r.subTareas.length, 1);
+    const sub = r.subTareas[0];
+    assert.equal(sub.texto, "Urgente");
+    assert.equal(sub.enDesgloseCronometro, true);
+    assert.equal(sub.resultadoSituacion, "pendiente");
+    assert.ok((sub.minutosCupo ?? 0) >= 1);
+    assert.equal(r.situacionCupoAnchor?.subTareaId, "st_ring");
+    assert.equal(r.situacionCupoAnchor?.startedAt, now);
+  });
+
+  it("conserva anchor si la fila foco sigue válida", () => {
+    const existing = st("foco", 10);
+    const v = situacionVehicle({
+      subTareas: [existing],
+      situacionCupoAnchor: { subTareaId: "foco", startedAt: 1_100_000 },
+    });
+    const r = buildSellarDirectoEnRingState(v, "Nueva", { nowMs: now, newSubId: "st_n" });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.subTareas.length, 2);
+    assert.equal(r.situacionCupoAnchor?.subTareaId, "foco");
+    assert.equal(r.anchorStillValid, true);
   });
 });

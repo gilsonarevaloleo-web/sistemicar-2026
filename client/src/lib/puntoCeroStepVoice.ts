@@ -13,6 +13,7 @@ import { resetPuntoCeroVoiceQueue } from "./puntoCeroVoice";
 import { pickCalmDeepSpanishVoice, primeSpanishVoices } from "./spanishTtsVoice";
 import {
   isSpeechSynthesisUnlocked,
+  logVoiceEvent,
   unlockSpeechSynthesis,
   voiceEngine,
 } from "./speechQueue";
@@ -22,7 +23,6 @@ export const PUNTO_CERO_GUIA_STEP_COUNT = 4;
 const STEP_ADVANCE_PAUSE_MS = 800;
 const PHRASE_GAP_MS = 820;
 const PC_STEP_VOICE_KEY = "pc-step-guia";
-const PC_STEP_LOG = "[PC-StepVoice]";
 
 export type PuntoCeroPasoDef = {
   index: 0 | 1 | 2 | 3;
@@ -77,21 +77,12 @@ function getSynth(): SpeechSynthesis | null {
 }
 
 function logPcStepDiagnostics(event: string, extra?: Record<string, unknown>): void {
-  if (typeof console === "undefined") return;
-  const synth = getSynth();
-  console.log(PC_STEP_LOG, {
-    event,
+  logVoiceEvent(`pc-step-${event}`, {
     speakingToken,
     activePasoIndex,
     phraseQueueLen: phraseQueue.length,
     pausedByRemount,
     hasRemountSnapshot: remountSnapshot != null,
-    speechUnlocked: isSpeechSynthesisUnlocked(),
-    synthSpeaking: synth?.speaking ?? false,
-    synthPending: synth?.pending ?? false,
-    engineSpeaking: voiceEngine.isSpeaking(),
-    engineQueueLen: voiceEngine.queueLength(),
-    engineChannel: voiceEngine.currentChannel(),
     ...extra,
   });
 }

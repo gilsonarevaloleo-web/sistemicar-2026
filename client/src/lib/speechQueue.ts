@@ -14,9 +14,10 @@ import {
   isSituacionAlertsEnabled,
 } from "./tikSound";
 import {
-  deferJornadaVoice,
-  shouldDeferJornadaVoice,
+  getIsRemountingJornada,
 } from "./jornadaRemount";
+
+const VOICE_LOG = "[Voice]";
 
 export type UbicacionVoiceSource = "situacion" | "desglosador" | "puerta";
 export type VoiceChannel = TtsVoiceChannel;
@@ -223,7 +224,7 @@ class VoiceEngine {
     notifySpeechQueueIdle();
   }
 
-  hardReset(): void {
+  hardReset(opts?: { revokeUnlock?: boolean }): void {
     this.clearPauseTimer();
     this.clearStuckTimer();
     for (const item of this.queue) {
@@ -236,16 +237,19 @@ class VoiceEngine {
     this.currentItem = null;
     this.speaking = false;
     this.clearPhraseStartedCallback();
-    speechUnlocked = false;
-    voicesPrimed = false;
-    voicesLoadBypass = false;
-    lastQueuedPhrase = "";
-    lastQueuedAtMs = 0;
+    if (opts?.revokeUnlock) {
+      speechUnlocked = false;
+      voicesPrimed = false;
+      voicesLoadBypass = false;
+      lastQueuedPhrase = "";
+      lastQueuedAtMs = 0;
+    }
     try {
       getSynth()?.cancel();
     } catch {
       /* noop */
     }
+    logVoiceEvent("hard-reset", { revokeUnlock: !!opts?.revokeUnlock });
     notifyExternalSpeechCancelListeners();
     notifySpeechQueueIdle();
   }
@@ -255,24 +259,18 @@ class VoiceEngine {
       ...item,
       priority: item.priority ?? channelPriority(item.channel),
     };
-    if (shouldDeferJornadaVoice()) {
-      deferJornadaVoice(() => this.enqueue(item));
-      return;
-    }
     this.queue.push(full);
     this.sortQueue();
+    logVoiceEvent("enqueue", { channel: full.channel, textLen: full.text.length, queueLen: this.queue.length });
     this.processQueue();
   }
 
   enqueueBatch(items: QueueItem[]): void {
-    if (shouldDeferJornadaVoice()) {
-      deferJornadaVoice(() => this.enqueueBatch(items));
-      return;
-    }
     for (const item of items) {
       this.queue.push(item);
     }
     this.sortQueue();
+    logVoiceEvent("enqueue-batch", { count: items.length, queueLen: this.queue.length });
     this.processQueue();
   }
 
@@ -524,12 +522,32 @@ export type SpeechDiagnostics = {
   spanishVoiceCount: number;
   speaking: boolean;
   queueLength: number;
+  currentChannel: VoiceChannel | null;
+  remounting: boolean;
   channels: {
     situacion: boolean;
     desglosador: boolean;
     puerta: boolean;
   };
 };
+
+export function logVoiceEvent(event: string, extra?: Record<string, unknown>): void {
+  const isDev =
+    typeof import.meta !== "undefined" &&
+    typeof import.meta.env !== "undefined" &&
+    Boolean(import.meta.env.DEV);
+  if (!isDev) return;
+  if (typeof console === "undefined") return;
+  console.log(VOICE_LOG, {
+    event,
+    ...extra,
+    speechUnlocked,
+    engineSpeaking: voiceEngine.isSpeaking(),
+    engineQueueLen: voiceEngine.queueLength(),
+    engineChannel: voiceEngine.currentChannel(),
+    remounting: getIsRemountingJornada(),
+  });
+}
 
 export type SpeakVoiceProbeResult = {
   ok: boolean;
@@ -542,21 +560,14 @@ export type SpeakUtteranceOptions = {
 };
 
 /**
- * Emisión TTS de bajo nivel — voiceEngine y cola meditativa PC.
- * Por defecto no hace cancel global (evita cortar guía pasos u otro canal en cola).
+ * Emisión TTS de bajo nivel — solo VoiceEngine.processQueue (no exportar).
  */
-export function speakUtterance(
+function speakUtterance(
   text: string,
   handlers: UtteranceHandlers = {},
   configure?: (u: SpeechSynthesisUtterance) => void,
   options?: SpeakUtteranceOptions
 ): boolean {
-  if (shouldDeferJornadaVoice()) {
-    deferJornadaVoice(() => {
-      speakUtterance(text, handlers, configure, options);
-    });
-    return true;
-  }
   const synth = getSynth();
   if (!synth || !text.trim()) return false;
 
@@ -565,6 +576,7 @@ export function speakUtterance(
   try {
     if (options?.cancelPrevious) {
       synth.cancel();
+      logVoiceEvent("cancel-previous");
     }
     const u = new SpeechSynthesisUtterance(text);
     if (configure) {
@@ -619,7 +631,6 @@ export function isUbicacionSpeechActive(): boolean {
 }
 
 export function recoverSpeechQueue(): void {
-  if (shouldDeferJornadaVoice()) return;
   voiceEngine.recover();
 }
 
@@ -638,6 +649,8 @@ export function getSpeechDiagnostics(): SpeechDiagnostics {
     spanishVoiceCount,
     speaking: voiceEngine.isSpeaking(),
     queueLength: voiceEngine.queueLength(),
+    currentChannel: voiceEngine.currentChannel(),
+    remounting: getIsRemountingJornada(),
     channels: {
       situacion: isSituacionAlertsEnabled(),
       desglosador: isDesglosadorVoiceEnabled(),
@@ -648,12 +661,12 @@ export function getSpeechDiagnostics(): SpeechDiagnostics {
 
 /** Solo tests — reinicia estado interno de la cola. */
 export function resetSpeechQueueForTests(): void {
-  voiceEngine.hardReset();
+  voiceEngine.hardReset({ revokeUnlock: true });
 }
 
 /** Cancelación fulminante — teardown de emergencia / WebView móvil. */
-export function cancelSpeechSynthesisHard(): void {
-  voiceEngine.hardReset();
+export function cancelSpeechSynthesisHard(revokeUnlock = false): void {
+  voiceEngine.hardReset({ revokeUnlock });
 }
 
 /**
@@ -693,6 +706,10 @@ export function unlockSpeechSynthesis(fromUserGesture = false): void {
     if (fromUserGesture) speechUnlocked = true;
   }
 
+  if (fromUserGesture) {
+    logVoiceEvent("unlock", { fromUserGesture });
+  }
+
   if (speechUnlocked && voiceEngine.queueLength() > 0 && !voiceEngine.isSpeaking()) {
     voiceEngine.processQueue();
   }
@@ -703,7 +720,6 @@ export function warmupSpeechSynthesis(force = false, fromUserGesture = false): v
     unlockSpeechSynthesis(true);
     return;
   }
-  if (shouldDeferJornadaVoice()) return;
   const synth = getSynth();
   if (!synth) return;
   const now = Date.now();
@@ -740,14 +756,10 @@ export function speakVoiceProbe(source: UbicacionVoiceSource = "puerta"): SpeakV
   return { ok: true };
 }
 
-/** Corta TTS activo al remontar Jornada (no vacía unlock del usuario). */
+/** Corta TTS activo al remontar Jornada desde background (halt por canal, sin cancel global). */
 export function pauseVoice(): void {
+  logVoiceEvent("pause-voice");
   voiceEngine.haltSpeechOnChannels(["conquista", "situacion", "puntocero"]);
-  try {
-    getSynth()?.cancel();
-  } catch {
-    /* noop */
-  }
   voiceEngine.releaseAfterExternalCancel();
 }
 
@@ -759,7 +771,6 @@ export {
   beginJornadaRemount,
   cancelJornadaRemountGuard,
   endJornadaRemount,
-  flushJornadaVoiceQueue,
   getIsRemountingJornada,
   isJornadaHeavyComputeAllowed,
   msUntilJornadaHeavyComputeAllowed,
@@ -797,8 +808,6 @@ export function speakUbicacionQueue(
   const channel = sourceToChannel(source);
 
   if (cancelPrevious) {
-    voiceEngine.stopChannel(channel);
-  } else if (source === "desglosador") {
     voiceEngine.stopChannel(channel);
   }
 

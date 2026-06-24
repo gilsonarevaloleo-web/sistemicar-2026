@@ -111,20 +111,10 @@ function trySpeak(key: string): void {
   });
 }
 
-/** Hub global visibility/focus — pointerdown vive en VoiceBootstrap (App.tsx). */
+/** Hub global — visibility centralizado en voiceLifecycle; pointerdown en VoiceBootstrap. */
 export function ensureUbicacionVoiceRetryHub(): void {
   if (voiceRetryHubRegistered || typeof window === "undefined") return;
   voiceRetryHubRegistered = true;
-  const onRetry = () => {
-    warmupSpeechSynthesis(true);
-    recoverSpeechQueue();
-    retryAllPendingUbicacionVoice();
-  };
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") onRetry();
-  });
-  window.addEventListener("focus", onRetry);
-  window.addEventListener("pageshow", onRetry);
 }
 
 export function retryAllPendingUbicacionVoice(): void {

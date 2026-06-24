@@ -1,20 +1,12 @@
 /**
- * Guard de montaje / retorno a Jornada: evita TTS + heavy compute compitiendo al volver
- * desde otra app (p. ej. Voice) o al remontar el chunk lazy de planeacion.
+ * Guard de montaje / retorno a Jornada: difiere heavy compute al volver desde background.
+ * TTS ya no se difiere aquí — VoiceEngine serializa por sí solo.
  */
 
 const JORNADA_HEAVY_DEFER_MS = 1500;
-const JORNADA_VOICE_FLUSH_DELAY_MS = 1500;
-const JORNADA_VOICE_PHRASE_GAP_MS = 2000;
 
 let isRemountingJornada = false;
 let heavyComputeAllowedAfterMs = 0;
-let voiceFlushTimer: ReturnType<typeof setTimeout> | null = null;
-let voiceDrainTimer: ReturnType<typeof setTimeout> | null = null;
-let voiceFlushInProgress = false;
-
-type PendingVoiceFn = () => void;
-const pendingVoiceQueue: PendingVoiceFn[] = [];
 
 export function getIsRemountingJornada(): boolean {
   return isRemountingJornada;
@@ -28,85 +20,45 @@ export function msUntilJornadaHeavyComputeAllowed(): number {
   return Math.max(0, heavyComputeAllowedAfterMs - Date.now());
 }
 
+/** @deprecated TTS ya no se difiere — siempre false. */
 export function shouldDeferJornadaVoice(): boolean {
-  return isRemountingJornada;
+  return false;
 }
 
-export function deferJornadaVoice(fn: PendingVoiceFn): void {
-  pendingVoiceQueue.push(fn);
+/** @deprecated No-op — cola de voz eliminada. */
+export function deferJornadaVoice(_fn: () => void): void {
+  /* noop */
+}
+
+/** @deprecated No-op — cola de voz eliminada. */
+export function flushJornadaVoiceQueue(): void {
+  /* noop */
 }
 
 export function clearJornadaVoiceFlushTimers(): void {
-  if (voiceFlushTimer) {
-    clearTimeout(voiceFlushTimer);
-    voiceFlushTimer = null;
-  }
-  if (voiceDrainTimer) {
-    clearTimeout(voiceDrainTimer);
-    voiceDrainTimer = null;
-  }
-  voiceFlushInProgress = false;
-}
-
-/** Vacía cola diferida — 1 frase cada 2s vía requestIdleCallback. */
-export function flushJornadaVoiceQueue(): void {
-  if (voiceFlushInProgress || pendingVoiceQueue.length === 0) return;
-  voiceFlushInProgress = true;
-
-  const drainNext = () => {
-    if (pendingVoiceQueue.length === 0) {
-      voiceFlushInProgress = false;
-      voiceDrainTimer = null;
-      return;
-    }
-    const run = () => {
-      const fn = pendingVoiceQueue.shift();
-      try {
-        fn?.();
-      } catch {
-        /* noop */
-      }
-      voiceDrainTimer = setTimeout(drainNext, JORNADA_VOICE_PHRASE_GAP_MS);
-    };
-    if (typeof requestIdleCallback !== "undefined") {
-      requestIdleCallback(run, { timeout: JORNADA_VOICE_PHRASE_GAP_MS });
-    } else {
-      run();
-    }
-  };
-
-  drainNext();
+  /* noop — compat */
 }
 
 export function beginJornadaRemount(opts?: { heavyDeferMs?: number }): void {
   isRemountingJornada = true;
   heavyComputeAllowedAfterMs = Date.now() + (opts?.heavyDeferMs ?? JORNADA_HEAVY_DEFER_MS);
-  clearJornadaVoiceFlushTimers();
 }
 
-export function endJornadaRemount(opts?: { voiceFlushDelayMs?: number }): void {
+export function endJornadaRemount(_opts?: { voiceFlushDelayMs?: number }): void {
   isRemountingJornada = false;
-  clearJornadaVoiceFlushTimers();
-  const delay = opts?.voiceFlushDelayMs ?? JORNADA_VOICE_FLUSH_DELAY_MS;
-  voiceFlushTimer = setTimeout(() => {
-    voiceFlushTimer = null;
-    flushJornadaVoiceQueue();
-  }, delay);
 }
 
 export function cancelJornadaRemountGuard(): void {
   isRemountingJornada = false;
-  clearJornadaVoiceFlushTimers();
 }
 
 /** Solo tests — reinicia estado global. */
 export function resetJornadaRemountForTests(): void {
   isRemountingJornada = false;
   heavyComputeAllowedAfterMs = 0;
-  pendingVoiceQueue.length = 0;
-  clearJornadaVoiceFlushTimers();
 }
 
+/** @deprecated Siempre 0 — cola de voz eliminada. */
 export function getJornadaPendingVoiceCountForTests(): number {
-  return pendingVoiceQueue.length;
+  return 0;
 }

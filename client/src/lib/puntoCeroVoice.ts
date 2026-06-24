@@ -1,12 +1,9 @@
 import {
-  speakUtterance,
   subscribeSpeechExternalCancel,
   unlockSpeechSynthesis,
   warmupSpeechSynthesis,
   voiceEngine,
-  isSpeechSynthesisUnlocked,
 } from "./speechQueue";
-import { deferJornadaVoice, shouldDeferJornadaVoice } from "./jornadaRemount";
 import { isPuntoCeroVoiceEnabled } from "./tikSound";
 import {
   pickCalmDeepSpanishVoice,
@@ -66,34 +63,13 @@ const VOICE_PROFILES: Record<
   reactivation: { rate: 0.86, pitch: 0.96, volume: 0.56, pauseMs: 520 },
 };
 
-/** Cola meditativa propia — secuencias largas con pausas; no comparte cola de conquista/situación. */
 const MAX_PC_PHRASES = 48;
-const PC_VOICES_LOAD_WAIT_MS = 450;
-
-let pcQueue: string[] = [];
-let pcSpeaking = false;
-let pcPauseTimer: ReturnType<typeof setTimeout> | null = null;
-let pcProfile: PuntoCeroVoiceProfile = "calm";
-let pcVoicesLoadBypass = false;
+const PC_MEDITATIVE_KEY = "pc-meditative";
 
 if (typeof window !== "undefined") {
   subscribeSpeechExternalCancel(() => {
-    resetPuntoCeroQueueLocal();
+    voiceEngine.stopChannel("puntocero");
   });
-}
-
-function clearPuntoCeroPauseTimer(): void {
-  if (pcPauseTimer) {
-    clearTimeout(pcPauseTimer);
-    pcPauseTimer = null;
-  }
-}
-
-function resetPuntoCeroQueueLocal(): void {
-  clearPuntoCeroPauseTimer();
-  pcQueue = [];
-  pcSpeaking = false;
-  pcVoicesLoadBypass = false;
 }
 
 function applyCalmVoice(u: SpeechSynthesisUtterance, profile: PuntoCeroVoiceProfile): void {
@@ -108,73 +84,14 @@ function applyCalmVoice(u: SpeechSynthesisUtterance, profile: PuntoCeroVoiceProf
 
 /** Recuperación de emergencia — expuesto para speechRecovery. */
 export function resetPuntoCeroVoiceQueue(): void {
-  voiceEngine.haltSpeechOnChannels(["puntocero"]);
-  resetPuntoCeroQueueLocal();
+  voiceEngine.stopChannel("puntocero");
 }
 
-function preemptOtherChannelsForPuntoCero(): void {
-  voiceEngine.haltSpeechOnChannels(["situacion", "conquista", "puntocero"]);
-  resetPuntoCeroQueueLocal();
-}
-
-function processPuntoCeroQueue(opts?: { force?: boolean }): void {
-  if (pcSpeaking || pcQueue.length === 0) return;
-  if (shouldDeferJornadaVoice()) {
-    deferJornadaVoice(() => processPuntoCeroQueue(opts));
-    return;
-  }
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    pcQueue = [];
-    return;
-  }
-  if (!opts?.force && !isSpeechSynthesisUnlocked()) return;
-
-  primeSpanishVoices();
-  const voiceCount = window.speechSynthesis.getVoices().length;
-  if (voiceCount === 0) {
-    if (!pcVoicesLoadBypass) {
-      pcVoicesLoadBypass = true;
-      const retry = () => processPuntoCeroQueue(opts);
-      window.speechSynthesis.addEventListener(
-        "voiceschanged",
-        () => {
-          pcVoicesLoadBypass = false;
-          retry();
-        },
-        { once: true }
-      );
-      window.setTimeout(retry, PC_VOICES_LOAD_WAIT_MS);
-      return;
-    }
-  } else {
-    pcVoicesLoadBypass = false;
-  }
-
-  const text = pcQueue.shift()!;
-  pcSpeaking = true;
-  const profile = pcProfile;
-  const pauseMs = VOICE_PROFILES[profile].pauseMs;
-
-  const ok = speakUtterance(
-    text,
-    {
-      onend: () => {
-        pcSpeaking = false;
-        if (pcQueue.length > 0) {
-          pcPauseTimer = setTimeout(() => processPuntoCeroQueue(opts), pauseMs);
-        }
-      },
-      onerror: () => {
-        pcSpeaking = false;
-        processPuntoCeroQueue(opts);
-      },
-    },
-    u => applyCalmVoice(u, profile)
-  );
-
-  if (!ok) {
-    pcSpeaking = false;
-    processPuntoCeroQueue(opts);
+function preemptForPuntoCero(cancelOthers: boolean): void {
+  voiceEngine.stopChannel("puntocero");
+  if (cancelOthers) {
+    voiceEngine.stopChannel("conquista");
+    voiceEngine.stopChannel("situacion");
   }
 }
 
@@ -183,34 +100,38 @@ function enqueuePuntoCeroPhrases(
   profile: PuntoCeroVoiceProfile,
   cancelPrevious: boolean
 ): void {
-  const filtered = phrases.map(p => p.trim()).filter(Boolean);
+  const filtered = phrases.map(p => p.trim()).filter(Boolean).slice(0, MAX_PC_PHRASES);
   if (filtered.length === 0) return;
-
-  if (shouldDeferJornadaVoice()) {
-    deferJornadaVoice(() => enqueuePuntoCeroPhrases(phrases, profile, cancelPrevious));
-    return;
-  }
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
 
   unlockSpeechSynthesis(true);
   warmupSpeechSynthesis(true);
-  pcProfile = profile;
+  primeSpanishVoices();
 
   if (cancelPrevious) {
-    preemptOtherChannelsForPuntoCero();
+    preemptForPuntoCero(true);
   }
 
-  pcQueue.push(...filtered.slice(0, MAX_PC_PHRASES));
-  processPuntoCeroQueue({ force: true });
+  const pauseMs = VOICE_PROFILES[profile].pauseMs;
+  for (let i = 0; i < filtered.length; i++) {
+    const text = filtered[i]!;
+    voiceEngine.enqueue({
+      text,
+      channel: "puntocero",
+      key: PC_MEDITATIVE_KEY,
+      pauseAfterMs: i < filtered.length - 1 ? pauseMs : 0,
+      configure: u => applyCalmVoice(u, profile),
+    });
+  }
 }
 
-/** Encola frases con pausas — fluidez meditativa, sin cortes bruscos. */
+/** Encola frases con pausas — fluidez meditativa vía VoiceEngine canal puntocero. */
 export function speakPuntoCeroSequence(
   phrases: readonly string[],
   profile: PuntoCeroVoiceProfile = "calm",
   cancelPrevious = true
 ): void {
   if (filteredEmpty(phrases) || !isPuntoCeroVoiceEnabled()) return;
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
   enqueuePuntoCeroPhrases(phrases, profile, cancelPrevious);
 }
 
@@ -233,36 +154,27 @@ export function speakPleasant(
   text: string,
   opts?: { rate?: number; pitch?: number; volume?: number }
 ): void {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  preemptOtherChannelsForPuntoCero();
+  if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) return;
+  preemptForPuntoCero(true);
   unlockSpeechSynthesis(true);
   warmupSpeechSynthesis(true);
-  pcSpeaking = true;
-  const ok = speakUtterance(
-    text,
-    {
-      onend: () => {
-        pcSpeaking = false;
-      },
-      onerror: () => {
-        pcSpeaking = false;
-      },
-    },
-    u => {
+  voiceEngine.enqueue({
+    text: text.trim(),
+    channel: "puntocero",
+    key: PC_MEDITATIVE_KEY,
+    configure: u => {
       u.lang = "es-ES";
       u.rate = opts?.rate ?? VOICE_PROFILES.calm.rate;
       u.pitch = opts?.pitch ?? VOICE_PROFILES.calm.pitch;
       u.volume = opts?.volume ?? VOICE_PROFILES.calm.volume;
       const voice = pickPleasantSpanishVoice();
       if (voice) u.voice = voice;
-    }
-  );
-  if (!ok) pcSpeaking = false;
+    },
+  });
 }
 
 export function stopPleasantVoice(): void {
-  voiceEngine.haltSpeechOnChannels(["puntocero"]);
-  resetPuntoCeroQueueLocal();
+  voiceEngine.stopChannel("puntocero");
 }
 
 /** TTS de Punto Cero con warmup (requerido en móvil tras gesto del usuario). */
@@ -317,7 +229,7 @@ export function speakReactivacionDia(): void {
   speakPuntoCeroSequence(MENSAJE_REACTIVACION_DIA, "reactivation");
 }
 
-/** Solo tests — expone estado de la cola meditativa. */
+/** Solo tests — frases pendientes en cola engine (canal puntocero). */
 export function getPuntoCeroQueueDepthForTests(): number {
-  return pcQueue.length + (pcSpeaking ? 1 : 0);
+  return voiceEngine.queueLength();
 }
