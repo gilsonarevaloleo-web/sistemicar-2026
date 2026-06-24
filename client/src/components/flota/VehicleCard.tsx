@@ -3491,17 +3491,8 @@ function VehicleCard({
                       onSessionPersist={(id, session) => onPuntoCeroSessionUpdate?.(id, session)}
                       onAutoClose={id => onPuntoCeroAutoClose?.(id)}
                       onConfirmManualClose={(id, etiqueta, nota) => {
-                        if (onOpenCierreEnergia) {
-                          onOpenCierreEnergia({
-                            kind: "descanso",
-                            vehicleId: id,
-                            status: "cumplido",
-                            etiqueta,
-                            nota,
-                          });
-                        } else {
-                          onDescansoClose?.(id, "cumplido", etiqueta, nota);
-                        }
+                        // Punto Cero cierra directo: el modal de energía queda detrás de la pantalla pasiva (z-250).
+                        onDescansoClose?.(id, "cumplido", etiqueta, nota);
                       }}
                     />
                   );

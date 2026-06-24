@@ -75,6 +75,7 @@ export function usePuntoCeroOrchestrator(
           stopPleasantVoice();
         }
         cbRef.current.onCompletada?.(msg);
+        cbRef.current.onAutoClose();
       }
       if (ev.type === "auto_close_due") {
         cbRef.current.onAutoClose();

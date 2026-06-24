@@ -444,7 +444,8 @@ export function PuntoCeroPanel({
   usePuntoCeroOrchestrator(session, orchestratorActive, {
     onSessionUpdate: handleSessionUpdate,
     onAutoClose: () => {
-      /* El operador cierra manualmente — no auto-archivar al completar. */
+      stopPuntoCeroMedia();
+      onAutoClose(vehicle.id);
     },
     onEnterPasiva: () => {
       if (session?.modo === "dia") {

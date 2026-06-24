@@ -2072,6 +2072,28 @@ export default function Planeacion() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+
+    const checkPuntoCeroEntropy = () => {
+      const now = Date.now();
+      for (const v of vehiclesRef.current) {
+        if (v.status !== "activo" || v.tipoDescanso !== "punto_cero") continue;
+        const aperturaAt = v.aperturaAt || Date.now();
+        const descansoMatch = v.criterioDetalle?.match(/([\d.]+)\s*min/i);
+        const descansoDurMin = descansoMatch ? parseFloat(descansoMatch[1]) : 20;
+        const deadlineMs = aperturaAt + (descansoDurMin + 5) * 60000;
+        if (now >= deadlineMs && !isCloseBlocked(v.id)) {
+          void handlePuntoCeroEntropyClose(v.id);
+        }
+      }
+    };
+
+    const interval = setInterval(checkPuntoCeroEntropy, 30_000);
+    checkPuntoCeroEntropy();
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
     if (relojTiempo !== "desglosador" || titulo.trim().length < 3) {
       setHistorialSubs([]);
       return;
@@ -3154,6 +3176,7 @@ export default function Planeacion() {
   };
 
   const puntoCeroSessionSigRef = useRef<Record<string, string>>({});
+  const puntoCeroAutoCloseAttemptedRef = useRef<Set<string>>(new Set());
 
   const handlePuntoCeroSessionUpdate = (vehicleId: string, session: PuntoCeroSession) => {
     if (!user) return;
@@ -3189,9 +3212,61 @@ export default function Planeacion() {
   };
 
   const handlePuntoCeroAutoClose = (vehicleId: string) => {
+    if (puntoCeroAutoCloseAttemptedRef.current.has(vehicleId)) return;
     const v = vehiclesRef.current.find(x => x.id === vehicleId) || vehicles.find(x => x.id === vehicleId);
     if (!v || v.status !== "activo") return;
-    void handleDescansoClose(vehicleId, "cumplido", "recuperado", "", "fluido");
+    puntoCeroAutoCloseAttemptedRef.current.add(vehicleId);
+    resetPuntoCeroVoiceQueue();
+    void handleDescansoClose(vehicleId, "cumplido", "recuperado", "");
+  };
+
+  const handlePuntoCeroEntropyClose = async (vehicleId: string) => {
+    if (!user) return;
+    if (isCloseBlocked(vehicleId)) return;
+    const entropyKey = `entropy:${vehicleId}`;
+    if (puntoCeroAutoCloseAttemptedRef.current.has(entropyKey)) return;
+    const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
+    if (!vehicle || vehicle.status !== "activo" || vehicle.tipoDescanso !== "punto_cero") return;
+
+    puntoCeroAutoCloseAttemptedRef.current.add(entropyKey);
+    puntoCeroAutoCloseAttemptedRef.current.add(vehicleId);
+    resetPuntoCeroVoiceQueue();
+    beginClose(vehicleId);
+
+    const aperturaAt = vehicle.aperturaAt || Date.now();
+    const cierreAt = Date.now();
+    const duracionMin = Math.round((cierreAt - aperturaAt) / 60000);
+
+    notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+
+    const optimisticClose = {
+      status: "archivado" as const,
+      cierreAt,
+      duracionFinal: duracionMin,
+      cierreManual: false,
+      etiquetaSalida: "fragmentado" as const,
+      notaSalida: "Cierre por entropía — ventana de tolerancia superada",
+    };
+
+    setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...optimisticClose } : v)));
+    vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? { ...v, ...optimisticClose } : v));
+    optimisticVehiclesRef.current = optimisticVehiclesRef.current.filter(v => v.id !== vehicleId);
+    saveLocalVehicles(vehiclesRef.current);
+
+    try {
+      await updateVehicle(user.uid, vehicleId, optimisticClose);
+      await updateVehicleStatus(user.uid, vehicleId, "archivado");
+    } catch {
+      /* updateVehicle ya persiste en local si Firebase falla */
+    } finally {
+      endClose(vehicleId);
+    }
+
+    toast.info("Punto Cero cerrado por entropía", {
+      description: "Superaste la ventana de 5 min sin cerrar. Sin PS de cierre — las etapas ya acreditadas se conservan.",
+      style: { backgroundColor: PIZARRA, border: "1px solid #ef4444", color: "#ef4444" },
+      duration: 6000,
+    });
   };
 
   const handleDescansoClose = async (vehicleId: string, closingStatus: "cumplido" | "archivado", etiqueta: "recuperado" | "parcial" | "fragmentado", nota: string, intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite") => {
@@ -3200,6 +3275,7 @@ export default function Planeacion() {
     beginClose(vehicleId);
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
     if (!vehicle) { endClose(vehicleId); return; }
+    if (vehicle.tipoDescanso === "punto_cero") resetPuntoCeroVoiceQueue();
 
     const aperturaAt = vehicle.aperturaAt || Date.now();
     const cierreAt = Date.now();
