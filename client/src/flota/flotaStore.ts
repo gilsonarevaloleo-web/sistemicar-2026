@@ -47,8 +47,13 @@ let unsubFirebase: (() => void) | null = null;
 let mergeContext: FlotaMergeContext | null = null;
 let fetchGeneration = 0;
 let deferredMergeTimer: ReturnType<typeof setTimeout> | null = null;
+let deferredMergeForceTimer: ReturnType<typeof setTimeout> | null = null;
+/** Inicio del primer defer — TTL estricto aunque extendLocalVehicleMutation renueve el lock. */
+let deferredMergeFirstAt = 0;
 let syncReadyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingIncoming: { data: Vehicle[]; generation: number } | null = null;
+
+const DEFERRED_MERGE_MAX_WAIT_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS;
 let vehiclesUpdatedHandler: (() => void) | null = null;
 
 const listeners = new Set<StoreListener>();
@@ -152,23 +157,80 @@ function clearDeferredMerge(): void {
     clearTimeout(deferredMergeTimer);
     deferredMergeTimer = null;
   }
+  if (deferredMergeForceTimer != null) {
+    clearTimeout(deferredMergeForceTimer);
+    deferredMergeForceTimer = null;
+  }
   pendingIncoming = null;
+  deferredMergeFirstAt = 0;
+}
+
+function forceDeferredMerge(): void {
+  const pending = pendingIncoming;
+  if (deferredMergeTimer != null) {
+    clearTimeout(deferredMergeTimer);
+    deferredMergeTimer = null;
+  }
+  if (deferredMergeForceTimer != null) {
+    clearTimeout(deferredMergeForceTimer);
+    deferredMergeForceTimer = null;
+  }
+  pendingIncoming = null;
+  deferredMergeFirstAt = 0;
+  if (!pending) return;
+  if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
+  applyIncomingSnapshot(pending.data, pending.generation, { force: true });
 }
 
 function scheduleDeferredMerge(data: Vehicle[], generation: number): void {
   pendingIncoming = { data, generation };
+  const now = Date.now();
+  if (deferredMergeFirstAt === 0) deferredMergeFirstAt = now;
+
+  const ttlRemaining = DEFERRED_MERGE_MAX_WAIT_MS - (now - deferredMergeFirstAt);
+  if (ttlRemaining <= 0) {
+    forceDeferredMerge();
+    return;
+  }
+
+  if (deferredMergeForceTimer == null) {
+    deferredMergeForceTimer = setTimeout(forceDeferredMerge, ttlRemaining);
+  }
+
   if (deferredMergeTimer != null) return;
+
   deferredMergeTimer = setTimeout(() => {
     deferredMergeTimer = null;
-    const pending = pendingIncoming;
-    pendingIncoming = null;
-    if (!pending) return;
-    if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
-    applyIncomingSnapshot(pending.data, pending.generation);
+    if (!isLocalVehicleMutationLocked()) {
+      const pending = pendingIncoming;
+      pendingIncoming = null;
+      deferredMergeFirstAt = 0;
+      if (deferredMergeForceTimer != null) {
+        clearTimeout(deferredMergeForceTimer);
+        deferredMergeForceTimer = null;
+      }
+      if (!pending) return;
+      if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
+      applyIncomingSnapshot(pending.data, pending.generation);
+      return;
+    }
+    const elapsed = Date.now() - deferredMergeFirstAt;
+    const wait = Math.max(0, DEFERRED_MERGE_MAX_WAIT_MS - elapsed);
+    if (wait === 0) {
+      forceDeferredMerge();
+    } else {
+      deferredMergeTimer = setTimeout(forceDeferredMerge, wait);
+    }
   }, LOCAL_VEHICLE_MUTATION_LOCK_MS + 50);
 }
 
-function applyIncomingSnapshot(data: Vehicle[], generation: number): void {
+type ApplySnapshotOpts = { duringMutationLock?: boolean; force?: boolean };
+
+function applyIncomingSnapshot(
+  data: Vehicle[],
+  generation: number,
+  opts?: ApplySnapshotOpts
+): void {
   const ctx = mergeContext;
   const current = vehicles;
 
@@ -191,18 +253,22 @@ function applyIncomingSnapshot(data: Vehicle[], generation: number): void {
   const sig = vehiclesReactiveSignature(merged);
   const uid = ctx?.userId ?? userId;
 
-  if (uid && merged.length > 0 && sig !== mergedSig) {
+  const paintNow = opts?.force === true || opts?.duringMutationLock === true;
+
+  if (uid && merged.length > 0 && sig !== mergedSig && !opts?.duringMutationLock) {
     writeLocalFlota(uid, merged);
+    syncLocalCache(merged);
+  } else if (opts?.duringMutationLock && merged.length > 0) {
     syncLocalCache(merged);
   }
 
-  if (sig === mergedSig) {
+  if (sig === mergedSig && !paintNow) {
     markSyncReady(generation);
     return;
   }
 
   const localSig = vehiclesReactiveSignature(current);
-  if (sig !== localSig && localSig === mergedSig) {
+  if (!paintNow && sig !== localSig && localSig === mergedSig) {
     markSyncReady(generation);
     return;
   }
@@ -217,11 +283,14 @@ function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
   if (!shouldAcceptFlotaFetchResponse(generation)) return;
 
   if (isLocalVehicleMutationLocked()) {
-    markSyncReady(generation);
+    // deliverDuringMutationLock: pintar firma en memoria ya — no bloquear React
+    applyIncomingSnapshot(data, generation, { duringMutationLock: true });
     scheduleDeferredMerge(data, generation);
+    markSyncReady(generation);
     return;
   }
 
+  clearDeferredMerge();
   applyIncomingSnapshot(data, generation);
 }
 
