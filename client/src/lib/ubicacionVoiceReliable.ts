@@ -97,15 +97,18 @@ function trySpeak(key: string): void {
   }
   recoverSpeechQueue();
 
-  speakUbicacionQueue(
-    entry.phrases,
-    entry.cancelPrevious,
-    entry.source,
-    () => {
-      markVoiceDelivered(key);
-    },
-    key
-  );
+  queueMicrotask(() => {
+    if (entry.spoken || !pending.has(key)) return;
+    speakUbicacionQueue(
+      entry.phrases,
+      entry.cancelPrevious,
+      entry.source,
+      () => {
+        markVoiceDelivered(key);
+      },
+      key
+    );
+  });
 }
 
 /** Hub global visibility/focus — pointerdown vive en VoiceBootstrap (App.tsx). */

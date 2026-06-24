@@ -546,6 +546,7 @@ export function speakUtterance(
   resumeSynthIfPaused();
 
   try {
+    synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     if (configure) {
       configure(u);
@@ -777,6 +778,13 @@ export function speakUbicacionQueue(
   const channel = sourceToChannel(source);
 
   if (cancelPrevious) {
+    voiceEngine.stopChannel(channel);
+  } else if (source === "desglosador") {
+    try {
+      getSynth()?.cancel();
+    } catch {
+      /* noop */
+    }
     voiceEngine.stopChannel(channel);
   }
 

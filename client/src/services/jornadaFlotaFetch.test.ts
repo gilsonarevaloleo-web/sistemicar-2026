@@ -12,7 +12,8 @@ import {
   resetJornadaFlotaFetchForTests,
   retryFlotaFetch,
   armFlotaFetchTimeout,
-  queueVisibilityReturnForTests,
+  setFlotaPaintedCount,
+  shouldAcceptFlotaFetchResponse,
 } from "./jornadaFlotaFetch.ts";
 
 describe("jornadaFlotaFetch", () => {
@@ -32,6 +33,12 @@ describe("jornadaFlotaFetch", () => {
     assert.equal(getFlotaFetchStatus(), "loading");
   });
 
+  it("pintado optimista mantiene ready", () => {
+    const session = beginFlotaFetch({ hasOptimisticPaint: true });
+    assert.equal(getFlotaFetchStatus(), "ready");
+    assert.equal(isFlotaFetchCurrent(session.generation), true);
+  });
+
   it("completeFlotaFetch solo aplica a generación vigente", () => {
     const a = beginFlotaFetch();
     const b = beginFlotaFetch();
@@ -41,20 +48,28 @@ describe("jornadaFlotaFetch", () => {
     assert.equal(getFlotaFetchStatus(), "ready");
   });
 
-  it("timeout a los 6s si no completa", async () => {
+  it("timeout a los 6s si no hay vehículos pintados", async () => {
     const { generation } = beginFlotaFetch();
     armFlotaFetchTimeout(generation);
     await new Promise(resolve => setTimeout(resolve, FLOTA_FETCH_TIMEOUT_MS + 50));
     assert.equal(getFlotaFetchStatus(), "timeout");
-    assert.equal(isFlotaFetchCurrent(generation), false);
+    assert.equal(shouldAcceptFlotaFetchResponse(generation), true);
+  });
+
+  it("timeout con vehículos pintados no bloquea UI", async () => {
+    const { generation } = beginFlotaFetch();
+    setFlotaPaintedCount(3);
+    armFlotaFetchTimeout(generation);
+    await new Promise(resolve => setTimeout(resolve, FLOTA_FETCH_TIMEOUT_MS + 50));
+    assert.equal(getFlotaFetchStatus(), "ready");
   });
 
   it("retryFlotaFetch reinicia sesión tras timeout", () => {
     const first = beginFlotaFetch();
     failFlotaFetchTimeout(first.generation);
     assert.equal(getFlotaFetchStatus(), "timeout");
-    const retry = retryFlotaFetch();
-    assert.equal(getFlotaFetchStatus(), "loading");
+    const retry = retryFlotaFetch({ hasOptimisticPaint: true });
+    assert.equal(getFlotaFetchStatus(), "ready");
     assert.equal(isFlotaFetchCurrent(retry.generation), true);
   });
 
@@ -63,6 +78,7 @@ describe("jornadaFlotaFetch", () => {
     onJornadaVisibilityReturn(() => {
       calls += 1;
     });
+    const { queueVisibilityReturnForTests } = await import("./jornadaFlotaFetch.ts");
 
     for (let i = 0; i < 10; i++) {
       queueVisibilityReturnForTests();
