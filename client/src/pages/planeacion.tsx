@@ -508,7 +508,12 @@ import {
   readLocalFlota,
   writeLocalFlota,
 } from "@/services/jornadaFlotaCache";
-import { registerFlotaMergeContext, refreshFlotaSession, getFlotaMergedSignature } from "@/flota/flotaStore";
+import {
+  registerFlotaMergeContext,
+  refreshFlotaSession,
+  getFlotaMergedSignature,
+  getFlotaVehicles,
+} from "@/flota/flotaStore";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaStore } from "@/hooks/useFlotaStore";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
@@ -1825,7 +1830,8 @@ export default function Planeacion() {
     const rehydrateFromLocal = () => {
       const nowMs = Date.now();
       const dayStart = getJournalDayStartMs(nowMs);
-      const localRaw = getLocalVehicles();
+      const storeLocal = getFlotaVehicles();
+      const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
       const localById = new Map(localRaw.map(v => [v.id, v]));
       const parked = getParkedActiveVehicles().filter(p => {
         const local = localById.get(p.id) ??
@@ -1897,7 +1903,8 @@ export default function Planeacion() {
     } catch { /* ignore */ }
     try {
       const nowMs = Date.now();
-      const localRaw = getLocalVehicles();
+      const storeLocal = getFlotaVehicles();
+      const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
       const byId = new Map(localRaw.map(v => [v.id, v]));
       const localActivos = localRaw.filter(
         v =>

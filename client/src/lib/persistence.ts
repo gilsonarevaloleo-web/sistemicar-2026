@@ -1280,7 +1280,11 @@ export function subscribeToVehicles(
   userId: string,
   onData: (vehicles: Vehicle[]) => void,
   onError: (error: Error) => void,
-  options?: { isCloseInFlight?: (vehicleId: string) => boolean }
+  options?: {
+    isCloseInFlight?: (vehicleId: string) => boolean;
+    /** FlotaStore central: entrega snapshots aunque haya mutation lock (el store decide defer). */
+    deliverDuringMutationLock?: boolean;
+  }
 ): () => void {
   if (isFirebaseConfigured() && db) {
     const path = getPrivatePath(userId, "vehicles");
@@ -1295,7 +1299,7 @@ export function subscribeToVehicles(
     }
 
     return onSnapshot(q, (snapshot) => {
-      if (isLocalVehicleMutationLocked()) {
+      if (isLocalVehicleMutationLocked() && !options?.deliverDuringMutationLock) {
         console.log("[Vehicles] Snapshot ignorado — mutación local en curso");
         return;
       }

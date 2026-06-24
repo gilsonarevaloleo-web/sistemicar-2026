@@ -18,6 +18,7 @@ import {
   armFlotaFetchTimeout,
   beginFlotaFetch,
   completeFlotaFetch,
+  getFlotaFetchStatus,
   setFlotaPaintedCount,
   shouldAcceptFlotaFetchResponse,
 } from "@/services/jornadaFlotaFetch";
@@ -39,12 +40,16 @@ type StoreListener = () => void;
 let userId: string | null = null;
 let vehicles: Vehicle[] = [];
 let mergedSig = "";
+/** Parse de localStorage una vez por sesión — evita JSON.parse en cada snapshot. */
+let localCache: Vehicle[] | null = null;
 let refCount = 0;
 let unsubFirebase: (() => void) | null = null;
 let mergeContext: FlotaMergeContext | null = null;
 let fetchGeneration = 0;
 let deferredMergeTimer: ReturnType<typeof setTimeout> | null = null;
+let syncReadyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingIncoming: { data: Vehicle[]; generation: number } | null = null;
+let vehiclesUpdatedHandler: (() => void) | null = null;
 
 const listeners = new Set<StoreListener>();
 
@@ -58,8 +63,37 @@ function notify(): void {
   });
 }
 
+function hydrateLocalCache(): Vehicle[] {
+  if (localCache === null) {
+    localCache = getLocalVehicles();
+  }
+  return localCache;
+}
+
+function syncLocalCache(next: Vehicle[]): void {
+  localCache = next;
+}
+
+/** Fuentes locales para merge — memoria del store; sin JSON.parse repetido. */
+function getLocalSourcesForMerge(ctx: FlotaMergeContext | null): Vehicle[] {
+  const base = vehicles.length > 0 ? vehicles : hydrateLocalCache();
+  if (!ctx) return base;
+  const extra = ctx.getExtraLocalSources();
+  if (extra.length === 0) return base;
+  const seen = new Set(base.map(v => v.id));
+  const merged = [...base];
+  for (const v of extra) {
+    if (!seen.has(v.id)) {
+      seen.add(v.id);
+      merged.push(v);
+    }
+  }
+  return merged;
+}
+
 function setVehiclesInternal(next: Vehicle[], opts?: { skipNotify?: boolean }): void {
   vehicles = next;
+  syncLocalCache(next);
   mergedSig = vehiclesReactiveSignature(next);
   if (!opts?.skipNotify) notify();
 }
@@ -95,6 +129,24 @@ export function markSyncReady(generation: number): void {
   completeFlotaFetch(generation);
 }
 
+function clearSyncReadyFallback(): void {
+  if (syncReadyFallbackTimer != null) {
+    clearTimeout(syncReadyFallbackTimer);
+    syncReadyFallbackTimer = null;
+  }
+}
+
+/** Cierra skeleton si snapshots de red quedan bloqueados (lock / caché Firebase). */
+function armSyncReadyFallback(generation: number): void {
+  clearSyncReadyFallback();
+  syncReadyFallbackTimer = setTimeout(() => {
+    syncReadyFallbackTimer = null;
+    if (!shouldAcceptFlotaFetchResponse(generation)) return;
+    if (getFlotaFetchStatus() !== "loading") return;
+    markSyncReady(generation);
+  }, LOCAL_VEHICLE_MUTATION_LOCK_MS + 100);
+}
+
 function clearDeferredMerge(): void {
   if (deferredMergeTimer != null) {
     clearTimeout(deferredMergeTimer);
@@ -124,7 +176,7 @@ function applyIncomingSnapshot(data: Vehicle[], generation: number): void {
   if (ctx) {
     const firebaseIds = new Set(data.map(v => v.id));
     const pending = ctx.getOptimisticPending().filter(ov => !firebaseIds.has(ov.id));
-    const localSources = [...getLocalVehicles(), ...ctx.getExtraLocalSources()];
+    const localSources = getLocalSourcesForMerge(ctx);
     const mergedRaw = reconcileVehicleListView({
       incoming: data,
       localSources,
@@ -141,6 +193,7 @@ function applyIncomingSnapshot(data: Vehicle[], generation: number): void {
 
   if (uid && merged.length > 0 && sig !== mergedSig) {
     writeLocalFlota(uid, merged);
+    syncLocalCache(merged);
   }
 
   if (sig === mergedSig) {
@@ -172,24 +225,51 @@ function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
   applyIncomingSnapshot(data, generation);
 }
 
+function installVehiclesUpdatedBridge(): void {
+  if (vehiclesUpdatedHandler || typeof window === "undefined") return;
+  vehiclesUpdatedHandler = () => {
+    if (isLocalVehicleMutationLocked()) return;
+    const disk = getLocalVehicles();
+    syncLocalCache(disk);
+    if (vehicles.length === 0 && disk.length > 0) {
+      setVehiclesInternal(disk);
+      setFlotaPaintedCount(disk.length);
+    }
+  };
+  window.addEventListener("vehicles-updated", vehiclesUpdatedHandler);
+}
+
+function uninstallVehiclesUpdatedBridge(): void {
+  if (!vehiclesUpdatedHandler || typeof window === "undefined") return;
+  window.removeEventListener("vehicles-updated", vehiclesUpdatedHandler);
+  vehiclesUpdatedHandler = null;
+}
+
 function stopFirebaseSubscription(): void {
   unsubFirebase?.();
   unsubFirebase = null;
   clearDeferredMerge();
+  clearSyncReadyFallback();
+  uninstallVehiclesUpdatedBridge();
 }
 
 function startFirebaseSubscription(uid: string): void {
   stopFirebaseSubscription();
+  installVehiclesUpdatedBridge();
 
-  const local = getLocalVehicles();
+  const local = hydrateLocalCache();
   if (local.length > 0 && vehicles.length === 0) {
     setVehiclesInternal(local);
     setFlotaPaintedCount(local.length);
     console.log("[flotaStore] pintado inicial desde local", local.length);
+    markSyncReady(fetchGeneration);
   }
 
   const isCloseInFlight = (vehicleId: string): boolean =>
     mergeContext?.isCloseInFlight(vehicleId) ?? false;
+
+  const generationAtSubscribe = fetchGeneration;
+  armSyncReadyFallback(generationAtSubscribe);
 
   unsubFirebase = subscribeToVehicles(
     uid,
@@ -199,7 +279,7 @@ function startFirebaseSubscription(uid: string): void {
       console.error("[flotaStore]", err);
       markSyncReady(fetchGeneration);
     },
-    { isCloseInFlight }
+    { isCloseInFlight, deliverDuringMutationLock: true }
   );
 }
 
@@ -211,6 +291,11 @@ export function refreshFlotaSession(opts?: { hasOptimisticPaint?: boolean }): nu
   const { generation } = beginFlotaFetch(opts);
   fetchGeneration = generation;
   armFlotaFetchTimeout(generation);
+  if (vehicles.length > 0 && getFlotaFetchStatus() === "loading") {
+    markSyncReady(generation);
+  } else {
+    armSyncReadyFallback(generation);
+  }
   return generation;
 }
 
@@ -220,6 +305,7 @@ export function acquireFlotaStore(uid: string): () => void {
     userId = uid;
     vehicles = [];
     mergedSig = "";
+    localCache = null;
     stopFirebaseSubscription();
   }
   refCount += 1;
@@ -236,6 +322,7 @@ export function releaseFlotaStore(): void {
     stopFirebaseSubscription();
     userId = null;
     mergeContext = null;
+    localCache = null;
   }
 }
 
@@ -243,10 +330,12 @@ export function releaseFlotaStore(): void {
 export function resetFlotaStoreForTests(): void {
   stopFirebaseSubscription();
   clearDeferredMerge();
+  clearSyncReadyFallback();
   listeners.clear();
   userId = null;
   vehicles = [];
   mergedSig = "";
+  localCache = null;
   refCount = 0;
   mergeContext = null;
   fetchGeneration = 0;
