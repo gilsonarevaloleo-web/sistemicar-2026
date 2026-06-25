@@ -513,6 +513,7 @@ import {
   refreshFlotaSession,
   getFlotaMergedSignature,
   getFlotaVehicles,
+  flushFlotaDeferredMergeIfReady,
 } from "@/flota/flotaStore";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaStore } from "@/hooks/useFlotaStore";
@@ -2237,6 +2238,8 @@ export default function Planeacion() {
   };
 
   const handleFlotaSave = async () => {
+    forceResetOrphanMutationLocks();
+    flushFlotaDeferredMergeIfReady();
     if (!user) {
       toast.error("Inicia sesión para lanzar vehículos");
       return;
@@ -2260,10 +2263,8 @@ export default function Planeacion() {
     }
     const launchKey = `${titulo.trim()}|${tipoFlotaSeleccionado}`;
     const launchNow = Date.now();
-    if (isLocalVehicleMutationLocked()) {
-      const last = lastFlotaLaunchRef.current;
-      if (last?.key === launchKey && launchNow - last.at < 2000) return;
-    }
+    const last = lastFlotaLaunchRef.current;
+    if (last?.key === launchKey && launchNow - last.at < 2000) return;
     lastFlotaLaunchRef.current = { key: launchKey, at: launchNow };
     setSaving(true);
     resetCentinelaLaunchGate();
@@ -2958,6 +2959,8 @@ export default function Planeacion() {
   ];
 
   const handleQuickSaveAndNew = async (tipoTermino: TipoTerminoRapido, detalle?: string) => {
+    forceResetOrphanMutationLocks();
+    flushFlotaDeferredMergeIfReady();
     if (!user || !titulo.trim()) return;
     const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "quick_save");
     if (!slotsCheck.allowed) {
@@ -5603,6 +5606,8 @@ export default function Planeacion() {
   }, [vehicles, expandedId]);
 
   const handleVehicleToggle = useCallback((vehicleId: string) => {
+    forceResetOrphanMutationLocks();
+    flushFlotaDeferredMergeIfReady();
     setExpandedId(prev => (prev === vehicleId ? null : vehicleId));
   }, []);
 
@@ -6496,6 +6501,10 @@ export default function Planeacion() {
             }}
             tab={planTab}
             onTabChange={(tab) => {
+              if (tab === "operar") {
+                forceResetOrphanMutationLocks();
+                flushFlotaDeferredMergeIfReady();
+              }
               setPlanTab(tab);
               if (planLayout === "full") setPlanLayout("compact");
             }}
@@ -8115,7 +8124,7 @@ export default function Planeacion() {
                 {(Object.entries(FLOTA_CONFIG) as [TipoFlota, typeof FLOTA_CONFIG["tiempo"]][]).map(([tipo, cfg]) => {
                   const Icon = cfg.icon;
                   return (
-                    <button key={tipo} onClick={() => { setCierreEnergiaPending(null); setCierreEnergiaSeleccion(null); setShowCierreJornada(false); setSituacionDesgloseCelebration(null); setSaving(false); setPlanTab("operar"); setIsCreating(true); setVehicleMode("flota"); setTipoFlotaSeleccionado(tipo); if (tipo === "situacion" && !terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque"); }} className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02]" style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }} data-testid={`button-flota-${tipo}`}>
+                    <button key={tipo} onClick={() => { forceResetOrphanMutationLocks(); flushFlotaDeferredMergeIfReady(); setCierreEnergiaPending(null); setCierreEnergiaSeleccion(null); setShowCierreJornada(false); setSituacionDesgloseCelebration(null); setSaving(false); setPlanTab("operar"); setIsCreating(true); setVehicleMode("flota"); setTipoFlotaSeleccionado(tipo); if (tipo === "situacion" && !terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque"); }} className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02]" style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }} data-testid={`button-flota-${tipo}`}>
                       <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${cfg.color}20` }}>
                         <Icon size={20} style={{ color: cfg.color }} />
                       </div>

@@ -62,6 +62,7 @@ const DEFERRED_MERGE_MAX_WAIT_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS;
 let vehiclesUpdatedHandler: (() => void) | null = null;
 let deferredMergeWakeHandler: (() => void) | null = null;
 let backgroundWakeFlushTimer: ReturnType<typeof setTimeout> | null = null;
+let lastDocumentVisibility: DocumentVisibilityState | null = null;
 
 const BACKGROUND_WAKE_SHIELD_MS = 800;
 
@@ -380,8 +381,13 @@ function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
 
 function installDeferredMergeWakeBridge(): void {
   if (deferredMergeWakeHandler || typeof document === "undefined") return;
+  lastDocumentVisibility = document.visibilityState;
   deferredMergeWakeHandler = () => {
-    if (document.visibilityState !== "visible") return;
+    const prev = lastDocumentVisibility;
+    const next = document.visibilityState;
+    lastDocumentVisibility = next;
+    if (next !== "visible") return;
+    if (prev !== "hidden" && prev !== "prerender") return;
 
     armBackgroundWakeReentryShield(BACKGROUND_WAKE_SHIELD_MS);
 
@@ -404,6 +410,7 @@ function uninstallDeferredMergeWakeBridge(): void {
   if (!deferredMergeWakeHandler || typeof document === "undefined") return;
   document.removeEventListener("visibilitychange", deferredMergeWakeHandler);
   deferredMergeWakeHandler = null;
+  lastDocumentVisibility = null;
   clearBackgroundWakeFlushTimer();
 }
 

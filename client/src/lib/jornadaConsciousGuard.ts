@@ -1,13 +1,11 @@
-import {
-  isLocalVehicleMutationLocked,
-  isStructuralCloseInTransit,
-} from "@/lib/localMutationLock";
 import type { Vehicle } from "@/lib/persistence";
+import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 
-/** Proceso consciente activo: vehículo en ring, desglosador o Punto Cero en curso. */
+/**
+ * Proceso consciente activo (ring, desglosador, Punto Cero).
+ * Solo para escudo del modal automático de Cierre de Jornada — no bloquea taps del usuario.
+ */
 export function hasActiveConsciousJornadaProcess(vehicles: Vehicle[]): boolean {
-  if (isLocalVehicleMutationLocked() || isStructuralCloseInTransit()) return true;
-
   return vehicles.some(v => {
     if (v.status !== "activo" || v.autoVerdad) return false;
 
@@ -20,7 +18,12 @@ export function hasActiveConsciousJornadaProcess(vehicles: Vehicle[]): boolean {
       return true;
     }
 
-    return true;
+    if (v.tipoFlota === "situacion") {
+      if (v.situacionCronometro?.activo === true) return true;
+      return ringSessionOperable(v.situacionCronometro, v.subTareas ?? []);
+    }
+
+    return false;
   });
 }
 

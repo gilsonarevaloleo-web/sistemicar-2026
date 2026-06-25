@@ -66,40 +66,27 @@ function scheduleReleaseAt(releaseAt: number, rapidFollowUp = false): void {
   releaseTimer = setTimeout(finalizeMutationLockRelease, capped - now);
 }
 
-function armTimedLock(requestedUntil: number, reason?: string): void {
+function applyMutationLock(requestedUntil: number, reason?: string): void {
   const now = Date.now();
   const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
   noteLockBurst();
-  const capped = capLockUntil(requestedUntil);
+  const capped = capLockUntil(Math.max(requestedUntil, now + LOCK_MS));
   lockUntil = capped;
   if (reason) lockReason = reason;
-  scheduleReleaseAt(capped, rapidFollowUp);
+  if (releaseTimer != null && rapidFollowUp) return;
+  if (releaseTimer != null) {
+    clearTimeout(releaseTimer);
+    releaseTimer = null;
+    scheduledReleaseAt = 0;
+  }
 }
 
 export function beginLocalVehicleMutation(reason?: string): void {
-  const now = Date.now();
-  const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
-  if (releaseTimer != null && rapidFollowUp) {
-    noteLockBurst();
-    lockUntil = capLockUntil(Math.max(lockUntil, now + LOCK_MS));
-    lockReason = reason;
-    scheduleReleaseAt(lockUntil, true);
-    return;
-  }
-  armTimedLock(now + LOCK_MS, reason);
+  applyMutationLock(Date.now() + LOCK_MS, reason);
 }
 
 export function extendLocalVehicleMutation(reason?: string): void {
-  const now = Date.now();
-  const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
-  if (releaseTimer != null && rapidFollowUp) {
-    noteLockBurst();
-    lockUntil = capLockUntil(Math.max(lockUntil, now + LOCK_MS));
-    if (reason) lockReason = reason;
-    scheduleReleaseAt(lockUntil, true);
-    return;
-  }
-  armTimedLock(now + LOCK_MS, reason);
+  applyMutationLock(Math.max(lockUntil, Date.now() + LOCK_MS), reason);
 }
 
 export function isLocalVehicleMutationLocked(): boolean {
