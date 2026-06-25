@@ -55,6 +55,7 @@ let pendingIncoming: { data: Vehicle[]; generation: number } | null = null;
 
 const DEFERRED_MERGE_MAX_WAIT_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS;
 let vehiclesUpdatedHandler: (() => void) | null = null;
+let deferredMergeWakeHandler: (() => void) | null = null;
 
 const listeners = new Set<StoreListener>();
 
@@ -101,6 +102,13 @@ function setVehiclesInternal(next: Vehicle[], opts?: { skipNotify?: boolean }): 
   syncLocalCache(next);
   mergedSig = vehiclesReactiveSignature(next);
   if (!opts?.skipNotify) notify();
+}
+
+/** Actualiza búfer interno + firma sin disparar listeners de React (mutation lock activo). */
+function setVehiclesBufferOnly(next: Vehicle[]): void {
+  vehicles = next;
+  syncLocalCache(next);
+  mergedSig = vehiclesReactiveSignature(next);
 }
 
 export function getFlotaVehicles(): Vehicle[] {
@@ -182,6 +190,31 @@ function forceDeferredMerge(): void {
   applyIncomingSnapshot(pending.data, pending.generation, { force: true });
 }
 
+/** Al volver de segundo plano: disyuntor si el TTL desde el primer defer ya venció. */
+function flushDeferredMergeIfReady(): void {
+  if (!pendingIncoming) return;
+  const elapsed = deferredMergeFirstAt > 0 ? Date.now() - deferredMergeFirstAt : 0;
+  if (elapsed >= DEFERRED_MERGE_MAX_WAIT_MS) {
+    forceDeferredMerge();
+    return;
+  }
+  if (!isLocalVehicleMutationLocked()) {
+    const pending = pendingIncoming;
+    pendingIncoming = null;
+    deferredMergeFirstAt = 0;
+    if (deferredMergeTimer != null) {
+      clearTimeout(deferredMergeTimer);
+      deferredMergeTimer = null;
+    }
+    if (deferredMergeForceTimer != null) {
+      clearTimeout(deferredMergeForceTimer);
+      deferredMergeForceTimer = null;
+    }
+    if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
+    applyIncomingSnapshot(pending.data, pending.generation);
+  }
+}
+
 function scheduleDeferredMerge(data: Vehicle[], generation: number): void {
   pendingIncoming = { data, generation };
   const now = Date.now();
@@ -252,23 +285,31 @@ function applyIncomingSnapshot(
 
   const sig = vehiclesReactiveSignature(merged);
   const uid = ctx?.userId ?? userId;
+  const lockActive = isLocalVehicleMutationLocked();
+  const silentBuffer = opts?.duringMutationLock === true && lockActive && opts?.force !== true;
 
-  const paintNow = opts?.force === true || opts?.duringMutationLock === true;
+  // FASE 1: búfer silencioso — disco + memoria interna, sin hook reactivo
+  if (silentBuffer) {
+    if (uid && merged.length > 0) {
+      writeLocalFlota(uid, merged);
+    }
+    setVehiclesBufferOnly(merged);
+    markSyncReady(generation);
+    return;
+  }
 
-  if (uid && merged.length > 0 && sig !== mergedSig && !opts?.duringMutationLock) {
+  if (uid && merged.length > 0 && sig !== mergedSig) {
     writeLocalFlota(uid, merged);
-    syncLocalCache(merged);
-  } else if (opts?.duringMutationLock && merged.length > 0) {
     syncLocalCache(merged);
   }
 
-  if (sig === mergedSig && !paintNow) {
+  if (sig === mergedSig && !opts?.force) {
     markSyncReady(generation);
     return;
   }
 
   const localSig = vehiclesReactiveSignature(current);
-  if (!paintNow && sig !== localSig && localSig === mergedSig) {
+  if (!opts?.force && sig !== localSig && localSig === mergedSig) {
     markSyncReady(generation);
     return;
   }
@@ -283,15 +324,28 @@ function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
   if (!shouldAcceptFlotaFetchResponse(generation)) return;
 
   if (isLocalVehicleMutationLocked()) {
-    // deliverDuringMutationLock: pintar firma en memoria ya — no bloquear React
     applyIncomingSnapshot(data, generation, { duringMutationLock: true });
     scheduleDeferredMerge(data, generation);
-    markSyncReady(generation);
     return;
   }
 
   clearDeferredMerge();
   applyIncomingSnapshot(data, generation);
+}
+
+function installDeferredMergeWakeBridge(): void {
+  if (deferredMergeWakeHandler || typeof document === "undefined") return;
+  deferredMergeWakeHandler = () => {
+    if (document.visibilityState !== "visible") return;
+    flushDeferredMergeIfReady();
+  };
+  document.addEventListener("visibilitychange", deferredMergeWakeHandler);
+}
+
+function uninstallDeferredMergeWakeBridge(): void {
+  if (!deferredMergeWakeHandler || typeof document === "undefined") return;
+  document.removeEventListener("visibilitychange", deferredMergeWakeHandler);
+  deferredMergeWakeHandler = null;
 }
 
 function installVehiclesUpdatedBridge(): void {
@@ -320,11 +374,13 @@ function stopFirebaseSubscription(): void {
   clearDeferredMerge();
   clearSyncReadyFallback();
   uninstallVehiclesUpdatedBridge();
+  uninstallDeferredMergeWakeBridge();
 }
 
 function startFirebaseSubscription(uid: string): void {
   stopFirebaseSubscription();
   installVehiclesUpdatedBridge();
+  installDeferredMergeWakeBridge();
 
   const local = hydrateLocalCache();
   if (local.length > 0 && vehicles.length === 0) {

@@ -35,7 +35,8 @@ import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
-const CLOCK_MS_FOREGROUND = isMobilePerfMode() ? MOBILE_PERF.CLOCK_MS_FOREGROUND : 1_000;
+/** Latido visual global — estrictamente 1 s en foreground (segunderos y sonidos). */
+const CLOCK_MS_FOREGROUND = 1_000;
 const CLOCK_MS_BACKGROUND = 5_000;
 /** Deferir primer catch-up para no bloquear apertura de Jornada. */
 const INITIAL_TICK_DEFER_MS = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_INITIAL_DEFER_MS : 6_000;
