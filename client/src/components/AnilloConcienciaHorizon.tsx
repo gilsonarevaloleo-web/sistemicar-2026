@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import type { HorizonArc, HorizonProjection } from "@/engines/ConcienciaHorizonEngine";
 import { HORIZON_VISIBLE_DEG } from "@/engines/ConcienciaHorizonEngine";
+import { MiniEntropyRing } from "@/components/jornada/MiniEntropyRing";
 import { svgDropShadowFilter } from "@/lib/mobilePerf";
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -36,16 +37,20 @@ function segmentColor(estado?: string): string {
 interface AnilloConcienciaHorizonProps {
   projection: HorizonProjection;
   planificacionPct: number;
-  conquistaArcPct?: number;
-  entropiaArcPct?: number;
+  planPresentePct?: number;
+  blockConquestPct?: number;
+  hasSegmentoActivo?: boolean;
+  conquistaPulse?: boolean;
   size?: number;
 }
 
 export default function AnilloConcienciaHorizon({
   projection,
   planificacionPct,
-  conquistaArcPct = 0,
-  entropiaArcPct = 0,
+  planPresentePct = 0,
+  blockConquestPct = 0,
+  hasSegmentoActivo = false,
+  conquistaPulse = false,
   size = 140,
 }: AnilloConcienciaHorizonProps) {
   const cx = size / 2;
@@ -57,13 +62,15 @@ export default function AnilloConcienciaHorizon({
   const strokeW = size * 0.05;
 
   const outerCirc = 2 * Math.PI * outerR;
-  const innerCirc = 2 * Math.PI * innerR;
   const outerDash = (planificacionPct / 100) * outerCirc;
-  const conquistaDash = (Math.min(100, conquistaArcPct) / 100) * innerCirc;
-  const entropiaDash = (Math.min(100, entropiaArcPct) / 100) * innerCirc;
 
   const planLabel = Math.round(planificacionPct);
+  const presenteLabel = Math.round(planPresentePct);
+  const blockLabel = Math.round(blockConquestPct);
+  const compactCenter = size < 90;
   const planColor = planLabel >= 70 ? CYAN : planLabel >= 40 ? GOLD : "#6b7280";
+  const presenteColor =
+    presenteLabel >= 40 ? PURPLE : presenteLabel > 0 ? CYAN : "rgba(148,163,184,0.45)";
   const halfWin = projection.windowMin / 2;
 
   const byKind = (kind: HorizonArc["kind"]) => projection.arcs.filter(a => a.kind === kind);
@@ -138,33 +145,14 @@ export default function AnilloConcienciaHorizon({
             transform={`rotate(-90 ${cx} ${cy})`}
           />
 
-          <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeW} />
-          {entropiaArcPct > 0 && (
-            <circle
-              cx={cx}
-              cy={cy}
-              r={innerR}
-              fill="none"
-              stroke={BLOOD}
-              strokeWidth={strokeW}
-              strokeLinecap="round"
-              strokeDasharray={`${entropiaDash} ${innerCirc}`}
-              transform={`rotate(90 ${cx} ${cy})`}
-            />
-          )}
-          {conquistaArcPct > 0 && (
-            <circle
-              cx={cx}
-              cy={cy}
-              r={innerR}
-              fill="none"
-              stroke={PURPLE}
-              strokeWidth={strokeW}
-              strokeLinecap="round"
-              strokeDasharray={`${conquistaDash} ${innerCirc}`}
-              transform={`rotate(90 ${cx} ${cy})`}
-            />
-          )}
+          <MiniEntropyRing
+            cx={cx}
+            cy={cy}
+            innerR={innerR}
+            strokeW={strokeW}
+            conquistaPct={blockConquestPct}
+            conquistaPulse={conquistaPulse}
+          />
 
           {/* Puntero fijo en Norte = ahora */}
           <line
@@ -182,36 +170,66 @@ export default function AnilloConcienciaHorizon({
 
           <text
             x={cx}
-            y={cy - 8}
+            y={cy - (compactCenter ? 4 : 16)}
             textAnchor="middle"
-            fill={planColor}
-            fontSize={size * 0.13}
+            fill={presenteColor}
+            fontSize={size * (compactCenter ? 0.11 : 0.12)}
             fontFamily="JetBrains Mono, monospace"
             fontWeight="bold"
           >
-            {planLabel}%
+            {presenteLabel}%
           </text>
-          <text
-            x={cx}
-            y={cy + 8}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.22)"
-            fontSize={size * 0.05}
-            fontFamily="JetBrains Mono, monospace"
-          >
-            PLAN
-          </text>
-          <text
-            x={cx}
-            y={cy + 22}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.35)"
-            fontSize={size * 0.045}
-            fontFamily="JetBrains Mono, monospace"
-            fontWeight="bold"
-          >
-            AHORA
-          </text>
+          {!compactCenter && (
+            <text
+              x={cx}
+              y={cy - 4}
+              textAnchor="middle"
+              fill="rgba(255,255,255,0.22)"
+              fontSize={size * 0.045}
+              fontFamily="JetBrains Mono, monospace"
+            >
+              PRESENTE
+            </text>
+          )}
+          {!compactCenter && hasSegmentoActivo && (
+            <>
+              <text
+                x={cx}
+                y={cy + 12}
+                textAnchor="middle"
+                fill={PURPLE}
+                fontSize={size * 0.09}
+                fontFamily="JetBrains Mono, monospace"
+                fontWeight="bold"
+              >
+                {blockLabel}%
+              </text>
+              <text
+                x={cx}
+                y={cy + 24}
+                textAnchor="middle"
+                fill="rgba(255,255,255,0.35)"
+                fontSize={size * 0.042}
+                fontFamily="JetBrains Mono, monospace"
+                fontWeight="bold"
+              >
+                BLOQUE
+              </text>
+            </>
+          )}
+          {!compactCenter && !hasSegmentoActivo && (
+            <text
+              x={cx}
+              y={cy + 14}
+              textAnchor="middle"
+              fill="rgba(255,255,255,0.35)"
+              fontSize={size * 0.045}
+              fontFamily="JetBrains Mono, monospace"
+              fontWeight="bold"
+            >
+              AHORA
+            </text>
+          )}
         </svg>
       </div>
 

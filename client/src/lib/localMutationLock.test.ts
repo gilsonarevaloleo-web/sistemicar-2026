@@ -3,7 +3,10 @@ import { describe, it, mock, afterEach } from "node:test";
 import {
   beginLocalVehicleMutation,
   extendLocalVehicleMutation,
+  forceResetOrphanMutationLocks,
   isLocalVehicleMutationLocked,
+  isStructuralCloseInTransit,
+  markStructuralCloseInTransit,
   resetLocalVehicleMutationLockForTests,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "./localMutationLock.ts";
@@ -40,5 +43,16 @@ describe("localMutationLock", () => {
     assert.equal(isLocalVehicleMutationLocked(), true);
     extendLocalVehicleMutation("ring");
     assert.equal(isLocalVehicleMutationLocked(), true);
+  });
+
+  it("forceResetOrphanMutationLocks limpia lock y cierre en tránsito", () => {
+    mock.timers.enable({ apis: ["Date", "setTimeout"] });
+    beginLocalVehicleMutation("close");
+    markStructuralCloseInTransit();
+    assert.equal(isLocalVehicleMutationLocked(), true);
+    assert.equal(isStructuralCloseInTransit(), true);
+    forceResetOrphanMutationLocks();
+    assert.equal(isLocalVehicleMutationLocked(), false);
+    assert.equal(isStructuralCloseInTransit(), false);
   });
 });

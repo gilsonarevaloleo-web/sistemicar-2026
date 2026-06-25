@@ -8,6 +8,7 @@ import type {
   TimelineClockArc,
 } from "@/engines/ConcienciaEngine";
 import { clockMinutesToDeg } from "@/engines/ConcienciaEngine";
+import { MiniEntropyRing } from "@/components/jornada/MiniEntropyRing";
 import { svgDropShadowFilter } from "@/lib/mobilePerf";
 
 interface SegmentoLite {
@@ -19,6 +20,11 @@ interface SegmentoLite {
 
 interface AnilloConcienciaProps {
   planificacionPct: number;
+  /** Presencia en el plan nombrado del día (conquistaMin / jornadaMin). */
+  planPresentePct?: number;
+  /** Progreso del bloque activo (mini-anillo). */
+  blockConquestPct?: number;
+  hasSegmentoActivo?: boolean;
   timelineArcs?: TimelineClockArc[];
   segmentClockArcs?: SegmentClockArc[];
   segmentBattleArcs?: SegmentBattleArc[];
@@ -83,14 +89,13 @@ function segmentArcColor(estado: string): { color: string; glow: string } {
 
 export default function AnilloConciencia({
   planificacionPct,
+  planPresentePct = 0,
+  blockConquestPct = 0,
+  hasSegmentoActivo = false,
   timelineArcs = [],
   segmentClockArcs = [],
   segmentBattleArcs = [],
   segmentArcStats = [],
-  conquistaArcPct,
-  entropiaArcPct: entropiaArcPctProp,
-  conquistaPct,
-  entropiaPct,
   conquistaPulse = false,
   size = 140,
   segmentos = [],
@@ -128,9 +133,6 @@ export default function AnilloConciencia({
   const tooltipStats =
     tooltipOrdinal != null ? segmentArcStats.find(s => s.ordinal === tooltipOrdinal) : null;
 
-  const resolvedConquista = conquistaArcPct ?? conquistaPct ?? 0;
-  const resolvedEntropia = entropiaArcPctProp ?? entropiaPct ?? 0;
-
   const cx = size / 2;
   const cy = size / 2;
 
@@ -144,19 +146,17 @@ export default function AnilloConciencia({
   const timelineSW = size * 0.048;
 
   const outerCirc = 2 * Math.PI * outerR;
-  const innerCirc = 2 * Math.PI * innerR;
   const outerDash = (planificacionPct / 100) * outerCirc;
-  const conquistaDash = (Math.min(100, resolvedConquista) / 100) * innerCirc;
-  const entropiaDash = (Math.min(100, resolvedEntropia) / 100) * innerCirc;
 
   const planLabel = Math.round(planificacionPct);
-  const conquLabel = Math.round(resolvedConquista);
-  const entropiaLabel = Math.round(resolvedEntropia);
+  const presenteLabel = Math.round(planPresentePct);
+  const blockLabel = Math.round(blockConquestPct);
   const ampm = pointerLap === 1 ? "PM" : "AM";
+  const compactCenter = size < 90;
 
   const planColor = planLabel >= 70 ? CYAN : planLabel >= 40 ? GOLD : "#6b7280";
-  const showEntropia = resolvedEntropia > 0;
-  const showConquista = resolvedConquista > 0;
+  const presenteColor =
+    presenteLabel >= 40 ? PURPLE : presenteLabel > 0 ? CYAN : "rgba(148,163,184,0.45)";
   const holeInPlannedSegment = pointerMode === "libre" && segmentos.length > 0;
 
   const fondoArcs = timelineArcs.filter(a => a.kind === "fondo");
@@ -514,51 +514,14 @@ export default function AnilloConciencia({
             style={{ filter: svgDropShadowFilter(`drop-shadow(0 0 4px ${planColor}60)`) }}
           />
 
-          <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeW} />
-          {showEntropia && (
-            <motion.circle
-              cx={cx}
-              cy={cy}
-              r={innerR}
-              fill="none"
-              stroke={BLOOD}
-              strokeWidth={strokeW}
-              strokeLinecap="round"
-              strokeDasharray={`${entropiaDash} ${innerCirc}`}
-              transform={`rotate(90 ${cx} ${cy})`}
-              animate={{ strokeDasharray: `${entropiaDash} ${innerCirc}` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              style={{ filter: svgDropShadowFilter(`drop-shadow(0 0 5px ${BLOOD}70)`) }}
-            />
-          )}
-          {showConquista && (
-            <motion.circle
-              cx={cx}
-              cy={cy}
-              r={innerR}
-              fill="none"
-              stroke={PURPLE}
-              strokeWidth={conquistaPulse ? strokeW * 1.35 : strokeW}
-              strokeLinecap="round"
-              strokeDasharray={`${conquistaDash} ${innerCirc}`}
-              transform={`rotate(90 ${cx} ${cy})`}
-              animate={{
-                strokeDasharray: `${conquistaDash} ${innerCirc}`,
-                opacity: conquistaPulse ? [1, 0.65, 1] : 1,
-              }}
-              transition={{
-                strokeDasharray: { duration: 0.8, ease: "easeOut" },
-                opacity: conquistaPulse ? { duration: 0.8, repeat: Infinity } : { duration: 0 },
-              }}
-              style={{
-                filter: svgDropShadowFilter(
-                  conquistaPulse
-                    ? `drop-shadow(0 0 10px ${PURPLE})`
-                    : `drop-shadow(0 0 4px ${PURPLE}60)`
-                ),
-              }}
-            />
-          )}
+          <MiniEntropyRing
+            cx={cx}
+            cy={cy}
+            innerR={innerR}
+            strokeW={strokeW}
+            conquistaPct={blockConquestPct}
+            conquistaPulse={conquistaPulse}
+          />
 
           <line
             x1={cx}
@@ -603,28 +566,56 @@ export default function AnilloConciencia({
           <g>
             <text
               x={cx}
-              y={cy - 8}
+              y={cy - (compactCenter ? 4 : 18)}
               textAnchor="middle"
-              fill={planColor}
-              fontSize={size * 0.13}
+              fill={presenteColor}
+              fontSize={size * (compactCenter ? 0.11 : 0.12)}
               fontFamily="JetBrains Mono, monospace"
               fontWeight="bold"
             >
-              {planLabel}%
+              {presenteLabel}%
             </text>
+            {!compactCenter && (
+              <text
+                x={cx}
+                y={cy - 6}
+                textAnchor="middle"
+                fill="rgba(255,255,255,0.22)"
+                fontSize={size * 0.045}
+                fontFamily="JetBrains Mono, monospace"
+              >
+                PRESENTE
+              </text>
+            )}
+            {!compactCenter && hasSegmentoActivo && (
+              <>
+                <text
+                  x={cx}
+                  y={cy + 12}
+                  textAnchor="middle"
+                  fill={PURPLE}
+                  fontSize={size * 0.09}
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="bold"
+                >
+                  {blockLabel}%
+                </text>
+                <text
+                  x={cx}
+                  y={cy + 24}
+                  textAnchor="middle"
+                  fill="rgba(255,255,255,0.28)"
+                  fontSize={size * 0.042}
+                  fontFamily="JetBrains Mono, monospace"
+                  fontWeight="bold"
+                >
+                  BLOQUE
+                </text>
+              </>
+            )}
             <text
               x={cx}
-              y={cy + 8}
-              textAnchor="middle"
-              fill="rgba(255,255,255,0.22)"
-              fontSize={size * 0.05}
-              fontFamily="JetBrains Mono, monospace"
-            >
-              PLAN
-            </text>
-            <text
-              x={cx}
-              y={cy + 32}
+              y={cy + (compactCenter ? 14 : hasSegmentoActivo ? 38 : 24)}
               textAnchor="middle"
               fill="rgba(255,255,255,0.32)"
               fontSize={size * 0.05}
@@ -636,7 +627,7 @@ export default function AnilloConciencia({
             {limaClockLabel ? (
               <text
                 x={cx}
-                y={cy + 42}
+                y={cy + (compactCenter ? 24 : hasSegmentoActivo ? 48 : 34)}
                 textAnchor="middle"
                 fill="rgba(255,255,255,0.38)"
                 fontSize={size * 0.055}
@@ -645,17 +636,6 @@ export default function AnilloConciencia({
                 {limaClockLabel}
               </text>
             ) : null}
-            <text
-              x={cx}
-              y={cy + 20}
-              textAnchor="middle"
-              fill={showEntropia && !showConquista ? BLOOD : PURPLE}
-              fontSize={size * 0.09}
-              fontFamily="JetBrains Mono, monospace"
-              fontWeight="bold"
-            >
-              {showConquista ? conquLabel : showEntropia ? entropiaLabel : 0}%
-            </text>
           </g>
         </svg>
 

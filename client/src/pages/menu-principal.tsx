@@ -61,6 +61,12 @@ import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
+import {
+  forceResetOrphanMutationLocks,
+  isLocalVehicleMutationLocked,
+  isStructuralCloseInTransit,
+} from "@/lib/localMutationLock";
+import { flushFlotaDeferredMergeIfReady } from "@/flota/flotaStore";
 
 // ESPECTRO CROMÁTICO DE CONCIENCIA
 const SPECTRUM = {
@@ -184,6 +190,14 @@ export default function MenuPrincipal() {
       setUserEmail(getUserEmail());
     }
   }, [user]);
+
+  /** Home sin UI de cierre/desglosador: cualquier candado activo aquí es huérfano. */
+  useEffect(() => {
+    if (isLocalVehicleMutationLocked() || isStructuralCloseInTransit()) {
+      forceResetOrphanMutationLocks();
+      flushFlotaDeferredMergeIfReady();
+    }
+  }, []);
 
   useEffect(() => {
     const checkPendingMigration = async () => {

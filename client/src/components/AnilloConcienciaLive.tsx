@@ -6,8 +6,13 @@ import {
   formatMinutosJornada,
   nowToClockDeg,
   nowToHalfDayLap,
+  vehicleCoversConsciousnessAt,
   type SegmentoAnilloLite,
 } from "@/engines/ConcienciaEngine";
+import {
+  useMiniBlockConquest,
+  type SegmentoMiniRing,
+} from "@/components/jornada/useMiniBlockConquest";
 import { computeHorizonProjection } from "@/engines/ConcienciaHorizonEngine";
 import { formatLimaTimeHM } from "@/lib/segmentTime";
 import { getSharedAnilloLiveModel } from "@/lib/anilloLiveModelCache";
@@ -25,6 +30,15 @@ const BLOOD = "#FF3131";
 
 function sanitizeSegmentos(segmentos: SegmentoAnilloLite[]): SegmentoAnilloLite[] {
   return segmentos.filter((s): s is SegmentoAnilloLite => !!s && typeof s === "object");
+}
+
+type SegmentoConEstado = SegmentoAnilloLite & { id?: string; estado?: string };
+
+function resolveSegmentoActivo(segmentos: SegmentoAnilloLite[]): SegmentoMiniRing | null {
+  const segs = sanitizeSegmentos(segmentos) as SegmentoConEstado[];
+  const found = segs.find(s => s.estado === "activo");
+  if (!found?.id || !found.horaInicio || !found.horaFin) return null;
+  return { id: found.id, horaInicio: found.horaInicio, horaFin: found.horaFin };
 }
 
 function emptyAnilloModel(segs: SegmentoAnilloLite[]) {
@@ -135,6 +149,30 @@ function AnilloConcienciaLiveInner({
     return formatLimaTimeHM(Date.now());
   }, [pointerTick]);
 
+  const segmentoActivo = useMemo(
+    () => resolveSegmentoActivo(segmentos),
+    [segmentos]
+  );
+
+  const hayVehiculoActivo = useMemo(() => {
+    void pointerTick;
+    const now = Date.now();
+    return vehicles.some(v => vehicleCoversConsciousnessAt(v, now));
+  }, [vehicles, pointerTick]);
+
+  const blockConquestPct = useMiniBlockConquest(segmentoActivo, hayVehiculoActivo, pointerTick);
+
+  const planPresentePct = useMemo(() => {
+    const jornada = model.metricas.jornadaMin;
+    if (jornada <= 0) return 0;
+    return Math.min(100, Math.round((model.dayStats.conquistaMin / jornada) * 100));
+  }, [model.metricas.jornadaMin, model.dayStats.conquistaMin]);
+
+  const libreMin = useMemo(
+    () => Math.max(0, 1440 - model.metricas.jornadaMin),
+    [model.metricas.jornadaMin]
+  );
+
   const toggle = showViewToggle ? (
     <div
       className="flex rounded-lg border overflow-hidden mb-1"
@@ -174,15 +212,18 @@ function AnilloConcienciaLiveInner({
         <AnilloConcienciaHorizon
           projection={model.horizonProjection}
           planificacionPct={model.metricas.planificacionPct}
-          conquistaArcPct={model.metricas.conquistaArcPct}
-          entropiaArcPct={model.metricas.entropiaArcPct}
+          planPresentePct={planPresentePct}
+          blockConquestPct={blockConquestPct}
+          hasSegmentoActivo={segmentoActivo != null}
           size={size}
+          conquistaPulse={conquistaPulse}
         />
       ) : (
         <AnilloConciencia
           planificacionPct={model.metricas.planificacionPct}
-          conquistaArcPct={model.metricas.conquistaArcPct}
-          entropiaArcPct={model.metricas.entropiaArcPct}
+          planPresentePct={planPresentePct}
+          blockConquestPct={blockConquestPct}
+          hasSegmentoActivo={segmentoActivo != null}
           timelineArcs={model.timelineArcs}
           conquistaPulse={conquistaPulse}
           size={size}
@@ -231,14 +272,10 @@ function AnilloConcienciaLiveInner({
               className="text-xs font-black"
               style={{
                 color:
-                  (model.metricas.terrenoRestanteMin ?? model.dayStats.entropiaMin) > 0
-                    ? BLOOD
-                    : "rgba(148,163,184,0.5)",
+                  model.dayStats.entropiaMin > 0 ? BLOOD : "rgba(148,163,184,0.5)",
               }}
             >
-              {formatMinutosJornada(
-                model.metricas.terrenoRestanteMin ?? model.dayStats.entropiaMin
-              )}
+              {formatMinutosJornada(model.dayStats.entropiaMin)}
             </p>
           </div>
           <div>
@@ -248,6 +285,12 @@ function AnilloConcienciaLiveInner({
             </p>
           </div>
         </div>
+      )}
+      {showDayStats && model.metricas.jornadaMin > 0 && (
+        <p className="mt-1.5 text-[7px] text-slate-600 text-center leading-snug px-1">
+          Nombraste {formatMinutosJornada(model.metricas.jornadaMin)}
+          {libreMin > 0 ? ` · ${formatMinutosJornada(libreMin)} tiempo abierto` : ""}
+        </p>
       )}
     </div>
   );

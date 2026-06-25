@@ -520,6 +520,7 @@ import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/Entropia
 import {
   beginLocalVehicleMutation,
   extendLocalVehicleMutation,
+  forceResetOrphanMutationLocks,
   markStructuralCloseInTransit,
   releaseMutationLockWithDelay,
   isLocalVehicleMutationLocked,
@@ -1608,6 +1609,13 @@ export default function Planeacion() {
         cancelIdleCallback(idleId);
       }
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  /** Al abandonar Planificación: libera candados huérfanos (teardown / cierre a medias). */
+  useEffect(() => {
+    return () => {
+      forceResetOrphanMutationLocks();
     };
   }, []);
 

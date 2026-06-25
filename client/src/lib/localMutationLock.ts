@@ -60,8 +60,7 @@ export function getLocalMutationLockDebug(): { until: number; reason?: string; c
   return { until: lockUntil, reason: lockReason, closeInTransitUntil };
 }
 
-/** Expuesto para tests con fake timers. */
-export function resetLocalVehicleMutationLockForTests(): void {
+function clearMutationLockState(): void {
   if (releaseTimer != null) {
     clearTimeout(releaseTimer);
     releaseTimer = null;
@@ -69,6 +68,19 @@ export function resetLocalVehicleMutationLockForTests(): void {
   lockUntil = 0;
   lockReason = undefined;
   closeInTransitUntil = 0;
+}
+
+/**
+ * Reset inmediato de candados huérfanos (p. ej. al salir de un módulo sin endClose).
+ * No aplica gracia post-cierre — solo para rutas sin UI de mutación activa.
+ */
+export function forceResetOrphanMutationLocks(): void {
+  clearMutationLockState();
+}
+
+/** Expuesto para tests con fake timers. */
+export function resetLocalVehicleMutationLockForTests(): void {
+  clearMutationLockState();
 }
 
 export const LOCAL_VEHICLE_MUTATION_LOCK_MS = LOCK_MS;

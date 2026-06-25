@@ -192,7 +192,7 @@ function forceDeferredMerge(): void {
 }
 
 /** Al volver de segundo plano: disyuntor si el TTL desde el primer defer ya venció. */
-function flushDeferredMergeIfReady(): void {
+export function flushFlotaDeferredMergeIfReady(): void {
   if (!pendingIncoming) return;
   const elapsed = deferredMergeFirstAt > 0 ? Date.now() - deferredMergeFirstAt : 0;
   if (elapsed >= DEFERRED_MERGE_MAX_WAIT_MS) {
@@ -348,7 +348,7 @@ function installDeferredMergeWakeBridge(): void {
   if (deferredMergeWakeHandler || typeof document === "undefined") return;
   deferredMergeWakeHandler = () => {
     if (document.visibilityState !== "visible") return;
-    flushDeferredMergeIfReady();
+    flushFlotaDeferredMergeIfReady();
   };
   document.addEventListener("visibilitychange", deferredMergeWakeHandler);
 }
