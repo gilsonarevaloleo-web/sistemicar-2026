@@ -513,7 +513,6 @@ import {
   refreshFlotaSession,
   getFlotaMergedSignature,
   getFlotaVehicles,
-  flushFlotaDeferredMergeIfReady,
 } from "@/flota/flotaStore";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaStore } from "@/hooks/useFlotaStore";
@@ -528,6 +527,16 @@ import {
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "@/lib/localMutationLock";
 import { hasActiveConsciousJornadaProcess } from "@/lib/jornadaConsciousGuard";
+import { releaseOperatorTapLocks } from "@/lib/operatorTapPriority";
+import {
+  buildDesglosadorNestedPausePatch,
+  buildNestedParentResumePatch,
+  buildSituacionNestedPausePatch,
+  findActiveDesglosadorForNestedStack,
+  findActiveSituacionRingForNestedStack,
+  findNestedParentAwaitingPuntoCeroResume,
+  resumeDesglosadorFromNestedPause,
+} from "@/lib/nestedContextStack";
 import { scheduleDeferredVehicleCleanup } from "@/lib/vehicleDeferredCleanup";
 import { generateStableUuid } from "@/lib/stableUuid";
 import { sealVehicleSessionClose } from "@/lib/vehicleSessionSeal";
@@ -2238,8 +2247,7 @@ export default function Planeacion() {
   };
 
   const handleFlotaSave = async () => {
-    forceResetOrphanMutationLocks();
-    flushFlotaDeferredMergeIfReady();
+    releaseOperatorTapLocks();
     if (!user) {
       toast.error("Inicia sesión para lanzar vehículos");
       return;
@@ -2362,6 +2370,36 @@ export default function Planeacion() {
           : undefined;
 
       console.log(`[handleFlotaSave] Guardando vehículo local primero...`);
+
+      if (tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero") {
+        const cur = vehiclesRef.current;
+        const desgParent = findActiveDesglosadorForNestedStack(cur);
+        const sitParent = desgParent ? null : findActiveSituacionRingForNestedStack(cur);
+        if (desgParent) {
+          const pausePatch = buildDesglosadorNestedPausePatch(desgParent, "punto_cero");
+          if (pausePatch) {
+            const pausedList = cur.map(v => (v.id === desgParent.id ? { ...v, ...pausePatch } : v));
+            vehiclesRef.current = pausedList;
+            setVehicles(pausedList);
+            saveLocalVehicles(pausedList);
+            void updateVehicle(user.uid, desgParent.id, pausePatch).catch(e =>
+              console.warn("[nested-stack] desglosador pause:", e)
+            );
+          }
+        } else if (sitParent) {
+          const pausePatch = buildSituacionNestedPausePatch(sitParent, "punto_cero");
+          if (pausePatch) {
+            const pausedList = cur.map(v => (v.id === sitParent.id ? { ...v, ...pausePatch } : v));
+            vehiclesRef.current = pausedList;
+            setVehicles(pausedList);
+            saveLocalVehicles(pausedList);
+            void updateVehicle(user.uid, sitParent.id, pausePatch).catch(e =>
+              console.warn("[nested-stack] situacion pause:", e)
+            );
+          }
+        }
+      }
+
       let newVehicleId: string;
       let newClientRequestId: string;
       try {
@@ -2959,8 +2997,7 @@ export default function Planeacion() {
   ];
 
   const handleQuickSaveAndNew = async (tipoTermino: TipoTerminoRapido, detalle?: string) => {
-    forceResetOrphanMutationLocks();
-    flushFlotaDeferredMergeIfReady();
+    releaseOperatorTapLocks();
     if (!user || !titulo.trim()) return;
     const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "quick_save");
     if (!slotsCheck.allowed) {
@@ -3359,6 +3396,31 @@ export default function Planeacion() {
         description: `Base: +${psBase} · Tolerancia superada · ${etapasLabel}`,
         style: { backgroundColor: PIZARRA, border: `1px solid ${borderColor}`, color: borderColor }, duration: 4000
       });
+    }
+
+    if (esPuntoCero) {
+      const parent = findNestedParentAwaitingPuntoCeroResume(vehiclesRef.current);
+      if (parent) {
+        const resumePatch = buildNestedParentResumePatch(parent);
+        if (resumePatch) {
+          setVehicles(prev => prev.map(v => (v.id === parent.id ? { ...v, ...resumePatch } : v)));
+          vehiclesRef.current = vehiclesRef.current.map(v =>
+            v.id === parent.id ? { ...v, ...resumePatch } : v
+          );
+          saveLocalVehicles(vehiclesRef.current);
+          void updateVehicle(user.uid, parent.id, resumePatch).catch(e =>
+            console.warn("[nested-stack] resume parent:", e)
+          );
+          toast.info("Contexto reanudado", {
+            description:
+              parent.tipoReloj === "desglosador"
+                ? "Desglosador situacional retomado en el sub-paso donde lo dejaste."
+                : "Ring situacional retomado donde lo dejaste.",
+            style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+            duration: 4500,
+          });
+        }
+      }
     }
   };
 
@@ -3828,21 +3890,26 @@ export default function Planeacion() {
 
     let patch: Partial<Vehicle>;
     if (parent.desglosadorPausa) {
-      const pausa = parent.desglosadorPausa;
-      const subs = [...(parent.subVehiculos || [])];
-      const idx = subs.findIndex(s => s.id === pausa.subActivoId);
-      if (idx === -1) {
-        patch = { desglosadorPausa: undefined, interrupcionActiva: false };
+      const nestedResume = resumeDesglosadorFromNestedPause(parent);
+      if (nestedResume) {
+        patch = nestedResume;
       } else {
-        const resumedApertura = pausa.elapsedSecSnapshot != null
-          ? Date.now() - pausa.elapsedSecSnapshot * 1000
-          : Date.now();
-        subs[idx] = { ...subs[idx], status: "activo", aperturaAt: resumedApertura };
-        patch = {
-          subVehiculos: subs,
-          desglosadorPausa: undefined,
-          interrupcionActiva: false,
-        };
+        const pausa = parent.desglosadorPausa;
+        const subs = [...(parent.subVehiculos || [])];
+        const idx = subs.findIndex(s => s.id === pausa.subActivoId);
+        if (idx === -1) {
+          patch = { desglosadorPausa: undefined, interrupcionActiva: false };
+        } else {
+          const resumedApertura = pausa.elapsedSecSnapshot != null
+            ? Date.now() - pausa.elapsedSecSnapshot * 1000
+            : Date.now();
+          subs[idx] = { ...subs[idx], status: "activo", aperturaAt: resumedApertura };
+          patch = {
+            subVehiculos: subs,
+            desglosadorPausa: undefined,
+            interrupcionActiva: false,
+          };
+        }
       }
     } else {
       patch = { desglosadorPausa: undefined, interrupcionActiva: false };
@@ -3911,13 +3978,19 @@ export default function Planeacion() {
       restanteUnidades = Math.max(0, activeSub.cantidadObjetivo - done);
     }
 
-    const pausa = {
-      pausadoAt: Date.now(),
-      subActivoId: activeSub.id,
-      restanteUnidades,
-      elapsedSecSnapshot: elapsedSec,
+    const nestedPause = buildDesglosadorNestedPausePatch(vehicle, "interrupcion_situacion");
+    if (!nestedPause) {
+      pausaInterrupcionLockRef.current = null;
+      toast.error("No se pudo pausar el sub activo");
+      return;
+    }
+    const pausedPatch = {
+      ...nestedPause,
+      desglosadorPausa: {
+        ...nestedPause.desglosadorPausa,
+        restanteUnidades,
+      },
     };
-    const pausedPatch = { desglosadorPausa: pausa, interrupcionActiva: true };
 
     const provisionalInterruptId = generateStableUuid();
     const clientRequestId = `crq_${generateStableUuid()}`;
@@ -5606,8 +5679,6 @@ export default function Planeacion() {
   }, [vehicles, expandedId]);
 
   const handleVehicleToggle = useCallback((vehicleId: string) => {
-    forceResetOrphanMutationLocks();
-    flushFlotaDeferredMergeIfReady();
     setExpandedId(prev => (prev === vehicleId ? null : vehicleId));
   }, []);
 
@@ -6501,10 +6572,6 @@ export default function Planeacion() {
             }}
             tab={planTab}
             onTabChange={(tab) => {
-              if (tab === "operar") {
-                forceResetOrphanMutationLocks();
-                flushFlotaDeferredMergeIfReady();
-              }
               setPlanTab(tab);
               if (planLayout === "full") setPlanLayout("compact");
             }}
@@ -8124,7 +8191,7 @@ export default function Planeacion() {
                 {(Object.entries(FLOTA_CONFIG) as [TipoFlota, typeof FLOTA_CONFIG["tiempo"]][]).map(([tipo, cfg]) => {
                   const Icon = cfg.icon;
                   return (
-                    <button key={tipo} onClick={() => { forceResetOrphanMutationLocks(); flushFlotaDeferredMergeIfReady(); setCierreEnergiaPending(null); setCierreEnergiaSeleccion(null); setShowCierreJornada(false); setSituacionDesgloseCelebration(null); setSaving(false); setPlanTab("operar"); setIsCreating(true); setVehicleMode("flota"); setTipoFlotaSeleccionado(tipo); if (tipo === "situacion" && !terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque"); }} className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02]" style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }} data-testid={`button-flota-${tipo}`}>
+                    <button key={tipo} onClick={() => { setCierreEnergiaPending(null); setCierreEnergiaSeleccion(null); setShowCierreJornada(false); setSituacionDesgloseCelebration(null); setSaving(false); setPlanTab("operar"); setIsCreating(true); setVehicleMode("flota"); setTipoFlotaSeleccionado(tipo); if (tipo === "situacion" && !terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque"); }} className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02]" style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }} data-testid={`button-flota-${tipo}`}>
                       <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${cfg.color}20` }}>
                         <Icon size={20} style={{ color: cfg.color }} />
                       </div>

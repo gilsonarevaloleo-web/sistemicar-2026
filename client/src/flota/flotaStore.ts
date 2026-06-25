@@ -6,6 +6,7 @@ import {
   subscribeToVehicles,
   type Vehicle,
 } from "@/lib/persistence";
+import { hardwareClockNow } from "@/lib/hardwareClock";
 import {
   armBackgroundWakeReentryShield,
   clearBackgroundWakeReentryShieldIfActive,
@@ -124,17 +125,25 @@ export function getFlotaVehicles(): Vehicle[] {
   return vehicles;
 }
 
-export function getFlotaMergedSignature(): string {
-  return mergedSig;
+let flotaStoreHydrated = false;
+
+export function isFlotaStoreHydrated(): boolean {
+  return flotaStoreHydrated;
+}
+
+function markFlotaStoreHydrated(): void {
+  flotaStoreHydrated = true;
 }
 
 /**
  * Guardián de autolimpieza — pulso del reloj global (1 s).
- * Libera candados cuyo TTL venció sin timer activo (candado perpetuo en caliente).
+ * Cortocircuito durante hidratación en frío para evitar flush sobre búfer vacío.
  */
 export function runFlotaMutationLockGuardian(): void {
+  if (!flotaStoreHydrated || vehicles.length === 0) return;
+
   const { until, closeInTransitUntil } = getLocalMutationLockDebug();
-  const now = Date.now();
+  const now = hardwareClockNow();
   if ((until > 0 && now > until) || (closeInTransitUntil > 0 && now > closeInTransitUntil)) {
     console.warn(
       "[FlotaStore] Guardián activado: Detectado candado residual expirado en caliente. Forzando liberación."
@@ -142,6 +151,10 @@ export function runFlotaMutationLockGuardian(): void {
     forceResetOrphanMutationLocks();
     flushFlotaDeferredMergeIfReady();
   }
+}
+
+export function getFlotaMergedSignature(): string {
+  return mergedSig;
 }
 
 export function subscribeFlotaStore(listener: StoreListener): () => void {
@@ -362,6 +375,7 @@ function applyIncomingSnapshot(
 
   setVehiclesInternal(merged);
   setFlotaPaintedCount(merged.length);
+  markFlotaStoreHydrated();
   ctx?.onAfterRemoteMerge?.(merged);
   markSyncReady(generation);
 }
@@ -379,6 +393,15 @@ function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
   applyIncomingSnapshot(data, generation);
 }
 
+function isRealBackgroundWake(
+  prev: DocumentVisibilityState | null,
+  next: DocumentVisibilityState
+): boolean {
+  if (next !== "visible") return false;
+  const p = String(prev ?? "");
+  return p === "hidden" || p === "prerender";
+}
+
 function installDeferredMergeWakeBridge(): void {
   if (deferredMergeWakeHandler || typeof document === "undefined") return;
   lastDocumentVisibility = document.visibilityState;
@@ -386,8 +409,7 @@ function installDeferredMergeWakeBridge(): void {
     const prev = lastDocumentVisibility;
     const next = document.visibilityState;
     lastDocumentVisibility = next;
-    if (next !== "visible") return;
-    if (prev !== "hidden" && prev !== "prerender") return;
+    if (!isRealBackgroundWake(prev, next)) return;
 
     armBackgroundWakeReentryShield(BACKGROUND_WAKE_SHIELD_MS);
 
@@ -453,6 +475,7 @@ function startFirebaseSubscription(uid: string): void {
   if (local.length > 0 && vehicles.length === 0) {
     setVehiclesInternal(local);
     setFlotaPaintedCount(local.length);
+    markFlotaStoreHydrated();
     console.log("[flotaStore] pintado inicial desde local", local.length);
     markSyncReady(fetchGeneration);
   }
@@ -512,10 +535,11 @@ export function releaseFlotaStore(): void {
   refCount = Math.max(0, refCount - 1);
   if (refCount === 0) {
     stopFirebaseSubscription();
-    userId = null;
-    mergeContext = null;
-    localCache = null;
-  }
+  userId = null;
+  mergeContext = null;
+  localCache = null;
+  flotaStoreHydrated = false;
+}
 }
 
 /** Solo tests — reinicia estado global. */

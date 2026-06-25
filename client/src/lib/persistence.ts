@@ -529,7 +529,7 @@ export interface SubVehiculo {
   titulo: string;
   aperturaAt?: number;
   cierreAt?: number;
-  status: "pendiente" | "activo" | "cumplido" | "fallado";
+  status: "pendiente" | "activo" | "cumplido" | "fallado" | "nested_paused";
   cantidadObjetivo?: number;
   cantidadLograda?: number;
   duracionFinal?: number;
@@ -694,9 +694,18 @@ export interface Vehicle {
     restanteUnidades?: number;
     cantidadRealizadaSnapshot?: number;
     elapsedSecSnapshot?: number;
+    /** Pausa por contexto anidado (Punto Cero, interrupción situacional). */
+    nestedKind?: "punto_cero" | "interrupcion_situacion";
   };
   /** Hay una interrupción activa fuera del flujo normal de subs. */
   interrupcionActiva?: boolean;
+  /** Ring situacional pausado por descanso Punto Cero anidado. */
+  situacionNestedPause?: {
+    pausedAt: number;
+    kind: "punto_cero" | "interrupcion_situacion";
+    situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
+    situacionCupoAnchor?: { subTareaId: string; startedAt: number } | null;
+  } | null;
   /** No aparece en buscador/historial desglosador. */
   excluirDeHistorial?: boolean;
   /** Vehículo situación lanzado desde pausa de desglosador. */

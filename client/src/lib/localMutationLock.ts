@@ -1,5 +1,7 @@
 /** Candado temporal contra ecos de Firebase durante mutaciones locales (create/close/delete). */
 
+import { hardwareClockNow } from "@/lib/hardwareClock";
+
 const LOCK_MS = 1500;
 const STRUCTURAL_CLOSE_RELEASE_DELAY_MS = 300;
 /** Ráfagas <100 ms comparten techo absoluto — imposible postergar el release indefinidamente. */
@@ -15,7 +17,7 @@ let lockBurstStartedAt = 0;
 let lastLockRequestAt = 0;
 
 function noteLockBurst(): void {
-  const now = Date.now();
+  const now = hardwareClockNow();
   if (lockBurstStartedAt === 0 || now - lastLockRequestAt > BURST_GAP_MS) {
     lockBurstStartedAt = now;
   }
@@ -23,7 +25,7 @@ function noteLockBurst(): void {
 }
 
 function absoluteLockCeiling(): number {
-  if (lockBurstStartedAt === 0) return Date.now() + LOCK_MS;
+  if (lockBurstStartedAt === 0) return hardwareClockNow() + LOCK_MS;
   return lockBurstStartedAt + ABSOLUTE_LOCK_CAP_MS;
 }
 
@@ -40,17 +42,31 @@ function finalizeMutationLockRelease(): void {
   lockBurstStartedAt = 0;
 }
 
+function armReleaseTimerAt(cappedUntil: number): void {
+  scheduledReleaseAt = cappedUntil;
+  const tick = (): void => {
+    const now = hardwareClockNow();
+    if (lockUntil > 0 && now < lockUntil) {
+      releaseTimer = setTimeout(tick, Math.min(lockUntil - now, 400));
+      return;
+    }
+    finalizeMutationLockRelease();
+  };
+  releaseTimer = setTimeout(tick, Math.max(0, cappedUntil - hardwareClockNow()));
+}
+
 function scheduleReleaseAt(releaseAt: number, rapidFollowUp = false): void {
-  const now = Date.now();
+  const now = hardwareClockNow();
   const capped = capLockUntil(releaseAt);
+  lockUntil = capped;
+  closeInTransitUntil = Math.min(closeInTransitUntil || capped, capped);
   if (capped <= now) {
     finalizeMutationLockRelease();
     return;
   }
 
   if (releaseTimer != null && scheduledReleaseAt > 0 && rapidFollowUp && scheduledReleaseAt <= capped) {
-    lockUntil = Math.max(lockUntil, now);
-    lockUntil = Math.min(lockUntil, scheduledReleaseAt);
+    lockUntil = Math.min(Math.max(lockUntil, now), scheduledReleaseAt);
     closeInTransitUntil = Math.min(closeInTransitUntil || capped, scheduledReleaseAt);
     return;
   }
@@ -60,14 +76,11 @@ function scheduleReleaseAt(releaseAt: number, rapidFollowUp = false): void {
     releaseTimer = null;
   }
 
-  scheduledReleaseAt = capped;
-  lockUntil = capped;
-  closeInTransitUntil = Math.min(closeInTransitUntil || capped, capped);
-  releaseTimer = setTimeout(finalizeMutationLockRelease, capped - now);
+  armReleaseTimerAt(capped);
 }
 
 function applyMutationLock(requestedUntil: number, reason?: string): void {
-  const now = Date.now();
+  const now = hardwareClockNow();
   const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
   noteLockBurst();
   const capped = capLockUntil(Math.max(requestedUntil, now + LOCK_MS));
@@ -82,15 +95,15 @@ function applyMutationLock(requestedUntil: number, reason?: string): void {
 }
 
 export function beginLocalVehicleMutation(reason?: string): void {
-  applyMutationLock(Date.now() + LOCK_MS, reason);
+  applyMutationLock(hardwareClockNow() + LOCK_MS, reason);
 }
 
 export function extendLocalVehicleMutation(reason?: string): void {
-  applyMutationLock(Math.max(lockUntil, Date.now() + LOCK_MS), reason);
+  applyMutationLock(Math.max(lockUntil, hardwareClockNow() + LOCK_MS), reason);
 }
 
 export function isLocalVehicleMutationLocked(): boolean {
-  const now = Date.now();
+  const now = hardwareClockNow();
   if (lockUntil > 0 && now >= lockUntil && releaseTimer == null) {
     lockUntil = 0;
     lockReason = undefined;
@@ -103,7 +116,7 @@ export function isLocalVehicleMutationLocked(): boolean {
 
 /** Candado síncrono al despertar desde background — absorbe ráfaga Firebase sin pintar React. */
 export function armBackgroundWakeReentryShield(ms = 800): void {
-  const until = Date.now() + ms;
+  const until = hardwareClockNow() + ms;
   if (until > lockUntil) {
     lockUntil = until;
     lockReason = "background-wake";
@@ -121,11 +134,11 @@ export function clearBackgroundWakeReentryShieldIfActive(): void {
 /** Cierre estructural (desglosador / flota) en tránsito — bloquea pintado reactivo del store. */
 export function markStructuralCloseInTransit(durationMs = LOCK_MS + STRUCTURAL_CLOSE_RELEASE_DELAY_MS): void {
   noteLockBurst();
-  closeInTransitUntil = capLockUntil(Date.now() + durationMs);
+  closeInTransitUntil = capLockUntil(hardwareClockNow() + durationMs);
 }
 
 export function isStructuralCloseInTransit(): boolean {
-  const now = Date.now();
+  const now = hardwareClockNow();
   if (closeInTransitUntil > 0 && now >= closeInTransitUntil) {
     closeInTransitUntil = 0;
   }
@@ -138,7 +151,7 @@ export function isStructuralCloseInTransit(): boolean {
  */
 export function releaseMutationLockWithDelay(delayMs = STRUCTURAL_CLOSE_RELEASE_DELAY_MS): void {
   noteLockBurst();
-  const releaseAt = capLockUntil(Date.now() + delayMs);
+  const releaseAt = capLockUntil(hardwareClockNow() + delayMs);
   lockUntil = releaseAt;
   closeInTransitUntil = releaseAt;
   scheduleReleaseAt(releaseAt);
@@ -164,7 +177,7 @@ function clearMutationLockState(): void {
 /** Pulso del reloj global — libera candados huérfanos cuyo TTL ya venció en caliente. */
 export function sweepExpiredMutationLocks(): boolean {
   const { until, closeInTransitUntil: closeUntil } = getLocalMutationLockDebug();
-  const now = Date.now();
+  const now = hardwareClockNow();
   const lockExpired = until > 0 && now > until;
   const closeExpired = closeUntil > 0 && now > closeUntil;
   if (!lockExpired && !closeExpired) return false;
@@ -192,7 +205,7 @@ export function simulateOrphanMutationLockForTests(expiredSinceMs = 1): void {
     releaseTimer = null;
   }
   scheduledReleaseAt = 0;
-  const expiredAt = Date.now() - expiredSinceMs;
+  const expiredAt = hardwareClockNow() - expiredSinceMs;
   lockUntil = expiredAt;
   closeInTransitUntil = expiredAt;
   lockReason = "test-orphan";

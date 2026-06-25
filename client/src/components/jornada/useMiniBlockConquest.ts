@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { segmentDurationMinutes } from "@/lib/segmentTime";
+import { hardwareElapsedSec } from "@/lib/hardwareClock";
 
 export interface SegmentoMiniRing {
   id: string;
@@ -25,16 +26,24 @@ export function useMiniBlockConquest(
   }, [segmento?.horaInicio, segmento?.horaFin]);
 
   const [conquistaSegLocal, setConquistaSegLocal] = useState(0);
+  const [blockStartedAt, setBlockStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!hayVehiculoActivo || !segId) {
+      setBlockStartedAt(null);
+      setConquistaSegLocal(0);
+      return;
+    }
+    setBlockStartedAt(Date.now());
     setConquistaSegLocal(0);
-  }, [segId]);
+  }, [hayVehiculoActivo, segId]);
 
   useEffect(() => {
     void tick;
-    if (!hayVehiculoActivo || !segId || duracionSeg <= 0) return;
-    setConquistaSegLocal(prev => Math.min(duracionSeg, prev + 1));
-  }, [tick, hayVehiculoActivo, segId, duracionSeg]);
+    if (!blockStartedAt || !hayVehiculoActivo || !segId || duracionSeg <= 0) return;
+    const elapsedSec = hardwareElapsedSec(blockStartedAt);
+    setConquistaSegLocal(Math.min(duracionSeg, elapsedSec));
+  }, [tick, blockStartedAt, hayVehiculoActivo, segId, duracionSeg]);
 
   if (duracionSeg <= 0) return 0;
   return Math.min(100, Math.round((conquistaSegLocal / duracionSeg) * 100));
