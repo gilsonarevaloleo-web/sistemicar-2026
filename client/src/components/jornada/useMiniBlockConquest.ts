@@ -17,7 +17,11 @@ export function useMiniBlockConquest(
 
   const duracionSeg = useMemo(() => {
     if (!segmento?.horaInicio || !segmento?.horaFin) return 0;
-    return Math.max(1, Math.round(segmentDurationMinutes(segmento.horaInicio, segmento.horaFin) * 60));
+    try {
+      return Math.max(1, Math.round(segmentDurationMinutes(segmento.horaInicio, segmento.horaFin) * 60));
+    } catch {
+      return 0;
+    }
   }, [segmento?.horaInicio, segmento?.horaFin]);
 
   const [conquistaSegLocal, setConquistaSegLocal] = useState(0);
@@ -28,9 +32,9 @@ export function useMiniBlockConquest(
 
   useEffect(() => {
     void tick;
-    if (!hayVehiculoActivo || !segmento || duracionSeg <= 0) return;
+    if (!hayVehiculoActivo || !segId || duracionSeg <= 0) return;
     setConquistaSegLocal(prev => Math.min(duracionSeg, prev + 1));
-  }, [tick, hayVehiculoActivo, segmento, duracionSeg]);
+  }, [tick, hayVehiculoActivo, segId, duracionSeg]);
 
   if (duracionSeg <= 0) return 0;
   return Math.min(100, Math.round((conquistaSegLocal / duracionSeg) * 100));

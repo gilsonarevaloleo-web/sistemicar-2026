@@ -162,6 +162,24 @@ export function cancelPuntoCeroStepVoice(): void {
   logPcStepDiagnostics("cancel");
 }
 
+/** Libera TTS y colas al desmontar Punto Cero — evita canal mudo al día siguiente. */
+export function teardownPuntoCeroStepVoice(): void {
+  cancelPuntoCeroStepVoice();
+  clearPuntoCeroStepVoiceRemountPause();
+  callbacksRef = {};
+  pasosRef = [];
+  const synth = getSynth();
+  if (synth) {
+    try {
+      synth.cancel();
+    } catch {
+      /* noop */
+    }
+  }
+  resetPuntoCeroVoiceQueue();
+  logPcStepDiagnostics("teardown");
+}
+
 /** Pausa con snapshot para reanudar tras remontaje Jornada (no incrementa token). */
 export function pausePuntoCeroStepVoiceForRemount(): void {
   if (activePasoIndex >= 0 || phraseQueue.length > 0) {

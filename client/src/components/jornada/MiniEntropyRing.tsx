@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { svgDropShadowFilter } from "@/lib/mobilePerf";
 
 const PURPLE = "#8B5CF6";
-const TRACK = "rgba(255,255,255,0.06)";
+const TRACK = "rgba(255,255,255,0.14)";
 
 export interface MiniEntropyRingProps {
   cx: number;
@@ -28,7 +28,7 @@ export function MiniEntropyRing({
   const conquistaDash = (pct / 100) * innerCirc;
 
   return (
-    <>
+    <g data-testid="mini-entropy-ring">
       <circle cx={cx} cy={cy} r={innerR} fill="none" stroke={TRACK} strokeWidth={strokeW} />
       {pct > 0 && (
         <motion.circle
@@ -58,6 +58,6 @@ export function MiniEntropyRing({
           }}
         />
       )}
-    </>
+    </g>
   );
 }

@@ -71,9 +71,10 @@ export default function AnilloConcienciaHorizon({
   const planColor = planLabel >= 70 ? CYAN : planLabel >= 40 ? GOLD : "#6b7280";
   const presenteColor =
     presenteLabel >= 40 ? PURPLE : presenteLabel > 0 ? CYAN : "rgba(148,163,184,0.45)";
-  const halfWin = projection.windowMin / 2;
+  const halfWin = (projection?.windowMin ?? 0) / 2;
 
-  const byKind = (kind: HorizonArc["kind"]) => projection.arcs.filter(a => a.kind === kind);
+  const byKind = (kind: HorizonArc["kind"]) =>
+    (projection?.arcs ?? []).filter(a => a.kind === kind);
 
   return (
     <div className="flex flex-col items-center gap-2">

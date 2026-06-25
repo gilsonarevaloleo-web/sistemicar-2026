@@ -149,15 +149,27 @@ function AnilloConcienciaLiveInner({
     return formatLimaTimeHM(Date.now());
   }, [pointerTick]);
 
+  const segmentoActivoSig = useMemo(
+    () =>
+      sanitizeSegmentos(segmentos)
+        .map(s => {
+          const seg = s as SegmentoConEstado;
+          return `${seg.id ?? ""}:${seg.estado ?? ""}:${seg.horaInicio ?? ""}:${seg.horaFin ?? ""}`;
+        })
+        .join("|"),
+    [segmentos]
+  );
+
   const segmentoActivo = useMemo(
     () => resolveSegmentoActivo(segmentos),
-    [segmentos]
+    [segmentos, segmentoActivoSig]
   );
 
   const hayVehiculoActivo = useMemo(() => {
     void pointerTick;
+    const list = Array.isArray(vehicles) ? vehicles : [];
     const now = Date.now();
-    return vehicles.some(v => vehicleCoversConsciousnessAt(v, now));
+    return list.some(v => vehicleCoversConsciousnessAt(v, now));
   }, [vehicles, pointerTick]);
 
   const blockConquestPct = useMiniBlockConquest(segmentoActivo, hayVehiculoActivo, pointerTick);

@@ -246,6 +246,35 @@ export function usePuntoCeroAudio(
     }
   }, []);
 
+  const releaseHardware = useCallback(() => {
+    binauralRef.current?.stop(0);
+    binauralRef.current = null;
+    activePresetRef.current = null;
+    const ctx = ctxRef.current;
+    const master = masterRef.current;
+    if (master) {
+      try {
+        master.disconnect();
+      } catch {
+        /* noop */
+      }
+    }
+    masterRef.current = null;
+    unlockedRef.current = false;
+    if (ctx && ctx.state !== "closed") {
+      void ctx.suspend().then(() => {
+        if (ctx.state !== "closed") void ctx.close();
+      }).catch(() => {
+        try {
+          if (ctx.state !== "closed") void ctx.close();
+        } catch {
+          /* noop */
+        }
+      });
+    }
+    ctxRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (!enabled || !modo || !unlockedRef.current || mutedRef.current || volumeRef.current <= 0) return;
     const preset = presetForFase(fase, modo);
@@ -256,11 +285,9 @@ export function usePuntoCeroAudio(
     if (!enabled) stopAll();
     return () => {
       stopAll();
-      void ctxRef.current?.close();
-      ctxRef.current = null;
-      masterRef.current = null;
+      releaseHardware();
     };
-  }, [enabled, stopAll]);
+  }, [enabled, releaseHardware, stopAll]);
 
   return {
     unlockAudio,

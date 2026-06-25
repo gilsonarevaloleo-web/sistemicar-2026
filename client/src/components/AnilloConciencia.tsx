@@ -12,9 +12,9 @@ import { MiniEntropyRing } from "@/components/jornada/MiniEntropyRing";
 import { svgDropShadowFilter } from "@/lib/mobilePerf";
 
 interface SegmentoLite {
-  horaInicio: string;
-  horaFin: string;
-  estado: string;
+  horaInicio?: string;
+  horaFin?: string;
+  estado?: string;
   nombre?: string;
 }
 
@@ -673,14 +673,12 @@ export default function AnilloConciencia({
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: planColor }} />
           <span className="text-[7px] font-black uppercase tracking-widest text-slate-500">Plan</span>
         </div>
-        {showEntropia && (
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: BLOOD }} />
-            <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: BLOOD }}>
-              Entropía
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: BLOOD }} />
+          <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: BLOOD }}>
+            Entropía
+          </span>
+        </div>
         <div className="flex items-center gap-1">
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PURPLE }} />
           <span className="text-[7px] font-black uppercase tracking-widest text-slate-500">Conquista</span>

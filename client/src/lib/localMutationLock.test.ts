@@ -3,6 +3,8 @@ import { describe, it, mock, afterEach } from "node:test";
 import {
   beginLocalVehicleMutation,
   extendLocalVehicleMutation,
+  armBackgroundWakeReentryShield,
+  clearBackgroundWakeReentryShieldIfActive,
   forceResetOrphanMutationLocks,
   isLocalVehicleMutationLocked,
   isStructuralCloseInTransit,
@@ -54,5 +56,17 @@ describe("localMutationLock", () => {
     forceResetOrphanMutationLocks();
     assert.equal(isLocalVehicleMutationLocked(), false);
     assert.equal(isStructuralCloseInTransit(), false);
+  });
+
+  it("armBackgroundWakeReentryShield extiende candado 800ms sin pisar lock más largo", () => {
+    mock.timers.enable({ apis: ["Date", "setTimeout"] });
+    beginLocalVehicleMutation("ring");
+    mock.timers.tick(500);
+    armBackgroundWakeReentryShield(800);
+    mock.timers.tick(LOCAL_VEHICLE_MUTATION_LOCK_MS - 500 - 1);
+    assert.equal(isLocalVehicleMutationLocked(), true);
+    mock.timers.tick(1);
+    assert.equal(isLocalVehicleMutationLocked(), false);
+    clearBackgroundWakeReentryShieldIfActive();
   });
 });

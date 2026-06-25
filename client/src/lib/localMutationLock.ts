@@ -30,6 +30,23 @@ export function isLocalVehicleMutationLocked(): boolean {
   return Date.now() < lockUntil;
 }
 
+/** Candado síncrono al despertar desde background — absorbe ráfaga Firebase sin pintar React. */
+export function armBackgroundWakeReentryShield(ms = 800): void {
+  const until = Date.now() + ms;
+  if (until > lockUntil) {
+    lockUntil = until;
+    lockReason = "background-wake";
+  }
+}
+
+/** Libera solo el escudo de reentrada si sigue activo (p. ej. tras fallo de flush). */
+export function clearBackgroundWakeReentryShieldIfActive(): void {
+  if (lockReason === "background-wake" && releaseTimer == null) {
+    lockUntil = 0;
+    lockReason = undefined;
+  }
+}
+
 /** Cierre estructural (desglosador / flota) en tránsito — bloquea pintado reactivo del store. */
 export function markStructuralCloseInTransit(durationMs = LOCK_MS + STRUCTURAL_CLOSE_RELEASE_DELAY_MS): void {
   closeInTransitUntil = Date.now() + durationMs;

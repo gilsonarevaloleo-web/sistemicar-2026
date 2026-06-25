@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { writeAnilloViewMode } from "@/lib/anilloViewMode";
 
 type Props = { children: ReactNode; size?: number };
@@ -12,8 +12,8 @@ export class AnilloRingErrorBoundary extends Component<Props, State> {
     return { failed: true };
   }
 
-  componentDidCatch(error: Error) {
-    console.error("[AnilloRingErrorBoundary]", error);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[AnilloRingErrorBoundary]", error, info.componentStack);
     try {
       writeAnilloViewMode("mapa");
     } catch {

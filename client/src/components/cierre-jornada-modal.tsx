@@ -35,6 +35,7 @@ import {
 import BalanceConquistaPanel from "@/components/BalanceConquistaPanel";
 import { calcularBalanceConquistaJornada } from "@/engines/ConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
+import { shouldMountAutoCierreJornada } from "@/lib/jornadaConsciousGuard";
 
 const GOLD = "#D4AF37";
 const PURPLE = "#A855F7";
@@ -191,17 +192,18 @@ export function CierreJornadaModal() {
       const hours = now.getHours();
       const lastCierre = localStorage.getItem("sistemicar_last_cierre");
       const today = now.toDateString();
-      
-      if (hours >= 21 && lastCierre !== today && !hasClosed) {
-        setIsOpen(true);
-        fetchCierreData();
-      }
+
+      if (hours < 21 || lastCierre === today || hasClosed) return;
+      if (!shouldMountAutoCierreJornada(vehicles, location)) return;
+
+      setIsOpen(true);
+      fetchCierreData();
     };
 
     checkTime();
     const interval = setInterval(checkTime, 60000);
     return () => clearInterval(interval);
-  }, [hasClosed, user, isPlanificacion]);
+  }, [hasClosed, user, isPlanificacion, vehicles, location]);
 
   const fetchCierreData = async () => {
     if (!user) return;

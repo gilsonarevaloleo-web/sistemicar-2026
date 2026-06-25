@@ -10,6 +10,7 @@ import {
   resumeStepVoiceAfterRemount,
   speakPuntoCeroPaso,
   startPuntoCeroGuiaPasos,
+  teardownPuntoCeroStepVoice,
   type PuntoCeroPasoDef,
 } from "@/lib/puntoCeroStepVoice";
 import { unlockPuntoCeroSpeechFromGesture } from "@/lib/puntoCeroVoice";
@@ -128,7 +129,7 @@ export function usePuntoCeroSteps(opts: UsePuntoCeroStepsOptions = {}) {
 
   useEffect(() => {
     return () => {
-      cancelPuntoCeroStepVoice();
+      teardownPuntoCeroStepVoice();
     };
   }, []);
 

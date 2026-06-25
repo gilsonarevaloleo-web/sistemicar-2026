@@ -7,6 +7,8 @@ import {
   type Vehicle,
 } from "@/lib/persistence";
 import {
+  armBackgroundWakeReentryShield,
+  clearBackgroundWakeReentryShieldIfActive,
   isLocalVehicleMutationLocked,
   isStructuralCloseInTransit,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
@@ -57,6 +59,9 @@ let pendingIncoming: { data: Vehicle[]; generation: number } | null = null;
 const DEFERRED_MERGE_MAX_WAIT_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS;
 let vehiclesUpdatedHandler: (() => void) | null = null;
 let deferredMergeWakeHandler: (() => void) | null = null;
+let backgroundWakeFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+const BACKGROUND_WAKE_SHIELD_MS = 800;
 
 const listeners = new Set<StoreListener>();
 
@@ -191,9 +196,20 @@ function forceDeferredMerge(): void {
   applyIncomingSnapshot(pending.data, pending.generation, { force: true });
 }
 
+function clearBackgroundWakeFlushTimer(): void {
+  if (backgroundWakeFlushTimer != null) {
+    clearTimeout(backgroundWakeFlushTimer);
+    backgroundWakeFlushTimer = null;
+  }
+}
+
 /** Al volver de segundo plano: disyuntor si el TTL desde el primer defer ya venció. */
-export function flushFlotaDeferredMergeIfReady(): void {
+export function flushFlotaDeferredMergeIfReady(opts?: { force?: boolean }): void {
   if (!pendingIncoming) return;
+  if (opts?.force) {
+    forceDeferredMerge();
+    return;
+  }
   const elapsed = deferredMergeFirstAt > 0 ? Date.now() - deferredMergeFirstAt : 0;
   if (elapsed >= DEFERRED_MERGE_MAX_WAIT_MS) {
     forceDeferredMerge();
@@ -348,7 +364,20 @@ function installDeferredMergeWakeBridge(): void {
   if (deferredMergeWakeHandler || typeof document === "undefined") return;
   deferredMergeWakeHandler = () => {
     if (document.visibilityState !== "visible") return;
-    flushFlotaDeferredMergeIfReady();
+
+    armBackgroundWakeReentryShield(BACKGROUND_WAKE_SHIELD_MS);
+
+    clearBackgroundWakeFlushTimer();
+    backgroundWakeFlushTimer = setTimeout(() => {
+      backgroundWakeFlushTimer = null;
+      try {
+        flushFlotaDeferredMergeIfReady({ force: true });
+      } catch (err) {
+        console.warn("[flotaStore] background-wake flush failed:", err);
+        clearDeferredMerge();
+        clearBackgroundWakeReentryShieldIfActive();
+      }
+    }, BACKGROUND_WAKE_SHIELD_MS);
   };
   document.addEventListener("visibilitychange", deferredMergeWakeHandler);
 }
@@ -357,6 +386,7 @@ function uninstallDeferredMergeWakeBridge(): void {
   if (!deferredMergeWakeHandler || typeof document === "undefined") return;
   document.removeEventListener("visibilitychange", deferredMergeWakeHandler);
   deferredMergeWakeHandler = null;
+  clearBackgroundWakeFlushTimer();
 }
 
 function installVehiclesUpdatedBridge(): void {
@@ -383,6 +413,7 @@ function stopFirebaseSubscription(): void {
   unsubFirebase?.();
   unsubFirebase = null;
   clearDeferredMerge();
+  clearBackgroundWakeFlushTimer();
   clearSyncReadyFallback();
   uninstallVehiclesUpdatedBridge();
   uninstallDeferredMergeWakeBridge();

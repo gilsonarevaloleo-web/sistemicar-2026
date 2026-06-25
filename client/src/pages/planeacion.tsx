@@ -526,6 +526,7 @@ import {
   isLocalVehicleMutationLocked,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "@/lib/localMutationLock";
+import { hasActiveConsciousJornadaProcess } from "@/lib/jornadaConsciousGuard";
 import { scheduleDeferredVehicleCleanup } from "@/lib/vehicleDeferredCleanup";
 import { generateStableUuid } from "@/lib/stableUuid";
 import { sealVehicleSessionClose } from "@/lib/vehicleSessionSeal";
@@ -1148,12 +1149,12 @@ export default function Planeacion() {
     if (!user) return;
     const checkNightBlocking = async () => {
       const hour = new Date().getHours();
-      if (hour >= 22) {
-        const todayCierre = await getTodayCierreJornada(user.uid);
-        setTodayCierreJornada(todayCierre);
-        if (!todayCierre) {
-          setShowCierreJornada(true);
-        }
+      if (hour < 22) return;
+      if (hasActiveConsciousJornadaProcess(vehiclesRef.current)) return;
+      const todayCierre = await getTodayCierreJornada(user.uid);
+      setTodayCierreJornada(todayCierre);
+      if (!todayCierre) {
+        setShowCierreJornada(true);
       }
     };
     checkNightBlocking();
