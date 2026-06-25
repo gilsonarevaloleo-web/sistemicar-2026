@@ -564,6 +564,7 @@ function VehicleCard({
   onDescansoClose, onMicroPasoToggle, onEtapaPuntoCeroToggle,
   onPuntoCeroSessionUpdate, onPuntoCeroColorConfirm, onPuntoCeroAutoClose,
   onOpenCierreEnergia,
+  cierreEnergiaPendingVehicleId,
   onRutaBandCross, onBloqueCierre
 }: {
   vehicle: Vehicle; expanded: boolean;
@@ -612,6 +613,8 @@ function VehicleCard({
   onPuntoCeroColorConfirm?: (vehicleId: string, idx: number, session: PuntoCeroSession) => void;
   onPuntoCeroAutoClose?: (vehicleId: string) => void;
   onOpenCierreEnergia?: (payload: CierreEnergiaModalPayload) => void;
+  /** Si el modal de energía se cierra sin confirmar, libera el despacho local. */
+  cierreEnergiaPendingVehicleId?: string | null;
   onRutaBandCross?: (payload: { vehicleId: string; subId: string; subTitulo: string; banda: RutaBandaId }) => void;
   onBloqueCierre?: (payload: { vehicleId: string; sub: SubVehiculo; status: string }) => void;
 }) {
@@ -628,6 +631,7 @@ function VehicleCard({
   const [subTimerIsCountdown, setSubTimerIsCountdown] = useState(false);
   const [subTimerExpired, setSubTimerExpired] = useState(false);
   const [desglosadorSummary, setDesglosadorSummary] = useState(false);
+  const [desglosadorCloseSubmitting, setDesglosadorCloseSubmitting] = useState(false);
   const subtasksExpandedStorageKey = `sistemicar_subtasks_expanded_${vehicle.id}`;
   const [subTasksCollapsed, setSubTasksCollapsed] = useState(() => {
     if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) return false;
@@ -1314,6 +1318,30 @@ function VehicleCard({
   }, [tipoFlota, vehicle.status, vehicle.tipoDescanso, vehicle.aperturaAt]);
 
   useEffect(() => {
+    if (vehicle.status !== "activo") {
+      setDesglosadorCloseSubmitting(false);
+    }
+  }, [vehicle.status, vehicle.id]);
+
+  useEffect(() => {
+    if (!expanded) setDesglosadorCloseSubmitting(false);
+  }, [expanded]);
+
+  const prevCierreEnergiaPendingRef = useRef<string | null>(null);
+  useEffect(() => {
+    const pendingId = cierreEnergiaPendingVehicleId ?? null;
+    if (
+      desglosadorCloseSubmitting &&
+      prevCierreEnergiaPendingRef.current === vehicle.id &&
+      pendingId !== vehicle.id &&
+      vehicle.status === "activo"
+    ) {
+      setDesglosadorCloseSubmitting(false);
+    }
+    prevCierreEnergiaPendingRef.current = pendingId;
+  }, [cierreEnergiaPendingVehicleId, desglosadorCloseSubmitting, vehicle.id, vehicle.status]);
+
+  useEffect(() => {
     if (vehicle.status === "activo") return;
     setShowEtiquetaSalida(false);
     setEtiquetaSalidaLocal(null);
@@ -1889,6 +1917,22 @@ function VehicleCard({
                 const fmtSec = (sec: number) => { const m = Math.floor(sec / 60); const s = sec % 60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
 
                 if (done) {
+                  if (desglosadorCloseSubmitting) {
+                    return (
+                      <div className="pt-3">
+                        <div
+                          className="p-4 rounded-xl border-2 space-y-2 text-center"
+                          style={{ backgroundColor: "rgba(212,175,55,0.05)", borderColor: "#D4AF37" }}
+                          data-testid={`desglosador-close-dispatching-${vehicle.id}`}
+                        >
+                          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#D4AF37" }}>
+                            Cerrando ciclo…
+                          </p>
+                          <p className="text-[8px] text-slate-500">Sellando PS y sincronizando jornada</p>
+                        </div>
+                      </div>
+                    );
+                  }
                   const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle);
                   const totalRealSec = subs.reduce((acc, s) => acc + (s.duracionFinal || 0), 0);
                   const totalSugeridoSec = subs.reduce((acc, s) => acc + (s.tiempoSugeridoSeg || 0), 0);
@@ -2039,18 +2083,25 @@ function VehicleCard({
                             <RotateCcw size={11} /> Nuevo Ciclo
                           </button>
                           <button
-                            onClick={() => {
+                            type="button"
+                            disabled={desglosadorCloseSubmitting}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (desglosadorCloseSubmitting) return;
+                              setDesglosadorCloseSubmitting(true);
                               if (onOpenCierreEnergia) {
                                 onOpenCierreEnergia({ kind: "desglosador", vehicleId: vehicle.id, subs });
                               } else {
-                                onDesglosadorGlobalClose?.(vehicle.id, subs);
+                                void Promise.resolve(onDesglosadorGlobalClose?.(vehicle.id, subs)).finally(() => {
+                                  setDesglosadorCloseSubmitting(false);
+                                });
                               }
                             }}
-                            className="py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                            className="py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:pointer-events-none"
                             style={{ backgroundColor: "#D4AF37", color: "#000", boxShadow: "0 0 16px rgba(212,175,55,0.25)" }}
                             data-testid={`button-desglosador-global-close-${vehicle.id}`}
                           >
-                            Cerrar · +{totalPS} PS
+                            {desglosadorCloseSubmitting ? "Cerrando…" : `Cerrar · +${totalPS} PS`}
                           </button>
                         </div>
                       </div>

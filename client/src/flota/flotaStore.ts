@@ -8,6 +8,7 @@ import {
 } from "@/lib/persistence";
 import {
   isLocalVehicleMutationLocked,
+  isStructuralCloseInTransit,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "@/lib/localMutationLock";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
@@ -310,6 +311,16 @@ function applyIncomingSnapshot(
 
   const localSig = vehiclesReactiveSignature(current);
   if (!opts?.force && sig !== localSig && localSig === mergedSig) {
+    markSyncReady(generation);
+    return;
+  }
+
+  // Filtro de transición: cierre estructural en tránsito — búfer sin notify
+  if (isStructuralCloseInTransit() && !opts?.force) {
+    if (uid && merged.length > 0) {
+      writeLocalFlota(uid, merged);
+    }
+    setVehiclesBufferOnly(merged);
     markSyncReady(generation);
     return;
   }

@@ -22,6 +22,7 @@ export type VehicleCardMemoProps = {
   arquitectoUnlocked?: boolean;
   situacionBloquePsTotal?: number;
   situacionDesgloseSummary?: { vehicleId?: string; psTotal?: number };
+  cierreEnergiaPendingVehicleId?: string | null;
 };
 
 /** Campos del ring que vehiclesReactiveSignature omite — sin esto Cumplido/Fallado no re-renderiza. */
@@ -84,6 +85,7 @@ export function areVehicleCardPropsEqual(
   if (prev.situacionBloquePsTotal !== next.situacionBloquePsTotal) return false;
   if (prev.situacionDesgloseSummary?.vehicleId !== next.situacionDesgloseSummary?.vehicleId) return false;
   if (prev.situacionDesgloseSummary?.psTotal !== next.situacionDesgloseSummary?.psTotal) return false;
+  if (prev.cierreEnergiaPendingVehicleId !== next.cierreEnergiaPendingVehicleId) return false;
   if (prev.planilla?.fecha !== next.planilla?.fecha) return false;
   if (vehicleRingUiSignature(prev.vehicle) !== vehicleRingUiSignature(next.vehicle)) {
     return false;
