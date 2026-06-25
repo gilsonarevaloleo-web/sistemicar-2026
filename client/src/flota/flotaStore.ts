@@ -9,6 +9,8 @@ import {
 import {
   armBackgroundWakeReentryShield,
   clearBackgroundWakeReentryShieldIfActive,
+  forceResetOrphanMutationLocks,
+  getLocalMutationLockDebug,
   isLocalVehicleMutationLocked,
   isStructuralCloseInTransit,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
@@ -123,6 +125,22 @@ export function getFlotaVehicles(): Vehicle[] {
 
 export function getFlotaMergedSignature(): string {
   return mergedSig;
+}
+
+/**
+ * Guardián de autolimpieza — pulso del reloj global (1 s).
+ * Libera candados cuyo TTL venció sin timer activo (candado perpetuo en caliente).
+ */
+export function runFlotaMutationLockGuardian(): void {
+  const { until, closeInTransitUntil } = getLocalMutationLockDebug();
+  const now = Date.now();
+  if ((until > 0 && now > until) || (closeInTransitUntil > 0 && now > closeInTransitUntil)) {
+    console.warn(
+      "[FlotaStore] Guardián activado: Detectado candado residual expirado en caliente. Forzando liberación."
+    );
+    forceResetOrphanMutationLocks();
+    flushFlotaDeferredMergeIfReady();
+  }
 }
 
 export function subscribeFlotaStore(listener: StoreListener): () => void {

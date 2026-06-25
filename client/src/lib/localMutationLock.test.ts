@@ -9,9 +9,14 @@ import {
   isLocalVehicleMutationLocked,
   isStructuralCloseInTransit,
   markStructuralCloseInTransit,
+  releaseMutationLockWithDelay,
   resetLocalVehicleMutationLockForTests,
+  simulateOrphanMutationLockForTests,
+  sweepExpiredMutationLocks,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "./localMutationLock.ts";
+
+const ABSOLUTE_LOCK_CAP_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS + 300;
 
 describe("localMutationLock", () => {
   afterEach(() => {
@@ -68,5 +73,26 @@ describe("localMutationLock", () => {
     mock.timers.tick(1);
     assert.equal(isLocalVehicleMutationLocked(), false);
     clearBackgroundWakeReentryShieldIfActive();
+  });
+
+  it("ráfaga ring <100ms respeta techo absoluto y libera al vencer", () => {
+    mock.timers.enable({ apis: ["Date", "setTimeout"] });
+    beginLocalVehicleMutation("ring");
+    for (let i = 0; i < 20; i++) {
+      mock.timers.tick(40);
+      extendLocalVehicleMutation("ring");
+    }
+    assert.equal(isLocalVehicleMutationLocked(), true);
+    mock.timers.tick(ABSOLUTE_LOCK_CAP_MS);
+    assert.equal(isLocalVehicleMutationLocked(), false);
+  });
+
+  it("sweepExpiredMutationLocks limpia candado residual expirado", () => {
+    mock.timers.enable({ apis: ["Date", "setTimeout"] });
+    mock.timers.tick(5000);
+    simulateOrphanMutationLockForTests();
+    assert.equal(sweepExpiredMutationLocks(), true);
+    assert.equal(isLocalVehicleMutationLocked(), false);
+    assert.equal(isStructuralCloseInTransit(), false);
   });
 });

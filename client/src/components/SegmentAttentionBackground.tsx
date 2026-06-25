@@ -9,7 +9,7 @@ import {
   type UserProgression,
   type Vehicle,
 } from "@/lib/persistence";
-import { acquireFlotaStore, getFlotaVehicles, subscribeFlotaStore } from "@/flota/flotaStore";
+import { acquireFlotaStore, getFlotaVehicles, runFlotaMutationLockGuardian, subscribeFlotaStore } from "@/flota/flotaStore";
 import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
@@ -152,9 +152,14 @@ export function SegmentAttentionBackground() {
     let intervalId = window.setInterval(() => void runTick(), intervalMs);
     const initialTickId = window.setTimeout(() => void runTick({ force: true }), INITIAL_TICK_DEFER_MS);
 
+    const pulseConcienciaClock = () => {
+      runFlotaMutationLockGuardian();
+      dispatchConcienciaClockTick();
+    };
+
     let clockMs = CLOCK_MS_FOREGROUND;
-    let clockId = window.setInterval(dispatchConcienciaClockTick, clockMs);
-    dispatchConcienciaClockTick();
+    let clockId = window.setInterval(pulseConcienciaClock, clockMs);
+    pulseConcienciaClock();
 
     const resetInterval = () => {
       clearInterval(intervalId);
@@ -163,8 +168,8 @@ export function SegmentAttentionBackground() {
 
       clearInterval(clockId);
       clockMs = isAppInBackground() ? CLOCK_MS_BACKGROUND : CLOCK_MS_FOREGROUND;
-      clockId = window.setInterval(dispatchConcienciaClockTick, clockMs);
-      dispatchConcienciaClockTick();
+      clockId = window.setInterval(pulseConcienciaClock, clockMs);
+      pulseConcienciaClock();
     };
 
     const unregisterVoiceVisible = registerVoiceVisibleHandler(() => {

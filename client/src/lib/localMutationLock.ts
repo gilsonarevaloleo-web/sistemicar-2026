@@ -2,32 +2,116 @@
 
 const LOCK_MS = 1500;
 const STRUCTURAL_CLOSE_RELEASE_DELAY_MS = 300;
+/** Ráfagas <100 ms comparten techo absoluto — imposible postergar el release indefinidamente. */
+const BURST_GAP_MS = 100;
+const ABSOLUTE_LOCK_CAP_MS = LOCK_MS + STRUCTURAL_CLOSE_RELEASE_DELAY_MS;
 
 let lockUntil = 0;
 let lockReason: string | undefined;
 let closeInTransitUntil = 0;
 let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+let scheduledReleaseAt = 0;
+let lockBurstStartedAt = 0;
+let lastLockRequestAt = 0;
 
-export function beginLocalVehicleMutation(reason?: string): void {
+function noteLockBurst(): void {
+  const now = Date.now();
+  if (lockBurstStartedAt === 0 || now - lastLockRequestAt > BURST_GAP_MS) {
+    lockBurstStartedAt = now;
+  }
+  lastLockRequestAt = now;
+}
+
+function absoluteLockCeiling(): number {
+  if (lockBurstStartedAt === 0) return Date.now() + LOCK_MS;
+  return lockBurstStartedAt + ABSOLUTE_LOCK_CAP_MS;
+}
+
+function capLockUntil(requestedUntil: number): number {
+  return Math.min(requestedUntil, absoluteLockCeiling());
+}
+
+function finalizeMutationLockRelease(): void {
+  releaseTimer = null;
+  scheduledReleaseAt = 0;
+  lockUntil = 0;
+  closeInTransitUntil = 0;
+  lockReason = undefined;
+  lockBurstStartedAt = 0;
+}
+
+function scheduleReleaseAt(releaseAt: number, rapidFollowUp = false): void {
+  const now = Date.now();
+  const capped = capLockUntil(releaseAt);
+  if (capped <= now) {
+    finalizeMutationLockRelease();
+    return;
+  }
+
+  if (releaseTimer != null && scheduledReleaseAt > 0 && rapidFollowUp && scheduledReleaseAt <= capped) {
+    lockUntil = Math.max(lockUntil, now);
+    lockUntil = Math.min(lockUntil, scheduledReleaseAt);
+    closeInTransitUntil = Math.min(closeInTransitUntil || capped, scheduledReleaseAt);
+    return;
+  }
+
   if (releaseTimer != null) {
     clearTimeout(releaseTimer);
     releaseTimer = null;
   }
-  lockUntil = Date.now() + LOCK_MS;
-  lockReason = reason;
+
+  scheduledReleaseAt = capped;
+  lockUntil = capped;
+  closeInTransitUntil = Math.min(closeInTransitUntil || capped, capped);
+  releaseTimer = setTimeout(finalizeMutationLockRelease, capped - now);
+}
+
+function armTimedLock(requestedUntil: number, reason?: string): void {
+  const now = Date.now();
+  const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
+  noteLockBurst();
+  const capped = capLockUntil(requestedUntil);
+  lockUntil = capped;
+  if (reason) lockReason = reason;
+  scheduleReleaseAt(capped, rapidFollowUp);
+}
+
+export function beginLocalVehicleMutation(reason?: string): void {
+  const now = Date.now();
+  const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
+  if (releaseTimer != null && rapidFollowUp) {
+    noteLockBurst();
+    lockUntil = capLockUntil(Math.max(lockUntil, now + LOCK_MS));
+    lockReason = reason;
+    scheduleReleaseAt(lockUntil, true);
+    return;
+  }
+  armTimedLock(now + LOCK_MS, reason);
 }
 
 export function extendLocalVehicleMutation(reason?: string): void {
-  if (releaseTimer != null) {
-    clearTimeout(releaseTimer);
-    releaseTimer = null;
+  const now = Date.now();
+  const rapidFollowUp = now - lastLockRequestAt <= BURST_GAP_MS && lastLockRequestAt > 0;
+  if (releaseTimer != null && rapidFollowUp) {
+    noteLockBurst();
+    lockUntil = capLockUntil(Math.max(lockUntil, now + LOCK_MS));
+    if (reason) lockReason = reason;
+    scheduleReleaseAt(lockUntil, true);
+    return;
   }
-  lockUntil = Date.now() + LOCK_MS;
-  if (reason) lockReason = reason;
+  armTimedLock(now + LOCK_MS, reason);
 }
 
 export function isLocalVehicleMutationLocked(): boolean {
-  return Date.now() < lockUntil;
+  const now = Date.now();
+  if (lockUntil > 0 && now >= lockUntil && releaseTimer == null) {
+    lockUntil = 0;
+    lockReason = undefined;
+    if (closeInTransitUntil > 0 && now >= closeInTransitUntil) {
+      closeInTransitUntil = 0;
+    }
+  }
+  return now < lockUntil;
 }
 
 /** Candado síncrono al despertar desde background — absorbe ráfaga Firebase sin pintar React. */
@@ -49,11 +133,16 @@ export function clearBackgroundWakeReentryShieldIfActive(): void {
 
 /** Cierre estructural (desglosador / flota) en tránsito — bloquea pintado reactivo del store. */
 export function markStructuralCloseInTransit(durationMs = LOCK_MS + STRUCTURAL_CLOSE_RELEASE_DELAY_MS): void {
-  closeInTransitUntil = Date.now() + durationMs;
+  noteLockBurst();
+  closeInTransitUntil = capLockUntil(Date.now() + durationMs);
 }
 
 export function isStructuralCloseInTransit(): boolean {
-  return Date.now() < closeInTransitUntil;
+  const now = Date.now();
+  if (closeInTransitUntil > 0 && now >= closeInTransitUntil) {
+    closeInTransitUntil = 0;
+  }
+  return now < closeInTransitUntil;
 }
 
 /**
@@ -61,16 +150,11 @@ export function isStructuralCloseInTransit(): boolean {
  * para que React desmonte la vista de ciclo sin cruzarse con el eco de red.
  */
 export function releaseMutationLockWithDelay(delayMs = STRUCTURAL_CLOSE_RELEASE_DELAY_MS): void {
-  if (releaseTimer != null) clearTimeout(releaseTimer);
-  const releaseAt = Date.now() + delayMs;
+  noteLockBurst();
+  const releaseAt = capLockUntil(Date.now() + delayMs);
   lockUntil = releaseAt;
   closeInTransitUntil = releaseAt;
-  releaseTimer = setTimeout(() => {
-    releaseTimer = null;
-    lockUntil = 0;
-    closeInTransitUntil = 0;
-    lockReason = undefined;
-  }, delayMs);
+  scheduleReleaseAt(releaseAt);
 }
 
 export function getLocalMutationLockDebug(): { until: number; reason?: string; closeInTransitUntil: number } {
@@ -82,9 +166,23 @@ function clearMutationLockState(): void {
     clearTimeout(releaseTimer);
     releaseTimer = null;
   }
+  scheduledReleaseAt = 0;
+  lockBurstStartedAt = 0;
+  lastLockRequestAt = 0;
   lockUntil = 0;
   lockReason = undefined;
   closeInTransitUntil = 0;
+}
+
+/** Pulso del reloj global — libera candados huérfanos cuyo TTL ya venció en caliente. */
+export function sweepExpiredMutationLocks(): boolean {
+  const { until, closeInTransitUntil: closeUntil } = getLocalMutationLockDebug();
+  const now = Date.now();
+  const lockExpired = until > 0 && now > until;
+  const closeExpired = closeUntil > 0 && now > closeUntil;
+  if (!lockExpired && !closeExpired) return false;
+  forceResetOrphanMutationLocks();
+  return true;
 }
 
 /**
@@ -98,6 +196,19 @@ export function forceResetOrphanMutationLocks(): void {
 /** Expuesto para tests con fake timers. */
 export function resetLocalVehicleMutationLockForTests(): void {
   clearMutationLockState();
+}
+
+/** Simula candado huérfano (lockUntil residual sin releaseTimer). Solo tests. */
+export function simulateOrphanMutationLockForTests(expiredSinceMs = 1): void {
+  if (releaseTimer != null) {
+    clearTimeout(releaseTimer);
+    releaseTimer = null;
+  }
+  scheduledReleaseAt = 0;
+  const expiredAt = Date.now() - expiredSinceMs;
+  lockUntil = expiredAt;
+  closeInTransitUntil = expiredAt;
+  lockReason = "test-orphan";
 }
 
 export const LOCAL_VEHICLE_MUTATION_LOCK_MS = LOCK_MS;

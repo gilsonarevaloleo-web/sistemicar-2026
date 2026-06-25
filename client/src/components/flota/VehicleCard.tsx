@@ -521,6 +521,7 @@ import {
   beginLocalVehicleMutation,
   extendLocalVehicleMutation,
   isLocalVehicleMutationLocked,
+  isStructuralCloseInTransit,
   LOCAL_VEHICLE_MUTATION_LOCK_MS,
 } from "@/lib/localMutationLock";
 import { scheduleDeferredVehicleCleanup } from "@/lib/vehicleDeferredCleanup";
@@ -699,6 +700,10 @@ function VehicleCard({
     () => vehicleCardNeedsLiveTick(vehicle, expanded),
     [vehicle, expanded]
   );
+  /** Pulso 1 s — re-evalúa candado de mutación para recuperar tactilidad del ring al expirar. */
+  const concienciaTick = useConcienciaClockTick();
+  const ringMutationLocked =
+    concienciaTick >= 0 && (isLocalVehicleMutationLocked() || isStructuralCloseInTransit());
   const subStartVoiceRef = useRef<Set<string>>(new Set());
   const [subRutaModal, setSubRutaModal] = useState<null | {
     subId: string;
@@ -3171,11 +3176,17 @@ function VehicleCard({
                                             </span>
                                           )}
                                           {pend && ringOperable && (
-                                            <div className="flex gap-1 flex-shrink-0">
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
-                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
+                                            <div
+                                              className={`flex gap-1 flex-shrink-0 transition-opacity ${ringMutationLocked ? "opacity-40 pointer-events-none" : ""}`}
+                                              aria-busy={ringMutationLocked}
+                                            >
+                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
+                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
+                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5 disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
                                             </div>
+                                          )}
+                                          {pend && ringOperable && ringMutationLocked && (
+                                            <span className="text-[6px] font-bold uppercase tracking-wider text-slate-600 flex-shrink-0">sync</span>
                                           )}
                                           {pend && situacionCronActivo && !enFoco && !ringOperable && (
                                             <span className="text-[7px] text-slate-600 flex-shrink-0">en cola</span>
