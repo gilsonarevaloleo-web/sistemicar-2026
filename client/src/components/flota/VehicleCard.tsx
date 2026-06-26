@@ -217,7 +217,16 @@ import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
   speakDesglosadorVoiceReliable,
+  speakDesglosadorVoiceReliableDeferred,
 } from "@/lib/desglosadorVoice";
+import {
+  computeSafeRemainingMs,
+  computeSafeRemainingSec,
+  durationMinutesToMs,
+  hardwareClockNow,
+  hardwareElapsedMs,
+} from "@/lib/hardwareClock";
+import { forceResetOrphanMutationLocks } from "@/lib/localMutationLock";
 import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
 import {
   registerSituacionSessionCleanup,
@@ -291,6 +300,7 @@ import {
   isCupoFijo,
   resolveFocusSubTareaId,
   situacionFilaCronometroPendiente,
+  situacionFilaEnFocoPendiente,
   situacionRelojDebeMostrarse,
   situacionTargetMsReloj,
   computeSituacionProyeccionFinMs,
@@ -916,8 +926,8 @@ function VehicleCard({
     if (!sub || !(sub.minutosCupo && sub.minutosCupo > 0)) return;
     if (sub.enDesgloseCronometro && (sub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     if (!sub.enDesgloseCronometro && sub.completada) return;
-    const limitMs = sub.minutosCupo * 60 * 1000;
-    const fireKey = `${anchor.subTareaId}-${anchor.startedAt}-${sub.minutosCupo}`;
+    const durationMin = sub.minutosCupo;
+    const fireKey = `${anchor.subTareaId}-${anchor.startedAt}-${durationMin}`;
 
     const isSubStillPending = () => {
       const a = situacionAnchorRef.current;
@@ -941,8 +951,7 @@ function VehicleCard({
         clearEscalation();
         return;
       }
-      const elapsed = Date.now() - anchor.startedAt;
-      if (elapsed < limitMs) return;
+      if (computeSafeRemainingMs(anchor.startedAt, durationMin) > 0) return;
       if (situacionCupoFireKeyRef.current === fireKey) return;
       situacionCupoFireKeyRef.current = fireKey;
       fireSituacionCupoAlert({
@@ -1173,7 +1182,7 @@ function VehicleCard({
         playChime();
       }
       voiceCleanups.push(
-        speakDesglosadorVoiceReliable(
+        speakDesglosadorVoiceReliableDeferred(
           `${vehicle.id}:ruta-${key}`,
           rutaVozPartsForBanda(alert),
           false,
@@ -1239,7 +1248,6 @@ function VehicleCard({
     if (!built) return;
     const { subs: allSubs, closedSub, nextActiveSubId } = built;
 
-    onBloqueCierre?.({ vehicleId: vehicle.id, sub: closedSub, status });
     const veredicto = computeSubCloseVerdict(closedSub);
     setUltimoCierreSub({
       subId: closedSub.id,
@@ -1262,6 +1270,12 @@ function VehicleCard({
     setSubRutaSel(new Set());
     setSubRutaSinUso(false);
     setSubRutaPatron(null);
+    forceResetOrphanMutationLocks();
+
+    const bloquePayload = { vehicleId: vehicle.id, sub: closedSub, status };
+    setTimeout(() => {
+      onBloqueCierre?.(bloquePayload);
+    }, 0);
   }, [onBloqueCierre, onDesglosadorUpdate, vehicle.id, vehicle.subVehiculos]);
 
   const attemptCloseActiveSubById = useCallback((
@@ -1398,21 +1412,56 @@ function VehicleCard({
 
     const computeTimer = () => {
       if (tipoFlota === "verdad") {
-        const elapsed = Math.max(0, Math.floor((Date.now() - aperturaMs) / 1000));
+        const elapsed = Math.max(0, Math.floor(hardwareElapsedMs(aperturaMs) / 1000));
         setTimerDisplay(fmtTime(elapsed));
         return;
       }
       if (targetMs !== null) {
-        const now = Date.now();
-        const diff = targetMs - now;
-        if (diff > 0) {
+        const now = hardwareClockNow();
+
+        if (tipoFlota === "situacion") {
+          const anchor = vehicle.situacionCupoAnchor;
+          const sub = anchor?.subTareaId
+            ? (vehicle.subTareas || []).find(s => s.id === anchor.subTareaId)
+            : null;
+          if (
+            anchor?.startedAt &&
+            sub &&
+            (sub.minutosCupo ?? 0) > 0 &&
+            situacionFilaEnFocoPendiente(sub)
+          ) {
+            const durationInMs = durationMinutesToMs(sub.minutosCupo!);
+            const elapsedMs = hardwareElapsedMs(anchor.startedAt, now);
+            const remainingMs = durationInMs - elapsedMs;
+            const safeRemainingMs = Math.max(0, remainingMs);
+            if (remainingMs > 0) {
+              setTimerExpired(false);
+              setDebtDisplay("");
+              setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
+            } else if (elapsedMs >= durationInMs) {
+              setTimerExpired(true);
+              setTimerDisplay("00:00:00");
+              const overMs = elapsedMs - durationInMs;
+              setDebtDisplay(overMs > 0 ? fmtTime(Math.floor(overMs / 1000)) : "");
+            } else {
+              setTimerExpired(false);
+              setDebtDisplay("");
+              setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
+            }
+            return;
+          }
+        }
+
+        const remainingMs = targetMs - now;
+        const safeRemainingMs = Math.max(0, remainingMs);
+        if (remainingMs > 0) {
           setTimerExpired(false);
           setDebtDisplay("");
-          setTimerDisplay(fmtTime(Math.floor(diff / 1000)));
+          setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
         } else {
           setTimerExpired(true);
           setTimerDisplay("00:00:00");
-          setDebtDisplay(fmtTime(Math.floor(Math.abs(diff) / 1000)));
+          setDebtDisplay(fmtTime(Math.floor(Math.abs(remainingMs) / 1000)));
         }
         if (matchProd) {
           const cantObj = parseFloat(matchProd[1]);
@@ -2840,9 +2889,7 @@ function VehicleCard({
                     if (!st || !(st.minutosCupo && st.minutosCupo > 0)) return null;
                     if (st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") !== "pendiente") return null;
                     if (!st.enDesgloseCronometro && st.completada) return null;
-                    const limitSec = st.minutosCupo * 60;
-                    const elapsedSec = Math.max(0, Math.floor((nowMs - anchor.startedAt) / 1000));
-                    const remainSec = Math.max(0, limitSec - elapsedSec);
+                    const remainSec = computeSafeRemainingSec(anchor.startedAt, st.minutosCupo);
                     const gananciaVivoMin = minutosGanadosEnVivoFoco(subs, anchor, nowMs);
                     const rm = Math.floor(remainSec / 60);
                     const rs = remainSec % 60;

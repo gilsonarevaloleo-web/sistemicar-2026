@@ -1,6 +1,7 @@
 import { formatHHMM } from "./desglosadorClock";
 import { aplicarProyectoHeredadoASub, dominanteProyectoIdEnSubs } from "./imanPensamientos";
 import type { SubTarea, Vehicle } from "./persistence";
+import { computeSafeRemainingMs } from "./hardwareClock";
 import { situacionContratoFinMs } from "./situacionGanancia";
 
 export function situacionFilaCronometroPendiente(st: SubTarea): boolean {
@@ -153,8 +154,7 @@ export function resolveCronometroCupoAnchor(
   if (cur?.subTareaId && !opts?.forceResetSameRow) {
     const curSub = subTareas.find(s => s.id === cur.subTareaId);
     if (curSub && situacionFilaCronometroPendiente(curSub) && (curSub.minutosCupo ?? 0) > 0) {
-      const limitMs = (curSub.minutosCupo ?? 0) * 60000;
-      if (now - cur.startedAt <= limitMs) return "unchanged";
+      if (computeSafeRemainingMs(cur.startedAt, curSub.minutosCupo ?? 0, now) > 0) return "unchanged";
       const idx = cronPending.findIndex(s => s.id === cur.subTareaId);
       const nextSub = idx >= 0 ? cronPending[idx + 1] : undefined;
       if (nextSub) return { subTareaId: nextSub.id, startedAt: now };

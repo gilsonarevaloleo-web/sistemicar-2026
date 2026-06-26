@@ -1,4 +1,5 @@
 import type { SubVehiculo, Vehicle } from "./persistence";
+import { hardwareElapsedMs } from "./hardwareClock";
 
 export function suggestedSec(sub: SubVehiculo): number | null {
   if (sub.cantidadObjetivo && sub.tiempoRecordMinPerUnit) {
@@ -31,11 +32,12 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   if (activeSub?.aperturaAt) {
     subElapsedSec = frozen
       ? pausa!.elapsedSecSnapshot!
-      : Math.floor((now - activeSub.aperturaAt) / 1000);
+      : Math.floor(hardwareElapsedMs(activeSub.aperturaAt, now) / 1000);
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
-  const subRemainingSec = objSecs != null ? objSecs - subElapsedSec : null;
+  const subRemainingSec =
+    objSecs != null ? Math.max(0, objSecs - subElapsedSec) : null;
   const subEndAt =
     activeSub?.aperturaAt && objSecs != null
       ? activeSub.aperturaAt + objSecs * 1000

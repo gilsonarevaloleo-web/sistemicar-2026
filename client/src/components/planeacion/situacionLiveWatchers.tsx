@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { Vehicle } from "@/lib/persistence";
 import { useVehicleTimerTick } from "@/lib/concienciaClock";
+import { computeSafeRemainingSec } from "@/lib/hardwareClock";
 import { fireSituacion2MinAlert, speakRingTiempoSobra } from "@/lib/situacionAlerts";
 import { RING_SOBRA_INVITACION_MIN } from "@/lib/ringEnfoqueReal";
 import { situacionContratoFinMs } from "@/lib/situacionGanancia";
@@ -25,9 +26,7 @@ export function Situacion2MinAlertWatcher({
     if (!sub || !(sub.minutosCupo && sub.minutosCupo >= 2)) return;
     if (sub.enDesgloseCronometro && (sub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     if (!sub.enDesgloseCronometro && sub.completada) return;
-    const limitSec = sub.minutosCupo * 60;
-    const elapsedSec = Math.max(0, Math.floor((Date.now() - anchor.startedAt) / 1000));
-    const remainSec = Math.max(0, limitSec - elapsedSec);
+    const remainSec = computeSafeRemainingSec(anchor.startedAt, sub.minutosCupo);
     if (remainSec !== 120 && remainSec !== 119 && remainSec !== 118) return;
     const warnKey = `2m-${anchor.subTareaId}-${anchor.startedAt}-${sub.minutosCupo}`;
     if (warnKeyRef.current === warnKey) return;

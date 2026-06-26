@@ -14,6 +14,7 @@ import {
   voiceEngine,
   type UbicacionVoiceSource,
 } from "./speechQueue";
+import { runConscienteVoiceDeferred } from "./conscienteVoiceDeferred";
 import {
   isDesglosadorVoiceEnabled,
   isPuertaVozEnabled,
@@ -97,7 +98,7 @@ function trySpeak(key: string): void {
   }
   recoverSpeechQueue();
 
-  queueMicrotask(() => {
+  setTimeout(() => {
     if (entry.spoken || !pending.has(key)) return;
     speakUbicacionQueue(
       entry.phrases,
@@ -108,7 +109,7 @@ function trySpeak(key: string): void {
       },
       key
     );
-  });
+  }, 0);
 }
 
 /** Hub global — visibility centralizado en voiceLifecycle; pointerdown en VoiceBootstrap. */
@@ -177,6 +178,18 @@ export function speakDesglosadorVoiceReliable(
   onSpoken?: () => void
 ): () => void {
   return speakUbicacionVoiceReliable(key, phrases, cancelPrevious, "desglosador", onSpoken);
+}
+
+/** Igual que speakDesglosadorVoiceReliable pero en macrotarea — no bloquea cierre de subs. */
+export function speakDesglosadorVoiceReliableDeferred(
+  key: string,
+  phrases: string[],
+  cancelPrevious: boolean,
+  onSpoken?: () => void
+): () => void {
+  return runConscienteVoiceDeferred(() =>
+    speakDesglosadorVoiceReliable(key, phrases, cancelPrevious, onSpoken)
+  );
 }
 
 export function speakSituacionVoiceReliable(
