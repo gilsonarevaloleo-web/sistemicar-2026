@@ -15,6 +15,7 @@ import {
   type UbicacionVoiceSource,
 } from "./speechQueue";
 import { runConscienteVoiceDeferred } from "./conscienteVoiceDeferred";
+import { isPostCallAudioShieldActive } from "./postCallAudioShield";
 import {
   isDesglosadorVoiceEnabled,
   isPuertaVozEnabled,
@@ -65,6 +66,10 @@ function abandonVoicePending(key: string): void {
 function trySpeak(key: string): void {
   const entry = pending.get(key);
   if (!entry || entry.spoken || !isVoiceEnabledFor(entry.source)) return;
+
+  if (isPostCallAudioShieldActive()) {
+    return;
+  }
 
   if (!isSpeechSynthesisUnlocked()) {
     return;

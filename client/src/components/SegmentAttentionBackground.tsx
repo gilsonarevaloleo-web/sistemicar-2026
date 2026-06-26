@@ -32,6 +32,7 @@ import { registerNotificationStateProvider } from "@/lib/notificationState";
 import { dispatchConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
+import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -114,6 +115,7 @@ export function SegmentAttentionBackground() {
     });
 
     const runTick = async (opts?: { force?: boolean }) => {
+      if (isInterModuleSyncBlocked()) return;
       if (!hasAccessRef.current || tickingRef.current) return;
       const planilla = planillaRef.current;
       if (!planilla) return;

@@ -5,6 +5,9 @@ import {
   endJornadaRemount,
   getIsRemountingJornada,
   isJornadaHeavyComputeAllowed,
+  isJornadaViewMounting,
+  beginJornadaViewMount,
+  endJornadaViewMount,
   resetJornadaRemountForTests,
   shouldDeferJornadaVoice,
 } from "./jornadaRemount.ts";
@@ -22,5 +25,12 @@ describe("jornadaRemount", () => {
     endJornadaRemount();
     assert.equal(getIsRemountingJornada(), false);
     assert.equal(isJornadaHeavyComputeAllowed(), false);
+  });
+
+  it("suspende sync cruzada durante los primeros 400ms de montaje", () => {
+    beginJornadaViewMount();
+    assert.equal(isJornadaViewMounting(), true);
+    endJornadaViewMount();
+    assert.equal(isJornadaViewMounting(), false);
   });
 });

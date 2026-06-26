@@ -211,6 +211,10 @@ import {
   rutaSeguimientoPickerCanConfirm,
 } from "@/components/RutaSeguimientoPicker";
 import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue, subscribeSpeechQueueIdle, beginJornadaRemount, endJornadaRemount, pauseVoice, resumeVoice, cancelJornadaRemountGuard } from "@/lib/speechQueue";
+import { beginJornadaViewMount, endJornadaViewMount } from "@/lib/jornadaRemount";
+import { isInterModuleSyncBlocked, onViewTransitionShieldReleased } from "@/lib/viewTransitionShield";
+import { consumeJornadaVehicleIntent } from "@/lib/jornadaVehicleIntent";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
 import { pausePuntoCeroStepVoiceForRemount, resumeStepVoiceAfterRemount } from "@/lib/puntoCeroStepVoice";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
@@ -515,7 +519,7 @@ import {
   getFlotaVehicles,
 } from "@/flota/flotaStore";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
-import { useFlotaStore } from "@/hooks/useFlotaStore";
+import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
 import {
   beginLocalVehicleMutation,
@@ -750,7 +754,11 @@ const MONITOR_STATES = {
 export default function Planeacion() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
-  const { vehicles, setVehicles } = useFlotaStore(user?.uid);
+  const { vehicles, setVehicles } = {
+    vehicles: useFlotaVehiclesShallow(user?.uid),
+    setVehicles: useFlotaMutator(),
+  };
+  useViewTransitionShield();
   useEffect(() => {
     try {
       repairStuckSituacionVehicles();
@@ -771,6 +779,7 @@ export default function Planeacion() {
     plantillaSubTareas?: string[];
   } | null>(null);
   const proyectoLaunchHandledRef = useRef(false);
+  const isViewMountingRef = useRef(true);
   const [isCreating, setIsCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const flotaActivosRef = useRef<HTMLDivElement | null>(null);
@@ -1603,6 +1612,11 @@ export default function Planeacion() {
 
   /** Montaje del chunk — warmup TTS sin cancelar cola (remount con pauseVoice solo al volver de background). */
   useEffect(() => {
+    isViewMountingRef.current = true;
+    beginJornadaViewMount();
+    const mountGuardTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
+      isViewMountingRef.current = false;
+    }, 400);
     setJornadaBooting(true);
     warmupSpeechSynthesis();
     recoverSpeechQueue();
@@ -1615,6 +1629,9 @@ export default function Planeacion() {
       timeoutId = window.setTimeout(finishBoot, 300);
     }
     return () => {
+      window.clearTimeout(mountGuardTimer);
+      isViewMountingRef.current = false;
+      endJornadaViewMount();
       cancelJornadaRemountGuard();
       if (idleId !== undefined && typeof cancelIdleCallback !== "undefined") {
         cancelIdleCallback(idleId);
@@ -2588,6 +2605,18 @@ export default function Planeacion() {
   };
 
   useEffect(() => {
+    const processVehicleIntent = () => {
+      if (!user || isInterModuleSyncBlocked()) return;
+      const intent = consumeJornadaVehicleIntent();
+      if (!intent) return;
+      void addVehicle(user.uid, intent.payload);
+    };
+    processVehicleIntent();
+    return onViewTransitionShieldReleased(processVehicleIntent);
+  }, [user]);
+
+  useEffect(() => {
+    if (isInterModuleSyncBlocked() || isViewMountingRef.current) return;
     if (!user || !nuevoSegProyectoId) {
       setNuevoSegRutas(null);
       return;
@@ -2595,6 +2624,7 @@ export default function Planeacion() {
     const proy = proyectosHub.find(p => p.id === nuevoSegProyectoId);
     if (!proy) return;
     void getPeldanosByProyecto(user.uid, nuevoSegProyectoId).then(peldanos => {
+      if (isInterModuleSyncBlocked() || isViewMountingRef.current) return;
       const claridad = resolveClaridadParaProyecto(proy, peldanos, nuevoSegNombre.trim() || undefined);
       if (claridad) setNuevoSegRutas(claridad);
     });

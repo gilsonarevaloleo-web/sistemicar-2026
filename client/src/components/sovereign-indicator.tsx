@@ -1,9 +1,9 @@
 import { Database, CloudOff, WifiOff } from "lucide-react";
-import { useSovereignMode } from "@/lib/sovereign-mode";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSovereignModeShallow } from "@/hooks/useModularStoreSelectors";
 
 export function SovereignIndicator() {
-  const { isOfflineMode, errorMsg } = useSovereignMode();
+  const { isOfflineMode, errorMsg } = useSovereignModeShallow();
 
   return (
     <AnimatePresence>

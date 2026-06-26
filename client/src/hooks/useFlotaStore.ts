@@ -1,43 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
 import type { Vehicle } from "@/lib/persistence";
 import {
-  acquireFlotaStore,
-  getFlotaVehicles,
-  setFlotaVehicles,
-  subscribeFlotaStore,
-} from "@/flota/flotaStore";
+  useFlotaMutator,
+  useFlotaVehiclesShallow,
+} from "@/hooks/useModularStoreSelectors";
 
 /**
- * Suscripción React a la fuente de verdad de flota.
- * `setVehicles` actualiza el store (y todos los consumidores).
+ * @deprecated Usar useFlotaVehiclesShallow + useFlotaMutator (selectores aislados).
+ * Suscripción React a la fuente de verdad de flota con comparación por firma.
  */
 export function useFlotaStore(userId: string | undefined): {
   vehicles: Vehicle[];
   setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void;
 } {
-  const [vehicles, setVehiclesState] = useState<Vehicle[]>(() => getFlotaVehicles());
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const release = acquireFlotaStore(userId);
-    const unsub = subscribeFlotaStore(() => {
-      setVehiclesState(getFlotaVehicles());
-    });
-    setVehiclesState(getFlotaVehicles());
-
-    return () => {
-      unsub();
-      release();
-    };
-  }, [userId]);
-
-  const setVehicles = useCallback(
-    (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => {
-      setFlotaVehicles(update);
-    },
-    []
-  );
-
+  const vehicles = useFlotaVehiclesShallow(userId);
+  const setVehicles = useFlotaMutator();
   return { vehicles, setVehicles };
 }
+
+export { useFlotaVehiclesShallow, useFlotaMutator, useJornadaActiveVehicleIds } from "@/hooks/useModularStoreSelectors";

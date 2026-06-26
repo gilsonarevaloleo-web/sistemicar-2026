@@ -67,6 +67,7 @@ import {
   isStructuralCloseInTransit,
 } from "@/lib/localMutationLock";
 import { flushFlotaDeferredMergeIfReady } from "@/flota/flotaStore";
+import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
 import { resetVoicePlaybackCache } from "@/lib/voicePlaybackCacheReset";
 
 // ESPECTRO CROMÁTICO DE CONCIENCIA
@@ -195,6 +196,7 @@ export default function MenuPrincipal() {
   /** Home sin UI de cierre/desglosador: cualquier candado activo aquí es huérfano. */
   useEffect(() => {
     resetVoicePlaybackCache();
+    if (isInterModuleSyncBlocked()) return;
     if (isLocalVehicleMutationLocked() || isStructuralCloseInTransit()) {
       forceResetOrphanMutationLocks();
       flushFlotaDeferredMergeIfReady();

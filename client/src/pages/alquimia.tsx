@@ -34,6 +34,8 @@ import {
 } from "@/lib/persistence";
 import { cn } from "@/lib/utils";
 import { ManualTriggerButton, MasterManualDrawer } from "@/components/master-manual-drawer";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
+import { useJornadaActiveVehicleIds } from "@/hooks/useModularStoreSelectors";
 
 const GOLD = "#D4AF37";
 const VIOLET = "#7C3AED";
@@ -246,6 +248,8 @@ function WisdomCard({ entry, showUser = false }: { entry: AlquimiaEntry; showUse
 
 export default function Alquimia() {
   const { user } = useAuthContext();
+  useViewTransitionShield();
+  useJornadaActiveVehicleIds(user?.uid);
   const [formData, setFormData] = useState<FormData>({
     observacion: "",
     crisis: "",

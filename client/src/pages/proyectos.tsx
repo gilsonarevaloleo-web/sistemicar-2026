@@ -50,6 +50,7 @@ import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnume
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { forceResetOrphanMutationLocks } from "@/lib/localMutationLock";
 import { flushFlotaDeferredMergeIfReady } from "@/flota/flotaStore";
+import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -169,6 +170,7 @@ export default function ProyectosPage() {
     });
     return () => {
       unsub();
+      if (isInterModuleSyncBlocked()) return;
       forceResetOrphanMutationLocks();
       flushFlotaDeferredMergeIfReady();
     };
@@ -177,6 +179,7 @@ export default function ProyectosPage() {
   /** Al salir del módulo: libera candados huérfanos aunque el cleanup del subscribe no corra. */
   useEffect(() => {
     return () => {
+      if (isInterModuleSyncBlocked()) return;
       forceResetOrphanMutationLocks();
       flushFlotaDeferredMergeIfReady();
     };

@@ -34,6 +34,8 @@ import {
   awardSovereigntyPoints
 } from "@/lib/persistence";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
+import { useJornadaActiveVehicleIds } from "@/hooks/useModularStoreSelectors";
 
 const GRAY = "#6B7280";
 const GOLD = "#D4AF37";
@@ -377,6 +379,8 @@ function getAvatarCapsuleProgress(avatar: AliadoEntry): { [capsuleId: string]: n
 
 export default function Umbral() {
   const { user } = useAuthContext();
+  useViewTransitionShield();
+  useJornadaActiveVehicleIds(user?.uid);
   const [phase, setPhase] = useState<Phase>("gallery");
   const [formData, setFormData] = useState<FormData>({
     shadow: { identidad: "", lenguaje: "", accion: "", tiempo: "" },

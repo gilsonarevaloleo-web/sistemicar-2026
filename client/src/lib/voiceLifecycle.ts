@@ -2,6 +2,11 @@
  * Coordinador único de ciclo de vida TTS — visibility / focus / pageshow.
  */
 import { getIsRemountingJornada } from "./jornadaRemount";
+import {
+  armPostCallAudioShield,
+  isPostCallAudioShieldActive,
+  POST_CALL_AUDIO_SHIELD_MS,
+} from "./postCallAudioShield";
 import { logVoiceEvent, recoverSpeechQueue, warmupSpeechSynthesis } from "./speechQueue";
 import { retryAllPendingUbicacionVoice } from "./ubicacionVoiceReliable";
 
@@ -31,13 +36,13 @@ function runVisibleRecovery(): void {
   recoverSpeechQueue();
   retryAllPendingUbicacionVoice();
   const ctx: VoiceVisibleContext = { hiddenDurationMs };
-  for (const fn of visibleHandlers) {
+  visibleHandlers.forEach(fn => {
     try {
       fn(ctx);
     } catch {
       /* noop */
     }
-  }
+  });
 }
 
 /** Un solo hub — registrar desde VoiceBootstrap (App.tsx). */
@@ -51,11 +56,19 @@ export function installVoiceLifecycleHub(): () => void {
       logVoiceEvent("hidden");
       return;
     }
-    runVisibleRecovery();
+    // Post-llamada / retorno de background: escudo 1500 ms antes de tocar hardware TTS.
+    armPostCallAudioShield();
+    logVoiceEvent("visible-shield-armed", { delayMs: POST_CALL_AUDIO_SHIELD_MS });
+    window.setTimeout(() => {
+      if (document.visibilityState === "visible") {
+        runVisibleRecovery();
+      }
+    }, POST_CALL_AUDIO_SHIELD_MS);
   };
 
   const onFocusLike = () => {
     if (document.visibilityState === "hidden") return;
+    if (isPostCallAudioShieldActive()) return;
     runVisibleRecovery();
   };
 

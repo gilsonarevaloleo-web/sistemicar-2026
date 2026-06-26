@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
-import { getProyectos, subscribeToProyectos, type Proyecto } from "@/lib/proyectos";
+import { subscribeToProyectos } from "@/lib/proyectos";
+import { syncJornadaProyectosFromRemote } from "@/lib/jornadaProyectosStore";
+import {
+  useJornadaProyectoIds,
+  useJornadaProyectosHub,
+} from "@/hooks/useModularStoreSelectors";
+import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
 import {
   ordenFlotaParaSegmento,
   resolverProyectoIdVehiculo,
@@ -13,13 +19,15 @@ export function useSegmentoProyectoVinculo(
   userId: string | undefined,
   segmentoActivo: SegmentoV5 | null
 ) {
-  const [proyectosHub, setProyectosHub] = useState<Proyecto[]>([]);
+  const proyectosHub = useJornadaProyectosHub();
+  const proyectoIds = useJornadaProyectoIds();
 
   useEffect(() => {
     if (!userId) return;
-    void getProyectos(userId).then(setProyectosHub);
+    void syncJornadaProyectosFromRemote(userId, { force: true });
     return subscribeToProyectos(userId, () => {
-      void getProyectos(userId).then(setProyectosHub);
+      if (isInterModuleSyncBlocked()) return;
+      void syncJornadaProyectosFromRemote(userId);
     });
   }, [userId]);
 
@@ -31,7 +39,7 @@ export function useSegmentoProyectoVinculo(
   const proyectoVinculadoActivo = useMemo(() => {
     const id = segmentoActivo?.proyectoVinculadoId;
     if (!id) return null;
-    return proyectosHub.find((p) => p.id === id) ?? null;
+    return proyectosHub.find(p => p.id === id) ?? null;
   }, [segmentoActivo?.proyectoVinculadoId, proyectosHub]);
 
   const priorizaDescanso = useMemo(
@@ -55,6 +63,7 @@ export function useSegmentoProyectoVinculo(
 
   return {
     proyectosHub,
+    proyectoIds,
     flotaOrden,
     proyectoVinculadoActivo,
     priorizaDescanso,

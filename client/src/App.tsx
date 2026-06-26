@@ -63,6 +63,7 @@ import ApiDocs from "@/pages/api-docs";
 import NotFound from "@/pages/not-found";
 import { CierreJornadaModal } from "@/components/cierre-jornada-modal";
 import { SegmentAttentionBackground } from "@/components/SegmentAttentionBackground";
+import { ViewTransitionBootstrap } from "@/components/ViewTransitionBootstrap";
 import { CentinelaEngine } from "@/components/centinela-engine";
 import { useSovereigntyToast } from "@/components/sovereignty-toast";
 import { DoctorIAChat } from "@/components/doctor-ia-chat";
@@ -294,6 +295,7 @@ function ArquitectoRoute({ component: Component }: { component: React.ComponentT
 function Router() {
   return (
     <Layout>
+      <ViewTransitionBootstrap />
       <SellerRefCapture />
       <Switch>
         <Route path="/menu">

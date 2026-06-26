@@ -16,6 +16,11 @@ import {
 import {
   getIsRemountingJornada,
 } from "./jornadaRemount";
+import {
+  isPostCallAudioShieldActive,
+  msUntilPostCallAudioAllowed,
+  onPostCallAudioShieldReleased,
+} from "./postCallAudioShield";
 
 const VOICE_LOG = "[Voice]";
 
@@ -66,6 +71,26 @@ const idleListeners = new Set<() => void>();
 const externalCancelListeners = new Set<() => void>();
 let lastQueuedPhrase = "";
 let lastQueuedAtMs = 0;
+let postCallShieldResumeInstalled = false;
+
+function ensurePostCallShieldResumeBridge(): void {
+  if (postCallShieldResumeInstalled || typeof window === "undefined") return;
+  postCallShieldResumeInstalled = true;
+  onPostCallAudioShieldReleased(() => {
+    if (voiceEngine.queueLength() > 0 && !voiceEngine.isSpeaking()) {
+      voiceEngine.processQueue();
+    }
+  });
+}
+
+ensurePostCallShieldResumeBridge();
+
+function deferUntilPostCallAudioAllowed(fn: () => void): boolean {
+  if (!isPostCallAudioShieldActive()) return false;
+  const delay = msUntilPostCallAudioAllowed();
+  window.setTimeout(fn, delay);
+  return true;
+}
 
 const PHRASE_ENQUEUE_DEDUP_MS = 90_000;
 const STUCK_SPEAK_MS = 45_000;
@@ -332,6 +357,11 @@ class VoiceEngine {
     this.unblockStuckSpeechSynth();
     if (this.speaking || this.pauseTimer || this.queue.length === 0) return;
 
+    if (isPostCallAudioShieldActive()) {
+      deferUntilPostCallAudioAllowed(() => this.processQueue());
+      return;
+    }
+
     const synth = getSynth();
     if (!synth) {
       this.queue = [];
@@ -571,6 +601,14 @@ function speakUtterance(
   const synth = getSynth();
   if (!synth || !text.trim()) return false;
 
+  if (isPostCallAudioShieldActive()) {
+    const delay = msUntilPostCallAudioAllowed();
+    window.setTimeout(() => {
+      speakUtterance(text, handlers, configure, options);
+    }, delay);
+    return true;
+  }
+
   resumeSynthIfPaused();
 
   try {
@@ -676,6 +714,12 @@ export function cancelSpeechSynthesisHard(revokeUnlock = false): void {
 export function unlockSpeechSynthesis(fromUserGesture = false): void {
   const synth = getSynth();
   if (!synth) return;
+
+  if (!fromUserGesture && isPostCallAudioShieldActive()) {
+    deferUntilPostCallAudioAllowed(() => unlockSpeechSynthesis(false));
+    return;
+  }
+
   primeVoicesOnce();
   resumeSynthIfPaused();
   lastWarmupMs = Date.now();
@@ -718,6 +762,10 @@ export function unlockSpeechSynthesis(fromUserGesture = false): void {
 export function warmupSpeechSynthesis(force = false, fromUserGesture = false): void {
   if (fromUserGesture) {
     unlockSpeechSynthesis(true);
+    return;
+  }
+  if (isPostCallAudioShieldActive()) {
+    deferUntilPostCallAudioAllowed(() => warmupSpeechSynthesis(force, false));
     return;
   }
   const synth = getSynth();

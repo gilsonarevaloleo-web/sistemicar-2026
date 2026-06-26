@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import {
   BookOpen,
   Terminal,
@@ -31,6 +31,7 @@ import { subscribeToProgression, UserProgression } from "@/lib/persistence";
 import { isOwner } from "@/lib/owner";
 import { getUserEmail } from "@/lib/firebase";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 
 type NavItem = { path: string; icon: React.ElementType; label: string };
 
@@ -56,7 +57,7 @@ function MobileNavSection({
         {items.map((item) => {
           const isActive = location === item.path;
           return (
-            <Link key={item.path} href={item.path} onClick={onNavigate}>
+            <NavTransitionLink key={item.path} href={item.path} onClick={onNavigate}>
               <div className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-white/5">
                 <item.icon
                   size={22}
@@ -71,7 +72,7 @@ function MobileNavSection({
                   {item.label}
                 </span>
               </div>
-            </Link>
+            </NavTransitionLink>
           );
         })}
       </div>
@@ -157,7 +158,7 @@ export function Sidebar() {
           {navItems.map((item) => {
             const isActive = location === item.path;
             return (
-              <Link key={`${item.path}-${item.label}`} href={item.path}>
+              <NavTransitionLink key={`${item.path}-${item.label}`} href={item.path}>
                 <div className="relative group flex justify-center w-full cursor-pointer" title={item.label}>
                   <div
                     className={cn(
@@ -177,7 +178,7 @@ export function Sidebar() {
                     />
                   )}
                 </div>
-              </Link>
+              </NavTransitionLink>
             );
           })}
         </div>
@@ -189,7 +190,7 @@ export function Sidebar() {
               {adminItems.map((item) => {
                 const isActive = location === item.path;
                 return (
-                  <Link key={item.path} href={item.path}>
+                  <NavTransitionLink key={item.path} href={item.path}>
                     <div className="relative group flex justify-center w-full cursor-pointer">
                       <div
                         className={cn(
@@ -203,7 +204,7 @@ export function Sidebar() {
                         <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                       </div>
                     </div>
-                  </Link>
+                  </NavTransitionLink>
                 );
               })}
             </>
@@ -306,7 +307,7 @@ export function Sidebar() {
           return mobileItems.map((item) => {
             const isActive = location === item.path;
             return (
-              <Link key={item.path} href={item.path}>
+              <NavTransitionLink key={item.path} href={item.path}>
                 <div className="relative flex flex-col items-center justify-center cursor-pointer p-2">
                   <div
                     className={cn(
@@ -328,7 +329,7 @@ export function Sidebar() {
                     )}
                   </div>
                 </div>
-              </Link>
+              </NavTransitionLink>
             );
           });
         })()}

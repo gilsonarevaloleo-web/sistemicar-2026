@@ -4,12 +4,35 @@
  */
 
 const JORNADA_HEAVY_DEFER_MS = 1500;
+const JORNADA_VIEW_MOUNT_GUARD_MS = 400;
 
 let isRemountingJornada = false;
 let heavyComputeAllowedAfterMs = 0;
+let isViewMounting = false;
+let viewMountGuardTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function getIsRemountingJornada(): boolean {
   return isRemountingJornada;
+}
+
+/** Primeros 400 ms del montaje de Jornada — ignora sync cruzada con Proyectos. */
+export function isJornadaViewMounting(): boolean {
+  return isViewMounting;
+}
+
+export function beginJornadaViewMount(): void {
+  isViewMounting = true;
+  if (viewMountGuardTimer) clearTimeout(viewMountGuardTimer);
+  viewMountGuardTimer = setTimeout(() => {
+    viewMountGuardTimer = null;
+    isViewMounting = false;
+  }, JORNADA_VIEW_MOUNT_GUARD_MS);
+}
+
+export function endJornadaViewMount(): void {
+  if (viewMountGuardTimer) clearTimeout(viewMountGuardTimer);
+  viewMountGuardTimer = null;
+  isViewMounting = false;
 }
 
 export function isJornadaHeavyComputeAllowed(): boolean {
@@ -56,6 +79,7 @@ export function cancelJornadaRemountGuard(): void {
 export function resetJornadaRemountForTests(): void {
   isRemountingJornada = false;
   heavyComputeAllowedAfterMs = 0;
+  endJornadaViewMount();
 }
 
 /** @deprecated Siempre 0 — cola de voz eliminada. */

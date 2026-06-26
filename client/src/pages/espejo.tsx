@@ -59,7 +59,6 @@ import {
   detectarBucleSabotaje,
   getBloqueoEje3,
   getMuroFirmado,
-  addVehicle,
   subscribeToPacientes,
   updatePaciente,
   type BloqueoEje3,
@@ -67,6 +66,10 @@ import {
   type Paciente
 } from "@/lib/persistence";
 import { scheduleEspejoFollowup, requestNotificationPermission } from "@/lib/notifications";
+import { enqueueJornadaVehicleIntent } from "@/lib/jornadaVehicleIntent";
+import { beginViewTransition } from "@/lib/viewTransitionShield";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
+import { useJornadaActiveVehicleIds } from "@/hooks/useModularStoreSelectors";
 import { getUserEmail } from "@/lib/firebase";
 import { isOwner } from "@/lib/owner";
 import { registrarEvento, COMPONENTES } from "@/lib/evento-universal";
@@ -315,6 +318,8 @@ interface SesionEspejo {
 export default function Espejo() {
   const { user, login } = useAuthContext();
   const [, navigate] = useLocation();
+  useViewTransitionShield();
+  useJornadaActiveVehicleIds(user?.uid);
   const [phase, setPhase] = useState<"landing" | "preparacion" | "arquitecto" | "historial" | "mapa">("landing");
   const [showPaywall, setShowPaywall] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -1368,7 +1373,10 @@ export default function Espejo() {
     setProtocolo5DiasLoading(true);
     try {
       const codigoDiag = lastDiagCode || "Protocolo Espejo";
-      await addVehicle(user.uid, {
+      enqueueJornadaVehicleIntent({
+        kind: "create",
+        sourceModule: "espejo",
+        payload: {
         titulo: `[Espejo] Protocolo 5 Días — ${codigoDiag}`,
         criterioFin: "circunstancia",
         criterioDetalle: `${codigoDiag} — Completar todos los días del protocolo clínico`,
@@ -1390,13 +1398,17 @@ export default function Espejo() {
           aperturaAt: idx === 0 ? Date.now() : undefined,
           cantidadObjetivo: 1,
         })),
+        },
       });
       setProtocolo5DiasActivado(true);
       setShow5DayModal(false);
       toast.success("Protocolo de 5 Días activado — revisa Planificación.", {
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => navigate("/planeacion"), 1200);
+      setTimeout(() => {
+        beginViewTransition();
+        navigate("/planeacion");
+      }, 1200);
     } catch {
       toast.error("Error al activar el protocolo. Intenta de nuevo.");
     } finally {
@@ -1411,7 +1423,10 @@ export default function Espejo() {
       const habitoText = (calibracionDoctorText || mapaVoltaje?.recomendacion || "Protocolo de calibración activo").substring(0, 80);
       const codigoDiag = mapaVoltaje?.codigo_diagnostico || lastDiagCode || "Protocolo Espejo";
       const doctorNota = calibracionDoctorText ? calibracionDoctorText.substring(0, 200) : (mapaVoltaje?.recomendacion || "");
-      await addVehicle(user.uid, {
+      enqueueJornadaVehicleIntent({
+        kind: "create",
+        sourceModule: "espejo",
+        payload: {
         titulo: `[Espejo] ${habitoText}`,
         criterioFin: "circunstancia",
         criterioDetalle: `${codigoDiag} — ${doctorNota}`,
@@ -1425,6 +1440,7 @@ export default function Espejo() {
         tipoTerminoRapido: "situacion",
         tipoFlota: "situacion",
         aperturaAt: Date.now(),
+        },
       });
       await requestNotificationPermission();
       scheduleEspejoFollowup(habitoText);
@@ -1432,7 +1448,10 @@ export default function Espejo() {
       toast.success("Seguimiento activado — revisa Planificación.", {
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => navigate("/planeacion"), 1200);
+      setTimeout(() => {
+        beginViewTransition();
+        navigate("/planeacion");
+      }, 1200);
     } catch {
       toast.error("Error al activar seguimiento. Intenta de nuevo.");
     } finally {
