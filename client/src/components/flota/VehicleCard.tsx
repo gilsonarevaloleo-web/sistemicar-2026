@@ -642,7 +642,6 @@ function VehicleCard({
   const [subTimerIsCountdown, setSubTimerIsCountdown] = useState(false);
   const [subTimerExpired, setSubTimerExpired] = useState(false);
   const [desglosadorSummary, setDesglosadorSummary] = useState(false);
-  const [desglosadorCloseSubmitting, setDesglosadorCloseSubmitting] = useState(false);
   const subtasksExpandedStorageKey = `sistemicar_subtasks_expanded_${vehicle.id}`;
   const [subTasksCollapsed, setSubTasksCollapsed] = useState(() => {
     if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) return false;
@@ -681,6 +680,14 @@ function VehicleCard({
   const [ultimoCierreSub, setUltimoCierreSub] = useState<UltimoCierreSub | null>(null);
   const [futuroSubLabel, setFuturoSubLabel] = useState<string>("—");
   const [futuroCicloLabel, setFuturoCicloLabel] = useState<string>("—");
+
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const prevRemainingRef = useRef<number | null>(null);
   const prevSubRestanteRef = useRef<number | null>(null);
@@ -1338,27 +1345,16 @@ function VehicleCard({
 
   useEffect(() => {
     if (vehicle.status !== "activo") {
-      setDesglosadorCloseSubmitting(false);
+      if (!mountedRef.current) return;
+      setDesglosadorSummary(false);
     }
   }, [vehicle.status, vehicle.id]);
 
   useEffect(() => {
-    if (!expanded) setDesglosadorCloseSubmitting(false);
-  }, [expanded]);
-
-  const prevCierreEnergiaPendingRef = useRef<string | null>(null);
-  useEffect(() => {
-    const pendingId = cierreEnergiaPendingVehicleId ?? null;
-    if (
-      desglosadorCloseSubmitting &&
-      prevCierreEnergiaPendingRef.current === vehicle.id &&
-      pendingId !== vehicle.id &&
-      vehicle.status === "activo"
-    ) {
-      setDesglosadorCloseSubmitting(false);
+    if (!expanded && mountedRef.current) {
+      setDesglosadorSummary(false);
     }
-    prevCierreEnergiaPendingRef.current = pendingId;
-  }, [cierreEnergiaPendingVehicleId, desglosadorCloseSubmitting, vehicle.id, vehicle.status]);
+  }, [expanded]);
 
   useEffect(() => {
     if (vehicle.status === "activo") return;
@@ -1971,22 +1967,6 @@ function VehicleCard({
                 const fmtSec = (sec: number) => { const m = Math.floor(sec / 60); const s = sec % 60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; };
 
                 if (done) {
-                  if (desglosadorCloseSubmitting) {
-                    return (
-                      <div className="pt-3">
-                        <div
-                          className="p-4 rounded-xl border-2 space-y-2 text-center"
-                          style={{ backgroundColor: "rgba(212,175,55,0.05)", borderColor: "#D4AF37" }}
-                          data-testid={`desglosador-close-dispatching-${vehicle.id}`}
-                        >
-                          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#D4AF37" }}>
-                            Cerrando ciclo…
-                          </p>
-                          <p className="text-[8px] text-slate-500">Sellando PS y sincronizando jornada</p>
-                        </div>
-                      </div>
-                    );
-                  }
                   const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle);
                   const totalRealSec = subs.reduce((acc, s) => acc + (s.duracionFinal || 0), 0);
                   const totalSugeridoSec = subs.reduce((acc, s) => acc + (s.tiempoSugeridoSeg || 0), 0);
@@ -2138,24 +2118,21 @@ function VehicleCard({
                           </button>
                           <button
                             type="button"
-                            disabled={desglosadorCloseSubmitting}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (desglosadorCloseSubmitting) return;
-                              setDesglosadorCloseSubmitting(true);
+                              if (!mountedRef.current) return;
+                              setDesglosadorSummary(false);
                               if (onOpenCierreEnergia) {
                                 onOpenCierreEnergia({ kind: "desglosador", vehicleId: vehicle.id, subs });
-                              } else {
-                                void Promise.resolve(onDesglosadorGlobalClose?.(vehicle.id, subs)).finally(() => {
-                                  setDesglosadorCloseSubmitting(false);
-                                });
+                                return;
                               }
+                              onDesglosadorGlobalClose?.(vehicle.id, subs);
                             }}
-                            className="py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:pointer-events-none"
+                            className="py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
                             style={{ backgroundColor: "#D4AF37", color: "#000", boxShadow: "0 0 16px rgba(212,175,55,0.25)" }}
                             data-testid={`button-desglosador-global-close-${vehicle.id}`}
                           >
-                            {desglosadorCloseSubmitting ? "Cerrando…" : `Cerrar · +${totalPS} PS`}
+                            {`Cerrar · +${totalPS} PS`}
                           </button>
                         </div>
                       </div>

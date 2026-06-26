@@ -172,6 +172,11 @@ import {
   estimateDesglosadorSessionPs,
 } from "@/lib/desglosadorPointsAward";
 import {
+  applyDesglosadorCloseOptimistic,
+  isDesglosadorLiquidationInFlight,
+  scheduleGlobalCycleLiquidation,
+} from "@/lib/desglosadorCycleLiquidation";
+import {
   computeDesglosadorTiempoCloseSummary,
   fmtDesgloseSec,
   type DesglosadorTiempoCloseSummary,
@@ -3768,7 +3773,7 @@ export default function Planeacion() {
         subs.length > 0 &&
         subs.every(s => s.status === "cumplido" || s.status === "fallado");
       if (desglosadorListo) {
-        await handleDesglosadorGlobalClose(v.id, subs);
+        dispatchDesglosadorGlobalClose(v.id, subs);
       } else {
         await forceCloseVehicle(v.id, "archivado");
       }
@@ -4329,254 +4334,121 @@ export default function Planeacion() {
     });
   };
 
-  const handleDesglosadorGlobalClose = async (
+  const dispatchDesglosadorGlobalClose = useCallback((
     vehicleId: string,
     subs: SubVehiculo[],
     intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite",
     rutaDeclaradaGlobal?: RutaBandaId[]
   ) => {
     if (!user) return;
-    if (isCloseBlocked(vehicleId)) {
+    if (isCloseBlocked(vehicleId) || isDesglosadorLiquidationInFlight(vehicleId)) {
       toast.info("Cierre en curso…", { description: "Espera unos segundos y reintenta.", duration: 2500 });
       return;
     }
-    beginClose(vehicleId);
+
     const pendingSubSync = desglosadorSyncTimersRef.current.get(vehicleId);
     if (pendingSubSync) {
       clearTimeout(pendingSubSync);
       desglosadorSyncTimersRef.current.delete(vehicleId);
     }
-    const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) { endClose(vehicleId); return; }
-    if (vehicle.tipoFlota === "situacion") {
-      teardownSituacionSession(vehicleId);
-    }
-    const cierreAt = Date.now();
-    const aperturaAt = vehicle.aperturaAt || vehicle.createdAt?.getTime() || 0;
-    const duracionFinal = aperturaAt > 0 ? Math.round((cierreAt - aperturaAt) / 60000) : 0;
-    const cumplidos = subs.filter(s => s.status === "cumplido").length;
-    const fallados = subs.filter(s => s.status === "fallado").length;
-    const closedSubs = subs.filter(s => s.status === "cumplido" || s.status === "fallado");
-    const rutaCruzada = mergeRutaCruzadaFromSubs(subs);
-    const subsConRuta = subs.map(sv => {
-      if (!sv.rutaEnfoque?.activa || (sv.rutaDeclarada && sv.rutaDeclarada.length > 0)) return sv;
-      if (!rutaDeclaradaGlobal?.length) return sv;
-      return enrichSubRutaCierre(sv, rutaDeclaradaGlobal);
-    });
-    const psRuta = subsConRuta.reduce((sum, s) => sum + computeRutaPrivilegioPS(s), 0);
 
-    notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
-    sealVehicleSessionClose(vehicleId, {
-      cierreAt,
-      status: "cumplido",
-      clientRequestId: vehicle.clientRequestId,
-    });
+    setExpandedId(prev => (prev === vehicleId ? null : prev));
+    setCierreEnergiaPending(null);
+    setCierreEnergiaSeleccion(null);
+    releaseOperatorTapLocks();
 
-    // Si quedó una interrupción situacional abierta, archivarla al cerrar el ciclo del padre.
-    const childInterrupts = vehiclesRef.current.filter(
-      v =>
-        v.status === "activo" &&
-        !v.autoVerdad &&
-        v.vehiculoPadreDesglosadorId === vehicleId &&
-        !wasVehicleRecentlyClosed(v.id, v.clientRequestId)
-    );
-    if (childInterrupts.length > 0) {
-      const nowChild = Date.now();
-      for (const child of childInterrupts) {
-        notifyVehicleClosed(child.id, child.clientRequestId);
-        orphanInterruptSweepRef.current.add(child.id);
-      }
-      const archiveChild = (v: Vehicle): Vehicle =>
-        childInterrupts.some(c => c.id === v.id)
-          ? {
-              ...v,
-              status: "archivado",
-              cierreAt: nowChild,
-              duracionFinal: Math.max(1, Math.round((nowChild - (v.aperturaAt || nowChild)) / 60000)),
-              cierreManual: false,
-            }
-          : v;
-      setVehicles(prev => prev.map(archiveChild));
-      vehiclesRef.current = vehiclesRef.current.map(archiveChild);
-      for (const child of childInterrupts) {
-        void updateVehicle(user.uid, child.id, {
-          status: "archivado",
-          cierreAt: nowChild,
-          duracionFinal: Math.max(1, Math.round((nowChild - (child.aperturaAt || nowChild)) / 60000)),
-          cierreManual: false,
-        }).catch(e => console.warn("[desglosadorClose] interrupción:", child.id, e));
-        void updateVehicleStatus(user.uid, child.id, "archivado").catch(e =>
-          console.warn("[desglosadorClose] interrupción status:", child.id, e)
-        );
-      }
-    }
+    const vehicle = vehicleById(vehicleId);
+    if (!vehicle) return;
 
-    for (const sv of subs) {
-      if (sv.excluirDeHistorial) continue;
-      if (sv.status === "cumplido" && sv.cantidadLograda && sv.cantidadLograda > 0 && sv.duracionFinal && sv.duracionFinal > 0) {
-        const minPerUnit = (sv.duracionFinal / 60) / sv.cantidadLograda;
-        const tituloCompleto = `${vehicle.titulo} → ${sv.titulo}`;
-        saveVehicleHistory(tituloCompleto, minPerUnit, sv.duracionFinal / 60, "desglosador", user.uid, { status: "cumplido" });
-      }
-    }
-
-    if (closedSubs.length > 0) {
-      saveVehicleHistory(
-        vehicle.titulo,
-        0,
-        duracionFinal,
-        "desglosador_ciclo",
-        user.uid,
-        {
-          status: "cumplido",
-          cumplidos,
-          fallados,
-          totalSubs: subs.length,
-          subResumen: closedSubs.map(sv => ({
-            titulo: sv.titulo,
-            status: sv.status as "cumplido" | "fallado",
-            cantidadObjetivo: sv.cantidadObjetivo,
-            cantidadLograda: sv.cantidadLograda,
-            duracionMin: sv.duracionFinal != null ? Math.round(sv.duracionFinal / 60) : undefined,
-            rutaDeclarada: sv.rutaDeclarada,
-          })),
-        }
-      );
-    }
-
-    optimisticVehiclesRef.current = optimisticVehiclesRef.current.filter(v => v.id !== vehicleId);
-    const termoDecisionSnapshot = buildTermoDecisionSnapshot(
-      { ...vehicle, status: "cumplido", cierreAt, subVehiculos: subsConRuta },
-      getJournalDayStartMs(cierreAt)
-    );
-    for (const sv of subsConRuta) {
-      if (sv.status !== "cumplido") continue;
-      recordDecision(user.uid, {
-        key: decisionKeySubDesglosador(vehicleId, sv.id),
-        kind: "sub_desglosador",
-        vehicleId,
-        ts: sv.cierreAt ?? cierreAt,
-      });
-    }
-    const closePatch = {
-      status: "cumplido" as const,
-      cierreAt,
-      duracionFinal,
-      cierreManual: true,
-      subVehiculos: subsConRuta,
-      desglosadorBloqueDepthPsGranted: vehicle.desglosadorBloqueDepthPsGranted ?? 0,
-      termoDecisionSnapshot,
-      interrupcionActiva: false,
-      desglosadorPausa: undefined,
-      ...(intensidadEnergeticaFin ? { intensidadEnergeticaFin } : {}),
-      ...(rutaCruzada ? { rutaCruzada } : {}),
-    };
-    setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, ...closePatch } : v));
-    vehiclesRef.current = vehiclesRef.current.map(v => v.id === vehicleId ? { ...v, ...closePatch } : v);
-    persistVehiclesRef();
-    armEntropyGapOnConsciousClose({
+    const optimistic = applyDesglosadorCloseOptimistic({
+      userId: user.uid,
+      vehicleId,
+      vehicle,
+      subs,
+      intensidadEnergeticaFin,
+      rutaDeclaradaGlobal,
+      getAllVehicles: () => vehiclesRef.current,
+      patchAllVehicles: mapper => {
+        setVehicles(prev => mapper(prev));
+        vehiclesRef.current = mapper(vehiclesRef.current);
+      },
+      removeFromOptimisticRef: id => {
+        optimisticVehiclesRef.current = optimisticVehiclesRef.current.filter(v => v.id !== id);
+      },
+      persistVehicles: persistVehiclesRef,
       segmentos: planilla?.segmentos || [],
-      vehiculosAfterClose: vehiclesRef.current,
-      cierreAt,
+      onConquistaPulse: () => window.requestAnimationFrame(() => triggerConquistaPulse()),
+      teardownSituacion: teardownSituacionSession,
+      markOrphanInterrupt: id => orphanInterruptSweepRef.current.add(id),
     });
-    window.requestAnimationFrame(() => triggerConquistaPulse());
-    try {
-      await updateVehicle(user.uid, vehicleId, closePatch);
-      await updateVehicleStatus(user.uid, vehicleId, "cumplido");
-    } catch (persistErr) {
-      console.warn("[desglosadorGlobalClose] Persistencia anticipada:", persistErr);
-    }
 
-    const { grantedTotal: depthPsGranted, awardedNow: depthPsAwardedNow } =
-      await reconcileDesglosadorDepthPS(vehicleId, { silent: true });
-    if (depthPsGranted !== closePatch.desglosadorBloqueDepthPsGranted) {
-      const depthOnly = { desglosadorBloqueDepthPsGranted: depthPsGranted };
-      setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...depthOnly } : v)));
-      vehiclesRef.current = vehiclesRef.current.map(v =>
-        v.id === vehicleId ? { ...v, ...depthOnly } : v
-      );
-      persistVehiclesRef();
-    }
-    const closePatchFinal = { ...closePatch, desglosadorBloqueDepthPsGranted: depthPsGranted };
+    if (!optimistic) return;
 
-    try {
-      const latestSubs = vehiclesRef.current.find(v => v.id === vehicleId)?.subVehiculos ?? subsConRuta;
-      const subsPsBefore = sumDesglosadorSubsPsAlreadyGranted(latestSubs);
-      const spLogs = getLocalSPLog(user.uid);
-      const skipCycleClose = hasJournalSpSourcePrefix(
-        spLogs,
-        `Cierre ciclo desglosador [${vehicleId}]`
-      );
-      const { subs: subsSettled, subsPsAwarded, cycleClosePs } = await settleDesglosadorCyclePoints(
+    scheduleGlobalCycleLiquidation({
+        userId: user.uid,
         vehicleId,
-        vehicle.titulo,
-        latestSubs,
+        vehicleSnapshot: vehicle,
+        subsConRuta: optimistic.subsConRuta,
+        closePatch: optimistic.closePatch,
+        childInterrupts: optimistic.childInterrupts,
+        cierreAt: optimistic.cierreAt,
+        duracionFinal: optimistic.duracionFinal,
+        cumplidos: optimistic.cumplidos,
+        fallados: optimistic.fallados,
+        psRuta: optimistic.psRuta,
+        rutaCruzada: optimistic.rutaCruzada,
+        intensidadEnergeticaFin,
+        getVehicle: () => vehicleById(vehicleId),
+        patchVehicle: (id, patch) => {
+          setVehicles(prev => prev.map(v => (v.id === id ? { ...v, ...patch } : v)));
+          vehiclesRef.current = vehiclesRef.current.map(v => (v.id === id ? { ...v, ...patch } : v));
+        },
+        persistVehicles: persistVehiclesRef,
+        flushPersistVehicles: flushPersistVehiclesRef,
+        saveVehicleHistory,
+        getSpLogs: () => getLocalSPLog(user.uid),
         safeAwardPS,
-        { skipCycleClose }
-      );
-      const subsPsTotal = subsPsBefore + subsPsAwarded;
-      const sessionTotalPs = subsPsTotal + cycleClosePs + depthPsGranted;
-      const closeDeltaPs = subsPsAwarded + cycleClosePs + depthPsAwardedNow;
-      const psRutaInSubs = psRuta;
+        reconcileDepthPS: (id, opts) => reconcileDesglosadorDepthPS(id, opts),
+        beginClose: () => beginClose(vehicleId),
+        endClose: () => endClose(vehicleId),
+        onDailyPs: setDailyPS,
+        getDailyPsTotal: () => getDailyPointsLocalSync(user.uid).total,
+        markPeldano: (v, subsSettled, sessionTotalPs) => {
+          void markPeldanoConquistadoTiempo(user.uid, v, subsSettled, sessionTotalPs);
+        },
+        recordVehiculoCierre: (id, banda) => recordVehiculoCierre(id, banda),
+        incrementModulePoints: () => {
+          incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
+        },
+        registrarEvento: () => {
+          registrarEvento(COMPONENTES.PLANIFICACION);
+        },
+        onCelebration: openDesglosadorTiempoCelebration,
+        onToastSuccess: (message, description) => {
+          toast.success(message, {
+            description,
+            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+            duration: 3200,
+          });
+        },
+        onToastError: message => {
+          toast.error(message, {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+          });
+        },
+    });
+  }, [
+    user,
+    planilla?.segmentos,
+    safeAwardPS,
+    reconcileDesglosadorDepthPS,
+    recordVehiculoCierre,
+    openDesglosadorTiempoCelebration,
+    setVehicles,
+  ]);
 
-      setDailyPS(getDailyPointsLocalSync(user.uid).total);
-
-      await updateVehicle(user.uid, vehicleId, {
-        ...closePatchFinal,
-        subVehiculos: subsSettled,
-      });
-      await updateVehicleStatus(user.uid, vehicleId, "cumplido");
-      setVehicles(prev =>
-        prev.map(v => (v.id === vehicleId ? { ...v, ...closePatchFinal, subVehiculos: subsSettled } : v))
-      );
-      vehiclesRef.current = vehiclesRef.current.map(v =>
-        v.id === vehicleId ? { ...v, ...closePatchFinal, subVehiculos: subsSettled } : v
-      );
-      flushPersistVehiclesRef();
-
-      if (vehicle.proyectoId && vehicle.proyectoPeldanoId) {
-        void markPeldanoConquistadoTiempo(
-          user.uid,
-          { ...vehicle, ...closePatchFinal, duracionFinal, subVehiculos: subsSettled, ...(rutaCruzada ? { rutaCruzada } : {}) },
-          subsSettled,
-          sessionTotalPs
-        );
-      }
-      if (intensidadEnergeticaFin) recordVehiculoCierre(vehicleId, intensidadEnergeticaFin);
-      incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
-      registrarEvento(COMPONENTES.PLANIFICACION);
-      setCierreEnergiaPending(null);
-      setCierreEnergiaSeleccion(null);
-      const closedVehicle: Vehicle = {
-        ...vehicle,
-        ...closePatchFinal,
-        subVehiculos: subsSettled,
-        desglosadorBloqueDepthPsGranted: depthPsGranted,
-      };
-      const celebrationSummary = computeDesglosadorTiempoCloseSummary(closedVehicle, subsSettled, {
-        duracionMin: duracionFinal,
-        psSubs: subsPsTotal,
-        psCierre: cycleClosePs,
-        psProfundidad: depthPsGranted,
-        psRuta: psRutaInSubs,
-        psTotal: sessionTotalPs,
-        psAwardedNow: closeDeltaPs,
-      });
-      openDesglosadorTiempoCelebration(vehicleId, vehicle.titulo, celebrationSummary);
-      if (closeDeltaPs > 0) {
-        toast.success(`+${closeDeltaPs} PS sumados a tu barra`, {
-          description: "Revisa el resumen del ciclo en pantalla.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
-          duration: 3200,
-        });
-      }
-    } catch (err) {
-      console.error("[desglosadorGlobalClose] Error:", err);
-      toast.error("Error al cerrar ciclo. El cierre local se conservó; reintenta si hace falta.");
-    } finally {
-      endClose(vehicleId);
-    }
-  };
+  /** @deprecated Usar dispatchDesglosadorGlobalClose — liquidación ya es asíncrona. */
+  const handleDesglosadorGlobalClose = dispatchDesglosadorGlobalClose;
 
   // ── RADIOGRAFÍA — generar reporte ──
   const handleGenerarRadiografia = async () => {
@@ -5110,7 +4982,7 @@ export default function Planeacion() {
     setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subVehiculos: subs } : v)));
     vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? { ...v, subVehiculos: subs } : v));
     saveLocalVehicles(vehiclesRef.current);
-    await handleDesglosadorGlobalClose(vehicleId, subs);
+    dispatchDesglosadorGlobalClose(vehicleId, subs);
   };
 
   const handleCerrarSituacionDesgloseBloque = useCallback(async (vehicleId: string) => {
@@ -9224,7 +9096,7 @@ export default function Planeacion() {
             const rutaDecl = showRuta && !cierreRutaSinUso ? Array.from(cierreRutaSeleccion) : [];
             if (p.kind === "flota") void handleFlotaStatusChange(p.vehicleId, p.status, sel);
             else if (p.kind === "investigador") void handleInvestigadorClose(p.vehicleId, p.cumplido, p.cantidadRealizada, sel);
-            else if (p.kind === "desglosador") void handleDesglosadorGlobalClose(p.vehicleId, p.subs, sel, rutaDecl);
+            else if (p.kind === "desglosador") dispatchDesglosadorGlobalClose(p.vehicleId, p.subs, sel, rutaDecl);
             else void handleDescansoClose(p.vehicleId, p.status, p.etiqueta, p.nota, sel);
             resetCierreModal();
           };
