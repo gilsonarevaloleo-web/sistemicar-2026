@@ -209,6 +209,7 @@ import {
   situacionDesgloseBloqueListo,
   playSituacionChimes,
   getHistoricalVehicleData,
+  vehicleClosedAtMs,
 } from "@/components/flota/vehicleCardShared";
 
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
@@ -282,6 +283,11 @@ export type UseDesglosadorManagerOptions = {
   onGoldenFlash?: () => void;
   onRecordBanner?: (banner: { mejora: number; titulo: string } | null) => void;
 };
+
+export type DesglosadorManagerReturn = ReturnType<typeof useDesglosadorManager>;
+export type DesglosadorManagerHandlers = DesglosadorManagerReturn["handlers"];
+export type DesglosadorManagerModales = DesglosadorManagerReturn["modales"];
+export type DesglosadorManagerVehicles = DesglosadorManagerReturn["vehicles"];
 
 export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const { user } = useAuthContext();
@@ -3871,6 +3877,51 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     [sortedOperativaActivos, panoramicaActivos, activeVehicles]
   );
 
+  const historialFlota = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartMs = todayStart.getTime();
+    const vehiculosHoy = completedVehicles
+      .filter(v => !v.autoVerdad && vehicleClosedAtMs(v) >= todayStartMs)
+      .sort((a, b) => vehicleClosedAtMs(a) - vehicleClosedAtMs(b));
+    const vehiculosAnteriores = completedVehicles
+      .filter(v => {
+        if (v.autoVerdad) return false;
+        const t = Math.max(v.createdAt?.getTime?.() || 0, v.aperturaAt || 0, v.cierreAt || 0);
+        return t > 0 && t < todayStartMs;
+      })
+      .sort((a, b) => {
+        const tA = Math.max(a.cierreAt || 0, a.aperturaAt || 0, a.createdAt?.getTime?.() || 0);
+        const tB = Math.max(b.cierreAt || 0, b.aperturaAt || 0, b.createdAt?.getTime?.() || 0);
+        return tB - tA;
+      });
+    const gruposPorFecha: Record<string, Vehicle[]> = {};
+    for (const v of vehiculosAnteriores) {
+      const ts = Math.max(v.cierreAt || 0, v.aperturaAt || 0, v.createdAt?.getTime?.() || 0);
+      const d = new Date(ts);
+      const key = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      if (!gruposPorFecha[key]) gruposPorFecha[key] = [];
+      gruposPorFecha[key].push(v);
+    }
+    return { vehiculosHoy, vehiculosAnteriores, gruposPorFecha };
+  }, [completedVehicles]);
+
+  const situacionRetoAtascado = useMemo(
+    () =>
+      activeVehicles.some(
+        v =>
+          v.tipoFlota === "situacion" &&
+          v.situacionCronometro?.activo === true &&
+          situacionDesgloseBloqueListo(v.subTareas || [], v.situacionCronometro)
+      ),
+    [activeVehicles]
+  );
+
+  const showEmergencyArchiveBanner = useMemo(
+    () => activeVehicles.length >= 5 || situacionRetoAtascado,
+    [activeVehicles.length, situacionRetoAtascado]
+  );
+
   useEffect(() => {
     registerDesglosadorDepthReconciler(reconcileDesglosadorDepthPS);
     return () => registerDesglosadorDepthReconciler(null);
@@ -4040,6 +4091,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       flotaActivos,
       active: activeVehicles,
       completed: completedVehicles,
+      historialHoy: historialFlota.vehiculosHoy,
+      historialAnteriores: historialFlota.vehiculosAnteriores,
+      historialGrupos: historialFlota.gruposPorFecha,
       setVehicles,
     },
     modales: {
@@ -4069,6 +4123,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       reservaActivas,
       rehydrateFlotaFromLocalRef,
       checkPuertaAtencionRef,
+      situacionRetoAtascado,
+      showEmergencyArchiveBanner,
     },
     handlers,
   };

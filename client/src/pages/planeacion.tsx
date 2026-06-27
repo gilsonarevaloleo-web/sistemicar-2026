@@ -468,6 +468,7 @@ import PlanificacionCockpit from "@/components/PlanificacionCockpit";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import PlaneacionMetricsEscalera from "@/components/planeacion/PlaneacionMetricsEscalera";
 import { MemoVehicleCard } from "@/components/flota/VehicleCard";
+import { FlotaActivaVehicleCards } from "@/components/flota/FlotaActivaVehicleCards";
 import {
   aplicarProyectoHeredadoASub,
   devolverRingPendientesAlIman,
@@ -912,7 +913,9 @@ export default function Planeacion() {
     deferred: deferredVehicles,
     flotaActivos: flotaActivosRenderList,
     active: activeVehicles,
-    completed: completedVehicles,
+    historialHoy: vehiculosHoy,
+    historialAnteriores: vehiculosAnteriores,
+    historialGrupos: gruposPorFechaHistorial,
     setVehicles,
   } = vehicleState;
   const {
@@ -940,64 +943,25 @@ export default function Planeacion() {
     reservaActivas,
     rehydrateFlotaFromLocalRef,
     checkPuertaAtencionRef,
+    situacionRetoAtascado,
+    showEmergencyArchiveBanner,
   } = modales;
   const {
     handleVehicleToggle,
-    handleVehicleComplete,
-    handleVehicleArchive,
-    handleOpenCierreEnergiaStable,
-    handleVerSituacionBloquePsStable,
-    handleAddSubTarea,
-    handleAddSubTareaUrgenteACola,
-    handleToggleSubTarea,
-    handleSetSubTareaMinutosCupo,
-    handleExtendSituacionCupo,
-    handleSyncSituacionCupoAnchor,
-    handleMoveSubTareasToCronometro,
-    handleSituacionCronometroSetHoraFin,
-    handleSituacionCronometroCumplido,
-    handleSituacionCronometroFallado,
-    handleSituacionCronometroReservar,
-    handleQuitarSituacionCupo,
-    handleCerrarSituacionDesgloseBloque,
-    handleCerrarSituacionDesglosadorDeGolpe,
-    handleAddDetalle,
-    handleEntregarDetalle,
-    handleAddCasaItem,
-    handleToggleCasaItem,
-    handleInvestigadorClose,
-    handleDesglosadorUpdate,
-    handleDesglosadorGlobalClose,
-    handleDesglosadorCierreDeGolpe,
-    handleDesglosadorPausaInterrupcion,
-    resumeDesglosadorTrasInterrupcion,
-    handleDesglosadorReorderSubs,
-    handleDesglosadorAddSub,
-    handleDesglosadorActivatePendingSub,
-    handleReorderSubTareasCronometro,
-    handleDescansoClose,
-    handleMicroPasoToggle,
-    handleEtapaPuntoCeroToggle,
-    handlePuntoCeroSessionUpdate,
-    handlePuntoCeroColorConfirm,
-    handlePuntoCeroAutoClose,
-    recordRutaBandCross,
-    recordBloqueCierre,
     handleFlotaStatusChange,
-    handleStatusChange,
+    handleInvestigadorClose,
+    handleDesglosadorGlobalClose,
+    handleDescansoClose,
     handleEmergencyArchiveStuckActives,
     scrollFlotaActivosIntoView,
     handleReservaTacticaQuickAdd,
     handleReservaRutaChange,
     handleReservaEliminar,
-    handleReservaAListaLibre,
-    handleReservaACronometro,
     handleEnviarReservaASituacion,
     handleEnviarReservasSeleccionadas,
     handleAbrirNidoEnSituacion,
     safeAwardPS,
     recordVehiculoInicio,
-    recordVehiculoCierre,
     applyCentinelaArchiveLocally,
     setupFlotaSubscription,
     optimisticVehiclesRef,
@@ -4533,15 +4497,7 @@ export default function Planeacion() {
               </div>
             </motion.div>
 
-            {(() => {
-              const situacionRetoAtascado = activeVehicles.some(
-                v =>
-                  v.tipoFlota === "situacion" &&
-                  v.situacionCronometro?.activo === true &&
-                  situacionDesgloseBloqueListo(v.subTareas || [], v.situacionCronometro)
-              );
-              if (activeVehicles.length < 5 && !situacionRetoAtascado) return null;
-              return (
+            {showEmergencyArchiveBanner && (
               <div
                 className="mb-3 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center gap-2"
                 style={{ backgroundColor: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.35)" }}
@@ -4565,14 +4521,20 @@ export default function Planeacion() {
                   Archivar atascados
                 </button>
               </div>
-              );
-            })()}
+            )}
             {activeVehicles.length > 0 ? (
               <div ref={flotaActivosRef} className="scroll-mt-4">
               <AccordionSection title="VEHÍCULOS ACTIVOS" icon={Zap} color={BLOOD} count={activeVehicles.length} defaultOpen>
-                {flotaActivosRenderList.map((v) => (
-                  <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} onOpenCierreEnergia={handleOpenCierreEnergiaStable} cierreEnergiaPendingVehicleId={cierreEnergiaPending?.vehicleId ?? null} onCompleteVehicle={handleVehicleComplete} onArchiveVehicle={handleVehicleArchive} segmentoNumero={segmentoNumero} planilla={planilla} onAddSubTarea={handleAddSubTarea} onAddSubTareaUrgenteACola={handleAddSubTareaUrgenteACola} onToggleSubTarea={handleToggleSubTarea} onSetSubTareaMinutosCupo={handleSetSubTareaMinutosCupo} onExtendSituacionCupo={handleExtendSituacionCupo} onSyncSituacionCupoAnchor={handleSyncSituacionCupoAnchor} onMoveSubTareasToCronometro={handleMoveSubTareasToCronometro} onSituacionCronometroSetHoraFin={handleSituacionCronometroSetHoraFin} onSituacionCronometroCumplido={handleSituacionCronometroCumplido} onSituacionCronometroFallado={handleSituacionCronometroFallado} onSituacionCronometroReservar={handleSituacionCronometroReservar} onQuitarSituacionCupo={handleQuitarSituacionCupo} onCerrarSituacionDesgloseBloque={handleCerrarSituacionDesgloseBloque} onCerrarSituacionDesglosadorDeGolpe={handleCerrarSituacionDesglosadorDeGolpe} situacionBloquePsTotal={situacionBloqueSummaries[v.id]?.psTotal} situacionDesgloseSummary={situacionBloqueSummaries[v.id]} onVerSituacionBloquePs={handleVerSituacionBloquePsStable} onAddDetalle={handleAddDetalle} onEntregarDetalle={handleEntregarDetalle} onAddCasaItem={handleAddCasaItem} onToggleCasaItem={handleToggleCasaItem} arquitectoUnlocked={soberaniaDiaUnlocked} onInvestigadorClose={handleInvestigadorClose} onDesglosadorUpdate={handleDesglosadorUpdate} onDesglosadorGlobalClose={handleDesglosadorGlobalClose} onDesglosadorCierreDeGolpe={handleDesglosadorCierreDeGolpe} onDesglosadorPausaInterrupcion={handleDesglosadorPausaInterrupcion} onResumeDesglosador={resumeDesglosadorTrasInterrupcion} onDesglosadorReorderSubs={handleDesglosadorReorderSubs} onDesglosadorAddSub={handleDesglosadorAddSub} onDesglosadorActivatePendingSub={handleDesglosadorActivatePendingSub} onReorderSubTareasCronometro={handleReorderSubTareasCronometro} onDescansoClose={handleDescansoClose} onMicroPasoToggle={handleMicroPasoToggle} onEtapaPuntoCeroToggle={handleEtapaPuntoCeroToggle} onPuntoCeroSessionUpdate={handlePuntoCeroSessionUpdate} onPuntoCeroColorConfirm={handlePuntoCeroColorConfirm} onPuntoCeroAutoClose={handlePuntoCeroAutoClose} onRutaBandCross={recordRutaBandCross} onBloqueCierre={recordBloqueCierre} />
-                ))}
+                <FlotaActivaVehicleCards
+                  flotaActivos={flotaActivosRenderList}
+                  expandedId={expandedId}
+                  cierreEnergiaPendingVehicleId={cierreEnergiaPending?.vehicleId ?? null}
+                  segmentoNumero={segmentoNumero}
+                  planilla={planilla}
+                  situacionBloqueSummaries={situacionBloqueSummaries}
+                  arquitectoUnlocked={soberaniaDiaUnlocked}
+                  handlers={handlers}
+                />
               </AccordionSection>
               </div>
             ) : (
@@ -4582,31 +4544,7 @@ export default function Planeacion() {
               </div>
             )}
 
-            {(() => {
-              const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-              const todayStartMs = todayStart.getTime();
-              const vehiculosHoy = completedVehicles.filter(v => !v.autoVerdad && (() => {
-                const t = vehicleClosedAtMs(v);
-                return t >= todayStartMs;
-              })()).sort((a, b) => vehicleClosedAtMs(a) - vehicleClosedAtMs(b));
-              const vehiculosAnteriores = completedVehicles.filter(v => !v.autoVerdad && (() => {
-                const t = Math.max(v.createdAt?.getTime?.() || 0, v.aperturaAt || 0, v.cierreAt || 0);
-                return t > 0 && t < todayStartMs;
-              })()).sort((a, b) => {
-                const tA = Math.max(a.cierreAt || 0, a.aperturaAt || 0, a.createdAt?.getTime?.() || 0);
-                const tB = Math.max(b.cierreAt || 0, b.aperturaAt || 0, b.createdAt?.getTime?.() || 0);
-                return tB - tA;
-              });
-              const gruposPorFecha: Record<string, typeof vehiculosAnteriores> = {};
-              vehiculosAnteriores.forEach(v => {
-                const ts = Math.max(v.cierreAt || 0, v.aperturaAt || 0, v.createdAt?.getTime?.() || 0);
-                const d = new Date(ts);
-                const key = `${d.getDate().toString().padStart(2,"0")}/${(d.getMonth()+1).toString().padStart(2,"0")}`;
-                if (!gruposPorFecha[key]) gruposPorFecha[key] = [];
-                gruposPorFecha[key].push(v);
-              });
-              if (vehiculosHoy.length === 0 && vehiculosAnteriores.length === 0) return null;
-              return (
+            {(vehiculosHoy.length > 0 || vehiculosAnteriores.length > 0) && (
                 <AccordionSection title="HISTORIAL" subtitle="Hoy" icon={Flag} color={SLATE} count={vehiculosHoy.length} defaultOpen={false}>
                   {vehiculosHoy.map((v) => (
                     <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} minimal planilla={planilla} />
@@ -4621,7 +4559,7 @@ export default function Planeacion() {
                       {showHistorialCompleto ? "▲ Ocultar días anteriores" : `▼ Ver días anteriores (${vehiculosAnteriores.length})`}
                     </button>
                   )}
-                  {showHistorialCompleto && Object.entries(gruposPorFecha).map(([fecha, lista]) => (
+                  {showHistorialCompleto && Object.entries(gruposPorFechaHistorial).map(([fecha, lista]) => (
                     <div key={fecha}>
                       <div className="flex items-center gap-2 my-2">
                         <div className="flex-1 h-px" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />
@@ -4634,8 +4572,7 @@ export default function Planeacion() {
                     </div>
                   ))}
                 </AccordionSection>
-              );
-            })()}
+            )}
 
             {/* CIERRE DE JORNADA & DEPÓSITO */}
             <div className="grid grid-cols-2 gap-2">
