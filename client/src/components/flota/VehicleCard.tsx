@@ -1448,7 +1448,7 @@ function VehicleCard({
       document.removeEventListener("visibilitychange", onFocus);
       clearInterval(timerInterval);
     };
-  }, [expanded, vehicle.status, vehicle.tipoTerminoRapido, vehicle.criterioDetalle, vehicle.tiempoInicio, tipoFlota, vehicle.aperturaAt, vehicle.parentesisRecarga, vehicle.tipoReloj, vehicle.cantidadObjetivo, vehicle.titulo, vehicle.situacionCronometro, vehicle.situacionCupoAnchor, vehicle.subTareas]);
+  }, [activeSub, activeSub?.id, expanded, vehicle.status, vehicle.tipoTerminoRapido, vehicle.criterioDetalle]);
 
   // Timer for active sub-vehicle in desglosador mode — fuente única: computeDesglosadorClocks
   useEffect(() => {
