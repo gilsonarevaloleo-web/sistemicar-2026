@@ -854,6 +854,17 @@ export function sanitizeForFirestore(value: unknown): unknown {
   return out;
 }
 
+/** Firebase en sombra tras pintado ms0 local (evita doble saveLocal en lanzamiento). */
+export function scheduleVehicleRemotePersist(
+  userId: string,
+  provisionalId: string,
+  vehicle: Omit<Vehicle, "id" | "createdAt" | "userId" | "status">,
+  clientRequestId: string
+): void {
+  const aperturaAt = vehicle.aperturaAt ?? Date.now();
+  void persistVehicleToFirebase(userId, provisionalId, vehicle, clientRequestId, aperturaAt);
+}
+
 async function persistVehicleToFirebase(
   userId: string,
   provisionalId: string,

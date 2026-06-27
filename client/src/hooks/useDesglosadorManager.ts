@@ -2209,6 +2209,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       force?: boolean;
       /** Solo cruce de banda ruta — memoria local, sin Firebase/depth/disco. */
       rutaCruzadoOnly?: boolean;
+      /** Primer paint tras lanzar — sin depth ni disco en el mismo frame. */
+      launchPaint?: boolean;
     }
   ) => {
     if (!user) return;
@@ -2237,6 +2239,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       );
       return;
     }
+
+    const launchPaint = opts?.launchPaint === true;
 
     const prevActiveId = prevVehicle.subVehiculos?.find(s => s.status === "activo")?.id;
     const closedPrevActive =
@@ -2304,8 +2308,10 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
             ...(shouldResetDepth ? { aperturaAt: latest.aperturaAt } : {}),
           }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
         });
-      }, 450)
+      }, launchPaint ? 2_500 : 450)
     );
+
+    if (launchPaint) return;
 
     if (shouldResetDepth) {
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });

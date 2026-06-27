@@ -10,6 +10,7 @@ import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import { preferLocalSubTareasInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
 import { writeLocalFlota } from "@/services/jornadaFlotaCache";
+import { runShadowTask } from "@/lib/desglosadorShadow";
 import {
   armFlotaFetchTimeout,
   beginFlotaFetch,
@@ -224,7 +225,9 @@ function applyIncomingSnapshot(
   }
 
   if (uid && merged.length > 0) {
-    writeLocalFlota(uid, merged);
+    runShadowTask(() => {
+      writeLocalFlota(uid, merged);
+    });
   }
   setVehiclesBufferOnly(merged);
   setFlotaPaintedCount(merged.length);

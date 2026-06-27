@@ -68,6 +68,7 @@ import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import {
   addVehicle,
+  scheduleVehicleRemotePersist,
   updateVehicleStatus,
   updateVehicle,
   Vehicle,
@@ -147,6 +148,7 @@ import {
 import {
   requestGhostReconcileAfterVehicleAction,
   requestGhostReconcileForced,
+  suppressGhostReconcileAfterLaunch,
 } from "@/lib/ghostReconcileScheduler";
 import {
   filterVehiclesForAnilloCoverage,
@@ -1798,10 +1800,13 @@ export default function Planeacion() {
         }
       }
 
-      let newVehicleId: string;
-      let newClientRequestId: string;
-      try {
-        const created = await addVehicle(user.uid, {
+      const aperturaAtMs = Date.now();
+      const subVehiculosDesg =
+        relojTiempo === "desglosador"
+          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, aperturaAtMs))
+          : undefined;
+
+      const vehicleCreatePayload: Omit<Vehicle, "id" | "createdAt" | "userId" | "status"> = {
         titulo: titulo.trim(),
         criterioFin: criterio,
         criterioDetalle: detalle,
@@ -1809,13 +1814,11 @@ export default function Planeacion() {
         ejes: STUB_EJES,
         tipoTerminoRapido: tipoTermino,
         tipoFlota: tipoFlotaSeleccionado,
-        aperturaAt: Date.now(),
+        aperturaAt: aperturaAtMs,
         bonoTemple,
         tipoReloj: tipoFlotaSeleccionado === "tiempo" ? relojTiempo : undefined,
         cantidadObjetivo: relojTiempo === "investigador" ? Number(cantidadInvestigador) : (relojTiempo === "produccion" ? Number(cantidadProduccion) : undefined),
-        subVehiculos: relojTiempo === "desglosador"
-          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
-          : undefined,
+        subVehiculos: subVehiculosDesg,
         subTareas: subTareasPrefill,
         ...(launchCtx || resolvedProyectoId
           ? {
@@ -1837,9 +1840,97 @@ export default function Planeacion() {
         etapasPuntoCero: tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero" ? { etapa1: false, etapa2: false, etapa3: false, etapa4: false } : undefined,
         puntoCero:
           tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
-            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
+            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), aperturaAtMs)
             : undefined,
+      };
+
+      const isDesglosadorMs0Launch = tipoFlotaSeleccionado === "tiempo" && relojTiempo === "desglosador";
+      const savedLaunchCtx = launchCtx;
+
+      const applyPostLaunchSideEffects = (newVehicleId: string) => {
+        if (savedLaunchCtx) {
+          const tipoOrigen = savedLaunchCtx.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
+          void markPeldanoEnCurso(user.uid, savedLaunchCtx.peldanoId, newVehicleId, tipoOrigen);
+          proyectoLaunchRef.current = null;
+        }
+        if (intensidadEnergetica) {
+          recordVehiculoInicio(newVehicleId, intensidadEnergetica);
+        }
+        if (relojTiempo === "desglosador" && user) {
+          const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
+          if (filteredSubs[0]?.titulo.trim()) {
+            toast.info("Profundidad de sesión", {
+              description: "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
+              style: { backgroundColor: PIZARRA, border: `1px solid rgba(212,175,55,0.35)`, color: GOLD },
+              duration: 4500,
+            });
+          }
+        }
+        if (bonoTemple) {
+          void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo.trim());
+          toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
+            description: "Iniciaste en los últimos 15 min antes del descanso",
+            style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
+            duration: 4000
+          });
+        }
+      };
+
+      const paintOptimisticLaunch = (optimisticVehicle: Vehicle, skipGhostReconcile: boolean) => {
+        optimisticVehiclesRef.current = [
+          ...optimisticVehiclesRef.current.filter(v => v.id !== optimisticVehicle.id),
+          optimisticVehicle,
+        ];
+        vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== optimisticVehicle.id)];
+        startTransition(() => {
+          setVehicles(prev => {
+            const withoutDupe = prev.filter(v => v.id !== optimisticVehicle.id);
+            return [optimisticVehicle, ...withoutDupe];
+          });
         });
+        saveLocalVehicles(vehiclesRef.current);
+        if (tipoFlotaSeleccionado === "situacion") {
+          setExpandedId(optimisticVehicle.id);
+        }
+        setIsCreating(false);
+        scrollFlotaActivosIntoView();
+        if (skipGhostReconcile) {
+          suppressGhostReconcileAfterLaunch();
+        } else {
+          ghostReconcileRef.current?.();
+        }
+        toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
+          description: flotaConfig.psCierre,
+          style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
+        });
+        registrarEvento(COMPONENTES.PLANIFICACION);
+        resetForm();
+      };
+
+      if (isDesglosadorMs0Launch) {
+        const newVehicleId = generateStableUuid();
+        const newClientRequestId = `crq_${generateStableUuid()}`;
+        const optimisticVehicle: Vehicle = {
+          ...vehicleCreatePayload,
+          id: newVehicleId,
+          clientRequestId: newClientRequestId,
+          createdAt: new Date(),
+          userId: user.uid,
+          status: "activo",
+        };
+        paintOptimisticLaunch(optimisticVehicle, true);
+        applyPostLaunchSideEffects(newVehicleId);
+        runShadowTask(() => {
+          scheduleVehicleRemotePersist(user.uid, newVehicleId, vehicleCreatePayload, newClientRequestId);
+        });
+        console.log(`[handleFlotaSave] Desglosador ms0: "${titulo}" id=${newVehicleId}`);
+        return;
+      }
+
+      let newVehicleId: string;
+      let newClientRequestId: string;
+      try {
+        const created = await addVehicle(user.uid, vehicleCreatePayload);
         newVehicleId = created.id;
         newClientRequestId = created.clientRequestId;
       } catch (addErr) {
@@ -1853,35 +1944,7 @@ export default function Planeacion() {
       }
       console.log(`[handleFlotaSave] addVehicle retornó id: ${newVehicleId}`);
 
-      if (launchCtx) {
-        const tipoOrigen = launchCtx.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
-        void markPeldanoEnCurso(user.uid, launchCtx.peldanoId, newVehicleId, tipoOrigen);
-        proyectoLaunchRef.current = null;
-      }
-
-      if (intensidadEnergetica) {
-        recordVehiculoInicio(newVehicleId, intensidadEnergetica);
-      }
-
-      if (relojTiempo === "desglosador" && user) {
-        const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
-        if (filteredSubs[0]?.titulo.trim()) {
-          toast.info("Profundidad de sesión", {
-            description: "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
-            style: { backgroundColor: PIZARRA, border: `1px solid rgba(212,175,55,0.35)`, color: GOLD },
-            duration: 4500,
-          });
-        }
-      }
-
-      if (bonoTemple) {
-        void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo.trim());
-        toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
-          description: "Iniciaste en los últimos 15 min antes del descanso",
-          style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
-          duration: 4000
-        });
-      }
+      applyPostLaunchSideEffects(newVehicleId);
 
       console.log(`[handleFlotaSave] Vehículo creado exitosamente: "${titulo}"`);
 
@@ -1889,71 +1952,13 @@ export default function Planeacion() {
       const optimisticVehicle: Vehicle = {
         id: newVehicleId,
         clientRequestId: newClientRequestId,
-        titulo: titulo.trim(),
-        criterioFin: criterio,
-        criterioDetalle: detalle,
+        ...vehicleCreatePayload,
         tiempoInicio: new Date(),
         createdAt: new Date(),
         userId: user.uid,
         status: "activo" as VehicleStatus,
-        ejes: STUB_EJES,
-        tipoTerminoRapido: tipoTermino,
-        tipoFlota: tipoFlotaSeleccionado,
-        aperturaAt: Date.now(),
-        bonoTemple,
-        tipoReloj: tipoFlotaSeleccionado === "tiempo" ? relojTiempo : undefined,
-        cantidadObjetivo: relojTiempo === "investigador" ? Number(cantidadInvestigador) : (relojTiempo === "produccion" ? Number(cantidadProduccion) : undefined),
-        subVehiculos: relojTiempo === "desglosador"
-          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
-          : undefined,
-        subTareas: subTareasPrefill,
-        ...(launchCtx || resolvedProyectoId
-          ? {
-              proyectoId: launchCtx?.proyectoId ?? resolvedProyectoId,
-              ...(launchCtx?.peldanoId ? { proyectoPeldanoId: launchCtx.peldanoId } : {}),
-            }
-          : {}),
-        energiaDiffPct,
-        segmentoOrigen: segActualNombre,
-        segmentoId: segActualId,
-        segmentosCruzados: 0,
-        rendimientoConsciente,
-        recordSugerido,
-        tiempoElegido,
-        intensidadEnergetica: intensidadEnergetica || undefined,
-        tipoDescanso: tipoFlotaSeleccionado === "descanso" ? (tipoDescanso || "microcarga") : undefined,
-        microPasos: tipoFlotaSeleccionado === "descanso" && tipoDescanso !== "punto_cero" ? { hidratacion: false, respiracion: false, pantallaZero: false } : undefined,
-        etapasPuntoCero: tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero" ? { etapa1: false, etapa2: false, etapa3: false, etapa4: false } : undefined,
-        puntoCero:
-          tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
-            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
-            : undefined,
       };
-      optimisticVehiclesRef.current = [...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId), optimisticVehicle];
-      vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== newVehicleId)];
-      startTransition(() => {
-        setVehicles(prev => {
-          const withoutDupe = prev.filter(v => v.id !== newVehicleId);
-          console.log(`[handleFlotaSave] OPTIMISTIC UPDATE: Agregando "${titulo}" al estado. Antes: ${withoutDupe.length}, Después: ${withoutDupe.length + 1}`);
-          return [optimisticVehicle, ...withoutDupe];
-        });
-      });
-      if (!saveLocalVehicles(vehiclesRef.current)) {
-        console.warn("[handleFlotaSave] Vehículo en memoria; localStorage lleno o bloqueado");
-      }
-      if (tipoFlotaSeleccionado === "situacion") {
-        setExpandedId(newVehicleId);
-      }
-      setIsCreating(false);
-      scrollFlotaActivosIntoView();
-      ghostReconcileRef.current?.();
-
-      toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
-        description: flotaConfig.psCierre,
-        style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
-      });
-      registrarEvento(COMPONENTES.PLANIFICACION);
-      resetForm();
+      paintOptimisticLaunch(optimisticVehicle, false);
       } catch (uiErr) {
         console.warn("[handleFlotaSave] UI post-lanzamiento:", uiErr);
         toast.success(`"${titulo}" lanzado en este dispositivo`, {

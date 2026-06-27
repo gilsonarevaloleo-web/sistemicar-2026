@@ -602,7 +602,7 @@ function VehicleCard({
   onDesglosadorUpdate?: (
     vehicleId: string,
     updatedSubs: SubVehiculo[],
-    opts?: { resetDepth?: boolean; rutaCruzadoOnly?: boolean; force?: boolean }
+    opts?: { resetDepth?: boolean; rutaCruzadoOnly?: boolean; force?: boolean; launchPaint?: boolean }
   ) => void;
   onDesglosadorGlobalClose?: (vehicleId: string, subs: SubVehiculo[], intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite", rutaDeclarada?: RutaBandaId[]) => void;
   onDesglosadorPausaInterrupcion?: (vehicleId: string, tituloInterrupcion: string) => void | Promise<void>;
@@ -891,7 +891,7 @@ function VehicleCard({
       );
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
-      onDesglosadorUpdate(vehicle.id, repaired);
+      onDesglosadorUpdate(vehicle.id, repaired, { launchPaint: true });
       const activated = repaired[pendingIdx];
       if (activated) {
         dispatchDesglosadorSubIntroVoiceOnce(
