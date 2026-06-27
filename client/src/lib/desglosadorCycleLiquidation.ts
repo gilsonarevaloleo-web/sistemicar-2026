@@ -121,6 +121,8 @@ export type DesglosadorLiquidationDeps = {
   onCelebration: (vehicleId: string, titulo: string, summary: DesglosadorTiempoCloseSummary) => void;
   onToastSuccess?: (message: string, description: string) => void;
   onToastError?: (message: string) => void;
+  /** Celebración ya mostrada en ms0 — omitir modal duplicado al final. */
+  skipCelebration?: boolean;
 };
 
 const liquidationInFlight = new Set<string>();
@@ -229,7 +231,6 @@ export function applyDesglosadorCloseOptimistic(
   };
 
   patchAllVehicles(list => list.map(v => (v.id === vehicleId ? { ...v, ...closePatch } : v)));
-  persistVehicles();
   onConquistaPulse();
 
   const shadowResult = {
@@ -438,6 +439,7 @@ export async function executeGlobalCycleLiquidation(
     });
 
     const showCelebration = () => {
+      if (deps.skipCelebration) return;
       deps.onCelebration(vehicleId, vehicle.titulo, celebrationSummary);
       if (closeDeltaPs > 0) {
         deps.onToastSuccess?.(

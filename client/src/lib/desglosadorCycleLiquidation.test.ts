@@ -64,7 +64,7 @@ describe("desglosadorCycleLiquidation", () => {
     assert.equal(vehicles[0].status, "cumplido");
     assert.equal(vehicles[0].cierreManual, true);
     assert.ok(vehicles[0].cierreAt);
-    assert.equal(persistCalls, 1);
+    assert.equal(persistCalls, 0);
   });
 
   it("scheduleGlobalCycleLiquidation agenda executeGlobalCycleLiquidation", () => {

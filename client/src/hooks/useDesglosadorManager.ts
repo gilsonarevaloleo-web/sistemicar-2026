@@ -40,7 +40,10 @@ import {
   vehicleMissionClosePS,
   VEHICLE_CUMPLIDO_BASE_PS,
 } from "@/lib/sovereigntyPointsConfig";
-import { awardDesglosadorSubPointsIfNeeded } from "@/lib/desglosadorPointsAward";
+import {
+  awardDesglosadorSubPointsIfNeeded,
+  sumDesglosadorSubsPsAlreadyGranted,
+} from "@/lib/desglosadorPointsAward";
 import {
   applyDesglosadorCloseOptimistic,
   isDesglosadorLiquidationInFlight,
@@ -59,6 +62,7 @@ import {
   dispatchSituacionFilaCloseVoice,
 } from "@/lib/desglosadorVoiceDispatch";
 import type { DesglosadorTiempoCloseSummary } from "@/lib/desglosadorTiempoCelebration";
+import { computeDesglosadorTiempoCloseSummary } from "@/lib/desglosadorTiempoCelebration";
 import { hasJournalSpExactSource } from "@/lib/spLogHygiene";
 import {
   archiveActiveCentinelas,
@@ -118,6 +122,7 @@ import {
   computeDesglosadorSessionDepthPS,
   depthAwardForHour,
 } from "@/lib/desglosadorDepth";
+import { DESGLOSADOR_CYCLE_CLOSE_BASE_PS } from "@/lib/sovereigntyPointsConfig";
 import {
   firstPendingCronometroTexto,
   firstPendingSubVehiculoTitulo,
@@ -1029,18 +1034,16 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     saveLocalVehicles(vehiclesRef.current);
   };
 
-  /** Fase ms0 — escribe memoria indexada + store + pintura React; Firebase queda en sombra. */
+  /** Fase ms0 — memoria + store + React. Disco solo con flush explícito (cierre / visibility). */
   const commitFlotaPatchMs0 = useCallback(
-    (mapper: (prev: Vehicle[]) => Vehicle[]) => {
+    (mapper: (prev: Vehicle[]) => Vehicle[], opts?: { flushDisk?: boolean }) => {
       const next = mapper(vehiclesRef.current);
       vehiclesRef.current = next;
       setVehicles(next);
-      try {
-        saveLocalVehicles(next);
-      } catch (e) {
-        console.warn("[flota] localStorage save failed (quota?), UI still updated:", e);
-      }
       setFlotaPaintEpoch(e => e + 1);
+      if (opts?.flushDisk) {
+        flushLocalVehicles(next);
+      }
       return next;
     },
     [setVehicles]
@@ -2200,7 +2203,13 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const handleDesglosadorUpdate = useCallback((
     vehicleId: string,
     updatedSubs: SubVehiculo[],
-    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean }
+    opts?: {
+      resetDepth?: boolean;
+      silentDepth?: boolean;
+      force?: boolean;
+      /** Solo cruce de banda ruta — memoria local, sin Firebase/depth/disco. */
+      rutaCruzadoOnly?: boolean;
+    }
   ) => {
     if (!user) return;
     const prevVehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -2219,6 +2228,13 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const nextProgress = desglosadorProgressScore(subs);
     if (!opts?.force && nextProgress < prevProgress) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
+      return;
+    }
+
+    if (opts?.rutaCruzadoOnly) {
+      commitFlotaPatchMs0(list =>
+        list.map(v => (v.id === vehicleId ? { ...v, subVehiculos: subs } : v))
+      );
       return;
     }
 
@@ -2298,6 +2314,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     } else {
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: false });
     }
+    saveLocalVehicles(vehiclesRef.current);
   }, [user, dispatchDesglosadorVoiceOnGesture, commitFlotaPatchMs0]);
 
   const handleDesglosadorReorderSubs = (vehicleId: string, movedId: string, direction: ReorderDirection) => {
@@ -2457,6 +2474,36 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     if (!optimistic) return;
 
+    const closedVehicleMs0: Vehicle = {
+      ...vehicle,
+      ...optimistic.closePatch,
+      subVehiculos: optimistic.subsConRuta,
+    };
+    const subsPsBefore = sumDesglosadorSubsPsAlreadyGranted(optimistic.subsConRuta);
+    const depthPs = vehicle.desglosadorBloqueDepthPsGranted ?? 0;
+    const psTotalEstimate =
+      subsPsBefore + DESGLOSADOR_CYCLE_CLOSE_BASE_PS + depthPs + optimistic.psRuta;
+    const celebrationSummaryMs0 = computeDesglosadorTiempoCloseSummary(
+      closedVehicleMs0,
+      optimistic.subsConRuta,
+      {
+        duracionMin: optimistic.duracionFinal,
+        psSubs: subsPsBefore,
+        psCierre: DESGLOSADOR_CYCLE_CLOSE_BASE_PS,
+        psProfundidad: depthPs,
+        psRuta: optimistic.psRuta,
+        psTotal: psTotalEstimate,
+        psAwardedNow: 0,
+      }
+    );
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() =>
+        openDesglosadorTiempoCelebration(vehicleId, vehicle.titulo, celebrationSummaryMs0)
+      );
+    } else {
+      openDesglosadorTiempoCelebration(vehicleId, vehicle.titulo, celebrationSummaryMs0);
+    }
+
     scheduleGlobalCycleLiquidation({
         userId: user.uid,
         vehicleId,
@@ -2497,6 +2544,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           registrarEvento(COMPONENTES.PLANIFICACION);
         },
         onCelebration: openDesglosadorTiempoCelebration,
+        skipCelebration: true,
         onToastSuccess: (message, description) => {
           toast.success(message, {
             description,
@@ -2822,17 +2870,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     }
   };
 
-  const tryFinalizeSituacionDesgloseBloque = useCallback(async (
+  const tryFinalizeSituacionDesgloseBloque = useCallback((
     vehicleId: string,
     subTareas: SubTarea[],
     vehicleSnapshot: Vehicle
   ): Promise<boolean> => {
-    if (!user) return false;
+    if (!user) return Promise.resolve(false);
     const sc = vehicleSnapshot.situacionCronometro;
-    if (!situacionDesgloseBloqueListo(subTareas, sc)) return false;
+    if (!situacionDesgloseBloqueListo(subTareas, sc)) return Promise.resolve(false);
 
     const bloqueKey = `${vehicleId}_${sc!.bloqueInicioAt ?? 0}`;
-    if (situacionBloqueCelebratedRef.current.has(bloqueKey)) return false;
+    if (situacionBloqueCelebratedRef.current.has(bloqueKey)) return Promise.resolve(false);
 
     const bloqueInicio = sc!.bloqueInicioAt ?? vehicleSnapshot.aperturaAt ?? Date.now();
     const elapsedSec = Math.floor((Date.now() - bloqueInicio) / 1000);
@@ -2847,56 +2895,63 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       depthBlockPsGranted: totalDepthPs,
     };
 
+    teardownSituacionSession(vehicleId);
+
     const updatedVehicle: Vehicle = { ...vehicleSnapshot, subTareas, situacionCronometro };
-    setVehicles(prev => prev.map(v => (v.id === vehicleId ? updatedVehicle : v)));
-    vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? updatedVehicle : v));
-    persistVehiclesRef();
+    commitFlotaPatchMs0(
+      prev => prev.map(v => (v.id === vehicleId ? updatedVehicle : v)),
+      { flushDisk: true }
+    );
 
-    try {
-      await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro });
-      if (deltaDepth > 0) {
-        await awardSovereigntyPoints(user.uid, deltaDepth, `Profundidad bloque situación: ${vehicleSnapshot.titulo}`);
-      }
-      void handleSyncSituacionCupoAnchor(vehicleId);
-      incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
-      registrarEvento(COMPONENTES.PLANIFICACION);
-      teardownSituacionSession(vehicleId);
-      const summary = presentSituacionDesgloseCelebration(vehicleId, vehicleSnapshot.titulo, updatedVehicle);
-      situacionBloqueCelebratedRef.current.add(bloqueKey);
-      if (vehicleSnapshot.proyectoId && vehicleSnapshot.proyectoPeldanoId) {
-        void markPeldanoConquistadoSituacion(user.uid, updatedVehicle, {
-          duracionMin: summary.minutosBloque,
-          psGanados: summary.psTotal,
-          subTareas,
-          minutosGanados: summary.minutosGanados,
-          minutosGanadosSesion: summary.minutosGanadosSesion,
-          retoNumero: summary.retoNumero,
-        }).then(({ ideasCreadas }) => {
-          if (ideasCreadas > 0) {
-            toast.info(
-              `${ideasCreadas} rama${ideasCreadas !== 1 ? "s" : ""} guardada${ideasCreadas !== 1 ? "s" : ""} en Proyectos`,
-              {
-                description: "Ideas de profundidad pendiente — retómalas desde el Hub.",
-                style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}40`, color: CYAN },
-                duration: 5000,
-              }
-            );
+    const summary = presentSituacionDesgloseCelebration(vehicleId, vehicleSnapshot.titulo, updatedVehicle);
+    situacionBloqueCelebratedRef.current.add(bloqueKey);
+
+    window.requestAnimationFrame(() => {
+      void playSituacionChimes(3);
+      options?.onGoldenFlash?.();
+    });
+
+    runShadowTask(() => {
+      void (async () => {
+        try {
+          await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro });
+          if (deltaDepth > 0) {
+            await awardSovereigntyPoints(user.uid, deltaDepth, `Profundidad bloque situación: ${vehicleSnapshot.titulo}`);
           }
-        });
-      }
-      window.requestAnimationFrame(() => {
-        void playSituacionChimes(3);
-        options?.onGoldenFlash?.();
-      });
-      return true;
-    } catch (e) {
-      console.error("[tryFinalizeSituacionDesgloseBloque]", e);
-      situacionBloqueCelebratedRef.current.delete(bloqueKey);
-      return false;
-    }
-  }, [user, presentSituacionDesgloseCelebration]);
+          void handleSyncSituacionCupoAnchor(vehicleId);
+          incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
+          registrarEvento(COMPONENTES.PLANIFICACION);
+          if (vehicleSnapshot.proyectoId && vehicleSnapshot.proyectoPeldanoId) {
+            const { ideasCreadas } = await markPeldanoConquistadoSituacion(user.uid, updatedVehicle, {
+              duracionMin: summary.minutosBloque,
+              psGanados: summary.psTotal,
+              subTareas,
+              minutosGanados: summary.minutosGanados,
+              minutosGanadosSesion: summary.minutosGanadosSesion,
+              retoNumero: summary.retoNumero,
+            });
+            if (ideasCreadas > 0) {
+              toast.info(
+                `${ideasCreadas} rama${ideasCreadas !== 1 ? "s" : ""} guardada${ideasCreadas !== 1 ? "s" : ""} en Proyectos`,
+                {
+                  description: "Ideas de profundidad pendiente — retómalas desde el Hub.",
+                  style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}40`, color: CYAN },
+                  duration: 5000,
+                }
+              );
+            }
+          }
+        } catch (e) {
+          console.error("[tryFinalizeSituacionDesgloseBloque]", e);
+          situacionBloqueCelebratedRef.current.delete(bloqueKey);
+        }
+      })();
+    });
 
-  const handleCerrarSituacionDesglosadorDeGolpe = async (vehicleId: string) => {
+    return Promise.resolve(true);
+  }, [user, presentSituacionDesgloseCelebration, commitFlotaPatchMs0, handleSyncSituacionCupoAnchor]);
+
+  const handleCerrarSituacionDesglosadorDeGolpe = (vehicleId: string) => {
     if (!user) return;
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || vehicle.situacionCronometro?.activo !== true) {
@@ -2920,47 +2975,55 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const prevGranted = sc.depthBlockPsGranted ?? 0;
     const deltaDepth = totalDepthPs - prevGranted;
     const situacionCronometroFinal = { ...situacionCronometro, depthBlockPsGranted: totalDepthPs };
-    setVehicles(prev =>
-      prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro: situacionCronometroFinal, situacionCupoAnchor: null } : v))
+    const closedVehicle: Vehicle = {
+      ...vehicle,
+      subTareas,
+      situacionCronometro: situacionCronometroFinal,
+      situacionCupoAnchor: null,
+    };
+
+    teardownSituacionSession(vehicleId);
+    commitFlotaPatchMs0(
+      prev =>
+        prev.map(v =>
+          v.id === vehicleId
+            ? { ...v, subTareas, situacionCronometro: situacionCronometroFinal, situacionCupoAnchor: null }
+            : v
+        ),
+      { flushDisk: true }
     );
-    vehiclesRef.current = vehiclesRef.current.map(v =>
-      v.id === vehicleId ? { ...v, subTareas, situacionCronometro: situacionCronometroFinal, situacionCupoAnchor: null } : v
-    );
-    persistVehiclesRef();
-    try {
-      await updateVehicle(user.uid, vehicleId, {
-        subTareas,
-        situacionCronometro: situacionCronometroFinal,
-        situacionCupoAnchor: null,
-      });
-      if (deltaDepth > 0) {
-        await awardSovereigntyPoints(user.uid, deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
-      }
-      incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
-      registrarEvento(COMPONENTES.PLANIFICACION);
-      const closedVehicle: Vehicle = {
-        ...vehicle,
-        subTareas,
-        situacionCronometro: situacionCronometroFinal,
-        situacionCupoAnchor: null,
-      };
-      teardownSituacionSession(vehicleId);
-      presentSituacionDesgloseCelebration(vehicleId, vehicle.titulo, closedVehicle);
-      window.requestAnimationFrame(() => {
-        void playSituacionChimes(2);
-        options?.onGoldenFlash?.();
-      });
-      const bolsa = situacionCronometroFinal.bolsaSegundoRetoMin ?? 0;
-      toast.info("Ronda cerrada de golpe", {
-        description:
-          bolsa > 0
-            ? `Filas pendientes marcadas falladas · ${bolsa} min disponibles para otra ronda`
-            : "Filas pendientes marcadas falladas · revisa el resumen del bloque",
-        duration: 3500,
-      });
-    } catch (e) {
-      console.error("[handleCerrarSituacionDesglosadorDeGolpe]", e);
-    }
+    presentSituacionDesgloseCelebration(vehicleId, vehicle.titulo, closedVehicle);
+    window.requestAnimationFrame(() => {
+      void playSituacionChimes(2);
+      options?.onGoldenFlash?.();
+    });
+    const bolsa = situacionCronometroFinal.bolsaSegundoRetoMin ?? 0;
+    toast.info("Ronda cerrada de golpe", {
+      description:
+        bolsa > 0
+          ? `Filas pendientes marcadas falladas · ${bolsa} min disponibles para otra ronda`
+          : "Filas pendientes marcadas falladas · revisa el resumen del bloque",
+      duration: 3500,
+    });
+
+    runShadowTask(() => {
+      void (async () => {
+        try {
+          await updateVehicle(user.uid, vehicleId, {
+            subTareas,
+            situacionCronometro: situacionCronometroFinal,
+            situacionCupoAnchor: null,
+          });
+          if (deltaDepth > 0) {
+            await awardSovereigntyPoints(user.uid, deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
+          }
+          incrementModulePoints(user.uid, "planificacion", 1).catch(() => {});
+          registrarEvento(COMPONENTES.PLANIFICACION);
+        } catch (e) {
+          console.error("[handleCerrarSituacionDesglosadorDeGolpe]", e);
+        }
+      })();
+    });
   };
 
   const handleDesglosadorCierreDeGolpe = async (vehicleId: string) => {

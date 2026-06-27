@@ -599,7 +599,11 @@ function VehicleCard({
   onToggleCasaItem?: (vehicleId: string, subTareaId: string, detalleId: string) => void;
   arquitectoUnlocked?: boolean;
   onInvestigadorClose?: (vehicleId: string, cumplido: boolean, cantidadRealizada: number, intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite") => void;
-  onDesglosadorUpdate?: (vehicleId: string, updatedSubs: SubVehiculo[], opts?: { resetDepth?: boolean }) => void;
+  onDesglosadorUpdate?: (
+    vehicleId: string,
+    updatedSubs: SubVehiculo[],
+    opts?: { resetDepth?: boolean; rutaCruzadoOnly?: boolean; force?: boolean }
+  ) => void;
   onDesglosadorGlobalClose?: (vehicleId: string, subs: SubVehiculo[], intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite", rutaDeclarada?: RutaBandaId[]) => void;
   onDesglosadorPausaInterrupcion?: (vehicleId: string, tituloInterrupcion: string) => void | Promise<void>;
   onResumeDesglosador?: (vehicleId: string) => void;
@@ -1127,7 +1131,7 @@ function VehicleCard({
         const updated = subsNow.map(s =>
           s.id === activeSub.id ? { ...s, rutaEnfoque: repaired } : s
         );
-        onDesglosadorUpdate(vehicle.id, updated);
+        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true });
       }
       return;
     }
@@ -1173,7 +1177,7 @@ function VehicleCard({
       const updated = (subVehiculosRef.current ?? []).map(s =>
         s.id === activeSub.id ? { ...s, rutaEnfoque: nextRuta } : s
       );
-      onDesglosadorUpdate(vehicle.id, updated);
+      onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true });
     }
   }, [subVehicleRestante, vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate, playChime, onRutaBandCross]);
 

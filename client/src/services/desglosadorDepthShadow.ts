@@ -19,14 +19,6 @@ export function registerDesglosadorDepthReconciler(fn: DesglosadorDepthReconcile
 }
 
 export function syncDesglosadorDepthActiveIds(ids: string[]): void {
-  const next = new Set(ids);
-  ids.forEach(id => {
-    if (!activeVehicleIds.has(id) && reconcileFn) {
-      runShadowTaskAsync(() => {
-        void reconcileFn!(id, { silent: true });
-      });
-    }
-  });
   activeVehicleIds.clear();
   ids.forEach(id => activeVehicleIds.add(id));
   if (activeVehicleIds.size === 0) {
