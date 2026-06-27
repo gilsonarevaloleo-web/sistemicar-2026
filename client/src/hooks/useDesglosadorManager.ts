@@ -1484,11 +1484,20 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       }
     }
   };
-
-  const handleFlotaStatusChange = async (vehicleId: string, status: "cumplido" | "archivado", intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite") => {
+  const handleFlotaStatusChange = async (
+    vehicleId: string, 
+    status: "cumplido" | "archivado", 
+    intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite"
+  ) => {
     if (!user) return;
+  
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) { console.warn("[handleFlotaStatusChange] Vehículo no encontrado:", vehicleId); return; }
+    if (!vehicle) { 
+      console.warn("[handleFlotaStatusChange] Vehículo no encontrado:", vehicleId); 
+      return; 
+    }
+  
+    // 1. Autarquía del proceso (Desglosador tiempo requiere botón dorado)
     if (vehicle.tipoReloj === "desglosador") {
       toast.error("Usa «Cerrar ciclo» en el desglosador", {
         description: "Cumplido/Incumplido de flota no cierra un desglose en curso. Abre el vehículo y usa el botón dorado de cierre de ciclo.",
@@ -1497,12 +1506,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       });
       return;
     }
+  
     if (isCloseBlocked(vehicleId)) {
       toast.info("Cierre en curso…", { description: "Espera unos segundos y reintenta.", duration: 2500 });
       return;
     }
+  
+    // ==========================================
+    // FASE MS0 — PRIORIDAD DEL OPERADOR (INMEDIATO)
+    // ==========================================
     beginClose(vehicleId);
-
+  
     const tipoFlota = vehicle.tipoFlota;
     const aperturaAt = vehicle.aperturaAt || vehicle.createdAt?.getTime() || Date.now();
     const cierreAt = Date.now();
@@ -1510,32 +1524,55 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const parentesisTotal = (vehicle.parentesisRecarga || []).reduce((sum, p) => sum + p.duracionMin * 60000, 0);
     const duracionNeta = Math.max(0, duracionMs - parentesisTotal);
     const duracionMin = Math.round(duracionNeta / 60000);
-    const isCierreManual = status === "cumplido";
-
-    const situacionCloseExtras =
-      tipoFlota === "situacion"
-        ? { situacionCronometro: null, situacionCupoAnchor: null }
-        : {};
-
+  
+    const situacionCloseExtras = tipoFlota === "situacion"
+      ? { situacionCronometro: null, situacionCupoAnchor: null }
+      : {};
+  
+    // Pintar en React en el mismo frame (UI Espejo se limpia rápido)
     notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
-
-    const termoDecisionSnapshot = buildTermoDecisionSnapshot(
-      { ...vehicle, status, cierreAt, ...situacionCloseExtras },
-      getJournalDayStartMs(cierreAt)
-    );
-    if (
-      (vehicle.tipoReloj as string | undefined) !== "desglosador" &&
-      vehicle.tipoFlota !== "descanso" &&
-      vehicle.tipoFlota !== "situacion" &&
-      (status === "cumplido" || status === "archivado")
-    ) {
-      recordDecision(user.uid, {
-        key: decisionKeyMision(vehicleId),
-        kind: "mision_directa",
-        vehicleId,
-        ts: cierreAt,
-      });
-    }
+  
+    // ==========================================
+    // TRABAJO EN SOMBRA — FUERA DEL TICK DE REACT
+    // ==========================================
+    runShadowTask(async () => {
+      // A. Procesar snapshot termodinámico e historial en diferido
+      const termoDecisionSnapshot = buildTermoDecisionSnapshot(
+        { ...vehicle, status, cierreAt, ...situacionCloseExtras },
+        getJournalDayStartMs(cierreAt)
+      );
+  
+      // B. Registro de decisiones soberanas sin bloquear la UI
+      if (
+        (vehicle.tipoReloj as string | undefined) !== "desglosador" &&
+        vehicle.tipoFlota !== "descanso" &&
+        vehicle.tipoFlota !== "situacion" &&
+        (status === "cumplido" || status === "archivado")
+      ) {
+        recordDecision(user.uid, {
+          key: decisionKeyMision(vehicleId),
+          kind: "mision_directa",
+          vehicleId,
+          ts: cierreAt,
+        });
+      }
+  
+      // C. Procesamiento de subtareas de contingencia de la situación
+      if (vehicle.tipoFlota === "situacion" && vehicle.subTareas) {
+        for (const st of vehicle.subTareas) {
+          if (st.enDesgloseCronometro) {
+            if (st.resultadoSituacion !== "cumplido") continue;
+          } else if (!st.completada) {
+            continue;
+          }
+          // Cualquier mutación incremental profunda se procesa de forma segura aquí dentro
+        }
+      }
+      
+      // Aquí puedes incluir el push/update final a Firebase si desglosadorShadow posee la primitiva
+    });
+  };
+ 
     if (vehicle.tipoFlota === "situacion") {
       for (const st of vehicle.subTareas ?? []) {
         if (st.enDesgloseCronometro) {
