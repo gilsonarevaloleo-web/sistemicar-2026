@@ -6,6 +6,7 @@
 import {
   recoverSpeechQueue,
   speakUbicacionQueue,
+  enqueueDesglosadorVoicePassive,
   unlockSpeechSynthesis,
   warmupSpeechSynthesis,
   isUbicacionPhraseQueued,
@@ -14,7 +15,6 @@ import {
   voiceEngine,
   type UbicacionVoiceSource,
 } from "./speechQueue";
-import { runConscienteVoiceDeferred } from "./conscienteVoiceDeferred";
 import { isPostCallAudioShieldActive } from "./postCallAudioShield";
 import {
   isDesglosadorVoiceEnabled,
@@ -182,19 +182,24 @@ export function speakDesglosadorVoiceReliable(
   cancelPrevious: boolean,
   onSpoken?: () => void
 ): () => void {
-  return speakUbicacionVoiceReliable(key, phrases, cancelPrevious, "desglosador", onSpoken);
+  if (!isDesglosadorVoiceEnabled()) {
+    return () => {};
+  }
+  enqueueDesglosadorVoicePassive(key, phrases, {
+    cancelPrevious,
+    onPhraseStarted: onSpoken,
+  });
+  return () => cancelUbicacionVoice(key);
 }
 
-/** Igual que speakDesglosadorVoiceReliable pero en macrotarea — no bloquea cierre de subs. */
+/** @deprecated Usar dispatchDesglosadorVoice — misma cola pasiva en sombra. */
 export function speakDesglosadorVoiceReliableDeferred(
   key: string,
   phrases: string[],
   cancelPrevious: boolean,
   onSpoken?: () => void
 ): () => void {
-  return runConscienteVoiceDeferred(() =>
-    speakDesglosadorVoiceReliable(key, phrases, cancelPrevious, onSpoken)
-  );
+  return speakDesglosadorVoiceReliable(key, phrases, cancelPrevious, onSpoken);
 }
 
 export function speakSituacionVoiceReliable(

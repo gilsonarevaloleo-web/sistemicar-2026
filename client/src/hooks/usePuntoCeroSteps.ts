@@ -13,7 +13,6 @@ import {
   teardownPuntoCeroStepVoice,
   type PuntoCeroPasoDef,
 } from "@/lib/puntoCeroStepVoice";
-import { forceResetOrphanMutationLocks } from "@/lib/localMutationLock";
 import { unlockPuntoCeroSpeechFromGesture } from "@/lib/puntoCeroVoice";
 
 export type UsePuntoCeroStepsOptions = {
@@ -69,7 +68,6 @@ export function usePuntoCeroSteps(opts: UsePuntoCeroStepsOptions = {}) {
   const irAPaso = useCallback(
     async (index: 0 | 1 | 2 | 3) => {
       if (getIsRemountingJornada()) return;
-      forceResetOrphanMutationLocks();
       cancelPuntoCeroStepVoice();
       clearPuntoCeroStepVoiceRemountPause();
       unlockPuntoCeroSpeechFromGesture();
@@ -85,7 +83,6 @@ export function usePuntoCeroSteps(opts: UsePuntoCeroStepsOptions = {}) {
 
   const iniciar = useCallback(async () => {
     if (getIsRemountingJornada()) return;
-    forceResetOrphanMutationLocks();
     unlockPuntoCeroSpeechFromGesture();
     await optsRef.current.onUnlockAudio?.();
     const withIntro = includeIntroRef.current;

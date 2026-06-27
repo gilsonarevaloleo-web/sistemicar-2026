@@ -205,7 +205,6 @@ import {
   computeRutaPrivilegioPS,
   type RutaSeguimientoPatron,
 } from "@/lib/rutaSeguimiento";
-import { rutaVozFluidoParts, rutaVozPartsForBanda } from "@/lib/rutaEnfoqueVoz";
 import {
   RutaSeguimientoPicker,
   rutaSeguimientoPickerCanConfirm,
@@ -214,11 +213,11 @@ import { speakUbicacionQueue, speakUbicacionSingle, speakVoiceProbe, unlockSpeec
 import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
 import { pausePuntoCeroStepVoiceForRemount, resumeStepVoiceAfterRemount } from "@/lib/puntoCeroStepVoice";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
+import { cancelUbicacionVoiceForVehicle } from "@/lib/desglosadorVoice";
 import {
-  cancelUbicacionVoiceForVehicle,
-  speakDesglosadorVoiceReliable,
-  speakDesglosadorVoiceReliableDeferred,
-} from "@/lib/desglosadorVoice";
+  dispatchDesglosadorRutaBandVoice,
+  dispatchDesglosadorSubIntroVoiceOnce,
+} from "@/lib/desglosadorVoiceDispatch";
 import {
   computeSafeRemainingMs,
   computeSafeRemainingSec,
@@ -226,7 +225,6 @@ import {
   hardwareClockNow,
   hardwareElapsedMs,
 } from "@/lib/hardwareClock";
-import { forceResetOrphanMutationLocks } from "@/lib/localMutationLock";
 import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
 import {
   registerSituacionSessionCleanup,
@@ -495,7 +493,7 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
+import { isCoarseConcienciaDevice } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
@@ -527,13 +525,6 @@ import { registerFlotaMergeContext, refreshFlotaSession, getFlotaMergedSignature
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaStore } from "@/hooks/useFlotaStore";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
-import {
-  beginLocalVehicleMutation,
-  extendLocalVehicleMutation,
-  isLocalVehicleMutationLocked,
-  isStructuralCloseInTransit,
-  LOCAL_VEHICLE_MUTATION_LOCK_MS,
-} from "@/lib/localMutationLock";
 import { scheduleDeferredVehicleCleanup } from "@/lib/vehicleDeferredCleanup";
 import { generateStableUuid } from "@/lib/stableUuid";
 import { sealVehicleSessionClose } from "@/lib/vehicleSessionSeal";
@@ -570,7 +561,7 @@ function VehicleCard({
   planilla,
   onAddSubTarea, onAddSubTareaUrgenteACola, onToggleSubTarea, onSetSubTareaMinutosCupo, onExtendSituacionCupo, onSyncSituacionCupoAnchor, onAddDetalle, onEntregarDetalle, onAddCasaItem, onToggleCasaItem, arquitectoUnlocked,
   onMoveSubTareasToCronometro, onSituacionCronometroSetHoraFin, onSituacionCronometroCumplido, onSituacionCronometroFallado, onSituacionCronometroReservar, onQuitarSituacionCupo, onCerrarSituacionDesgloseBloque, onCerrarSituacionDesglosadorDeGolpe, situacionBloquePsTotal, situacionDesgloseSummary, onVerSituacionBloquePs,
-  onInvestigadorClose, onDesglosadorUpdate, onDesglosadorGlobalClose, onDesglosadorCierreDeGolpe, onDesglosadorDepthTick, onDesglosadorPausaInterrupcion, onResumeDesglosador, onDesglosadorReorderSubs, onDesglosadorAddSub, onDesglosadorActivatePendingSub,
+  onInvestigadorClose, onDesglosadorUpdate, onDesglosadorGlobalClose, onDesglosadorCierreDeGolpe, onDesglosadorPausaInterrupcion, onResumeDesglosador, onDesglosadorReorderSubs, onDesglosadorAddSub, onDesglosadorActivatePendingSub,
   onReorderSubTareasCronometro,
   onDescansoClose, onMicroPasoToggle, onEtapaPuntoCeroToggle,
   onPuntoCeroSessionUpdate, onPuntoCeroColorConfirm, onPuntoCeroAutoClose,
@@ -610,7 +601,6 @@ function VehicleCard({
   onInvestigadorClose?: (vehicleId: string, cumplido: boolean, cantidadRealizada: number, intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite") => void;
   onDesglosadorUpdate?: (vehicleId: string, updatedSubs: SubVehiculo[], opts?: { resetDepth?: boolean }) => void;
   onDesglosadorGlobalClose?: (vehicleId: string, subs: SubVehiculo[], intensidadEnergeticaFin?: "fluido" | "concentrado" | "limite", rutaDeclarada?: RutaBandaId[]) => void;
-  onDesglosadorDepthTick?: (vehicleId: string) => void;
   onDesglosadorPausaInterrupcion?: (vehicleId: string, tituloInterrupcion: string) => void | Promise<void>;
   onResumeDesglosador?: (vehicleId: string) => void;
   onDesglosadorReorderSubs?: (vehicleId: string, movedId: string, direction: ReorderDirection) => void;
@@ -654,8 +644,6 @@ function VehicleCard({
   const [expandedDetalleStId, setExpandedDetalleStId] = useState<string | null>(null);
   const [expandedCasaStId, setExpandedCasaStId] = useState<string | null>(null);
   const [situacionLibreSeleccion, setSituacionLibreSeleccion] = useState<Set<string>>(() => new Set());
-  const [sellarRingPending, setSellarRingPending] = useState(false);
-  const [encolarRingPending, setEncolarRingPending] = useState(false);
   const [situacionRetoObjetivoHora, setSituacionRetoObjetivoHora] = useState("");
   const [newDetalleTexts, setNewDetalleTexts] = useState<Record<string, string>>({});
   const [newCasaTexts, setNewCasaTexts] = useState<Record<string, string>>({});
@@ -717,11 +705,6 @@ function VehicleCard({
     () => vehicleCardNeedsLiveTick(vehicle, expanded),
     [vehicle, expanded]
   );
-  /** Pulso 1 s — re-evalúa candado de mutación para recuperar tactilidad del ring al expirar. */
-  const concienciaTick = useConcienciaClockTick();
-  const ringMutationLocked =
-    concienciaTick >= 0 && (isLocalVehicleMutationLocked() || isStructuralCloseInTransit());
-  const subStartVoiceRef = useRef<Set<string>>(new Set());
   const [subRutaModal, setSubRutaModal] = useState<null | {
     subId: string;
     status: "cumplido" | "fallado";
@@ -873,33 +856,16 @@ function VehicleCard({
 
   useEffect(() => {
     if (!onSyncSituacionCupoAnchor || vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
-      if (isLocalVehicleMutationLocked()) {
-        retryTimer = window.setTimeout(run, 250);
-        return;
-      }
       onSyncSituacionCupoAnchor(vehicle.id);
     };
     if (typeof requestIdleCallback !== "undefined") {
       const id = requestIdleCallback(run, { timeout: 1500 });
-      return () => {
-        cancelIdleCallback(id);
-        if (retryTimer) clearTimeout(retryTimer);
-      };
+      return () => cancelIdleCallback(id);
     }
-    retryTimer = window.setTimeout(run, 0);
-    return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-    };
+    const retryTimer = window.setTimeout(run, 0);
+    return () => clearTimeout(retryTimer);
   }, [vehicle.id, vehicle.status, vehicle.tipoFlota, situacionSubWatchKey, onSyncSituacionCupoAnchor]);
-
-  useEffect(() => {
-    if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !onDesglosadorDepthTick) return;
-    onDesglosadorDepthTick(vehicle.id);
-    const id = window.setInterval(() => onDesglosadorDepthTick(vehicle.id), 60_000);
-    return () => clearInterval(id);
-  }, [vehicle.id, vehicle.tipoReloj, vehicle.status, vehicle.aperturaAt, onDesglosadorDepthTick]);
 
   const desglosadorAutoActivateRef = useRef<Set<string>>(new Set());
 
@@ -922,6 +888,16 @@ function VehicleCard({
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
       onDesglosadorUpdate(vehicle.id, repaired);
+      const activated = repaired[pendingIdx];
+      if (activated) {
+        dispatchDesglosadorSubIntroVoiceOnce(
+          vehicle.id,
+          activated.id,
+          activated.aperturaAt ?? now,
+          activated.titulo,
+          Boolean(activated.rutaEnfoque?.activa)
+        );
+      }
     }
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj, vehicle.id, onDesglosadorUpdate]);
 
@@ -1108,7 +1084,6 @@ function VehicleCard({
   }, [subVehicleRestante, playChime, vehicle.tipoReloj]);
 
   const resetDesglosadorVoiceRefs = useCallback(() => {
-    subStartVoiceRef.current.clear();
     rutaUmbralAlertKeysRef.current.clear();
     activeSubIdForRutaRef.current = null;
     prevSubRestanteRutaRef.current = null;
@@ -1133,7 +1108,6 @@ function VehicleCard({
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || subVehicleRestante === null) return;
-    const voiceCleanups: Array<() => void> = [];
     const subsNow = subVehiculosRef.current ?? [];
     const activeSub = subsNow.find(s => s.status === "activo");
     if (!activeSub?.rutaEnfoque?.activa || !onDesglosadorUpdate) {
@@ -1188,16 +1162,9 @@ function VehicleCard({
       } else {
         playChime();
       }
-      voiceCleanups.push(
-        speakDesglosadorVoiceReliableDeferred(
-          `${vehicle.id}:ruta-${key}`,
-          rutaVozPartsForBanda(alert),
-          false,
-          () => {
-            rutaUmbralAlertKeysRef.current.add(key);
-          }
-        )
-      );
+      dispatchDesglosadorRutaBandVoice(vehicle.id, activeSub.id, alert, () => {
+        rutaUmbralAlertKeysRef.current.add(key);
+      });
     }
     const cruzadoChanged =
       nextRuta.cruzado.concentrado !== activeSub.rutaEnfoque.cruzado.concentrado ||
@@ -1208,30 +1175,7 @@ function VehicleCard({
       );
       onDesglosadorUpdate(vehicle.id, updated);
     }
-    return () => {
-      voiceCleanups.forEach(fn => fn());
-    };
   }, [subVehicleRestante, vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate, playChime, onRutaBandCross]);
-
-  useEffect(() => {
-    if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo") return;
-    const activeSub = (vehicle.subVehiculos || []).find(s => s.status === "activo");
-    if (!activeSub?.rutaEnfoque?.activa || !activeSub.aperturaAt) return;
-    const key = `${activeSub.id}-${activeSub.aperturaAt}`;
-    if (subStartVoiceRef.current.has(key)) return;
-
-    const phrases = rutaVozFluidoParts(cleanSubTitulo(activeSub.titulo));
-    const cleanup = speakDesglosadorVoiceReliable(
-      `${vehicle.id}:intro-${key}`,
-      phrases,
-      true,
-      () => {
-        subStartVoiceRef.current.add(key);
-      }
-    );
-
-    return cleanup;
-  }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj]);
 
   const finalizeSubClose = useCallback((
     activeSubId: string,
@@ -1268,6 +1212,16 @@ function VehicleCard({
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
       rutaUmbralAlertKeysRef.current.clear();
+      const nextSub = allSubs.find(s => s.id === nextActiveSubId);
+      if (nextSub) {
+        dispatchDesglosadorSubIntroVoiceOnce(
+          vehicle.id,
+          nextSub.id,
+          nextSub.aperturaAt ?? now,
+          nextSub.titulo,
+          Boolean(nextSub.rutaEnfoque?.activa)
+        );
+      }
     }
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
     const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
@@ -1277,7 +1231,6 @@ function VehicleCard({
     setSubRutaSel(new Set());
     setSubRutaSinUso(false);
     setSubRutaPatron(null);
-    forceResetOrphanMutationLocks();
 
     const bloquePayload = { vehicleId: vehicle.id, sub: closedSub, status };
     setTimeout(() => {
@@ -3200,17 +3153,11 @@ function VehicleCard({
                                             </span>
                                           )}
                                           {pend && ringOperable && (
-                                            <div
-                                              className={`flex gap-1 flex-shrink-0 transition-opacity ${ringMutationLocked ? "opacity-40 pointer-events-none" : ""}`}
-                                              aria-busy={ringMutationLocked}
-                                            >
-                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
-                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
-                                              <button type="button" disabled={ringMutationLocked} onClick={(e) => { e.stopPropagation(); if (!ringMutationLocked) onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5 disabled:cursor-not-allowed" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
+                                            <div className="flex gap-1 flex-shrink-0">
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroCumplido?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(0,200,81,0.15)", color: VERDE, border: "1px solid rgba(0,200,81,0.4)" }}>Cumplido</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroFallado?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase" style={{ backgroundColor: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)" }}>Fallado</button>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); onSituacionCronometroReservar?.(vehicle.id, st.id); }} className="px-2 py-0.5 rounded text-[7px] font-black uppercase flex items-center gap-0.5" style={{ backgroundColor: "rgba(148,163,184,0.12)", color: PLATA, border: "1px solid rgba(148,163,184,0.35)" }} title="Devolver al Crisol (ruta S)"><FlaskConical size={9} /> Crisol</button>
                                             </div>
-                                          )}
-                                          {pend && ringOperable && ringMutationLocked && (
-                                            <span className="text-[6px] font-bold uppercase tracking-wider text-slate-600 flex-shrink-0">sync</span>
                                           )}
                                           {pend && situacionCronActivo && !enFoco && !ringOperable && (
                                             <span className="text-[7px] text-slate-600 flex-shrink-0">en cola</span>
@@ -3435,14 +3382,12 @@ function VehicleCard({
                       </p>
                       <button
                         type="button"
-                        disabled={situacionLibreSeleccion.size === 0 || encolarRingPending}
+                        disabled={situacionLibreSeleccion.size === 0}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (encolarRingPending || situacionLibreSeleccion.size === 0) return;
-                          setEncolarRingPending(true);
+                          if (situacionLibreSeleccion.size === 0) return;
                           onMoveSubTareasToCronometro?.(vehicle.id, [...situacionLibreSeleccion]);
                           setSituacionLibreSeleccion(new Set());
-                          window.setTimeout(() => setEncolarRingPending(false), 500);
                         }}
                         className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-40"
                         style={{ backgroundColor: "rgba(0,200,81,0.12)", color: VERDE, border: "1px solid rgba(0,200,81,0.35)" }}
@@ -3479,12 +3424,10 @@ function VehicleCard({
                   )}
                   <div className="flex gap-2 mt-2">
                     <input value={newSubTarea} onChange={(e) => setNewSubTarea(e.target.value)} onKeyDown={(e) => {
-                      if (e.key !== "Enter" || !newSubTarea.trim() || sellarRingPending) return;
+                      if (e.key !== "Enter" || !newSubTarea.trim()) return;
                       if (situacionCronActivo && onAddSubTareaUrgenteACola) {
-                        setSellarRingPending(true);
                         onAddSubTareaUrgenteACola(vehicle.id, newSubTarea.trim());
                         setNewSubTarea("");
-                        window.setTimeout(() => setSellarRingPending(false), 500);
                       } else if (onAddSubTarea) {
                         onAddSubTarea(vehicle.id, newSubTarea.trim());
                         setNewSubTarea("");
@@ -3494,13 +3437,11 @@ function VehicleCard({
                       <button
                         type="button"
                         onClick={() => {
-                          if (!newSubTarea.trim() || sellarRingPending) return;
-                          setSellarRingPending(true);
+                          if (!newSubTarea.trim()) return;
                           onAddSubTareaUrgenteACola(vehicle.id, newSubTarea.trim());
                           setNewSubTarea("");
-                          window.setTimeout(() => setSellarRingPending(false), 500);
                         }}
-                        disabled={!newSubTarea.trim() || sellarRingPending}
+                        disabled={!newSubTarea.trim()}
                         className="px-2 py-1.5 rounded-lg transition-all disabled:opacity-30 text-[6px] font-black uppercase leading-tight max-w-[5.5rem]"
                         style={{ backgroundColor: "rgba(0,255,195,0.12)", color: CYAN, border: "1px solid rgba(0,255,195,0.35)" }}
                         title="Crear y sellar directo en el ring de enfoque real"

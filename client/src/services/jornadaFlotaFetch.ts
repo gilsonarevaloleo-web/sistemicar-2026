@@ -66,7 +66,7 @@ export type BeginFlotaFetchOptions = {
   hasOptimisticPaint?: boolean;
 };
 
-/** Invalida fetch anterior y abre sesión nueva. */
+/** Invalida fetch anterior y abre sesión nueva (silenciosa — sin bloquear UI). */
 export function beginFlotaFetch(
   opts?: BeginFlotaFetchOptions
 ): { generation: number; signal: AbortSignal } {
@@ -74,11 +74,7 @@ export function beginFlotaFetch(
   flotaGeneration += 1;
   flotaAbort = new AbortController();
   loadingStartMs = Date.now();
-  if (!opts?.hasOptimisticPaint) {
-    setFlotaStatus("loading");
-  } else {
-    setFlotaStatus("ready");
-  }
+  setFlotaStatus("ready");
   return { generation: flotaGeneration, signal: flotaAbort.signal };
 }
 
@@ -104,27 +100,21 @@ export function completeFlotaFetch(generation: number): void {
 
 export function failFlotaFetchTimeout(generation: number): void {
   if (generation !== flotaGeneration) return;
-  if (paintedVehicleCount > 0) {
-    cancelFlotaFetch();
-    flotaGeneration += 1;
-    setFlotaStatus("ready");
-    return;
-  }
   cancelFlotaFetch();
   flotaGeneration += 1;
-  setFlotaStatus("timeout");
+  setFlotaStatus("ready");
 }
 
 export function getFlotaFetchGeneration(): number {
   return flotaGeneration;
 }
 
-/** Timeout duro: solo timeout si no hay vehículos pintados. */
+/** Timeout silencioso — invalida generación stale sin congelar la UI. */
 export function armFlotaFetchTimeout(generation: number): void {
   if (activeTimeoutId != null) clearTimeout(activeTimeoutId);
   activeTimeoutId = setTimeout(() => {
     activeTimeoutId = null;
-    if (isFlotaFetchCurrent(generation) && flotaStatus === "loading") {
+    if (isFlotaFetchCurrent(generation)) {
       failFlotaFetchTimeout(generation);
     }
   }, FLOTA_FETCH_TIMEOUT_MS);

@@ -1,5 +1,3 @@
-import { isLocalVehicleMutationLocked, LOCAL_VEHICLE_MUTATION_LOCK_MS } from "./localMutationLock";
-
 const DEFER_MS = 500;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -8,11 +6,6 @@ const pendingJobs: Array<() => void> = [];
 function flushDeferredVehicleCleanupJobs(): void {
   timer = null;
   if (pendingJobs.length === 0) return;
-
-  if (isLocalVehicleMutationLocked()) {
-    timer = setTimeout(flushDeferredVehicleCleanupJobs, LOCAL_VEHICLE_MUTATION_LOCK_MS);
-    return;
-  }
 
   const jobs = pendingJobs.splice(0, pendingJobs.length);
   for (const job of jobs) {

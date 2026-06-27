@@ -48,11 +48,6 @@ import {
   shouldPreserveLocalActivo,
 } from "./ghostVehicleEngine";
 import { reconcileVehicleListView } from "./vehicleSessionAuthority";
-import {
-  beginLocalVehicleMutation,
-  extendLocalVehicleMutation,
-  isLocalVehicleMutationLocked,
-} from "./localMutationLock";
 import { generateStableUuid } from "./stableUuid";
 import { mergeSovereigntyPointsLogs, spLogEffectiveMs } from "./dailyPointsCollect";
 import { sanitizeJournalSpLogs } from "./spLogHygiene";
@@ -886,7 +881,6 @@ async function persistVehicleToFirebase(
       v.id === provisionalId ? { ...v, id: docRef.id } : v
     );
     const remapped = updatedLocal.find(v => v.id === docRef.id);
-    extendLocalVehicleMutation("create-remap");
     saveLocalVehicles(updatedLocal);
     backupToLocal("vehicles", updatedLocal);
     window.dispatchEvent(new CustomEvent("vehicles-updated"));
@@ -1291,8 +1285,6 @@ export function subscribeToVehicles(
   onError: (error: Error) => void,
   options?: {
     isCloseInFlight?: (vehicleId: string) => boolean;
-    /** FlotaStore central: entrega snapshots aunque haya mutation lock (el store decide defer). */
-    deliverDuringMutationLock?: boolean;
   }
 ): () => void {
   if (isFirebaseConfigured() && db) {
@@ -1308,11 +1300,6 @@ export function subscribeToVehicles(
     }
 
     return onSnapshot(q, (snapshot) => {
-      if (isLocalVehicleMutationLocked() && !options?.deliverDuringMutationLock) {
-        console.log("[Vehicles] Snapshot ignorado — mutación local en curso");
-        return;
-      }
-
       const allDocs = snapshot.docs;
       const data = allDocs.map(d => {
         const raw = d.data();
@@ -1468,7 +1455,6 @@ export async function addVehicle(
   vehicle: Omit<Vehicle, "id" | "createdAt" | "userId" | "status">,
   options?: AddVehicleOptions
 ): Promise<AddVehicleResult> {
-  beginLocalVehicleMutation("create");
   const clientRequestId = options?.clientRequestId ?? `crq_${generateStableUuid()}`;
   const provisionalId = options?.provisionalId ?? generateStableUuid();
   const aperturaAt = vehicle.aperturaAt ?? Date.now();
@@ -1551,7 +1537,6 @@ export async function updateVehicleStatus(
 }
 
 export async function deleteVehicle(userId: string, vehicleId: string): Promise<void> {
-  beginLocalVehicleMutation("delete");
   if (isFirebaseConfigured() && db) {
     const path = getPrivatePath(userId, "vehicles");
     await deleteDoc(doc(db, path, vehicleId));

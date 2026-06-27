@@ -6,16 +6,6 @@ import {
   subscribeToVehicles,
   type Vehicle,
 } from "@/lib/persistence";
-import { hardwareClockNow } from "@/lib/hardwareClock";
-import {
-  armBackgroundWakeReentryShield,
-  clearBackgroundWakeReentryShieldIfActive,
-  forceResetOrphanMutationLocks,
-  getLocalMutationLockDebug,
-  isLocalVehicleMutationLocked,
-  isStructuralCloseInTransit,
-  LOCAL_VEHICLE_MUTATION_LOCK_MS,
-} from "@/lib/localMutationLock";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import { preferLocalSubTareasInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
@@ -24,7 +14,6 @@ import {
   armFlotaFetchTimeout,
   beginFlotaFetch,
   completeFlotaFetch,
-  getFlotaFetchStatus,
   setFlotaPaintedCount,
   shouldAcceptFlotaFetchResponse,
 } from "@/services/jornadaFlotaFetch";
@@ -52,20 +41,11 @@ let refCount = 0;
 let unsubFirebase: (() => void) | null = null;
 let mergeContext: FlotaMergeContext | null = null;
 let fetchGeneration = 0;
-let deferredMergeTimer: ReturnType<typeof setTimeout> | null = null;
-let deferredMergeForceTimer: ReturnType<typeof setTimeout> | null = null;
-/** Inicio del primer defer — TTL estricto aunque extendLocalVehicleMutation renueve el lock. */
-let deferredMergeFirstAt = 0;
-let syncReadyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingIncoming: { data: Vehicle[]; generation: number } | null = null;
+let remoteNotifyRafId: number | null = null;
+let remoteNotifyPending = false;
+let pendingRemoteAfterMerge: (() => void) | null = null;
 
-const DEFERRED_MERGE_MAX_WAIT_MS = LOCAL_VEHICLE_MUTATION_LOCK_MS;
 let vehiclesUpdatedHandler: (() => void) | null = null;
-let deferredMergeWakeHandler: (() => void) | null = null;
-let backgroundWakeFlushTimer: ReturnType<typeof setTimeout> | null = null;
-let lastDocumentVisibility: DocumentVisibilityState | null = null;
-
-const BACKGROUND_WAKE_SHIELD_MS = 800;
 
 const listeners = new Set<StoreListener>();
 
@@ -77,6 +57,47 @@ function notify(): void {
       /* noop */
     }
   });
+}
+
+/** Cancela notify diferido de snapshot remoto — mutadores locales tienen prioridad absoluta. */
+function cancelRemoteSnapshotNotifySchedule(): void {
+  if (remoteNotifyRafId != null && typeof cancelAnimationFrame !== "undefined") {
+    cancelAnimationFrame(remoteNotifyRafId);
+    remoteNotifyRafId = null;
+  }
+  remoteNotifyPending = false;
+  pendingRemoteAfterMerge = null;
+}
+
+/**
+ * Snapshots Firebase: búfer + disco sincrónico, pub/sub React en el siguiente frame.
+ * Nunca compite con taps del operador en el mismo tick.
+ */
+function scheduleRemoteSnapshotNotify(after?: () => void): void {
+  if (after) {
+    const prev = pendingRemoteAfterMerge;
+    pendingRemoteAfterMerge = prev
+      ? () => {
+          prev();
+          after();
+        }
+      : after;
+  }
+  if (remoteNotifyPending) return;
+  remoteNotifyPending = true;
+  const flush = () => {
+    remoteNotifyRafId = null;
+    remoteNotifyPending = false;
+    const cb = pendingRemoteAfterMerge;
+    pendingRemoteAfterMerge = null;
+    notify();
+    cb?.();
+  };
+  if (typeof requestAnimationFrame !== "undefined") {
+    remoteNotifyRafId = requestAnimationFrame(flush);
+  } else {
+    queueMicrotask(flush);
+  }
 }
 
 function hydrateLocalCache(): Vehicle[] {
@@ -114,7 +135,7 @@ function setVehiclesInternal(next: Vehicle[], opts?: { skipNotify?: boolean }): 
   if (!opts?.skipNotify) notify();
 }
 
-/** Actualiza búfer interno + firma sin disparar listeners de React (mutation lock activo). */
+/** Actualiza búfer interno + firma sin disparar listeners de React. */
 function setVehiclesBufferOnly(next: Vehicle[]): void {
   vehicles = next;
   syncLocalCache(next);
@@ -135,24 +156,6 @@ function markFlotaStoreHydrated(): void {
   flotaStoreHydrated = true;
 }
 
-/**
- * Guardián de autolimpieza — pulso del reloj global (1 s).
- * Cortocircuito durante hidratación en frío para evitar flush sobre búfer vacío.
- */
-export function runFlotaMutationLockGuardian(): void {
-  if (!flotaStoreHydrated || vehicles.length === 0) return;
-
-  const { until, closeInTransitUntil } = getLocalMutationLockDebug();
-  const now = hardwareClockNow();
-  if ((until > 0 && now > until) || (closeInTransitUntil > 0 && now > closeInTransitUntil)) {
-    console.warn(
-      "[FlotaStore] Guardián activado: Detectado candado residual expirado en caliente. Forzando liberación."
-    );
-    forceResetOrphanMutationLocks();
-    flushFlotaDeferredMergeIfReady();
-  }
-}
-
 export function getFlotaMergedSignature(): string {
   return mergedSig;
 }
@@ -165,6 +168,7 @@ export function subscribeFlotaStore(listener: StoreListener): () => void {
 export function setFlotaVehicles(
   update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])
 ): void {
+  cancelRemoteSnapshotNotifySchedule();
   const next = typeof update === "function" ? update(vehicles) : update;
   setVehiclesInternal(next);
   setFlotaPaintedCount(next.length);
@@ -174,139 +178,12 @@ export function registerFlotaMergeContext(ctx: FlotaMergeContext | null): void {
   mergeContext = ctx;
 }
 
-/** Marca fetch listo — siempre, incluso con mutation lock activo. */
 export function markSyncReady(generation: number): void {
   setFlotaPaintedCount(vehicles.length);
   completeFlotaFetch(generation);
 }
 
-function clearSyncReadyFallback(): void {
-  if (syncReadyFallbackTimer != null) {
-    clearTimeout(syncReadyFallbackTimer);
-    syncReadyFallbackTimer = null;
-  }
-}
-
-/** Cierra skeleton si snapshots de red quedan bloqueados (lock / caché Firebase). */
-function armSyncReadyFallback(generation: number): void {
-  clearSyncReadyFallback();
-  syncReadyFallbackTimer = setTimeout(() => {
-    syncReadyFallbackTimer = null;
-    if (!shouldAcceptFlotaFetchResponse(generation)) return;
-    if (getFlotaFetchStatus() !== "loading") return;
-    markSyncReady(generation);
-  }, LOCAL_VEHICLE_MUTATION_LOCK_MS + 100);
-}
-
-function clearDeferredMerge(): void {
-  if (deferredMergeTimer != null) {
-    clearTimeout(deferredMergeTimer);
-    deferredMergeTimer = null;
-  }
-  if (deferredMergeForceTimer != null) {
-    clearTimeout(deferredMergeForceTimer);
-    deferredMergeForceTimer = null;
-  }
-  pendingIncoming = null;
-  deferredMergeFirstAt = 0;
-}
-
-function forceDeferredMerge(): void {
-  const pending = pendingIncoming;
-  if (deferredMergeTimer != null) {
-    clearTimeout(deferredMergeTimer);
-    deferredMergeTimer = null;
-  }
-  if (deferredMergeForceTimer != null) {
-    clearTimeout(deferredMergeForceTimer);
-    deferredMergeForceTimer = null;
-  }
-  pendingIncoming = null;
-  deferredMergeFirstAt = 0;
-  if (!pending) return;
-  if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
-  applyIncomingSnapshot(pending.data, pending.generation, { force: true });
-}
-
-function clearBackgroundWakeFlushTimer(): void {
-  if (backgroundWakeFlushTimer != null) {
-    clearTimeout(backgroundWakeFlushTimer);
-    backgroundWakeFlushTimer = null;
-  }
-}
-
-/** Al volver de segundo plano: disyuntor si el TTL desde el primer defer ya venció. */
-export function flushFlotaDeferredMergeIfReady(opts?: { force?: boolean }): void {
-  if (!pendingIncoming) return;
-  if (opts?.force) {
-    forceDeferredMerge();
-    return;
-  }
-  const elapsed = deferredMergeFirstAt > 0 ? Date.now() - deferredMergeFirstAt : 0;
-  if (elapsed >= DEFERRED_MERGE_MAX_WAIT_MS) {
-    forceDeferredMerge();
-    return;
-  }
-  if (!isLocalVehicleMutationLocked()) {
-    const pending = pendingIncoming;
-    pendingIncoming = null;
-    deferredMergeFirstAt = 0;
-    if (deferredMergeTimer != null) {
-      clearTimeout(deferredMergeTimer);
-      deferredMergeTimer = null;
-    }
-    if (deferredMergeForceTimer != null) {
-      clearTimeout(deferredMergeForceTimer);
-      deferredMergeForceTimer = null;
-    }
-    if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
-    applyIncomingSnapshot(pending.data, pending.generation);
-  }
-}
-
-function scheduleDeferredMerge(data: Vehicle[], generation: number): void {
-  pendingIncoming = { data, generation };
-  const now = Date.now();
-  if (deferredMergeFirstAt === 0) deferredMergeFirstAt = now;
-
-  const ttlRemaining = DEFERRED_MERGE_MAX_WAIT_MS - (now - deferredMergeFirstAt);
-  if (ttlRemaining <= 0) {
-    forceDeferredMerge();
-    return;
-  }
-
-  if (deferredMergeForceTimer == null) {
-    deferredMergeForceTimer = setTimeout(forceDeferredMerge, ttlRemaining);
-  }
-
-  if (deferredMergeTimer != null) return;
-
-  deferredMergeTimer = setTimeout(() => {
-    deferredMergeTimer = null;
-    if (!isLocalVehicleMutationLocked()) {
-      const pending = pendingIncoming;
-      pendingIncoming = null;
-      deferredMergeFirstAt = 0;
-      if (deferredMergeForceTimer != null) {
-        clearTimeout(deferredMergeForceTimer);
-        deferredMergeForceTimer = null;
-      }
-      if (!pending) return;
-      if (!shouldAcceptFlotaFetchResponse(pending.generation)) return;
-      applyIncomingSnapshot(pending.data, pending.generation);
-      return;
-    }
-    const elapsed = Date.now() - deferredMergeFirstAt;
-    const wait = Math.max(0, DEFERRED_MERGE_MAX_WAIT_MS - elapsed);
-    if (wait === 0) {
-      forceDeferredMerge();
-    } else {
-      deferredMergeTimer = setTimeout(forceDeferredMerge, wait);
-    }
-  }, LOCAL_VEHICLE_MUTATION_LOCK_MS + 50);
-}
-
-type ApplySnapshotOpts = { duringMutationLock?: boolean; force?: boolean };
+type ApplySnapshotOpts = { force?: boolean };
 
 function applyIncomingSnapshot(
   data: Vehicle[],
@@ -334,23 +211,6 @@ function applyIncomingSnapshot(
 
   const sig = vehiclesReactiveSignature(merged);
   const uid = ctx?.userId ?? userId;
-  const lockActive = isLocalVehicleMutationLocked();
-  const silentBuffer = opts?.duringMutationLock === true && lockActive && opts?.force !== true;
-
-  // FASE 1: búfer silencioso — disco + memoria interna, sin hook reactivo
-  if (silentBuffer) {
-    if (uid && merged.length > 0) {
-      writeLocalFlota(uid, merged);
-    }
-    setVehiclesBufferOnly(merged);
-    markSyncReady(generation);
-    return;
-  }
-
-  if (uid && merged.length > 0 && sig !== mergedSig) {
-    writeLocalFlota(uid, merged);
-    syncLocalCache(merged);
-  }
 
   if (sig === mergedSig && !opts?.force) {
     markSyncReady(generation);
@@ -363,83 +223,25 @@ function applyIncomingSnapshot(
     return;
   }
 
-  // Filtro de transición: cierre estructural en tránsito — búfer sin notify
-  if (isStructuralCloseInTransit() && !opts?.force) {
-    if (uid && merged.length > 0) {
-      writeLocalFlota(uid, merged);
-    }
-    setVehiclesBufferOnly(merged);
-    markSyncReady(generation);
-    return;
+  if (uid && merged.length > 0) {
+    writeLocalFlota(uid, merged);
   }
-
-  setVehiclesInternal(merged);
+  setVehiclesBufferOnly(merged);
   setFlotaPaintedCount(merged.length);
   markFlotaStoreHydrated();
-  ctx?.onAfterRemoteMerge?.(merged);
   markSyncReady(generation);
+
+  scheduleRemoteSnapshotNotify(() => ctx?.onAfterRemoteMerge?.(merged));
 }
 
 function handleIncomingSnapshot(data: Vehicle[], generation: number): void {
   if (!shouldAcceptFlotaFetchResponse(generation)) return;
-
-  if (isLocalVehicleMutationLocked()) {
-    applyIncomingSnapshot(data, generation, { duringMutationLock: true });
-    scheduleDeferredMerge(data, generation);
-    return;
-  }
-
-  clearDeferredMerge();
   applyIncomingSnapshot(data, generation);
-}
-
-function isRealBackgroundWake(
-  prev: DocumentVisibilityState | null,
-  next: DocumentVisibilityState
-): boolean {
-  if (next !== "visible") return false;
-  const p = String(prev ?? "");
-  return p === "hidden" || p === "prerender";
-}
-
-function installDeferredMergeWakeBridge(): void {
-  if (deferredMergeWakeHandler || typeof document === "undefined") return;
-  lastDocumentVisibility = document.visibilityState;
-  deferredMergeWakeHandler = () => {
-    const prev = lastDocumentVisibility;
-    const next = document.visibilityState;
-    lastDocumentVisibility = next;
-    if (!isRealBackgroundWake(prev, next)) return;
-
-    armBackgroundWakeReentryShield(BACKGROUND_WAKE_SHIELD_MS);
-
-    clearBackgroundWakeFlushTimer();
-    backgroundWakeFlushTimer = setTimeout(() => {
-      backgroundWakeFlushTimer = null;
-      try {
-        flushFlotaDeferredMergeIfReady({ force: true });
-      } catch (err) {
-        console.warn("[flotaStore] background-wake flush failed:", err);
-        clearDeferredMerge();
-        clearBackgroundWakeReentryShieldIfActive();
-      }
-    }, BACKGROUND_WAKE_SHIELD_MS);
-  };
-  document.addEventListener("visibilitychange", deferredMergeWakeHandler);
-}
-
-function uninstallDeferredMergeWakeBridge(): void {
-  if (!deferredMergeWakeHandler || typeof document === "undefined") return;
-  document.removeEventListener("visibilitychange", deferredMergeWakeHandler);
-  deferredMergeWakeHandler = null;
-  lastDocumentVisibility = null;
-  clearBackgroundWakeFlushTimer();
 }
 
 function installVehiclesUpdatedBridge(): void {
   if (vehiclesUpdatedHandler || typeof window === "undefined") return;
   vehiclesUpdatedHandler = () => {
-    if (isLocalVehicleMutationLocked()) return;
     const disk = getLocalVehicles();
     syncLocalCache(disk);
     if (vehicles.length === 0 && disk.length > 0) {
@@ -459,17 +261,13 @@ function uninstallVehiclesUpdatedBridge(): void {
 function stopFirebaseSubscription(): void {
   unsubFirebase?.();
   unsubFirebase = null;
-  clearDeferredMerge();
-  clearBackgroundWakeFlushTimer();
-  clearSyncReadyFallback();
+  cancelRemoteSnapshotNotifySchedule();
   uninstallVehiclesUpdatedBridge();
-  uninstallDeferredMergeWakeBridge();
 }
 
 function startFirebaseSubscription(uid: string): void {
   stopFirebaseSubscription();
   installVehiclesUpdatedBridge();
-  installDeferredMergeWakeBridge();
 
   const local = hydrateLocalCache();
   if (local.length > 0 && vehicles.length === 0) {
@@ -483,9 +281,6 @@ function startFirebaseSubscription(uid: string): void {
   const isCloseInFlight = (vehicleId: string): boolean =>
     mergeContext?.isCloseInFlight(vehicleId) ?? false;
 
-  const generationAtSubscribe = fetchGeneration;
-  armSyncReadyFallback(generationAtSubscribe);
-
   unsubFirebase = subscribeToVehicles(
     uid,
     data => handleIncomingSnapshot(data, fetchGeneration),
@@ -494,22 +289,20 @@ function startFirebaseSubscription(uid: string): void {
       console.error("[flotaStore]", err);
       markSyncReady(fetchGeneration);
     },
-    { isCloseInFlight, deliverDuringMutationLock: true }
+    { isCloseInFlight }
   );
 }
 
 /**
- * Inicia sesión de fetch (timeout, estado loading/ready).
+ * Inicia sesión de fetch silenciosa en background.
  * Llamar desde Jornada al montar o reintentar.
  */
 export function refreshFlotaSession(opts?: { hasOptimisticPaint?: boolean }): number {
   const { generation } = beginFlotaFetch(opts);
   fetchGeneration = generation;
   armFlotaFetchTimeout(generation);
-  if (vehicles.length > 0 && getFlotaFetchStatus() === "loading") {
+  if (vehicles.length > 0) {
     markSyncReady(generation);
-  } else {
-    armSyncReadyFallback(generation);
   }
   return generation;
 }
@@ -535,18 +328,17 @@ export function releaseFlotaStore(): void {
   refCount = Math.max(0, refCount - 1);
   if (refCount === 0) {
     stopFirebaseSubscription();
-  userId = null;
-  mergeContext = null;
-  localCache = null;
-  flotaStoreHydrated = false;
-}
+    userId = null;
+    mergeContext = null;
+    localCache = null;
+    flotaStoreHydrated = false;
+  }
 }
 
 /** Solo tests — reinicia estado global. */
 export function resetFlotaStoreForTests(): void {
   stopFirebaseSubscription();
-  clearDeferredMerge();
-  clearSyncReadyFallback();
+  cancelRemoteSnapshotNotifySchedule();
   listeners.clear();
   userId = null;
   vehicles = [];

@@ -27,6 +27,7 @@ import { decisionKeySubDesglosador, recordDecision } from "@/lib/decisionesLedge
 import { sealVehicleSessionClose } from "@/lib/vehicleSessionSeal";
 import { armEntropyGapOnConsciousClose } from "@/engines/ConcienciaEngine";
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
+import { runShadowTask, runShadowTaskAsync } from "@/lib/desglosadorShadow";
 
 export type DesglosadorClosePatch = {
   status: "cumplido";
@@ -178,13 +179,6 @@ export function applyDesglosadorCloseOptimistic(
   const subsConRuta = buildSubsConRuta(subs, rutaDeclaradaGlobal);
   const psRuta = subsConRuta.reduce((sum, s) => sum + computeRutaPrivilegioPS(s), 0);
 
-  notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
-  sealVehicleSessionClose(vehicleId, {
-    cierreAt,
-    status: "cumplido",
-    clientRequestId: vehicle.clientRequestId,
-  });
-
   const childInterrupts = getAllVehicles().filter(
     v =>
       v.status === "activo" &&
@@ -196,7 +190,6 @@ export function applyDesglosadorCloseOptimistic(
   if (childInterrupts.length > 0) {
     const nowChild = Date.now();
     for (const child of childInterrupts) {
-      notifyVehicleClosed(child.id, child.clientRequestId);
       markOrphanInterrupt?.(child.id);
     }
     patchAllVehicles(list =>
@@ -237,15 +230,9 @@ export function applyDesglosadorCloseOptimistic(
 
   patchAllVehicles(list => list.map(v => (v.id === vehicleId ? { ...v, ...closePatch } : v)));
   persistVehicles();
-
-  armEntropyGapOnConsciousClose({
-    segmentos,
-    vehiculosAfterClose: getAllVehicles(),
-    cierreAt,
-  });
   onConquistaPulse();
 
-  return {
+  const shadowResult = {
     closePatch,
     subsConRuta,
     childInterrupts,
@@ -256,6 +243,25 @@ export function applyDesglosadorCloseOptimistic(
     psRuta,
     rutaCruzada,
   };
+
+  runShadowTask(() => {
+    notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+    sealVehicleSessionClose(vehicleId, {
+      cierreAt,
+      status: "cumplido",
+      clientRequestId: vehicle.clientRequestId,
+    });
+    for (const child of childInterrupts) {
+      notifyVehicleClosed(child.id, child.clientRequestId);
+    }
+    armEntropyGapOnConsciousClose({
+      segmentos,
+      vehiculosAfterClose: getAllVehicles(),
+      cierreAt,
+    });
+  });
+
+  return shadowResult;
 }
 
 export function scheduleGlobalCycleLiquidation(
@@ -265,7 +271,7 @@ export function scheduleGlobalCycleLiquidation(
     execute?: (deps: DesglosadorLiquidationDeps) => Promise<void>;
   }
 ): void {
-  const defer = options?.defer ?? (run => setTimeout(run, 0));
+  const defer = options?.defer ?? runShadowTaskAsync;
   const execute = options?.execute ?? executeGlobalCycleLiquidation;
   defer(() => {
     void execute(deps);
@@ -430,12 +436,20 @@ export async function executeGlobalCycleLiquidation(
       psTotal: sessionTotalPs,
       psAwardedNow: closeDeltaPs,
     });
-    deps.onCelebration(vehicleId, vehicle.titulo, celebrationSummary);
-    if (closeDeltaPs > 0) {
-      deps.onToastSuccess?.(
-        `+${closeDeltaPs} PS sumados a tu barra`,
-        "Revisa el resumen del ciclo en pantalla."
-      );
+
+    const showCelebration = () => {
+      deps.onCelebration(vehicleId, vehicle.titulo, celebrationSummary);
+      if (closeDeltaPs > 0) {
+        deps.onToastSuccess?.(
+          `+${closeDeltaPs} PS sumados a tu barra`,
+          "Revisa el resumen del ciclo en pantalla."
+        );
+      }
+    };
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(showCelebration);
+    } else {
+      showCelebration();
     }
   } catch (err) {
     console.error("[desglosadorLiquidation] Error:", err);

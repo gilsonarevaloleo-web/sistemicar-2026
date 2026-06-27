@@ -16,6 +16,7 @@ import {
 import {
   getIsRemountingJornada,
 } from "./jornadaRemount";
+import { runShadowTask } from "./desglosadorShadow";
 import {
   isPostCallAudioShieldActive,
   msUntilPostCallAudioAllowed,
@@ -914,6 +915,27 @@ export function speakUbicacionSingle(
   source: UbicacionVoiceSource = "situacion"
 ): void {
   speakUbicacionQueue([text], false, source);
+}
+
+/**
+ * Cola pasiva desglosador — despacho instantáneo, síntesis en sombra (no bloquea render).
+ */
+export function enqueueDesglosadorVoicePassive(
+  key: string,
+  phrases: string[],
+  opts?: { cancelPrevious?: boolean; onPhraseStarted?: () => void }
+): void {
+  const filtered = phrases.map(p => p.trim()).filter(Boolean);
+  if (filtered.length === 0) return;
+  runShadowTask(() => {
+    speakUbicacionQueue(
+      filtered,
+      opts?.cancelPrevious ?? false,
+      "desglosador",
+      opts?.onPhraseStarted,
+      key
+    );
+  });
 }
 
 /** API directa del motor — texto, canal, key opcional. */

@@ -9,7 +9,7 @@ import {
   type UserProgression,
   type Vehicle,
 } from "@/lib/persistence";
-import { acquireFlotaStore, getFlotaVehicles, runFlotaMutationLockGuardian, subscribeFlotaStore } from "@/flota/flotaStore";
+import { acquireFlotaStore, getFlotaVehicles, subscribeFlotaStore } from "@/flota/flotaStore";
 import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
@@ -155,7 +155,6 @@ export function SegmentAttentionBackground() {
     const initialTickId = window.setTimeout(() => void runTick({ force: true }), INITIAL_TICK_DEFER_MS);
 
     const pulseConcienciaClock = () => {
-      runFlotaMutationLockGuardian();
       dispatchConcienciaClockTick();
     };
 

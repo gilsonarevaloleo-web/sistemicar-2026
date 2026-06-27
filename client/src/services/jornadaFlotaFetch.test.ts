@@ -30,7 +30,7 @@ describe("jornadaFlotaFetch", () => {
     const b = beginFlotaFetch();
     assert.equal(isFlotaFetchCurrent(a.generation), false);
     assert.equal(isFlotaFetchCurrent(b.generation), true);
-    assert.equal(getFlotaFetchStatus(), "loading");
+    assert.equal(getFlotaFetchStatus(), "ready");
   });
 
   it("pintado optimista mantiene ready", () => {
@@ -43,16 +43,16 @@ describe("jornadaFlotaFetch", () => {
     const a = beginFlotaFetch();
     const b = beginFlotaFetch();
     completeFlotaFetch(a.generation);
-    assert.equal(getFlotaFetchStatus(), "loading");
+    assert.equal(getFlotaFetchStatus(), "ready");
     completeFlotaFetch(b.generation);
     assert.equal(getFlotaFetchStatus(), "ready");
   });
 
-  it("timeout a los 6s si no hay vehículos pintados", async () => {
+  it("timeout silencioso mantiene ready", async () => {
     const { generation } = beginFlotaFetch();
     armFlotaFetchTimeout(generation);
     await new Promise(resolve => setTimeout(resolve, FLOTA_FETCH_TIMEOUT_MS + 50));
-    assert.equal(getFlotaFetchStatus(), "timeout");
+    assert.equal(getFlotaFetchStatus(), "ready");
     assert.equal(shouldAcceptFlotaFetchResponse(generation), true);
   });
 
@@ -64,10 +64,10 @@ describe("jornadaFlotaFetch", () => {
     assert.equal(getFlotaFetchStatus(), "ready");
   });
 
-  it("retryFlotaFetch reinicia sesión tras timeout", () => {
+  it("retryFlotaFetch reinicia sesión silenciosa", () => {
     const first = beginFlotaFetch();
     failFlotaFetchTimeout(first.generation);
-    assert.equal(getFlotaFetchStatus(), "timeout");
+    assert.equal(getFlotaFetchStatus(), "ready");
     const retry = retryFlotaFetch({ hasOptimisticPaint: true });
     assert.equal(getFlotaFetchStatus(), "ready");
     assert.equal(isFlotaFetchCurrent(retry.generation), true);

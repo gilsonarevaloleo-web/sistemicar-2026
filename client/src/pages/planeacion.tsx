@@ -176,6 +176,13 @@ import {
   isDesglosadorLiquidationInFlight,
   scheduleGlobalCycleLiquidation,
 } from "@/lib/desglosadorCycleLiquidation";
+import { runShadowTask } from "@/lib/desglosadorShadow";
+import {
+  registerDesglosadorDepthReconciler,
+  scheduleDesglosadorDepthOnTap,
+  syncDesglosadorDepthActiveIds,
+} from "@/services/desglosadorDepthShadow";
+import { dispatchDesglosadorSubIntroVoiceOnce } from "@/lib/desglosadorVoiceDispatch";
 import {
   computeDesglosadorTiempoCloseSummary,
   fmtDesgloseSec,
@@ -225,7 +232,6 @@ import { pausePuntoCeroStepVoiceForRemount, resumeStepVoiceAfterRemount } from "
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
-  speakDesglosadorVoiceReliable,
 } from "@/lib/desglosadorVoice";
 import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
 import {
@@ -492,7 +498,6 @@ import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buil
 import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
-import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { BotonRepararJornada } from "@/components/jornada/BotonRepararJornada";
 import {
   JORNADA_BACKUP_INTERVAL_MS,
@@ -504,16 +509,11 @@ import {
 import { setJornadaFatalError } from "@/lib/jornadaFatalError";
 import {
   cancelFlotaFetch,
-  getFlotaFetchStatus,
   onFlotaStaleLoadingRefetch,
   onJornadaVisibilityReturn,
-  retryFlotaFetch,
   setFlotaPaintedCount,
-  subscribeFlotaFetchStatus,
-  type FlotaFetchStatus,
 } from "@/services/jornadaFlotaFetch";
 import {
-  hasLocalFlotaPaint,
   readLocalFlota,
   writeLocalFlota,
 } from "@/services/jornadaFlotaCache";
@@ -526,17 +526,7 @@ import {
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
-import {
-  beginLocalVehicleMutation,
-  extendLocalVehicleMutation,
-  forceResetOrphanMutationLocks,
-  markStructuralCloseInTransit,
-  releaseMutationLockWithDelay,
-  isLocalVehicleMutationLocked,
-  LOCAL_VEHICLE_MUTATION_LOCK_MS,
-} from "@/lib/localMutationLock";
 import { hasActiveConsciousJornadaProcess } from "@/lib/jornadaConsciousGuard";
-import { releaseOperatorTapLocks } from "@/lib/operatorTapPriority";
 import {
   buildDesglosadorNestedPausePatch,
   buildNestedParentResumePatch,
@@ -1031,9 +1021,6 @@ export default function Planeacion() {
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
   /** Refresco ligero de UI de segmentos (puertas/ventanas) sin recomputar métricas pesadas en render. */
   const segmentUiTick = useConcienciaClockTick();
-  const [flotaFetchStatus, setFlotaFetchStatus] = useState<FlotaFetchStatus>(() =>
-    vehicles.length > 0 ? "ready" : getFlotaFetchStatus()
-  );
   const resumeGenRef = useRef(0);
   const rehydrateFlotaFromLocalRef = useRef<(() => void) | null>(null);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
@@ -1111,35 +1098,37 @@ export default function Planeacion() {
 
     const vehicle = vehiclesRef.current.find(v => v.id === payload.vehicleId);
     if (vehicle?.tipoReloj === "desglosador") {
-      void (async () => {
-        const { sub, awarded } = await awardDesglosadorSubPointsIfNeeded(
-          vehicle.titulo,
-          payload.sub,
-          safeAwardPS
-        );
-        if (awarded > 0) {
-          const patchOne = (list: Vehicle[]) =>
-            list.map(v => {
-              if (v.id !== payload.vehicleId) return v;
-              const subs = (v.subVehiculos ?? []).map(s => (s.id === sub.id ? sub : s));
-              return { ...v, subVehiculos: subs };
+      runShadowTask(() => {
+        void (async () => {
+          const { sub, awarded } = await awardDesglosadorSubPointsIfNeeded(
+            vehicle.titulo,
+            payload.sub,
+            safeAwardPS
+          );
+          if (awarded > 0) {
+            const patchOne = (list: Vehicle[]) =>
+              list.map(v => {
+                if (v.id !== payload.vehicleId) return v;
+                const subs = (v.subVehiculos ?? []).map(s => (s.id === sub.id ? sub : s));
+                return { ...v, subVehiculos: subs };
+              });
+            setVehicles(patchOne);
+            vehiclesRef.current = patchOne(vehiclesRef.current);
+            saveLocalVehicles(vehiclesRef.current);
+            const subVehiculos = vehiclesRef.current.find(v => v.id === payload.vehicleId)?.subVehiculos;
+            if (subVehiculos) {
+              void updateVehicle(user.uid, payload.vehicleId, { subVehiculos }).catch(e =>
+                console.warn("[recordBloqueCierre] psOtorgados sync:", e)
+              );
+            }
+            toast.success(`+${awarded} PS · ${cleanSubTitulo(sub.titulo)}`, {
+              description: `Sub cumplido (+${DESGLOSADOR_SUB_CUMPLIDO_PS} base${awarded > DESGLOSADOR_SUB_CUMPLIDO_PS ? " + ruta" : ""}) · sumado a tu barra del día`,
+              style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+              duration: 2800,
             });
-          setVehicles(patchOne);
-          vehiclesRef.current = patchOne(vehiclesRef.current);
-          saveLocalVehicles(vehiclesRef.current);
-          const subVehiculos = vehiclesRef.current.find(v => v.id === payload.vehicleId)?.subVehiculos;
-          if (subVehiculos) {
-            void updateVehicle(user.uid, payload.vehicleId, { subVehiculos }).catch(e =>
-              console.warn("[recordBloqueCierre] psOtorgados sync:", e)
-            );
           }
-          toast.success(`+${awarded} PS · ${cleanSubTitulo(sub.titulo)}`, {
-            description: `Sub cumplido (+${DESGLOSADOR_SUB_CUMPLIDO_PS} base${awarded > DESGLOSADOR_SUB_CUMPLIDO_PS ? " + ruta" : ""}) · sumado a tu barra del día`,
-            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
-            duration: 2800,
-          });
-        }
-      })();
+        })();
+      });
     }
 
     void recordFocusBandEvent(user.uid, {
@@ -1307,13 +1296,12 @@ export default function Planeacion() {
     if (!user) return;
 
     const cachedFlota = readLocalFlota(user.uid);
-    const hasOptimistic = cachedFlota.length > 0 || vehiclesRef.current.length > 0;
-    if (hasOptimistic && vehiclesRef.current.length === 0) {
-      setVehicles(prev => (prev.length > 0 ? prev : cachedFlota));
-      console.log("[flota] UI optimista", cachedFlota.length);
+    if (cachedFlota.length > 0 && vehiclesRef.current.length === 0) {
+      setVehicles(cachedFlota);
+      console.log("[flota] UI optimista", cachedFlota.length, "vehículos");
     }
 
-    refreshFlotaSession({ hasOptimisticPaint: hasOptimistic });
+    refreshFlotaSession({ hasOptimisticPaint: cachedFlota.length > 0 || vehiclesRef.current.length > 0 });
   }, [user, setVehicles]);
 
   useEffect(() => {
@@ -1336,7 +1324,6 @@ export default function Planeacion() {
       isCloseInFlight,
       onAfterRemoteMerge: () => {
         scheduleDeferredVehicleCleanup(() => {
-          if (isLocalVehicleMutationLocked()) return;
           const archived = archiveOrphanDesglosadorInterrupts(vehiclesRef.current, Date.now());
           const archivedSig = vehiclesReactiveSignature(archived);
           if (archivedSig === getFlotaMergedSignature()) return;
@@ -1485,33 +1472,7 @@ export default function Planeacion() {
     escaleraConciencia,
   } = heavyMetrics;
 
-  const [jornadaBooting, setJornadaBooting] = useState(true);
-  const [bootCapReached, setBootCapReached] = useState(false);
-  const jornadaBootingRef = useRef(true);
   const ringSellarInFlightRef = useRef(new Set<string>());
-
-  useEffect(() => {
-    jornadaBootingRef.current = jornadaBooting;
-    if (!jornadaBooting) setBootCapReached(false);
-  }, [jornadaBooting]);
-
-  /** Tras 3s de boot sin flota pintada, mostrar Reparar (evita skeleton infinito en móvil). */
-  useEffect(() => {
-    if (!jornadaBooting) return;
-    const id = window.setTimeout(() => setBootCapReached(true), 3000);
-    return () => clearTimeout(id);
-  }, [jornadaBooting]);
-
-  /** Watchdog 3s — quita overlay si flota ya resolvió o expiró. */
-  useEffect(() => {
-    if (!jornadaBooting) return;
-    const id = window.setTimeout(() => {
-      if (jornadaBootingRef.current) {
-        setJornadaBooting(false);
-      }
-    }, 3000);
-    return () => clearTimeout(id);
-  }, [jornadaBooting]);
 
   useEffect(() => {
     if (!user) return;
@@ -1552,24 +1513,6 @@ export default function Planeacion() {
     return () => window.removeEventListener("sovereignty-points-awarded", onAward);
   }, [user]);
 
-  useEffect(() => {
-    return subscribeFlotaFetchStatus(() => {
-      const status = getFlotaFetchStatus();
-      setFlotaFetchStatus(status);
-      if (status === "ready" || status === "timeout") {
-        setJornadaBooting(false);
-      }
-    });
-  }, []);
-
-  const handleRetryFlotaFetch = useCallback(() => {
-    if (!user) return;
-    const hasOptimistic = hasLocalFlotaPaint(user.uid) || vehiclesRef.current.length > 0;
-    if (!hasOptimistic) setJornadaBooting(true);
-    retryFlotaFetch({ hasOptimisticPaint: hasOptimistic });
-    setupFlotaSubscription();
-  }, [user, setupFlotaSubscription]);
-
   /** Montaje / retorno desde background: TTS y heavy metrics no compiten con el primer paint. */
   const scheduleJornadaForegroundResume = useCallback((afterReady?: () => void) => {
     const gen = ++resumeGenRef.current;
@@ -1600,8 +1543,6 @@ export default function Planeacion() {
 
   const handleJornadaVisibilityReturn = useCallback(() => {
     if (!user || document.visibilityState !== "visible") return;
-    const hasPaint = hasLocalFlotaPaint(user.uid) || vehiclesRef.current.length > 0;
-    if (!hasPaint) setJornadaBooting(true);
     rehydrateFlotaFromLocalRef.current?.();
     setupFlotaSubscription();
     scheduleJornadaForegroundResume(() => {
@@ -1622,33 +1563,13 @@ export default function Planeacion() {
     const mountGuardTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       isViewMountingRef.current = false;
     }, 400);
-    setJornadaBooting(true);
     warmupSpeechSynthesis();
     recoverSpeechQueue();
-    const finishBoot = () => setJornadaBooting(false);
-    let idleId: number | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    if (typeof requestIdleCallback !== "undefined") {
-      idleId = requestIdleCallback(finishBoot, { timeout: 2000 });
-    } else {
-      timeoutId = window.setTimeout(finishBoot, 300);
-    }
     return () => {
       window.clearTimeout(mountGuardTimer);
       isViewMountingRef.current = false;
       endJornadaViewMount();
       cancelJornadaRemountGuard();
-      if (idleId !== undefined && typeof cancelIdleCallback !== "undefined") {
-        cancelIdleCallback(idleId);
-      }
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-    };
-  }, []);
-
-  /** Al abandonar Planificación: libera candados huérfanos (teardown / cierre a medias). */
-  useEffect(() => {
-    return () => {
-      forceResetOrphanMutationLocks();
     };
   }, []);
 
@@ -1818,13 +1739,10 @@ export default function Planeacion() {
     return true;
   };
   const beginClose = (vehicleId: string) => {
-    beginLocalVehicleMutation("close");
-    markStructuralCloseInTransit();
     closingInProgressRef.current.set(vehicleId, Date.now());
   };
   const endClose = (vehicleId: string) => {
     closingInProgressRef.current.delete(vehicleId);
-    releaseMutationLockWithDelay();
     ghostReconcileRef.current?.();
   };
   const pausaInterrupcionLockRef = useRef<string | null>(null);
@@ -2002,7 +1920,6 @@ export default function Planeacion() {
   useEffect(() => {
     if (!user || !orphanInterruptSignature) return;
     scheduleDeferredVehicleCleanup(() => {
-      if (isLocalVehicleMutationLocked()) return;
       const vehicles = vehiclesRef.current;
       const byId = new Map(vehicles.map(v => [v.id, v]));
       const orphans = vehicles.filter(
@@ -2012,7 +1929,6 @@ export default function Planeacion() {
           !isCloseBlocked(v.id)
       );
       if (orphans.length === 0) return;
-      beginLocalVehicleMutation("orphan-cleanup");
       const now = Date.now();
       const patches = new Map(
         orphans.map(o => {
@@ -2269,7 +2185,6 @@ export default function Planeacion() {
   };
 
   const handleFlotaSave = async () => {
-    releaseOperatorTapLocks();
     if (!user) {
       toast.error("Inicia sesión para lanzar vehículos");
       return;
@@ -3032,7 +2947,6 @@ export default function Planeacion() {
   ];
 
   const handleQuickSaveAndNew = async (tipoTermino: TipoTerminoRapido, detalle?: string) => {
-    releaseOperatorTapLocks();
     if (!user || !titulo.trim()) return;
     const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "quick_save");
     if (!slotsCheck.allowed) {
@@ -4165,10 +4079,6 @@ export default function Planeacion() {
     return { grantedTotal: newGranted, awardedNow: delta };
   }, [user, safeAwardPS]);
 
-  const handleDesglosadorDepthTick = useCallback((vehicleId: string) => {
-    void reconcileDesglosadorDepthPS(vehicleId, { silent: false });
-  }, [reconcileDesglosadorDepthPS]);
-
   const desglosadorProgressScore = (subs: SubVehiculo[] | undefined): number =>
     (subs ?? []).reduce((acc, s) => {
       if (s.status === "cumplido" || s.status === "fallado") return acc + 100;
@@ -4239,11 +4149,11 @@ export default function Planeacion() {
     );
 
     if (opts?.resetDepth) {
-      void reconcileDesglosadorDepthPS(vehicleId, { silent: true, resetGranted: 0 });
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
     } else if (opts?.silentDepth) {
-      void reconcileDesglosadorDepthPS(vehicleId, { silent: true });
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: true });
     } else {
-      void reconcileDesglosadorDepthPS(vehicleId, { silent: false });
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: false });
     }
   }, [user]);
 
@@ -4293,6 +4203,13 @@ export default function Planeacion() {
     const now = Date.now();
     subs[targetIdx] = { ...subs[targetIdx], status: "activo", aperturaAt: now };
     handleDesglosadorUpdate(vehicleId, subs, { silentDepth: true });
+    dispatchDesglosadorSubIntroVoiceOnce(
+      vehicleId,
+      subs[targetIdx].id,
+      now,
+      subs[targetIdx].titulo,
+      Boolean(subs[targetIdx].rutaEnfoque?.activa)
+    );
     toast.success("Sub en curso", {
       description: cleanSubTitulo(subs[targetIdx].titulo),
       style: { backgroundColor: PIZARRA, border: `1px solid ${NARANJA}`, color: NARANJA },
@@ -4325,6 +4242,15 @@ export default function Planeacion() {
     const activate = !hasActive && allDone;
     const newSub = buildDesglosadorSubFromRuntime(form, subs, { activate });
     handleDesglosadorUpdate(vehicleId, [...subs, newSub], { silentDepth: true });
+    if (activate && newSub.aperturaAt) {
+      dispatchDesglosadorSubIntroVoiceOnce(
+        vehicleId,
+        newSub.id,
+        newSub.aperturaAt,
+        newSub.titulo,
+        Boolean(newSub.rutaEnfoque?.activa)
+      );
+    }
     toast.success("Subtarea añadida", {
       description: activate
         ? `"${titulo}" · en curso ahora`
@@ -4355,7 +4281,6 @@ export default function Planeacion() {
     setExpandedId(prev => (prev === vehicleId ? null : prev));
     setCierreEnergiaPending(null);
     setCierreEnergiaSeleccion(null);
-    releaseOperatorTapLocks();
 
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return;
@@ -4560,7 +4485,6 @@ export default function Planeacion() {
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return undefined;
     if (showEntropyDebug) performance.mark("add-subtarea-start");
-    beginLocalVehicleMutation("sub-situacion");
     const proyectoId = resolveProyectoIdEnfoqueSituacion(vehicle, segmentoActivo?.proyectoVinculadoId);
     const newSubTarea = {
       id: `st_${Date.now()}`,
@@ -4575,7 +4499,6 @@ export default function Planeacion() {
     startTransition(() => {
       setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
     });
-    extendLocalVehicleMutation("sub-situacion");
     void updateVehicle(user.uid, vehicleId, { subTareas })
       .then(() => {
         const live = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -4613,7 +4536,6 @@ export default function Planeacion() {
       return false;
     }
     const { subTareas, situacionCronometro, situacionCupoAnchor } = built;
-    beginLocalVehicleMutation("ring-sellar");
     vehiclesRef.current = vehiclesRef.current.map(v =>
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
@@ -4626,7 +4548,6 @@ export default function Planeacion() {
       );
     });
     setExpandedId(vehicleId);
-    extendLocalVehicleMutation("ring-sellar");
     suppressSituacionFilaVoiceAfterSellar(vehicleId);
     void updateVehicle(user.uid, vehicleId, {
       subTareas,
@@ -4645,7 +4566,6 @@ export default function Planeacion() {
 
   const handleToggleSubTarea = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
-    beginLocalVehicleMutation("sub-situacion");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return;
     const targetSub = (vehicle.subTareas || []).find(st => st.id === subTareaId);
@@ -4677,7 +4597,6 @@ export default function Planeacion() {
     vehiclesRef.current = vehiclesRef.current.map(v => v.id === vehicleId ? { ...v, subTareas } : v);
     persistVehiclesRef();
     try {
-      extendLocalVehicleMutation("sub-situacion");
       await updateVehicle(user.uid, vehicleId, { subTareas });
       const live = vehiclesRef.current.find(v => v.id === vehicleId);
       if (live && vehicleNeedsCupoAnchorSync(live)) {
@@ -4712,7 +4631,6 @@ export default function Planeacion() {
 
   const handleSetSubTareaMinutosCupo = async (vehicleId: string, subTareaId: string, minutos: number | undefined) => {
     if (!user) return;
-    beginLocalVehicleMutation("sub-situacion");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle?.subTareas) return;
     const sc = vehicle.situacionCronometro;
@@ -4744,7 +4662,6 @@ export default function Planeacion() {
     vehiclesRef.current = vehiclesRef.current.map(v => v.id === vehicleId ? { ...v, subTareas } : v);
     persistVehiclesRef();
     try {
-      extendLocalVehicleMutation("sub-situacion");
       await updateVehicle(user.uid, vehicleId, { subTareas });
       const vAfter = vehiclesRef.current.find(x => x.id === vehicleId);
       const first = (vAfter?.subTareas || []).find(st => {
@@ -5111,7 +5028,6 @@ export default function Planeacion() {
       }
     }
 
-    beginLocalVehicleMutation("ring");
     vehiclesRef.current = vehiclesRef.current.map(v =>
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
@@ -5124,7 +5040,6 @@ export default function Planeacion() {
       );
     });
     setExpandedId(vehicleId);
-    extendLocalVehicleMutation("ring");
     void updateVehicle(user.uid, vehicleId, {
       subTareas,
       situacionCronometro,
@@ -5234,7 +5149,6 @@ export default function Planeacion() {
         };
       }
     }
-    beginLocalVehicleMutation("ring");
     setVehicles(prev =>
       prev.map(v =>
         v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
@@ -5246,7 +5160,6 @@ export default function Planeacion() {
     persistVehiclesRef();
     setExpandedId(vehicleId);
     try {
-      extendLocalVehicleMutation("ring");
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor: situacionCupoAnchor ?? null });
       if (firstActivation) {
         void requestNotificationPermission();
@@ -5335,7 +5248,6 @@ export default function Planeacion() {
 
   const handleSituacionCronometroCumplido = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
-    extendLocalVehicleMutation("ring");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const list = vehicle.subTareas;
@@ -5453,7 +5365,6 @@ export default function Planeacion() {
 
   const handleSituacionCronometroFallado = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
-    extendLocalVehicleMutation("ring");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
@@ -5501,7 +5412,6 @@ export default function Planeacion() {
 
   const handleSituacionCronometroReservar = async (vehicleId: string, subTareaId: string) => {
     if (!user) return;
-    extendLocalVehicleMutation("ring");
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId) || vehicles.find(v => v.id === vehicleId);
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const { subTareas, extraido } = extraerSubTareaAReserva(vehicle.subTareas, subTareaId);
@@ -5989,7 +5899,6 @@ export default function Planeacion() {
 
   const handleAddCasaItem = async (vehicleId: string, subTareaId: string, texto: string) => {
     if (!user) return;
-    beginLocalVehicleMutation("sub-situacion");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return;
     const t = texto.trim();
@@ -6009,7 +5918,6 @@ export default function Planeacion() {
     startTransition(() => {
       setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subTareas } : v)));
     });
-    extendLocalVehicleMutation("sub-situacion");
     void updateVehicle(user.uid, vehicleId, { subTareas }).catch(e => {
       console.error("[handleAddCasaItem]", e);
     });
@@ -6044,7 +5952,6 @@ export default function Planeacion() {
 
   const handleAddDetalle = async (vehicleId: string, subTareaId: string, texto: string) => {
     if (!user) return;
-    beginLocalVehicleMutation("sub-situacion");
     const vehicle = vehicleById(vehicleId);
     if (!vehicle) return;
     const nuevoDetalle: DetalleSubTarea = { id: `dt_${Date.now()}`, texto, entregado: false, creadaAt: Date.now() };
@@ -6056,7 +5963,6 @@ export default function Planeacion() {
     startTransition(() => {
       setVehicles(prev => prev.map(v => v.id === vehicleId ? { ...v, subTareas } : v));
     });
-    extendLocalVehicleMutation("sub-situacion");
     void updateVehicle(user.uid, vehicleId, { subTareas }).catch(e => {
       console.error("[handleAddDetalle]", e);
     });
@@ -6121,6 +6027,19 @@ export default function Planeacion() {
     () => buildFlotaActivosRenderList(sortedOperativaActivos, panoramicaActivos, activeVehicles),
     [sortedOperativaActivos, panoramicaActivos, activeVehicles]
   );
+
+  useEffect(() => {
+    registerDesglosadorDepthReconciler(reconcileDesglosadorDepthPS);
+    return () => registerDesglosadorDepthReconciler(null);
+  }, [reconcileDesglosadorDepthPS]);
+
+  useEffect(() => {
+    syncDesglosadorDepthActiveIds(
+      flotaActivosRenderList
+        .filter(v => v.tipoReloj === "desglosador" && v.status === "activo")
+        .map(v => v.id)
+    );
+  }, [flotaActivosRenderList]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const tikTapIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -6406,26 +6325,6 @@ export default function Planeacion() {
   return (
     <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
       <JornadaStuckProbe />
-      {jornadaBooting && !bootCapReached && flotaFetchStatus !== "timeout" && activeVehicles.length === 0 && (
-        <div className="fixed inset-0 z-[60] pointer-events-none" aria-hidden>
-          <JornadaShell statusLine="Preparando Jornada…" />
-        </div>
-      )}
-      {jornadaBooting && activeVehicles.length === 0 && (flotaFetchStatus === "timeout" || bootCapReached) && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center p-4 pb-24 bg-black/70">
-          <div className="w-full max-w-lg space-y-2">
-            <BotonRepararJornada title="Reparar Jornada" />
-            <button
-              type="button"
-              onClick={handleRetryFlotaFetch}
-              className="w-full py-3 rounded-xl text-sm font-black uppercase tracking-wider"
-              style={{ backgroundColor: "rgba(212,175,55,0.12)", color: "#D4AF37", border: "1px solid rgba(212,175,55,0.35)" }}
-            >
-              Reintentar
-            </button>
-          </div>
-        </div>
-      )}
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">
@@ -8145,32 +8044,8 @@ export default function Planeacion() {
             {activeVehicles.length > 0 ? (
               <div ref={flotaActivosRef} className="scroll-mt-4">
               <AccordionSection title="VEHÍCULOS ACTIVOS" icon={Zap} color={BLOOD} count={activeVehicles.length} defaultOpen>
-                {flotaFetchStatus === "timeout" && activeVehicles.length === 0 ? (
-                  <div className="p-4 rounded-xl border text-center space-y-3" style={{ backgroundColor: PIZARRA, borderColor: "rgba(239,68,68,0.35)" }}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-300">
-                      La flota no respondió a tiempo
-                    </p>
-                    <p className="text-[9px] text-slate-500 leading-snug">
-                      Varios cambios de app pueden acumular solicitudes. Reintenta o repara la jornada.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleRetryFlotaFetch}
-                      className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider"
-                      style={{ backgroundColor: "rgba(212,175,55,0.15)", color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)" }}
-                      data-testid="button-retry-flota-fetch"
-                    >
-                      Reintentar
-                    </button>
-                    <BotonRepararJornada compact title="Reparar Jornada" />
-                  </div>
-                ) : flotaFetchStatus === "loading" && activeVehicles.length === 0 ? (
-                  <div className="p-4 rounded-xl border text-center space-y-2" style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.06)" }}>
-                    <div className="w-8 h-8 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preparando flota activa…</p>
-                  </div>
-                ) : flotaActivosRenderList.map((v) => (
-                  <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} onOpenCierreEnergia={handleOpenCierreEnergiaStable} cierreEnergiaPendingVehicleId={cierreEnergiaPending?.vehicleId ?? null} onCompleteVehicle={handleVehicleComplete} onArchiveVehicle={handleVehicleArchive} segmentoNumero={segmentoNumero} planilla={planilla} onAddSubTarea={handleAddSubTarea} onAddSubTareaUrgenteACola={handleAddSubTareaUrgenteACola} onToggleSubTarea={handleToggleSubTarea} onSetSubTareaMinutosCupo={handleSetSubTareaMinutosCupo} onExtendSituacionCupo={handleExtendSituacionCupo} onSyncSituacionCupoAnchor={handleSyncSituacionCupoAnchor} onMoveSubTareasToCronometro={handleMoveSubTareasToCronometro} onSituacionCronometroSetHoraFin={handleSituacionCronometroSetHoraFin} onSituacionCronometroCumplido={handleSituacionCronometroCumplido} onSituacionCronometroFallado={handleSituacionCronometroFallado} onSituacionCronometroReservar={handleSituacionCronometroReservar} onQuitarSituacionCupo={handleQuitarSituacionCupo} onCerrarSituacionDesgloseBloque={handleCerrarSituacionDesgloseBloque} onCerrarSituacionDesglosadorDeGolpe={handleCerrarSituacionDesglosadorDeGolpe} situacionBloquePsTotal={situacionBloqueSummaries[v.id]?.psTotal} situacionDesgloseSummary={situacionBloqueSummaries[v.id]} onVerSituacionBloquePs={handleVerSituacionBloquePsStable} onAddDetalle={handleAddDetalle} onEntregarDetalle={handleEntregarDetalle} onAddCasaItem={handleAddCasaItem} onToggleCasaItem={handleToggleCasaItem} arquitectoUnlocked={soberaniaDiaUnlocked} onInvestigadorClose={handleInvestigadorClose} onDesglosadorUpdate={handleDesglosadorUpdate} onDesglosadorGlobalClose={handleDesglosadorGlobalClose} onDesglosadorCierreDeGolpe={handleDesglosadorCierreDeGolpe} onDesglosadorDepthTick={handleDesglosadorDepthTick} onDesglosadorPausaInterrupcion={handleDesglosadorPausaInterrupcion} onResumeDesglosador={resumeDesglosadorTrasInterrupcion} onDesglosadorReorderSubs={handleDesglosadorReorderSubs} onDesglosadorAddSub={handleDesglosadorAddSub} onDesglosadorActivatePendingSub={handleDesglosadorActivatePendingSub} onReorderSubTareasCronometro={handleReorderSubTareasCronometro} onDescansoClose={handleDescansoClose} onMicroPasoToggle={handleMicroPasoToggle} onEtapaPuntoCeroToggle={handleEtapaPuntoCeroToggle} onPuntoCeroSessionUpdate={handlePuntoCeroSessionUpdate} onPuntoCeroColorConfirm={handlePuntoCeroColorConfirm} onPuntoCeroAutoClose={handlePuntoCeroAutoClose} onRutaBandCross={recordRutaBandCross} onBloqueCierre={recordBloqueCierre} />
+                {flotaActivosRenderList.map((v) => (
+                  <MemoVehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id} onToggleVehicle={handleVehicleToggle} onOpenCierreEnergia={handleOpenCierreEnergiaStable} cierreEnergiaPendingVehicleId={cierreEnergiaPending?.vehicleId ?? null} onCompleteVehicle={handleVehicleComplete} onArchiveVehicle={handleVehicleArchive} segmentoNumero={segmentoNumero} planilla={planilla} onAddSubTarea={handleAddSubTarea} onAddSubTareaUrgenteACola={handleAddSubTareaUrgenteACola} onToggleSubTarea={handleToggleSubTarea} onSetSubTareaMinutosCupo={handleSetSubTareaMinutosCupo} onExtendSituacionCupo={handleExtendSituacionCupo} onSyncSituacionCupoAnchor={handleSyncSituacionCupoAnchor} onMoveSubTareasToCronometro={handleMoveSubTareasToCronometro} onSituacionCronometroSetHoraFin={handleSituacionCronometroSetHoraFin} onSituacionCronometroCumplido={handleSituacionCronometroCumplido} onSituacionCronometroFallado={handleSituacionCronometroFallado} onSituacionCronometroReservar={handleSituacionCronometroReservar} onQuitarSituacionCupo={handleQuitarSituacionCupo} onCerrarSituacionDesgloseBloque={handleCerrarSituacionDesgloseBloque} onCerrarSituacionDesglosadorDeGolpe={handleCerrarSituacionDesglosadorDeGolpe} situacionBloquePsTotal={situacionBloqueSummaries[v.id]?.psTotal} situacionDesgloseSummary={situacionBloqueSummaries[v.id]} onVerSituacionBloquePs={handleVerSituacionBloquePsStable} onAddDetalle={handleAddDetalle} onEntregarDetalle={handleEntregarDetalle} onAddCasaItem={handleAddCasaItem} onToggleCasaItem={handleToggleCasaItem} arquitectoUnlocked={soberaniaDiaUnlocked} onInvestigadorClose={handleInvestigadorClose} onDesglosadorUpdate={handleDesglosadorUpdate} onDesglosadorGlobalClose={handleDesglosadorGlobalClose} onDesglosadorCierreDeGolpe={handleDesglosadorCierreDeGolpe} onDesglosadorPausaInterrupcion={handleDesglosadorPausaInterrupcion} onResumeDesglosador={resumeDesglosadorTrasInterrupcion} onDesglosadorReorderSubs={handleDesglosadorReorderSubs} onDesglosadorAddSub={handleDesglosadorAddSub} onDesglosadorActivatePendingSub={handleDesglosadorActivatePendingSub} onReorderSubTareasCronometro={handleReorderSubTareasCronometro} onDescansoClose={handleDescansoClose} onMicroPasoToggle={handleMicroPasoToggle} onEtapaPuntoCeroToggle={handleEtapaPuntoCeroToggle} onPuntoCeroSessionUpdate={handlePuntoCeroSessionUpdate} onPuntoCeroColorConfirm={handlePuntoCeroColorConfirm} onPuntoCeroAutoClose={handlePuntoCeroAutoClose} onRutaBandCross={recordRutaBandCross} onBloqueCierre={recordBloqueCierre} />
                 ))}
               </AccordionSection>
               </div>

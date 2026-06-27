@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { Vehicle } from "@/lib/persistence";
 import type { Proyecto } from "@/lib/proyectos";
+import { readLocalFlota } from "@/services/jornadaFlotaCache";
 import {
   acquireFlotaStore,
   getFlotaMergedSignature,
@@ -72,17 +73,29 @@ export function useJornadaActiveVehicleIds(userId: string | undefined): string {
   return sig;
 }
 
+function hydrateFlotaFromLocal(): Vehicle[] {
+  const fromStore = getFlotaVehicles();
+  if (fromStore.length > 0) return fromStore;
+  return readLocalFlota();
+}
+
 /**
  * Flota — vehículos completos; re-render solo si cambia la firma reactiva del store.
  * Reservado a Jornada (Planificación) como módulo dueño de mutaciones.
  */
 export function useFlotaVehiclesShallow(userId: string | undefined): Vehicle[] {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => getFlotaVehicles());
+  const [vehicles, setVehicles] = useState<Vehicle[]>(hydrateFlotaFromLocal);
   const sigRef = useRef(getFlotaMergedSignature());
 
   useEffect(() => {
     if (!userId) return;
     const release = acquireFlotaStore(userId);
+    if (getFlotaVehicles().length === 0) {
+      const local = readLocalFlota(userId);
+      if (local.length > 0) {
+        setFlotaVehicles(local);
+      }
+    }
     const refresh = () => {
       const nextSig = getFlotaMergedSignature();
       if (nextSig === sigRef.current) return;
