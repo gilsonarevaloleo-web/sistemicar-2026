@@ -21,6 +21,7 @@ import {
   getLocalVehicles,
   parkActiveVehiclesForResume,
   getParkedActiveVehicles,
+  clearParkedActiveVehicles,
   getDailyPointsLocalSync,
   getLocalSPLog,
   notifyVehicleClosed,
@@ -51,7 +52,12 @@ import {
   scheduleDesglosadorDepthOnTap,
   syncDesglosadorDepthActiveIds,
 } from "@/services/desglosadorDepthShadow";
-import { dispatchDesglosadorSubIntroVoiceOnce } from "@/lib/desglosadorVoiceDispatch";
+import {
+  dispatchDesglosadorDepthVoice,
+  dispatchDesglosadorSubCloseVoice,
+  dispatchDesglosadorSubIntroVoiceOnce,
+  dispatchSituacionFilaCloseVoice,
+} from "@/lib/desglosadorVoiceDispatch";
 import type { DesglosadorTiempoCloseSummary } from "@/lib/desglosadorTiempoCelebration";
 import { hasJournalSpExactSource } from "@/lib/spLogHygiene";
 import {
@@ -66,7 +72,7 @@ import {
 import { clearStuckDesglosadorPause, archiveOrphanDesglosadorInterrupts } from "@/lib/situacionSessionMerge";
 import type { RutaBandaId } from "@/lib/rutaEnfoque";
 import type { RutaSeguimientoPatron } from "@/lib/rutaSeguimiento";
-import { unlockSpeechSynthesis } from "@/lib/speechQueue";
+import { unlockSpeechSynthesis, warmupSpeechSynthesis } from "@/lib/speechQueue";
 import { speakRingBienvenida } from "@/lib/situacionAlerts";
 import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
 import { teardownSituacionSession } from "@/lib/situacionSessionTeardown";
@@ -173,12 +179,13 @@ import {
   cancelFlotaFetch,
   setFlotaPaintedCount,
 } from "@/services/jornadaFlotaFetch";
-import { readLocalFlota, writeLocalFlota } from "@/services/jornadaFlotaCache";
+import { writeLocalFlota } from "@/services/jornadaFlotaCache";
 import {
   registerFlotaMergeContext,
   refreshFlotaSession,
   getFlotaMergedSignature,
   getFlotaVehicles,
+  setFlotaVehicles,
 } from "@/flota/flotaStore";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
@@ -209,7 +216,6 @@ import {
   situacionDesgloseBloqueListo,
   playSituacionChimes,
   getHistoricalVehicleData,
-  vehicleClosedAtMs,
 } from "@/components/flota/vehicleCardShared";
 
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
@@ -276,6 +282,132 @@ function timeStringToMinutes(t: string): number {
   return parsed.h * 60 + parsed.m;
 }
 
+const LOCAL_FLOTA_STORAGE_KEY = "sistemicar_vehicles";
+
+function coerceValidDate(value: unknown): Date | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value);
+  if (typeof value === "string" && value.trim()) {
+    const d = new Date(value);
+    if (Number.isFinite(d.getTime())) return d;
+  }
+  return null;
+}
+
+function hasInvalidFlotaStructure(v: Vehicle): boolean {
+  if (v.subTareas != null && !Array.isArray(v.subTareas)) return true;
+  if (v.subVehiculos != null && !Array.isArray(v.subVehiculos)) return true;
+  if (v.aperturaAt != null && (typeof v.aperturaAt !== "number" || !Number.isFinite(v.aperturaAt))) return true;
+  if (v.cierreAt != null && (typeof v.cierreAt !== "number" || !Number.isFinite(v.cierreAt))) return true;
+  return false;
+}
+
+/** Fase 1 — parser tolerante; detecta caché corrupta o desalineada tras cambio de jornada. */
+function parseLocalFlotaForRehydrate(): { vehicles: Vehicle[]; corrupt: boolean } {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(LOCAL_FLOTA_STORAGE_KEY);
+  } catch {
+    return { vehicles: [], corrupt: true };
+  }
+  if (!raw) return { vehicles: [], corrupt: false };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { vehicles: [], corrupt: true };
+  }
+  if (!Array.isArray(parsed)) return { vehicles: [], corrupt: true };
+  if (parsed.length === 0) return { vehicles: [], corrupt: false };
+
+  const sanitized: Vehicle[] = [];
+  let corrupt = false;
+
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") {
+      corrupt = true;
+      continue;
+    }
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.id !== "string" || !rec.id) {
+      corrupt = true;
+      continue;
+    }
+    try {
+      const createdAt = coerceValidDate(rec.createdAt);
+      if (!createdAt) {
+        corrupt = true;
+        continue;
+      }
+      const tiempoInicio = coerceValidDate(rec.tiempoInicio) ?? createdAt;
+      const completedAt =
+        rec.completedAt != null ? coerceValidDate(rec.completedAt) ?? undefined : undefined;
+      const vehicle: Vehicle = {
+        ...(item as Vehicle),
+        createdAt,
+        tiempoInicio,
+        completedAt,
+      };
+      if (hasInvalidFlotaStructure(vehicle)) {
+        corrupt = true;
+        continue;
+      }
+      sanitized.push(vehicle);
+    } catch {
+      corrupt = true;
+    }
+  }
+
+  if (sanitized.length === 0 && parsed.length > 0) corrupt = true;
+
+  sanitized.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return { vehicles: sanitized, corrupt };
+}
+
+function purgeCorruptLocalFlotaBuffer(): void {
+  try {
+    localStorage.removeItem(LOCAL_FLOTA_STORAGE_KEY);
+  } catch {
+    /* quota / private mode */
+  }
+  clearParkedActiveVehicles();
+  setFlotaVehicles([]);
+  setFlotaPaintedCount(0);
+}
+
+function safeVehicleTimestampMs(
+  v: Vehicle,
+  ...fields: Array<"cierreAt" | "aperturaAt" | "createdAt">
+): number {
+  for (const field of fields) {
+    if (field === "createdAt") {
+      const t =
+        v.createdAt instanceof Date
+          ? v.createdAt.getTime()
+          : typeof (v.createdAt as unknown) === "number"
+            ? (v.createdAt as unknown as number)
+            : NaN;
+      if (Number.isFinite(t) && t > 0) return t;
+      continue;
+    }
+    const t = v[field];
+    if (typeof t === "number" && Number.isFinite(t) && t > 0) return t;
+  }
+  return 0;
+}
+
+function safeVehicleClosedAtMs(v: Vehicle): number {
+  return safeVehicleTimestampMs(v, "cierreAt", "aperturaAt", "createdAt");
+}
+
+function formatHistorialDateKey(tsMs: number): string | null {
+  if (!Number.isFinite(tsMs) || tsMs <= 0) return null;
+  const d = new Date(tsMs);
+  if (!Number.isFinite(d.getTime())) return null;
+  return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+}
+
 
 export type UseDesglosadorManagerOptions = {
   onDailyPsChange?: (total: number) => void;
@@ -294,6 +426,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
   const [planilla, setPlanilla] = useState<Planilla | null>(null);
   const planillaFecha = getJournalDateString();
+  const journalDayStartMs = useMemo(() => getJournalDayStartMs(), [planillaFecha]);
+  const flotaSortAnchorMin = useMemo(() => getCurrentTimeMinutes(), [planillaFecha]);
 
   useEffect(() => {
     if (!user) return;
@@ -357,6 +491,19 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       flotaActivosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, []);
+
+  /** Fase ms0 — desbloqueo TTS en el gesto del operador (móvil). */
+  const unlockDesglosadorSpeechFromGesture = useCallback(() => {
+    unlockSpeechSynthesis(true);
+    warmupSpeechSynthesis(true, true);
+  }, []);
+
+  const dispatchDesglosadorVoiceOnGesture = useCallback((
+    dispatch: () => void
+  ) => {
+    unlockDesglosadorSpeechFromGesture();
+    dispatch();
+  }, [unlockDesglosadorSpeechFromGesture]);
   vehiclesRef.current = vehicles;
   const vehicleById = (vehicleId: string) =>
     vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicles.find(v => v.id === vehicleId);
@@ -553,7 +700,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const setupFlotaSubscription = useCallback(() => {
     if (!user) return;
 
-    const cachedFlota = readLocalFlota(user.uid);
+    const { vehicles: cachedFlota, corrupt } = parseLocalFlotaForRehydrate();
+
+    if (corrupt) {
+      console.warn("[flota] Caché local corrupta o desalineada — purga y fetch limpio desde Firebase");
+      purgeCorruptLocalFlotaBuffer();
+      refreshFlotaSession({ hasOptimisticPaint: false });
+      return;
+    }
+
     if (cachedFlota.length > 0 && vehiclesRef.current.length === 0) {
       setVehicles(cachedFlota);
       console.log("[flota] UI optimista", cachedFlota.length, "vehículos");
@@ -686,10 +841,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       parkActiveVehiclesForResume(vehiclesRef.current);
     };
     const rehydrateFromLocal = () => {
+      const { vehicles: parsedLocal, corrupt } = parseLocalFlotaForRehydrate();
+      if (corrupt) {
+        console.warn("[Vehicles] Caché corrupta al rehidratar — purga y fetch limpio");
+        purgeCorruptLocalFlotaBuffer();
+        refreshFlotaSession({ hasOptimisticPaint: vehiclesRef.current.length > 0 });
+        return;
+      }
       const nowMs = Date.now();
-      const dayStart = getJournalDayStartMs(nowMs);
+      const dayStart = journalDayStartMs;
       const storeLocal = getFlotaVehicles();
-      const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
+      const localRaw = storeLocal.length > 0 ? storeLocal : parsedLocal;
       const localById = new Map(localRaw.map(v => [v.id, v]));
       const parked = getParkedActiveVehicles().filter(p => {
         const local = localById.get(p.id) ??
@@ -741,7 +903,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushToLocal);
     };
-  }, [user]);
+  }, [user, journalDayStartMs]);
 
   useEffect(() => {
     setCierreEnergiaPending(null);
@@ -750,10 +912,18 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     setSituacionDesgloseCelebration(null);
     setDesglosadorTiempoCelebration(null);
     closingInProgressRef.current.clear();
+  }, []);
+
+  useEffect(() => {
     try {
+      const { vehicles: localRaw, corrupt } = parseLocalFlotaForRehydrate();
+      if (corrupt) {
+        console.warn("[Planeacion] Caché local corrupta en arranque — purga silenciosa");
+        purgeCorruptLocalFlotaBuffer();
+        refreshFlotaSession({ hasOptimisticPaint: false });
+        return;
+      }
       const nowMs = Date.now();
-      const storeLocal = getFlotaVehicles();
-      const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
       const byId = new Map(localRaw.map(v => [v.id, v]));
       const localActivos = localRaw.filter(
         v =>
@@ -761,7 +931,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           !v.autoVerdad &&
           !wasVehicleRecentlyClosed(v.id) &&
           !isOrphanDesglosadorInterrupt(v, byId) &&
-          shouldPreserveLocalActivo(v, nowMs)
+          shouldPreserveLocalActivo(v, nowMs, journalDayStartMs)
       );
       if (localActivos.length > 0) {
         setVehicles(prev => {
@@ -775,8 +945,10 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       }
     } catch (e) {
       console.warn("[Planeacion] sync local activos:", e);
+      purgeCorruptLocalFlotaBuffer();
+      refreshFlotaSession({ hasOptimisticPaint: false });
     }
-  }, []);
+  }, [journalDayStartMs, setVehicles]);
 
   const orphanInterruptSweepRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -1969,6 +2141,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!options?.silent) {
       const hoursDone = Math.floor(elapsedSec / 3600);
       const hourAward = hoursDone > 0 ? depthAwardForHour(hoursDone) : delta;
+      dispatchDesglosadorVoiceOnGesture(() => {
+        dispatchDesglosadorDepthVoice(vehicleId, delta, hoursDone > 0 ? hoursDone : undefined);
+      });
       toast.success(`+${delta} PS · profundidad de sesión`, {
         description: hoursDone > 0
           ? `Hora ${hoursDone} completada · +${hourAward} PS (progresivo)`
@@ -1978,7 +2153,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       });
     }
     return { grantedTotal: newGranted, awardedNow: delta };
-  }, [user, safeAwardPS]);
+  }, [user, safeAwardPS, dispatchDesglosadorVoiceOnGesture]);
 
   const desglosadorProgressScore = (subs: SubVehiculo[] | undefined): number =>
     (subs ?? []).reduce((acc, s) => {
@@ -2016,6 +2191,18 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
         kind: "sub_desglosador",
         vehicleId,
       });
+    }
+
+    if (prevVehicle.tipoReloj === "desglosador") {
+      for (const sub of updatedSubs) {
+        if (sub.status !== "cumplido" && sub.status !== "fallado") continue;
+        const prevSub = prevVehicle.subVehiculos?.find(s => s.id === sub.id);
+        if (!prevSub || prevSub.status === sub.status) continue;
+        if (prevSub.status !== "activo" && prevSub.status !== "pendiente") continue;
+        dispatchDesglosadorVoiceOnGesture(() => {
+          dispatchDesglosadorSubCloseVoice(vehicleId, sub, sub.status as "cumplido" | "fallado");
+        });
+      }
     }
 
     let depthGranted = opts?.resetDepth ? 0 : (prevVehicle.desglosadorBloqueDepthPsGranted ?? 0);
@@ -2056,7 +2243,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     } else {
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: false });
     }
-  }, [user]);
+  }, [user, dispatchDesglosadorVoiceOnGesture]);
 
   const handleDesglosadorReorderSubs = (vehicleId: string, movedId: string, direction: ReorderDirection) => {
     const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -2104,13 +2291,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const now = Date.now();
     subs[targetIdx] = { ...subs[targetIdx], status: "activo", aperturaAt: now };
     handleDesglosadorUpdate(vehicleId, subs, { silentDepth: true });
-    dispatchDesglosadorSubIntroVoiceOnce(
-      vehicleId,
-      subs[targetIdx].id,
-      now,
-      subs[targetIdx].titulo,
-      Boolean(subs[targetIdx].rutaEnfoque?.activa)
-    );
+    dispatchDesglosadorVoiceOnGesture(() => {
+      dispatchDesglosadorSubIntroVoiceOnce(
+        vehicleId,
+        subs[targetIdx].id,
+        now,
+        subs[targetIdx].titulo,
+        Boolean(subs[targetIdx].rutaEnfoque?.activa)
+      );
+    });
     toast.success("Sub en curso", {
       description: cleanSubTitulo(subs[targetIdx].titulo),
       style: { backgroundColor: PIZARRA, border: `1px solid ${NARANJA}`, color: NARANJA },
@@ -2143,14 +2332,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const activate = !hasActive && allDone;
     const newSub = buildDesglosadorSubFromRuntime(form, subs, { activate });
     handleDesglosadorUpdate(vehicleId, [...subs, newSub], { silentDepth: true });
-    if (activate && newSub.aperturaAt) {
-      dispatchDesglosadorSubIntroVoiceOnce(
-        vehicleId,
-        newSub.id,
-        newSub.aperturaAt,
-        newSub.titulo,
-        Boolean(newSub.rutaEnfoque?.activa)
-      );
+    if (activate && newSub.aperturaAt != null) {
+      const subAperturaAt = newSub.aperturaAt;
+      dispatchDesglosadorVoiceOnGesture(() => {
+        dispatchDesglosadorSubIntroVoiceOnce(
+          vehicleId,
+          newSub.id,
+          subAperturaAt,
+          newSub.titulo,
+          Boolean(newSub.rutaEnfoque?.activa)
+        );
+      });
     }
     toast.success("Subtarea añadida", {
       description: activate
@@ -2728,7 +2920,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       return;
     }
     const now = Date.now();
-    const subs = vehicle.subVehiculos.map(sv => {
+    const prevSubs = vehicle.subVehiculos;
+    const subs = prevSubs.map(sv => {
       if (sv.status === "cumplido" || sv.status === "fallado") return sv;
       if (sv.status === "activo") {
         const duracionFinal = sv.aperturaAt ? Math.floor((now - sv.aperturaAt) / 1000) : 0;
@@ -2746,6 +2939,14 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
         duracionFinal: 0,
       };
     });
+    unlockDesglosadorSpeechFromGesture();
+    for (const sub of subs) {
+      const prev = prevSubs.find(s => s.id === sub.id);
+      if (!prev || prev.status === sub.status) continue;
+      if (sub.status === "fallado" || sub.status === "cumplido") {
+        dispatchDesglosadorSubCloseVoice(vehicleId, sub, sub.status);
+      }
+    }
     setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, subVehiculos: subs } : v)));
     vehiclesRef.current = vehiclesRef.current.map(v => (v.id === vehicleId ? { ...v, subVehiculos: subs } : v));
     saveLocalVehicles(vehiclesRef.current);
@@ -3013,7 +3214,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor: situacionCupoAnchor ?? null });
       if (firstActivation) {
         void requestNotificationPermission();
-        unlockSpeechSynthesis(true);
+        unlockDesglosadorSpeechFromGesture();
         queueMicrotask(() =>
           speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
         );
@@ -3169,6 +3370,14 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       vehicleId,
       ts: now,
     });
+    dispatchDesglosadorVoiceOnGesture(() => {
+      dispatchSituacionFilaCloseVoice(vehicleId, subTareaId, targetSub.texto, "cumplido", {
+        psBase: 4,
+        depthDelta: deltaDepth > 0 ? deltaDepth : undefined,
+        minutosGanados: deltaDepth <= 0 && minutosGanados > 0 ? minutosGanados : undefined,
+        ts: now,
+      });
+    });
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
       void playSituacionChimes(chimesOnComplete);
@@ -3241,6 +3450,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
     persistVehiclesRef();
+    dispatchDesglosadorVoiceOnGesture(() => {
+      dispatchSituacionFilaCloseVoice(vehicleId, subTareaId, targetSub.texto, "fallado", { ts: now });
+    });
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
       if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId, { forceResetSameRow: true });
@@ -3844,33 +4056,54 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       } catch { console.error("[handleEntregarDetalle] awardSovereigntyPoints falló"); }
     } catch (e) { console.error("[handleEntregarDetalle]", e); }
   };
-  const activeVehicles = vehicles.filter(
-    v => v.status === "activo" && !isInvisibleCentinelaVehicle(v)
+  const activeVehicles = useMemo(
+    () => vehicles.filter(v => v.status === "activo" && !isInvisibleCentinelaVehicle(v)),
+    [vehicles]
   );
-  const completedVehicles = vehicles.filter(
-    v =>
-      (v.status === "cumplido" || v.status === "archivado") &&
-      !isInvisibleCentinelaVehicle(v)
+  const completedVehicles = useMemo(
+    () =>
+      vehicles.filter(
+        v =>
+          (v.status === "cumplido" || v.status === "archivado") &&
+          !isInvisibleCentinelaVehicle(v)
+      ),
+    [vehicles]
   );
-  const expressVehiclesActivos = activeVehicles.filter(v => v.tipoTerminoRapido);
-  const panoramicaActivos = expressVehiclesActivos.filter(v => v.tipoTerminoRapido === "omitido");
-  const operativaActivos = expressVehiclesActivos.filter(v => v.tipoTerminoRapido !== "omitido");
-  const panoramicaHistorial = completedVehicles.filter(v => v.tipoTerminoRapido === "omitido");
-  const operativaHistorial = completedVehicles.filter(v => v.tipoTerminoRapido !== "omitido");
+  const expressVehiclesActivos = useMemo(
+    () => activeVehicles.filter(v => v.tipoTerminoRapido),
+    [activeVehicles]
+  );
+  const panoramicaActivos = useMemo(
+    () => expressVehiclesActivos.filter(v => v.tipoTerminoRapido === "omitido"),
+    [expressVehiclesActivos]
+  );
+  const operativaActivos = useMemo(
+    () => expressVehiclesActivos.filter(v => v.tipoTerminoRapido !== "omitido"),
+    [expressVehiclesActivos]
+  );
+  const panoramicaHistorial = useMemo(
+    () => completedVehicles.filter(v => v.tipoTerminoRapido === "omitido"),
+    [completedVehicles]
+  );
+  const operativaHistorial = useMemo(
+    () => completedVehicles.filter(v => v.tipoTerminoRapido !== "omitido"),
+    [completedVehicles]
+  );
 
-  const sortedOperativaActivos = [...operativaActivos].sort((a, b) => {
-    const isHoraA = a.tipoTerminoRapido === "hora";
-    const isHoraB = b.tipoTerminoRapido === "hora";
-    if (isHoraA && !isHoraB) return -1;
-    if (!isHoraA && isHoraB) return 1;
-    if (isHoraA && isHoraB) {
-      const now = getCurrentTimeMinutes();
-      const diffA = Math.abs(timeStringToMinutes(a.criterioDetalle) - now);
-      const diffB = Math.abs(timeStringToMinutes(b.criterioDetalle) - now);
-      return diffA - diffB;
-    }
-    return 0;
-  });
+  const sortedOperativaActivos = useMemo(() => {
+    return [...operativaActivos].sort((a, b) => {
+      const isHoraA = a.tipoTerminoRapido === "hora";
+      const isHoraB = b.tipoTerminoRapido === "hora";
+      if (isHoraA && !isHoraB) return -1;
+      if (!isHoraA && isHoraB) return 1;
+      if (isHoraA && isHoraB) {
+        const diffA = Math.abs(timeStringToMinutes(a.criterioDetalle) - flotaSortAnchorMin);
+        const diffB = Math.abs(timeStringToMinutes(b.criterioDetalle) - flotaSortAnchorMin);
+        return diffA - diffB;
+      }
+      return 0;
+    });
+  }, [operativaActivos, flotaSortAnchorMin]);
 
   const flotaActivos = useMemo(
     () => buildFlotaActivosRenderList(sortedOperativaActivos, panoramicaActivos, activeVehicles),
@@ -3878,33 +4111,35 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   );
 
   const historialFlota = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayStartMs = todayStart.getTime();
+    const todayStartMs = journalDayStartMs;
     const vehiculosHoy = completedVehicles
-      .filter(v => !v.autoVerdad && vehicleClosedAtMs(v) >= todayStartMs)
-      .sort((a, b) => vehicleClosedAtMs(a) - vehicleClosedAtMs(b));
+      .filter(v => {
+        if (v.autoVerdad) return false;
+        const closedAt = safeVehicleClosedAtMs(v);
+        return closedAt > 0 && closedAt >= todayStartMs;
+      })
+      .sort((a, b) => safeVehicleClosedAtMs(a) - safeVehicleClosedAtMs(b));
     const vehiculosAnteriores = completedVehicles
       .filter(v => {
         if (v.autoVerdad) return false;
-        const t = Math.max(v.createdAt?.getTime?.() || 0, v.aperturaAt || 0, v.cierreAt || 0);
+        const t = safeVehicleTimestampMs(v, "cierreAt", "aperturaAt", "createdAt");
         return t > 0 && t < todayStartMs;
       })
       .sort((a, b) => {
-        const tA = Math.max(a.cierreAt || 0, a.aperturaAt || 0, a.createdAt?.getTime?.() || 0);
-        const tB = Math.max(b.cierreAt || 0, b.aperturaAt || 0, b.createdAt?.getTime?.() || 0);
+        const tA = safeVehicleTimestampMs(a, "cierreAt", "aperturaAt", "createdAt");
+        const tB = safeVehicleTimestampMs(b, "cierreAt", "aperturaAt", "createdAt");
         return tB - tA;
       });
     const gruposPorFecha: Record<string, Vehicle[]> = {};
     for (const v of vehiculosAnteriores) {
-      const ts = Math.max(v.cierreAt || 0, v.aperturaAt || 0, v.createdAt?.getTime?.() || 0);
-      const d = new Date(ts);
-      const key = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+      const ts = safeVehicleTimestampMs(v, "cierreAt", "aperturaAt", "createdAt");
+      const key = formatHistorialDateKey(ts);
+      if (!key) continue;
       if (!gruposPorFecha[key]) gruposPorFecha[key] = [];
       gruposPorFecha[key].push(v);
     }
     return { vehiculosHoy, vehiculosAnteriores, gruposPorFecha };
-  }, [completedVehicles]);
+  }, [completedVehicles, journalDayStartMs]);
 
   const situacionRetoAtascado = useMemo(
     () =>
@@ -3997,6 +4232,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       handlePuntoCeroAutoClose,
       recordRutaBandCross,
       recordBloqueCierre,
+      unlockDesglosadorSpeechFromGesture,
       handleFlotaStatusChange,
       handleStatusChange,
       handleEmergencyArchiveStuckActives,
@@ -4062,6 +4298,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       handlePuntoCeroAutoClose,
       recordRutaBandCross,
       recordBloqueCierre,
+      unlockDesglosadorSpeechFromGesture,
       handleFlotaStatusChange,
       handleStatusChange,
       handleEmergencyArchiveStuckActives,

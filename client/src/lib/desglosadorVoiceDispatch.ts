@@ -5,6 +5,12 @@ import { enqueueDesglosadorVoicePassive } from "@/lib/speechQueue";
 import { cleanSubTitulo } from "@/components/flota/vehicleCardShared";
 import { rutaVozFluidoParts, rutaVozPartsForBanda } from "@/lib/rutaEnfoqueVoz";
 import type { RutaBandaId } from "@/lib/rutaEnfoque";
+import type { SubVehiculo } from "@/lib/persistence";
+import {
+  buildDesglosadorDepthPhrases,
+  buildDesglosadorSubClosePhrases,
+  buildSituacionFilaClosePhrases,
+} from "@/lib/desglosadorSubCloseVoice";
 
 export function dispatchDesglosadorVoice(
   key: string,
@@ -61,4 +67,41 @@ export function dispatchDesglosadorRutaBandVoice(
 ): void {
   const key = `${vehicleId}:ruta-${subId}-${banda}`;
   dispatchDesglosadorVoice(key, rutaVozPartsForBanda(banda), { cancelPrevious: false, onSpoken });
+}
+
+export function dispatchDesglosadorSubCloseVoice(
+  vehicleId: string,
+  sub: SubVehiculo,
+  status: "cumplido" | "fallado"
+): void {
+  const key = `${vehicleId}:close-${sub.id}-${sub.cierreAt ?? Date.now()}`;
+  dispatchDesglosadorVoice(key, buildDesglosadorSubClosePhrases(sub, status), {
+    cancelPrevious: false,
+  });
+}
+
+export function dispatchDesglosadorDepthVoice(
+  vehicleId: string,
+  delta: number,
+  hoursDone?: number
+): void {
+  const phrases = buildDesglosadorDepthPhrases(delta, hoursDone);
+  if (phrases.length === 0) return;
+  const key = `${vehicleId}:depth-${hoursDone ?? 0}-${Date.now()}`;
+  dispatchDesglosadorVoice(key, phrases, { cancelPrevious: false });
+}
+
+export function dispatchSituacionFilaCloseVoice(
+  vehicleId: string,
+  subTareaId: string,
+  texto: string,
+  status: "cumplido" | "fallado",
+  opts?: { psBase?: number; depthDelta?: number; minutosGanados?: number; ts?: number }
+): void {
+  const key = `${vehicleId}:ring-${subTareaId}-${opts?.ts ?? Date.now()}`;
+  dispatchDesglosadorVoice(
+    key,
+    buildSituacionFilaClosePhrases(texto, status, opts),
+    { cancelPrevious: false }
+  );
 }

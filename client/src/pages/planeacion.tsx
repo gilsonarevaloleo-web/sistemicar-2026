@@ -2813,7 +2813,11 @@ export default function Planeacion() {
   };
 
   return (
-    <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
+    <div
+      className="min-h-screen p-4 pb-40"
+      style={{ backgroundColor: "#020202" }}
+      onPointerDown={handlers.unlockDesglosadorSpeechFromGesture}
+    >
       <JornadaStuckProbe />
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (

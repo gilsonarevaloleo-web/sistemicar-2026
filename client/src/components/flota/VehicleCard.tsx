@@ -1233,9 +1233,7 @@ function VehicleCard({
     setSubRutaPatron(null);
 
     const bloquePayload = { vehicleId: vehicle.id, sub: closedSub, status };
-    setTimeout(() => {
-      onBloqueCierre?.(bloquePayload);
-    }, 0);
+    onBloqueCierre?.(bloquePayload);
   }, [onBloqueCierre, onDesglosadorUpdate, vehicle.id, vehicle.subVehiculos]);
 
   const attemptCloseActiveSubById = useCallback((
