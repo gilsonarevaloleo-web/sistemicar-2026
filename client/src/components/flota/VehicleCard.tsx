@@ -1442,9 +1442,11 @@ function VehicleCard({
 
     const onFocus = () => computeTimer();
     document.addEventListener("visibilitychange", onFocus);
+    const timerInterval = setInterval(computeTimer, 1000);
 
     return () => {
       document.removeEventListener("visibilitychange", onFocus);
+      clearInterval(timerInterval);
     };
   }, [expanded, vehicle.status, vehicle.tipoTerminoRapido, vehicle.criterioDetalle, vehicle.tiempoInicio, tipoFlota, vehicle.aperturaAt, vehicle.parentesisRecarga, vehicle.tipoReloj, vehicle.cantidadObjetivo, vehicle.titulo, vehicle.situacionCronometro, vehicle.situacionCupoAnchor, vehicle.subTareas]);
 
