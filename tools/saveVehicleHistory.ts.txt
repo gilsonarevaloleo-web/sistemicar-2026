@@ -1,0 +1,44 @@
+import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
+
+const saveVehicleHistory = (
+  titulo: string,
+  minPerUnit: number,
+  totalMin: number,
+  tipoReloj: string,
+  userId?: string,
+  opts?: VehicleHistoryOpts
+) => {
+  if (opts?.excluirDeHistorial) return;
+  try {
+    const data = localStorage.getItem("sistemicar_vehicle_history");
+    const history: VehicleHistoryEntry[] = data ? JSON.parse(data) : [];
+    const newEntry: VehicleHistoryEntry = { titulo, minPerUnit, totalMin, tipoReloj, fecha: Date.now(), ...opts };
+    history.push(newEntry);
+    if (history.length > 200) history.splice(0, history.length - 200);
+    localStorage.setItem("sistemicar_vehicle_history", JSON.stringify(history));
+    if (userId) {
+      saveVehicleHistoryFirebase(userId, history).catch(e => console.warn("[vehicleHistory] Firebase save error:", e));
+      if (auth.currentUser) {
+        auth.currentUser.getIdToken().then(token =>
+          fetch("/api/vehicle-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({
+              entries: [{
+                titulo: newEntry.titulo,
+                minPerUnit: newEntry.minPerUnit,
+                totalMin: newEntry.totalMin,
+                tipoReloj: newEntry.tipoReloj,
+                fecha: newEntry.fecha,
+                status: newEntry.status,
+                subResumen: newEntry.subResumen ? JSON.stringify(newEntry.subResumen) : undefined,
+              }],
+            }),
+          })
+        ).then(r => {
+          if (!r.ok) console.warn("[vehicleHistory] Backend save non-2xx:", r.status);
+        }).catch(e => console.warn("[vehicleHistory] Backend save error:", e));
+      }
+    }
+  } catch {}
+};

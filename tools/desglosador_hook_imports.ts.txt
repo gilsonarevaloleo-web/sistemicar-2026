@@ -1,0 +1,207 @@
+import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue, startTransition } from "react";
+import { toast } from "sonner";
+import { useAuthContext } from "@/App";
+import {
+  addVehicle,
+  updateVehicleStatus,
+  updateVehicle,
+  Vehicle,
+  saveMision,
+  MisionScores,
+  recordMissionResult,
+  awardSovereigntyPoints,
+  incrementModulePoints,
+  subscribeToPlanilla,
+  Planilla,
+  SubTarea,
+  DetalleSubTarea,
+  SubVehiculo,
+  saveLocalVehicles,
+  flushLocalVehicles,
+  getLocalVehicles,
+  parkActiveVehiclesForResume,
+  getParkedActiveVehicles,
+  getDailyPointsLocalSync,
+  getLocalSPLog,
+  notifyVehicleClosed,
+  wasVehicleRecentlyClosed,
+  isOrphanDesglosadorInterrupt,
+  reconcileStaleCentinelaInFirestore,
+  saveVehicleHistoryFirebase,
+  VehicleHistoryEntry,
+} from "@/lib/persistence";
+import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
+import { shouldPreserveLocalActivo } from "@/lib/ghostVehicleEngine";
+import {
+  DESGLOSADOR_SUB_CUMPLIDO_PS,
+  vehicleMissionClosePS,
+} from "@/lib/sovereigntyPointsConfig";
+import { awardDesglosadorSubPointsIfNeeded } from "@/lib/desglosadorPointsAward";
+import {
+  applyDesglosadorCloseOptimistic,
+  isDesglosadorLiquidationInFlight,
+  scheduleGlobalCycleLiquidation,
+} from "@/lib/desglosadorCycleLiquidation";
+import { runShadowTask } from "@/lib/desglosadorShadow";
+import {
+  registerDesglosadorDepthReconciler,
+  scheduleDesglosadorDepthOnTap,
+  syncDesglosadorDepthActiveIds,
+} from "@/services/desglosadorDepthShadow";
+import { dispatchDesglosadorSubIntroVoiceOnce } from "@/lib/desglosadorVoiceDispatch";
+import type { DesglosadorTiempoCloseSummary } from "@/lib/desglosadorTiempoCelebration";
+import { hasJournalSpExactSource } from "@/lib/spLogHygiene";
+import {
+  archiveActiveCentinelas,
+  buildCentinelaArchiveFields,
+  closeCentinelasBeforeConsciousLaunch,
+  isCentinelaBlockedByVehicles,
+  isInvisibleCentinelaVehicle,
+  listActiveCentinelas,
+  releaseCentinela,
+} from "@/lib/centinelaEngine";
+import { clearStuckDesglosadorPause, archiveOrphanDesglosadorInterrupts } from "@/lib/situacionSessionMerge";
+import type { RutaBandaId } from "@/lib/rutaEnfoque";
+import type { RutaSeguimientoPatron } from "@/lib/rutaSeguimiento";
+import { speakRingBienvenida, unlockSpeechSynthesis } from "@/lib/speechQueue";
+import { speakRingBienvenida as speakRingBienvenidaAlert } from "@/lib/situacionAlerts";
+import { resetPuntoCeroVoiceQueue } from "@/lib/puntoCeroVoice";
+import { teardownSituacionSession, suppressSituacionFilaVoiceAfterSellar } from "@/lib/situacionSessionTeardown";
+import { RING_COPY, reanudarSituacionCronometroRing, ringSessionOperable } from "@/lib/ringEnfoqueReal";
+import { getDesglosadorSessionElapsedSec } from "@/lib/desglosadorClock";
+import {
+  aplicarTiempoGanadoAlCumplir,
+  absorberSaldoAdelantoEnFoco,
+  applyCupoManualYRedistribuir,
+  quitarMinutosHaciaFoco,
+  redistribuirMinutosSituacionCronometro,
+  remainingCronometroBudgetMin,
+  cerrarCronometroDeGolpe,
+  resolveCronometroCupoAnchor,
+  registrarCierreFalladoCronometro,
+  extraerSubTareaAReserva,
+  isCupoFijo,
+  resolveFocusSubTareaId,
+  situacionFilaCronometroPendiente,
+  totalBudgetMinFromCronometro,
+  vehicleNeedsCupoAnchorSync,
+  buildSellarDirectoEnRingState,
+} from "@/lib/situacionCupoDistrib";
+import {
+  bolsaDisponibleSegundoReto,
+  buildSituacionCronometroCierre,
+  nextRetoNumero,
+  situacionContratoFinMs,
+  situacionMinutosHastaObjetivoHora,
+  situacionObjetivoHoraToContratoMs,
+  resolveDefaultObjetivoHoraParaRing,
+  describeRepartoGananciaEnCola,
+} from "@/lib/situacionGanancia";
+import type { PuntoCeroSession } from "@/lib/puntoCeroTypes";
+import {
+  etapasConColoresCompletos,
+  initPuntoCeroSession,
+  parsePuntoCeroDuracionMin,
+  todosColoresConfirmados,
+} from "@/engines/PuntoCeroEngine";
+import {
+  computeDesglosadorSessionDepthPS,
+  depthAwardForHour,
+} from "@/lib/desglosadorDepth";
+import {
+  firstPendingCronometroTexto,
+  firstPendingSubVehiculoTitulo,
+  reorderSubTareasCronometro,
+  reorderSubVehiculos,
+  type ReorderDirection,
+} from "@/lib/desglosadorReorder";
+import {
+  addSituacionReserva,
+  deleteSituacionReserva,
+  getReservaActivas,
+  RUTA_TACTICA_META,
+  sortReservasTacticas,
+  subscribeToSituacionReserva,
+  updateSituacionReservaEstado,
+  updateSituacionReservaRuta,
+  type ReservaTacticaRuta,
+  type SituacionReservaItem,
+} from "@/lib/situacionReserva";
+import { recordFocusBandEvent, inferBandaBloque, psEspectroBloque } from "@/lib/focusBandLedger";
+import { buildTermoDecisionSnapshot } from "@/lib/termodinamicaAtencional";
+import {
+  decisionKeyMision,
+  decisionKeySubDesglosador,
+  decisionKeySubSituacion,
+  recordDecision,
+} from "@/lib/decisionesLedger";
+import { repairStuckSituacionVehicles, vehiclesReactiveSignature } from "@/lib/situacionRepair";
+import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
+import { registrarEvento, COMPONENTES } from "@/lib/evento-universal";
+import {
+  markPeldanoConquistadoSituacion,
+  markPeldanoConquistadoTiempo,
+} from "@/lib/proyectos";
+import {
+  aplicarProyectoHeredadoASub,
+  dominanteProyectoIdEnSubs,
+  imanItemsParaDesglosador,
+  NIDO_INBOX_ID,
+  nidoKeyFromReserva,
+  proyectoMetaParaReservaDesdeSub,
+  reservaEsEnviabeASituacion,
+  resolveProyectoIdEnfoqueSituacion,
+  subTareaConPasoEjecutado,
+  subTareaFromImanItem,
+} from "@/lib/imanPensamientos";
+import {
+  assertCanOpenVehicle,
+  formatOperationalSlotsBlockMessage,
+  isDesglosadorCrossSegmentExempt,
+} from "@/lib/vehicleOperationalSlots";
+import {
+  getJournalDateString,
+  getJournalDayStartMs,
+  getSegmentCalendarDayStartMs,
+} from "@/lib/segmentTime";
+import { resolveVehicleSegmentContext } from "@/lib/segmentVehicleAssign";
+import {
+  cancelFlotaFetch,
+  setFlotaPaintedCount,
+} from "@/services/jornadaFlotaFetch";
+import { readLocalFlota, writeLocalFlota } from "@/services/jornadaFlotaCache";
+import {
+  registerFlotaMergeContext,
+  refreshFlotaSession,
+  getFlotaMergedSignature,
+  getFlotaVehicles,
+} from "@/flota/flotaStore";
+import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
+import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
+import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
+import {
+  buildDesglosadorNestedPausePatch,
+  buildNestedParentResumePatch,
+  buildSituacionNestedPausePatch,
+  findActiveDesglosadorForNestedStack,
+  findActiveSituacionRingForNestedStack,
+  findNestedParentAwaitingPuntoCeroResume,
+  resumeDesglosadorFromNestedPause,
+} from "@/lib/nestedContextStack";
+import { scheduleDeferredVehicleCleanup } from "@/lib/vehicleDeferredCleanup";
+import { generateStableUuid } from "@/lib/stableUuid";
+import { isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
+import { requestNotificationPermission } from "@/lib/notifications";
+import { auth } from "@/lib/firebase";
+import {
+  GOLD, AZURE, EMERALD, VIOLET, SLATE, BLOOD, PIZARRA, NARANJA, PLATA, VERDE, GRIS, CYAN,
+  cleanSubTitulo,
+  buildDesglosadorSubFromRuntime,
+  type SituacionDesgloseSummary,
+  type CierreEnergiaModalPayload,
+  type DesglosadorSubFormRow,
+  computeSituacionDesgloseSummary,
+  situacionDesgloseBloqueTerminado,
+  situacionDesgloseBloqueListo,
+  playSituacionChimes,
+} from "@/components/flota/vehicleCardShared";
