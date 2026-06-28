@@ -151,6 +151,19 @@ Al cerrar bloque situacional, orden **imperativo**:
 
 Celebración UI **después** de teardown, no antes. Evita freeze + overlay negro huérfano.
 
+### B.6 Ley sistémica — una clase, una solución
+
+**Prohibido** cerrar un issue con un parche que solo aplique al síntoma reportado (ej. «solo desglosador conquista colapsado») sin:
+
+1. Identificar la **clase** de problema (tick en monolito, ms0 roto, reconcile, etc.).
+2. Verificar **todos los procesos** de § A.3 que comparten esa clase.
+3. Añadir **contrato en código** + test que impida regresión.
+4. Pasar el checklist § REGLA DE DECISIÓN para **cada** proceso afectado.
+
+**Criterio de rechazo:** si el fix introduce un segundo patrón paralelo (ej. tick en padre para situación y island para conquista), el PR se rediseña antes de merge.
+
+**Implementación de referencia (ticks UI):** `VehicleCard` no suscribe ticks; cada proceso usa un **island** (`DesglosadorSubLiveIsland`, `SituacionRelojIsland`, etc.) con `useVehicleTimerTick` interno. `vehicleCardNeedsLiveTick` devuelve `false` siempre.
+
 ---
 
 ## MAPA DE ARQUITECTURA
@@ -252,6 +265,7 @@ Antes de cada cambio, responder en orden:
 |---------|--------|
 | V1.0 | Pulso ms0 + sombra; omitía filosofía; contradecía embudo (entropía “destruida”, disco síncrono) |
 | V2.0 | Dos capas (filosofía + técnica), autarquía, flujo datos corregido, pilares embudo, scheduler/persistencia como meta explícita |
+| V2.1 | § B.6 Ley sistémica; ticks UI en islands (no monolito VehicleCard) |
 
 ---
 

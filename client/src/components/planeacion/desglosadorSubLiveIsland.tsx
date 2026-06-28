@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import {
-  computeDesglosadorClocks,
+  computeActiveSubClocks,
+  desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   formatHHMM,
   suggestedSec,
@@ -36,13 +37,15 @@ export function emptyDesglosadorSubClockUi(): DesglosadorSubClockUi {
   };
 }
 
+export { desglosadorSubClockKey };
+
 export function computeDesglosadorSubClockUi(
   vehicle: Vehicle,
   activeSub: SubVehiculo,
   nowMs: number
 ): DesglosadorSubClockUi {
   if (!activeSub.aperturaAt) return emptyDesglosadorSubClockUi();
-  const clocks = computeDesglosadorClocks(nowMs, vehicle);
+  const clocks = computeActiveSubClocks(nowMs, vehicle, activeSub);
   const obj = suggestedSec(activeSub);
   const timerUi = desglosadorSubTimerUiFromClocks(clocks, obj);
 
@@ -91,10 +94,11 @@ function useDesglosadorSubClockUi(
   activeSub: SubVehiculo | undefined
 ): DesglosadorSubClockUi {
   const tick = useVehicleTimerTick();
+  const clockKey = desglosadorSubClockKey(activeSub);
   return useMemo(() => {
     if (!activeSub?.aperturaAt) return emptyDesglosadorSubClockUi();
     return computeDesglosadorSubClockUi(vehicle, activeSub, Date.now());
-  }, [tick, vehicle, activeSub]);
+  }, [tick, clockKey, vehicle, activeSub]);
 }
 
 /**

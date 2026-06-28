@@ -20,25 +20,25 @@ function baseVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
 }
 
 describe("vehicleCardNeedsLiveTick", () => {
-  it("no tick si no está activo", () => {
+  it("siempre false — islands suscriben concienciaClock internamente", () => {
     assert.equal(
       vehicleCardNeedsLiveTick(baseVehicle({ status: "cumplido" }), false),
       false
     );
-  });
-
-  it("tick si está expandido", () => {
-    assert.equal(vehicleCardNeedsLiveTick(baseVehicle(), true), true);
-  });
-
-  it("sin tick desglosador (sesión y subs en subárboles aislados)", () => {
-    const v = baseVehicle({ tipoReloj: "desglosador", aperturaAt: Date.now() - 60_000 });
-    assert.equal(vehicleCardNeedsLiveTick(v, false), false);
-    assert.equal(vehicleCardNeedsLiveTick(v, true), false);
-  });
-
-  it("sin tick colapsado operativa sin reloj visible", () => {
+    assert.equal(vehicleCardNeedsLiveTick(baseVehicle(), true), false);
     assert.equal(vehicleCardNeedsLiveTick(baseVehicle(), false), false);
+  });
+
+  it("sin tick desglosador ni situación expandida", () => {
+    const desglosador = baseVehicle({ tipoReloj: "desglosador", aperturaAt: Date.now() - 60_000 });
+    assert.equal(vehicleCardNeedsLiveTick(desglosador, false), false);
+    assert.equal(vehicleCardNeedsLiveTick(desglosador, true), false);
+
+    const situacion = baseVehicle({
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: Date.now() },
+    } as Partial<Vehicle>);
+    assert.equal(vehicleCardNeedsLiveTick(situacion, true), false);
   });
 
   it("sin tick desglosador cuando todos los subs están cerrados", () => {

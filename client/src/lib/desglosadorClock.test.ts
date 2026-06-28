@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SubVehiculo, Vehicle } from "./persistence.ts";
 import {
+  computeActiveSubClocks,
   computeDesglosadorClocks,
   computeSubCloseVerdict,
+  desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   suggestedSec,
   validateSubCloseCantidad,
@@ -169,6 +171,35 @@ describe("desglosadorSubTimerUiFromClocks", () => {
     const ui = desglosadorSubTimerUiFromClocks(clocks, obj);
     assert.equal(ui.expired, true);
     assert.equal(ui.display, "00:30");
+  });
+});
+
+describe("desglosadorSubClockKey", () => {
+  it("cambia al transicionar sub con nuevo aperturaAt", () => {
+    const sub1: SubVehiculo = { id: "s1", titulo: "A", status: "activo", aperturaAt: 100 };
+    const sub2: SubVehiculo = { id: "s2", titulo: "B", status: "activo", aperturaAt: 200 };
+    assert.notEqual(desglosadorSubClockKey(sub1), desglosadorSubClockKey(sub2));
+    assert.equal(desglosadorSubClockKey(sub1), "s1:100");
+  });
+});
+
+describe("computeActiveSubClocks", () => {
+  it("reinicia elapsed al pasar sub explícito con aperturaAt nuevo", () => {
+    const now = 2_000_000;
+    const nextSub: SubVehiculo = {
+      id: "s2",
+      titulo: "B",
+      status: "activo",
+      aperturaAt: now,
+    };
+    const v = {
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "cumplido" },
+        nextSub,
+      ],
+    } as Vehicle;
+    const clocks = computeActiveSubClocks(now + 3000, v, nextSub);
+    assert.equal(clocks.subElapsedSec, 3);
   });
 });
 

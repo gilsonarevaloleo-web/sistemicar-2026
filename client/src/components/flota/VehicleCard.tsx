@@ -456,16 +456,15 @@ import BalanceConquistaPanel from "@/components/BalanceConquistaPanel";
 import PlanificacionCockpit from "@/components/PlanificacionCockpit";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import PlaneacionMetricsEscalera from "@/components/planeacion/PlaneacionMetricsEscalera";
-import { VehicleCardLiveClock, VehicleCardLiveNow } from "@/components/planeacion/vehicleCardLiveClock";
-import { DesglosadorSubLiveIsland } from "@/components/planeacion/desglosadorSubLiveIsland";
+import { VehicleCardLiveNow } from "@/components/planeacion/vehicleCardLiveClock";
+import { DesglosadorSubLiveIsland, desglosadorSubClockKey } from "@/components/planeacion/desglosadorSubLiveIsland";
+import { SituacionRelojIsland } from "@/components/planeacion/situacionRelojIsland";
+import { VehicleTimerIsland } from "@/components/planeacion/vehicleTimerIsland";
 import {
   Situacion2MinAlertWatcher,
   SituacionRingSobraVoiceWatcher,
 } from "@/components/planeacion/situacionLiveWatchers";
-import {
-  areVehicleCardPropsEqual,
-  vehicleCardNeedsLiveTick,
-} from "@/components/planeacion/vehicleCardMemo";
+import { areVehicleCardPropsEqual } from "@/components/planeacion/vehicleCardMemo";
 import {
   aplicarProyectoHeredadoASub,
   devolverRingPendientesAlIman,
@@ -493,7 +492,7 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice } from "@/lib/concienciaClock";
+import { burstConcienciaClockTick, isCoarseConcienciaDevice } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
@@ -623,10 +622,7 @@ function VehicleCard({
   onRutaBandCross?: (payload: { vehicleId: string; subId: string; subTitulo: string; banda: RutaBandaId }) => void;
   onBloqueCierre?: (payload: { vehicleId: string; sub: SubVehiculo; status: string }) => void;
 }) {
-  const [timerDisplay, setTimerDisplay] = useState("");
   const [timerExpired, setTimerExpired] = useState(false);
-  const [debtDisplay, setDebtDisplay] = useState("");
-  const [targetTimeLabel, setTargetTimeLabel] = useState("");
   const [showDescansoReloj, setShowDescansoReloj] = useState(false);
   const [newSubTarea, setNewSubTarea] = useState("");
   const [cantidadRealizada, setCantidadRealizada] = useState("");
@@ -696,11 +692,6 @@ function VehicleCard({
   subTareasRef.current = vehicle.subTareas;
   const situacionAnchorRef = useRef(vehicle.situacionCupoAnchor);
   situacionAnchorRef.current = vehicle.situacionCupoAnchor;
-  const computeTimerRef = useRef<() => void>(() => {});
-  const needsLiveTick = useMemo(
-    () => vehicleCardNeedsLiveTick(vehicle, expanded),
-    [vehicle, expanded]
-  );
   const [subRutaModal, setSubRutaModal] = useState<null | {
     subId: string;
     status: "cumplido" | "fallado";
@@ -740,8 +731,12 @@ function VehicleCard({
   const [execSubRuta, setExecSubRuta] = useState(true);
   const [execSubSugOpen, setExecSubSugOpen] = useState(false);
 
-  const runLiveTimerTick = useCallback(() => {
-    computeTimerRef.current();
+  const handleTimerExpiredChange = useCallback((expired: boolean) => {
+    setTimerExpired(expired);
+  }, []);
+
+  const handleRemainingUnitsChange = useCallback((n: number | null) => {
+    setRemainingUnits(n);
   }, []);
 
   const resetDesglosadorSubCounterState = useCallback(() => {
@@ -1228,6 +1223,7 @@ function VehicleCard({
       }
     }
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
+    burstConcienciaClockTick(1);
     const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
     if (allDone) {
       setDesglosadorSummary(true);
@@ -1320,139 +1316,9 @@ function VehicleCard({
     setEtiquetaSalidaLocal(null);
     setNotaSalidaLocal("");
     setPendingDescansoStatus(null);
+    setTimerExpired(false);
+    setRemainingUnits(null);
   }, [vehicle.status, vehicle.id]);
-
-  useEffect(() => {
-    if (vehicle.status !== "activo") return;
-    if (vehicle.tipoReloj === "desglosador") return;
-    const aperturaMs = vehicle.aperturaAt || (vehicle.tiempoInicio ? (typeof vehicle.tiempoInicio === 'object' && (vehicle.tiempoInicio as any).seconds ? (vehicle.tiempoInicio as any).seconds * 1000 : new Date(vehicle.tiempoInicio as any).getTime()) : Date.now());
-    const parentesisExtra = (vehicle.parentesisRecarga || []).reduce((sum, p) => sum + p.duracionMin, 0);
-    const fmtTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60); const s = totalSec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; };
-    const fmtHHMM = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-    let targetMs: number | null = null;
-    let matchProd: RegExpMatchArray | null = null;
-
-    if ((tipoFlota === "tiempo" || vehicle.tipoTerminoRapido === "hora") && vehicle.criterioDetalle) {
-      const matchHora = vehicle.criterioDetalle.match(/^(\d{1,2}):(\d{2})$/);
-      matchProd = vehicle.criterioDetalle.match(/^([\d.]+)\s*x\s*([\d.]+)\s*min$/i);
-      if (matchHora) {
-        const target = new Date(); target.setHours(parseInt(matchHora[1]), parseInt(matchHora[2]), 0, 0);
-        target.setMinutes(target.getMinutes() + parentesisExtra);
-        targetMs = target.getTime();
-        setTargetTimeLabel(fmtHHMM(target));
-      } else if (matchProd) {
-        const totalMin = parseFloat(matchProd[1]) * parseFloat(matchProd[2]);
-        targetMs = aperturaMs + (totalMin + parentesisExtra) * 60000;
-        setTargetTimeLabel(fmtHHMM(new Date(targetMs)));
-      }
-    }
-
-    if (tipoFlota === "descanso" && vehicle.criterioDetalle) {
-      const matchDur = vehicle.criterioDetalle.match(/([\d.]+)\s*min/i);
-      if (matchDur) {
-        const durMin = parseFloat(matchDur[1]) + 5;
-        targetMs = aperturaMs + (durMin + parentesisExtra) * 60000;
-        setTargetTimeLabel(fmtHHMM(new Date(targetMs)));
-      }
-    }
-
-    if (tipoFlota === "situacion") {
-      const tMs = situacionTargetMsReloj(vehicle, Date.now());
-      if (tMs != null) {
-        targetMs = tMs;
-        setTargetTimeLabel(fmtHHMM(new Date(tMs)));
-      }
-    }
-
-    const computeTimer = () => {
-      if (tipoFlota === "verdad") {
-        const elapsed = Math.max(0, Math.floor(hardwareElapsedMs(aperturaMs) / 1000));
-        setTimerDisplay(fmtTime(elapsed));
-        return;
-      }
-      if (targetMs !== null) {
-        const now = hardwareClockNow();
-
-        if (tipoFlota === "situacion") {
-          const anchor = vehicle.situacionCupoAnchor;
-          const sub = anchor?.subTareaId
-            ? (vehicle.subTareas || []).find(s => s.id === anchor.subTareaId)
-            : null;
-          if (
-            anchor?.startedAt &&
-            sub &&
-            (sub.minutosCupo ?? 0) > 0 &&
-            situacionFilaEnFocoPendiente(sub)
-          ) {
-            const durationInMs = durationMinutesToMs(sub.minutosCupo!);
-            const elapsedMs = hardwareElapsedMs(anchor.startedAt, now);
-            const remainingMs = durationInMs - elapsedMs;
-            const safeRemainingMs = Math.max(0, remainingMs);
-            if (remainingMs > 0) {
-              setTimerExpired(false);
-              setDebtDisplay("");
-              setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
-            } else if (elapsedMs >= durationInMs) {
-              setTimerExpired(true);
-              setTimerDisplay("00:00:00");
-              const overMs = elapsedMs - durationInMs;
-              setDebtDisplay(overMs > 0 ? fmtTime(Math.floor(overMs / 1000)) : "");
-            } else {
-              setTimerExpired(false);
-              setDebtDisplay("");
-              setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
-            }
-            return;
-          }
-        }
-
-        const remainingMs = targetMs - now;
-        const safeRemainingMs = Math.max(0, remainingMs);
-        if (remainingMs > 0) {
-          setTimerExpired(false);
-          setDebtDisplay("");
-          setTimerDisplay(fmtTime(Math.floor(safeRemainingMs / 1000)));
-        } else {
-          setTimerExpired(true);
-          setTimerDisplay("00:00:00");
-          setDebtDisplay(fmtTime(Math.floor(Math.abs(remainingMs) / 1000)));
-        }
-        if (matchProd) {
-          const cantObj = parseFloat(matchProd[1]);
-          const minPerUnit = parseFloat(matchProd[2]);
-          const elapsedMin = (Date.now() - aperturaMs) / 60000;
-          const done = Math.floor(elapsedMin / minPerUnit);
-          setRemainingUnits(Math.max(0, cantObj - done));
-        }
-        return;
-      }
-      if (vehicle.tipoReloj === "investigador" && vehicle.cantidadObjetivo) {
-        const hist = getHistoricalVehicleData(vehicle.titulo);
-        const recordMpu = hist.bestMinPerUnit ?? hist.lastMinPerUnit;
-        if (recordMpu) {
-          const elapsedMin = (Date.now() - aperturaMs) / 60000;
-          const done = Math.floor(elapsedMin / recordMpu);
-          setRemainingUnits(Math.max(0, vehicle.cantidadObjetivo - done));
-        }
-      }
-      const elapsed = Math.max(0, Math.floor((Date.now() - aperturaMs) / 1000));
-      setTimerDisplay(fmtTime(elapsed));
-    };
-
-    computeTimer();
-
-    computeTimerRef.current = computeTimer;
-
-    const onFocus = () => computeTimer();
-    document.addEventListener("visibilitychange", onFocus);
-    const timerInterval = setInterval(computeTimer, 1000);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onFocus);
-      clearInterval(timerInterval);
-    };
-  }, [expanded, vehicle.status, vehicle.tipoReloj, vehicle.tipoTerminoRapido, vehicle.criterioDetalle, vehicle.subVehiculos]);
 
   const statusColors = { activo: GOLD, cumplido: EMERALD, archivado: "#6b7280" };
   const { difficulty, potentialCPCumplido, potentialCPArchivado, scorePercent } = calculateVehicleScore(vehicle);
@@ -1732,7 +1598,6 @@ function VehicleCard({
       className="rounded-xl border overflow-hidden"
       style={{ backgroundColor: "#0a0a0a", borderColor: `${statusColors[vehicle.status]}30` }}
     >
-      {needsLiveTick && <VehicleCardLiveClock onTick={runLiveTimerTick} />}
       {vehicle.tipoFlota === "situacion" && vehicle.status === "activo" && (
         <>
           <Situacion2MinAlertWatcher
@@ -1796,24 +1661,19 @@ function VehicleCard({
                   </VehicleCardLiveNow>
                 )}
                 {segmentoNumero != null && vehicle.status === "activo" && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${EMERALD}20`, color: EMERALD }}>S{segmentoNumero}</span>}
-                {isSituacionFlota && vehicle.status === "activo" && situacionRelojDebeMostrarse(vehicle) && timerDisplay && (
-                  <span
-                    className="text-[9px] font-black px-1.5 py-0.5 rounded font-mono tracking-wider"
-                    style={{
-                      backgroundColor: timerExpired ? "rgba(153,27,27,0.25)" : "rgba(212,175,55,0.15)",
-                      color: timerExpired ? "#ef4444" : GOLD,
-                      border: `1px solid ${timerExpired ? "rgba(153,27,27,0.45)" : "rgba(212,175,55,0.35)"}`,
-                    }}
-                    data-testid={`situacion-header-timer-${vehicle.id}`}
-                  >
-                    {timerDisplay}
-                  </span>
+                {isSituacionFlota && vehicle.status === "activo" && situacionRelojDebeMostrarse(vehicle) && (
+                  <SituacionRelojIsland vehicle={vehicle} compact onExpiredChange={handleTimerExpiredChange} />
                 )}
               </div>
               <p className="text-[10px] text-slate-500">{vehicle.criterioDetalle}</p>
               {!expanded && vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && isMobilePerfMode() && (
                 <p className="text-[9px] font-bold mt-0.5 tracking-wide" style={{ color: NARANJA }} data-testid={`desglosador-tap-hint-${vehicle.id}`}>
                   Toca para abrir subs
+                </p>
+              )}
+              {!expanded && isSituacionFlota && vehicle.status === "activo" && isMobilePerfMode() && (
+                <p className="text-[9px] font-bold mt-0.5 tracking-wide" style={{ color: NARANJA }} data-testid={`situacion-tap-hint-${vehicle.id}`}>
+                  Toca para operar
                 </p>
               )}
             </div>
@@ -2037,6 +1897,7 @@ function VehicleCard({
 
                 return (
                   <DesglosadorSubLiveIsland
+                    key={desglosadorSubClockKey(activeSub)}
                     vehicle={vehicle}
                     activeSub={activeSub}
                     onSubVehicleRestanteChange={handleSubVehicleRestanteChange}
@@ -2536,41 +2397,24 @@ function VehicleCard({
                 );
               })()}
 
-              {vehicle.status === "activo" && timerDisplay && vehicle.tipoReloj !== "desglosador" && tipoFlota !== "verdad" && (tipoFlota !== "descanso" || showDescansoReloj) && (tipoFlota !== "situacion" || situacionRelojDebeMostrarse(vehicle)) && (
-                <div className="pt-3">
-                  <div className="p-3 rounded-xl border text-center" style={{
-                    backgroundColor: timerExpired ? "rgba(153,27,27,0.15)" : `${VERDE}08`,
-                    borderColor: timerExpired ? "#991b1b" : `${VERDE}40`,
-                    boxShadow: timerExpired ? "0 0 20px rgba(153,27,27,0.3)" : `0 0 15px ${VERDE}15`
-                  }}>
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <Timer size={12} style={{ color: timerExpired ? "#ef4444" : VERDE }} />
-                      <span className="text-[8px] font-bold uppercase tracking-widest" style={{ color: timerExpired ? "#ef4444" : VERDE }}>
-                        {vehicle.tipoReloj === "investigador" ? "CRONÓMETRO LIBRE" : timerExpired ? (tipoFlota === "descanso" ? "DESCANSO EN DEUDA" : "TIEMPO EN DEUDA") : tipoFlota === "situacion" ? "FILA EN FOCO" : "CUENTA REGRESIVA"}
-                      </span>
-                    </div>
-                    {!timerExpired ? (
-                      <span className="text-2xl font-black tracking-wider" style={{ color: VERDE, fontFamily: "JetBrains Mono, monospace" }}>{timerDisplay}</span>
-                    ) : (
-                      <div>
-                        <span className="text-sm text-slate-600 line-through" style={{ fontFamily: "JetBrains Mono, monospace" }}>00:00:00</span>
-                        {debtDisplay && (
-                          <div className="mt-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest text-red-500 block mb-0.5">DEUDA ACUMULADA</span>
-                            <span className="text-2xl font-black tracking-wider" style={{ color: "#ef4444", fontFamily: "JetBrains Mono, monospace", textShadow: "0 0 15px rgba(239,68,68,0.4)" }}>+{debtDisplay}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {targetTimeLabel && (
-                      <p className="text-[9px] mt-1" style={{ color: timerExpired ? "#ef4444" : VERDE }}>
-                        Objetivo: {targetTimeLabel} {tipoFlota === "descanso" && "(+5 min tolerancia)"}
-                      </p>
-                    )}
-                    {(vehicle.parentesisRecarga || []).length > 0 && (
-                      <p className="text-[8px] mt-1" style={{ color: VERDE }}>Paréntesis: +{(vehicle.parentesisRecarga || []).reduce((s, p) => s + p.duracionMin, 0)} min</p>
-                    )}
-                  </div>
+              {vehicle.status === "activo" && tipoFlota === "situacion" && situacionRelojDebeMostrarse(vehicle) && (
+                <SituacionRelojIsland vehicle={vehicle} onExpiredChange={handleTimerExpiredChange} />
+              )}
+
+              {vehicle.status === "activo" && vehicle.tipoReloj !== "desglosador" && tipoFlota !== "situacion" && tipoFlota !== "verdad" && (
+                <>
+                  <VehicleTimerIsland
+                    vehicle={vehicle}
+                    tipoFlota={tipoFlota}
+                    showDescansoReloj={showDescansoReloj}
+                    onExpiredChange={handleTimerExpiredChange}
+                    onRemainingUnitsChange={handleRemainingUnitsChange}
+                  />
+                  {(vehicle.parentesisRecarga || []).length > 0 && (
+                    <p className="text-[8px] mt-1 text-center" style={{ color: VERDE }}>
+                      Paréntesis: +{(vehicle.parentesisRecarga || []).reduce((s, p) => s + p.duracionMin, 0)} min
+                    </p>
+                  )}
                   {(vehicle.tipoReloj === "produccion" || vehicle.tipoReloj === "investigador") && remainingUnits !== null && (
                     <div className="mt-2 pt-2 border-t text-center" style={{ borderColor: "rgba(139,92,246,0.2)" }}>
                       <p className="text-[8px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "#8B5CF6", fontFamily: "monospace", opacity: 0.7 }}>RESTANTE</p>
@@ -2603,7 +2447,7 @@ function VehicleCard({
                       </div>
                     );
                   })()}
-                </div>
+                </>
               )}
 
               {tipoFlota === "situacion" && vehicle.status === "activo" && (
@@ -3546,12 +3390,16 @@ function VehicleCard({
                     <span className="text-[8px] px-2 py-1 rounded-full font-black uppercase" style={{ backgroundColor: vehicle.autoVerdad ? `${BLOOD}20` : `${EMERALD}20`, color: vehicle.autoVerdad ? BLOOD : EMERALD }}>{vehicle.autoVerdad ? "VERDAD INCONSCIENTE" : "VERDAD CONSCIENTE"}</span>
                   </div>
                   <p className="text-[10px] text-slate-400 italic text-center" style={{ fontFamily: "Georgia, serif" }}>{vehicle.autoVerdad ? "Tiempo perdido detectado. No hay actividad consciente registrada." : "Registro voluntario de pausa o reflexión."}</p>
-                  {timerDisplay && (
-                    <div className="mt-2 text-center">
-                      <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">{vehicle.autoVerdad ? "Tiempo perdido" : "Duración"}</p>
-                      <span className="text-lg font-black tracking-wider" style={{ color: vehicle.autoVerdad ? BLOOD : EMERALD, fontFamily: "JetBrains Mono, monospace" }}>{timerDisplay}</span>
-                    </div>
-                  )}
+                  <VehicleTimerIsland vehicle={vehicle} tipoFlota={tipoFlota}>
+                    {(ui) =>
+                      ui.display ? (
+                        <div className="mt-2 text-center">
+                          <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">{vehicle.autoVerdad ? "Tiempo perdido" : "Duración"}</p>
+                          <span className="text-lg font-black tracking-wider" style={{ color: vehicle.autoVerdad ? BLOOD : EMERALD, fontFamily: "JetBrains Mono, monospace" }}>{ui.display}</span>
+                        </div>
+                      ) : null
+                    }
+                  </VehicleTimerIsland>
                 </div>
               )}
 

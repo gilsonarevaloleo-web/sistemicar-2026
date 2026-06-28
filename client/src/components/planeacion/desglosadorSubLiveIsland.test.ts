@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import {
   computeDesglosadorSubClockUi,
+  desglosadorSubClockKey,
   emptyDesglosadorSubClockUi,
 } from "./desglosadorSubLiveIsland";
 
@@ -60,5 +61,31 @@ describe("computeDesglosadorSubClockUi", () => {
     assert.equal(ui.subTimerIsCountdown, true);
     assert.notEqual(ui.futuroCicloLabel, "—");
     assert.notEqual(ui.horaFinProyectada, null);
+  });
+
+  it("desglosadorSubClockKey invalida al cambiar aperturaAt", () => {
+    const subA: SubVehiculo = { id: "s1", titulo: "A", status: "activo", aperturaAt: 100 };
+    const subB: SubVehiculo = { ...subA, aperturaAt: 200 };
+    assert.notEqual(desglosadorSubClockKey(subA), desglosadorSubClockKey(subB));
+  });
+
+  it("transición sub→sub reinicia elapsed en computeDesglosadorSubClockUi", () => {
+    const t0 = 1_000_000;
+    const sub1: SubVehiculo = {
+      id: "s1",
+      titulo: "A",
+      status: "cumplido",
+      aperturaAt: t0 - 120_000,
+      cierreAt: t0,
+    };
+    const sub2: SubVehiculo = {
+      id: "s2",
+      titulo: "B",
+      status: "activo",
+      aperturaAt: t0,
+    };
+    const v = vehicle({ subVehiculos: [sub1, sub2] });
+    const ui = computeDesglosadorSubClockUi(v, sub2, t0 + 5_000);
+    assert.equal(ui.subTimerDisplay, "00:00:05");
   });
 });

@@ -19,6 +19,26 @@ export interface DesglosadorClockResult {
   hasProjection: boolean;
 }
 
+/** Firma única del reloj de un sub — invalida UI al transicionar. */
+export function desglosadorSubClockKey(sub: SubVehiculo | undefined): string {
+  if (!sub?.aperturaAt) return "";
+  return `${sub.id}:${sub.aperturaAt}`;
+}
+
+/** Reloj del sub activo explícito (evita frames con find(activo) desincronizado). */
+export function computeActiveSubClocks(
+  now: number,
+  vehicle: Vehicle,
+  activeSub: SubVehiculo
+): DesglosadorClockResult {
+  const subs = (vehicle.subVehiculos ?? []).map(s => {
+    if (s.id === activeSub.id) return { ...activeSub, status: "activo" as const };
+    if (s.status === "activo") return { ...s, status: "pendiente" as const };
+    return s;
+  });
+  return computeDesglosadorClocks(now, { ...vehicle, subVehiculos: subs });
+}
+
 export function computeDesglosadorClocks(now: number, vehicle: Vehicle): DesglosadorClockResult {
   const subs = vehicle.subVehiculos || [];
   const activeSub = subs.find(s => s.status === "activo");

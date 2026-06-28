@@ -498,7 +498,7 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
+import { isCoarseConcienciaDevice, useConcienciaClockTick, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
@@ -1924,6 +1924,9 @@ export default function Planeacion() {
           description: flotaConfig.psCierre,
           style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
         });
+        if (tipoFlotaSeleccionado === "situacion" || relojTiempo === "desglosador") {
+          dispatchConcienciaClockTick();
+        }
         registrarEvento(COMPONENTES.PLANIFICACION);
         resetForm();
       };
