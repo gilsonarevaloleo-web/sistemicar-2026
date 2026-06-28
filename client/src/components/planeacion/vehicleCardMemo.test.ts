@@ -31,14 +31,10 @@ describe("vehicleCardNeedsLiveTick", () => {
     assert.equal(vehicleCardNeedsLiveTick(baseVehicle(), true), true);
   });
 
-  it("tick colapsado desglosador (panel compacto en header)", () => {
-    assert.equal(
-      vehicleCardNeedsLiveTick(
-        baseVehicle({ tipoReloj: "desglosador", aperturaAt: Date.now() - 60_000 }),
-        false
-      ),
-      true
-    );
+  it("sin tick desglosador (sesión y subs en subárboles aislados)", () => {
+    const v = baseVehicle({ tipoReloj: "desglosador", aperturaAt: Date.now() - 60_000 });
+    assert.equal(vehicleCardNeedsLiveTick(v, false), false);
+    assert.equal(vehicleCardNeedsLiveTick(v, true), false);
   });
 
   it("sin tick colapsado operativa sin reloj visible", () => {

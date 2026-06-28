@@ -1895,7 +1895,22 @@ export default function Planeacion() {
           });
         });
         saveLocalVehicles(vehiclesRef.current);
-        if (tipoFlotaSeleccionado === "situacion") {
+        if (optimisticVehicle.tipoReloj === "desglosador") {
+          const sub0 = optimisticVehicle.subVehiculos?.[0];
+          if (!sub0 || sub0.status !== "activo" || !sub0.aperturaAt) {
+            console.warn(
+              "[paintOptimisticLaunch] Desglosador sin sub activo inicial:",
+              optimisticVehicle.id,
+              optimisticVehicle.subVehiculos
+            );
+            toast.warning("Subs no listos", {
+              description: "El desglosador se lanzó sin sub inicial activo. Toca la tarjeta o relanza.",
+              style: { backgroundColor: PIZARRA, border: `1px solid ${NARANJA}`, color: NARANJA },
+              duration: 5000,
+            });
+          }
+        }
+        if (tipoFlotaSeleccionado === "situacion" || relojTiempo === "desglosador") {
           setExpandedId(optimisticVehicle.id);
         }
         setIsCreating(false);

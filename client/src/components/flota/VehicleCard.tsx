@@ -270,7 +270,6 @@ import {
   ringSessionOperable,
 } from "@/lib/ringEnfoqueReal";
 import {
-  computeDesglosadorClocks,
   formatElapsedHHMMSS,
   formatHHMM,
   formatMMSS,
@@ -458,6 +457,7 @@ import PlanificacionCockpit from "@/components/PlanificacionCockpit";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import PlaneacionMetricsEscalera from "@/components/planeacion/PlaneacionMetricsEscalera";
 import { VehicleCardLiveClock, VehicleCardLiveNow } from "@/components/planeacion/vehicleCardLiveClock";
+import { DesglosadorSubLiveIsland } from "@/components/planeacion/desglosadorSubLiveIsland";
 import {
   Situacion2MinAlertWatcher,
   SituacionRingSobraVoiceWatcher,
@@ -632,9 +632,6 @@ function VehicleCard({
   const [cantidadRealizada, setCantidadRealizada] = useState("");
   const [remainingUnits, setRemainingUnits] = useState<number | null>(null);
   const [subVehicleRestante, setSubVehicleRestante] = useState<number | null>(null);
-  const [subTimerDisplay, setSubTimerDisplay] = useState("");
-  const [subTimerIsCountdown, setSubTimerIsCountdown] = useState(false);
-  const [subTimerExpired, setSubTimerExpired] = useState(false);
   const [desglosadorSummary, setDesglosadorSummary] = useState(false);
   const subtasksExpandedStorageKey = `sistemicar_subtasks_expanded_${vehicle.id}`;
   const [subTasksCollapsed, setSubTasksCollapsed] = useState(() => {
@@ -657,10 +654,6 @@ function VehicleCard({
   const [notaSalidaLocal, setNotaSalidaLocal] = useState("");
   const [pendingDescansoStatus, setPendingDescansoStatus] = useState<"cumplido" | "archivado" | null>(null);
   const [showMicroPasos, setShowMicroPasos] = useState(false);
-  const [horaFinProyectada, setHoraFinProyectada] = useState<string | null>(null);
-  const [horaFinRemainSec, setHoraFinRemainSec] = useState<number | null>(null);
-  const [horaFinDeltaSec, setHoraFinDeltaSec] = useState<number>(0);
-  const [liveAccumDeltaSec, setLiveAccumDeltaSec] = useState<number>(0);
   type UltimoCierreSub = {
     subId: string;
     titulo: string;
@@ -670,8 +663,6 @@ function VehicleCard({
     conquistaFluidezAbsoluta?: boolean;
   };
   const [ultimoCierreSub, setUltimoCierreSub] = useState<UltimoCierreSub | null>(null);
-  const [futuroSubLabel, setFuturoSubLabel] = useState<string>("—");
-  const [futuroCicloLabel, setFuturoCicloLabel] = useState<string>("—");
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -706,7 +697,6 @@ function VehicleCard({
   const situacionAnchorRef = useRef(vehicle.situacionCupoAnchor);
   situacionAnchorRef.current = vehicle.situacionCupoAnchor;
   const computeTimerRef = useRef<() => void>(() => {});
-  const desglosadorUpdateRef = useRef<() => void>(() => {});
   const needsLiveTick = useMemo(
     () => vehicleCardNeedsLiveTick(vehicle, expanded),
     [vehicle, expanded]
@@ -752,21 +742,14 @@ function VehicleCard({
 
   const runLiveTimerTick = useCallback(() => {
     computeTimerRef.current();
-    desglosadorUpdateRef.current();
   }, []);
 
   const resetDesglosadorSubCounterState = useCallback(() => {
     setSubVehicleRestante(null);
-    setSubTimerDisplay("");
-    setSubTimerIsCountdown(false);
-    setSubTimerExpired(false);
-    setFuturoSubLabel("—");
-    setFuturoCicloLabel("—");
-    setHoraFinProyectada(null);
-    setHoraFinRemainSec(null);
-    setHoraFinDeltaSec(0);
-    setLiveAccumDeltaSec(0);
-    desglosadorUpdateRef.current = () => {};
+  }, []);
+
+  const handleSubVehicleRestanteChange = useCallback((n: number | null) => {
+    setSubVehicleRestante(n);
   }, []);
 
   const playChime = useCallback(() => {
@@ -1241,6 +1224,7 @@ function VehicleCard({
           nextSub.titulo,
           Boolean(nextSub.rutaEnfoque?.activa)
         );
+        subVehiculosRef.current = allSubs;
       }
     }
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
@@ -1469,96 +1453,6 @@ function VehicleCard({
       clearInterval(timerInterval);
     };
   }, [expanded, vehicle.status, vehicle.tipoReloj, vehicle.tipoTerminoRapido, vehicle.criterioDetalle, vehicle.subVehiculos]);
-
-  // Timer for active sub-vehicle in desglosador mode — fuente única: computeDesglosadorClocks
-  useEffect(() => {
-    if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !expanded) {
-      desglosadorUpdateRef.current = () => {};
-      return;
-    }
-    const subsNow = subVehiculosRef.current ?? vehicle.subVehiculos ?? [];
-    const activeSub = subsNow.find(s => s.status === "activo");
-    if (!activeSub?.aperturaAt) {
-      desglosadorUpdateRef.current = () => {};
-      return;
-    }
-
-    const objSecs = suggestedSec(activeSub);
-    setSubTimerIsCountdown(objSecs !== null);
-    const vehicleForClocks = () => ({
-      ...vehicleRef.current,
-      subVehiculos: subVehiculosRef.current ?? vehicleRef.current.subVehiculos ?? [],
-    });
-    const clocksInit = computeDesglosadorClocks(Date.now(), vehicleForClocks());
-    if (clocksInit.unitsRemaining !== null) {
-      setSubVehicleRestante(clocksInit.unitsRemaining);
-    } else if (activeSub.cantidadObjetivo && activeSub.tiempoRecordMinPerUnit) {
-      setSubVehicleRestante(activeSub.cantidadObjetivo);
-    } else {
-      setSubVehicleRestante(null);
-    }
-
-    const update = () => {
-      const v = vehicleForClocks();
-      const activeNow = (v.subVehiculos ?? []).find(s => s.status === "activo");
-      if (!activeNow?.aperturaAt) {
-        desglosadorUpdateRef.current = () => {};
-        return;
-      }
-      const now = Date.now();
-      const clocks = computeDesglosadorClocks(now, v);
-      const obj = suggestedSec(activeNow);
-
-      if (obj !== null && clocks.subRemainingSec !== null) {
-        setSubTimerExpired(clocks.subRemainingSec <= 0);
-        setSubTimerDisplay(formatMMSS(clocks.subRemainingSec));
-      } else {
-        setSubTimerExpired(false);
-        setSubTimerDisplay(formatElapsedHHMMSS(clocks.subElapsedSec));
-      }
-
-      if (clocks.unitsRemaining !== null) {
-        setSubVehicleRestante(clocks.unitsRemaining);
-      }
-
-      if (clocks.subEndAt != null) {
-        setFuturoSubLabel(formatHHMM(clocks.subEndAt));
-      } else {
-        setFuturoSubLabel("—");
-      }
-
-      if (clocks.hasProjection && clocks.cycleEndAt != null && clocks.cycleRemainSec != null) {
-        const horaFin = formatHHMM(clocks.cycleEndAt);
-        setHoraFinProyectada(horaFin);
-        setFuturoCicloLabel(horaFin);
-        setHoraFinRemainSec(clocks.cycleRemainSec);
-        setHoraFinDeltaSec(clocks.liveAccumDeltaSec);
-        setLiveAccumDeltaSec(clocks.liveAccumDeltaSec);
-      } else {
-        setHoraFinProyectada(null);
-        setFuturoCicloLabel("—");
-        setHoraFinRemainSec(null);
-        setHoraFinDeltaSec(0);
-        setLiveAccumDeltaSec(0);
-      }
-    };
-
-    update();
-    desglosadorUpdateRef.current = update;
-    return () => {
-      desglosadorUpdateRef.current = () => {};
-      setHoraFinProyectada(null);
-      setFuturoSubLabel("—");
-      setFuturoCicloLabel("—");
-    };
-  }, [
-    expanded,
-    vehicle.tipoReloj,
-    vehicle.status,
-    vehicle.subVehiculos,
-    vehicle.interrupcionActiva,
-    vehicle.desglosadorPausa,
-  ]);
 
   const statusColors = { activo: GOLD, cumplido: EMERALD, archivado: "#6b7280" };
   const { difficulty, potentialCPCumplido, potentialCPArchivado, scorePercent } = calculateVehicleScore(vehicle);
@@ -1891,11 +1785,15 @@ function VehicleCard({
                   <span className="text-[7px] font-black px-1.5 py-0.5 rounded-full tracking-widest" style={{ backgroundColor: "rgba(139,92,246,0.15)", color: VIOLET, border: "1px solid rgba(139,92,246,0.35)" }}>EN PAUSA</span>
                 )}
                 {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (
-                  <DesglosadorDuracionPanel
-                    elapsedSec={getDesglosadorSessionElapsedSec(vehicle)}
-                    depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
-                    compact
-                  />
+                  <VehicleCardLiveNow>
+                    {(nowMs) => (
+                      <DesglosadorDuracionPanel
+                        elapsedSec={getDesglosadorSessionElapsedSec(vehicle, nowMs)}
+                        depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
+                        compact
+                      />
+                    )}
+                  </VehicleCardLiveNow>
                 )}
                 {segmentoNumero != null && vehicle.status === "activo" && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${EMERALD}20`, color: EMERALD }}>S{segmentoNumero}</span>}
                 {isSituacionFlota && vehicle.status === "activo" && situacionRelojDebeMostrarse(vehicle) && timerDisplay && (
@@ -1913,6 +1811,11 @@ function VehicleCard({
                 )}
               </div>
               <p className="text-[10px] text-slate-500">{vehicle.criterioDetalle}</p>
+              {!expanded && vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && isMobilePerfMode() && (
+                <p className="text-[9px] font-bold mt-0.5 tracking-wide" style={{ color: NARANJA }} data-testid={`desglosador-tap-hint-${vehicle.id}`}>
+                  Toca para abrir subs
+                </p>
+              )}
             </div>
           </div>
           {expanded ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
@@ -2133,6 +2036,12 @@ function VehicleCard({
                 }
 
                 return (
+                  <DesglosadorSubLiveIsland
+                    vehicle={vehicle}
+                    activeSub={activeSub}
+                    onSubVehicleRestanteChange={handleSubVehicleRestanteChange}
+                  >
+                    {(clockUi) => (
                   <VehicleCardLiveNow>
                     {(nowMs) => {
                 const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
@@ -2164,7 +2073,7 @@ function VehicleCard({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[8px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.82)" }}>{cumplidos + fallados}/{subs.length}</span>
-                        <span className="text-[8px] font-mono font-bold" style={{ color: futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "#FDBA74" }}>🏁 CICLO: {futuroCicloLabel}</span>
+                        <span className="text-[8px] font-mono font-bold" style={{ color: clockUi.futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "#FDBA74" }}>🏁 CICLO: {clockUi.futuroCicloLabel}</span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSubTasksCollapsed(c => !c); }}
                           className="p-1 rounded-md transition-colors hover:bg-white/10"
@@ -2255,10 +2164,10 @@ function VehicleCard({
                                 </div>
                                 {/* Active sub timer */}
                                 <div className="space-y-1">
-                                  <div className="flex items-center justify-center gap-2 py-3 rounded-lg" style={{ backgroundColor: subTimerExpired ? "rgba(255,49,49,0.08)" : `${flotaColor}10` }}>
-                                    <Timer size={12} style={{ color: subTimerExpired ? "#FF3131" : flotaColor }} />
-                                    <span className="text-2xl font-black tracking-wider" style={{ color: subTimerExpired ? "#FF3131" : flotaColor, fontFamily: "JetBrains Mono, monospace" }}>
-                                      {subTimerIsCountdown && subTimerExpired ? `+${subTimerDisplay}` : subTimerDisplay || "00:00:00"}
+                                  <div className="flex items-center justify-center gap-2 py-3 rounded-lg" style={{ backgroundColor: clockUi.subTimerExpired ? "rgba(255,49,49,0.08)" : `${flotaColor}10` }}>
+                                    <Timer size={12} style={{ color: clockUi.subTimerExpired ? "#FF3131" : flotaColor }} />
+                                    <span className="text-2xl font-black tracking-wider" style={{ color: clockUi.subTimerExpired ? "#FF3131" : flotaColor, fontFamily: "JetBrains Mono, monospace" }}>
+                                      {clockUi.subTimerIsCountdown && clockUi.subTimerExpired ? `+${clockUi.subTimerDisplay}` : clockUi.subTimerDisplay || "00:00:00"}
                                     </span>
                                   </div>
                                   {activeSub.cantidadObjetivo && activeSub.tiempoRecordMinPerUnit && (
@@ -2271,19 +2180,19 @@ function VehicleCard({
                                     </p>
                                   )}
                                   {/* Lucha Consciente — delta acumulado en tiempo real */}
-                                  {(liveAccumDeltaSec < -5 || liveAccumDeltaSec > 5) && (
+                                  {(clockUi.liveAccumDeltaSec < -5 || clockUi.liveAccumDeltaSec > 5) && (
                                     <div className="flex items-center justify-center gap-2 py-1.5 rounded-lg" style={{
-                                      backgroundColor: liveAccumDeltaSec < 0 ? "rgba(0,200,81,0.08)" : "rgba(255,49,49,0.08)",
-                                      border: `1px solid ${liveAccumDeltaSec < 0 ? "rgba(0,200,81,0.25)" : "rgba(255,49,49,0.25)"}`,
+                                      backgroundColor: clockUi.liveAccumDeltaSec < 0 ? "rgba(0,200,81,0.08)" : "rgba(255,49,49,0.08)",
+                                      border: `1px solid ${clockUi.liveAccumDeltaSec < 0 ? "rgba(0,200,81,0.25)" : "rgba(255,49,49,0.25)"}`,
                                     }}>
-                                      <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
-                                        {liveAccumDeltaSec < 0 ? "↓" : "↑"}
+                                      <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: clockUi.liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
+                                        {clockUi.liveAccumDeltaSec < 0 ? "↓" : "↑"}
                                       </span>
-                                      <span className="text-[13px] font-black" style={{ color: liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131", fontFamily: "JetBrains Mono, monospace" }}>
-                                        {Math.floor(Math.abs(liveAccumDeltaSec) / 60)}m {String(Math.abs(liveAccumDeltaSec) % 60).padStart(2, "0")}s
+                                      <span className="text-[13px] font-black" style={{ color: clockUi.liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131", fontFamily: "JetBrains Mono, monospace" }}>
+                                        {Math.floor(Math.abs(clockUi.liveAccumDeltaSec) / 60)}m {String(Math.abs(clockUi.liveAccumDeltaSec) % 60).padStart(2, "0")}s
                                       </span>
-                                      <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
-                                        {liveAccumDeltaSec < 0 ? "ganando" : "perdiendo"}
+                                      <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: clockUi.liveAccumDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
+                                        {clockUi.liveAccumDeltaSec < 0 ? "ganando" : "perdiendo"}
                                       </span>
                                     </div>
                                   )}
@@ -2291,11 +2200,11 @@ function VehicleCard({
                                   <div className="flex justify-between items-center px-1 pt-0.5">
                                     <div>
                                       <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: "#6EE7B7" }}>TERMINA A LAS</p>
-                                      <p className="text-[11px] font-black" style={{ color: futuroSubLabel === "—" ? "rgba(255,255,255,0.45)" : "#00FFC3", fontFamily: "JetBrains Mono, monospace" }}>{futuroSubLabel}</p>
+                                      <p className="text-[11px] font-black" style={{ color: clockUi.futuroSubLabel === "—" ? "rgba(255,255,255,0.45)" : "#00FFC3", fontFamily: "JetBrains Mono, monospace" }}>{clockUi.futuroSubLabel}</p>
                                     </div>
                                     <div className="text-right">
                                       <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.72)" }}>CICLO GLOBAL</p>
-                                      <p className="text-[11px] font-black" style={{ color: futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.9)", fontFamily: "JetBrains Mono, monospace" }}>{futuroCicloLabel}</p>
+                                      <p className="text-[11px] font-black" style={{ color: clockUi.futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.9)", fontFamily: "JetBrains Mono, monospace" }}>{clockUi.futuroCicloLabel}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -2328,16 +2237,16 @@ function VehicleCard({
                                         >+</button>
                                       </div>
                                     </div>
-                                    {subVehicleRestante !== null && activeSub.tiempoRecordMinPerUnit ? (
+                                    {clockUi.subVehicleRestante !== null && activeSub.tiempoRecordMinPerUnit ? (
                                       <div className="text-center py-1">
                                         <p className="text-[8px] font-bold uppercase tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,0.75)", fontFamily: "monospace" }}>RESTANTE</p>
-                                        <span className="text-3xl font-black tracking-wider" style={{ color: subVehicleRestante === 0 ? "#22C55E" : "#8B5CF6", fontFamily: "JetBrains Mono, monospace", textShadow: subVehicleRestante === 0 ? "0 0 12px rgba(34,197,94,0.5)" : "0 0 12px rgba(139,92,246,0.5)" }}>
-                                          {subVehicleRestante}
+                                        <span className="text-3xl font-black tracking-wider" style={{ color: clockUi.subVehicleRestante === 0 ? "#22C55E" : "#8B5CF6", fontFamily: "JetBrains Mono, monospace", textShadow: clockUi.subVehicleRestante === 0 ? "0 0 12px rgba(34,197,94,0.5)" : "0 0 12px rgba(139,92,246,0.5)" }}>
+                                          {clockUi.subVehicleRestante}
                                         </span>
                                         <p className="text-[8px] mt-0.5 font-mono font-bold" style={{ color: "rgba(255,255,255,0.78)" }}>
                                           Ritmo: <span style={{ color: "#C4B5FD" }}>{activeSub.tiempoRecordMinPerUnit.toFixed(1)} min/unidad</span> (récord)
                                         </p>
-                                        {subVehicleRestante === 0 && (
+                                        {clockUi.subVehicleRestante === 0 && (
                                           <p className="text-[8px] font-black uppercase tracking-widest mt-0.5" style={{ color: "#22C55E", fontFamily: "monospace" }}>OBJETIVO ALCANZADO</p>
                                         )}
                                         {(() => {
@@ -2346,10 +2255,10 @@ function VehicleCard({
                                             activeSub.tiempoRecordMinPerUnit,
                                             activeSub.rutaEnfoque
                                           );
-                                          if (!rutaBar || subVehicleRestante === null) return null;
+                                          if (!rutaBar || clockUi.subVehicleRestante === null) return null;
                                           return (
                                             <div className="mt-2 px-1">
-                                              <RutaEnfoqueBar restantes={subVehicleRestante} ruta={rutaBar} />
+                                              <RutaEnfoqueBar restantes={clockUi.subVehicleRestante} ruta={rutaBar} />
                                             </div>
                                           );
                                         })()}
@@ -2526,34 +2435,34 @@ function VehicleCard({
 
                           {/* Projection panel — shown while active sub exists */}
                           {activeSub && (() => {
-                            const ganando = liveAccumDeltaSec < -5;
-                            const perdiendo = liveAccumDeltaSec > 5;
+                            const ganando = clockUi.liveAccumDeltaSec < -5;
+                            const perdiendo = clockUi.liveAccumDeltaSec > 5;
                             const deltaColor = ganando ? "#00C851" : perdiendo ? "#FF3131" : "#D4AF37";
                             const deltaLabel = ganando ? "↓ ganando" : perdiendo ? "↑ perdiendo" : "→ estable";
-                            const futureClockColor = perdiendo && liveAccumDeltaSec > 300 ? "#FF3131" : "#F97316";
+                            const futureClockColor = perdiendo && clockUi.liveAccumDeltaSec > 300 ? "#FF3131" : "#F97316";
                             const noSuggested = !subs.some(s => suggestedSec(s) != null);
-                            const cycleRemain = horaFinRemainSec ?? 0;
+                            const cycleRemain = clockUi.horaFinRemainSec ?? 0;
                             return (
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="p-2.5 rounded-xl border text-center" style={{ backgroundColor: `${futureClockColor}08`, borderColor: `${futureClockColor}30` }}>
                                   <p className="text-[7px] font-black uppercase tracking-widest mb-1" style={{ color: futureClockColor }}>🔮 FIN PROYECTADO</p>
-                                  {horaFinProyectada && !noSuggested ? (
+                                  {clockUi.horaFinProyectada && !noSuggested ? (
                                     <>
                                       <motion.p
-                                        key={horaFinProyectada}
+                                        key={clockUi.horaFinProyectada}
                                         animate={{ scale: [1, 1.05, 1] }}
                                         transition={{ duration: 0.3, times: [0, 0.5, 1] }}
                                         className="text-base font-black leading-tight"
                                         style={{ color: futureClockColor, fontFamily: "JetBrains Mono, monospace" }}
                                       >
-                                        {horaFinProyectada}
+                                        {clockUi.horaFinProyectada}
                                       </motion.p>
-                                      {horaFinRemainSec !== null && (
-                                        <p className="text-[8px] font-mono font-bold mt-0.5" style={{ color: "rgba(255,255,255,0.72)" }}>en {(() => { const h = Math.floor(horaFinRemainSec / 3600); const m = Math.floor((horaFinRemainSec % 3600) / 60); return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m}min ${String(horaFinRemainSec % 60).padStart(2,'0')}s`; })()}</p>
+                                      {clockUi.horaFinRemainSec !== null && (
+                                        <p className="text-[8px] font-mono font-bold mt-0.5" style={{ color: "rgba(255,255,255,0.72)" }}>en {(() => { const h = Math.floor(clockUi.horaFinRemainSec / 3600); const m = Math.floor((clockUi.horaFinRemainSec % 3600) / 60); return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m}min ${String(clockUi.horaFinRemainSec % 60).padStart(2,'0')}s`; })()}</p>
                                       )}
-                                      {horaFinDeltaSec !== 0 && (
-                                        <p className="text-[7px] font-bold mt-0.5" style={{ color: horaFinDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
-                                          {horaFinDeltaSec < 0 ? `−${Math.floor(Math.abs(horaFinDeltaSec)/60).toString().padStart(2,'0')}:${String(Math.abs(horaFinDeltaSec)%60).padStart(2,'0')} · ganando` : `+${Math.floor(horaFinDeltaSec/60).toString().padStart(2,'0')}:${String(horaFinDeltaSec%60).padStart(2,'0')} · perdiendo`}
+                                      {clockUi.horaFinDeltaSec !== 0 && (
+                                        <p className="text-[7px] font-bold mt-0.5" style={{ color: clockUi.horaFinDeltaSec < 0 ? "#00C851" : "#FF3131" }}>
+                                          {clockUi.horaFinDeltaSec < 0 ? `−${Math.floor(Math.abs(clockUi.horaFinDeltaSec)/60).toString().padStart(2,'0')}:${String(Math.abs(clockUi.horaFinDeltaSec)%60).padStart(2,'0')} · ganando` : `+${Math.floor(clockUi.horaFinDeltaSec/60).toString().padStart(2,'0')}:${String(clockUi.horaFinDeltaSec%60).padStart(2,'0')} · perdiendo`}
                                         </p>
                                       )}
                                     </>
@@ -2574,7 +2483,7 @@ function VehicleCard({
                                   </p>
                                   {!noSuggested ? (
                                     <p className="text-[7px] font-bold mt-0.5" style={{ color: deltaColor }}>
-                                      {liveAccumDeltaSec !== 0 ? `${liveAccumDeltaSec <= 0 ? "−" : "+"}${fmtSec(Math.abs(liveAccumDeltaSec))} · ` : ""}{deltaLabel}
+                                      {clockUi.liveAccumDeltaSec !== 0 ? `${clockUi.liveAccumDeltaSec <= 0 ? "−" : "+"}${fmtSec(Math.abs(clockUi.liveAccumDeltaSec))} · ` : ""}{deltaLabel}
                                     </p>
                                   ) : (
                                     <p className="text-[8px] font-bold mt-0.5" style={{ color: "rgba(255,255,255,0.65)" }}>sin ref. aún</p>
@@ -2622,6 +2531,8 @@ function VehicleCard({
                 );
                     }}
                   </VehicleCardLiveNow>
+                    )}
+                  </DesglosadorSubLiveIsland>
                 );
               })()}
 

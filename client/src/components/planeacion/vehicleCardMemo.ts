@@ -11,9 +11,8 @@ export function desglosadorAllSubsClosed(vehicle: Vehicle): boolean {
 
 export function vehicleCardNeedsLiveTick(vehicle: Vehicle, expanded: boolean): boolean {
   if (vehicle.status !== "activo") return false;
-  if (vehicle.tipoReloj === "desglosador" && desglosadorAllSubsClosed(vehicle)) return false;
+  if (vehicle.tipoReloj === "desglosador") return false;
   if (expanded) return true;
-  if (vehicle.tipoReloj === "desglosador") return true;
   if (vehicle.tipoFlota === "situacion") {
     if (situacionRelojDebeMostrarse(vehicle)) return true;
     if (vehicle.situacionCronometro?.activo === true) return true;

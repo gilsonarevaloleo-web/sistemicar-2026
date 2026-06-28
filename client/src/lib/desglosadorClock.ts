@@ -117,6 +117,31 @@ export function formatElapsedHHMMSS(totalSec: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+export type DesglosadorSubTimerUi = {
+  display: string;
+  isCountdown: boolean;
+  expired: boolean;
+};
+
+/** Mapeo puro reloj → display del sub activo (countdown, elapsed u overtime). */
+export function desglosadorSubTimerUiFromClocks(
+  clocks: DesglosadorClockResult,
+  objSecs: number | null
+): DesglosadorSubTimerUi {
+  if (objSecs != null && clocks.subRemainingSec !== null) {
+    const expired = clocks.subRemainingSec <= 0;
+    const display = expired
+      ? formatMMSS(clocks.subElapsedSec - objSecs)
+      : formatMMSS(clocks.subRemainingSec);
+    return { display, isCountdown: true, expired };
+  }
+  return {
+    display: formatElapsedHHMMSS(clocks.subElapsedSec),
+    isCountdown: false,
+    expired: false,
+  };
+}
+
 /** Tiempo total en el vehículo desglosador (desde apertura) — base de profundidad y resistencia. */
 export function getDesglosadorSessionElapsedSec(vehicle: Vehicle, now = Date.now()): number {
   const aperturaMs = vehicle.aperturaAt ?? vehicle.createdAt?.getTime?.() ?? 0;
