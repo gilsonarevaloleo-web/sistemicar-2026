@@ -2,8 +2,16 @@ import type { Planilla, Vehicle } from "@/lib/persistence";
 import { situacionRelojDebeMostrarse } from "@/lib/situacionCupoDistrib";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
 
+/** Todos los subs cerrados — no hay contador activo que actualizar. */
+export function desglosadorAllSubsClosed(vehicle: Vehicle): boolean {
+  const subs = vehicle.subVehiculos ?? [];
+  if (subs.length === 0) return false;
+  return subs.every(s => s.status === "cumplido" || s.status === "fallado");
+}
+
 export function vehicleCardNeedsLiveTick(vehicle: Vehicle, expanded: boolean): boolean {
   if (vehicle.status !== "activo") return false;
+  if (vehicle.tipoReloj === "desglosador" && desglosadorAllSubsClosed(vehicle)) return false;
   if (expanded) return true;
   if (vehicle.tipoReloj === "desglosador") return true;
   if (vehicle.tipoFlota === "situacion") {

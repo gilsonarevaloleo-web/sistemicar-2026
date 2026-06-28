@@ -14,6 +14,9 @@ import { teardownAllSituacionSessions } from "@/lib/situacionSessionTeardown";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import { cancelPuntoCeroStepVoice } from "@/lib/puntoCeroStepVoice";
 import { cancelJornadaRemountGuard } from "@/lib/jornadaRemount";
+import { jornadaBackupStorageKey } from "@/services/jornadaBackup";
+
+const PARKED_ACTIVES_KEY = "sistemicar_parked_actives";
 
 export function runJornadaRecovery(opts?: { archiveSituacion?: boolean }): void {
   try {
@@ -28,6 +31,16 @@ export function runJornadaRecovery(opts?: { archiveSituacion?: boolean }): void 
     cancelJornadaRemountGuard();
     try {
       localStorage.removeItem("planeacion_cache_v2");
+    } catch {
+      /* noop */
+    }
+    try {
+      sessionStorage.removeItem(PARKED_ACTIVES_KEY);
+    } catch {
+      /* noop */
+    }
+    try {
+      localStorage.removeItem(jornadaBackupStorageKey());
     } catch {
       /* noop */
     }

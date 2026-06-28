@@ -1,4 +1,6 @@
 /** Estado compartido para forzar ErrorBoundary sin throw en useEffect. */
+import { bumpPlaneacionCrashCount } from "@/lib/situacionRepair";
+
 let fatalMessage: string | null = null;
 const listeners = new Set<() => void>();
 
@@ -12,6 +14,11 @@ export function getJornadaFatal(): string | null {
 }
 
 export function setJornadaFatalError(message: string): void {
+  try {
+    bumpPlaneacionCrashCount();
+  } catch {
+    /* noop */
+  }
   fatalMessage = message;
   listeners.forEach(fn => fn());
 }

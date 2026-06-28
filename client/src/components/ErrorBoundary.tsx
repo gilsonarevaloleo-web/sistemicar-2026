@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertOctagon } from "lucide-react";
-import { PLANEACION_CACHE_V2_KEY } from "@/lib/planeacionCache";
-import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
+import { repairAndReloadJornada } from "@/lib/jornadaRecovery";
+import { getPlaneacionCrashCount } from "@/lib/situacionRepair";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean };
@@ -10,19 +10,8 @@ const PIZARRA = "#0a0a0a";
 const GOLD = "#D4AF37";
 
 function repairJornadaFromBoundary(): void {
-  try {
-    localStorage.removeItem(PLANEACION_CACHE_V2_KEY);
-    localStorage.removeItem("planeacion_snapshot_v1");
-  } catch {
-    /* noop */
-  }
-  try {
-    sessionStorage.clear();
-  } catch {
-    /* noop */
-  }
-  clearJornadaFatalError();
-  window.location.reload();
+  const archiveSituacion = getPlaneacionCrashCount() >= 2;
+  repairAndReloadJornada(archiveSituacion);
 }
 
 /**

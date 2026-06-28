@@ -17,6 +17,7 @@ import {
   getIsRemountingJornada,
 } from "./jornadaRemount";
 import { runShadowTask } from "./desglosadorShadow";
+import { shouldAllowJornadaVoice } from "./mobilePerf";
 import {
   isPostCallAudioShieldActive,
   msUntilPostCallAudioAllowed,
@@ -765,6 +766,7 @@ export function warmupSpeechSynthesis(force = false, fromUserGesture = false): v
     unlockSpeechSynthesis(true);
     return;
   }
+  if (!shouldAllowJornadaVoice()) return;
   if (isPostCallAudioShieldActive()) {
     deferUntilPostCallAudioAllowed(() => warmupSpeechSynthesis(force, false));
     return;
@@ -841,6 +843,7 @@ export function speakUbicacionQueue(
   if (!getSynth()) return;
 
   if (!isVoiceEnabledFor(source)) return;
+  if (!shouldAllowJornadaVoice()) return;
 
   if (isBackground()) {
     enqueueForBackground(filtered, source);
@@ -925,6 +928,7 @@ export function enqueueDesglosadorVoicePassive(
   phrases: string[],
   opts?: { cancelPrevious?: boolean; onPhraseStarted?: () => void }
 ): void {
+  if (!shouldAllowJornadaVoice()) return;
   const filtered = phrases.map(p => p.trim()).filter(Boolean);
   if (filtered.length === 0) return;
   runShadowTask(() => {

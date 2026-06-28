@@ -21,6 +21,7 @@ import {
   isPuertaVozEnabled,
   isSituacionAlertsEnabled,
 } from "./tikSound";
+import { shouldAllowJornadaVoice } from "./mobilePerf";
 
 type PendingVoice = {
   phrases: string[];
@@ -143,6 +144,10 @@ export function speakUbicacionVoiceReliable(
 ): () => void {
   cleanupByKey.get(key)?.();
   ensureUbicacionVoiceRetryHub();
+
+  if (!shouldAllowJornadaVoice()) {
+    return () => {};
+  }
 
   if (!isVoiceEnabledFor(source)) {
     return () => {};

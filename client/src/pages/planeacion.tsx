@@ -235,7 +235,7 @@ import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
 } from "@/lib/desglosadorVoice";
-import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
+import { isMobilePerfMode, MOBILE_PERF, shouldAllowJornadaVoice, shouldRunMobileSurvival, setJornadaFullModeEnabled } from "@/lib/mobilePerf";
 import {
   registerSituacionSessionCleanup,
   resetSituacionSessionTeardownGate,
@@ -502,6 +502,8 @@ import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienc
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
+import { AnilloSurvivalPlaceholder } from "@/components/jornada/AnilloSurvivalPlaceholder";
+import { reloadJornadaHard } from "@/lib/jornadaRecovery";
 import { BotonRepararJornada } from "@/components/jornada/BotonRepararJornada";
 import {
   JORNADA_BACKUP_INTERVAL_MS,
@@ -1373,11 +1375,13 @@ export default function Planeacion() {
     rehydrateFlotaFromLocalRef.current?.();
     setupFlotaSubscription();
     scheduleJornadaForegroundResume(() => {
-      warmupSpeechSynthesis();
-      recoverSpeechQueue();
-      const flushed = flushMissedPuertaVoiceOnVisible();
-      if (flushed > 0) {
-        console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
+      if (shouldAllowJornadaVoice()) {
+        warmupSpeechSynthesis();
+        recoverSpeechQueue();
+        const flushed = flushMissedPuertaVoiceOnVisible();
+        if (flushed > 0) {
+          console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
+        }
       }
       runSegmentAttentionTickNow();
     });
@@ -1390,8 +1394,10 @@ export default function Planeacion() {
     const mountGuardTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       isViewMountingRef.current = false;
     }, 400);
-    warmupSpeechSynthesis();
-    recoverSpeechQueue();
+    if (shouldAllowJornadaVoice()) {
+      warmupSpeechSynthesis();
+      recoverSpeechQueue();
+    }
     return () => {
       window.clearTimeout(mountGuardTimer);
       isViewMountingRef.current = false;
@@ -2895,13 +2901,17 @@ export default function Planeacion() {
             )}
             anillo={(
               <div hidden={compactLayout && planTab === "metricas" ? true : undefined} aria-hidden={compactLayout && planTab === "metricas" ? true : undefined}>
-                <AnilloConcienciaLive
-                  segmentos={planilla?.segmentos || []}
-                  vehicles={vehicles}
-                  conquistaPulse={conquistaPulse}
-                  ringOnly
-                  size={72}
-                />
+                {shouldRunMobileSurvival() ? (
+                  <AnilloSurvivalPlaceholder size={72} />
+                ) : (
+                  <AnilloConcienciaLive
+                    segmentos={planilla?.segmentos || []}
+                    vehicles={vehicles}
+                    conquistaPulse={conquistaPulse}
+                    ringOnly
+                    size={72}
+                  />
+                )}
               </div>
             )}
             segmentoChip={(
@@ -2918,6 +2928,29 @@ export default function Planeacion() {
               )
             )}
           />
+
+        {shouldRunMobileSurvival() && (
+          <div
+            className="rounded-xl border px-3 py-2 mb-3 flex flex-col gap-2"
+            style={{ borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(255,255,255,0.02)" }}
+            data-testid="jornada-survival-banner"
+          >
+            <p className="text-[9px] text-slate-400 leading-snug">
+              Modo ligero en móvil: voz y anillo en vivo desactivados para mayor estabilidad.
+            </p>
+            <button
+              type="button"
+              className="text-[9px] font-black uppercase tracking-wider py-2 rounded-lg touch-manipulation"
+              style={{ backgroundColor: "rgba(212,175,55,0.15)", color: "#D4AF37" }}
+              onClick={() => {
+                setJornadaFullModeEnabled(true);
+                reloadJornadaHard();
+              }}
+            >
+              Activar modo completo
+            </button>
+          </div>
+        )}
 
         {/* MONITOR DE ESTADOS */}
         <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
@@ -3553,13 +3586,17 @@ export default function Planeacion() {
             <p className="text-[7px] text-slate-600 text-center mb-2 leading-snug px-2">
               Tiempo presente · el combustible son tus decisiones cerradas (abajo)
             </p>
-            <AnilloConcienciaLive
-              segmentos={planilla?.segmentos || []}
-              vehicles={vehicles}
-              conquistaPulse={conquistaPulse}
-              size={130}
-              showDayStats
-            />
+            {shouldRunMobileSurvival() ? (
+              <AnilloSurvivalPlaceholder size={130} showCaption />
+            ) : (
+              <AnilloConcienciaLive
+                segmentos={planilla?.segmentos || []}
+                vehicles={vehicles}
+                conquistaPulse={conquistaPulse}
+                size={130}
+                showDayStats
+              />
+            )}
             <div
               className="mt-2 w-full p-2 rounded-lg border text-center"
               style={{ backgroundColor: "rgba(168,85,247,0.08)", borderColor: "rgba(168,85,247,0.28)" }}

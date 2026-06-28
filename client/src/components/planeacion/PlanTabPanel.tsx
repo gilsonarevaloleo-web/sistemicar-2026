@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { shouldRunMobileSurvival } from "@/lib/mobilePerf";
 
 export type PlanTabId = "operar" | "metricas" | "meta";
 
@@ -9,7 +10,7 @@ type PlanTabPanelProps = {
   children: ReactNode;
 };
 
-/** En móvil (compact) mantiene el DOM montado con `hidden` al cambiar de tab. */
+/** En móvil supervivencia desmonta tabs inactivos; en compact normal usa `hidden`. */
 export function PlanTabPanel({
   planLayout,
   planTab,
@@ -19,6 +20,9 @@ export function PlanTabPanel({
   const visible = planLayout === "full" || planTab === tab;
   if (planLayout === "full" || visible) {
     return <>{children}</>;
+  }
+  if (shouldRunMobileSurvival()) {
+    return null;
   }
   return (
     <div hidden aria-hidden="true">

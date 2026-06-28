@@ -699,6 +699,8 @@ function VehicleCard({
   const situacionCupoEscalationRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subVehiculosRef = useRef(vehicle.subVehiculos);
   subVehiculosRef.current = vehicle.subVehiculos;
+  const vehicleRef = useRef(vehicle);
+  vehicleRef.current = vehicle;
   const subTareasRef = useRef(vehicle.subTareas);
   subTareasRef.current = vehicle.subTareas;
   const situacionAnchorRef = useRef(vehicle.situacionCupoAnchor);
@@ -751,6 +753,20 @@ function VehicleCard({
   const runLiveTimerTick = useCallback(() => {
     computeTimerRef.current();
     desglosadorUpdateRef.current();
+  }, []);
+
+  const resetDesglosadorSubCounterState = useCallback(() => {
+    setSubVehicleRestante(null);
+    setSubTimerDisplay("");
+    setSubTimerIsCountdown(false);
+    setSubTimerExpired(false);
+    setFuturoSubLabel("—");
+    setFuturoCicloLabel("—");
+    setHoraFinProyectada(null);
+    setHoraFinRemainSec(null);
+    setHoraFinDeltaSec(0);
+    setLiveAccumDeltaSec(0);
+    desglosadorUpdateRef.current = () => {};
   }, []);
 
   const playChime = useCallback(() => {
@@ -1229,7 +1245,10 @@ function VehicleCard({
     }
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
     const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
-    if (allDone) setDesglosadorSummary(true);
+    if (allDone) {
+      setDesglosadorSummary(true);
+      resetDesglosadorSubCounterState();
+    }
     setCantidadRealizada("");
     setSubRutaModal(null);
     setSubRutaSel(new Set());
@@ -1238,7 +1257,7 @@ function VehicleCard({
 
     const bloquePayload = { vehicleId: vehicle.id, sub: closedSub, status };
     onBloqueCierre?.(bloquePayload);
-  }, [onBloqueCierre, onDesglosadorUpdate, vehicle.id, vehicle.subVehiculos]);
+  }, [onBloqueCierre, onDesglosadorUpdate, resetDesglosadorSubCounterState, vehicle.id, vehicle.subVehiculos]);
 
   const attemptCloseActiveSubById = useCallback((
     subId: string,
@@ -1321,6 +1340,7 @@ function VehicleCard({
 
   useEffect(() => {
     if (vehicle.status !== "activo") return;
+    if (vehicle.tipoReloj === "desglosador") return;
     const aperturaMs = vehicle.aperturaAt || (vehicle.tiempoInicio ? (typeof vehicle.tiempoInicio === 'object' && (vehicle.tiempoInicio as any).seconds ? (vehicle.tiempoInicio as any).seconds * 1000 : new Date(vehicle.tiempoInicio as any).getTime()) : Date.now());
     const parentesisExtra = (vehicle.parentesisRecarga || []).reduce((sum, p) => sum + p.duracionMin, 0);
     const fmtTime = (totalSec: number) => { const h = Math.floor(totalSec / 3600); const m = Math.floor((totalSec % 3600) / 60); const s = totalSec % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; };
@@ -1448,7 +1468,7 @@ function VehicleCard({
       document.removeEventListener("visibilitychange", onFocus);
       clearInterval(timerInterval);
     };
-  }, [activeSub, activeSub?.id, expanded, vehicle.status, vehicle.tipoTerminoRapido, vehicle.criterioDetalle]);
+  }, [expanded, vehicle.status, vehicle.tipoReloj, vehicle.tipoTerminoRapido, vehicle.criterioDetalle, vehicle.subVehiculos]);
 
   // Timer for active sub-vehicle in desglosador mode — fuente única: computeDesglosadorClocks
   useEffect(() => {
@@ -1456,12 +1476,20 @@ function VehicleCard({
       desglosadorUpdateRef.current = () => {};
       return;
     }
-    const activeSub = (vehicle.subVehiculos || []).find(s => s.status === "activo");
-    if (!activeSub?.aperturaAt) return;
+    const subsNow = subVehiculosRef.current ?? vehicle.subVehiculos ?? [];
+    const activeSub = subsNow.find(s => s.status === "activo");
+    if (!activeSub?.aperturaAt) {
+      desglosadorUpdateRef.current = () => {};
+      return;
+    }
 
     const objSecs = suggestedSec(activeSub);
     setSubTimerIsCountdown(objSecs !== null);
-    const clocksInit = computeDesglosadorClocks(Date.now(), vehicle);
+    const vehicleForClocks = () => ({
+      ...vehicleRef.current,
+      subVehiculos: subVehiculosRef.current ?? vehicleRef.current.subVehiculos ?? [],
+    });
+    const clocksInit = computeDesglosadorClocks(Date.now(), vehicleForClocks());
     if (clocksInit.unitsRemaining !== null) {
       setSubVehicleRestante(clocksInit.unitsRemaining);
     } else if (activeSub.cantidadObjetivo && activeSub.tiempoRecordMinPerUnit) {
@@ -1471,10 +1499,17 @@ function VehicleCard({
     }
 
     const update = () => {
+      const v = vehicleForClocks();
+      const activeNow = (v.subVehiculos ?? []).find(s => s.status === "activo");
+      if (!activeNow?.aperturaAt) {
+        desglosadorUpdateRef.current = () => {};
+        return;
+      }
       const now = Date.now();
-      const clocks = computeDesglosadorClocks(now, vehicle);
+      const clocks = computeDesglosadorClocks(now, v);
+      const obj = suggestedSec(activeNow);
 
-      if (objSecs !== null && clocks.subRemainingSec !== null) {
+      if (obj !== null && clocks.subRemainingSec !== null) {
         setSubTimerExpired(clocks.subRemainingSec <= 0);
         setSubTimerDisplay(formatMMSS(clocks.subRemainingSec));
       } else {

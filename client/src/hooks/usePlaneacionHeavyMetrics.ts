@@ -29,11 +29,24 @@ import {
   msUntilJornadaHeavyComputeAllowed,
 } from "@/lib/jornadaRemount";
 import { setJornadaFatalError } from "@/lib/jornadaFatalError";
+import { shouldRunMobileSurvival } from "@/lib/mobilePerf";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import type { PlanillaDailySnapshot } from "@/lib/termodinamicaAtencional";
 import { SEGMENT_ATTENTION_TICK_EVENT } from "@/lib/segmentAttentionCycle";
 
-const HEAVY_COMPUTE_TIMEOUT_MS = 6_000;
+const HEAVY_COMPUTE_TIMEOUT_MS_DESKTOP = 6_000;
+const HEAVY_COMPUTE_TIMEOUT_MS_MOBILE = 12_000;
+
+function getHeavyComputeTimeoutMs(): number {
+  return isCoarseConcienciaDevice()
+    ? HEAVY_COMPUTE_TIMEOUT_MS_MOBILE
+    : HEAVY_COMPUTE_TIMEOUT_MS_DESKTOP;
+}
+
+function shouldSkipHeavyComputeOnSurvival(planTab?: "operar" | "metricas" | "meta"): boolean {
+  if (!shouldRunMobileSurvival()) return false;
+  return (planTab ?? "operar") === "operar";
+}
 
 export type UsePlaneacionHeavyMetricsParams = {
   userId: string | undefined;
@@ -124,7 +137,7 @@ async function computeHeavyMetricsSafe(
     return computePlaneacionHeavyMetrics(params);
   };
 
-  return Promise.race([Promise.resolve().then(run), sleep(HEAVY_COMPUTE_TIMEOUT_MS)]);
+  return Promise.race([Promise.resolve().then(run), sleep(getHeavyComputeTimeoutMs())]);
 }
 
 export function usePlaneacionHeavyMetrics(
@@ -146,6 +159,8 @@ export function usePlaneacionHeavyMetrics(
     yesterdayTermoSnapshot: params.yesterdayTermoSnapshot,
     disciplinaSnapshots: params.disciplinaSnapshots,
   };
+  const planTabRef = useRef(params.planTab ?? "operar");
+  planTabRef.current = params.planTab ?? "operar";
 
   const inputSig = planeacionHeavyMetricsInputSig(paramsRef.current);
 
@@ -184,6 +199,10 @@ export function usePlaneacionHeavyMetrics(
     const inputSigNow = planeacionHeavyMetricsInputSig(paramsRef.current);
 
     if (tabHiddenRef.current) {
+      return () => {};
+    }
+
+    if (shouldSkipHeavyComputeOnSurvival(planTabRef.current)) {
       return () => {};
     }
 
@@ -261,7 +280,9 @@ export function usePlaneacionHeavyMetrics(
 
           const message = err instanceof Error ? err.message : String(err);
           if (message === "timeout") {
-            console.error("[HeavyMetrics] Timeout >6s — forzando ErrorBoundary");
+            console.error(
+              `[HeavyMetrics] Timeout >${getHeavyComputeTimeoutMs() / 1000}s — forzando ErrorBoundary`
+            );
             setJornadaFatalError("timeout");
             return;
           }
@@ -351,6 +372,12 @@ export function usePlaneacionHeavyMetrics(
     ) {
       return;
     }
+    return runCompute(false, PLANEACION_IDLE_DEFER_MS, true);
+  }, [params.planTab, runCompute]);
+
+  useEffect(() => {
+    if (!shouldRunMobileSurvival()) return;
+    if ((params.planTab ?? "operar") !== "metricas") return;
     return runCompute(false, PLANEACION_IDLE_DEFER_MS, true);
   }, [params.planTab, runCompute]);
 

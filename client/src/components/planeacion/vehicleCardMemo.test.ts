@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Vehicle } from "@/lib/persistence";
 import {
   areVehicleCardPropsEqual,
+  desglosadorAllSubsClosed,
   desglosadorSubUiSignature,
   vehicleCardNeedsLiveTick,
 } from "./vehicleCardMemo";
@@ -42,6 +43,20 @@ describe("vehicleCardNeedsLiveTick", () => {
 
   it("sin tick colapsado operativa sin reloj visible", () => {
     assert.equal(vehicleCardNeedsLiveTick(baseVehicle(), false), false);
+  });
+
+  it("sin tick desglosador cuando todos los subs están cerrados", () => {
+    const allDone = baseVehicle({
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "cumplido" },
+        { id: "s2", titulo: "B", status: "cumplido" },
+        { id: "s3", titulo: "C", status: "fallado" },
+      ],
+    } as Partial<Vehicle>);
+    assert.equal(desglosadorAllSubsClosed(allDone), true);
+    assert.equal(vehicleCardNeedsLiveTick(allDone, true), false);
+    assert.equal(vehicleCardNeedsLiveTick(allDone, false), false);
   });
 });
 
