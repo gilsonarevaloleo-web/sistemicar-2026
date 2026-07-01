@@ -21,6 +21,9 @@ import MenuPrincipal from "@/pages/menu-principal";
 import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
 const Planeacion = lazyWithRetry(() => import("@/pages/planeacion"));
+const PlaneacionV3 = lazyWithRetry(() =>
+  import("@/pages/planeacion").then(mod => ({ default: mod.PlaneacionV3 }))
+);
 import Esperanza from "@/pages/esperanza";
 import Rewards from "@/pages/rewards";
 import Analytics from "@/pages/analytics";
@@ -292,6 +295,20 @@ function ArquitectoRoute({ component: Component }: { component: React.ComponentT
   return <Component />;
 }
 
+function JornadaV3ModuleRoute() {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<JornadaSuspenseFallback />}>
+        <ModuleRoute
+          component={PlaneacionV3}
+          requiredModule="planificacion_base"
+          loadingFallback={<JornadaShell statusLine="Laboratorio V3 · verificando acceso…" />}
+        />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <Layout>
@@ -317,6 +334,12 @@ function Router() {
               />
             </Suspense>
           </ErrorBoundary>
+        </Route>
+        <Route path="/jornada-v3">
+          <JornadaV3ModuleRoute />
+        </Route>
+        <Route path="/planeacion-v3">
+          <JornadaV3ModuleRoute />
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />

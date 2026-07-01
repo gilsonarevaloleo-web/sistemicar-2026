@@ -502,6 +502,8 @@ import { isCoarseConcienciaDevice, useConcienciaClockTick, dispatchConcienciaClo
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
+import JornadaShellV3 from "@/components/jornada/JornadaShellV3";
+import type { CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
 import { AnilloSurvivalPlaceholder } from "@/components/jornada/AnilloSurvivalPlaceholder";
 import { reloadJornadaHard } from "@/lib/jornadaRecovery";
 import { BotonRepararJornada } from "@/components/jornada/BotonRepararJornada";
@@ -752,9 +754,20 @@ const MONITOR_STATES = {
   }
 };
 
-export default function Planeacion() {
+type PlaneacionProps = {
+  /** Laboratorio modular — monta JornadaShellV3 en lugar del monolito legacy. */
+  useJornadaV3?: boolean;
+};
+
+/** Entrada dedicada para `/jornada-v3` y `/planeacion-v3`. */
+export function PlaneacionV3() {
+  return <Planeacion useJornadaV3 />;
+}
+
+export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: PlaneacionProps = {}) {
   const { user } = useAuthContext();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const useJornadaV3 = useJornadaV3Prop || location.includes("v3");
   useViewTransitionShield();
   /** Métricas pesadas — no bloquean tap + subtarea en flota. */
   const lastFlotaLaunchRef = useRef<{ key: string; at: number } | null>(null);
@@ -964,6 +977,10 @@ export default function Planeacion() {
     handleEnviarReservaASituacion,
     handleEnviarReservasSeleccionadas,
     handleAbrirNidoEnSituacion,
+    handleToggleSubTarea,
+    handleSituacionCronometroCumplido,
+    handleSituacionCronometroFallado,
+    handleDesglosadorUpdate,
     safeAwardPS,
     recordVehiculoInicio,
     applyCentinelaArchiveLocally,
@@ -2840,6 +2857,50 @@ export default function Planeacion() {
       default: return Brain;
     }
   };
+
+  const handleAterrizarReservaV3 = useCallback(
+    (payload: CrisolAterrizarPayload) =>
+      handleReservaTacticaQuickAdd(payload.texto, payload.ruta, payload.proyectoId),
+    [handleReservaTacticaQuickAdd]
+  );
+
+  if (useJornadaV3 && user) {
+    return (
+      <div
+        className="min-h-screen pb-24"
+        style={{ backgroundColor: "#020202" }}
+        onPointerDown={handlers.unlockDesglosadorSpeechFromGesture}
+        data-testid="planeacion-jornada-v3-root"
+      >
+        <JornadaStuckProbe />
+        <JornadaShellV3
+          userId={user.uid}
+          segmentos={planilla?.segmentos ?? []}
+          segmentoActivoId={segmentoActivo?.id ?? null}
+          vehicles={vehicles}
+          vehiclesRef={vehiclesRef}
+          setVehicles={setVehicles}
+          expandedId={expandedId}
+          setExpandedId={setExpandedId}
+          todayPs={dailyPS}
+          yesterdayPs={yesterdayPS}
+          situacionReserva={reservaActivas}
+          imanProyectos={imanProyectos}
+          defaultProyectoId={segmentoActivo?.proyectoVinculadoId ?? ""}
+          onAterrizarReserva={handleAterrizarReservaV3}
+          onReservaRutaChange={handleReservaRutaChange}
+          onEnviarReservaASituacion={handleEnviarReservaASituacion}
+          handleSituacionCronometroCumplido={handleSituacionCronometroCumplido}
+          handleSituacionCronometroFallado={handleSituacionCronometroFallado}
+          handleToggleSubTarea={handleToggleSubTarea}
+          handleDesglosadorUpdate={handleDesglosadorUpdate}
+          volcarMetricasAlHub={volcarMetricasAlHub}
+          rehydrateFlotaFromLocalRef={rehydrateFlotaFromLocalRef}
+          setupFlotaSubscription={setupFlotaSubscription}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
