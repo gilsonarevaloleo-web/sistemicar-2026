@@ -307,6 +307,7 @@ function AnilloConcienciaAisladoInner({
   const planRingRef = useRef<SVGCircleElement>(null);
 
   const pointerModeRef = useRef<AnilloPointerMode>("libre");
+  const consciousCachedRef = useRef(true);
   const volatileBlockRef = useRef<VolatileBlock>({ segmentId: null, startedAt: null });
   const prevSegmentRef = useRef<string | null>(null);
   const innerMetricsRef = useRef({ conquistaArcPct: 0, entropiaArcPct: 0, fillPct: 0 });
@@ -315,20 +316,22 @@ function AnilloConcienciaAisladoInner({
   const onSegmentChangeRef = useRef(onSegmentChange);
   const hayVehiculoActivoRef = useRef(hayVehiculoActivo);
   const activeSegmentIdRef = useRef(activeSegmentId);
-  const vehiculosLiteRef = useRef(vehiculosLite);
   const segmentosRef = useRef(segmentos);
 
   geomRef.current = geom;
   onSegmentChangeRef.current = onSegmentChange;
   hayVehiculoActivoRef.current = hayVehiculoActivo;
   activeSegmentIdRef.current = activeSegmentId;
-  vehiculosLiteRef.current = vehiculosLite;
   segmentosRef.current = segmentos;
 
   useEffect(() => {
     if (!model) return;
     pointerModeRef.current = model.timeline.anilloEstado.mode;
     innerMetricsRef.current = model.inner;
+    consciousCachedRef.current =
+      vehiculosLite.length === 0
+        ? false
+        : vehiculosLite.some(v => vehicleCoversConsciousnessAt(v, Date.now()));
 
     const g = geomRef.current;
     const planCirc = 2 * Math.PI * g.outerR;
@@ -400,10 +403,18 @@ function AnilloConcienciaAisladoInner({
   }, [hayVehiculoActivo, activeSegmentId]);
 
   useEffect(() => {
-    const tick = () => {
+    consciousCachedRef.current =
+      vehiculosLite.length === 0
+        ? false
+        : vehiculosLite.some(v => vehicleCoversConsciousnessAt(v, Date.now()));
+  }, [vehiclesSig, vehiculosLite]);
+
+  useEffect(() => {
+    let deferId: ReturnType<typeof setTimeout> | null = null;
+
+    const runTick = () => {
       const now = Date.now();
       const g = geomRef.current;
-      const vehiculos = vehiculosLiteRef.current;
       const segs = segmentosRef.current;
       const hayActivo = hayVehiculoActivoRef.current;
       const segId = activeSegmentIdRef.current;
@@ -414,7 +425,7 @@ function AnilloConcienciaAisladoInner({
       const rad = toRad(deg - 90);
       const needleLen = railR - railSW * 0.5;
 
-      const consciousNow = vehiculos.some(v => vehicleCoversConsciousnessAt(v, now));
+      const consciousNow = consciousCachedRef.current;
       let mode = pointerModeRef.current;
       if (!consciousNow && segs.length > 0) {
         mode = "libre";
@@ -471,9 +482,16 @@ function AnilloConcienciaAisladoInner({
       }
     };
 
+    const tick = () => {
+      deferId = globalThis.setTimeout(runTick, 0);
+    };
+
     tick();
     const id = window.setInterval(tick, TICK_MS);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      if (deferId != null) globalThis.clearTimeout(deferId);
+    };
   }, []);
 
   const mapaSegArcs = useMemo(() => {

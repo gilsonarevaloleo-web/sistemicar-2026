@@ -251,6 +251,7 @@ function useJornadaHardwareSync(params: {
   speechHooks: JornadaShellSpeechHooks;
   /** Sello primitivo — recomputar métricas del anillo solo cuando cambia la flota/segmentos. */
   timelineSig: string;
+  hayVehiculoActivo?: boolean;
 }): { metricsRevision: number } {
   const [metricsRevision, setMetricsRevision] = useState(0);
   const speechRef = useRef(params.speechHooks);
@@ -260,6 +261,8 @@ function useJornadaHardwareSync(params: {
   rehydrateRef.current = params.rehydrateFlotaFromLocalRef;
   const setupFlotaRef = useRef(params.setupFlotaSubscription);
   setupFlotaRef.current = params.setupFlotaSubscription;
+  const hayVehiculoActivoRef = useRef(params.hayVehiculoActivo ?? false);
+  hayVehiculoActivoRef.current = params.hayVehiculoActivo ?? false;
 
   useEffect(() => {
     if (timelineSigRef.current === params.timelineSig) return;
@@ -277,7 +280,11 @@ function useJornadaHardwareSync(params: {
     rehydrateRef.current?.current?.();
     setupFlotaRef.current?.();
 
-    burstConcienciaClockTick(4, 80);
+    if (hayVehiculoActivoRef.current) {
+      burstConcienciaClockTick(1);
+    } else {
+      burstConcienciaClockTick(4, 80);
+    }
     runSegmentAttentionTickNow();
     bumpMetricsRevision();
 
@@ -403,11 +410,17 @@ function JornadaShellV3Inner({
   );
   const timelineSig = `${segmentosSig}::${vehiclesSig}`;
 
+  const hayVehiculoActivo = useMemo(
+    () => vehicles.some(v => v.status === "activo"),
+    [vehicles]
+  );
+
   const { metricsRevision } = useJornadaHardwareSync({
     rehydrateFlotaFromLocalRef,
     setupFlotaSubscription,
     speechHooks: DEFAULT_SPEECH_HOOKS,
     timelineSig,
+    hayVehiculoActivo,
   });
 
   const ringContext = useMemo(
@@ -420,11 +433,6 @@ function JornadaShellV3Inner({
   const ringVehicle = ringContext?.vehicle;
   const ringSubTareas = ringVehicle?.subTareas ?? EMPTY_SUB_TAREAS;
   const ringSubVehiculos = ringVehicle?.subVehiculos ?? EMPTY_SUB_VEHICULOS;
-
-  const hayVehiculoActivo = useMemo(
-    () => vehicles.some(v => v.status === "activo"),
-    [vehicles]
-  );
 
   const refreshHistory = useCallback(() => {
     setVehicleHistory(readVehicleHistoryLocal());
@@ -680,9 +688,11 @@ function JornadaShellV3Inner({
                 subTareas={ringSubTareas}
                 subVehiculos={ringSubVehiculos}
                 situacionCronometro={ringVehicle.situacionCronometro}
+                situacionCupoAnchor={ringVehicle.situacionCupoAnchor}
                 desglosadorPausa={ringVehicle.desglosadorPausa}
                 interrupcionActiva={ringVehicle.interrupcionActiva}
                 blockedByInterrupt={Boolean(ringVehicle.interrupcionActiva)}
+                hayVehiculoActivo={hayVehiculoActivo}
                 onSubTareasChange={handleSubTareasChange}
                 onSubVehiculosChange={handleSubVehiculosChange}
                 onSubTareaClose={handleSubTareaClose}

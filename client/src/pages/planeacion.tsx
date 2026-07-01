@@ -499,7 +499,7 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, useConcienciaClockTick, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
+import { isCoarseConcienciaDevice, useConcienciaClockTickWhen, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
@@ -1025,8 +1025,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
   const [rutinaResaltadaId, setRutinaResaltadaId] = useState<string | null>(null);
   const rutinaItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
-  /** Refresco ligero de UI de segmentos (puertas/ventanas) sin recomputar métricas pesadas en render. */
-  const segmentUiTick = useConcienciaClockTick();
+  /** Refresco ligero de UI de segmentos (puertas/ventanas) — solo planeación clásica. */
+  const segmentUiTick = useConcienciaClockTickWhen(!useJornadaV3);
   const resumeGenRef = useRef(0);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
   const [cerrandoSegId, setCerrandoSegId] = useState<string | null>(null);
@@ -1302,6 +1302,7 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     yesterdayTermoSnapshot,
     disciplinaSnapshots,
     planTab,
+    enabled: !useJornadaV3,
   });
 
   const {
@@ -1335,7 +1336,7 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
   }, [user, yesterdayTermoSnapshot, vehicles]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || useJornadaV3) return;
     const tick = () => {
       const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(heavyMetrics);
       saveJornadaBackup(
@@ -1347,7 +1348,7 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     tick();
     const id = window.setInterval(tick, JORNADA_BACKUP_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [user, vehicles, heavyMetrics]);
+  }, [user, vehicles, heavyMetrics, useJornadaV3]);
 
   useEffect(() => {
     if (!user) return;

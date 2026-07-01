@@ -46,6 +46,19 @@ export function useConcienciaClockTick(): number {
   return tick;
 }
 
+/** Igual que useConcienciaClockTick pero sin suscripción cuando enabled=false (p. ej. Jornada V3). */
+export function useConcienciaClockTickWhen(enabled: boolean): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const onClock = () => setTick(t => t + 1);
+    window.addEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
+    dispatchConcienciaClockTick();
+    return () => window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
+  }, [enabled]);
+  return enabled ? tick : 0;
+}
+
 /**
  * Tick para métricas pesadas (entropía, arcos): ~3 s escritorio, ~5 s móvil.
  */

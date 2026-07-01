@@ -56,6 +56,8 @@ export type UsePlaneacionHeavyMetricsParams = {
   yesterdayTermoSnapshot: PlanillaDailySnapshot | null;
   disciplinaSnapshots: PlanillaDailySnapshot[];
   planTab?: "operar" | "metricas" | "meta";
+  /** false en Jornada V3 operar — evita Escalera/métricas pesadas en el hilo del segundero. */
+  enabled?: boolean;
 };
 
 function sleep(ms: number): Promise<never> {
@@ -161,6 +163,8 @@ export function usePlaneacionHeavyMetrics(
   };
   const planTabRef = useRef(params.planTab ?? "operar");
   planTabRef.current = params.planTab ?? "operar";
+  const enabledRef = useRef(params.enabled !== false);
+  enabledRef.current = params.enabled !== false;
 
   const inputSig = planeacionHeavyMetricsInputSig(paramsRef.current);
 
@@ -197,6 +201,10 @@ export function usePlaneacionHeavyMetrics(
   const runCompute = useCallback((urgent: boolean, idleTimeoutMs?: number, swr = false) => {
     const generation = ++generationRef.current;
     const inputSigNow = planeacionHeavyMetricsInputSig(paramsRef.current);
+
+    if (!enabledRef.current) {
+      return () => {};
+    }
 
     if (tabHiddenRef.current) {
       return () => {};
@@ -309,6 +317,8 @@ export function usePlaneacionHeavyMetrics(
   }, []);
 
   useEffect(() => {
+    if (!enabledRef.current) return;
+
     const onVisibility = () => {
       const hidden = document.hidden;
       tabHiddenRef.current = hidden;
@@ -337,9 +347,14 @@ export function usePlaneacionHeavyMetrics(
 
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [applyBackupMetrics, runCompute]);
+  }, [applyBackupMetrics, runCompute, params.enabled]);
 
   useEffect(() => {
+    if (!enabledRef.current) {
+      needsRecalcRef.current = false;
+      return;
+    }
+
     const cached =
       getPlaneacionHeavyMetricsSnapshot(inputSig) ??
       getPlaneacionHeavyMetricsWithBackup(inputSig, params.yesterdayTermoSnapshot);
@@ -357,7 +372,7 @@ export function usePlaneacionHeavyMetrics(
     inputSigRef.current = inputSig;
     const idleMs = cached ? PLANEACION_IDLE_DEFER_MS : undefined;
     return runCompute(urgent, idleMs, !!cached);
-  }, [inputSig, runCompute, params.yesterdayTermoSnapshot]);
+  }, [inputSig, runCompute, params.yesterdayTermoSnapshot, params.enabled]);
 
   useEffect(() => {
     const prev = prevPlanTabRef.current;
@@ -382,8 +397,17 @@ export function usePlaneacionHeavyMetrics(
   }, [params.planTab, runCompute]);
 
   useEffect(() => {
+    if (!enabledRef.current) return;
+
+    const deferRunCompute = () => {
+      globalThis.setTimeout(() => {
+        if (!enabledRef.current || tabHiddenRef.current) return;
+        runCompute(false, undefined, true);
+      }, 0);
+    };
+
     const onAttentionTick = () => {
-      if (!tabHiddenRef.current) runCompute(false, undefined, true);
+      if (!tabHiddenRef.current) deferRunCompute();
     };
     const onClockTick = () => {
       if (tabHiddenRef.current) return;
@@ -391,7 +415,7 @@ export function usePlaneacionHeavyMetrics(
       metricSkipRef.current += 1;
       if (metricSkipRef.current >= step) {
         metricSkipRef.current = 0;
-        runCompute(false, undefined, true);
+        deferRunCompute();
       }
     };
 
@@ -401,7 +425,7 @@ export function usePlaneacionHeavyMetrics(
       window.removeEventListener(SEGMENT_ATTENTION_TICK_EVENT, onAttentionTick);
       window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClockTick);
     };
-  }, [runCompute]);
+  }, [runCompute, params.enabled]);
 
   return metrics;
 }
