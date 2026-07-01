@@ -30,7 +30,8 @@ import {
   warmupSpeechSynthesis,
 } from "@/lib/speechQueue";
 import { onJornadaVisibilityReturn } from "@/services/jornadaFlotaFetch";
-import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 import type { ReservaTacticaRuta, SituacionReservaItem } from "@/lib/situacionReserva";
 import type { ImanProyectoOpcion } from "@/lib/imanPensamientos";
 import { CrisolModule, type CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
@@ -552,7 +553,19 @@ function JornadaShellV3Inner({
               </p>
               <p className="text-[7px] text-slate-600 truncate">{JORNADA_MODULE.taglineShort}</p>
             </div>
-            <div className="flex gap-1 shrink-0">
+            <div className="flex gap-1 shrink-0 items-center">
+              <NavTransitionLink href="/planeacion">
+                <span
+                  className="text-[7px] font-bold uppercase px-2 py-1 rounded-lg touch-manipulation"
+                  style={{
+                    color: SHELL_COLORS.plata,
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                  data-testid="jornada-v3-back-classic"
+                >
+                  Clásica
+                </span>
+              </NavTransitionLink>
               {(["mapa", "horizonte"] as const).map(mode => (
                 <button
                   key={mode}

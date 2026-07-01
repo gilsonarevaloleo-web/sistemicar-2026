@@ -59,7 +59,7 @@ import { useAuthContext } from "@/App";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
-import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
 import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
 import { resetVoicePlaybackCache } from "@/lib/voicePlaybackCacheReset";
 
@@ -118,6 +118,14 @@ function buildMenuItems(progression: UserProgression | null, email: string | nul
       icon: Heart,
       route: "/planeacion",
       color: SPECTRUM.VERDE,
+    });
+    items.push({
+      id: "jornada-v3",
+      title: `${JORNADA_MODULE.titleUpper} V3`,
+      subtitle: "Laboratorio modular · motor nuevo",
+      icon: Zap,
+      route: JORNADA_V3_PATH,
+      color: "#D4AF37",
     });
   }
 
@@ -704,7 +712,14 @@ export default function MenuPrincipal() {
                     transition={{ delay: i * 0.04 }}
                     onClick={() => item.id !== "proximo" && navigate(item.route)}
                     onPointerEnter={() => {
-                      if (item.id === "planificacion" || item.route === "/planeacion") prefetchJornadaChunk();
+                      if (
+                        item.id === "planificacion" ||
+                        item.id === "jornada-v3" ||
+                        item.route === "/planeacion" ||
+                        item.route === JORNADA_V3_PATH
+                      ) {
+                        prefetchJornadaChunk();
+                      }
                     }}
                     className={`group relative p-4 rounded-xl border text-center transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] ${item.enCamino ? "opacity-80" : ""}`}
                     style={{ 

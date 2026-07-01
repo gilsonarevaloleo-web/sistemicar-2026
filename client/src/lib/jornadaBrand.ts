@@ -1,6 +1,9 @@
 import { SISTEMICAR_CATEGORY } from "./sistemicarCategory";
 
 /** Identidad visible del módulo `/planeacion` (capa usuario). */
+/** Ruta del laboratorio modular (no sustituye `/planeacion` en producción). */
+export const JORNADA_V3_PATH = "/jornada-v3" as const;
+
 export const JORNADA_MODULE = {
   title: "Jornada",
   titleUpper: "JORNADA",

@@ -485,7 +485,8 @@ import {
   subTareaFromImanItem,
 } from "@/lib/imanPensamientos";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
-import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR, flotaLabelUpper, flotaLabelsRecord } from "@/lib/flotaBrand";
 import { SituacionCasaPanel } from "@/components/SituacionCasaPanel";
 import { PuntoCeroPanel } from "@/components/PuntoCeroPanel";
@@ -2909,6 +2910,30 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
       onPointerDown={handlers.unlockDesglosadorSpeechFromGesture}
     >
       <JornadaStuckProbe />
+      <div className="max-w-lg mx-auto px-4 pt-2">
+        <NavTransitionLink href={JORNADA_V3_PATH}>
+          <div
+            className="rounded-xl border px-3 py-2 flex items-center justify-between gap-2 touch-manipulation"
+            style={{
+              backgroundColor: "rgba(212, 175, 55, 0.08)",
+              borderColor: "rgba(212, 175, 55, 0.28)",
+            }}
+            data-testid="banner-jornada-v3-lab"
+          >
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
+                Laboratorio Jornada V3
+              </p>
+              <p className="text-[7px] text-slate-500 truncate">
+                Motor modular nuevo — Crisol, Ring, Anillo, Fe 120%
+              </p>
+            </div>
+            <span className="text-[8px] font-bold shrink-0" style={{ color: GOLD }}>
+              Probar →
+            </span>
+          </div>
+        </NavTransitionLink>
+      </div>
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">

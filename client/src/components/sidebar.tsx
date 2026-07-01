@@ -30,10 +30,20 @@ import { useAuthContext } from "@/App";
 import { subscribeToProgression, UserProgression } from "@/lib/persistence";
 import { isOwner } from "@/lib/owner";
 import { getUserEmail } from "@/lib/firebase";
-import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 
 type NavItem = { path: string; icon: React.ElementType; label: string };
+
+function isNavPathActive(location: string, itemPath: string): boolean {
+  if (itemPath === JORNADA_V3_PATH) {
+    return location === JORNADA_V3_PATH || location === "/planeacion-v3";
+  }
+  if (itemPath === "/planeacion") {
+    return location === "/planeacion";
+  }
+  return location === itemPath;
+}
 
 function MobileNavSection({
   title,
@@ -55,7 +65,7 @@ function MobileNavSection({
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 px-1">{title}</p>
       <div className="grid grid-cols-4 gap-3">
         {items.map((item) => {
-          const isActive = location === item.path;
+          const isActive = isNavPathActive(location, item.path);
           return (
             <NavTransitionLink key={item.path} href={item.path} onClick={onNavigate}>
               <div className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-white/5">
@@ -116,6 +126,7 @@ export function Sidebar() {
     { path: "/radar", icon: Radio, label: "Radar" },
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
     { path: "/planeacion", icon: Compass, label: JORNADA_MODULE.title },
+    { path: JORNADA_V3_PATH, icon: Zap, label: "Jornada V3" },
     { path: "/proyectos", icon: Layers, label: "Proyectos" },
     { path: "/esperanza", icon: Sparkles, label: "Esperanza" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
@@ -156,9 +167,9 @@ export function Sidebar() {
 
         <div className="flex flex-col gap-6 w-full px-2 overflow-y-auto flex-1">
           {navItems.map((item) => {
-            const isActive = location === item.path;
-            return (
-              <NavTransitionLink key={`${item.path}-${item.label}`} href={item.path}>
+          const isActive = isNavPathActive(location, item.path);
+          return (
+            <NavTransitionLink key={`${item.path}-${item.label}`} href={item.path}>
                 <div className="relative group flex justify-center w-full cursor-pointer" title={item.label}>
                   <div
                     className={cn(
