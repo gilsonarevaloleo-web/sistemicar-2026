@@ -56,6 +56,8 @@ export type AnilloViewMode = "mapa" | "horizonte";
 export interface AnilloConcienciaAisladoProps {
   segmentos: SegmentoAnilloLite[];
   vehicles: Vehicle[];
+  /** Firma primitiva de la flota — evita recomputar cuando la referencia del array cambia sin datos nuevos. */
+  vehiclesSig?: string;
   viewMode: AnilloViewMode;
   size?: number;
   /** ID del segmento activo — al cambiar, el micro-ring resetea fillPct en memoria volátil. */
@@ -228,6 +230,7 @@ function filterHorizonForActiveSegment(
 function AnilloConcienciaAisladoInner({
   segmentos,
   vehicles,
+  vehiclesSig = "",
   viewMode,
   size = 140,
   activeSegmentId = null,
@@ -237,7 +240,7 @@ function AnilloConcienciaAisladoInner({
   className = "",
 }: AnilloConcienciaAisladoProps) {
   const geom = useMemo(() => ringGeometry(size), [size]);
-  const vehiculosLite = useMemo(() => vehiclesToLite(vehicles), [vehicles]);
+  const vehiculosLite = useMemo(() => vehiclesToLite(vehicles), [vehiclesSig]);
 
   const segmentSig = useMemo(
     () =>
@@ -291,7 +294,7 @@ function AnilloConcienciaAisladoInner({
     } catch {
       return null;
     }
-  }, [segmentos, vehiculosLite, segmentSig, metricsRevision]);
+  }, [segmentSig, vehiclesSig, metricsRevision]);
 
   const pointerNeedleRef = useRef<SVGLineElement>(null);
   const pointerCapRef = useRef<SVGCircleElement>(null);
@@ -309,8 +312,18 @@ function AnilloConcienciaAisladoInner({
   const innerMetricsRef = useRef({ conquistaArcPct: 0, entropiaArcPct: 0, fillPct: 0 });
   const geomRef = useRef(geom);
   const segmentDurSecRef = useRef(0);
+  const onSegmentChangeRef = useRef(onSegmentChange);
+  const hayVehiculoActivoRef = useRef(hayVehiculoActivo);
+  const activeSegmentIdRef = useRef(activeSegmentId);
+  const vehiculosLiteRef = useRef(vehiculosLite);
+  const segmentosRef = useRef(segmentos);
 
   geomRef.current = geom;
+  onSegmentChangeRef.current = onSegmentChange;
+  hayVehiculoActivoRef.current = hayVehiculoActivo;
+  activeSegmentIdRef.current = activeSegmentId;
+  vehiculosLiteRef.current = vehiculosLite;
+  segmentosRef.current = segmentos;
 
   useEffect(() => {
     if (!model) return;
@@ -356,7 +369,7 @@ function AnilloConcienciaAisladoInner({
       const g = geomRef.current;
       const boxCirc = 2 * Math.PI * g.boxingR;
       applyDashOffset(boxingBlockRef.current, 0, boxCirc, g.cx, g.cy);
-      onSegmentChange?.(activeSegmentId);
+      onSegmentChangeRef.current?.(activeSegmentId);
     }
 
     if (seg?.horaInicio && seg?.horaFin) {
@@ -371,12 +384,29 @@ function AnilloConcienciaAisladoInner({
     } else {
       segmentDurSecRef.current = 0;
     }
-  }, [activeSegmentId, hayVehiculoActivo, onSegmentChange, segmentos]);
+  }, [activeSegmentId, hayVehiculoActivo, segmentSig]);
+
+  useEffect(() => {
+    if (!hayVehiculoActivo || !activeSegmentId) return;
+    const block = volatileBlockRef.current;
+    if (block.segmentId === activeSegmentId && block.startedAt != null) return;
+    volatileBlockRef.current = {
+      segmentId: activeSegmentId,
+      startedAt: Date.now(),
+    };
+    const g = geomRef.current;
+    const boxCirc = 2 * Math.PI * g.boxingR;
+    applyDashOffset(boxingBlockRef.current, 0, boxCirc, g.cx, g.cy);
+  }, [hayVehiculoActivo, activeSegmentId]);
 
   useEffect(() => {
     const tick = () => {
       const now = Date.now();
       const g = geomRef.current;
+      const vehiculos = vehiculosLiteRef.current;
+      const segs = segmentosRef.current;
+      const hayActivo = hayVehiculoActivoRef.current;
+      const segId = activeSegmentIdRef.current;
       const deg = limaNowToClockDeg(now);
       const lap = limaNowToHalfDayLap(now);
       const railR = lap === 1 ? g.timelineR2 : g.timelineR;
@@ -384,14 +414,14 @@ function AnilloConcienciaAisladoInner({
       const rad = toRad(deg - 90);
       const needleLen = railR - railSW * 0.5;
 
-      const consciousNow = vehiculosLite.some(v => vehicleCoversConsciousnessAt(v, now));
+      const consciousNow = vehiculos.some(v => vehicleCoversConsciousnessAt(v, now));
       let mode = pointerModeRef.current;
-      if (!consciousNow && segmentos.length > 0) {
+      if (!consciousNow && segs.length > 0) {
         mode = "libre";
       }
 
       const color = POINTER_COLORS[mode];
-      const holeInPlanned = mode === "libre" && segmentos.length > 0;
+      const holeInPlanned = mode === "libre" && segs.length > 0;
 
       const needle = pointerNeedleRef.current;
       if (needle) {
@@ -429,9 +459,9 @@ function AnilloConcienciaAisladoInner({
 
       const block = volatileBlockRef.current;
       if (
-        hayVehiculoActivo &&
+        hayActivo &&
         block.startedAt &&
-        block.segmentId === activeSegmentId &&
+        block.segmentId === segId &&
         segmentDurSecRef.current > 0
       ) {
         const elapsed = Math.min(segmentDurSecRef.current, hardwareElapsedSec(block.startedAt));
@@ -444,7 +474,7 @@ function AnilloConcienciaAisladoInner({
     tick();
     const id = window.setInterval(tick, TICK_MS);
     return () => window.clearInterval(id);
-  }, [vehiculosLite, segmentos.length, hayVehiculoActivo, activeSegmentId]);
+  }, []);
 
   const mapaSegArcs = useMemo(() => {
     if (!model) return [];

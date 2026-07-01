@@ -20,7 +20,7 @@ import {
   type VehicleHistoryEntry,
 } from "@/lib/persistence";
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
-import { burstConcienciaClockTick, useConcienciaClockTick, useConcienciaMetricTick } from "@/lib/concienciaClock";
+import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { hardwareClockNow } from "@/lib/hardwareClock";
 import { shouldAllowJornadaVoice } from "@/lib/mobilePerf";
 import { runSegmentAttentionTickNow } from "@/lib/segmentAttentionCycle";
@@ -56,6 +56,25 @@ const SHELL_COLORS = {
 } as const;
 
 type JornadaTab = "operar" | "fe";
+
+const EMPTY_SUB_TAREAS: SubTarea[] = [];
+const EMPTY_SUB_VEHICULOS: SubVehiculo[] = [];
+const EMPTY_SEGMENTOS: SegmentoV5[] = [];
+
+function buildVehiclesAnilloSig(vehicles: Vehicle[]): string {
+  return vehicles
+    .map(
+      v =>
+        `${v.id}:${v.status}:${v.tipoFlota ?? ""}:${v.tipoReloj ?? ""}:${v.aperturaAt ?? 0}:${v.interrupcionActiva ? 1 : 0}:${v.desglosadorPausa?.pausadoAt ?? 0}`
+    )
+    .join("|");
+}
+
+function buildSegmentosSig(segmentos: SegmentoV5[]): string {
+  return segmentos
+    .map(s => `${s.id}:${s.estado}:${s.horaInicio}:${s.horaFin}`)
+    .join("|");
+}
 
 // ─── Hooks de salida para audio / segundo plano ─────────────────────────────
 
@@ -230,27 +249,44 @@ function useJornadaHardwareSync(params: {
   rehydrateFlotaFromLocalRef?: MutableRefObject<(() => void) | undefined>;
   setupFlotaSubscription?: () => void;
   speechHooks: JornadaShellSpeechHooks;
+  /** Sello primitivo — recomputar métricas del anillo solo cuando cambia la flota/segmentos. */
+  timelineSig: string;
 }): { metricsRevision: number } {
-  const metricsRevision = useConcienciaMetricTick();
-  useConcienciaClockTick();
+  const [metricsRevision, setMetricsRevision] = useState(0);
   const speechRef = useRef(params.speechHooks);
   speechRef.current = params.speechHooks;
+  const timelineSigRef = useRef(params.timelineSig);
+  const rehydrateRef = useRef(params.rehydrateFlotaFromLocalRef);
+  rehydrateRef.current = params.rehydrateFlotaFromLocalRef;
+  const setupFlotaRef = useRef(params.setupFlotaSubscription);
+  setupFlotaRef.current = params.setupFlotaSubscription;
+
+  useEffect(() => {
+    if (timelineSigRef.current === params.timelineSig) return;
+    timelineSigRef.current = params.timelineSig;
+    setMetricsRevision(r => r + 1);
+  }, [params.timelineSig]);
+
+  const bumpMetricsRevision = useCallback(() => {
+    setMetricsRevision(r => r + 1);
+  }, []);
 
   const reconcileFromTimestamps = useCallback(() => {
     void hardwareClockNow();
 
-    params.rehydrateFlotaFromLocalRef?.current?.();
-    params.setupFlotaSubscription?.();
+    rehydrateRef.current?.current?.();
+    setupFlotaRef.current?.();
 
     burstConcienciaClockTick(4, 80);
     runSegmentAttentionTickNow();
+    bumpMetricsRevision();
 
     const hooks = speechRef.current;
     hooks.warmupSpeech?.();
     hooks.recoverSpeech?.();
     hooks.flushBackgroundVoice?.();
     hooks.onForegroundResume?.();
-  }, [params.rehydrateFlotaFromLocalRef, params.setupFlotaSubscription]);
+  }, [bumpMetricsRevision]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -357,21 +393,33 @@ function JornadaShellV3Inner({
     readVehicleHistoryLocal()
   );
 
-  const speechHooks = useMemo(
-    () => ({ ...DEFAULT_SPEECH_HOOKS, ...speechHooksProp }),
-    [speechHooksProp]
+  const speechHooksRef = useRef(speechHooksProp);
+  speechHooksRef.current = speechHooksProp;
+
+  const vehiclesSig = useMemo(() => buildVehiclesAnilloSig(vehicles), [vehicles]);
+  const segmentosSig = useMemo(
+    () => buildSegmentosSig(segmentos),
+    [segmentos]
   );
+  const timelineSig = `${segmentosSig}::${vehiclesSig}`;
 
   const { metricsRevision } = useJornadaHardwareSync({
     rehydrateFlotaFromLocalRef,
     setupFlotaSubscription,
-    speechHooks,
+    speechHooks: DEFAULT_SPEECH_HOOKS,
+    timelineSig,
   });
 
   const ringContext = useMemo(
     () => resolveRingContext(vehicles, expandedId),
     [vehicles, expandedId]
   );
+
+  const ringVehicleId = ringContext?.vehicle.id ?? null;
+  const ringMode = ringContext?.mode;
+  const ringVehicle = ringContext?.vehicle;
+  const ringSubTareas = ringVehicle?.subTareas ?? EMPTY_SUB_TAREAS;
+  const ringSubVehiculos = ringVehicle?.subVehiculos ?? EMPTY_SUB_VEHICULOS;
 
   const hayVehiculoActivo = useMemo(
     () => vehicles.some(v => v.status === "activo"),
@@ -415,18 +463,18 @@ function JornadaShellV3Inner({
 
   const handleSubTareasChange = useCallback(
     (subs: SubTarea[]) => {
-      if (!ringContext) return;
-      patchVehicleSubs(ringContext.vehicle.id, { subTareas: subs });
+      if (!ringVehicleId) return;
+      patchVehicleSubs(ringVehicleId, { subTareas: subs });
     },
-    [ringContext, patchVehicleSubs]
+    [ringVehicleId, patchVehicleSubs]
   );
 
   const handleSubVehiculosChange = useCallback(
     (subs: SubVehiculo[]) => {
-      if (!ringContext) return;
-      patchVehicleSubs(ringContext.vehicle.id, { subVehiculos: subs });
+      if (!ringVehicleId) return;
+      patchVehicleSubs(ringVehicleId, { subVehiculos: subs });
     },
-    [ringContext, patchVehicleSubs]
+    [ringVehicleId, patchVehicleSubs]
   );
 
   const handleSubTareaClose = useCallback(
@@ -519,12 +567,10 @@ function JornadaShellV3Inner({
     [vehiclesRef, handleDesglosadorUpdate, userId, refreshHistory, volcarMetricasAlHub]
   );
 
-  const handleSegmentChange = useCallback(
-    (segmentId: string | null) => {
-      speechHooks.onSegmentChange?.(segmentId);
-    },
-    [speechHooks]
-  );
+  const handleSegmentChange = useCallback((segmentId: string | null) => {
+    const hooks = { ...DEFAULT_SPEECH_HOOKS, ...speechHooksRef.current };
+    hooks.onSegmentChange?.(segmentId);
+  }, []);
 
   const anilloSize = useMemo(() => {
     if (typeof window === "undefined") return 220;
@@ -602,8 +648,9 @@ function JornadaShellV3Inner({
           data-testid="jornada-v3-brujula"
         >
           <AnilloConcienciaAislado
-            segmentos={segmentos}
+            segmentos={segmentos.length > 0 ? segmentos : EMPTY_SEGMENTOS}
             vehicles={vehicles}
+            vehiclesSig={vehiclesSig}
             viewMode={anilloView}
             size={anilloSize}
             activeSegmentId={segmentoActivoId}
@@ -625,17 +672,17 @@ function JornadaShellV3Inner({
               onRutaChange={onReservaRutaChange}
             />
 
-            {ringContext ? (
+            {ringVehicleId && ringMode && ringVehicle ? (
               <RingEnfoqueModule
                 ref={ringRef}
-                mode={ringContext.mode}
-                vehicleId={ringContext.vehicle.id}
-                subTareas={ringContext.vehicle.subTareas ?? []}
-                subVehiculos={ringContext.vehicle.subVehiculos ?? []}
-                situacionCronometro={ringContext.vehicle.situacionCronometro}
-                desglosadorPausa={ringContext.vehicle.desglosadorPausa}
-                interrupcionActiva={ringContext.vehicle.interrupcionActiva}
-                blockedByInterrupt={Boolean(ringContext.vehicle.interrupcionActiva)}
+                mode={ringMode}
+                vehicleId={ringVehicleId}
+                subTareas={ringSubTareas}
+                subVehiculos={ringSubVehiculos}
+                situacionCronometro={ringVehicle.situacionCronometro}
+                desglosadorPausa={ringVehicle.desglosadorPausa}
+                interrupcionActiva={ringVehicle.interrupcionActiva}
+                blockedByInterrupt={Boolean(ringVehicle.interrupcionActiva)}
                 onSubTareasChange={handleSubTareasChange}
                 onSubVehiculosChange={handleSubVehiculosChange}
                 onSubTareaClose={handleSubTareaClose}
