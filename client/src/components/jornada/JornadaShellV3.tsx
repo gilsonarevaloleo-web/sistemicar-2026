@@ -1,5 +1,6 @@
 import {
   memo,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -10,7 +11,6 @@ import {
 import { Compass, Target, Zap } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import {
-  saveLocalVehicles,
   saveVehicleHistoryFirebase,
   updateVehicle,
   type SegmentoV5,
@@ -20,7 +20,8 @@ import {
   type VehicleHistoryEntry,
 } from "@/lib/persistence";
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
-import { burstConcienciaClockTick } from "@/lib/concienciaClock";
+import { burstConcienciaClockTick, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
+import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { hardwareClockNow } from "@/lib/hardwareClock";
 import { shouldAllowJornadaVoice } from "@/lib/mobilePerf";
 import { runSegmentAttentionTickNow } from "@/lib/segmentAttentionCycle";
@@ -136,8 +137,9 @@ function persistVehicleHistoryEntry(
     void saveVehicleHistoryFirebase(userId, history).catch(e =>
       console.warn("[JornadaShellV3] vehicleHistory Firebase:", e)
     );
-    if (auth.currentUser) {
-      void auth.currentUser
+    const currentUser = auth?.currentUser;
+    if (currentUser) {
+      void currentUser
         .getIdToken()
         .then(token =>
           fetch("/api/vehicle-history", {
@@ -274,25 +276,36 @@ function useJornadaHardwareSync(params: {
     setMetricsRevision(r => r + 1);
   }, []);
 
+  const reconcileGenRef = useRef(0);
+
   const reconcileFromTimestamps = useCallback(() => {
-    void hardwareClockNow();
+    const gen = ++reconcileGenRef.current;
 
-    rehydrateRef.current?.current?.();
-    setupFlotaRef.current?.();
+    globalThis.setTimeout(() => {
+      if (gen !== reconcileGenRef.current) return;
 
-    if (hayVehiculoActivoRef.current) {
-      burstConcienciaClockTick(1);
-    } else {
-      burstConcienciaClockTick(4, 80);
-    }
-    runSegmentAttentionTickNow();
-    bumpMetricsRevision();
+      void hardwareClockNow();
+      rehydrateRef.current?.current?.();
+      setupFlotaRef.current?.();
 
-    const hooks = speechRef.current;
-    hooks.warmupSpeech?.();
-    hooks.recoverSpeech?.();
-    hooks.flushBackgroundVoice?.();
-    hooks.onForegroundResume?.();
+      if (hayVehiculoActivoRef.current) {
+        burstConcienciaClockTick(1);
+      } else {
+        burstConcienciaClockTick(4, 80);
+      }
+
+      const hooks = speechRef.current;
+      hooks.warmupSpeech?.();
+      hooks.recoverSpeech?.();
+      hooks.flushBackgroundVoice?.();
+      hooks.onForegroundResume?.();
+
+      globalThis.setTimeout(() => {
+        if (gen !== reconcileGenRef.current) return;
+        runSegmentAttentionTickNow();
+        bumpMetricsRevision();
+      }, 80);
+    }, 0);
   }, [bumpMetricsRevision]);
 
   useEffect(() => {
@@ -303,6 +316,7 @@ function useJornadaHardwareSync(params: {
     document.addEventListener("visibilitychange", onVisible);
     const unsub = onJornadaVisibilityReturn(onVisible);
     return () => {
+      reconcileGenRef.current += 1;
       document.removeEventListener("visibilitychange", onVisible);
       unsub();
     };
@@ -434,6 +448,15 @@ function JornadaShellV3Inner({
   const ringSubTareas = ringVehicle?.subTareas ?? EMPTY_SUB_TAREAS;
   const ringSubVehiculos = ringVehicle?.subVehiculos ?? EMPTY_SUB_VEHICULOS;
 
+  const handleTabChange = useCallback((tab: JornadaTab) => {
+    startTransition(() => {
+      setActiveTab(tab);
+      if (tab === "operar") {
+        dispatchConcienciaClockTick();
+      }
+    });
+  }, []);
+
   const refreshHistory = useCallback(() => {
     setVehicleHistory(readVehicleHistoryLocal());
   }, []);
@@ -452,11 +475,7 @@ function JornadaShellV3Inner({
       vehiclesRef.current = vehiclesRef.current.map(v =>
         v.id === vehicleId ? { ...v, ...patch } : v
       );
-      try {
-        saveLocalVehicles(vehiclesRef.current);
-      } catch {
-        /* quota */
-      }
+      scheduleSaveLocalVehicles(vehiclesRef.current);
     },
     [setVehicles, vehiclesRef]
   );
@@ -641,7 +660,7 @@ function JornadaShellV3Inner({
             </div>
           </div>
 
-          <TabBar active={activeTab} onChange={setActiveTab} />
+          <TabBar active={activeTab} onChange={handleTabChange} />
         </div>
       </header>
 
@@ -668,69 +687,78 @@ function JornadaShellV3Inner({
           />
         </section>
 
-        {activeTab === "operar" && (
-          <div className="space-y-3" role="tabpanel" data-testid="jornada-v3-panel-operar">
-            <CrisolModule
-              items={situacionReserva}
-              proyectos={imanProyectos}
-              userId={userId}
-              defaultProyectoId={defaultProyectoId}
-              onAterrizar={onAterrizarReserva}
-              onDespacharToRing={handleDespacharToRing}
-              onRutaChange={onReservaRutaChange}
-            />
+        <div
+          className={`space-y-3 ${activeTab !== "operar" ? "hidden" : ""}`}
+          role="tabpanel"
+          aria-hidden={activeTab !== "operar"}
+          hidden={activeTab !== "operar"}
+          data-testid="jornada-v3-panel-operar"
+        >
+          <CrisolModule
+            items={situacionReserva}
+            proyectos={imanProyectos}
+            userId={userId}
+            defaultProyectoId={defaultProyectoId}
+            onAterrizar={onAterrizarReserva}
+            onDespacharToRing={handleDespacharToRing}
+            onRutaChange={onReservaRutaChange}
+          />
 
-            {ringVehicleId && ringMode && ringVehicle ? (
-              <RingEnfoqueModule
-                ref={ringRef}
-                mode={ringMode}
-                vehicleId={ringVehicleId}
-                subTareas={ringSubTareas}
-                subVehiculos={ringSubVehiculos}
-                situacionCronometro={ringVehicle.situacionCronometro}
-                situacionCupoAnchor={ringVehicle.situacionCupoAnchor}
-                desglosadorPausa={ringVehicle.desglosadorPausa}
-                interrupcionActiva={ringVehicle.interrupcionActiva}
-                blockedByInterrupt={Boolean(ringVehicle.interrupcionActiva)}
-                hayVehiculoActivo={hayVehiculoActivo}
-                onSubTareasChange={handleSubTareasChange}
-                onSubVehiculosChange={handleSubVehiculosChange}
-                onSubTareaClose={handleSubTareaClose}
-                onSubVehiculoClose={handleSubVehiculoClose}
+          {ringVehicleId && ringMode && ringVehicle ? (
+            <RingEnfoqueModule
+              ref={ringRef}
+              mode={ringMode}
+              vehicleId={ringVehicleId}
+              vehiclesRef={vehiclesRef}
+              subTareas={ringSubTareas}
+              subVehiculos={ringSubVehiculos}
+              situacionCronometro={ringVehicle.situacionCronometro}
+              situacionCupoAnchor={ringVehicle.situacionCupoAnchor}
+              desglosadorPausa={ringVehicle.desglosadorPausa}
+              interrupcionActiva={ringVehicle.interrupcionActiva}
+              blockedByInterrupt={Boolean(ringVehicle.interrupcionActiva)}
+              hayVehiculoActivo={hayVehiculoActivo}
+              onSubTareasChange={handleSubTareasChange}
+              onSubVehiculosChange={handleSubVehiculosChange}
+              onSubTareaClose={handleSubTareaClose}
+              onSubVehiculoClose={handleSubVehiculoClose}
+            />
+          ) : (
+            <section
+              className="rounded-2xl border p-6 text-center"
+              style={{
+                borderColor: `${SHELL_COLORS.gold}20`,
+                backgroundColor: "rgba(0,0,0,0.25)",
+              }}
+              data-testid="jornada-v3-ring-empty"
+            >
+              <Target
+                size={28}
+                className="mx-auto mb-2 opacity-25"
+                style={{ color: SHELL_COLORS.gold }}
               />
-            ) : (
-              <section
-                className="rounded-2xl border p-6 text-center"
-                style={{
-                  borderColor: `${SHELL_COLORS.gold}20`,
-                  backgroundColor: "rgba(0,0,0,0.25)",
-                }}
-                data-testid="jornada-v3-ring-empty"
-              >
-                <Target
-                  size={28}
-                  className="mx-auto mb-2 opacity-25"
-                  style={{ color: SHELL_COLORS.gold }}
-                />
-                <p className="text-[10px] font-bold text-slate-400">Ring en espera</p>
-                <p className="text-[8px] text-slate-600 mt-1 max-w-xs mx-auto">
-                  Abre un vehículo de enfoque (situación o desglosador) para activar el cableado
-                  Crisol → Ring.
-                </p>
-              </section>
-            )}
-          </div>
-        )}
+              <p className="text-[10px] font-bold text-slate-400">Ring en espera</p>
+              <p className="text-[8px] text-slate-600 mt-1 max-w-xs mx-auto">
+                Abre un vehículo de enfoque (situación o desglosador) para activar el cableado
+                Crisol → Ring.
+              </p>
+            </section>
+          )}
+        </div>
 
-        {activeTab === "fe" && (
-          <div role="tabpanel" data-testid="jornada-v3-panel-fe">
-            <MetricasJornadaModule
-              todayPs={todayPs}
-              yesterdayPs={yesterdayPs ?? 0}
-              vehicleHistory={vehicleHistory}
-            />
-          </div>
-        )}
+        <div
+          role="tabpanel"
+          aria-hidden={activeTab !== "fe"}
+          hidden={activeTab !== "fe"}
+          className={activeTab !== "fe" ? "hidden" : ""}
+          data-testid="jornada-v3-panel-fe"
+        >
+          <MetricasJornadaModule
+            todayPs={todayPs}
+            yesterdayPs={yesterdayPs ?? 0}
+            vehicleHistory={vehicleHistory}
+          />
+        </div>
       </div>
     </div>
   );

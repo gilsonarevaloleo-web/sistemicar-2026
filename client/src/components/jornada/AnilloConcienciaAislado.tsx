@@ -1,5 +1,6 @@
 import {
   memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -25,6 +26,7 @@ import {
 } from "@/engines/ConcienciaHorizonEngine";
 import { formatLimaTimeHM, segmentDurationMinutes } from "@/lib/segmentTime";
 import { hardwareElapsedSec } from "@/lib/hardwareClock";
+import { useDomConcienciaClock } from "@/lib/domConcienciaClock";
 
 // ─── Paleta tech-noir ───────────────────────────────────────────────────────
 
@@ -46,8 +48,6 @@ const POINTER_COLORS: Record<AnilloPointerMode, string> = {
   conquista: COLORS.purple,
   entropia: COLORS.blood,
 };
-
-const TICK_MS = 1000;
 
 // ─── Tipos públicos ─────────────────────────────────────────────────────────
 
@@ -409,90 +409,77 @@ function AnilloConcienciaAisladoInner({
         : vehiculosLite.some(v => vehicleCoversConsciousnessAt(v, Date.now()));
   }, [vehiclesSig, vehiculosLite]);
 
-  useEffect(() => {
-    let deferId: ReturnType<typeof setTimeout> | null = null;
+  const runPointerTick = useCallback(() => {
+    const now = Date.now();
+    const g = geomRef.current;
+    const segs = segmentosRef.current;
+    const hayActivo = hayVehiculoActivoRef.current;
+    const segId = activeSegmentIdRef.current;
+    const deg = limaNowToClockDeg(now);
+    const lap = limaNowToHalfDayLap(now);
+    const railR = lap === 1 ? g.timelineR2 : g.timelineR;
+    const railSW = lap === 1 ? g.timelineSW * 0.9 : g.timelineSW;
+    const rad = toRad(deg - 90);
+    const needleLen = railR - railSW * 0.5;
 
-    const runTick = () => {
-      const now = Date.now();
-      const g = geomRef.current;
-      const segs = segmentosRef.current;
-      const hayActivo = hayVehiculoActivoRef.current;
-      const segId = activeSegmentIdRef.current;
-      const deg = limaNowToClockDeg(now);
-      const lap = limaNowToHalfDayLap(now);
-      const railR = lap === 1 ? g.timelineR2 : g.timelineR;
-      const railSW = lap === 1 ? g.timelineSW * 0.9 : g.timelineSW;
-      const rad = toRad(deg - 90);
-      const needleLen = railR - railSW * 0.5;
+    const consciousNow = consciousCachedRef.current;
+    let mode = pointerModeRef.current;
+    if (!consciousNow && segs.length > 0) {
+      mode = "libre";
+    }
 
-      const consciousNow = consciousCachedRef.current;
-      let mode = pointerModeRef.current;
-      if (!consciousNow && segs.length > 0) {
-        mode = "libre";
+    const color = POINTER_COLORS[mode];
+    const holeInPlanned = mode === "libre" && segs.length > 0;
+
+    const needle = pointerNeedleRef.current;
+    if (needle) {
+      needle.setAttribute("x1", String(g.cx));
+      needle.setAttribute("y1", String(g.cy));
+      needle.setAttribute("x2", String(g.cx + needleLen * Math.cos(rad)));
+      needle.setAttribute("y2", String(g.cy + needleLen * Math.sin(rad)));
+      needle.setAttribute("stroke", color);
+      needle.setAttribute("stroke-width", holeInPlanned ? "1.6" : "1.1");
+      if (holeInPlanned) {
+        needle.setAttribute("stroke-dasharray", "3 2");
+      } else {
+        needle.removeAttribute("stroke-dasharray");
       }
+    }
 
-      const color = POINTER_COLORS[mode];
-      const holeInPlanned = mode === "libre" && segs.length > 0;
+    const cap = pointerCapRef.current;
+    if (cap) {
+      cap.setAttribute("cx", String(g.cx + railR * Math.cos(rad)));
+      cap.setAttribute("cy", String(g.cy + railR * Math.sin(rad)));
+      cap.setAttribute("r", String(railSW * (holeInPlanned ? 0.72 : 0.55)));
+      cap.setAttribute("stroke", color);
+      cap.setAttribute("opacity", holeInPlanned ? "0.92" : "0.35");
+    }
 
-      const needle = pointerNeedleRef.current;
-      if (needle) {
-        needle.setAttribute("x1", String(g.cx));
-        needle.setAttribute("y1", String(g.cy));
-        needle.setAttribute("x2", String(g.cx + needleLen * Math.cos(rad)));
-        needle.setAttribute("y2", String(g.cy + needleLen * Math.sin(rad)));
-        needle.setAttribute("stroke", color);
-        needle.setAttribute("stroke-width", holeInPlanned ? "1.6" : "1.1");
-        if (holeInPlanned) {
-          needle.setAttribute("stroke-dasharray", "3 2");
-        } else {
-          needle.removeAttribute("stroke-dasharray");
-        }
-      }
+    const hub = pointerHubRef.current;
+    if (hub) hub.setAttribute("fill", color);
 
-      const cap = pointerCapRef.current;
-      if (cap) {
-        cap.setAttribute("cx", String(g.cx + railR * Math.cos(rad)));
-        cap.setAttribute("cy", String(g.cy + railR * Math.sin(rad)));
-        cap.setAttribute("r", String(railSW * (holeInPlanned ? 0.72 : 0.55)));
-        cap.setAttribute("stroke", color);
-        cap.setAttribute("opacity", holeInPlanned ? "0.92" : "0.35");
-      }
+    if (clockLabelRef.current) {
+      clockLabelRef.current.textContent = formatLimaTimeHM(now);
+    }
+    if (ampmLabelRef.current) {
+      ampmLabelRef.current.textContent = lap === 1 ? "PM" : "AM";
+    }
 
-      const hub = pointerHubRef.current;
-      if (hub) hub.setAttribute("fill", color);
-
-      if (clockLabelRef.current) {
-        clockLabelRef.current.textContent = formatLimaTimeHM(now);
-      }
-      if (ampmLabelRef.current) {
-        ampmLabelRef.current.textContent = lap === 1 ? "PM" : "AM";
-      }
-
-      const block = volatileBlockRef.current;
-      if (
-        hayActivo &&
-        block.startedAt &&
-        block.segmentId === segId &&
-        segmentDurSecRef.current > 0
-      ) {
-        const elapsed = Math.min(segmentDurSecRef.current, hardwareElapsedSec(block.startedAt));
-        const blockPct = Math.min(100, Math.round((elapsed / segmentDurSecRef.current) * 100));
-        const boxCirc = 2 * Math.PI * g.boxingR;
-        applyDashOffset(boxingBlockRef.current, blockPct, boxCirc, g.cx, g.cy);
-      }
-    };
-
-    const tick = () => {
-      deferId = globalThis.setTimeout(runTick, 0);
-    };
-
-    tick();
-    const id = window.setInterval(tick, TICK_MS);
-    return () => {
-      window.clearInterval(id);
-      if (deferId != null) globalThis.clearTimeout(deferId);
-    };
+    const block = volatileBlockRef.current;
+    if (
+      hayActivo &&
+      block.startedAt &&
+      block.segmentId === segId &&
+      segmentDurSecRef.current > 0
+    ) {
+      const elapsed = Math.min(segmentDurSecRef.current, hardwareElapsedSec(block.startedAt));
+      const blockPct = Math.min(100, Math.round((elapsed / segmentDurSecRef.current) * 100));
+      const boxCirc = 2 * Math.PI * g.boxingR;
+      applyDashOffset(boxingBlockRef.current, blockPct, boxCirc, g.cx, g.cy);
+    }
   }, []);
+
+  useDomConcienciaClock(runPointerTick, true);
 
   const mapaSegArcs = useMemo(() => {
     if (!model) return [];

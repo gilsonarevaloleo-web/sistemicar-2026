@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MutableRefObject,
   type Ref,
 } from "react";
 import { CheckCircle2, Target, XCircle } from "lucide-react";
@@ -25,7 +26,7 @@ import {
 } from "@/lib/desglosadorClock";
 import { getRutaBandaActual, RUTA_BANDA_META, type RutaBandaId } from "@/lib/rutaEnfoque";
 import { situacionFilaCronometroPendiente } from "@/lib/situacionCupoDistrib";
-import { CONCIENCIA_CLOCK_TICK_EVENT } from "@/lib/concienciaClock";
+import { useDomConcienciaClock } from "@/lib/domConcienciaClock";
 import { computeSituacionTimerUi } from "@/components/planeacion/situacionRelojIsland";
 
 // ─── Tokens ─────────────────────────────────────────────────────────────────
@@ -68,6 +69,8 @@ export type RingSubVehiculoClosePayload = {
 export interface RingEnfoqueModuleProps {
   mode: RingMode;
   vehicleId: string;
+  /** Fuente viva del segundero (aperturaAt, pausas, subs activos). */
+  vehiclesRef: MutableRefObject<Vehicle[]>;
   subTareas: SubTarea[];
   subVehiculos: SubVehiculo[];
   situacionCronometro?: Vehicle["situacionCronometro"];
@@ -141,56 +144,56 @@ function bandaActualFromSub(sub: SubVehiculo): RutaBandaId | null {
 // ─── Reloj DOM-only (cero re-render del Ring por tick) ──────────────────────
 
 type RingDomClockProps = {
-  activeSub: SubVehiculo;
-  clockVehicle: Pick<Vehicle, "subVehiculos" | "interrupcionActiva" | "desglosadorPausa">;
+  vehicleId: string;
+  vehiclesRef: MutableRefObject<Vehicle[]>;
+  clockKey: string;
+  activeSubTitulo: string;
 };
 
-const RingDomClock = memo(function RingDomClock({ activeSub, clockVehicle }: RingDomClockProps) {
+const RingDomClock = memo(function RingDomClock({
+  vehicleId,
+  vehiclesRef,
+  clockKey,
+  activeSubTitulo,
+}: RingDomClockProps) {
   const displayRef = useRef<HTMLSpanElement>(null);
   const expiredRef = useRef(false);
-  const deferRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeSubRef = useRef(activeSub);
-  const clockVehicleRef = useRef(clockVehicle);
-  const clockKey = `${activeSub.id}:${activeSub.aperturaAt ?? 0}`;
+  const vehicleIdRef = useRef(vehicleId);
+  vehicleIdRef.current = vehicleId;
 
-  activeSubRef.current = activeSub;
-  clockVehicleRef.current = clockVehicle;
+  const runTick = useCallback(() => {
+    const node = displayRef.current;
+    if (!node) return;
 
-  useEffect(() => {
-    const el = displayRef.current;
-    if (!el || !activeSub.aperturaAt) {
-      if (el) el.textContent = "00:00";
+    const vehicle = vehiclesRef.current.find(v => v.id === vehicleIdRef.current);
+    if (!vehicle) {
+      node.textContent = "00:00";
       return;
     }
 
-    const runTick = () => {
-      const node = displayRef.current;
-      const sub = activeSubRef.current;
-      if (!node || !sub.aperturaAt) return;
-      const now = Date.now();
-      const clocks = computeActiveSubClocks(now, clockVehicleRef.current as Vehicle, sub);
-      const objSecs = suggestedSec(sub);
-      const ui = desglosadorSubTimerUiFromClocks(clocks, objSecs);
-      node.textContent = ui.display;
-      if (ui.expired !== expiredRef.current) {
-        expiredRef.current = ui.expired;
-        node.style.color = ui.expired ? RING_COLORS.blood : RING_COLORS.cyan;
-      }
-    };
+    const sub = vehicle.subVehiculos?.find(s => s.status === "activo");
+    if (!sub?.aperturaAt) {
+      node.textContent = "00:00";
+      return;
+    }
 
-    const onClock = () => {
-      if (deferRef.current != null) globalThis.clearTimeout(deferRef.current);
-      deferRef.current = globalThis.setTimeout(runTick, 0);
-    };
+    const now = Date.now();
+    const clocks = computeActiveSubClocks(now, vehicle, sub);
+    const objSecs = suggestedSec(sub);
+    const ui = desglosadorSubTimerUiFromClocks(clocks, objSecs);
+    node.textContent = ui.display;
+    if (ui.expired !== expiredRef.current) {
+      expiredRef.current = ui.expired;
+      node.style.color = ui.expired ? RING_COLORS.blood : RING_COLORS.cyan;
+    }
+  }, [vehiclesRef]);
 
+  useDomConcienciaClock(runTick, Boolean(clockKey));
+
+  useEffect(() => {
+    expiredRef.current = false;
     runTick();
-    window.addEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-    return () => {
-      window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-      if (deferRef.current != null) globalThis.clearTimeout(deferRef.current);
-      deferRef.current = null;
-    };
-  }, [clockKey]);
+  }, [clockKey, runTick]);
 
   return (
     <div
@@ -203,7 +206,7 @@ const RingDomClock = memo(function RingDomClock({ activeSub, clockVehicle }: Rin
     >
       <div className="min-w-0">
         <p className="text-[7px] font-black uppercase tracking-widest text-slate-500">Sub activo</p>
-        <p className="text-[10px] text-slate-200 truncate">{activeSub.titulo}</p>
+        <p className="text-[10px] text-slate-200 truncate">{activeSubTitulo}</p>
       </div>
       <span
         ref={displayRef}
@@ -218,57 +221,47 @@ const RingDomClock = memo(function RingDomClock({ activeSub, clockVehicle }: Rin
 });
 
 type SituacionDomClockProps = {
-  clockVehicle: Pick<
-    Vehicle,
-    "tipoFlota" | "status" | "situacionCronometro" | "situacionCupoAnchor" | "subTareas"
-  >;
+  vehicleId: string;
+  vehiclesRef: MutableRefObject<Vehicle[]>;
   clockKey: string;
 };
 
 const SituacionDomClock = memo(function SituacionDomClock({
-  clockVehicle,
+  vehicleId,
+  vehiclesRef,
   clockKey,
 }: SituacionDomClockProps) {
   const displayRef = useRef<HTMLSpanElement>(null);
   const targetRef = useRef<HTMLSpanElement>(null);
   const expiredRef = useRef(false);
-  const deferRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clockVehicleRef = useRef(clockVehicle);
+  const vehicleIdRef = useRef(vehicleId);
+  vehicleIdRef.current = vehicleId;
 
-  clockVehicleRef.current = clockVehicle;
+  const runTick = useCallback(() => {
+    const vehicle = vehiclesRef.current.find(v => v.id === vehicleIdRef.current);
+    const ui = computeSituacionTimerUi(vehicle ?? ({} as Vehicle), Date.now());
+    const display = displayRef.current;
+    const target = targetRef.current;
+    if (!display) return;
+    if (!ui.visible) {
+      display.textContent = "--:--:--";
+      if (target) target.textContent = "";
+      return;
+    }
+    display.textContent = ui.display;
+    if (target) target.textContent = ui.targetLabel ? `Obj: ${ui.targetLabel}` : "";
+    if (ui.expired !== expiredRef.current) {
+      expiredRef.current = ui.expired;
+      display.style.color = ui.expired ? RING_COLORS.blood : RING_COLORS.gold;
+    }
+  }, [vehiclesRef]);
+
+  useDomConcienciaClock(runTick, Boolean(clockKey));
 
   useEffect(() => {
-    const runTick = () => {
-      const ui = computeSituacionTimerUi(clockVehicleRef.current as Vehicle, Date.now());
-      const display = displayRef.current;
-      const target = targetRef.current;
-      if (!display) return;
-      if (!ui.visible) {
-        display.textContent = "--:--:--";
-        if (target) target.textContent = "";
-        return;
-      }
-      display.textContent = ui.display;
-      if (target) target.textContent = ui.targetLabel ? `Obj: ${ui.targetLabel}` : "";
-      if (ui.expired !== expiredRef.current) {
-        expiredRef.current = ui.expired;
-        display.style.color = ui.expired ? RING_COLORS.blood : RING_COLORS.gold;
-      }
-    };
-
-    const onClock = () => {
-      if (deferRef.current != null) globalThis.clearTimeout(deferRef.current);
-      deferRef.current = globalThis.setTimeout(runTick, 0);
-    };
-
+    expiredRef.current = false;
     runTick();
-    window.addEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-    return () => {
-      window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-      if (deferRef.current != null) globalThis.clearTimeout(deferRef.current);
-      deferRef.current = null;
-    };
-  }, [clockKey]);
+  }, [clockKey, runTick]);
 
   return (
     <div
@@ -576,6 +569,7 @@ function RingEnfoqueModuleInner(
   {
     mode,
     vehicleId,
+    vehiclesRef,
     subTareas,
     subVehiculos,
     situacionCronometro,
@@ -613,25 +607,9 @@ function RingEnfoqueModuleInner(
     [localSubVehiculos]
   );
 
-  const clockVehicle = useMemo(
-    () => ({
-      subVehiculos: localSubVehiculos,
-      interrupcionActiva,
-      desglosadorPausa,
-    }),
-    [localSubVehiculos, interrupcionActiva, desglosadorPausa]
-  );
-
-  const situacionClockVehicle = useMemo(
-    () => ({
-      tipoFlota: "situacion" as const,
-      status: "activo" as const,
-      situacionCronometro,
-      situacionCupoAnchor,
-      subTareas: localSubTareas,
-    }),
-    [situacionCronometro, situacionCupoAnchor, localSubTareas]
-  );
+  const desglosadorClockKey = activeSubVehiculo
+    ? `${activeSubVehiculo.id}:${activeSubVehiculo.aperturaAt ?? 0}`
+    : "";
 
   const situacionClockKey = useMemo(
     () =>
@@ -761,15 +739,20 @@ function RingEnfoqueModuleInner(
 
       <div className="px-3 py-2 space-y-2 max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain">
         {mode === "tiempo" && activeSubVehiculo?.aperturaAt && (
-          <RingDomClock activeSub={activeSubVehiculo} clockVehicle={clockVehicle} />
-        )}
-
-        {mode === "tiempo" && activeSubVehiculo?.aperturaAt && (
-          <RingDomClock activeSub={activeSubVehiculo} clockVehicle={clockVehicle} />
+          <RingDomClock
+            vehicleId={vehicleId}
+            vehiclesRef={vehiclesRef}
+            clockKey={desglosadorClockKey}
+            activeSubTitulo={activeSubVehiculo.titulo}
+          />
         )}
 
         {mode === "situacion" && ringActivo && (
-          <SituacionDomClock clockVehicle={situacionClockVehicle} clockKey={situacionClockKey} />
+          <SituacionDomClock
+            vehicleId={vehicleId}
+            vehiclesRef={vehiclesRef}
+            clockKey={situacionClockKey}
+          />
         )}
 
         {mode === "situacion" && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue, startTransition } from "react";
+import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import {
@@ -2030,11 +2031,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     });
     setVehicles(newVehicles);
     vehiclesRef.current = newVehicles;
-    try {
-      saveLocalVehicles(newVehicles);
-    } catch (e) {
-      console.warn("[Desglosador] localStorage save failed (quota?), UI still updated:", e);
-    }
+    scheduleSaveLocalVehicles(newVehicles);
 
     const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
     if (prevTimer) clearTimeout(prevTimer);
