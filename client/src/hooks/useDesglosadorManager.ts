@@ -3351,15 +3351,29 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   }, []);
 
   const handleVehicleComplete = useCallback((vehicleId: string) => {
-    setCierreEnergiaSeleccion(null);
     setCierreEnergiaPending({ kind: "flota", vehicleId, status: "cumplido" });
+
+    // ⚡️ CORRECCIÓN: Limpieza nativa del cronómetro para evitar el tiempo congelado en móvil
+    const clockEl = document.getElementById("desglosador-clock") || 
+                    document.getElementById("conquista-clock") || 
+                    document.querySelector("[data-testid='cronometro-conquista']");
+    if (clockEl) {
+      clockEl.textContent = "00:00";
+    }
   }, []);
 
   const handleVehicleArchive = useCallback((vehicleId: string) => {
     setCierreEnergiaSeleccion(null);
     setCierreEnergiaPending({ kind: "flota", vehicleId, status: "archivado" });
-  }, []);
 
+    // ⚡️ CORRECCIÓN: Limpieza nativa del cronómetro al fallar/archivar el vehículo
+    const clockEl = document.getElementById("desglosador-clock") || 
+                    document.getElementById("conquista-clock") || 
+                    document.querySelector("[data-testid='cronometro-conquista']");
+    if (clockEl) {
+      clockEl.textContent = "00:00";
+    }
+  }, []);
   const handleOpenCierreEnergiaStable = useCallback((p: CierreEnergiaModalPayload) => {
     setCierreEnergiaSeleccion(null);
     setCierreRutaSeleccion(new Set());

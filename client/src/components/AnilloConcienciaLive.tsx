@@ -165,15 +165,49 @@ function AnilloConcienciaLiveInner({
     [segmentos, segmentoActivoSig]
   );
 
-  const hayVehiculoActivo = useMemo(() => {
+  // 1. Resolvemos el segmento activo (Se queda igual)
+  const segmentoActivo = useMemo(
+    () => resolveSegmentoActivo(segmentos),
+    [segmentos, segmentoActivoSig]
+  );
+
+  // 2. CAMBIO: Capturamos el vehículo activo real en lugar de solo un booleano
+  const vehiculoActivoReal = useMemo(() => {
     void pointerTick;
     const list = Array.isArray(vehicles) ? vehicles : [];
     const now = Date.now();
-    return list.some(v => vehicleCoversConsciousnessAt(v, now));
+    return list.find(v => vehicleCoversConsciousnessAt(v, now)) || null;
   }, [vehicles, pointerTick]);
 
-  const blockConquestPct = useMiniBlockConquest(segmentoActivo, hayVehiculoActivo, pointerTick);
+  // Mantenemos la variable compatible para el resto del componente
+  const hayVehiculoActivo = !!vehiculoActivoReal;
 
+  // 3. NUEVO: Extraemos el ID primitivo de la sub-tarea en ejecución
+  const subTareaActivaId = useMemo(() => {
+    if (!vehiculoActivoReal) return null;
+
+    // Intento A: Si tu objeto Vehicle ya tiene un puntero directo
+    if ('activeSubId' in vehiculoActivoReal) return (vehiculoActivoReal as any).activeSubId;
+    if ('currentSubId' in vehiculoActivoReal) return (vehiculoActivoReal as any).currentSubId;
+
+    // Intento B: Si viene dentro de un objeto activeSub estructurado
+    if ((vehiculoActivoReal as any).activeSub?.id) return (vehiculoActivoReal as any).activeSub.id;
+
+    // Intento C: Si se calcula buscando la primera sub-tarea no cumplida en la lista
+    const subs = (vehiculoActivoReal as any).subTareas || (vehiculoActivoReal as any).subs || [];
+    const subPendiente = subs.find((s: any) => !s.cumplido && !s.completed);
+    return subPendiente?.id || null;
+  }, [vehiculoActivoReal]);
+
+  // 4. CAMBIO: Le pasamos el subTareaActivaId al hook para activar el reinicio automático
+  const blockConquestPct = useMiniBlockConquest(
+    segmentoActivo,
+    hayVehiculoActivo,
+    subTareaActivaId,
+    pointerTick
+  );
+
+  // 5. Progreso del plan presente (Se queda igual)
   const planPresentePct = useMemo(() => {
     const jornada = model.metricas.jornadaMin;
     if (jornada <= 0) return 0;

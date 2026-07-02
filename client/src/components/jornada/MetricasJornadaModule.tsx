@@ -114,16 +114,15 @@ export function computeBovedaRecordsFromHistory(
 
   const records: BovedaRecordView[] = [];
 
-  for (const entries of grouped.values()) {
+  for (const entries of Array.from(grouped.values())) {
     if (!entries.length) continue;
     const sortedByPerf = [...entries].sort((a, b) => a.minPerUnit - b.minPerUnit);
     const best = sortedByPerf[0];
     const chronological = [...entries].sort((a, b) => a.fecha - b.fecha);
     const first = chronological[0];
-    const improvement =
-      chronological.length >= 2
-        ? computeImprovementPct(first.minPerUnit, best.minPerUnit)
-        : 0;
+  const improvement = chronological.length >= 2
+      ? computeImprovementPct(first.minPerUnit, best.minPerUnit)
+      : 0;
 
     records.push({
       titulo: entries[0].titulo,
