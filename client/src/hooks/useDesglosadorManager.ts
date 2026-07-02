@@ -2012,13 +2012,11 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const nextProgress = desglosadorProgressScore(updatedSubs);
     if (
       !opts?.force &&
-      nextProgress < prevProgress &&
-      prevActiveId !== nextActiveId
+      nextProgress < prevProgress
     ) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
       return;
-    }
-
+  }
     for (const sub of updatedSubs) {
       if (sub.status !== "cumplido") continue;
       const prevSub = prevVehicle.subVehiculos?.find(s => s.id === sub.id);

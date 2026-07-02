@@ -202,6 +202,7 @@ const RingDomClock = memo(function RingDomClock({
     if (activeSubIdRef.current !== sub.id) {
       activeSubIdRef.current = sub.id;
       expiredRef.current = false;
+      node.textContent = "00:00";
     }
 
     const now = Date.now();
