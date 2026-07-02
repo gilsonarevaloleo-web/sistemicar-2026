@@ -1,6 +1,12 @@
 import type { SubVehiculo, Vehicle } from "./persistence";
 import { hardwareElapsedMs } from "./hardwareClock";
 
+/** Desfase al activar el siguiente sub — evita colisión ms0 con cierre del anterior. */
+export const SUB_APERTURA_ACTIVATION_SKEW_MS = 50;
+
+/** Drift de merge local/Firebase considerado el mismo sub activo (no remontar reloj). */
+export const SUB_APERTURA_MERGE_TOLERANCE_MS = 2500;
+
 export function suggestedSec(sub: SubVehiculo): number | null {
   if (sub.cantidadObjetivo && sub.tiempoRecordMinPerUnit) {
     return Math.round(sub.cantidadObjetivo * sub.tiempoRecordMinPerUnit * 60);
@@ -23,6 +29,11 @@ export interface DesglosadorClockResult {
 export function desglosadorSubClockKey(sub: SubVehiculo | undefined): string {
   if (!sub?.aperturaAt) return "";
   return `${sub.id}:${sub.aperturaAt}`;
+}
+
+/** Solo id del sub activo — el reloj DOM no se reinicia por drift de aperturaAt. */
+export function desglosadorSubActiveIdKey(sub: SubVehiculo | undefined): string {
+  return sub?.id ?? "";
 }
 
 /** Reloj del sub activo explícito (evita frames con find(activo) desincronizado). */

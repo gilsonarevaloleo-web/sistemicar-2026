@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SubVehiculo } from "@/lib/persistence";
 import { buildDesglosadorSubClose } from "./desglosadorSubClose.ts";
+import { SUB_APERTURA_ACTIVATION_SKEW_MS } from "./desglosadorClock.ts";
 
 function sub(partial: Partial<SubVehiculo> & Pick<SubVehiculo, "id">): SubVehiculo {
   return {
@@ -25,7 +26,7 @@ describe("buildDesglosadorSubClose", () => {
     assert.equal(result!.nextActiveSubId, "s3");
     const next = result!.subs.find(s => s.id === "s3");
     assert.equal(next?.status, "activo");
-    assert.equal(next?.aperturaAt, 2000);
+    assert.equal(next?.aperturaAt, 2000 + SUB_APERTURA_ACTIVATION_SKEW_MS);
   });
 
   it("no usa índices: subId inexistente devuelve null", () => {

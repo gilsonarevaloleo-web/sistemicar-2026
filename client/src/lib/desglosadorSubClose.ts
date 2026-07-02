@@ -1,4 +1,4 @@
-import { validateSubCloseCantidad } from "@/lib/desglosadorClock";
+import { validateSubCloseCantidad, SUB_APERTURA_ACTIVATION_SKEW_MS } from "@/lib/desglosadorClock";
 import type { SubVehiculo } from "@/lib/persistence";
 import { enrichSubRutaCierre } from "@/lib/rutaSeguimiento";
 import type { RutaBandaId } from "@/lib/rutaEnfoque";
@@ -44,7 +44,11 @@ export function buildDesglosadorSubClose(
   let nextActiveSubId: string | null = null;
   if (nextPending !== -1) {
     nextActiveSubId = allSubs[nextPending].id;
-    allSubs[nextPending] = { ...allSubs[nextPending], status: "activo", aperturaAt: now };
+    allSubs[nextPending] = {
+      ...allSubs[nextPending],
+      status: "activo",
+      aperturaAt: now + SUB_APERTURA_ACTIVATION_SKEW_MS,
+    };
   }
 
   return { subs: allSubs, closedSub, nextActiveSubId };

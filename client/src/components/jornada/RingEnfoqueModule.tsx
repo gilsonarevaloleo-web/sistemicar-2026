@@ -1,6 +1,7 @@
 import {
   forwardRef,
   memo,
+  startTransition,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -18,8 +19,10 @@ import { RING_COPY, filtrarRingPendientes } from "@/lib/ringEnfoqueReal";
 import {
   computeActiveSubClocks,
   computeSubCloseVerdict,
+  desglosadorSubActiveIdKey,
   desglosadorSubTimerUiFromClocks,
   formatMMSS,
+  SUB_APERTURA_MERGE_TOLERANCE_MS,
   suggestedSec,
   validateSubCloseCantidad,
   type SubCloseVerdict,
@@ -141,6 +144,24 @@ function bandaActualFromSub(sub: SubVehiculo): RutaBandaId | null {
   return getRutaBandaActual(restantes, ruta.umbrales);
 }
 
+/** Ignora drift de aperturaAt dentro de tolerancia — evita reset de inputs al sync remoto ~2 s. */
+function subsStructuralEqual(a: SubVehiculo[], b: SubVehiculo[]): boolean {
+  if (a.length !== b.length) return false;
+  const tol = SUB_APERTURA_MERGE_TOLERANCE_MS;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x.id !== y.id || x.status !== y.status || x.titulo !== y.titulo) return false;
+    if (x.cantidadObjetivo !== y.cantidadObjetivo) return false;
+    if (x.status === "activo" && y.status === "activo" && x.aperturaAt != null && y.aperturaAt != null) {
+      if (Math.abs(x.aperturaAt - y.aperturaAt) > tol) return false;
+    } else if (x.aperturaAt !== y.aperturaAt) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // ─── Reloj DOM-only (cero re-render del Ring por tick) ──────────────────────
 
 type RingDomClockProps = {
@@ -158,6 +179,7 @@ const RingDomClock = memo(function RingDomClock({
 }: RingDomClockProps) {
   const displayRef = useRef<HTMLSpanElement>(null);
   const expiredRef = useRef(false);
+  const activeSubIdRef = useRef<string | null>(null);
   const vehicleIdRef = useRef(vehicleId);
   vehicleIdRef.current = vehicleId;
 
@@ -177,6 +199,11 @@ const RingDomClock = memo(function RingDomClock({
       return;
     }
 
+    if (activeSubIdRef.current !== sub.id) {
+      activeSubIdRef.current = sub.id;
+      expiredRef.current = false;
+    }
+
     const now = Date.now();
     const clocks = computeActiveSubClocks(now, vehicle, sub);
     const objSecs = suggestedSec(sub);
@@ -191,6 +218,9 @@ const RingDomClock = memo(function RingDomClock({
   useDomConcienciaClock(runTick, Boolean(clockKey));
 
   useEffect(() => {
+    if (!clockKey) return;
+    if (activeSubIdRef.current === clockKey) return;
+    activeSubIdRef.current = clockKey;
     expiredRef.current = false;
     runTick();
   }, [clockKey, runTick]);
@@ -415,8 +445,7 @@ type RingSubVehiculoRowProps = {
   vehicleId: string;
   isActive: boolean;
   blocked: boolean;
-  cantidadInput: string;
-  onCantidadChange: (subId: string, value: string) => void;
+  cantidadValuesRef: MutableRefObject<Record<string, string>>;
   onClose: (payload: RingSubVehiculoClosePayload) => void;
   frozenVerdict?: { verdict: SubCloseVerdict; deltaSec: number };
 };
@@ -426,8 +455,7 @@ const RingSubVehiculoRow = memo(function RingSubVehiculoRow({
   vehicleId,
   isActive,
   blocked,
-  cantidadInput,
-  onCantidadChange,
+  cantidadValuesRef,
   onClose,
   frozenVerdict,
 }: RingSubVehiculoRowProps) {
@@ -436,6 +464,7 @@ const RingSubVehiculoRow = memo(function RingSubVehiculoRow({
 
   const handleClose = useCallback(
     (status: "cumplido" | "fallado") => {
+      const cantidadInput = cantidadValuesRef.current[sub.id] ?? "";
       const validation = validateSubCloseCantidad(sub, cantidadInput, status);
       if (!validation.ok) return;
 
@@ -461,9 +490,10 @@ const RingSubVehiculoRow = memo(function RingSubVehiculoRow({
         cantidadLograda: validation.cantidad,
       });
     },
-    [sub, vehicleId, cantidadInput, onClose]
+    [sub, vehicleId, cantidadValuesRef, onClose]
   );
 
+  const cantidadInput = cantidadValuesRef.current[sub.id] ?? "";
   const cumplidoOk = validateSubCloseCantidad(sub, cantidadInput, "cumplido").ok;
   const falladoOk = validateSubCloseCantidad(sub, cantidadInput, "fallado").ok;
   const needsCantidad = Boolean(sub.cantidadObjetivo && sub.cantidadObjetivo > 0);
@@ -518,10 +548,13 @@ const RingSubVehiculoRow = memo(function RingSubVehiculoRow({
         <>
           {needsCantidad && (
             <input
+              key={sub.id}
               type="text"
               inputMode="numeric"
-              value={cantidadInput}
-              onChange={e => onCantidadChange(sub.id, e.target.value)}
+              defaultValue={cantidadValuesRef.current[sub.id] ?? ""}
+              onChange={e => {
+                cantidadValuesRef.current[sub.id] = e.target.value;
+              }}
               placeholder="Cant. lograda"
               className="ml-5 w-[calc(100%-1.25rem)] px-2 py-1 rounded bg-black/40 border border-white/10 text-[9px] text-white placeholder:text-slate-600 focus:outline-none focus:border-white/25"
               data-testid={`ring-sv-cantidad-${sub.id}`}
@@ -588,7 +621,7 @@ function RingEnfoqueModuleInner(
 ) {
   const [localSubTareas, setLocalSubTareas] = useState(subTareas);
   const [localSubVehiculos, setLocalSubVehiculos] = useState(subVehiculos);
-  const [cantidadBySubId, setCantidadBySubId] = useState<Record<string, string>>({});
+  const cantidadValuesRef = useRef<Record<string, string>>({});
   const [closedVerdicts, setClosedVerdicts] = useState<
     Record<string, { verdict: SubCloseVerdict; deltaSec: number }>
   >({});
@@ -598,7 +631,9 @@ function RingEnfoqueModuleInner(
   }, [subTareas]);
 
   useEffect(() => {
-    setLocalSubVehiculos(subVehiculos);
+    setLocalSubVehiculos(prev =>
+      subsStructuralEqual(prev, subVehiculos) ? prev : subVehiculos
+    );
   }, [subVehiculos]);
 
   const ringActivo = situacionCronometro?.activo === true;
@@ -607,9 +642,7 @@ function RingEnfoqueModuleInner(
     [localSubVehiculos]
   );
 
-  const desglosadorClockKey = activeSubVehiculo
-    ? `${activeSubVehiculo.id}:${activeSubVehiculo.aperturaAt ?? 0}`
-    : "";
+  const desglosadorClockKey = desglosadorSubActiveIdKey(activeSubVehiculo);
 
   const situacionClockKey = useMemo(
     () =>
@@ -639,7 +672,9 @@ function RingEnfoqueModuleInner(
         const newSub = subVehiculoFromCrisolItem(item);
         setLocalSubVehiculos(prev => {
           const next = [...prev, newSub];
-          onSubVehiculosChange?.(next);
+          startTransition(() => {
+            onSubVehiculosChange?.(next);
+          });
           return next;
         });
         return;
@@ -657,7 +692,9 @@ function RingEnfoqueModuleInner(
 
       setLocalSubTareas(prev => {
         const next = [...prev, newSub];
-        onSubTareasChange?.(next);
+        startTransition(() => {
+          onSubTareasChange?.(next);
+        });
         return next;
       });
     },
@@ -666,15 +703,13 @@ function RingEnfoqueModuleInner(
 
   useImperativeHandle(ref, () => ({ recibirItemDeCrisol }), [recibirItemDeCrisol]);
 
-  const handleCantidadChange = useCallback((subId: string, value: string) => {
-    setCantidadBySubId(prev => ({ ...prev, [subId]: value }));
-  }, []);
-
   const applySubTareaClose = useCallback(
     (payload: RingSubTareaClosePayload) => {
       setLocalSubTareas(prev => {
         const next = prev.map(st => (st.id === payload.subId ? payload.sub : st));
-        onSubTareasChange?.(next);
+        startTransition(() => {
+          onSubTareasChange?.(next);
+        });
         return next;
       });
       void Promise.resolve(onSubTareaClose(payload));
@@ -690,7 +725,9 @@ function RingEnfoqueModuleInner(
       }));
       setLocalSubVehiculos(prev => {
         const next = prev.map(sv => (sv.id === payload.subId ? payload.sub : sv));
-        onSubVehiculosChange?.(next);
+        startTransition(() => {
+          onSubVehiculosChange?.(next);
+        });
         return next;
       });
       void Promise.resolve(onSubVehiculoClose(payload));
@@ -816,8 +853,7 @@ function RingEnfoqueModuleInner(
                     vehicleId={vehicleId}
                     isActive={sv.status === "activo"}
                     blocked={blockedByInterrupt}
-                    cantidadInput={cantidadBySubId[sv.id] ?? ""}
-                    onCantidadChange={handleCantidadChange}
+                    cantidadValuesRef={cantidadValuesRef}
                     onClose={applySubVehiculoClose}
                   />
                 ))}
@@ -829,19 +865,23 @@ function RingEnfoqueModuleInner(
                 <p className="text-[7px] font-black uppercase tracking-widest text-slate-500 px-0.5">
                   Liquidados · {cerradosSv.length}
                 </p>
-                {cerradosSv.map(sv => (
+                {cerradosSv.map(sv => {
+                  if (sv.cantidadLograda != null && cantidadValuesRef.current[sv.id] == null) {
+                    cantidadValuesRef.current[sv.id] = String(sv.cantidadLograda);
+                  }
+                  return (
                   <RingSubVehiculoRow
                     key={sv.id}
                     sub={sv}
                     vehicleId={vehicleId}
                     isActive={false}
                     blocked
-                    cantidadInput={cantidadBySubId[sv.id] ?? String(sv.cantidadLograda ?? "")}
-                    onCantidadChange={handleCantidadChange}
+                    cantidadValuesRef={cantidadValuesRef}
                     onClose={applySubVehiculoClose}
                     frozenVerdict={closedVerdicts[sv.id]}
                   />
-                ))}
+                  );
+                })}
               </div>
             )}
 

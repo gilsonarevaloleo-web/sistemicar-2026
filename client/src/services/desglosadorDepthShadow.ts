@@ -3,6 +3,9 @@
  */
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
 
+/** Evita colisión con tick global #2 (~2 s post-lanzamiento). */
+const DEPTH_ON_TAP_DEFER_MS = 3200;
+
 export type DesglosadorDepthReconcileFn = (
   vehicleId: string,
   options?: { silent?: boolean; resetGranted?: number }
@@ -49,9 +52,11 @@ export function scheduleDesglosadorDepthOnTap(
   options?: { silent?: boolean; resetGranted?: number }
 ): void {
   if (!reconcileFn) return;
-  runShadowTaskAsync(() => {
-    void reconcileFn!(vehicleId, options);
-  });
+  globalThis.setTimeout(() => {
+    runShadowTaskAsync(() => {
+      void reconcileFn!(vehicleId, options);
+    });
+  }, DEPTH_ON_TAP_DEFER_MS);
 }
 
 /** Solo tests. */

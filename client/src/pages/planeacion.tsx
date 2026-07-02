@@ -178,7 +178,8 @@ import {
   isDesglosadorLiquidationInFlight,
   scheduleGlobalCycleLiquidation,
 } from "@/lib/desglosadorCycleLiquidation";
-import { runShadowTask } from "@/lib/desglosadorShadow";
+import { runShadowTask, runShadowTaskAfterLaunch } from "@/lib/desglosadorShadow";
+import { showProfundidadSesionToast } from "@/lib/profundidadSesionToast";
 import {
   registerDesglosadorDepthReconciler,
   scheduleDesglosadorDepthOnTap,
@@ -1884,10 +1885,15 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
         if (relojTiempo === "desglosador" && user) {
           const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
           if (filteredSubs[0]?.titulo.trim()) {
-            toast.info("Profundidad de sesión", {
-              description: "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
-              style: { backgroundColor: PIZARRA, border: `1px solid rgba(212,175,55,0.35)`, color: GOLD },
-              duration: 4500,
+            showProfundidadSesionToast({
+              description:
+                "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid rgba(212,175,55,0.35)`,
+                color: GOLD,
+              },
+              durationMs: 4500,
             });
           }
         }
@@ -1963,7 +1969,7 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
         };
         paintOptimisticLaunch(optimisticVehicle, true);
         applyPostLaunchSideEffects(newVehicleId);
-        runShadowTask(() => {
+        runShadowTaskAfterLaunch(() => {
           scheduleVehicleRemotePersist(user.uid, newVehicleId, vehicleCreatePayload, newClientRequestId);
         });
         console.log(`[handleFlotaSave] Desglosador ms0: "${titulo}" id=${newVehicleId}`);

@@ -469,13 +469,15 @@ function JornadaShellV3Inner({
 
   const patchVehicleSubs = useCallback(
     (vehicleId: string, patch: Partial<Vehicle>) => {
-      setVehicles(prev =>
-        prev.map(v => (v.id === vehicleId ? { ...v, ...patch } : v))
-      );
       vehiclesRef.current = vehiclesRef.current.map(v =>
         v.id === vehicleId ? { ...v, ...patch } : v
       );
       scheduleSaveLocalVehicles(vehiclesRef.current);
+      startTransition(() => {
+        setVehicles(prev =>
+          prev.map(v => (v.id === vehicleId ? { ...v, ...patch } : v))
+        );
+      });
     },
     [setVehicles, vehiclesRef]
   );
@@ -499,9 +501,11 @@ function JornadaShellV3Inner({
   const handleSubVehiculosChange = useCallback(
     (subs: SubVehiculo[]) => {
       if (!ringVehicleId) return;
-      patchVehicleSubs(ringVehicleId, { subVehiculos: subs });
+      startTransition(() => {
+        handleDesglosadorUpdate(ringVehicleId, subs, { silentDepth: true });
+      });
     },
-    [ringVehicleId, patchVehicleSubs]
+    [ringVehicleId, handleDesglosadorUpdate]
   );
 
   const handleSubTareaClose = useCallback(

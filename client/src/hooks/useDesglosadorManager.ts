@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue, startTransition } from "react";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
+import { scheduleRecordBannerClear } from "@/lib/recordBannerTimer";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import {
@@ -1496,7 +1497,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
             if (mejoraPct > 0) {
               options?.onGoldenFlash?.();
               options?.onRecordBanner?.({ mejora: mejoraPct, titulo: vehicle.titulo });
-              setTimeout(() => options?.onRecordBanner?.(null), 8000);
+              scheduleRecordBannerClear(() => options?.onRecordBanner?.(null), 8000);
               safeFire(() => awardSovereigntyPoints(user.uid, 3, "Eficiencia Pura: Récord en " + vehicle.titulo));
               toast.success("RÉCORD DE SOBERANÍA DETECTADO", {
                 description: `Has optimizado tu procesamiento en un ${mejoraPct}%. +3 PS de bono por Eficiencia Pura.`,
@@ -1663,7 +1664,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
             options?.onGoldenFlash?.();
             options?.onGoldenFlash?.();
             options?.onRecordBanner?.({ mejora: mejoraPct, titulo: vehicle.titulo });
-            setTimeout(() => options?.onRecordBanner?.(null), 8000);
+            scheduleRecordBannerClear(() => options?.onRecordBanner?.(null), 8000);
             awardSovereigntyPoints(user.uid, 3, "Récord Investigador: " + vehicle.titulo)
               .catch(e => console.warn("[investigadorClose] recordPS falló:", e));
           }
@@ -1947,9 +1948,11 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       if (depthGranted < newGranted) {
         const patchOnly = (list: Vehicle[]) =>
           list.map(v => v.id === vehicleId ? { ...v, desglosadorBloqueDepthPsGranted: newGranted } : v);
-        setVehicles(patchOnly);
+        startTransition(() => {
+          setVehicles(patchOnly);
+        });
         vehiclesRef.current = patchOnly(vehiclesRef.current);
-        try { saveLocalVehicles(vehiclesRef.current); } catch { /* ignore */ }
+        scheduleSaveLocalVehicles(vehiclesRef.current);
       }
       return { grantedTotal: Math.max(depthGranted, newGranted), awardedNow: 0 };
     }
@@ -1961,24 +1964,24 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!ok) return { grantedTotal: depthGranted, awardedNow: 0 };
     const patchVehicles = (list: Vehicle[]) =>
       list.map(v => v.id === vehicleId ? { ...v, desglosadorBloqueDepthPsGranted: newGranted } : v);
-    setVehicles(patchVehicles);
+    startTransition(() => {
+      setVehicles(patchVehicles);
+    });
     vehiclesRef.current = patchVehicles(vehiclesRef.current);
-    try {
-      saveLocalVehicles(vehiclesRef.current);
-    } catch (e) {
-      console.warn("[reconcileDesglosadorDepthPS] localStorage save failed:", e);
-    }
+    scheduleSaveLocalVehicles(vehiclesRef.current);
 
     if (!options?.silent) {
       const hoursDone = Math.floor(elapsedSec / 3600);
       const hourAward = hoursDone > 0 ? depthAwardForHour(hoursDone) : delta;
-      toast.success(`+${delta} PS · profundidad de sesión`, {
-        description: hoursDone > 0
-          ? `Hora ${hoursDone} completada · +${hourAward} PS (progresivo)`
-          : `Profundidad progresiva · +${delta} PS`,
-        style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
-        duration: 3200,
-      });
+      globalThis.setTimeout(() => {
+        toast.success(`+${delta} PS · profundidad de sesión`, {
+          description: hoursDone > 0
+            ? `Hora ${hoursDone} completada · +${hourAward} PS (progresivo)`
+            : `Profundidad progresiva · +${delta} PS`,
+          style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+          duration: 3200,
+        });
+      }, 0);
     }
     return { grantedTotal: newGranted, awardedNow: delta };
   }, [user, safeAwardPS]);
@@ -2003,9 +2006,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       return;
     }
 
+    const prevActiveId = prevVehicle.subVehiculos?.find(s => s.status === "activo")?.id;
+    const nextActiveId = updatedSubs.find(s => s.status === "activo")?.id;
     const prevProgress = desglosadorProgressScore(prevVehicle.subVehiculos);
     const nextProgress = desglosadorProgressScore(updatedSubs);
-    if (!opts?.force && nextProgress < prevProgress) {
+    if (
+      !opts?.force &&
+      nextProgress < prevProgress &&
+      prevActiveId !== nextActiveId
+    ) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
       return;
     }
@@ -2029,7 +2038,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       if (opts?.resetDepth) patch.aperturaAt = Date.now();
       return { ...v, ...patch };
     });
-    setVehicles(newVehicles);
+    startTransition(() => {
+      setVehicles(newVehicles);
+    });
     vehiclesRef.current = newVehicles;
     scheduleSaveLocalVehicles(newVehicles);
 
@@ -2050,10 +2061,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     if (opts?.resetDepth) {
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
-    } else if (opts?.silentDepth) {
-      scheduleDesglosadorDepthOnTap(vehicleId, { silent: true });
     } else {
-      scheduleDesglosadorDepthOnTap(vehicleId, { silent: false });
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
     }
   }, [user]);
 
