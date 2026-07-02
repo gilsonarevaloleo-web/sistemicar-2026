@@ -160,11 +160,6 @@ function AnilloConcienciaLiveInner({
     [segmentos]
   );
 
-  const segmentoActivo = useMemo(
-    () => resolveSegmentoActivo(segmentos),
-    [segmentos, segmentoActivoSig]
-  );
-
   // 1. Resolvemos el segmento activo (Se queda igual)
   const segmentoActivo = useMemo(
     () => resolveSegmentoActivo(segmentos),
