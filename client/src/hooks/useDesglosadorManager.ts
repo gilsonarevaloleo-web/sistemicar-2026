@@ -1705,8 +1705,16 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
         duration: 5000,
       });
     } finally {
+      // ⚡️ CORRECCIÓN: Limpieza nativa del cronómetro antes de liberar el componente de la memoria
+      const clockEl = document.getElementById("desglosador-clock") || 
+                      document.getElementById("conquista-clock") || 
+                      document.querySelector("[data-testid='cronometro-conquista']");
+      if (clockEl) {
+        clockEl.textContent = "00:00";
+      }
+  
       endClose(vehicleId);
-    }
+    } 
   };
 
   const ackInterrupcionDesglosadorCerrada = async (parentId: string) => {
