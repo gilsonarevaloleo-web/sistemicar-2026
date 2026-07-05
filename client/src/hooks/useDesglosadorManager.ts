@@ -3355,7 +3355,11 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   }, [vehicles, expandedId]);
 
   const handleVehicleToggle = useCallback((vehicleId: string) => {
-    setExpandedId(prev => (prev === vehicleId ? null : vehicleId));
+    // A1: apertura como transición no-urgente → el tap/scroll pinta antes de
+    // que React reconcilie el subárbol pesado del desglosador (móvil sin jank).
+    startTransition(() => {
+      setExpandedId(prev => (prev === vehicleId ? null : vehicleId));
+    });
   }, []);
 
   const handleVehicleComplete = useCallback((vehicleId: string) => {

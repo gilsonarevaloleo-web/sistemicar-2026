@@ -39,6 +39,8 @@ const TICK_MS_BACKGROUND = 15_000;
 /** Latido visual global — estrictamente 1 s en foreground (segunderos y sonidos). */
 const CLOCK_MS_FOREGROUND = 1_000;
 const CLOCK_MS_BACKGROUND = 5_000;
+/** Reposo foreground (sin vehículos activos): puntero/segunderos no aportan → latido lento. */
+const CLOCK_MS_IDLE = 5_000;
 /** Deferir primer catch-up para no bloquear apertura de Jornada. */
 const INITIAL_TICK_DEFER_MS = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_INITIAL_DEFER_MS : 6_000;
 const MIN_TICK_GAP_MS = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_MIN_GAP_MS : 4_000;
@@ -162,9 +164,31 @@ export function SegmentAttentionBackground() {
       dispatchConcienciaClockTick();
     };
 
-    let clockMs = CLOCK_MS_FOREGROUND;
+    // B1: el latido de 1 s solo aporta con trabajo vivo (segunderos/puntero de
+    // sesión activa). En reposo (sin vehículos activos) baja a cadencia lenta,
+    // recortando re-renders globales sin afectar puertas/entropía, que van por
+    // el ciclo de runTick (intervalId), independiente de este reloj visual.
+    const computeClockMs = () => {
+      if (isAppInBackground()) return CLOCK_MS_BACKGROUND;
+      const hasLiveWork = vehiclesRef.current.some(v => v.status === "activo");
+      return hasLiveWork ? CLOCK_MS_FOREGROUND : CLOCK_MS_IDLE;
+    };
+
+    let clockMs = computeClockMs();
     let clockId = window.setInterval(pulseConcienciaClock, clockMs);
     pulseConcienciaClock();
+
+    const retuneClock = () => {
+      const next = computeClockMs();
+      if (next === clockMs) return;
+      clockMs = next;
+      clearInterval(clockId);
+      clockId = window.setInterval(pulseConcienciaClock, clockMs);
+      pulseConcienciaClock(); // tick inmediato al cambiar de cadencia (arranque de segunderos)
+    };
+
+    // Re-evalúa la cadencia cuando cambia la flota (apertura/cierre de vehículos).
+    const unsubFlotaClock = subscribeFlotaStore(() => retuneClock());
 
     const resetInterval = () => {
       clearInterval(intervalId);
@@ -172,7 +196,7 @@ export function SegmentAttentionBackground() {
       intervalId = window.setInterval(() => void runTick(), intervalMs);
 
       clearInterval(clockId);
-      clockMs = isAppInBackground() ? CLOCK_MS_BACKGROUND : CLOCK_MS_FOREGROUND;
+      clockMs = computeClockMs();
       clockId = window.setInterval(pulseConcienciaClock, clockMs);
       pulseConcienciaClock();
     };
@@ -193,6 +217,7 @@ export function SegmentAttentionBackground() {
       unsubNotificationState();
       unsubPlanilla();
       unsubFlota();
+      unsubFlotaClock();
       releaseFlota();
       unregisterForce();
       unregisterVoiceVisible();

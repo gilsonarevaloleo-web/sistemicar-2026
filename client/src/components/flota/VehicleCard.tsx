@@ -1310,6 +1310,30 @@ function VehicleCard({
     }
   }, [expanded]);
 
+  // A1: montaje en dos fases. Al expandir, el contenedor se abre de inmediato
+  // (barato) y el subárbol pesado del desglosador se monta en el frame siguiente
+  // vía requestAnimationFrame, sacando el trabajo de reconciliación del gesto.
+  const [heavyBodyReady, setHeavyBodyReady] = useState(false);
+  useEffect(() => {
+    if (!expanded) {
+      setHeavyBodyReady(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setHeavyBodyReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, [expanded]);
+
+  // A3: el histórico se parsea de localStorage una sola vez cuando el cuerpo
+  // pesado está listo (no en cada render ni en el frame del tap), y solo para
+  // vehículos investigador que lo consumen.
+  const historicalVehicleData = useMemo(
+    () =>
+      heavyBodyReady && vehicle.tipoReloj === "investigador"
+        ? getHistoricalVehicleData(vehicle.titulo)
+        : null,
+    [heavyBodyReady, vehicle.tipoReloj, vehicle.titulo]
+  );
+
   useEffect(() => {
     if (vehicle.status === "activo") return;
     setShowEtiquetaSalida(false);
@@ -1709,7 +1733,8 @@ function VehicleCard({
 
       <AnimatePresence>
         {expanded && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18, ease: "easeOut" }} className="overflow-hidden">
+            {heavyBodyReady && (
             <div className="px-3 pb-3 space-y-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
               {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (() => {
                 const subs = vehicle.subVehiculos || [];
@@ -2425,7 +2450,7 @@ function VehicleCard({
                         <p className="text-[8px] font-black uppercase tracking-widest mt-0.5" style={{ color: "#22C55E", fontFamily: "monospace" }}>OBJETIVO ALCANZADO</p>
                       )}
                       {vehicle.tipoReloj === "investigador" && (() => {
-                        const hist = getHistoricalVehicleData(vehicle.titulo);
+                        const hist = historicalVehicleData ?? getHistoricalVehicleData(vehicle.titulo);
                         const mpu = hist.bestMinPerUnit ?? hist.lastMinPerUnit;
                         return mpu ? (
                           <p className="text-[8px] mt-1" style={{ color: "rgba(139,92,246,0.6)", fontFamily: "monospace" }}>
@@ -2436,7 +2461,7 @@ function VehicleCard({
                     </div>
                   )}
                   {vehicle.tipoReloj === "investigador" && vehicle.cantidadObjetivo && remainingUnits === null && (() => {
-                    const hist = getHistoricalVehicleData(vehicle.titulo);
+                    const hist = historicalVehicleData ?? getHistoricalVehicleData(vehicle.titulo);
                     const mpu = hist.bestMinPerUnit ?? hist.lastMinPerUnit;
                     if (mpu) return null;
                     return (
@@ -3479,7 +3504,7 @@ function VehicleCard({
                   {vehicle.tipoReloj === "investigador" && onInvestigadorClose ? (
                     <>
                       {(() => {
-                        const histInvest = getHistoricalVehicleData(vehicle.titulo);
+                        const histInvest = historicalVehicleData ?? getHistoricalVehicleData(vehicle.titulo);
                         const cantNum = Number(cantidadRealizada);
                         const cantValida = cantNum > 0;
                         return (
@@ -3648,6 +3673,7 @@ function VehicleCard({
               )}
 
             </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

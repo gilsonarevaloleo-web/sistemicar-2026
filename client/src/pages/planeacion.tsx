@@ -500,7 +500,8 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, useConcienciaClockTickWhen, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
+import { isCoarseConcienciaDevice, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
+import { SegmentTicker } from "@/components/planeacion/SegmentTicker";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
@@ -1026,8 +1027,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
   const [rutinaResaltadaId, setRutinaResaltadaId] = useState<string | null>(null);
   const rutinaItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
-  /** Refresco ligero de UI de segmentos (puertas/ventanas) — solo planeación clásica. */
-  const segmentUiTick = useConcienciaClockTickWhen(!useJornadaV3);
+  // B2: el refresco de 1 s del listado de segmentos ya no vive en la raíz de la
+  // página (re-renderizaba todo /planeacion). Ahora lo aísla <SegmentTicker>.
   const resumeGenRef = useRef(0);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
   const [cerrandoSegId, setCerrandoSegId] = useState<string | null>(null);
@@ -1336,20 +1337,26 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     }
   }, [user, yesterdayTermoSnapshot, vehicles]);
 
+  // B4: el intervalo de backup se crea una sola vez; lee vehicles/heavyMetrics
+  // por ref para no destruirse y recrearse en cada tick del reloj (churn de timers).
+  const jornadaBackupVehiclesRef = useRef(vehicles);
+  jornadaBackupVehiclesRef.current = vehicles;
+  const jornadaBackupMetricsRef = useRef(heavyMetrics);
+  jornadaBackupMetricsRef.current = heavyMetrics;
   useEffect(() => {
     if (!user || useJornadaV3) return;
     const tick = () => {
-      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(heavyMetrics);
+      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(jornadaBackupMetricsRef.current);
       saveJornadaBackup(
         conquistaDiaSeg,
         entropiaDiaSeg,
-        vehiclesForJornadaBackup(vehicles)
+        vehiclesForJornadaBackup(jornadaBackupVehiclesRef.current)
       );
     };
     tick();
     const id = window.setInterval(tick, JORNADA_BACKUP_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [user, vehicles, heavyMetrics, useJornadaV3]);
+  }, [user, useJornadaV3]);
 
   useEffect(() => {
     if (!user) return;
@@ -4405,8 +4412,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
 
                   {planilla && planilla.segmentos.length > 0 ? (
                     <div className="space-y-2">
-                      {planilla.segmentos.map((seg) => {
-                        void segmentUiTick;
+                      <SegmentTicker enabled={!useJornadaV3}>
+                      {() => (planilla?.segmentos ?? []).map((seg) => {
                         const isActive = seg.estado === "activo";
                         const isPuertaSistema = isActive && !!seg.puertaSistema;
                         const isEntropia = seg.estado === "entropia";
@@ -4604,6 +4611,7 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
                           </div>
                         );
                       })}
+                      </SegmentTicker>
                       {planilla.segmentos.filter(s => s.estado === "entropia" || s.puertaSistema).length > 0 && (
                         <div className="p-4 rounded-2xl border border-red-900/50 shadow-[0_0_15px_rgba(220,38,38,0.12)] bg-gradient-to-br from-zinc-950 via-[#141416] to-zinc-950">
                           <div className="flex items-center gap-2 mb-1">
