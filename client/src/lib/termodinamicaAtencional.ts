@@ -943,6 +943,9 @@ export type TermodinamicaCompareV2Model = TermodinamicaCompareModel & {
   indiceAyer: number | null;
 };
 
+/** Alias usado por planeacionHeavyMetricsCompute y consumidores de métricas. */
+export type TermodinamicaCompareV2 = TermodinamicaCompareV2Model;
+
 /** Comparativa v2: resistencia objetiva (estructura + calibración + persistencia). */
 export function computeTermodinamicaCompareV2(
   yesterday: PlanillaDailySnapshot | null,

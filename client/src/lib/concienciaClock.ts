@@ -1,4 +1,4 @@
-/**
+/**-
  * Reloj global de conciencia: fuerza re-render del anillo y métricas en vivo
  * aunque no haya vehículos activos ni cambios de estado en segmentos.
  */
@@ -91,8 +91,11 @@ export function useVehicleTimerTick(): number {
   useEffect(() => {
     const onClock = () => setTick(t => t + 1);
     window.addEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-    dispatchConcienciaClockTick();
-    return () => window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-  }, []);
-  return tick;
-}
+        
+        // COMENTADO PARA EVITAR CONGELAMIENTO EN RE-MONTAJES:
+        // dispatchConcienciaClockTick(); 
+    
+        return () => window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
+      }, []);
+      return tick;
+    }

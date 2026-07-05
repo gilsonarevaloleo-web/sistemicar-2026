@@ -68,7 +68,6 @@ import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import {
   addVehicle,
-  scheduleVehicleRemotePersist,
   updateVehicleStatus,
   updateVehicle,
   Vehicle,
@@ -148,7 +147,6 @@ import {
 import {
   requestGhostReconcileAfterVehicleAction,
   requestGhostReconcileForced,
-  suppressGhostReconcileAfterLaunch,
 } from "@/lib/ghostReconcileScheduler";
 import {
   filterVehiclesForAnilloCoverage,
@@ -178,8 +176,7 @@ import {
   isDesglosadorLiquidationInFlight,
   scheduleGlobalCycleLiquidation,
 } from "@/lib/desglosadorCycleLiquidation";
-import { runShadowTask, runShadowTaskAfterLaunch } from "@/lib/desglosadorShadow";
-import { showProfundidadSesionToast } from "@/lib/profundidadSesionToast";
+import { runShadowTask } from "@/lib/desglosadorShadow";
 import {
   registerDesglosadorDepthReconciler,
   scheduleDesglosadorDepthOnTap,
@@ -236,7 +233,7 @@ import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import {
   cancelUbicacionVoiceForVehicle,
 } from "@/lib/desglosadorVoice";
-import { isMobilePerfMode, MOBILE_PERF, shouldAllowJornadaVoice, shouldRunMobileSurvival, setJornadaFullModeEnabled } from "@/lib/mobilePerf";
+import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
 import {
   registerSituacionSessionCleanup,
   resetSituacionSessionTeardownGate,
@@ -486,8 +483,7 @@ import {
   subTareaFromImanItem,
 } from "@/lib/imanPensamientos";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
-import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
-import { NavTransitionLink } from "@/components/NavTransitionLink";
+import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR, flotaLabelUpper, flotaLabelsRecord } from "@/lib/flotaBrand";
 import { SituacionCasaPanel } from "@/components/SituacionCasaPanel";
 import { PuntoCeroPanel } from "@/components/PuntoCeroPanel";
@@ -500,15 +496,10 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
-import { SegmentTicker } from "@/components/planeacion/SegmentTicker";
+import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
-import JornadaShellV3 from "@/components/jornada/JornadaShellV3";
-import type { CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
-import { AnilloSurvivalPlaceholder } from "@/components/jornada/AnilloSurvivalPlaceholder";
-import { reloadJornadaHard } from "@/lib/jornadaRecovery";
 import { BotonRepararJornada } from "@/components/jornada/BotonRepararJornada";
 import {
   JORNADA_BACKUP_INTERVAL_MS,
@@ -595,7 +586,7 @@ const saveVehicleHistory = (
     localStorage.setItem("sistemicar_vehicle_history", JSON.stringify(history));
     if (userId) {
       saveVehicleHistoryFirebase(userId, history).catch(e => console.warn("[vehicleHistory] Firebase save error:", e));
-      if (auth.currentUser) {
+      if (auth?.currentUser) {
         auth.currentUser.getIdToken().then(token =>
           fetch("/api/vehicle-history", {
             method: "POST",
@@ -757,20 +748,9 @@ const MONITOR_STATES = {
   }
 };
 
-type PlaneacionProps = {
-  /** Laboratorio modular — monta JornadaShellV3 en lugar del monolito legacy. */
-  useJornadaV3?: boolean;
-};
-
-/** Entrada dedicada para `/jornada-v3` y `/planeacion-v3`. */
-export function PlaneacionV3() {
-  return <Planeacion useJornadaV3 />;
-}
-
-export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: PlaneacionProps = {}) {
+export default function Planeacion() {
   const { user } = useAuthContext();
-  const [location, navigate] = useLocation();
-  const useJornadaV3 = useJornadaV3Prop || location.includes("v3");
+  const [, navigate] = useLocation();
   useViewTransitionShield();
   /** Métricas pesadas — no bloquean tap + subtarea en flota. */
   const lastFlotaLaunchRef = useRef<{ key: string; at: number } | null>(null);
@@ -980,10 +960,6 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     handleEnviarReservaASituacion,
     handleEnviarReservasSeleccionadas,
     handleAbrirNidoEnSituacion,
-    handleToggleSubTarea,
-    handleSituacionCronometroCumplido,
-    handleSituacionCronometroFallado,
-    handleDesglosadorUpdate,
     safeAwardPS,
     recordVehiculoInicio,
     applyCentinelaArchiveLocally,
@@ -1027,8 +1003,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
   const [rutinaResaltadaId, setRutinaResaltadaId] = useState<string | null>(null);
   const rutinaItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [notifPermission, setNotifPermission] = useState<string>(getNotificationPermission());
-  // B2: el refresco de 1 s del listado de segmentos ya no vive en la raíz de la
-  // página (re-renderizaba todo /planeacion). Ahora lo aísla <SegmentTicker>.
+  /** Refresco ligero de UI de segmentos (puertas/ventanas) sin recomputar métricas pesadas en render. */
+  const segmentUiTick = useConcienciaClockTick();
   const resumeGenRef = useRef(0);
   const [activandoSegId, setActivandoSegId] = useState<string | null>(null);
   const [cerrandoSegId, setCerrandoSegId] = useState<string | null>(null);
@@ -1102,8 +1078,9 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user || !auth.currentUser || auth.currentUser.uid !== user.uid) return;
-    auth.currentUser.getIdToken()
+    const currentUser = auth?.currentUser;
+    if (!user || !currentUser || currentUser.uid !== user.uid) return;
+    currentUser.getIdToken()
       .then(token => fetch(`/api/vehicle-history`, {
         headers: { "Authorization": `Bearer ${token}` },
       }))
@@ -1119,8 +1096,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
             totalMin: rec.totalMin,
             tipoReloj: rec.tipoReloj,
             fecha: rec.fecha,
-            status: rec.status,
-            subResumen: rec.subResumen ? (() => { try { return JSON.parse(rec.subResumen!); } catch { return undefined; } })() : undefined,
+            status: rec.status as VehicleHistoryEntry["status"],
+            subResumen: rec.subResumen ? (() => { try { return JSON.parse(rec.subResumen!) as VehicleHistoryEntry["subResumen"]; } catch { return undefined; } })() : undefined,
           }));
           const merged = mergeVehicleHistories(local, remote);
           localStorage.setItem("sistemicar_vehicle_history", JSON.stringify(merged));
@@ -1304,7 +1281,6 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     yesterdayTermoSnapshot,
     disciplinaSnapshots,
     planTab,
-    enabled: !useJornadaV3,
   });
 
   const {
@@ -1337,26 +1313,20 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     }
   }, [user, yesterdayTermoSnapshot, vehicles]);
 
-  // B4: el intervalo de backup se crea una sola vez; lee vehicles/heavyMetrics
-  // por ref para no destruirse y recrearse en cada tick del reloj (churn de timers).
-  const jornadaBackupVehiclesRef = useRef(vehicles);
-  jornadaBackupVehiclesRef.current = vehicles;
-  const jornadaBackupMetricsRef = useRef(heavyMetrics);
-  jornadaBackupMetricsRef.current = heavyMetrics;
   useEffect(() => {
-    if (!user || useJornadaV3) return;
+    if (!user) return;
     const tick = () => {
-      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(jornadaBackupMetricsRef.current);
+      const { conquistaDiaSeg, entropiaDiaSeg } = segundosFromMetrics(heavyMetrics);
       saveJornadaBackup(
         conquistaDiaSeg,
         entropiaDiaSeg,
-        vehiclesForJornadaBackup(jornadaBackupVehiclesRef.current)
+        vehiclesForJornadaBackup(vehicles)
       );
     };
     tick();
     const id = window.setInterval(tick, JORNADA_BACKUP_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [user, useJornadaV3]);
+  }, [user, vehicles, heavyMetrics]);
 
   useEffect(() => {
     if (!user) return;
@@ -1402,13 +1372,11 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     rehydrateFlotaFromLocalRef.current?.();
     setupFlotaSubscription();
     scheduleJornadaForegroundResume(() => {
-      if (shouldAllowJornadaVoice()) {
-        warmupSpeechSynthesis();
-        recoverSpeechQueue();
-        const flushed = flushMissedPuertaVoiceOnVisible();
-        if (flushed > 0) {
-          console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
-        }
+      warmupSpeechSynthesis();
+      recoverSpeechQueue();
+      const flushed = flushMissedPuertaVoiceOnVisible();
+      if (flushed > 0) {
+        console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
       }
       runSegmentAttentionTickNow();
     });
@@ -1421,10 +1389,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     const mountGuardTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       isViewMountingRef.current = false;
     }, 400);
-    if (shouldAllowJornadaVoice()) {
-      warmupSpeechSynthesis();
-      recoverSpeechQueue();
-    }
+    warmupSpeechSynthesis();
+    recoverSpeechQueue();
     return () => {
       window.clearTimeout(mountGuardTimer);
       isViewMountingRef.current = false;
@@ -1833,13 +1799,10 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
         }
       }
 
-      const aperturaAtMs = Date.now();
-      const subVehiculosDesg =
-        relojTiempo === "desglosador"
-          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, aperturaAtMs))
-          : undefined;
-
-      const vehicleCreatePayload: Omit<Vehicle, "id" | "createdAt" | "userId" | "status"> = {
+      let newVehicleId: string;
+      let newClientRequestId: string;
+      try {
+        const created = await addVehicle(user.uid, {
         titulo: titulo.trim(),
         criterioFin: criterio,
         criterioDetalle: detalle,
@@ -1847,11 +1810,13 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
         ejes: STUB_EJES,
         tipoTerminoRapido: tipoTermino,
         tipoFlota: tipoFlotaSeleccionado,
-        aperturaAt: aperturaAtMs,
+        aperturaAt: Date.now(),
         bonoTemple,
         tipoReloj: tipoFlotaSeleccionado === "tiempo" ? relojTiempo : undefined,
         cantidadObjetivo: relojTiempo === "investigador" ? Number(cantidadInvestigador) : (relojTiempo === "produccion" ? Number(cantidadProduccion) : undefined),
-        subVehiculos: subVehiculosDesg,
+        subVehiculos: relojTiempo === "desglosador"
+          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
+          : undefined,
         subTareas: subTareasPrefill,
         ...(launchCtx || resolvedProyectoId
           ? {
@@ -1873,120 +1838,9 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
         etapasPuntoCero: tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero" ? { etapa1: false, etapa2: false, etapa3: false, etapa4: false } : undefined,
         puntoCero:
           tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
-            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), aperturaAtMs)
+            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
             : undefined,
-      };
-
-      const isDesglosadorMs0Launch = tipoFlotaSeleccionado === "tiempo" && relojTiempo === "desglosador";
-      const savedLaunchCtx = launchCtx;
-
-      const applyPostLaunchSideEffects = (newVehicleId: string) => {
-        if (savedLaunchCtx) {
-          const tipoOrigen = savedLaunchCtx.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
-          void markPeldanoEnCurso(user.uid, savedLaunchCtx.peldanoId, newVehicleId, tipoOrigen);
-          proyectoLaunchRef.current = null;
-        }
-        if (intensidadEnergetica) {
-          recordVehiculoInicio(newVehicleId, intensidadEnergetica);
-        }
-        if (relojTiempo === "desglosador" && user) {
-          const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
-          if (filteredSubs[0]?.titulo.trim()) {
-            showProfundidadSesionToast({
-              description:
-                "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
-              style: {
-                backgroundColor: PIZARRA,
-                border: `1px solid rgba(212,175,55,0.35)`,
-                color: GOLD,
-              },
-              durationMs: 4500,
-            });
-          }
-        }
-        if (bonoTemple) {
-          void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo.trim());
-          toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
-            description: "Iniciaste en los últimos 15 min antes del descanso",
-            style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
-            duration: 4000
-          });
-        }
-      };
-
-      const paintOptimisticLaunch = (optimisticVehicle: Vehicle, skipGhostReconcile: boolean) => {
-        optimisticVehiclesRef.current = [
-          ...optimisticVehiclesRef.current.filter(v => v.id !== optimisticVehicle.id),
-          optimisticVehicle,
-        ];
-        vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== optimisticVehicle.id)];
-        startTransition(() => {
-          setVehicles(prev => {
-            const withoutDupe = prev.filter(v => v.id !== optimisticVehicle.id);
-            return [optimisticVehicle, ...withoutDupe];
-          });
         });
-        saveLocalVehicles(vehiclesRef.current);
-        if (optimisticVehicle.tipoReloj === "desglosador") {
-          const sub0 = optimisticVehicle.subVehiculos?.[0];
-          if (!sub0 || sub0.status !== "activo" || !sub0.aperturaAt) {
-            console.warn(
-              "[paintOptimisticLaunch] Desglosador sin sub activo inicial:",
-              optimisticVehicle.id,
-              optimisticVehicle.subVehiculos
-            );
-            toast.warning("Subs no listos", {
-              description: "El desglosador se lanzó sin sub inicial activo. Toca la tarjeta o relanza.",
-              style: { backgroundColor: PIZARRA, border: `1px solid ${NARANJA}`, color: NARANJA },
-              duration: 5000,
-            });
-          }
-        }
-        if (tipoFlotaSeleccionado === "situacion" || relojTiempo === "desglosador") {
-          setExpandedId(optimisticVehicle.id);
-        }
-        setIsCreating(false);
-        scrollFlotaActivosIntoView();
-        if (skipGhostReconcile) {
-          suppressGhostReconcileAfterLaunch();
-        } else {
-          ghostReconcileRef.current?.();
-        }
-        toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
-          description: flotaConfig.psCierre,
-          style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
-        });
-        if (tipoFlotaSeleccionado === "situacion" || relojTiempo === "desglosador") {
-          dispatchConcienciaClockTick();
-        }
-        registrarEvento(COMPONENTES.PLANIFICACION);
-        resetForm();
-      };
-
-      if (isDesglosadorMs0Launch) {
-        const newVehicleId = generateStableUuid();
-        const newClientRequestId = `crq_${generateStableUuid()}`;
-        const optimisticVehicle: Vehicle = {
-          ...vehicleCreatePayload,
-          id: newVehicleId,
-          clientRequestId: newClientRequestId,
-          createdAt: new Date(),
-          userId: user.uid,
-          status: "activo",
-        };
-        paintOptimisticLaunch(optimisticVehicle, true);
-        applyPostLaunchSideEffects(newVehicleId);
-        runShadowTaskAfterLaunch(() => {
-          scheduleVehicleRemotePersist(user.uid, newVehicleId, vehicleCreatePayload, newClientRequestId);
-        });
-        console.log(`[handleFlotaSave] Desglosador ms0: "${titulo}" id=${newVehicleId}`);
-        return;
-      }
-
-      let newVehicleId: string;
-      let newClientRequestId: string;
-      try {
-        const created = await addVehicle(user.uid, vehicleCreatePayload);
         newVehicleId = created.id;
         newClientRequestId = created.clientRequestId;
       } catch (addErr) {
@@ -2000,7 +1854,35 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
       }
       console.log(`[handleFlotaSave] addVehicle retornó id: ${newVehicleId}`);
 
-      applyPostLaunchSideEffects(newVehicleId);
+      if (launchCtx) {
+        const tipoOrigen = launchCtx.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
+        void markPeldanoEnCurso(user.uid, launchCtx.peldanoId, newVehicleId, tipoOrigen);
+        proyectoLaunchRef.current = null;
+      }
+
+      if (intensidadEnergetica) {
+        recordVehiculoInicio(newVehicleId, intensidadEnergetica);
+      }
+
+      if (relojTiempo === "desglosador" && user) {
+        const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
+        if (filteredSubs[0]?.titulo.trim()) {
+          toast.info("Profundidad de sesión", {
+            description: "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
+            style: { backgroundColor: PIZARRA, border: `1px solid rgba(212,175,55,0.35)`, color: GOLD },
+            duration: 4500,
+          });
+        }
+      }
+
+      if (bonoTemple) {
+        void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo.trim());
+        toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
+          description: "Iniciaste en los últimos 15 min antes del descanso",
+          style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
+          duration: 4000
+        });
+      }
 
       console.log(`[handleFlotaSave] Vehículo creado exitosamente: "${titulo}"`);
 
@@ -2008,13 +1890,71 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
       const optimisticVehicle: Vehicle = {
         id: newVehicleId,
         clientRequestId: newClientRequestId,
-        ...vehicleCreatePayload,
+        titulo: titulo.trim(),
+        criterioFin: criterio,
+        criterioDetalle: detalle,
         tiempoInicio: new Date(),
         createdAt: new Date(),
         userId: user.uid,
         status: "activo" as VehicleStatus,
+        ejes: STUB_EJES,
+        tipoTerminoRapido: tipoTermino,
+        tipoFlota: tipoFlotaSeleccionado,
+        aperturaAt: Date.now(),
+        bonoTemple,
+        tipoReloj: tipoFlotaSeleccionado === "tiempo" ? relojTiempo : undefined,
+        cantidadObjetivo: relojTiempo === "investigador" ? Number(cantidadInvestigador) : (relojTiempo === "produccion" ? Number(cantidadProduccion) : undefined),
+        subVehiculos: relojTiempo === "desglosador"
+          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
+          : undefined,
+        subTareas: subTareasPrefill,
+        ...(launchCtx || resolvedProyectoId
+          ? {
+              proyectoId: launchCtx?.proyectoId ?? resolvedProyectoId,
+              ...(launchCtx?.peldanoId ? { proyectoPeldanoId: launchCtx.peldanoId } : {}),
+            }
+          : {}),
+        energiaDiffPct,
+        segmentoOrigen: segActualNombre,
+        segmentoId: segActualId,
+        segmentosCruzados: 0,
+        rendimientoConsciente,
+        recordSugerido,
+        tiempoElegido,
+        intensidadEnergetica: intensidadEnergetica || undefined,
+        tipoDescanso: tipoFlotaSeleccionado === "descanso" ? (tipoDescanso || "microcarga") : undefined,
+        microPasos: tipoFlotaSeleccionado === "descanso" && tipoDescanso !== "punto_cero" ? { hidratacion: false, respiracion: false, pantallaZero: false } : undefined,
+        etapasPuntoCero: tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero" ? { etapa1: false, etapa2: false, etapa3: false, etapa4: false } : undefined,
+        puntoCero:
+          tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
+            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
+            : undefined,
       };
-      paintOptimisticLaunch(optimisticVehicle, false);
+      optimisticVehiclesRef.current = [...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId), optimisticVehicle];
+      vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== newVehicleId)];
+      startTransition(() => {
+        setVehicles(prev => {
+          const withoutDupe = prev.filter(v => v.id !== newVehicleId);
+          console.log(`[handleFlotaSave] OPTIMISTIC UPDATE: Agregando "${titulo}" al estado. Antes: ${withoutDupe.length}, Después: ${withoutDupe.length + 1}`);
+          return [optimisticVehicle, ...withoutDupe];
+        });
+      });
+      if (!saveLocalVehicles(vehiclesRef.current)) {
+        console.warn("[handleFlotaSave] Vehículo en memoria; localStorage lleno o bloqueado");
+      }
+      if (tipoFlotaSeleccionado === "situacion") {
+        setExpandedId(newVehicleId);
+      }
+      setIsCreating(false);
+      scrollFlotaActivosIntoView();
+      ghostReconcileRef.current?.();
+
+      toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
+        description: flotaConfig.psCierre,
+        style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
+      });
+      registrarEvento(COMPONENTES.PLANIFICACION);
+      resetForm();
       } catch (uiErr) {
         console.warn("[handleFlotaSave] UI post-lanzamiento:", uiErr);
         toast.success(`"${titulo}" lanzado en este dispositivo`, {
@@ -2873,81 +2813,9 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
     }
   };
 
-  const handleAterrizarReservaV3 = useCallback(
-    (payload: CrisolAterrizarPayload) =>
-      handleReservaTacticaQuickAdd(payload.texto, payload.ruta, payload.proyectoId),
-    [handleReservaTacticaQuickAdd]
-  );
-
-  if (useJornadaV3 && user) {
-    return (
-      <div
-        className="min-h-screen pb-24"
-        style={{ backgroundColor: "#020202" }}
-        onPointerDown={handlers.unlockDesglosadorSpeechFromGesture}
-        data-testid="planeacion-jornada-v3-root"
-      >
-        <JornadaStuckProbe />
-        <JornadaShellV3
-          userId={user.uid}
-          segmentos={planilla?.segmentos ?? []}
-          segmentoActivoId={segmentoActivo?.id ?? null}
-          vehicles={vehicles}
-          vehiclesRef={vehiclesRef}
-          setVehicles={setVehicles}
-          expandedId={expandedId}
-          setExpandedId={setExpandedId}
-          todayPs={dailyPS}
-          yesterdayPs={yesterdayPS}
-          situacionReserva={reservaActivas}
-          imanProyectos={imanProyectos}
-          defaultProyectoId={segmentoActivo?.proyectoVinculadoId ?? ""}
-          onAterrizarReserva={handleAterrizarReservaV3}
-          onReservaRutaChange={handleReservaRutaChange}
-          onEnviarReservaASituacion={handleEnviarReservaASituacion}
-          handleSituacionCronometroCumplido={handleSituacionCronometroCumplido}
-          handleSituacionCronometroFallado={handleSituacionCronometroFallado}
-          handleToggleSubTarea={handleToggleSubTarea}
-          handleDesglosadorUpdate={handleDesglosadorUpdate}
-          volcarMetricasAlHub={volcarMetricasAlHub}
-          rehydrateFlotaFromLocalRef={rehydrateFlotaFromLocalRef}
-          setupFlotaSubscription={setupFlotaSubscription}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="min-h-screen p-4 pb-40"
-      style={{ backgroundColor: "#020202" }}
-      onPointerDown={handlers.unlockDesglosadorSpeechFromGesture}
-    >
+    <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
       <JornadaStuckProbe />
-      <div className="max-w-lg mx-auto px-4 pt-2">
-        <NavTransitionLink href={JORNADA_V3_PATH}>
-          <div
-            className="rounded-xl border px-3 py-2 flex items-center justify-between gap-2 touch-manipulation"
-            style={{
-              backgroundColor: "rgba(212, 175, 55, 0.08)",
-              borderColor: "rgba(212, 175, 55, 0.28)",
-            }}
-            data-testid="banner-jornada-v3-lab"
-          >
-            <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
-                Laboratorio Jornada V3
-              </p>
-              <p className="text-[7px] text-slate-500 truncate">
-                Motor modular nuevo — Crisol, Ring, Anillo, Fe 120%
-              </p>
-            </div>
-            <span className="text-[8px] font-bold shrink-0" style={{ color: GOLD }}>
-              Probar →
-            </span>
-          </div>
-        </NavTransitionLink>
-      </div>
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">
@@ -3019,17 +2887,13 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
             )}
             anillo={(
               <div hidden={compactLayout && planTab === "metricas" ? true : undefined} aria-hidden={compactLayout && planTab === "metricas" ? true : undefined}>
-                {shouldRunMobileSurvival() ? (
-                  <AnilloSurvivalPlaceholder size={72} />
-                ) : (
-                  <AnilloConcienciaLive
-                    segmentos={planilla?.segmentos || []}
-                    vehicles={vehicles}
-                    conquistaPulse={conquistaPulse}
-                    ringOnly
-                    size={72}
-                  />
-                )}
+                <AnilloConcienciaLive
+                  segmentos={planilla?.segmentos || []}
+                  vehicles={vehicles}
+                  conquistaPulse={conquistaPulse}
+                  ringOnly
+                  size={72}
+                />
               </div>
             )}
             segmentoChip={(
@@ -3046,29 +2910,6 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
               )
             )}
           />
-
-        {shouldRunMobileSurvival() && (
-          <div
-            className="rounded-xl border px-3 py-2 mb-3 flex flex-col gap-2"
-            style={{ borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(255,255,255,0.02)" }}
-            data-testid="jornada-survival-banner"
-          >
-            <p className="text-[9px] text-slate-400 leading-snug">
-              Modo ligero en móvil: voz y anillo en vivo desactivados para mayor estabilidad.
-            </p>
-            <button
-              type="button"
-              className="text-[9px] font-black uppercase tracking-wider py-2 rounded-lg touch-manipulation"
-              style={{ backgroundColor: "rgba(212,175,55,0.15)", color: "#D4AF37" }}
-              onClick={() => {
-                setJornadaFullModeEnabled(true);
-                reloadJornadaHard();
-              }}
-            >
-              Activar modo completo
-            </button>
-          </div>
-        )}
 
         {/* MONITOR DE ESTADOS */}
         <PlanTabPanel planLayout={planLayout} planTab={planTab} tab="meta">
@@ -3704,17 +3545,13 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
             <p className="text-[7px] text-slate-600 text-center mb-2 leading-snug px-2">
               Tiempo presente · el combustible son tus decisiones cerradas (abajo)
             </p>
-            {shouldRunMobileSurvival() ? (
-              <AnilloSurvivalPlaceholder size={130} showCaption />
-            ) : (
-              <AnilloConcienciaLive
-                segmentos={planilla?.segmentos || []}
-                vehicles={vehicles}
-                conquistaPulse={conquistaPulse}
-                size={130}
-                showDayStats
-              />
-            )}
+            <AnilloConcienciaLive
+              segmentos={planilla?.segmentos || []}
+              vehicles={vehicles}
+              conquistaPulse={conquistaPulse}
+              size={130}
+              showDayStats
+            />
             <div
               className="mt-2 w-full p-2 rounded-lg border text-center"
               style={{ backgroundColor: "rgba(168,85,247,0.08)", borderColor: "rgba(168,85,247,0.28)" }}
@@ -4412,8 +4249,8 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
 
                   {planilla && planilla.segmentos.length > 0 ? (
                     <div className="space-y-2">
-                      <SegmentTicker enabled={!useJornadaV3}>
-                      {() => (planilla?.segmentos ?? []).map((seg) => {
+                      {planilla.segmentos.map((seg) => {
+                        void segmentUiTick;
                         const isActive = seg.estado === "activo";
                         const isPuertaSistema = isActive && !!seg.puertaSistema;
                         const isEntropia = seg.estado === "entropia";
@@ -4611,7 +4448,6 @@ export default function Planeacion({ useJornadaV3: useJornadaV3Prop = false }: P
                           </div>
                         );
                       })}
-                      </SegmentTicker>
                       {planilla.segmentos.filter(s => s.estado === "entropia" || s.puertaSistema).length > 0 && (
                         <div className="p-4 rounded-2xl border border-red-900/50 shadow-[0_0_15px_rgba(220,38,38,0.12)] bg-gradient-to-br from-zinc-950 via-[#141416] to-zinc-950">
                           <div className="flex items-center gap-2 mb-1">

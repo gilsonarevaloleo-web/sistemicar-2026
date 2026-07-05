@@ -46,8 +46,7 @@ import {
 import { AnilloConcienciaAislado, type AnilloViewMode } from "@/components/jornada/AnilloConcienciaAislado";
 import MetricasJornadaModule from "@/components/jornada/MetricasJornadaModule";
 
-// ─── Paleta tech-noir industrial ────────────────────────────────────────────
-
+// ─── 
 const SHELL_COLORS = {
   charcoal: "#0a0a0a",
   gold: "#D4AF37",

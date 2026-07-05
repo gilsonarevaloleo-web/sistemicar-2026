@@ -95,10 +95,15 @@ function useDesglosadorSubClockUi(
 ): DesglosadorSubClockUi {
   const tick = useVehicleTimerTick();
   const clockKey = desglosadorSubClockKey(activeSub);
+  
   return useMemo(() => {
+    // Si no hay sub-elemento activo o cambió la clave en pleno render, vaciamos el reloj inmediatamente
     if (!activeSub?.aperturaAt) return emptyDesglosadorSubClockUi();
+    
     return computeDesglosadorSubClockUi(vehicle, activeSub, Date.now());
-  }, [tick, clockKey, vehicle, activeSub]);
+  }, [tick, clockKey, activeSub]); // Agregamos activeSub para que limpie el render al cambiar de tarea
+    
+ 
 }
 
 /**
