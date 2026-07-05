@@ -2044,9 +2044,20 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       if (opts?.resetDepth) patch.aperturaAt = Date.now();
       return { ...v, ...patch };
     });
-    startTransition(() => {
+    // El reloj del sub se remonta por key (id:aperturaAt). Cuando cambia el sub
+    // activo (cierre/activación), la escritura DEBE ser urgente para que la isla
+    // del cronómetro se remonte y reinicie de inmediato con el nuevo aperturaAt;
+    // diferirla con startTransition la dejaba corriendo con el sub anterior y se
+    // percibía como congelamiento. Los updates que NO cambian el sub activo
+    // (cruces de ruta cada tick) siguen como transición no urgente.
+    const activeSubChanged = prevActiveId !== nextActiveId;
+    if (activeSubChanged) {
       setVehicles(newVehicles);
-    });
+    } else {
+      startTransition(() => {
+        setVehicles(newVehicles);
+      });
+    }
     vehiclesRef.current = newVehicles;
     scheduleSaveLocalVehicles(newVehicles);
 
@@ -3169,7 +3180,20 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       !bloqueListo && scActivo.activo !== true
         ? reanudarSituacionCronometroRing(scActivo)
         : scActivo;
-    const situacionCupoAnchor = bloqueListo ? null : vehicle.situacionCupoAnchor;
+    // Reinicio determinista del cronómetro de fila: al cerrar la fila en foco el
+    // ancla salta de inmediato a la siguiente fila pendiente con startedAt=now
+    // (o se limpia si la ronda quedó lista), dentro de la MISMA escritura de
+    // estado. Antes se conservaba el ancla vieja y el reinicio dependía de un
+    // sync async post-await (carrera + startTransition) que dejaba el reloj
+    // corriendo con el startedAt anterior.
+    const resolvedAnchor = bloqueListo
+      ? null
+      : resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
+          forceResetSameRow: true,
+          now,
+        });
+    const situacionCupoAnchor =
+      resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
     );
@@ -3186,7 +3210,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
       void playSituacionChimes(chimesOnComplete);
-      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId, { forceResetSameRow: true });
+      // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset =
+      // no-op (devuelve "unchanged") salvo que haga falta corregir un borde.
+      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
       await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
       if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
       if (bloqueListo) {
@@ -3247,7 +3273,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
     let situacionCronometro =
       !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-    const situacionCupoAnchor = bloqueListo ? null : vehicle.situacionCupoAnchor;
+    // Reinicio determinista del cronómetro de fila (mismo criterio que Cumplido):
+    // el ancla salta a la siguiente fila pendiente con startedAt=now en la misma
+    // escritura, en vez de conservar el startedAt anterior.
+    const resolvedAnchor = bloqueListo
+      ? null
+      : resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
+          forceResetSameRow: true,
+          now,
+        });
+    const situacionCupoAnchor =
+      resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
     );
@@ -3257,7 +3293,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     persistVehiclesRef();
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
-      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId, { forceResetSameRow: true });
+      // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset = no-op.
+      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
       if (bloqueListo) {
         toast.info("Ronda completada", {
           description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,
