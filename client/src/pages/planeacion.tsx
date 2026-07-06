@@ -496,7 +496,8 @@ import {
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
-import { isCoarseConcienciaDevice, useConcienciaClockTick } from "@/lib/concienciaClock";
+import { isCoarseConcienciaDevice, useConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
+import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
@@ -1939,9 +1940,8 @@ export default function Planeacion() {
           return [optimisticVehicle, ...withoutDupe];
         });
       });
-      if (!saveLocalVehicles(vehiclesRef.current)) {
-        console.warn("[handleFlotaSave] Vehículo en memoria; localStorage lleno o bloqueado");
-      }
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      burstConcienciaClockTick(1);
       if (tipoFlotaSeleccionado === "situacion") {
         setExpandedId(newVehicleId);
       }

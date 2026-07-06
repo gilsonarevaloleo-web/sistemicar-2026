@@ -91,11 +91,8 @@ export function useVehicleTimerTick(): number {
   useEffect(() => {
     const onClock = () => setTick(t => t + 1);
     window.addEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-        
-        // COMENTADO PARA EVITAR CONGELAMIENTO EN RE-MONTAJES:
-        // dispatchConcienciaClockTick(); 
-    
-        return () => window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
-      }, []);
-      return tick;
-    }
+    requestAnimationFrame(() => dispatchConcienciaClockTick());
+    return () => window.removeEventListener(CONCIENCIA_CLOCK_TICK_EVENT, onClock);
+  }, []);
+  return tick;
+}

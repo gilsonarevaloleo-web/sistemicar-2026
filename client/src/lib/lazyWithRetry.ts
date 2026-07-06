@@ -21,7 +21,8 @@ export function lazyWithRetry<T extends ComponentType<unknown>>(
   });
 }
 
-/** Precarga el chunk de Jornada (menú → transición más rápida). */
+/** Precarga chunks de Jornada (menú → transición más rápida). */
 export function prefetchJornadaChunk(): void {
+  void import("@/pages/planeacionV3");
   void import("@/pages/planeacion");
 }

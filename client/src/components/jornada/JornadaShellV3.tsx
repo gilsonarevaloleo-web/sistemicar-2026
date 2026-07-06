@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type ReactNode,
 } from "react";
 import { Compass, Target, Zap } from "lucide-react";
 import { auth } from "@/lib/firebase";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/persistence";
 import type { VehicleHistoryOpts } from "@/components/flota/vehicleCardShared";
 import { burstConcienciaClockTick, dispatchConcienciaClockTick } from "@/lib/concienciaClock";
+import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { hardwareClockNow } from "@/lib/hardwareClock";
 import { shouldAllowJornadaVoice } from "@/lib/mobilePerf";
@@ -240,6 +242,9 @@ export interface JornadaShellV3Props {
   setupFlotaSubscription?: () => void;
   speechHooks?: JornadaShellSpeechHooks;
 
+  /** Panel de lanzamiento de flota (V3). */
+  flotaLaunchSlot?: ReactNode;
+
   initialTab?: JornadaTab;
   className?: string;
 }
@@ -403,6 +408,7 @@ function JornadaShellV3Inner({
   rehydrateFlotaFromLocalRef,
   setupFlotaSubscription,
   speechHooks: speechHooksProp,
+  flotaLaunchSlot,
   initialTab = "operar",
   className = "",
 }: JornadaShellV3Props) {
@@ -510,29 +516,20 @@ function JornadaShellV3Inner({
   const handleSubTareaClose = useCallback(
     async (payload: RingSubTareaClosePayload) => {
       const { vehicleId, subId, status, sub } = payload;
-      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-      if (!vehicle) return;
 
       if (sub.enDesgloseCronometro) {
-        const primed = (vehicle.subTareas ?? []).map(st =>
-          st.id === subId
-            ? {
-                ...st,
-                resultadoSituacion: "pendiente" as const,
-                completada: false,
-              }
-            : st
-        );
-        patchVehicleSubs(vehicleId, { subTareas: primed });
         if (status === "cumplido") {
           await handleSituacionCronometroCumplido(vehicleId, subId);
         } else {
           await handleSituacionCronometroFallado(vehicleId, subId);
         }
+        burstConcienciaClockTick(1);
         return;
       }
 
       if (status === "cumplido") {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle) return;
         const primed = (vehicle.subTareas ?? []).map(st =>
           st.id === subId ? { ...st, completada: false } : st
         );
@@ -541,6 +538,8 @@ function JornadaShellV3Inner({
         return;
       }
 
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle) return;
       const nextSubs = (vehicle.subTareas ?? []).map(st => (st.id === subId ? sub : st));
       patchVehicleSubs(vehicleId, { subTareas: nextSubs });
       try {
@@ -561,14 +560,25 @@ function JornadaShellV3Inner({
 
   const handleSubVehiculoClose = useCallback(
     async (payload: RingSubVehiculoClosePayload) => {
-      const { vehicleId, sub, status, realSec, cantidadLograda } = payload;
+      const { vehicleId, subId, status, sub, realSec, cantidadLograda } = payload;
       const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
       if (!vehicle) return;
 
-      const updatedSubs = (vehicle.subVehiculos ?? []).map(s =>
-        s.id === sub.id ? sub : s
+      const sourceSubs = vehicle.subVehiculos ?? [];
+      const built = buildDesglosadorSubClose(
+        sourceSubs,
+        subId,
+        status,
+        cantidadLograda ?? 0,
+        realSec ?? sub.duracionFinal,
+        undefined,
+        Date.now()
       );
-      handleDesglosadorUpdate(vehicleId, updatedSubs, { force: true });
+      if (!built) return;
+
+      const { subs: allSubs, closedSub } = built;
+      handleDesglosadorUpdate(vehicleId, allSubs, { force: true });
+      burstConcienciaClockTick(1);
 
       if (
         status === "cumplido" &&
@@ -579,19 +589,19 @@ function JornadaShellV3Inner({
       ) {
         const totalMin = Math.max(1, Math.round(realSec / 60));
         const minPerUnit = totalMin / cantidadLograda;
-        persistVehicleHistoryEntry(sub.titulo, minPerUnit, totalMin, "desglosador", userId, {
+        persistVehicleHistoryEntry(closedSub.titulo, minPerUnit, totalMin, "desglosador", userId, {
           status: "cumplido",
         });
         refreshHistory();
       }
 
       if (status === "cumplido" && !vehicle.autoVerdad) {
-        const duracionMin = sub.duracionFinal
-          ? Math.max(1, Math.round(sub.duracionFinal / 60))
+        const duracionMin = closedSub.duracionFinal
+          ? Math.max(1, Math.round(closedSub.duracionFinal / 60))
           : realSec
             ? Math.max(1, Math.round(realSec / 60))
             : 1;
-        void volcarMetricasAlHub({ ...vehicle, subVehiculos: updatedSubs }, { minutos: duracionMin });
+        void volcarMetricasAlHub({ ...vehicle, subVehiculos: allSubs }, { minutos: duracionMin });
       }
     },
     [vehiclesRef, handleDesglosadorUpdate, userId, refreshHistory, volcarMetricasAlHub]
@@ -630,6 +640,7 @@ function JornadaShellV3Inner({
               <p className="text-[7px] text-slate-600 truncate">{JORNADA_MODULE.taglineShort}</p>
             </div>
             <div className="flex gap-1 shrink-0 items-center">
+              {flotaLaunchSlot}
               <NavTransitionLink href="/planeacion">
                 <span
                   className="text-[7px] font-bold uppercase px-2 py-1 rounded-lg touch-manipulation"

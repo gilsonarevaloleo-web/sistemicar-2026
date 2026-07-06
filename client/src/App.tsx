@@ -21,9 +21,7 @@ import MenuPrincipal from "@/pages/menu-principal";
 import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
 const Planeacion = lazyWithRetry(() => import("@/pages/planeacion"));
-const PlaneacionV3 = lazyWithRetry(() =>
-  import("@/pages/planeacion").then(mod => ({ default: mod.PlaneacionV3 }))
-);
+const PlaneacionV3 = lazyWithRetry(() => import("@/pages/planeacionV3"));
 import Esperanza from "@/pages/esperanza";
 import Rewards from "@/pages/rewards";
 import Analytics from "@/pages/analytics";

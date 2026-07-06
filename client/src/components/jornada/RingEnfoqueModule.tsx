@@ -19,7 +19,7 @@ import { RING_COPY, filtrarRingPendientes } from "@/lib/ringEnfoqueReal";
 import {
   computeActiveSubClocks,
   computeSubCloseVerdict,
-  desglosadorSubActiveIdKey,
+  desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   formatMMSS,
   SUB_APERTURA_MERGE_TOLERANCE_MS,
@@ -643,7 +643,7 @@ function RingEnfoqueModuleInner(
     [localSubVehiculos]
   );
 
-  const desglosadorClockKey = desglosadorSubActiveIdKey(activeSubVehiculo);
+  const desglosadorClockKey = desglosadorSubClockKey(activeSubVehiculo);
 
   const situacionClockKey = useMemo(
     () =>
@@ -706,6 +706,10 @@ function RingEnfoqueModuleInner(
 
   const applySubTareaClose = useCallback(
     (payload: RingSubTareaClosePayload) => {
+      if (payload.sub.enDesgloseCronometro) {
+        void Promise.resolve(onSubTareaClose(payload));
+        return;
+      }
       setLocalSubTareas(prev => {
         const next = prev.map(st => (st.id === payload.subId ? payload.sub : st));
         startTransition(() => {
@@ -724,16 +728,9 @@ function RingEnfoqueModuleInner(
         ...prev,
         [payload.subId]: { verdict: payload.verdict, deltaSec: payload.deltaSec },
       }));
-      setLocalSubVehiculos(prev => {
-        const next = prev.map(sv => (sv.id === payload.subId ? payload.sub : sv));
-        startTransition(() => {
-          onSubVehiculosChange?.(next);
-        });
-        return next;
-      });
       void Promise.resolve(onSubVehiculoClose(payload));
     },
-    [onSubVehiculoClose, onSubVehiculosChange]
+    [onSubVehiculoClose]
   );
 
   const pendientesSv = localSubVehiculos.filter(
