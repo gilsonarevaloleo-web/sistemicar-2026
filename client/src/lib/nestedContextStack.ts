@@ -98,9 +98,24 @@ export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehic
 export function resumeSituacionFromNestedPause(parent: Vehicle): Partial<Vehicle> | null {
   const snap = parent.situacionNestedPause;
   if (!snap) return null;
+  const pauseMs = Math.max(0, hardwareClockNow() - snap.pausedAt);
+  let situacionCronometro = { ...snap.situacionCronometro };
+  if (situacionCronometro.bloqueInicioAt != null) {
+    situacionCronometro = {
+      ...situacionCronometro,
+      bloqueInicioAt: situacionCronometro.bloqueInicioAt + pauseMs,
+    };
+  }
+  let situacionCupoAnchor = snap.situacionCupoAnchor ?? null;
+  if (situacionCupoAnchor?.startedAt != null) {
+    situacionCupoAnchor = {
+      ...situacionCupoAnchor,
+      startedAt: situacionCupoAnchor.startedAt + pauseMs,
+    };
+  }
   return {
-    situacionCronometro: snap.situacionCronometro,
-    situacionCupoAnchor: snap.situacionCupoAnchor ?? null,
+    situacionCronometro,
+    situacionCupoAnchor,
     situacionNestedPause: null,
   };
 }

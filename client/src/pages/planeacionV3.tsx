@@ -3,6 +3,8 @@ import { useAuthContext } from "@/App";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
 import JornadaShellV3 from "@/components/jornada/JornadaShellV3";
 import { FlotaLaunchPanel } from "@/components/jornada/FlotaLaunchPanel";
+import { JornadaV3MigrationChecklist } from "@/components/jornada/JornadaV3MigrationChecklist";
+import { JornadaV3BootStatus } from "@/components/jornada/JornadaV3BootStatus";
 import type { CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
@@ -15,6 +17,8 @@ import {
 } from "@/lib/persistence";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { beginJornadaViewMount, endJornadaViewMount } from "@/lib/jornadaRemount";
+import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
+import { markJornadaChunkLoaded } from "@/lib/jornadaChunkBoot";
 import { cancelJornadaRemountGuard, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue } from "@/lib/speechQueue";
 import { executeFlotaLaunch } from "@/lib/executeFlotaLaunch";
 import type { FlotaLaunchForm } from "@/lib/executeFlotaLaunch";
@@ -110,6 +114,8 @@ export default function PlaneacionV3() {
   }, [user, planillaFecha]);
 
   useEffect(() => {
+    clearJornadaFatalError();
+    markJornadaChunkLoaded();
     beginJornadaViewMount();
     warmupSpeechSynthesis();
     recoverSpeechQueue();
@@ -180,6 +186,10 @@ export default function PlaneacionV3() {
       data-testid="planeacion-v3"
     >
       <JornadaStuckProbe />
+      <JornadaV3BootStatus />
+      <div className="px-3 pt-2 max-w-lg mx-auto">
+        <JornadaV3MigrationChecklist />
+      </div>
       <JornadaShellV3
         userId={user.uid}
         segmentos={planilla?.segmentos ?? []}

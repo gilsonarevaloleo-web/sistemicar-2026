@@ -7,7 +7,7 @@ import {
   formatHHMM,
   suggestedSec,
 } from "@/lib/desglosadorClock";
-import { useVehicleTimerTick } from "@/lib/concienciaClock";
+import { useIslandConcienciaClock } from "@/lib/useIslandConcienciaClock";
 
 export type DesglosadorSubClockUi = {
   subTimerDisplay: string;
@@ -93,7 +93,7 @@ function useDesglosadorSubClockUi(
   vehicle: Vehicle,
   activeSub: SubVehiculo | undefined
 ): DesglosadorSubClockUi {
-  const tick = useVehicleTimerTick();
+  const tick = useIslandConcienciaClock(Boolean(activeSub?.aperturaAt));
   const clockKey = desglosadorSubClockKey(activeSub);
   
   return useMemo(() => {

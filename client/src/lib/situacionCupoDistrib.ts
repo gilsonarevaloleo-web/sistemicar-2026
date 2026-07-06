@@ -22,8 +22,19 @@ export function situacionFilaEnFocoPendiente(st: SubTarea): boolean {
 }
 
 /** True cuando debe mostrarse la cuenta regresiva situacional (cronómetro o fila en foco). */
-export function situacionRelojDebeMostrarse(vehicle: Pick<Vehicle, "tipoFlota" | "status" | "subTareas" | "situacionCronometro" | "situacionCupoAnchor">): boolean {
+export function situacionRelojDebeMostrarse(
+  vehicle: Pick<
+    Vehicle,
+    | "tipoFlota"
+    | "status"
+    | "subTareas"
+    | "situacionCronometro"
+    | "situacionCupoAnchor"
+    | "situacionNestedPause"
+  >
+): boolean {
   if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return false;
+  if (vehicle.situacionNestedPause) return false;
   const subs = vehicle.subTareas || [];
   if (vehicle.situacionCronometro?.activo === true) {
     if (sumMinutosCronometroPendientes(subs) > 0) return true;

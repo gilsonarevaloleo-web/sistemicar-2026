@@ -238,7 +238,7 @@ export interface JornadaShellV3Props {
   ) => void;
   volcarMetricasAlHub: (vehicle: Vehicle, opts: { minutos: number }) => void | Promise<void>;
 
-  rehydrateFlotaFromLocalRef?: MutableRefObject<(() => void) | undefined>;
+  rehydrateFlotaFromLocalRef?: MutableRefObject<(() => void) | null | undefined>;
   setupFlotaSubscription?: () => void;
   speechHooks?: JornadaShellSpeechHooks;
 
@@ -252,7 +252,7 @@ export interface JornadaShellV3Props {
 // ─── Sincronización hardware-clock al volver de background ───────────────────
 
 function useJornadaHardwareSync(params: {
-  rehydrateFlotaFromLocalRef?: MutableRefObject<(() => void) | undefined>;
+  rehydrateFlotaFromLocalRef?: MutableRefObject<(() => void) | null | undefined>;
   setupFlotaSubscription?: () => void;
   speechHooks: JornadaShellSpeechHooks;
   /** Sello primitivo — recomputar métricas del anillo solo cuando cambia la flota/segmentos. */

@@ -52,18 +52,27 @@ export function computeActiveSubClocks(
 
 export function computeDesglosadorClocks(now: number, vehicle: Vehicle): DesglosadorClockResult {
   const subs = vehicle.subVehiculos || [];
-  const activeSub = subs.find(s => s.status === "activo");
   const pausa = vehicle.desglosadorPausa;
+  const pausedSub =
+    pausa?.subActivoId != null
+      ? subs.find(s => s.id === pausa.subActivoId)
+      : undefined;
+  const activeSub =
+    subs.find(s => s.status === "activo") ??
+    (vehicle.interrupcionActiva && pausedSub?.status === "nested_paused" ? pausedSub : undefined);
   const frozen =
     vehicle.interrupcionActiva &&
     pausa?.elapsedSecSnapshot != null &&
-    pausa.subActivoId === activeSub?.id;
+    pausedSub != null &&
+    pausa.subActivoId === pausedSub.id;
 
   let subElapsedSec = 0;
-  if (activeSub?.aperturaAt) {
-    subElapsedSec = frozen
-      ? pausa!.elapsedSecSnapshot!
-      : Math.floor(hardwareElapsedMs(activeSub.aperturaAt, now) / 1000);
+  if (activeSub) {
+    if (frozen) {
+      subElapsedSec = pausa!.elapsedSecSnapshot!;
+    } else if (activeSub.aperturaAt) {
+      subElapsedSec = Math.floor(hardwareElapsedMs(activeSub.aperturaAt, now) / 1000);
+    }
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;

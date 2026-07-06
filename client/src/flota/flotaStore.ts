@@ -10,6 +10,7 @@ import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import { preferLocalSubTareasInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
 import { writeLocalFlota } from "@/services/jornadaFlotaCache";
+import { scheduleCoalescedNotify } from "@/lib/concienciaScheduler";
 import { runShadowTask } from "@/lib/desglosadorShadow";
 import {
   armFlotaFetchTimeout,
@@ -51,12 +52,14 @@ let vehiclesUpdatedHandler: (() => void) | null = null;
 const listeners = new Set<StoreListener>();
 
 function notify(): void {
-  listeners.forEach(fn => {
-    try {
-      fn();
-    } catch {
-      /* noop */
-    }
+  scheduleCoalescedNotify(() => {
+    listeners.forEach(fn => {
+      try {
+        fn();
+      } catch {
+        /* noop */
+      }
+    });
   });
 }
 

@@ -203,6 +203,28 @@ describe("computeActiveSubClocks", () => {
   });
 });
 
+describe("computeDesglosadorClocks nested_paused", () => {
+  it("sub nested_paused visible durante interrupcion con elapsed congelado", () => {
+    const sub: SubVehiculo = {
+      id: "s1",
+      titulo: "A",
+      status: "nested_paused",
+      aperturaAt: 1_000_000,
+    };
+    const v = {
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        subActivoId: "s1",
+        elapsedSecSnapshot: 120,
+        pausadoAt: 1_002_000,
+      },
+      subVehiculos: [sub],
+    } as Vehicle;
+    const clocks = computeDesglosadorClocks(1_010_000, v);
+    assert.equal(clocks.subElapsedSec, 120);
+  });
+});
+
 describe("computeDesglosadorClocks mixed subs", () => {
   it("transición sub medido a sub sin medición conserva aperturaAt", () => {
     const now = 2_000_000;

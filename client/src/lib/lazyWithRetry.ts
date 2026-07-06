@@ -1,4 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { markJornadaChunkLoaded, reportJornadaChunkError } from "@/lib/jornadaChunkBoot";
 
 /** Reintenta import() dinámico — útil en móvil tras pestaña colgada. */
 export function lazyWithRetry<T extends ComponentType<unknown>>(
@@ -9,9 +10,12 @@ export function lazyWithRetry<T extends ComponentType<unknown>>(
     let lastError: unknown;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        return await importer();
+        const mod = await importer();
+        markJornadaChunkLoaded();
+        return mod;
       } catch (err) {
         lastError = err;
+        reportJornadaChunkError(err);
         if (attempt < retries) {
           await new Promise(resolve => setTimeout(resolve, 600 * (attempt + 1)));
         }

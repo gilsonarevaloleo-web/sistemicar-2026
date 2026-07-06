@@ -1,13 +1,13 @@
 import { useEffect, useMemo } from "react";
 import { Timer } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { hardwareClockNow, hardwareElapsedMs, durationMinutesToMs } from "@/lib/hardwareClock";
+import { hardwareElapsedMs, durationMinutesToMs } from "@/lib/hardwareClock";
 import {
   situacionFilaEnFocoPendiente,
   situacionRelojDebeMostrarse,
   situacionTargetMsReloj,
 } from "@/lib/situacionCupoDistrib";
-import { useVehicleTimerTick } from "@/lib/concienciaClock";
+import { useIslandConcienciaClock } from "@/lib/useIslandConcienciaClock";
 import { GOLD, VERDE } from "@/components/flota/vehicleCardShared";
 
 export type SituacionTimerUi = {
@@ -32,6 +32,9 @@ function fmtHHMM(d: Date): string {
 export function computeSituacionTimerUi(vehicle: Vehicle, nowMs = Date.now()): SituacionTimerUi {
   const empty: SituacionTimerUi = { display: "", expired: false, debt: "", targetLabel: "", visible: false };
   if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return empty;
+  if (vehicle.situacionNestedPause) {
+    return { display: "—", expired: false, debt: "", targetLabel: "", visible: true };
+  }
   if (!situacionRelojDebeMostrarse(vehicle)) return empty;
 
   const targetMs = situacionTargetMsReloj(vehicle, nowMs);
@@ -81,7 +84,7 @@ export function computeSituacionTimerUi(vehicle: Vehicle, nowMs = Date.now()): S
     };
   }
 
-  const remainingMs = targetMs - hardwareClockNow(nowMs);
+  const remainingMs = targetMs - nowMs;
   if (remainingMs > 0) {
     return {
       display: fmtTime(Math.floor(Math.max(0, remainingMs) / 1000)),
@@ -108,7 +111,7 @@ type Props = {
 
 /** Reloj situacional aislado — no re-renderiza VehicleCard cada segundo. */
 export function SituacionRelojIsland({ vehicle, compact = false, onExpiredChange }: Props) {
-  const tick = useVehicleTimerTick();
+  const tick = useIslandConcienciaClock(true);
   const ui = useMemo(() => computeSituacionTimerUi(vehicle, Date.now()), [tick, vehicle]);
 
   useEffect(() => {

@@ -6,6 +6,8 @@ import { lazyWithRetry, prefetchJornadaChunk } from "@/lib/lazyWithRetry";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaSuspenseFallback } from "@/components/jornada/JornadaSuspenseFallback";
+import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
+import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
 import type { ModuleId } from "@shared/moduleAccess";
@@ -295,15 +297,15 @@ function ArquitectoRoute({ component: Component }: { component: React.ComponentT
 
 function JornadaV3ModuleRoute() {
   return (
-    <ErrorBoundary>
-      <Suspense fallback={<JornadaSuspenseFallback />}>
+    <JornadaErrorBoundary>
+      <Suspense fallback={<JornadaV3SuspenseFallback />}>
         <ModuleRoute
           component={PlaneacionV3}
           requiredModule="planificacion_base"
           loadingFallback={<JornadaShell statusLine="Laboratorio V3 · verificando acceso…" />}
         />
       </Suspense>
-    </ErrorBoundary>
+    </JornadaErrorBoundary>
   );
 }
 

@@ -30,6 +30,11 @@ import {
 } from "@/lib/notifications";
 import { registerNotificationStateProvider } from "@/lib/notificationState";
 import { dispatchConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
+import {
+  ensureConcienciaSchedulerStarted,
+  setSchedulerUiClockMs,
+  stopConcienciaScheduler,
+} from "@/lib/concienciaScheduler";
 import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival } from "@/lib/mobilePerf";
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
@@ -160,10 +165,6 @@ export function SegmentAttentionBackground() {
     let intervalId = window.setInterval(() => void runTick(), intervalMs);
     const initialTickId = window.setTimeout(() => void runTick({ force: true }), INITIAL_TICK_DEFER_MS);
 
-    const pulseConcienciaClock = () => {
-      dispatchConcienciaClockTick();
-    };
-
     // B1: el latido de 1 s solo aporta con trabajo vivo (segunderos/puntero de
     // sesión activa). En reposo (sin vehículos activos) baja a cadencia lenta,
     // recortando re-renders globales sin afectar puertas/entropía, que van por
@@ -174,31 +175,20 @@ export function SegmentAttentionBackground() {
       return hasLiveWork ? CLOCK_MS_FOREGROUND : CLOCK_MS_IDLE;
     };
 
-    let clockMs = computeClockMs();
-    let clockId = window.setInterval(pulseConcienciaClock, clockMs);
-    pulseConcienciaClock();
-
+    ensureConcienciaSchedulerStarted();
     const retuneClock = () => {
-      const next = computeClockMs();
-      if (next === clockMs) return;
-      clockMs = next;
-      clearInterval(clockId);
-      clockId = window.setInterval(pulseConcienciaClock, clockMs);
-      pulseConcienciaClock(); // tick inmediato al cambiar de cadencia (arranque de segunderos)
+      setSchedulerUiClockMs(computeClockMs());
+      dispatchConcienciaClockTick();
     };
+    retuneClock();
 
-    // Re-evalúa la cadencia cuando cambia la flota (apertura/cierre de vehículos).
     const unsubFlotaClock = subscribeFlotaStore(() => retuneClock());
 
     const resetInterval = () => {
       clearInterval(intervalId);
       intervalMs = isAppInBackground() ? TICK_MS_BACKGROUND : TICK_MS_FOREGROUND_BASE;
       intervalId = window.setInterval(() => void runTick(), intervalMs);
-
-      clearInterval(clockId);
-      clockMs = computeClockMs();
-      clockId = window.setInterval(pulseConcienciaClock, clockMs);
-      pulseConcienciaClock();
+      retuneClock();
     };
 
     const unregisterVoiceVisible = registerVoiceVisibleHandler(() => {
@@ -223,7 +213,7 @@ export function SegmentAttentionBackground() {
       unregisterVoiceVisible();
       clearTimeout(initialTickId);
       clearInterval(intervalId);
-      clearInterval(clockId);
+      stopConcienciaScheduler();
       cancelAllNotifications();
     };
   }, [user]);

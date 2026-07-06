@@ -498,6 +498,14 @@ import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
 import { isCoarseConcienciaDevice, useConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
+import {
+  buildOptimisticVehicleShell,
+  deferFlotaFormReset,
+  newFlotaLaunchIds,
+  paintFlotaLaunchOptimistic,
+  scheduleFlotaLaunchPillarShadow,
+  scheduleFlotaLaunchShadow,
+} from "@/lib/flotaLaunchMs0";
 import { usePlaneacionHeavyMetrics } from "@/hooks/usePlaneacionHeavyMetrics";
 import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
@@ -509,7 +517,8 @@ import {
   tryRestoreMetricsFromJornadaBackup,
   vehiclesForJornadaBackup,
 } from "@/services/jornadaBackup";
-import { setJornadaFatalError } from "@/lib/jornadaFatalError";
+import { setJornadaFatalError, clearJornadaFatalError } from "@/lib/jornadaFatalError";
+import { markJornadaChunkLoaded } from "@/lib/jornadaChunkBoot";
 import {
   cancelFlotaFetch,
   onFlotaStaleLoadingRefetch,
@@ -1386,6 +1395,8 @@ export default function Planeacion() {
   /** Montaje del chunk — warmup TTS sin cancelar cola (remount con pauseVoice solo al volver de background). */
   useEffect(() => {
     isViewMountingRef.current = true;
+    clearJornadaFatalError();
+    markJornadaChunkLoaded();
     beginJornadaViewMount();
     const mountGuardTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       isViewMountingRef.current = false;
@@ -1682,7 +1693,6 @@ export default function Planeacion() {
     try {
       const cierreAt = Date.now();
       applyCentinelaArchiveLocally(cierreAt);
-      await closeCentinelasBeforeConsciousLaunch(user.uid, vehiclesRef.current);
 
       const flotaConfig = FLOTA_CONFIG[tipoFlotaSeleccionado];
       let detalle = "";
@@ -1800,10 +1810,10 @@ export default function Planeacion() {
         }
       }
 
-      let newVehicleId: string;
-      let newClientRequestId: string;
-      try {
-        const created = await addVehicle(user.uid, {
+      const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
+      const launchCtxSnapshot = launchCtx;
+
+      const vehiclePayload = {
         titulo: titulo.trim(),
         criterioFin: criterio,
         criterioDetalle: detalle,
@@ -1819,10 +1829,10 @@ export default function Planeacion() {
           ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
           : undefined,
         subTareas: subTareasPrefill,
-        ...(launchCtx || resolvedProyectoId
+        ...(launchCtxSnapshot || resolvedProyectoId
           ? {
-              proyectoId: launchCtx?.proyectoId ?? resolvedProyectoId,
-              ...(launchCtx?.peldanoId ? { proyectoPeldanoId: launchCtx.peldanoId } : {}),
+              proyectoId: launchCtxSnapshot?.proyectoId ?? resolvedProyectoId,
+              ...(launchCtxSnapshot?.peldanoId ? { proyectoPeldanoId: launchCtxSnapshot.peldanoId } : {}),
             }
           : {}),
         estadoEnergia,
@@ -1841,28 +1851,27 @@ export default function Planeacion() {
           tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
             ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
             : undefined,
-        });
-        newVehicleId = created.id;
-        newClientRequestId = created.clientRequestId;
-      } catch (addErr) {
-        console.error("[handleFlotaSave] addVehicle:", addErr);
-        toast.error("Error al guardar vehículo", {
-          description: "No se pudo registrar en este dispositivo. Libera espacio del navegador e intenta de nuevo.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-          duration: 5000,
-        });
-        return;
-      }
-      console.log(`[handleFlotaSave] addVehicle retornó id: ${newVehicleId}`);
+      };
 
-      if (launchCtx) {
-        const tipoOrigen = launchCtx.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
-        void markPeldanoEnCurso(user.uid, launchCtx.peldanoId, newVehicleId, tipoOrigen);
+      const optimisticVehicle = buildOptimisticVehicleShell(
+        { ...vehiclePayload, id: newVehicleId, clientRequestId: newClientRequestId },
+        user.uid
+      );
+
+      paintFlotaLaunchOptimistic({
+        userId: user.uid,
+        optimisticVehicle,
+        vehiclesRef,
+        optimisticVehiclesRef,
+        setVehicles,
+        setExpandedId,
+        expandIfSituacion: true,
+        scrollFlotaActivosIntoView,
+        onAfterPaint: () => setIsCreating(false),
+      });
+
+      if (launchCtxSnapshot) {
         proyectoLaunchRef.current = null;
-      }
-
-      if (intensidadEnergetica) {
-        recordVehiculoInicio(newVehicleId, intensidadEnergetica);
       }
 
       if (relojTiempo === "desglosador" && user) {
@@ -1877,7 +1886,6 @@ export default function Planeacion() {
       }
 
       if (bonoTemple) {
-        void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo.trim());
         toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
           description: "Iniciaste en los últimos 15 min antes del descanso",
           style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
@@ -1885,84 +1893,35 @@ export default function Planeacion() {
         });
       }
 
-      console.log(`[handleFlotaSave] Vehículo creado exitosamente: "${titulo}"`);
-
-      try {
-      const optimisticVehicle: Vehicle = {
-        id: newVehicleId,
-        clientRequestId: newClientRequestId,
-        titulo: titulo.trim(),
-        criterioFin: criterio,
-        criterioDetalle: detalle,
-        tiempoInicio: new Date(),
-        createdAt: new Date(),
-        userId: user.uid,
-        status: "activo" as VehicleStatus,
-        ejes: STUB_EJES,
-        tipoTerminoRapido: tipoTermino,
-        tipoFlota: tipoFlotaSeleccionado,
-        aperturaAt: Date.now(),
-        bonoTemple,
-        tipoReloj: tipoFlotaSeleccionado === "tiempo" ? relojTiempo : undefined,
-        cantidadObjetivo: relojTiempo === "investigador" ? Number(cantidadInvestigador) : (relojTiempo === "produccion" ? Number(cantidadProduccion) : undefined),
-        subVehiculos: relojTiempo === "desglosador"
-          ? desglosadorSubs.filter(s => s.titulo.trim()).map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
-          : undefined,
-        subTareas: subTareasPrefill,
-        ...(launchCtx || resolvedProyectoId
-          ? {
-              proyectoId: launchCtx?.proyectoId ?? resolvedProyectoId,
-              ...(launchCtx?.peldanoId ? { proyectoPeldanoId: launchCtx.peldanoId } : {}),
-            }
-          : {}),
-        energiaDiffPct,
-        segmentoOrigen: segActualNombre,
-        segmentoId: segActualId,
-        segmentosCruzados: 0,
-        rendimientoConsciente,
-        recordSugerido,
-        tiempoElegido,
-        intensidadEnergetica: intensidadEnergetica || undefined,
-        tipoDescanso: tipoFlotaSeleccionado === "descanso" ? (tipoDescanso || "microcarga") : undefined,
-        microPasos: tipoFlotaSeleccionado === "descanso" && tipoDescanso !== "punto_cero" ? { hidratacion: false, respiracion: false, pantallaZero: false } : undefined,
-        etapasPuntoCero: tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero" ? { etapa1: false, etapa2: false, etapa3: false, etapa4: false } : undefined,
-        puntoCero:
-          tipoFlotaSeleccionado === "descanso" && tipoDescanso === "punto_cero"
-            ? initPuntoCeroSession(modoPuntoCero, parsePuntoCeroDuracionMin(detalle), Date.now())
-            : undefined,
-      };
-      optimisticVehiclesRef.current = [...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId), optimisticVehicle];
-      vehiclesRef.current = [optimisticVehicle, ...vehiclesRef.current.filter(v => v.id !== newVehicleId)];
-      startTransition(() => {
-        setVehicles(prev => {
-          const withoutDupe = prev.filter(v => v.id !== newVehicleId);
-          console.log(`[handleFlotaSave] OPTIMISTIC UPDATE: Agregando "${titulo}" al estado. Antes: ${withoutDupe.length}, Después: ${withoutDupe.length + 1}`);
-          return [optimisticVehicle, ...withoutDupe];
-        });
-      });
-      scheduleSaveLocalVehicles(vehiclesRef.current);
-      burstConcienciaClockTick(1);
-      if (tipoFlotaSeleccionado === "situacion") {
-        setExpandedId(newVehicleId);
-      }
-      setIsCreating(false);
-      scrollFlotaActivosIntoView();
-      ghostReconcileRef.current?.();
-
       toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
         description: flotaConfig.psCierre,
         style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
       });
       registrarEvento(COMPONENTES.PLANIFICACION);
-      resetForm();
-      } catch (uiErr) {
-        console.warn("[handleFlotaSave] UI post-lanzamiento:", uiErr);
-        toast.success(`"${titulo}" lanzado en este dispositivo`, {
-          description: "Si no lo ves en activos, recarga la pestaña Operar.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
-        });
-        setIsCreating(false);
-      }
+      deferFlotaFormReset(resetForm);
+
+      scheduleFlotaLaunchShadow({
+        userId: user.uid,
+        vehiclePayload,
+        provisionalId: newVehicleId,
+        clientRequestId: newClientRequestId,
+        vehiclesSnapshot: vehiclesRef.current,
+      });
+
+      scheduleFlotaLaunchPillarShadow({
+        bonoTemple,
+        titulo: titulo.trim(),
+        vehicleId: newVehicleId,
+        intensidadEnergetica: intensidadEnergetica || undefined,
+        safeAwardPS,
+        recordVehiculoInicio,
+        markPeldano: launchCtxSnapshot
+          ? async () => {
+              const tipoOrigen = launchCtxSnapshot.launch === "desglosador_tiempo" ? "tiempo" : "situacion";
+              await markPeldanoEnCurso(user.uid, launchCtxSnapshot.peldanoId, newVehicleId, tipoOrigen);
+            }
+          : undefined,
+      });
     } catch (err) {
       console.error("[handleFlotaSave] Error:", err);
       toast.error("Error al guardar vehículo", {

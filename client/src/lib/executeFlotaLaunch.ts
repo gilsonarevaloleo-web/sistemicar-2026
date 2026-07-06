@@ -1,19 +1,21 @@
 import { startTransition, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
-  addVehicle,
   type CriterioFin,
   type Planilla,
   type SegmentoV5,
   type TipoFlota,
   type TipoTerminoRapido,
   type Vehicle,
-  type VehicleStatus,
 } from "@/lib/persistence";
-import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
-import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import {
-  closeCentinelasBeforeConsciousLaunch,
+  buildOptimisticVehicleShell,
+  newFlotaLaunchIds,
+  paintFlotaLaunchOptimistic,
+  scheduleFlotaLaunchPillarShadow,
+  scheduleFlotaLaunchShadow,
+} from "@/lib/flotaLaunchMs0";
+import {
   releaseCentinela,
   resetCentinelaLaunchGate,
 } from "@/lib/centinelaEngine";
@@ -91,15 +93,18 @@ export type ExecuteFlotaLaunchParams = {
   segmentoActivo: SegmentoV5 | null;
   resolverProyectoId: (launchCtx: { proyectoId: string; peldanoId?: string } | null) => string | undefined;
   applyCentinelaArchiveLocally: (cierreAt: number) => void;
-  safeAwardPS: (points: number, reason: string) => void | Promise<void>;
-  recordVehiculoInicio: (vehicleId: string, intensidad: string) => void;
+  safeAwardPS: (points: number, reason: string) => void | Promise<void | boolean>;
+  recordVehiculoInicio: (
+    vehicleId: string,
+    banda?: "fluido" | "concentrado" | "limite"
+  ) => void;
   scrollFlotaActivosIntoView: () => void;
   optimisticVehiclesRef: MutableRefObject<Vehicle[]>;
-  ghostReconcileRef: MutableRefObject<(() => void) | undefined>;
+  ghostReconcileRef: MutableRefObject<(() => void) | null | undefined>;
   lastLaunchRef: MutableRefObject<{ key: string; at: number } | null>;
 };
 
-/** Lanzamiento mínimo Conquista (desglosador) / Enfoque — hot path sin JSON.stringify síncrono. */
+/** Lanzamiento mínimo Conquista (desglosador) / Enfoque — ms0 sin await Firebase. */
 export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Promise<string | null> {
   const {
     userId,
@@ -114,7 +119,6 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     safeAwardPS,
     scrollFlotaActivosIntoView,
     optimisticVehiclesRef,
-    ghostReconcileRef,
     lastLaunchRef,
   } = params;
 
@@ -145,7 +149,6 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
   try {
     const cierreAt = Date.now();
     applyCentinelaArchiveLocally(cierreAt);
-    await closeCentinelasBeforeConsciousLaunch(userId, vehiclesRef.current);
 
     const flotaConfig = FLOTA_CONFIG[tipoFlota];
     let detalle = "";
@@ -179,63 +182,16 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     const segActualId = segResuelto?.id ?? segmentoActivo?.id;
     const resolvedProyectoId = resolverProyectoId(null);
 
-    let newVehicleId: string;
-    let newClientRequestId: string;
-    try {
-      const created = await addVehicle(userId, {
-        titulo,
-        criterioFin: criterio,
-        criterioDetalle: detalle,
-        tiempoInicio: new Date(),
-        ejes: STUB_EJES,
-        tipoTerminoRapido: tipoTermino,
-        tipoFlota,
-        aperturaAt: Date.now(),
-        bonoTemple,
-        tipoReloj: relojTiempo,
-        subVehiculos:
-          relojTiempo === "desglosador"
-            ? desglosadorSubs.map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
-            : undefined,
-        ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
-        segmentoOrigen: segActualNombre,
-        segmentoId: segActualId,
-        segmentosCruzados: 0,
-      });
-      newVehicleId = created.id;
-      newClientRequestId = created.clientRequestId;
-    } catch (addErr) {
-      console.error("[executeFlotaLaunch] addVehicle:", addErr);
-      toast.error("Error al guardar vehículo", {
-        description: "No se pudo registrar en este dispositivo.",
-        style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-        duration: 5000,
-      });
-      return null;
-    }
+    const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
 
-    if (bonoTemple) {
-      void safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
-      toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
-        description: "Iniciaste en los últimos 15 min antes del descanso",
-        style: { backgroundColor: PIZARRA, border: `2px solid ${GOLD}`, color: GOLD },
-        duration: 4000,
-      });
-    }
-
-    const optimisticVehicle: Vehicle = {
-      id: newVehicleId,
-      clientRequestId: newClientRequestId,
+    const vehiclePayload = {
       titulo,
       criterioFin: criterio,
       criterioDetalle: detalle,
       tiempoInicio: new Date(),
-      createdAt: new Date(),
-      userId,
-      status: "activo" as VehicleStatus,
       ejes: STUB_EJES,
       tipoTerminoRapido: tipoTermino,
-      tipoFlota: tipoFlota as TipoFlota,
+      tipoFlota,
       aperturaAt: Date.now(),
       bonoTemple,
       tipoReloj: relojTiempo,
@@ -249,34 +205,51 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       segmentosCruzados: 0,
     };
 
-    optimisticVehiclesRef.current = [
-      ...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId),
-      optimisticVehicle,
-    ];
-    vehiclesRef.current = [
-      optimisticVehicle,
-      ...vehiclesRef.current.filter(v => v.id !== newVehicleId),
-    ];
-    startTransition(() => {
-      setVehicles(prev => {
-        const withoutDupe = prev.filter(v => v.id !== newVehicleId);
-        return [optimisticVehicle, ...withoutDupe];
-      });
-    });
-    scheduleSaveLocalVehicles(vehiclesRef.current);
-    burstConcienciaClockTick(1);
+    const optimisticVehicle = buildOptimisticVehicleShell(
+      { ...vehiclePayload, id: newVehicleId, clientRequestId: newClientRequestId },
+      userId
+    );
 
-    if (tipoFlota === "situacion") {
-      setExpandedId(newVehicleId);
+    paintFlotaLaunchOptimistic({
+      userId,
+      optimisticVehicle,
+      vehiclesRef,
+      optimisticVehiclesRef,
+      setVehicles,
+      setExpandedId,
+      expandIfSituacion: true,
+      scrollFlotaActivosIntoView,
+    });
+
+    if (bonoTemple) {
+      toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
+        description: "Iniciaste en los últimos 15 min antes del descanso",
+        style: { backgroundColor: PIZARRA, border: `2px solid ${GOLD}`, color: GOLD },
+        duration: 4000,
+      });
     }
-    scrollFlotaActivosIntoView();
-    ghostReconcileRef.current?.();
 
     toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
       description: flotaConfig.psCierre,
       style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color },
     });
     registrarEvento(COMPONENTES.PLANIFICACION);
+
+    scheduleFlotaLaunchShadow({
+      userId,
+      vehiclePayload,
+      provisionalId: newVehicleId,
+      clientRequestId: newClientRequestId,
+      vehiclesSnapshot: vehiclesRef.current,
+    });
+
+    scheduleFlotaLaunchPillarShadow({
+      bonoTemple,
+      titulo,
+      vehicleId: newVehicleId,
+      safeAwardPS,
+    });
+
     return newVehicleId;
   } catch (err) {
     console.error("[executeFlotaLaunch]", err);
