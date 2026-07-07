@@ -34,6 +34,8 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   } = params;
 
   const newVehicleId = optimisticVehicle.id;
+  const isSituacion = optimisticVehicle.tipoFlota === "situacion";
+
   optimisticVehiclesRef.current = [
     ...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId),
     optimisticVehicle,
@@ -43,30 +45,44 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
     ...vehiclesRef.current.filter(v => v.id !== newVehicleId),
   ];
 
-  setVehicles(prev => {
-    const withoutDupe = prev.filter(v => v.id !== newVehicleId);
-    return [optimisticVehicle, ...withoutDupe];
+  // ms0: lista en memoria ya actualizada; React en transición (situación no expande en el mismo frame).
+  startTransition(() => {
+    setVehicles(prev => {
+      const withoutDupe = prev.filter(v => v.id !== newVehicleId);
+      return [optimisticVehicle, ...withoutDupe];
+    });
   });
 
   scheduleSaveLocalVehicles(vehiclesRef.current);
   burstConcienciaClockTick(1);
   suppressGhostReconcileAfterLaunch();
 
-  if (expandIfSituacion && optimisticVehicle.tipoFlota === "situacion" && setExpandedId) {
-    setExpandedId(newVehicleId);
+  const deferHeavyUi = (fn: () => void) => {
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() => startTransition(fn));
+    } else {
+      startTransition(fn);
+    }
+  };
+
+  if (expandIfSituacion && isSituacion && setExpandedId) {
+    deferHeavyUi(() => setExpandedId(newVehicleId));
   }
-  scrollFlotaActivosIntoView?.();
-  onAfterPaint?.();
+  if (scrollFlotaActivosIntoView) {
+    deferHeavyUi(scrollFlotaActivosIntoView);
+  }
+  if (onAfterPaint) {
+    deferHeavyUi(onAfterPaint);
+  }
 }
 
 export function deferFlotaFormReset(reset: () => void): void {
-  startTransition(() => {
-    if (typeof requestIdleCallback !== "undefined") {
-      requestIdleCallback(() => reset(), { timeout: 1200 });
-    } else {
-      setTimeout(reset, 0);
-    }
-  });
+  const run = () => startTransition(reset);
+  if (typeof requestIdleCallback !== "undefined") {
+    requestIdleCallback(run, { timeout: 2000 });
+  } else {
+    setTimeout(run, 120);
+  }
 }
 
 export type FlotaLaunchShadowParams = {

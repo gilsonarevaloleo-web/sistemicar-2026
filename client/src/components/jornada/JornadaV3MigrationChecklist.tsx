@@ -8,25 +8,35 @@ import {
 import { subscribeJornadaChunkBoot } from "@/lib/jornadaChunkBoot";
 
 let checklistVersion = 0;
+let cachedChecklistSnapshot: JornadaV3ChecklistItem[] = [];
+let cachedChecklistVersion = -1;
 const checklistListeners = new Set<() => void>();
 
 function bumpChecklist(): void {
   checklistVersion += 1;
+  cachedChecklistVersion = -1;
   checklistListeners.forEach(fn => fn());
 }
 
 function subscribeChecklist(cb: () => void): () => void {
-  checklistListeners.add(cb);
-  const unsubChunk = subscribeJornadaChunkBoot(cb);
+  const wrapped = () => {
+    cachedChecklistVersion = -1;
+    cb();
+  };
+  checklistListeners.add(wrapped);
+  const unsubChunk = subscribeJornadaChunkBoot(wrapped);
   return () => {
-    checklistListeners.delete(cb);
+    checklistListeners.delete(wrapped);
     unsubChunk();
   };
 }
 
 function getChecklistSnapshot(): JornadaV3ChecklistItem[] {
-  void checklistVersion;
-  return buildJornadaV3MigrationChecklistWithOverrides();
+  if (cachedChecklistVersion !== checklistVersion) {
+    cachedChecklistVersion = checklistVersion;
+    cachedChecklistSnapshot = buildJornadaV3MigrationChecklistWithOverrides();
+  }
+  return cachedChecklistSnapshot;
 }
 
 /** Panel de checklist tronco — marcar en celular tras validar cada criterio. */
