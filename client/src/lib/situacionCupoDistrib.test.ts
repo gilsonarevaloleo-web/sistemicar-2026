@@ -388,6 +388,19 @@ describe("resolveCronometroCupoAnchor", () => {
     assert.equal((next as { subTareaId: string }).subTareaId, "b");
   });
 
+  it("forceResetSameRow salta a fila 2 tras cerrar fila 1", () => {
+    const now = 2_000_000;
+    const subs = [
+      { ...st("a", 10), enDesgloseCronometro: true, resultadoSituacion: "cumplido" as const },
+      { ...st("b", 10), enDesgloseCronometro: true },
+    ];
+    const cur = { subTareaId: "a", startedAt: now - 60_000 };
+    const next = resolveCronometroCupoAnchor(subs, cur, { forceResetSameRow: true, now });
+    assert.notEqual(next, "unchanged");
+    assert.equal((next as { subTareaId: string }).subTareaId, "b");
+    assert.equal((next as { startedAt: number }).startedAt, now);
+  });
+
   it("no cambia si la fila actual aún tiene cupo", () => {
     const now = 1_000_000;
     const subs = [st("a", 5), st("b", 10)];

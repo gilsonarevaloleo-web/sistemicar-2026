@@ -926,9 +926,11 @@ export function speakUbicacionSingle(
 export function enqueueDesglosadorVoicePassive(
   key: string,
   phrases: string[],
-  opts?: { cancelPrevious?: boolean; onPhraseStarted?: () => void }
+  opts?: { cancelPrevious?: boolean; onPhraseStarted?: () => void; rutaBandUmbral?: boolean }
 ): void {
-  if (!shouldAllowJornadaVoice()) return;
+  const voiceOk =
+    shouldAllowJornadaVoice() || (opts?.rutaBandUmbral === true && isDesglosadorVoiceEnabled());
+  if (!voiceOk) return;
   const filtered = phrases.map(p => p.trim()).filter(Boolean);
   if (filtered.length === 0) return;
   runShadowTask(() => {

@@ -15,11 +15,12 @@ import {
 export function dispatchDesglosadorVoice(
   key: string,
   phrases: string[],
-  opts?: { cancelPrevious?: boolean; onSpoken?: () => void }
+  opts?: { cancelPrevious?: boolean; onSpoken?: () => void; rutaBandUmbral?: boolean }
 ): void {
   enqueueDesglosadorVoicePassive(key, phrases, {
     cancelPrevious: opts?.cancelPrevious,
     onPhraseStarted: opts?.onSpoken,
+    rutaBandUmbral: opts?.rutaBandUmbral,
   });
 }
 
@@ -66,7 +67,11 @@ export function dispatchDesglosadorRutaBandVoice(
   onSpoken?: () => void
 ): void {
   const key = `${vehicleId}:ruta-${subId}-${banda}`;
-  dispatchDesglosadorVoice(key, rutaVozPartsForBanda(banda), { cancelPrevious: false, onSpoken });
+  dispatchDesglosadorVoice(key, rutaVozPartsForBanda(banda), {
+    cancelPrevious: false,
+    onSpoken,
+    rutaBandUmbral: true,
+  });
 }
 
 export function dispatchDesglosadorSubCloseVoice(

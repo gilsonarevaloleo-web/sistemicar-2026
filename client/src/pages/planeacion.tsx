@@ -519,6 +519,7 @@ import {
 } from "@/services/jornadaBackup";
 import { setJornadaFatalError, clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { markJornadaChunkLoaded } from "@/lib/jornadaChunkBoot";
+import { JornadaV3BootStatus } from "@/components/jornada/JornadaV3BootStatus";
 import {
   cancelFlotaFetch,
   onFlotaStaleLoadingRefetch,
@@ -1379,6 +1380,8 @@ export default function Planeacion() {
 
   const handleJornadaVisibilityReturn = useCallback(() => {
     if (!user || document.visibilityState !== "visible") return;
+    clearJornadaFatalError();
+    markJornadaChunkLoaded();
     rehydrateFlotaFromLocalRef.current?.();
     setupFlotaSubscription();
     scheduleJornadaForegroundResume(() => {
@@ -2775,6 +2778,7 @@ export default function Planeacion() {
   return (
     <div className="min-h-screen p-4 pb-40" style={{ backgroundColor: "#020202" }}>
       <JornadaStuckProbe />
+      <JornadaV3BootStatus />
       <div className="max-w-lg mx-auto space-y-4">
         {planLayout === "full" && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">

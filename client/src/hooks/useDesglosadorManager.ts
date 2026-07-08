@@ -48,7 +48,9 @@ import {
   isDesglosadorLiquidationInFlight,
   scheduleGlobalCycleLiquidation,
 } from "@/lib/desglosadorCycleLiquidation";
-import { runShadowTask } from "@/lib/desglosadorShadow";
+import { runShadowTask, runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import { burstConcienciaClockTick } from "@/lib/concienciaClock";
+import { paintSituacionRingRowCloseOptimistic } from "@/lib/situacionRingCloseMs0";
 import {
   registerDesglosadorDepthReconciler,
   scheduleDesglosadorDepthOnTap,
@@ -2004,7 +2006,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const handleDesglosadorUpdate = useCallback((
     vehicleId: string,
     updatedSubs: SubVehiculo[],
-    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean }
+    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean; rutaCruzadoOnly?: boolean }
   ) => {
     if (!user) return;
     const prevVehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -2051,7 +2053,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     // percibía como congelamiento. Los updates que NO cambian el sub activo
     // (cruces de ruta cada tick) siguen como transición no urgente.
     const activeSubChanged = prevActiveId !== nextActiveId;
-    if (activeSubChanged) {
+    if (activeSubChanged || opts?.force) {
       setVehicles(newVehicles);
     } else {
       startTransition(() => {
@@ -3128,6 +3130,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const list = vehicle.subTareas;
     const targetSub = list.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
+    paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
@@ -3153,15 +3156,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     );
     const contratoFin = sc.horaFinContratoMs ?? sc.horaFinMs;
     const repartoColaDesc = describeRepartoGananciaEnCola(workingList, subTareas, subTareaId);
-    let pasoNumero: number | null = null;
-    const updatedSub = subTareas.find(st => st.id === subTareaId);
-    if (updatedSub) {
-      const sync = await syncRingDecisionToProyectoHub(user.uid, vehicle, updatedSub, "cumplido", now);
-      pasoNumero = sync.pasoNumero;
-      if (pasoNumero != null) {
-        subTareas = subTareaConPasoEjecutado(subTareas, subTareaId, pasoNumero);
-      }
-    }
     const elapsedSec = Math.floor((now - bloqueInicio) / 1000);
     const totalDepthPs = computeDesglosadorSessionDepthPS(elapsedSec);
     const prevGranted = sc.depthBlockPsGranted ?? 0;
@@ -3180,12 +3174,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       !bloqueListo && scActivo.activo !== true
         ? reanudarSituacionCronometroRing(scActivo)
         : scActivo;
-    // Reinicio determinista del cronómetro de fila: al cerrar la fila en foco el
-    // ancla salta de inmediato a la siguiente fila pendiente con startedAt=now
-    // (o se limpia si la ronda quedó lista), dentro de la MISMA escritura de
-    // estado. Antes se conservaba el ancla vieja y el reinicio dependía de un
-    // sync async post-await (carrera + startTransition) que dejaba el reloj
-    // corriendo con el startedAt anterior.
     const resolvedAnchor = bloqueListo
       ? null
       : resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
@@ -3207,50 +3195,77 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       vehicleId,
       ts: now,
     });
-    try {
-      await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
-      void playSituacionChimes(chimesOnComplete);
-      // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset =
-      // no-op (devuelve "unchanged") salvo que haga falta corregir un borde.
-      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
-      await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
-      if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
-      if (bloqueListo) {
-        toast.success("+4 PS · Ronda completada", {
-          description: `Todas las filas del ring están cerradas. Usa «${RING_COPY.cerrarRing}» cuando quieras sellar la ronda.`,
-          style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
-          duration: 5000,
-        });
-      } else if (deltaDepth > 0) {
-        toast.success(`+4 PS · +${deltaDepth} PS profundidad (bloque)`, {
-          style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
-          duration: 2800,
-        });
-      } else if (minutosGanados > 0) {
-        toast.success(`+4 PS · +${minutosGanados} min ganados`, {
-          description:
-            repartoColaDesc ??
-            "Tiempo sumado al cupo de la cola o de la fila en foco",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${VERDE}`, color: VERDE },
-          duration: 3400,
-        });
-      } else {
-        toast.success("+4 PS · Cumplido (cronómetro)", {
-          style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
-          duration: 2200,
-        });
+    burstConcienciaClockTick(1);
+
+    void runShadowTaskAsync(async () => {
+      let finalSubTareas = subTareas;
+      let pasoNumero: number | null = null;
+      const updatedSub = subTareas.find(st => st.id === subTareaId);
+      if (updatedSub) {
+        const sync = await syncRingDecisionToProyectoHub(user.uid, vehicle, updatedSub, "cumplido", now);
+        pasoNumero = sync.pasoNumero;
+        if (pasoNumero != null) {
+          finalSubTareas = subTareaConPasoEjecutado(finalSubTareas, subTareaId, pasoNumero);
+          setVehicles(prev =>
+            prev.map(v =>
+              v.id === vehicleId ? { ...v, subTareas: finalSubTareas, situacionCronometro, situacionCupoAnchor } : v
+            )
+          );
+          vehiclesRef.current = vehiclesRef.current.map(v =>
+            v.id === vehicleId
+              ? { ...v, subTareas: finalSubTareas, situacionCronometro, situacionCupoAnchor }
+              : v
+          );
+          persistVehiclesRef();
+        }
       }
-      if (pasoNumero != null) {
-        const proyTitulo = proyectosHub.find(p => p.id === targetSub.proyectoId)?.titulo;
-        toast.info(`Paso #${pasoNumero} en ${proyTitulo ?? "proyecto"}`, {
-          description: "Paso desde el Crisol — fe incremental, anti-miopía.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
-          duration: 3500,
+      try {
+        await updateVehicle(user.uid, vehicleId, {
+          subTareas: finalSubTareas,
+          situacionCronometro,
+          situacionCupoAnchor,
         });
+        void playSituacionChimes(chimesOnComplete);
+        if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
+        await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
+        if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
+        if (bloqueListo) {
+          toast.success("+4 PS · Ronda completada", {
+            description: `Todas las filas del ring están cerradas. Usa «${RING_COPY.cerrarRing}» cuando quieras sellar la ronda.`,
+            style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
+            duration: 5000,
+          });
+        } else if (deltaDepth > 0) {
+          toast.success(`+4 PS · +${deltaDepth} PS profundidad (bloque)`, {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
+            duration: 2800,
+          });
+        } else if (minutosGanados > 0) {
+          toast.success(`+4 PS · +${minutosGanados} min ganados`, {
+            description:
+              repartoColaDesc ??
+              "Tiempo sumado al cupo de la cola o de la fila en foco",
+            style: { backgroundColor: PIZARRA, border: `1px solid ${VERDE}`, color: VERDE },
+            duration: 3400,
+          });
+        } else {
+          toast.success("+4 PS · Cumplido (cronómetro)", {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
+            duration: 2200,
+          });
+        }
+        if (pasoNumero != null) {
+          const proyTitulo = proyectosHub.find(p => p.id === targetSub.proyectoId)?.titulo;
+          toast.info(`Paso #${pasoNumero} en ${proyTitulo ?? "proyecto"}`, {
+            description: "Paso desde el Crisol — fe incremental, anti-miopía.",
+            style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
+            duration: 3500,
+          });
+        }
+      } catch (e) {
+        console.error("[handleSituacionCronometroCumplido]", e);
       }
-    } catch (e) {
-      console.error("[handleSituacionCronometroCumplido]", e);
-    }
+    });
   };
 
   const handleSituacionCronometroFallado = async (vehicleId: string, subTareaId: string) => {
@@ -3259,6 +3274,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
+    paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -3291,6 +3307,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
     persistVehiclesRef();
+    burstConcienciaClockTick(1);
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
       // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset = no-op.

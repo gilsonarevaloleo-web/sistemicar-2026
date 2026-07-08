@@ -16,6 +16,9 @@ export function buildJornadaV3MigrationChecklist(): JornadaV3ChecklistItem[] {
     { id: "close-sub", label: "Cerrar sub conquista → siguiente activo", pass: false },
     { id: "close-ring", label: "Cerrar ring → anchor nuevo", pass: false },
     { id: "nested", label: "Pausa/interrupción no resta tiempo base", pass: false },
+    { id: "resume-bg", label: "Minimizar 5 min y volver: flota activa visible (sin esqueleto)", pass: false },
+    { id: "resume-kill", label: "Kill pestaña + reabrir: watchdog 18s + Reparar OK", pass: false },
+    { id: "band-voice", label: "Umbral banda: chime + voz si toggle ON (reloj NO reinicia)", pass: false },
   ];
 }
 

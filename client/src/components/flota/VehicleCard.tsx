@@ -683,7 +683,7 @@ function VehicleCard({
   const ringSobraBloqueRef = useRef<string | null>(null);
   const ringSobraVoiceKeyRef = useRef<string | null>(null);
   const ringSobraVoicePendingRef = useRef<string | null>(null);
-  const situacionCupoEscalationRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const situacionCupoEscalationRef = useRef<number | null>(null);
   const subVehiculosRef = useRef(vehicle.subVehiculos);
   subVehiculosRef.current = vehicle.subVehiculos;
   const vehicleRef = useRef(vehicle);
@@ -1160,9 +1160,8 @@ function VehicleCard({
       } else {
         playChime();
       }
-      dispatchDesglosadorRutaBandVoice(vehicle.id, activeSub.id, alert, () => {
-        rutaUmbralAlertKeysRef.current.add(key);
-      });
+      rutaUmbralAlertKeysRef.current.add(key);
+      dispatchDesglosadorRutaBandVoice(vehicle.id, activeSub.id, alert);
     }
     const cruzadoChanged =
       nextRuta.cruzado.concentrado !== activeSub.rutaEnfoque.cruzado.concentrado ||
@@ -2998,7 +2997,11 @@ function VehicleCard({
                                           <div className="flex items-center gap-1.5 pl-1 flex-wrap" onClick={e => e.stopPropagation()}>
                                             <span className="text-[7px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-0.5">
                                               Min
-                                              {st.cupoFijo && <Lock size={8} style={{ color: GOLD }} title="Minutos fijados manualmente" />}
+                                              {st.cupoFijo && (
+                                                <span title="Minutos fijados manualmente">
+                                                  <Lock size={8} style={{ color: GOLD }} />
+                                                </span>
+                                              )}
                                             </span>
                                             {bonusCola > 0 ? (
                                               <span
@@ -3205,7 +3208,7 @@ function VehicleCard({
                         onClick={(e) => {
                           e.stopPropagation();
                           if (situacionLibreSeleccion.size === 0) return;
-                          onMoveSubTareasToCronometro?.(vehicle.id, [...situacionLibreSeleccion]);
+                          onMoveSubTareasToCronometro?.(vehicle.id, Array.from(situacionLibreSeleccion));
                           setSituacionLibreSeleccion(new Set());
                         }}
                         className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 disabled:opacity-40"
@@ -3291,7 +3294,7 @@ function VehicleCard({
                       disabled={situacionLibreSeleccion.size === 0 || !situacionObjetivoHoraValid}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMoveSubTareasToCronometro?.(vehicle.id, [...situacionLibreSeleccion], {
+                        onMoveSubTareasToCronometro?.(vehicle.id, Array.from(situacionLibreSeleccion), {
                           objetivoHora: situacionObjetivoHoraTrim,
                         });
                         setSituacionLibreSeleccion(new Set());
@@ -3705,7 +3708,7 @@ function VehicleCard({
                 <button
                   type="button"
                   disabled={!canConfirm}
-                  onClick={() => finalizeSubClose(subRutaModal.subId, subRutaModal.status, subRutaModal.cantidadRealizada, subRutaModal.duracionCompletado, subRutaSinUso ? [] : [...subRutaSel])}
+                  onClick={() => finalizeSubClose(subRutaModal.subId, subRutaModal.status, subRutaModal.cantidadRealizada, subRutaModal.duracionCompletado, subRutaSinUso ? [] : Array.from(subRutaSel))}
                   className="flex-1 py-2 rounded-xl text-xs font-bold disabled:opacity-40"
                   style={{ backgroundColor: "rgba(139,92,246,0.25)", color: "#c4b5fd" }}
                 >
