@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { JornadaShell } from "./JornadaShell";
 import { BotonRepararJornada } from "./BotonRepararJornada";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
-import { setJornadaChunkLoadPhase } from "@/lib/jornadaChunkBoot";
+import { setJornadaChunkLoadPhase, getJornadaChunkLoadPhase } from "@/lib/jornadaChunkBoot";
 
 const SLOW_LOAD_MS = isMobilePerfMode() ? 4_000 : 3_000;
 const WATCHDOG_MS = isMobilePerfMode() ? 18_000 : 10_000;
@@ -22,7 +22,9 @@ export function JornadaSuspenseFallback() {
     return () => {
       clearTimeout(slowId);
       clearTimeout(watchdogId);
-      setJornadaChunkLoadPhase("idle");
+      if (getJornadaChunkLoadPhase() !== "loaded") {
+        setJornadaChunkLoadPhase("idle");
+      }
     };
   }, []);
 

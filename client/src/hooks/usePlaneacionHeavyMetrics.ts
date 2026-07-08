@@ -28,7 +28,6 @@ import {
   isJornadaHeavyComputeAllowed,
   msUntilJornadaHeavyComputeAllowed,
 } from "@/lib/jornadaRemount";
-import { setJornadaFatalError } from "@/lib/jornadaFatalError";
 import { shouldRunMobileSurvival } from "@/lib/mobilePerf";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import type { PlanillaDailySnapshot } from "@/lib/termodinamicaAtencional";
@@ -288,10 +287,11 @@ export function usePlaneacionHeavyMetrics(
 
           const message = err instanceof Error ? err.message : String(err);
           if (message === "timeout") {
-            console.error(
-              `[HeavyMetrics] Timeout >${getHeavyComputeTimeoutMs() / 1000}s — forzando ErrorBoundary`
+            console.warn(
+              `[HeavyMetrics] Timeout >${getHeavyComputeTimeoutMs() / 1000}s — usando backup`
             );
-            setJornadaFatalError("timeout");
+            invalidatePlaneacionHeavyMetricsCache();
+            applyBackupMetrics();
             return;
           }
 

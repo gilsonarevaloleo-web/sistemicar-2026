@@ -3,17 +3,33 @@ import {
   getJornadaChunkLastError,
   getJornadaChunkLoadPhase,
   subscribeJornadaChunkBoot,
+  type JornadaChunkLoadPhase,
 } from "@/lib/jornadaChunkBoot";
 
+type BootSnapshot = { phase: JornadaChunkLoadPhase; error: string | null };
+
+let cachedBootSnapshot: BootSnapshot = { phase: "idle", error: null };
+
 function subscribe(cb: () => void): () => void {
-  return subscribeJornadaChunkBoot(cb);
+  return subscribeJornadaChunkBoot(() => {
+    cachedBootSnapshot = {
+      phase: getJornadaChunkLoadPhase(),
+      error: getJornadaChunkLastError(),
+    };
+    cb();
+  });
 }
 
-function getSnapshot(): { phase: ReturnType<typeof getJornadaChunkLoadPhase>; error: string | null } {
-  return { phase: getJornadaChunkLoadPhase(), error: getJornadaChunkLastError() };
+function getSnapshot(): BootSnapshot {
+  const phase = getJornadaChunkLoadPhase();
+  const error = getJornadaChunkLastError();
+  if (cachedBootSnapshot.phase !== phase || cachedBootSnapshot.error !== error) {
+    cachedBootSnapshot = { phase, error };
+  }
+  return cachedBootSnapshot;
 }
 
-/** Muestra error de chunk si V3 no pudo importarse (diagnóstico bloque 0). */
+/** Muestra error de chunk si no pudo importarse (diagnóstico bloque 0). */
 export function JornadaV3BootStatus() {
   const { phase, error } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   if (phase !== "failed" && phase !== "timeout") return null;
@@ -24,7 +40,7 @@ export function JornadaV3BootStatus() {
       style={{ borderColor: "rgba(239,68,68,0.35)", backgroundColor: "rgba(10,10,10,0.8)" }}
       data-testid="jornada-v3-boot-error"
     >
-      V3 boot: {phase}
+      Chunk: {phase}
       {error ? ` — ${error}` : ""}
     </div>
   );

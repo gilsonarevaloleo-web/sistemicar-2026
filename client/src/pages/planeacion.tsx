@@ -1381,7 +1381,6 @@ export default function Planeacion() {
   const handleJornadaVisibilityReturn = useCallback(() => {
     if (!user || document.visibilityState !== "visible") return;
     clearJornadaFatalError();
-    markJornadaChunkLoaded();
     rehydrateFlotaFromLocalRef.current?.();
     setupFlotaSubscription();
     scheduleJornadaForegroundResume(() => {

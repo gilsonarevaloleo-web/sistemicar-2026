@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertOctagon } from "lucide-react";
 import { repairAndReloadJornada } from "@/lib/jornadaRecovery";
+import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { getPlaneacionCrashCount } from "@/lib/situacionRepair";
 
 type Props = { children: ReactNode };
@@ -10,6 +11,7 @@ const PIZARRA = "#0a0a0a";
 const GOLD = "#D4AF37";
 
 function repairJornadaFromBoundary(): void {
+  clearJornadaFatalError();
   const archiveSituacion = getPlaneacionCrashCount() >= 2;
   repairAndReloadJornada(archiveSituacion);
 }

@@ -14,6 +14,7 @@ import { teardownAllSituacionSessions } from "@/lib/situacionSessionTeardown";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
 import { cancelPuntoCeroStepVoice } from "@/lib/puntoCeroStepVoice";
 import { cancelJornadaRemountGuard } from "@/lib/jornadaRemount";
+import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { jornadaBackupStorageKey } from "@/services/jornadaBackup";
 
 const PARKED_ACTIVES_KEY = "sistemicar_parked_actives";
@@ -59,6 +60,7 @@ export function runJornadaRecovery(opts?: { archiveSituacion?: boolean }): void 
   } catch {
     /* noop */
   }
+  clearJornadaFatalError();
 }
 
 export function reloadJornadaHard(): void {
