@@ -539,6 +539,7 @@ import {
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
+import { PerfDebugPanel, isPerfDebugEnabled } from "@/components/jornada/PerfDebugPanel";
 import { hasActiveConsciousJornadaProcess } from "@/lib/jornadaConsciousGuard";
 import {
   buildDesglosadorNestedPausePatch,
@@ -1186,7 +1187,7 @@ export default function Planeacion() {
   }, [planilla, segmentoActivo]);
 
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
-
+  const showPerfDebug = useMemo(() => isPerfDebugEnabled(), []);
 
   useEffect(() => {
     if (!user) return;
@@ -6102,6 +6103,7 @@ export default function Planeacion() {
             vehicles={vehicles}
           />
         )}
+        {showPerfDebug && <PerfDebugPanel />}
       </div>
     </div>
   );

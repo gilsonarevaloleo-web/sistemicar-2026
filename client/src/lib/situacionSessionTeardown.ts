@@ -1,6 +1,7 @@
 /**
  * Teardown imperativo del ring / desglosador situacional.
  * Debe ejecutarse ANTES de modales de victoria y al desmontar VehicleCard.
+ * Disco: sombra (no JSON.stringify síncrono en el gesto — Capa B/C).
  */
 
 import {
@@ -15,17 +16,34 @@ import {
   runSituacionSessionCleanups,
   registerSituacionSessionCleanup,
 } from "./situacionSessionRegistry";
+import { enqueueConcienciaWork } from "./concienciaScheduler";
+import { recordPerfSample } from "./jornadaPerfStats";
 
 export {
   registerSituacionSessionCleanup,
   resetSituacionSessionTeardownGate,
 };
 
+function scheduleShadowDiskFlush(): void {
+  enqueueConcienciaWork({
+    key: "flota-disk-flush",
+    priority: "high",
+    run: () => {
+      const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      flushLocalVehicles();
+      recordPerfSample(
+        "situacionTeardown",
+        (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0
+      );
+    },
+  });
+}
+
 export function teardownSituacionSession(vehicleId: string): void {
   if (!runSituacionSessionCleanups(vehicleId)) return;
 
   cancelUbicacionVoiceForVehicle(vehicleId);
-  flushLocalVehicles();
+  scheduleShadowDiskFlush();
 }
 
 export function teardownAllSituacionSessions(): void {
@@ -35,7 +53,7 @@ export function teardownAllSituacionSessions(): void {
   cancelAllUbicacionVoice();
   voiceEngine.stopChannel("situacion");
   voiceEngine.stopChannel("conquista");
-  flushLocalVehicles();
+  scheduleShadowDiskFlush();
 }
 
 function tornDownIdsResetAndTeardown(vehicleId: string): void {

@@ -26,6 +26,8 @@ import {
   initLocalVehiclesFlushListeners as initVehicleDebounceFlushListeners,
   scheduleDebouncedWrite,
 } from "./vehicleLocalStorageDebounce";
+import { vehiclesReactiveSignature } from "./vehiclesReactiveSignature";
+import { recordPerfSample } from "./jornadaPerfStats";
 import type { RutaBandaId, RutaCruzadaSnapshot, RutaEnfoqueState } from "./rutaEnfoque";
 import type { RutaSeguimientoPatron } from "./rutaSeguimiento";
 export type { RutaBandaId, RutaCruzadaSnapshot, RutaEnfoqueState } from "./rutaEnfoque";
@@ -948,13 +950,41 @@ export function mergeMissingLocalActives(sorted: Vehicle[], nowMs = Date.now()):
   return merged;
 }
 
+/** Última firma escrita a disco — evita JSON.stringify repetido (Capa B). */
+let lastWrittenVehiclesSig: string | null = null;
+let lastLocalVehiclesWriteAt = 0;
+let localVehiclesWriteSkipCount = 0;
+let localVehiclesWriteCount = 0;
+
+export function getLocalVehiclesWriteStats(): {
+  lastWrittenSig: string | null;
+  lastWriteAt: number;
+  writeCount: number;
+  skipCount: number;
+} {
+  return {
+    lastWrittenSig: lastWrittenVehiclesSig,
+    lastWriteAt: lastLocalVehiclesWriteAt,
+    writeCount: localVehiclesWriteCount,
+    skipCount: localVehiclesWriteSkipCount,
+  };
+}
+
+/** Solo tests. */
+export function resetLocalVehiclesWriteStatsForTests(): void {
+  lastWrittenVehiclesSig = null;
+  lastLocalVehiclesWriteAt = 0;
+  localVehiclesWriteSkipCount = 0;
+  localVehiclesWriteCount = 0;
+}
+
 export function saveLocalVehicles(vehicles: Vehicle[]): boolean {
   initLocalVehiclesFlushListeners();
   scheduleDebouncedWrite(() => flushLocalVehiclesNow(vehicles));
   return true;
 }
 
-/** Escritura síncrona inmediata (cierres críticos, beforeunload). */
+/** Escritura síncrona inmediata (beforeunload / visibility hidden). */
 export function flushLocalVehicles(vehicles?: Vehicle[]): boolean {
   if (vehicles) {
     return flushDebouncedWrite(() => flushLocalVehiclesNow(vehicles));
@@ -972,6 +1002,7 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
   // Per-ID tracking (not a global time window): only skip preservation for vehicle IDs
   // that were explicitly closed recently. A NEW vehicle created immediately after closing
   // another has a different ID and is always protected.
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const current = getLocalVehicles();
   vehicles = enforceLocalClosedOverrides(vehicles, current);
   const newIds = new Set(vehicles.map(v => v.id));
@@ -993,16 +1024,39 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
     console.warn(`[saveLocalVehicles] Preservando ${preserved.length} activo(s) no presentes en datos nuevos:`, preserved.map(v => `${v.id}:${v.titulo}`));
     vehicles = [...preserved, ...vehicles];
   }
+
+  const nextSig = vehiclesReactiveSignature(vehicles);
+  if (nextSig === lastWrittenVehiclesSig) {
+    localVehiclesWriteSkipCount += 1;
+    recordPerfSample("diskFlushSkip", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  }
+
   const payload = JSON.stringify(vehicles);
-  if (safeSetItem(VEHICLES_KEY, payload)) return true;
+  const markWritten = (): boolean => {
+    lastWrittenVehiclesSig = nextSig;
+    lastLocalVehiclesWriteAt = Date.now();
+    localVehiclesWriteCount += 1;
+    recordPerfSample("diskFlush", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  };
+
+  if (safeSetItem(VEHICLES_KEY, payload)) return markWritten();
 
   emergencyPruneStorage({ aggressive: true });
-  if (safeSetItem(VEHICLES_KEY, payload)) return true;
+  if (safeSetItem(VEHICLES_KEY, payload)) return markWritten();
 
   const activos = vehicles.filter(v => v.status === "activo");
   const recientes = vehicles.filter(v => v.status !== "activo").slice(0, 40);
-  const trimmed = JSON.stringify([...activos, ...recientes]);
-  if (safeSetItem(VEHICLES_KEY, trimmed)) return true;
+  const trimmedList = [...activos, ...recientes];
+  const trimmed = JSON.stringify(trimmedList);
+  if (safeSetItem(VEHICLES_KEY, trimmed)) {
+    lastWrittenVehiclesSig = vehiclesReactiveSignature(trimmedList);
+    lastLocalVehiclesWriteAt = Date.now();
+    localVehiclesWriteCount += 1;
+    recordPerfSample("diskFlushTrimmed", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  }
 
   console.error("[saveLocalVehicles] Reintento recortado falló");
   return false;

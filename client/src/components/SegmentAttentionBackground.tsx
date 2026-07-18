@@ -31,6 +31,7 @@ import {
 import { registerNotificationStateProvider } from "@/lib/notificationState";
 import { dispatchConcienciaClockTick, burstConcienciaClockTick } from "@/lib/concienciaClock";
 import {
+  enqueueConcienciaWork,
   ensureConcienciaSchedulerStarted,
   setSchedulerUiClockMs,
   stopConcienciaScheduler,
@@ -50,6 +51,7 @@ const CLOCK_MS_IDLE = 5_000;
 const INITIAL_TICK_DEFER_MS = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_INITIAL_DEFER_MS : 6_000;
 const MIN_TICK_GAP_MS = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_MIN_GAP_MS : 4_000;
 const TICK_MS_FOREGROUND_BASE = isMobilePerfMode() ? MOBILE_PERF.ATTENTION_TICK_MS : 10_000;
+const SEGMENT_WORK_KEY = "segment-attention-cycle";
 
 /**
  * Motor global de segmentos: puertas, entropía y cierres por cruce.
@@ -121,7 +123,7 @@ export function SegmentAttentionBackground() {
       }
     });
 
-    const runTick = async (opts?: { force?: boolean }) => {
+    const executeSegmentCycle = async (opts?: { force?: boolean }) => {
       if (isInterModuleSyncBlocked()) return;
       if (shouldRunMobileSurvival()) {
         dispatchConcienciaClockTick();
@@ -157,13 +159,28 @@ export function SegmentAttentionBackground() {
       }
     };
 
+    /** Intervalo solo encola; el scheduler drena con presupuesto de frame (Capa A). */
+    const pendingForceRef = { current: false };
+    const scheduleTick = (opts?: { force?: boolean }) => {
+      if (opts?.force) pendingForceRef.current = true;
+      enqueueConcienciaWork({
+        key: SEGMENT_WORK_KEY,
+        priority: "segment",
+        run: () => {
+          const force = pendingForceRef.current;
+          pendingForceRef.current = false;
+          return executeSegmentCycle({ force });
+        },
+      });
+    };
+
     const unregisterForce = registerSegmentAttentionForceTick(() => {
-      void runTick({ force: true });
+      scheduleTick({ force: true });
     });
 
     let intervalMs = TICK_MS_FOREGROUND_BASE;
-    let intervalId = window.setInterval(() => void runTick(), intervalMs);
-    const initialTickId = window.setTimeout(() => void runTick({ force: true }), INITIAL_TICK_DEFER_MS);
+    let intervalId = window.setInterval(() => scheduleTick(), intervalMs);
+    const initialTickId = window.setTimeout(() => scheduleTick({ force: true }), INITIAL_TICK_DEFER_MS);
 
     // B1: el latido de 1 s solo aporta con trabajo vivo (segunderos/puntero de
     // sesión activa). En reposo (sin vehículos activos) baja a cadencia lenta,
@@ -187,7 +204,7 @@ export function SegmentAttentionBackground() {
     const resetInterval = () => {
       clearInterval(intervalId);
       intervalMs = isAppInBackground() ? TICK_MS_BACKGROUND : TICK_MS_FOREGROUND_BASE;
-      intervalId = window.setInterval(() => void runTick(), intervalMs);
+      intervalId = window.setInterval(() => scheduleTick(), intervalMs);
       retuneClock();
     };
 
@@ -198,7 +215,7 @@ export function SegmentAttentionBackground() {
       }
       resetInterval();
       burstConcienciaClockTick(isMobilePerfMode() ? 1 : 3, isMobilePerfMode() ? 200 : 120);
-      void runTick({ force: true });
+      scheduleTick({ force: true });
       if (user) requestGhostReconcileAfterVehicleAction(user.uid);
     });
 

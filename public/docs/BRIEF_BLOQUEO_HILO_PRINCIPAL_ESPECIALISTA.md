@@ -278,7 +278,9 @@ Datos útiles para el especialista:
 
 ## Propuesta de solución sistémica (borrador para validar)
 
-No implementada aún; dirección que el equipo espera del especialista:
+**Estado julio 2026:** Capa A (cola presupuestada), B (skip por firma + flush sombra en teardown) y C (orden teardown→ms0→sombra en cierre situacional) implementadas en `concienciaScheduler` / `situacionDesgloseLiquidation` / `persistence`. Capa E: `?debug=perf`. Capa D (split de chunk) sigue parcial.
+
+Dirección original del especialista:
 
 ### Capa A — Scheduler único de conciencia
 

@@ -129,7 +129,7 @@ Un coordinador serializa con **tope de ms por frame**:
 
 **No destruir entropía** para ganar FPS. **Presupuestarla** en idle.
 
-Estado: parcial — `mobilePerf.ts` throttle existe; scheduler unificado **pendiente** (ver brief § Capa A).
+Estado: **parcial+** — `concienciaScheduler.ts` serializa pulso UI + cola presupuestada (`enqueueConcienciaWork`); `SegmentAttentionBackground` encola el ciclo de segmentos. Persistencia con skip por firma (`vehiclesReactiveSignature`) y teardown situacional en sombra. Ver brief § Capa A/B/C.
 
 ### B.4 Persistencia fuera del hot path
 
