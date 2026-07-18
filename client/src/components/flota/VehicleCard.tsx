@@ -744,7 +744,10 @@ function VehicleCard({
   }, []);
 
   const handleSubVehicleRestanteChange = useCallback((n: number | null) => {
-    setSubVehicleRestante(n);
+    // No re-renderizar el VehicleCard (~3.7k LOC) en el tick urgente del reloj.
+    startTransition(() => {
+      setSubVehicleRestante(n);
+    });
   }, []);
 
   const playChime = useCallback(() => {
@@ -866,6 +869,16 @@ function VehicleCard({
   }, [vehicle.id, vehicle.status, vehicle.tipoFlota, situacionSubWatchKey, onSyncSituacionCupoAnchor]);
 
   const desglosadorAutoActivateRef = useRef<Set<string>>(new Set());
+  /** Ventana post-lanzamiento: evita ruta-repair + voz que saturan el hilo al abrir conquista. */
+  const desglosadorLaunchGraceUntilRef = useRef(0);
+  useEffect(() => {
+    if (vehicle.tipoReloj === "desglosador" && vehicle.status === "activo") {
+      const ageMs = Date.now() - (vehicle.aperturaAt ?? 0);
+      if (ageMs >= 0 && ageMs < 4_000) {
+        desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
+      }
+    }
+  }, [vehicle.id, vehicle.tipoReloj, vehicle.status, vehicle.aperturaAt]);
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !onDesglosadorUpdate) return;
@@ -885,16 +898,20 @@ function VehicleCard({
       );
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
+      desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
       onDesglosadorUpdate(vehicle.id, repaired, { launchPaint: true });
       const activated = repaired[pendingIdx];
       if (activated) {
-        dispatchDesglosadorSubIntroVoiceOnce(
-          vehicle.id,
-          activated.id,
-          activated.aperturaAt ?? now,
-          activated.titulo,
-          Boolean(activated.rutaEnfoque?.activa)
-        );
+        // Voz intro fuera del gesto de apertura (tras grace de paint).
+        window.setTimeout(() => {
+          dispatchDesglosadorSubIntroVoiceOnce(
+            vehicle.id,
+            activated.id,
+            activated.aperturaAt ?? now,
+            activated.titulo,
+            Boolean(activated.rutaEnfoque?.activa)
+          );
+        }, 2_600);
       }
     }
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj, vehicle.id, onDesglosadorUpdate]);
@@ -1089,6 +1106,7 @@ function VehicleCard({
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !onDesglosadorUpdate) return;
+    if (Date.now() < desglosadorLaunchGraceUntilRef.current) return;
     const subsNow = subVehiculosRef.current ?? [];
     const activeSub = subsNow.find(s => s.status === "activo");
     if (!activeSub || activeSub.rutaEnfoque?.activa) return;
@@ -1100,12 +1118,14 @@ function VehicleCard({
     if (!ruta) return;
     onDesglosadorUpdate(
       vehicle.id,
-      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s))
+      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s)),
+      { launchPaint: true }
     );
   }, [vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate]);
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || subVehicleRestante === null) return;
+    if (Date.now() < desglosadorLaunchGraceUntilRef.current) return;
     const subsNow = subVehiculosRef.current ?? [];
     const activeSub = subsNow.find(s => s.status === "activo");
     if (!activeSub?.rutaEnfoque?.activa || !onDesglosadorUpdate) {
@@ -1125,7 +1145,7 @@ function VehicleCard({
         const updated = subsNow.map(s =>
           s.id === activeSub.id ? { ...s, rutaEnfoque: repaired } : s
         );
-        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true });
+        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true, launchPaint: true });
       }
       return;
     }
@@ -1310,17 +1330,28 @@ function VehicleCard({
   }, [expanded]);
 
   // A1: montaje en dos fases. Al expandir, el contenedor se abre de inmediato
-  // (barato) y el subárbol pesado del desglosador se monta en el frame siguiente
-  // vía requestAnimationFrame, sacando el trabajo de reconciliación del gesto.
+  // (barato) y el subárbol pesado del desglosador se monta en frames siguientes
+  // (doble rAF en conquista), sacando el trabajo de reconciliación del gesto.
   const [heavyBodyReady, setHeavyBodyReady] = useState(false);
   useEffect(() => {
     if (!expanded) {
       setHeavyBodyReady(false);
       return;
     }
-    const raf = requestAnimationFrame(() => setHeavyBodyReady(true));
-    return () => cancelAnimationFrame(raf);
-  }, [expanded]);
+    let raf2 = 0;
+    const isDesglosador = vehicle.tipoReloj === "desglosador";
+    const raf1 = requestAnimationFrame(() => {
+      if (!isDesglosador) {
+        setHeavyBodyReady(true);
+        return;
+      }
+      raf2 = requestAnimationFrame(() => setHeavyBodyReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [expanded, vehicle.tipoReloj]);
 
   // A3: el histórico se parsea de localStorage una sola vez cuando el cuerpo
   // pesado está listo (no en cada render ni en el frame del tap), y solo para

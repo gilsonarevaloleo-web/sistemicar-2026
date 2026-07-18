@@ -278,7 +278,7 @@ Datos útiles para el especialista:
 
 ## Propuesta de solución sistémica (borrador para validar)
 
-**Estado julio 2026:** Capa A (cola presupuestada), B (skip por firma + flush sombra en teardown) y C (orden teardown→ms0→sombra en cierre situacional) implementadas en `concienciaScheduler` / `situacionDesgloseLiquidation` / `persistence`. Capa E: `?debug=perf`. Capa D (split de chunk) sigue parcial.
+**Estado julio 2026:** Capa A (cola presupuestada), B (skip por firma + flush sombra en teardown) y C (orden teardown→ms0→sombra en cierre situacional) implementadas en `concienciaScheduler` / `situacionDesgloseLiquidation` / `persistence`. **Conquista/desglosador:** expansión diferida (doble rAF), `launchPaint` honrado, centinela sin stringify síncrono, grace 2.5s sin ruta-repair/voz. Capa E: `?debug=perf`. Capa D (split de chunk) sigue parcial.
 
 Dirección original del especialista:
 

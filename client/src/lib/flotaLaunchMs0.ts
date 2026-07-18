@@ -4,6 +4,7 @@ import { suppressGhostReconcileAfterLaunch } from "@/lib/ghostReconcileScheduler
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import { enqueueConcienciaWork } from "@/lib/concienciaScheduler";
 import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
 import { addVehicle, type Vehicle, type VehicleStatus } from "@/lib/persistence";
 import type { MutableRefObject } from "react";
@@ -15,10 +16,16 @@ export type FlotaLaunchOptimisticParams = {
   optimisticVehiclesRef: MutableRefObject<Vehicle[]>;
   setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void;
   setExpandedId?: (id: string | null) => void;
+  /** Expande situacion y desglosador conquista tras el primer paint (nunca en el frame del gesto). */
   expandIfSituacion?: boolean;
   scrollFlotaActivosIntoView?: () => void;
   onAfterPaint?: () => void;
 };
+
+function shouldExpandAfterPaint(vehicle: Vehicle, expandFlag?: boolean): boolean {
+  if (!expandFlag) return false;
+  return vehicle.tipoFlota === "situacion" || vehicle.tipoReloj === "desglosador";
+}
 
 /** ms0: pinta vehículo en memoria + store sin await Firebase ni centinela remoto. */
 export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams): void {
@@ -34,7 +41,6 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   } = params;
 
   const newVehicleId = optimisticVehicle.id;
-  const isSituacion = optimisticVehicle.tipoFlota === "situacion";
 
   optimisticVehiclesRef.current = [
     ...optimisticVehiclesRef.current.filter(v => v.id !== newVehicleId),
@@ -45,7 +51,7 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
     ...vehiclesRef.current.filter(v => v.id !== newVehicleId),
   ];
 
-  // ms0: lista en memoria ya actualizada; React en transición (situación no expande en el mismo frame).
+  // ms0: lista en memoria ya actualizada; React en transición.
   startTransition(() => {
     setVehicles(prev => {
       const withoutDupe = prev.filter(v => v.id !== newVehicleId);
@@ -54,18 +60,26 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   });
 
   scheduleSaveLocalVehicles(vehiclesRef.current);
-  burstConcienciaClockTick(1);
   suppressGhostReconcileAfterLaunch();
+
+  // Burst de reloj fuera del frame del gesto (móvil: evita cascada de anillo/métricas).
+  enqueueConcienciaWork({
+    key: `launch-clock-burst:${newVehicleId}`,
+    priority: "low",
+    run: () => burstConcienciaClockTick(1),
+  });
 
   const deferHeavyUi = (fn: () => void) => {
     if (typeof requestAnimationFrame !== "undefined") {
-      requestAnimationFrame(() => startTransition(fn));
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => startTransition(fn));
+      });
     } else {
-      startTransition(fn);
+      setTimeout(() => startTransition(fn), 32);
     }
   };
 
-  if (expandIfSituacion && isSituacion && setExpandedId) {
+  if (shouldExpandAfterPaint(optimisticVehicle, expandIfSituacion) && setExpandedId) {
     deferHeavyUi(() => setExpandedId(newVehicleId));
   }
   if (scrollFlotaActivosIntoView) {
@@ -155,3 +169,6 @@ export function buildOptimisticVehicleShell(
     createdAt: new Date(),
   };
 }
+
+/** Exportado para tests: decide si la card se abre tras paint. */
+export { shouldExpandAfterPaint };

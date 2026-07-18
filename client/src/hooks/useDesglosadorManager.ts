@@ -662,8 +662,11 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       );
     const next = patch(vehiclesRef.current);
     vehiclesRef.current = next;
-    setVehicles(patch);
-    saveLocalVehicles(next);
+    // ms0: no stringify síncrono ni reconcile urgente al lanzar conquista.
+    startTransition(() => {
+      setVehicles(patch);
+    });
+    scheduleSaveLocalVehicles(next);
   }, []);
 
   useEffect(() => {
@@ -2007,7 +2010,14 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const handleDesglosadorUpdate = useCallback((
     vehicleId: string,
     updatedSubs: SubVehiculo[],
-    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean; rutaCruzadoOnly?: boolean }
+    opts?: {
+      resetDepth?: boolean;
+      silentDepth?: boolean;
+      force?: boolean;
+      rutaCruzadoOnly?: boolean;
+      /** Pintado post-lanzamiento: no forzar reconcile urgente ni Firebase inmediato. */
+      launchPaint?: boolean;
+    }
   ) => {
     if (!user) return;
     const prevVehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -2053,8 +2063,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     // diferirla con startTransition la dejaba corriendo con el sub anterior y se
     // percibía como congelamiento. Los updates que NO cambian el sub activo
     // (cruces de ruta cada tick) siguen como transición no urgente.
+    // launchPaint: post-lanzamiento — nunca urgente (evita freeze al abrir conquista).
     const activeSubChanged = prevActiveId !== nextActiveId;
-    if (activeSubChanged || opts?.force) {
+    if ((activeSubChanged || opts?.force) && !opts?.launchPaint) {
       setVehicles(newVehicles);
     } else {
       startTransition(() => {
@@ -2066,6 +2077,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
     if (prevTimer) clearTimeout(prevTimer);
+    const firebaseDelayMs = opts?.launchPaint ? 2200 : 450;
     desglosadorSyncTimersRef.current.set(
       vehicleId,
       setTimeout(() => {
@@ -2076,7 +2088,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           subVehiculos: latest.subVehiculos,
           desglosadorBloqueDepthPsGranted: latest.desglosadorBloqueDepthPsGranted,
         }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
-      }, 450)
+      }, firebaseDelayMs)
     );
 
     if (opts?.resetDepth) {
