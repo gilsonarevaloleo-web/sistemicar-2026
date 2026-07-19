@@ -1,6 +1,7 @@
 /**
- * Sesión operativa V3 — chunk pesado (useDesglosadorManager + shell completo).
+ * Sesión operativa V3 — chunk pesado (ring/reserva/desglosador + shell completo).
  * Se carga lazy desde planeacionV3 tras el primer paint (paso 2 migración).
+ * Usa useJornadaFlotaCore para flota y useJornadaV3Ops para ring/reserva handlers.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
@@ -8,7 +9,8 @@ import JornadaShellV3 from "@/components/jornada/JornadaShellV3";
 import { FlotaLaunchPanel } from "@/components/jornada/FlotaLaunchPanel";
 import { JornadaV3MigrationChecklist } from "@/components/jornada/JornadaV3MigrationChecklist";
 import type { CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
-import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
+import { useJornadaFlotaCore } from "@/hooks/useJornadaFlotaCore";
+import { useJornadaV3Ops } from "@/hooks/useJornadaV3Ops";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   getPlanillaHoy,
@@ -29,44 +31,30 @@ export default function PlaneacionV3Session() {
   const [planilla, setPlanilla] = useState<Planilla | null>(null);
   const [planillaFecha] = useState(() => getJournalDateString());
 
-  const { vehicles: vehicleState, modales, handlers } = useDesglosadorManager({
-    onDailyPsChange: setDailyPS,
-  });
-
-  const { all: vehicles, setVehicles } = vehicleState;
+  const flota = useJornadaFlotaCore({ onDailyPsChange: setDailyPS });
 
   const {
+    vehicles,
+    setVehicles,
+    vehiclesRef,
     expandedId,
     setExpandedId,
-    situacionReserva,
-    vehiclesRef,
+    optimisticVehiclesRef,
+    ghostReconcileRef,
     rehydrateFlotaFromLocalRef,
-  } = modales;
-
-  const {
-    handleReservaTacticaQuickAdd,
-    handleReservaRutaChange,
-    handleEnviarReservaASituacion,
-    handleToggleSubTarea,
-    handleSituacionCronometroCumplido,
-    handleSituacionCronometroFallado,
-    handleDesglosadorUpdate,
     setupFlotaSubscription,
     applyCentinelaArchiveLocally,
     safeAwardPS,
     recordVehiculoInicio,
     scrollFlotaActivosIntoView,
-    resolverProyectoId,
-    optimisticVehiclesRef,
-    ghostReconcileRef,
-  } = handlers;
+  } = flota;
 
   const segmentoActivo = useMemo(() => {
     if (!planilla) return null;
     return planilla.segmentos.find(s => s.estado === "activo") ?? null;
   }, [planilla]);
 
-  const { proyectosHub, volcarMetricasAlHub } = useSegmentoProyectoVinculo(
+  const { proyectosHub, volcarMetricasAlHub, resolverProyectoId } = useSegmentoProyectoVinculo(
     user?.uid,
     segmentoActivo
   );
@@ -81,6 +69,29 @@ export default function PlaneacionV3Session() {
       })),
     [proyectosHub]
   );
+
+  const {
+    situacionReserva,
+    handleReservaTacticaQuickAdd,
+    handleReservaRutaChange,
+    handleEnviarReservaASituacion,
+    handleToggleSubTarea,
+    handleSituacionCronometroCumplido,
+    handleSituacionCronometroFallado,
+    handleDesglosadorUpdate,
+  } = useJornadaV3Ops({
+    flota: {
+      vehicles,
+      setVehicles,
+      vehiclesRef,
+      expandedId,
+      setExpandedId,
+      safeAwardPS,
+    },
+    userId: user?.uid,
+    segmentoActivo,
+    proyectosHub: imanProyectos,
+  });
 
   useEffect(() => {
     if (!user) return;
