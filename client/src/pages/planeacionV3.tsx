@@ -1,7 +1,7 @@
 /**
  * Entrada liviana de Jornada V3 (paso 2 migración).
  * Primer paint: flota core + lanzamiento — SIN useDesglosadorManager.
- * Idle: lazy-load de planeacionV3Session (manager + ring/shell completo).
+ * Idle: lazy-load de planeacionV3Session (flota core + useJornadaV3Ops + shell).
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";

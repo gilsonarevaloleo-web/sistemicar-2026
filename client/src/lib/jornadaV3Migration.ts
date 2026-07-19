@@ -13,7 +13,7 @@ export function buildJornadaV3MigrationChecklist(): JornadaV3ChecklistItem[] {
     { id: "chunk", label: "V3 abre en este dispositivo (chunk cargado)", pass: chunkOk },
     {
       id: "shell-core",
-      label: "Shell V3 pinta sin manager (useJornadaFlotaCore + lazy session)",
+      label: "Shell V3 sin manager (FlotaCore + V3Ops + lazy session)",
       pass: chunkOk,
     },
     { id: "launch", label: "Lanzar conquista/enfoque sin freeze post-toast", pass: false },
