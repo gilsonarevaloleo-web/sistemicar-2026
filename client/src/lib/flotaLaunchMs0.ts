@@ -2,12 +2,16 @@ import { startTransition } from "react";
 import { generateStableUuid } from "@/lib/stableUuid";
 import { suppressGhostReconcileAfterLaunch } from "@/lib/ghostReconcileScheduler";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
-import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
-import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import { scheduleSaveLocalVehiclesAfterLaunch } from "@/lib/deferredVehicleSave";
+import { runShadowTaskAfterLaunch } from "@/lib/desglosadorShadow";
 import { enqueueConcienciaWork } from "@/lib/concienciaScheduler";
 import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
 import { addVehicle, type Vehicle, type VehicleStatus } from "@/lib/persistence";
+import { isMobilePerfMode } from "@/lib/mobilePerf";
 import type { MutableRefObject } from "react";
+
+/** Expand situacional en móvil: deja respirar toast + primer paint de la card. */
+export const SITUACION_EXPAND_DELAY_MS = 700;
 
 export type FlotaLaunchOptimisticParams = {
   userId: string;
@@ -59,7 +63,8 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
     });
   });
 
-  scheduleSaveLocalVehicles(vehiclesRef.current);
+  // Disco fuera de la ventana toast/expand (no microtask → debounce 500ms).
+  scheduleSaveLocalVehiclesAfterLaunch(vehiclesRef.current);
   suppressGhostReconcileAfterLaunch();
 
   // Burst de reloj fuera del frame del gesto (móvil: evita cascada de anillo/métricas).
@@ -80,7 +85,13 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   };
 
   if (shouldExpandAfterPaint(optimisticVehicle, expandIfSituacion) && setExpandedId) {
-    deferHeavyUi(() => setExpandedId(newVehicleId));
+    const expand = () => deferHeavyUi(() => setExpandedId(newVehicleId));
+    // Situacional monta VehicleCard enorme: en móvil no expandir al instante del toast.
+    if (optimisticVehicle.tipoFlota === "situacion" && isMobilePerfMode()) {
+      setTimeout(expand, SITUACION_EXPAND_DELAY_MS);
+    } else {
+      expand();
+    }
   }
   if (scrollFlotaActivosIntoView) {
     deferHeavyUi(scrollFlotaActivosIntoView);
@@ -107,12 +118,14 @@ export type FlotaLaunchShadowParams = {
   vehiclesSnapshot: Vehicle[];
 };
 
-/** Sombra: centinela Firebase + persistencia remota tras ms0. */
+/** Sombra: centinela Firebase + persistencia remota tras ventana crítica post-toast. */
 export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void {
   const { userId, vehiclePayload, provisionalId, clientRequestId, vehiclesSnapshot } = params;
-  void runShadowTaskAsync(async () => {
-    await closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
-    await addVehicle(userId, vehiclePayload, { provisionalId, clientRequestId });
+  runShadowTaskAfterLaunch(() => {
+    void (async () => {
+      await closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
+      await addVehicle(userId, vehiclePayload, { provisionalId, clientRequestId });
+    })();
   });
 }
 
@@ -140,14 +153,16 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
     recordVehiculoInicio,
     markPeldano,
   } = params;
-  void runShadowTaskAsync(async () => {
-    if (markPeldano) await markPeldano();
-    if (intensidadEnergetica && recordVehiculoInicio) {
-      recordVehiculoInicio(vehicleId, intensidadEnergetica);
-    }
-    if (bonoTemple && safeAwardPS) {
-      await safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
-    }
+  runShadowTaskAfterLaunch(() => {
+    void (async () => {
+      if (markPeldano) await markPeldano();
+      if (intensidadEnergetica && recordVehiculoInicio) {
+        recordVehiculoInicio(vehicleId, intensidadEnergetica);
+      }
+      if (bonoTemple && safeAwardPS) {
+        await safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
+      }
+    })();
   });
 }
 

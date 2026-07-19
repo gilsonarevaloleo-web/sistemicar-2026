@@ -90,4 +90,40 @@ describe("flotaLaunchMs0 conquista", () => {
     assert.equal(expanded, null, "expand debe diferirse (doble rAF / transition)");
     await new Promise(r => setTimeout(r, 20));
   });
+
+  it("paintFlotaLaunchOptimistic: situacion no usa save inmediato (after-launch)", () => {
+    const store = new Map<string, string>();
+    // @ts-expect-error test stub
+    globalThis.localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    };
+
+    const vehiclesRef: MutableRefObject<Vehicle[]> = { current: [] };
+    const optimisticVehiclesRef: MutableRefObject<Vehicle[]> = { current: [] };
+    const optimistic = veh({
+      id: "sit-1",
+      tipoFlota: "situacion",
+      tipoReloj: undefined,
+      subVehiculos: [],
+    });
+
+    paintFlotaLaunchOptimistic({
+      userId: "u1",
+      optimisticVehicle: optimistic,
+      vehiclesRef,
+      optimisticVehiclesRef,
+      setVehicles: () => {},
+      setExpandedId: () => {},
+      expandIfSituacion: true,
+    });
+
+    // Tras paint, el disco no debe haberse escrito en el mismo tick (defer 2.2s).
+    assert.equal(store.has("sistemicar_vehicles"), false);
+  });
 });

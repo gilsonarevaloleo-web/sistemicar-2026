@@ -10,3 +10,19 @@ export function scheduleSaveLocalVehicles(vehicles: Vehicle[]): void {
     }
   });
 }
+
+/** Post-lanzamiento: el stringify de flota no debe chocar con toast/expand (0.5–2s). */
+export const LAUNCH_LOCAL_SAVE_DELAY_MS = 2_200;
+
+export function scheduleSaveLocalVehiclesAfterLaunch(
+  vehicles: Vehicle[],
+  delayMs = LAUNCH_LOCAL_SAVE_DELAY_MS
+): void {
+  globalThis.setTimeout(() => {
+    try {
+      saveLocalVehicles(vehicles);
+    } catch {
+      /* quota */
+    }
+  }, delayMs);
+}

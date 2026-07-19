@@ -1330,8 +1330,8 @@ function VehicleCard({
   }, [expanded]);
 
   // A1: montaje en dos fases. Al expandir, el contenedor se abre de inmediato
-  // (barato) y el subárbol pesado del desglosador se monta en frames siguientes
-  // (doble rAF en conquista), sacando el trabajo de reconciliación del gesto.
+  // (barato) y el subárbol pesado (conquista + situacional) se monta fuera del
+  // frame del expand — si no, el toast de lanzamiento "congela" el celular.
   const [heavyBodyReady, setHeavyBodyReady] = useState(false);
   useEffect(() => {
     if (!expanded) {
@@ -1339,19 +1339,38 @@ function VehicleCard({
       return;
     }
     let raf2 = 0;
-    const isDesglosador = vehicle.tipoReloj === "desglosador";
+    let idleHandle: number | ReturnType<typeof setTimeout> | null = null;
+    const isHeavyBody =
+      vehicle.tipoReloj === "desglosador" || vehicle.tipoFlota === "situacion";
+    const mountHeavy = () => {
+      if (!mountedRef.current) return;
+      setHeavyBodyReady(true);
+    };
     const raf1 = requestAnimationFrame(() => {
-      if (!isDesglosador) {
-        setHeavyBodyReady(true);
+      if (!isHeavyBody) {
+        mountHeavy();
         return;
       }
-      raf2 = requestAnimationFrame(() => setHeavyBodyReady(true));
+      raf2 = requestAnimationFrame(() => {
+        if (typeof requestIdleCallback !== "undefined") {
+          idleHandle = requestIdleCallback(mountHeavy, { timeout: 900 });
+        } else {
+          idleHandle = setTimeout(mountHeavy, 80);
+        }
+      });
     });
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
+      if (idleHandle != null) {
+        if (typeof cancelIdleCallback !== "undefined" && typeof idleHandle === "number") {
+          cancelIdleCallback(idleHandle);
+        } else {
+          clearTimeout(idleHandle);
+        }
+      }
     };
-  }, [expanded, vehicle.tipoReloj]);
+  }, [expanded, vehicle.tipoReloj, vehicle.tipoFlota]);
 
   // A3: el histórico se parsea de localStorage una sola vez cuando el cuerpo
   // pesado está listo (no en cada render ni en el frame del tap), y solo para
