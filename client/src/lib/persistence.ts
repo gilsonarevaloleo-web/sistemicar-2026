@@ -65,6 +65,7 @@ import {
   modulesGrantedByPlan,
   isOwnerEmail as _isOwnerEmail,
 } from "@shared/moduleAccess";
+import { isPreviewOpsUnlocked } from "./previewOps";
 
 export interface AcervoEntry {
   id: string;
@@ -2432,6 +2433,8 @@ export function hasPlanificacionBaseAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  // Deploy Preview Netlify: sesión distinta a producción; ver previewOps.ts
+  if (isPreviewOpsUnlocked()) return true;
   return _hasPlanificacionBaseAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
@@ -2441,6 +2444,7 @@ export function hasSoberaniaDiaAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  if (isPreviewOpsUnlocked()) return true;
   return _hasSoberaniaDiaAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
@@ -2450,6 +2454,7 @@ export function hasOperativoAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  if (isPreviewOpsUnlocked()) return true;
   return _hasOperativoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 

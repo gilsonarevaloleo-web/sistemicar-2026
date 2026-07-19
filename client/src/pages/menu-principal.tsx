@@ -44,6 +44,11 @@ import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
 import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
+import {
+  isDeployPreviewHost,
+  isPreviewOpsUnlocked,
+  setPreviewOpsUnlocked,
+} from "@/lib/previewOps";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { toast } from "sonner";
 import {
@@ -186,6 +191,7 @@ export default function MenuPrincipal() {
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [secretInput, setSecretInput] = useState("");
   const [certification, setCertification] = useState<UserCertification | null>(null);
+  const [previewUnlocked, setPreviewUnlocked] = useState(() => isPreviewOpsUnlocked());
 
   useEffect(() => {
     if (isFirebaseConfigured()) {
@@ -419,7 +425,7 @@ export default function MenuPrincipal() {
     <div className="min-h-screen p-4 md:p-6 pb-24 md:pb-6" style={{ backgroundColor: "#050505" }}>
       <PageContainer>
         <motion.div 
-          initial={{ opacity: 0, y: -10 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-6"
         >
@@ -694,20 +700,68 @@ export default function MenuPrincipal() {
         {/* Grid principal del espectro - filtrado por tier */}
         {(() => {
           const menuItems = buildMenuItems(progression, userEmail);
-          const tienePlanificacion = hasPlanificacionBaseAccess(
-            progression?.subscriptionPlan,
-            userEmail,
-            progression?.rank,
-            progression?.activeModules
-          );
-          
+          const tienePlanificacion =
+            previewUnlocked ||
+            hasPlanificacionBaseAccess(
+              progression?.subscriptionPlan,
+              userEmail,
+              progression?.rank,
+              progression?.activeModules
+            );
+          const showPreviewUnlock = isDeployPreviewHost() && !tienePlanificacion;
+
           return (
             <>
+              {showPreviewUnlock && (
+                <div
+                  className="mb-4 p-4 rounded-xl border text-center"
+                  style={{
+                    backgroundColor: "rgba(212, 175, 55, 0.08)",
+                    borderColor: "rgba(212, 175, 55, 0.35)",
+                  }}
+                  data-testid="preview-ops-banner"
+                >
+                  <p className="text-[11px] text-slate-300 mb-2 leading-relaxed">
+                    Este preview de Netlify no trae tu sesión de{" "}
+                    <span style={{ color: GOLD }}>sistemicar.app</span>. Por eso no ves Jornada —
+                    no es que falte construir.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewOpsUnlocked(true);
+                      setPreviewUnlocked(true);
+                      toast.success("Jornada desbloqueada en este preview", {
+                        description: "Entra a Jornada o Jornada V3 para probar.",
+                        style: {
+                          backgroundColor: "#0a0a0a",
+                          border: "1px solid #D4AF37",
+                          color: "#D4AF37",
+                        },
+                      });
+                    }}
+                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider"
+                    style={{ backgroundColor: GOLD, color: "#000" }}
+                    data-testid="button-preview-unlock-jornada"
+                  >
+                    Desbloquear Jornada en este preview
+                  </button>
+                </div>
+              )}
+              {previewUnlocked && isDeployPreviewHost() && (
+                <p
+                  className="mb-3 text-center text-[9px] uppercase tracking-wider"
+                  style={{ color: GOLD }}
+                  data-testid="preview-ops-active"
+                >
+                  Preview ops activo · sesión de prueba
+                </p>
+              )}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {menuItems.map((item, i) => (
                   <motion.button
                     key={item.id}
-                    initial={{ opacity: 0, y: 15 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
                     onClick={() => item.id !== "proximo" && navigate(item.route)}
