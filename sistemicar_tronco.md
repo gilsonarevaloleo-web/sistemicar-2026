@@ -226,6 +226,8 @@ flowchart TB
 
 **Dirección de split (no más monolito):** shell ligero → cards lazy → métricas/anillo en tab diferido. Nuevas features **no** expanden `planeacion.tsx`; van a hook, lib pura o componente lazy.
 
+**V3 paso 2 (en curso):** `/jornada-v3` entra por `planeacionV3.tsx` + `useJornadaFlotaCore` (sin manager). El orquestador `useDesglosadorManager` vive en chunk lazy `planeacionV3Session.tsx` tras idle. Siguiente: partir ring/conquista fuera del manager.
+
 ---
 
 ## REGLA DE DECISIÓN AL CODIFICAR
