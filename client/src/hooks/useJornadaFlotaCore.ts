@@ -51,6 +51,7 @@ export type JornadaFlotaCore = {
 export function useJornadaFlotaCore(options?: {
   onDailyPsChange?: (total: number) => void;
 }): JornadaFlotaCore {
+  const onDailyPsChange = options?.onDailyPsChange;
   const { user } = useAuthContext();
   const vehicles = useFlotaVehiclesShallow(user?.uid);
   const setVehicles = useFlotaMutator();
@@ -161,7 +162,7 @@ export function useJornadaFlotaCore(options?: {
       if (!user) return false;
       try {
         await awardSovereigntyPoints(user.uid, amount, source);
-        options?.onDailyPsChange?.(getDailyPointsLocalSync(user.uid).total);
+        onDailyPsChange?.(getDailyPointsLocalSync(user.uid).total);
         return true;
       } catch (e) {
         console.error("[useJornadaFlotaCore.safeAwardPS]", e);
@@ -171,7 +172,7 @@ export function useJornadaFlotaCore(options?: {
         return false;
       }
     },
-    [user, options]
+    [user, onDailyPsChange]
   );
 
   const recordVehiculoInicio = useCallback(
