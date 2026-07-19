@@ -902,7 +902,7 @@ function VehicleCard({
       onDesglosadorUpdate(vehicle.id, repaired, { launchPaint: true });
       const activated = repaired[pendingIdx];
       if (activated) {
-        // Voz intro fuera del gesto de apertura (tras grace de paint).
+        // Voz intro tras paint (corto): supervivencia ya no silencia TTS.
         window.setTimeout(() => {
           dispatchDesglosadorSubIntroVoiceOnce(
             vehicle.id,
@@ -911,7 +911,7 @@ function VehicleCard({
             activated.titulo,
             Boolean(activated.rutaEnfoque?.activa)
           );
-        }, 2_600);
+        }, 700);
       }
     }
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj, vehicle.id, onDesglosadorUpdate]);

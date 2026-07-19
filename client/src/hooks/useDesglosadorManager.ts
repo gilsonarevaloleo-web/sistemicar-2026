@@ -3150,7 +3150,13 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const list = vehicle.subTareas;
     const targetSub = list.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
+
+    // ms0: pinta cierre + ancla nueva ANTES de cualquier await (reinicio de reloj).
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
+    const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
+    const subTareasPainted = painted.subTareas ?? list;
+    const anchorPainted = painted.situacionCupoAnchor ?? null;
+
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
@@ -3160,13 +3166,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       sc = { ...sc, horaFinContratoMs: sc.horaFinMs };
     }
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
+
+    // Ganancia / saldo: calcular sobre snapshot pre-cierre; ancla final = la pintada (forceReset).
     let workingList = list;
     if ((sc.saldoAdelantoMin ?? 0) > 0) {
       const absorbed = absorberSaldoAdelantoEnFoco(workingList, sc.saldoAdelantoMin!, vehicle.situacionCupoAnchor);
       workingList = absorbed.subTareas;
       sc = { ...sc, saldoAdelantoMin: absorbed.saldoRestante };
     }
-    let { subTareas, minutosGanados, saldoAdelantoMin } = aplicarTiempoGanadoAlCumplir(
+    const gained = aplicarTiempoGanadoAlCumplir(
       workingList,
       subTareaId,
       vehicle.situacionCupoAnchor,
@@ -3174,8 +3182,20 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       bloqueInicio,
       sc.horaFinContratoMs ?? sc.horaFinMs
     );
-    const contratoFin = sc.horaFinContratoMs ?? sc.horaFinMs;
-    const repartoColaDesc = describeRepartoGananciaEnCola(workingList, subTareas, subTareaId);
+    // Preferir filas ya pintadas (resultado + cupos) para no pisar el ancla ms0.
+    const subTareas = subTareasPainted.map(st => {
+      const g = gained.subTareas.find(x => x.id === st.id);
+      if (!g) return st;
+      return {
+        ...st,
+        minutosCupo: g.minutosCupo ?? st.minutosCupo,
+        minutosObjetivoCupo: g.minutosObjetivoCupo ?? st.minutosObjetivoCupo,
+        bonusMinutosCola: g.bonusMinutosCola ?? st.bonusMinutosCola,
+      };
+    });
+    const minutosGanados = gained.minutosGanados;
+    const saldoAdelantoMin = gained.saldoAdelantoMin;
+    const repartoColaDesc = describeRepartoGananciaEnCola(workingList, gained.subTareas, subTareaId);
     const elapsedSec = Math.floor((now - bloqueInicio) / 1000);
     const totalDepthPs = computeDesglosadorSessionDepthPS(elapsedSec);
     const prevGranted = sc.depthBlockPsGranted ?? 0;
@@ -3194,14 +3214,16 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       !bloqueListo && scActivo.activo !== true
         ? reanudarSituacionCronometroRing(scActivo)
         : scActivo;
-    const resolvedAnchor = bloqueListo
-      ? null
-      : resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-          forceResetSameRow: true,
-          now,
-        });
-    const situacionCupoAnchor =
-      resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
+    // Ancla: la del paint (startedAt fresco). Solo re-resolvemos si falta.
+    let situacionCupoAnchor = bloqueListo ? null : anchorPainted;
+    if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
+      const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
+        forceResetSameRow: true,
+        now,
+      });
+      situacionCupoAnchor =
+        resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
+    }
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
     );
@@ -3216,6 +3238,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       ts: now,
     });
     burstConcienciaClockTick(1);
+    // Chime en el gesto (no esperar Firebase) — feedback ms0.
+    void playSituacionChimes(chimesOnComplete);
 
     void runShadowTaskAsync(async () => {
       let finalSubTareas = subTareas;
@@ -3245,8 +3269,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           situacionCronometro,
           situacionCupoAnchor,
         });
-        void playSituacionChimes(chimesOnComplete);
-        if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
         await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
         if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
         if (bloqueListo) {
@@ -3295,6 +3317,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
+    const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -3305,21 +3328,29 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       now,
       bloqueInicio
     );
-    const { subTareas, minutosPerdidos } = subTareasRaw;
+    // Conservar ancla ms0 del paint; solo fusionar cupos del cálculo.
+    const subTareas = (painted.subTareas ?? subTareasRaw.subTareas).map(st => {
+      const g = subTareasRaw.subTareas.find(x => x.id === st.id);
+      if (!g) return st;
+      return {
+        ...st,
+        minutosCupo: g.minutosCupo ?? st.minutosCupo,
+        minutosObjetivoCupo: g.minutosObjetivoCupo ?? st.minutosObjetivoCupo,
+      };
+    });
+    const minutosPerdidos = subTareasRaw.minutosPerdidos;
     const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
     let situacionCronometro =
       !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-    // Reinicio determinista del cronómetro de fila (mismo criterio que Cumplido):
-    // el ancla salta a la siguiente fila pendiente con startedAt=now en la misma
-    // escritura, en vez de conservar el startedAt anterior.
-    const resolvedAnchor = bloqueListo
-      ? null
-      : resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-          forceResetSameRow: true,
-          now,
-        });
-    const situacionCupoAnchor =
-      resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
+    let situacionCupoAnchor = bloqueListo ? null : painted.situacionCupoAnchor ?? null;
+    if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
+      const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
+        forceResetSameRow: true,
+        now,
+      });
+      situacionCupoAnchor =
+        resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
+    }
     setVehicles(prev =>
       prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
     );
@@ -3330,8 +3361,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     burstConcienciaClockTick(1);
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
-      // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset = no-op.
-      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
       if (bloqueListo) {
         toast.info("Ronda completada", {
           description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,

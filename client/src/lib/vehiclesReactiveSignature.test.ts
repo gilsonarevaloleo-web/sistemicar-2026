@@ -35,4 +35,47 @@ describe("vehiclesReactiveSignature", () => {
     } as Vehicle;
     assert.notEqual(vehiclesReactiveSignature([base]), vehiclesReactiveSignature([next]));
   });
+
+  it("cambia al Cumplido: ancla startedAt y resultadoSituacion (no skip de disco)", () => {
+    const base = veh({
+      id: "s1",
+      status: "activo",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1, depthBlockPsGranted: 0 } as never,
+      situacionCupoAnchor: { subTareaId: "a", startedAt: 1000 },
+      subTareas: [
+        {
+          id: "a",
+          texto: "A",
+          completada: false,
+          creadaAt: 0,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 10,
+        },
+        {
+          id: "b",
+          texto: "B",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 10,
+        },
+      ],
+    });
+    const afterCumplido = {
+      ...base,
+      situacionCupoAnchor: { subTareaId: "b", startedAt: 2000 },
+      subTareas: [
+        { ...base.subTareas![0]!, resultadoSituacion: "cumplido" as const, cerradaAt: 2000 },
+        base.subTareas![1]!,
+      ],
+    } as Vehicle;
+    assert.notEqual(
+      vehiclesReactiveSignature([base]),
+      vehiclesReactiveSignature([afterCumplido]),
+      "sin este cambio el flush a disco se saltaba y el reloj no reiniciaba"
+    );
+  });
 });
