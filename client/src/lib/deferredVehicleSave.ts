@@ -11,8 +11,11 @@ export function scheduleSaveLocalVehicles(vehicles: Vehicle[]): void {
   });
 }
 
-/** Post-lanzamiento: el stringify de flota no debe chocar con toast/expand (0.5–2s). */
-export const LAUNCH_LOCAL_SAVE_DELAY_MS = 2_200;
+/**
+ * Post-lanzamiento: stringify de flota ANTES del cluster expand/Firebase.
+ * Antes 2200 ms chocaba con shadow 3200 y Firebase launchPaint 2200 → Aw Snap ~4s.
+ */
+export const LAUNCH_LOCAL_SAVE_DELAY_MS = 1_500;
 
 export function scheduleSaveLocalVehiclesAfterLaunch(
   vehicles: Vehicle[],

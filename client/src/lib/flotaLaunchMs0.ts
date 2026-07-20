@@ -3,15 +3,21 @@ import { generateStableUuid } from "@/lib/stableUuid";
 import { suppressGhostReconcileAfterLaunch } from "@/lib/ghostReconcileScheduler";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { scheduleSaveLocalVehiclesAfterLaunch } from "@/lib/deferredVehicleSave";
-import { runShadowTaskAfterLaunch } from "@/lib/desglosadorShadow";
+import { runShadowTaskAfterLaunch, LAUNCH_SHADOW_DELAY_MS } from "@/lib/desglosadorShadow";
 import { enqueueConcienciaWork } from "@/lib/concienciaScheduler";
 import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
 import { addVehicle, type Vehicle, type VehicleStatus } from "@/lib/persistence";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
+import { suggestedSec } from "@/lib/desglosadorClock";
 import type { MutableRefObject } from "react";
 
-/** Expand situacional en móvil: deja respirar toast + primer paint de la card. */
+/** Expand situacional / conquista grande en móvil: deja respirar toast + primer paint. */
 export const SITUACION_EXPAND_DELAY_MS = 700;
+/** Conquista con muchos subs o proyección larga: un poco más de aire que situacional. */
+export const CONQUISTA_HEAVY_EXPAND_DELAY_MS = 900;
+/** ≥3 subs o ≥60 min proyectados → expand diferido en móvil. */
+export const CONQUISTA_HEAVY_SUBS_MIN = 3;
+export const CONQUISTA_HEAVY_PROJECTED_MIN = 60;
 
 export type FlotaLaunchOptimisticParams = {
   userId: string;
@@ -29,6 +35,35 @@ export type FlotaLaunchOptimisticParams = {
 function shouldExpandAfterPaint(vehicle: Vehicle, expandFlag?: boolean): boolean {
   if (!expandFlag) return false;
   return vehicle.tipoFlota === "situacion" || vehicle.tipoReloj === "desglosador";
+}
+
+/** Minutos proyectados de cola (sugeridos / récord×cantidad). */
+export function projectedConquistaMinutes(vehicle: Vehicle): number {
+  const subs = vehicle.subVehiculos ?? [];
+  let totalSec = 0;
+  for (const s of subs) {
+    const sec = suggestedSec(s);
+    if (sec != null && sec > 0) totalSec += sec;
+  }
+  return Math.round(totalSec / 60);
+}
+
+/**
+ * En móvil, diferir expand si la card es pesada (situacional o conquista grande).
+ * Evita montar VehicleCard enorme en el mismo cluster que disco/Firebase ~2–4 s.
+ */
+export function shouldDeferHeavyExpand(vehicle: Vehicle): boolean {
+  if (!isMobilePerfMode()) return false;
+  if (vehicle.tipoFlota === "situacion") return true;
+  if (vehicle.tipoReloj !== "desglosador") return false;
+  const n = vehicle.subVehiculos?.length ?? 0;
+  if (n >= CONQUISTA_HEAVY_SUBS_MIN) return true;
+  return projectedConquistaMinutes(vehicle) >= CONQUISTA_HEAVY_PROJECTED_MIN;
+}
+
+function expandDelayMsFor(vehicle: Vehicle): number {
+  if (vehicle.tipoFlota === "situacion") return SITUACION_EXPAND_DELAY_MS;
+  return CONQUISTA_HEAVY_EXPAND_DELAY_MS;
 }
 
 /** ms0: pinta vehículo en memoria + store sin await Firebase ni centinela remoto. */
@@ -86,9 +121,9 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
 
   if (shouldExpandAfterPaint(optimisticVehicle, expandIfSituacion) && setExpandedId) {
     const expand = () => deferHeavyUi(() => setExpandedId(newVehicleId));
-    // Situacional monta VehicleCard enorme: en móvil no expandir al instante del toast.
-    if (optimisticVehicle.tipoFlota === "situacion" && isMobilePerfMode()) {
-      setTimeout(expand, SITUACION_EXPAND_DELAY_MS);
+    // Card pesada en móvil: no expandir al instante del toast (conquista grande = situacional).
+    if (shouldDeferHeavyExpand(optimisticVehicle)) {
+      setTimeout(expand, expandDelayMsFor(optimisticVehicle));
     } else {
       expand();
     }
@@ -126,7 +161,7 @@ export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void
       await closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
       await addVehicle(userId, vehiclePayload, { provisionalId, clientRequestId });
     })();
-  });
+  }, LAUNCH_SHADOW_DELAY_MS);
 }
 
 export type FlotaLaunchPillarShadowParams = {
@@ -153,6 +188,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
     recordVehiculoInicio,
     markPeldano,
   } = params;
+  // Pilares un poco después del addVehicle (misma sombra, +800 ms) para no chocar.
   runShadowTaskAfterLaunch(() => {
     void (async () => {
       if (markPeldano) await markPeldano();
@@ -163,7 +199,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
         await safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
       }
     })();
-  });
+  }, LAUNCH_SHADOW_DELAY_MS + 800);
 }
 
 export function newFlotaLaunchIds(): { provisionalId: string; clientRequestId: string } {

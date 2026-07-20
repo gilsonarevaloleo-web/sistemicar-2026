@@ -1987,10 +1987,8 @@ function VehicleCard({
                     activeSub={activeSub}
                     onSubVehicleRestanteChange={handleSubVehicleRestanteChange}
                   >
-                    {(clockUi) => (
-                  <VehicleCardLiveNow>
-                    {(nowMs) => {
-                const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
+                    {(clockUi) => {
+                const sessionElapsedSec = clockUi.sessionElapsedSec;
 
                 return (
                   <div className="pt-3 space-y-3">
@@ -2480,8 +2478,6 @@ function VehicleCard({
                   </div>
                 );
                     }}
-                  </VehicleCardLiveNow>
-                    )}
                   </DesglosadorSubLiveIsland>
                 );
               })()}

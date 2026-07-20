@@ -2073,11 +2073,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       });
     }
     vehiclesRef.current = newVehicles;
-    scheduleSaveLocalVehicles(newVehicles);
+    // launchPaint: el disco after-launch (1.5s) ya cubre el snapshot; no re-stringify aquí.
+    if (!opts?.launchPaint) {
+      scheduleSaveLocalVehicles(newVehicles);
+    }
 
     const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
     if (prevTimer) clearTimeout(prevTimer);
-    const firebaseDelayMs = opts?.launchPaint ? 2200 : 450;
+    // launchPaint: Firebase a 4s (antes 2.2s chocaba con disco/sombra → Aw Snap ~4s).
+    const firebaseDelayMs = opts?.launchPaint ? 4_000 : 450;
     desglosadorSyncTimersRef.current.set(
       vehicleId,
       setTimeout(() => {
@@ -2091,10 +2095,13 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       }, firebaseDelayMs)
     );
 
-    if (opts?.resetDepth) {
-      scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
-    } else {
-      scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
+    // Profundidad a los 4s es noop (hace falta 1h); no encolar en launchPaint.
+    if (!opts?.launchPaint) {
+      if (opts?.resetDepth) {
+        scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
+      } else {
+        scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
+      }
     }
   }, [user]);
 

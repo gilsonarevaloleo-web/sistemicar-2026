@@ -4,7 +4,10 @@ import type { MutableRefObject } from "react";
 import type { Vehicle } from "./persistence.ts";
 import {
   paintFlotaLaunchOptimistic,
+  projectedConquistaMinutes,
+  shouldDeferHeavyExpand,
   shouldExpandAfterPaint,
+  CONQUISTA_HEAVY_SUBS_MIN,
 } from "./flotaLaunchMs0.ts";
 import { resetConcienciaSchedulerForTests } from "./concienciaScheduler.ts";
 
@@ -50,6 +53,47 @@ describe("flotaLaunchMs0 conquista", () => {
       shouldExpandAfterPaint(veh({ id: "d1", tipoFlota: "descanso", tipoReloj: undefined }), true),
       false
     );
+  });
+
+  it("shouldDeferHeavyExpand: conquista ≥3 subs en coarse", () => {
+    const prevWindow = globalThis.window;
+    const prevMatch = globalThis.matchMedia;
+    const media = (q: string) => ({
+      matches: String(q).includes("pointer: coarse") || String(q).includes("max-width"),
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+      onchange: null,
+    });
+    // @ts-expect-error test stub
+    globalThis.window = { matchMedia: media };
+    // @ts-expect-error test stub
+    globalThis.matchMedia = media;
+    try {
+      const heavy = veh({
+        id: "heavy",
+        subVehiculos: Array.from({ length: CONQUISTA_HEAVY_SUBS_MIN }, (_, i) => ({
+          id: `sv_${i}`,
+          titulo: `Sub ${i}`,
+          status: i === 0 ? ("activo" as const) : ("pendiente" as const),
+          aperturaAt: i === 0 ? Date.now() : undefined,
+          tiempoSugeridoSeg: 30 * 60,
+        })),
+      });
+      assert.ok(heavy.subVehiculos!.length >= CONQUISTA_HEAVY_SUBS_MIN);
+      assert.ok(projectedConquistaMinutes(heavy) >= 60);
+      assert.equal(shouldDeferHeavyExpand(heavy), true);
+
+      const light = veh({ id: "light" });
+      assert.equal(shouldDeferHeavyExpand(light), false);
+    } finally {
+      // @ts-expect-error restore
+      globalThis.window = prevWindow;
+      globalThis.matchMedia = prevMatch;
+    }
   });
 
   it("paintFlotaLaunchOptimistic no expande conquista en el mismo frame", async () => {
@@ -123,7 +167,7 @@ describe("flotaLaunchMs0 conquista", () => {
       expandIfSituacion: true,
     });
 
-    // Tras paint, el disco no debe haberse escrito en el mismo tick (defer 2.2s).
+    // Tras paint, el disco no debe haberse escrito en el mismo tick (defer 1.5s).
     assert.equal(store.has("sistemicar_vehicles"), false);
   });
 });
