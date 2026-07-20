@@ -230,6 +230,8 @@ flowchart TB
 
 **V3 paso 2 (completado):** `/jornada-v3` entra por `planeacionV3.tsx` + `useJornadaFlotaCore` (sin manager). La sesión V3 (`planeacionV3Session.tsx`) usa `useJornadaFlotaCore` para flota y `useJornadaV3Ops` para ring/reserva/desglosador — `useDesglosadorManager` ha sido eliminado de la sesión V3. Test en `useJornadaFlotaCore.test.ts` garantiza que ni el entry ni la sesión importan el manager. Siguiente: partir conquista fuera del manager en la ruta `/planeacion` monolítica.
 
+**Foco unidad (conquista):** overlay naranja opcional (`ConquistaUnitFocusOverlay`) — mide segundos/minutos por unidad para concentración; Reiniciar; al salir se apaga. No escribe a récord/PS/historial.
+
 ---
 
 ## REGLA DE DECISIÓN AL CODIFICAR
