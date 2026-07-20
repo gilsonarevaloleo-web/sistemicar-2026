@@ -24,6 +24,7 @@ import {
   resolveCronometroCupoAnchor,
   vehicleNeedsCupoAnchorSync,
   buildSellarDirectoEnRingState,
+  expandirColaCronometroHastaMeta,
 } from "./situacionCupoDistrib.ts";
 
 function st(id: string, minutosCupo: number, cupoFijo?: boolean): SubTarea {
@@ -339,6 +340,69 @@ describe("reacomodarColaCronometroAMeta", () => {
     const subs = [st("a", 10), st("b", 20), st("c", 10)];
     const out = reacomodarColaCronometroAMeta(subs, meta, base);
     assert.equal(sumMinutosCronometroPendientes(out), 15);
+  });
+
+  it("estira la última pendiente cuando falta pared hasta meta", () => {
+    const meta = base + 60 * 60000;
+    const subs = [st("a", 10), st("b", 10)];
+    const out = reacomodarColaCronometroAMeta(subs, meta, base);
+    assert.equal(sumMinutosCronometroPendientes(out), 60);
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 50);
+  });
+});
+
+describe("expandirColaCronometroHastaMeta / última en cola", () => {
+  const base = 1_700_000_000_000;
+
+  it("última en foco: TERMINA FOCO apunta a la meta sellada", () => {
+    const meta = base + 70 * 60000;
+    const startedAt = base;
+    const now = base + 31 * 60000;
+    const subs = [st("solo", 34)];
+    const vehicle = {
+      tipoFlota: "situacion" as const,
+      subTareas: subs,
+      situacionCronometro: { activo: true, horaFinContratoMs: meta },
+      situacionCupoAnchor: { subTareaId: "solo", startedAt },
+      aperturaAt: base,
+    };
+    const target = situacionTargetMsReloj(vehicle, now);
+    assert.equal(target, meta);
+  });
+
+  it("preview estira cupo del último foco hasta la meta", () => {
+    const meta = base + 70 * 60000;
+    const startedAt = base;
+    const now = base + 31 * 60000;
+    const subs = [st("solo", 34)];
+    const horarios = computeSituacionCronometroHorarios(subs, {
+      bloqueInicioAt: base,
+      anchor: { subTareaId: "solo", startedAt },
+      now,
+      previewTiempoGanado: true,
+      horaFinContratoMs: meta,
+    });
+    assert.equal(horarios.length, 1);
+    assert.equal(horarios[0]!.finMs, meta);
+    assert.ok((horarios[0]!.minutosCupo ?? 0) >= 70);
+  });
+
+  it("al cumplir con sobrante de pared, la última pendiente absorbe hasta meta", () => {
+    const meta = base + 60 * 60000;
+    const subs = [st("a", 20), st("b", 20)];
+    const now = base + 5 * 60000;
+    const { subTareas: out, minutosGanados } = aplicarTiempoGanadoAlCumplir(
+      subs,
+      "a",
+      { subTareaId: "a", startedAt: base },
+      now,
+      base,
+      meta
+    );
+    assert.equal(minutosGanados, 15);
+    assert.equal(out.find(s => s.id === "a")!.resultadoSituacion, "cumplido");
+    // Pared restante 55 min; b debe cubrirlos (20 + 15 ganados + estirado).
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 55);
   });
 });
 
