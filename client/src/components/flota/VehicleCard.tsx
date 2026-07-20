@@ -281,6 +281,10 @@ import {
 } from "@/lib/desglosadorClock";
 import DesglosadorDuracionPanel from "@/components/DesglosadorDuracionPanel";
 import {
+  ConquistaUnitFocusButton,
+  ConquistaUnitFocusOverlay,
+} from "@/components/flota/ConquistaUnitFocusOverlay";
+import {
   aplicarTiempoGanadoAlCumplir,
   absorberSaldoAdelantoEnFoco,
   applyCupoManualYRedistribuir,
@@ -629,6 +633,7 @@ function VehicleCard({
   const [remainingUnits, setRemainingUnits] = useState<number | null>(null);
   const [subVehicleRestante, setSubVehicleRestante] = useState<number | null>(null);
   const [desglosadorSummary, setDesglosadorSummary] = useState(false);
+  const [unitFocusOpen, setUnitFocusOpen] = useState(false);
   const subtasksExpandedStorageKey = `sistemicar_subtasks_expanded_${vehicle.id}`;
   const [subTasksCollapsed, setSubTasksCollapsed] = useState(() => {
     if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) return false;
@@ -1725,11 +1730,17 @@ function VehicleCard({
                 {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (
                   <VehicleCardLiveNow>
                     {(nowMs) => (
-                      <DesglosadorDuracionPanel
-                        elapsedSec={getDesglosadorSessionElapsedSec(vehicle, nowMs)}
-                        depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
-                        compact
-                      />
+                      <span className="inline-flex items-center gap-1.5">
+                        <DesglosadorDuracionPanel
+                          elapsedSec={getDesglosadorSessionElapsedSec(vehicle, nowMs)}
+                          depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
+                          compact
+                        />
+                        <ConquistaUnitFocusButton
+                          onOpen={() => setUnitFocusOpen(true)}
+                          accentColor={flotaColor}
+                        />
+                      </span>
                     )}
                   </VehicleCardLiveNow>
                 )}
@@ -2005,6 +2016,10 @@ function VehicleCard({
                       <div className="flex items-center gap-2">
                         <ListTodo size={12} style={{ color: flotaColor }} />
                         <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>MODO EJECUCIÓN</span>
+                        <ConquistaUnitFocusButton
+                          onOpen={() => setUnitFocusOpen(true)}
+                          accentColor={flotaColor}
+                        />
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[8px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.82)" }}>{cumplidos + fallados}/{subs.length}</span>
@@ -3770,6 +3785,13 @@ function VehicleCard({
           </motion.div>
         );
       })()}
+      {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (
+        <ConquistaUnitFocusOverlay
+          open={unitFocusOpen}
+          onClose={() => setUnitFocusOpen(false)}
+          accentColor={flotaColor}
+        />
+      )}
     </motion.div>
   );
 }
