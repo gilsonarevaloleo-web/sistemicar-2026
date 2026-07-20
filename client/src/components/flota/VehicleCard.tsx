@@ -903,8 +903,18 @@ function VehicleCard({
       );
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
-      desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
-      onDesglosadorUpdate(vehicle.id, repaired, { launchPaint: true });
+      const ageMs = Date.now() - (vehicle.aperturaAt ?? 0);
+      const isLaunchWindow = ageMs >= 0 && ageMs < 4_000;
+      if (isLaunchWindow) {
+        desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
+      }
+      // launchPaint SOLO en el primer paint post-lanzamiento.
+      // Mid-ciclo (tras Cumplido) debe ser force urgente o el reloj no remonta.
+      onDesglosadorUpdate(
+        vehicle.id,
+        repaired,
+        isLaunchWindow ? { launchPaint: true } : { force: true }
+      );
       const activated = repaired[pendingIdx];
       if (activated) {
         // Voz intro tras paint (corto): supervivencia ya no silencia TTS.
@@ -1124,7 +1134,7 @@ function VehicleCard({
     onDesglosadorUpdate(
       vehicle.id,
       subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s)),
-      { launchPaint: true }
+      { silentDepth: true }
     );
   }, [vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate]);
 
@@ -1150,7 +1160,7 @@ function VehicleCard({
         const updated = subsNow.map(s =>
           s.id === activeSub.id ? { ...s, rutaEnfoque: repaired } : s
         );
-        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true, launchPaint: true });
+        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true, silentDepth: true });
       }
       return;
     }

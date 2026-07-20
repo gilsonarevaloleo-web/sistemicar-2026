@@ -108,8 +108,8 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
     });
   });
 
-  // Disco fuera de la ventana toast/expand (no microtask → debounce 500ms).
-  scheduleSaveLocalVehiclesAfterLaunch(vehiclesRef.current);
+  // Disco fuera de la ventana toast/expand — lee ref al disparar (no snapshot del launch).
+  scheduleSaveLocalVehiclesAfterLaunch(() => vehiclesRef.current);
   suppressGhostReconcileAfterLaunch();
 
   // Burst de reloj fuera del frame del gesto (móvil: evita cascada de anillo/métricas).

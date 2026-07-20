@@ -186,7 +186,7 @@ import {
   getFlotaMergedSignature,
   getFlotaVehicles,
 } from "@/flota/flotaStore";
-import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
+import { buildDesglosadorSubClose, desglosadorSubsProgressScore, shouldAcceptDesglosadorSubsIncoming } from "@/lib/desglosadorSubClose";
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
@@ -2001,11 +2001,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   }, [user, safeAwardPS]);
 
   const desglosadorProgressScore = (subs: SubVehiculo[] | undefined): number =>
-    (subs ?? []).reduce((acc, s) => {
-      if (s.status === "cumplido" || s.status === "fallado") return acc + 100;
-      if (s.status === "activo") return acc + 10;
-      return acc;
-    }, 0);
+    desglosadorSubsProgressScore(subs);
 
   const handleDesglosadorUpdate = useCallback((
     vehicleId: string,
@@ -2037,7 +2033,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     ) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
       return;
-  }
+    }
     for (const sub of updatedSubs) {
       if (sub.status !== "cumplido") continue;
       const prevSub = prevVehicle.subVehiculos?.find(s => s.id === sub.id);
@@ -2051,25 +2047,30 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     let depthGranted = opts?.resetDepth ? 0 : (prevVehicle.desglosadorBloqueDepthPsGranted ?? 0);
 
-    const newVehicles = vehiclesRef.current.map(v => {
-      if (v.id !== vehicleId) return v;
-      const patch: Partial<Vehicle> = { subVehiculos: updatedSubs, desglosadorBloqueDepthPsGranted: depthGranted };
-      if (opts?.resetDepth) patch.aperturaAt = Date.now();
-      return { ...v, ...patch };
-    });
+    /** Aplica patch sin pisar un Cumplido más reciente (launchPaint diferido / ruta stale). */
+    const applyDesglosadorPatch = (prev: typeof vehiclesRef.current) =>
+      prev.map(v => {
+        if (v.id !== vehicleId) return v;
+        if (!shouldAcceptDesglosadorSubsIncoming(v.subVehiculos, updatedSubs, opts)) return v;
+        const patch: Partial<Vehicle> = {
+          subVehiculos: updatedSubs,
+          desglosadorBloqueDepthPsGranted: depthGranted,
+        };
+        if (opts?.resetDepth) patch.aperturaAt = Date.now();
+        return { ...v, ...patch };
+      });
+
+    const newVehicles = applyDesglosadorPatch(vehiclesRef.current);
     // El reloj del sub se remonta por key (id:aperturaAt). Cuando cambia el sub
     // activo (cierre/activación), la escritura DEBE ser urgente para que la isla
-    // del cronómetro se remonte y reinicie de inmediato con el nuevo aperturaAt;
-    // diferirla con startTransition la dejaba corriendo con el sub anterior y se
-    // percibía como congelamiento. Los updates que NO cambian el sub activo
-    // (cruces de ruta cada tick) siguen como transición no urgente.
-    // launchPaint: post-lanzamiento — nunca urgente (evita freeze al abrir conquista).
+    // del cronómetro se remonte y reinicie de inmediato con el nuevo aperturaAt.
+    // launchPaint: SOLO primer paint post-lanzamiento — nunca mid-ciclo tras Cumplido.
     const activeSubChanged = prevActiveId !== nextActiveId;
     if ((activeSubChanged || opts?.force) && !opts?.launchPaint) {
       setVehicles(newVehicles);
     } else {
       startTransition(() => {
-        setVehicles(newVehicles);
+        setVehicles(prev => applyDesglosadorPatch(prev));
       });
     }
     vehiclesRef.current = newVehicles;
