@@ -3,10 +3,20 @@ import { generateStableUuid } from "@/lib/stableUuid";
 import { suppressGhostReconcileAfterLaunch } from "@/lib/ghostReconcileScheduler";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { scheduleSaveLocalVehiclesAfterLaunch } from "@/lib/deferredVehicleSave";
-import { runShadowTaskAfterLaunch, LAUNCH_SHADOW_DELAY_MS } from "@/lib/desglosadorShadow";
+import {
+  runShadowTaskAfterLaunch,
+  runDeferredLaunchTask,
+  LAUNCH_SHADOW_DELAY_MS,
+  LAUNCH_CENTINELA_ARCHIVE_DELAY_MS,
+} from "@/lib/desglosadorShadow";
 import { enqueueConcienciaWork } from "@/lib/concienciaScheduler";
-import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
-import { addVehicle, type Vehicle, type VehicleStatus } from "@/lib/persistence";
+import {
+  closeCentinelasBeforeConsciousLaunch,
+  suppressCentinela,
+  resetCentinelaTimerState,
+} from "@/lib/centinelaEngine";
+import { recordConsciousVehicleLaunch } from "@/lib/entropyMonotonicStore";
+import { scheduleVehicleRemotePersist, type Vehicle, type VehicleStatus } from "@/lib/persistence";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
 import { suggestedSec } from "@/lib/desglosadorClock";
 import type { MutableRefObject } from "react";
@@ -153,15 +163,27 @@ export type FlotaLaunchShadowParams = {
   vehiclesSnapshot: Vehicle[];
 };
 
-/** Sombra: centinela Firebase + persistencia remota tras ventana crítica post-toast. */
+/**
+ * Sombra post-lanzamiento:
+ * - NO llama addVehicle (ya pintamos + disco after-launch): eso re-stringify + vehicles-updated ~6s.
+ * - Solo persist remoto (scheduleVehicleRemotePersist).
+ * - Centinela: suppress barato ya; archive Firebase mucho después.
+ */
 export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void {
   const { userId, vehiclePayload, provisionalId, clientRequestId, vehiclesSnapshot } = params;
+
+  // Inmediato y barato: apaga timer de centinela sin tocar Firebase.
+  suppressCentinela();
+  resetCentinelaTimerState();
+  recordConsciousVehicleLaunch();
+
   runShadowTaskAfterLaunch(() => {
-    void (async () => {
-      await closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
-      await addVehicle(userId, vehiclePayload, { provisionalId, clientRequestId });
-    })();
+    scheduleVehicleRemotePersist(userId, provisionalId, vehiclePayload, clientRequestId);
   }, LAUNCH_SHADOW_DELAY_MS);
+
+  runDeferredLaunchTask(() => {
+    void closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
+  }, LAUNCH_CENTINELA_ARCHIVE_DELAY_MS);
 }
 
 export type FlotaLaunchPillarShadowParams = {
@@ -188,7 +210,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
     recordVehiculoInicio,
     markPeldano,
   } = params;
-  // Pilares un poco después del addVehicle (misma sombra, +800 ms) para no chocar.
+  // Tras persist remoto (12s), no en el mismo segundo.
   runShadowTaskAfterLaunch(() => {
     void (async () => {
       if (markPeldano) await markPeldano();
@@ -199,7 +221,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
         await safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
       }
     })();
-  }, LAUNCH_SHADOW_DELAY_MS + 800);
+  }, LAUNCH_SHADOW_DELAY_MS + 2_000);
 }
 
 export function newFlotaLaunchIds(): { provisionalId: string; clientRequestId: string } {

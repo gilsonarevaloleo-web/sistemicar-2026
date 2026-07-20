@@ -131,7 +131,7 @@ Un coordinador serializa con **tope de ms por frame**:
 
 Estado: **parcial+** — `concienciaScheduler.ts` serializa pulso UI + cola presupuestada (`enqueueConcienciaWork`); `SegmentAttentionBackground` encola el ciclo de segmentos. Persistencia con skip por firma (`vehiclesReactiveSignature`) y teardown situacional en sombra. Ver brief § Capa A/B/C.
 
-**Lanzamiento flota (`/planeacion`):** el toast es ms0 barato; el freeze clásico era la avalancha *después* (expand + `VehicleCard` pesada + `JSON.stringify` disco + sombra Firebase). Mitigación escalonada: disco after-launch **1.5 s**, Firebase `launchPaint` **4 s**, sombra `runShadowTaskAfterLaunch` **5.5 s**, depth on tap **8 s** (skip en launchPaint), expand móvil diferido para situacional **y** conquista grande (≥3 subs o ≥60 min proyectados). Sin segundo `VehicleCardLiveNow` anidado dentro de `DesglosadorSubLiveIsland`.
+**Lanzamiento flota (`/planeacion`):** el toast es ms0 barato; el freeze clásico era la avalancha *después*. Timeline de control: disco **1.5 s**, Firebase `launchPaint` **4 s**, persist remoto **12 s** (sin `addVehicle`/re-stringify — usa `scheduleVehicleRemotePersist`), pilares **14 s**, archive centinela **18 s**. Expand móvil diferido para situacional y conquista grande. Sin segundo `VehicleCardLiveNow` anidado. El clavo en ~06 confirmó que la sombra a 5.5s con `addVehicle` era el siguiente pico.
 
 ### B.4 Persistencia fuera del hot path
 
