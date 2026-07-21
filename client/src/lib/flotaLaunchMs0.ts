@@ -165,9 +165,9 @@ export type FlotaLaunchShadowParams = {
 
 /**
  * Sombra post-lanzamiento:
- * - NO llama addVehicle (ya pintamos + disco after-launch): eso re-stringify + vehicles-updated ~6s.
- * - Solo persist remoto (scheduleVehicleRemotePersist).
- * - Centinela: suppress barato ya; archive Firebase mucho después.
+ * - NO llama addVehicle (ya pintamos + disco after-launch).
+ * - Solo persist remoto quiet (setDoc id provisional; sin remap/event).
+ * - Centinela: suppress barato ya; archive Firebase mucho después del persist.
  */
 export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void {
   const { userId, vehiclePayload, provisionalId, clientRequestId, vehiclesSnapshot } = params;
@@ -210,7 +210,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
     recordVehiculoInicio,
     markPeldano,
   } = params;
-  // Tras persist remoto (12s), no en el mismo segundo.
+  // Tras persist remoto quiet, no en el mismo segundo.
   runShadowTaskAfterLaunch(() => {
     void (async () => {
       if (markPeldano) await markPeldano();

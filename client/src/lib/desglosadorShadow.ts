@@ -15,12 +15,13 @@ export function runShadowTaskAsync(fn: () => void | Promise<void>): void {
 }
 
 /**
- * Post-lanzamiento: lejos del paint/expand (antes 3.2→5.5 aún mataba ~00:00:06).
- * El clavo en 06 confirmó que la sombra era el siguiente pico.
+ * Post-lanzamiento: lejos del paint/expand y del cluster ~12s
+ * (métricas heavy mobile timeout, centinela retro, voice safety).
+ * El clavo a ~13s era sombra@12s + addDoc remap/stringify — ahora persist quiet + más lejos.
  */
-export const LAUNCH_SHADOW_DELAY_MS = 12_000;
+export const LAUNCH_SHADOW_DELAY_MS = 28_000;
 /** Archivo de centinelas: después del persist remoto, no en el mismo golpe. */
-export const LAUNCH_CENTINELA_ARCHIVE_DELAY_MS = 18_000;
+export const LAUNCH_CENTINELA_ARCHIVE_DELAY_MS = 36_000;
 
 /**
  * Tarea diferida de lanzamiento — SOLO setTimeout (sin requestIdleCallback).
