@@ -1286,6 +1286,8 @@ export default function Espejo() {
     const contexto = contextoOverride || selectedContexto || "trabajo";
     setSelectedContexto(contexto);
     if (isVoiceRecording) cleanupVoiceRecording();
+
+    // Cerrar modal y entrar YA a la escritura (no esperar Firebase)
     setShowContextoSelector(false);
     setCurrentStep(0);
     setRespuestas({});
@@ -1306,8 +1308,6 @@ export default function Espejo() {
     setRecomendacionSesion(null);
     setCodigo343(null);
     setActiveColor343(undefined);
-    setWelcomeShown(false);
-    setWelcomeText("");
     setActiveFase(null);
     setDoctorMarkerColor(null);
     setActiveIdentidad(null);
@@ -1316,30 +1316,30 @@ export default function Espejo() {
     setVoiceAnalisis(null);
     lastAnalyzedTranscriptRef.current = "";
 
+    // Siempre a Ducha Mental escribiendo: sin welcome ni muro bloqueando
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
+    setShowMuro(false);
+    setPhase("arquitecto");
+
+    // Bloqueo Eje 3 en segundo plano (no debe impedir escribir)
     if (user) {
-      const bloqueoActivo = await getBloqueoEje3(user.uid);
-      if (bloqueoActivo) {
-        setBloqueoEje3(bloqueoActivo);
-      } else {
-        const bucle = await detectarBucleSabotaje(user.uid);
-        if (bucle && bucle.bloqueado) {
-          setBloqueoEje3({ codigo: bucle.codigo, veces: bucle.veces, hasta: bucle.hasta, activadoAt: Date.now() });
+      try {
+        const bloqueoActivo = await getBloqueoEje3(user.uid);
+        if (bloqueoActivo) {
+          setBloqueoEje3(bloqueoActivo);
         } else {
-          setBloqueoEje3(null);
+          const bucle = await detectarBucleSabotaje(user.uid);
+          if (bucle && bucle.bloqueado) {
+            setBloqueoEje3({ codigo: bucle.codigo, veces: bucle.veces, hasta: bucle.hasta, activadoAt: Date.now() });
+          } else {
+            setBloqueoEje3(null);
+          }
         }
+      } catch (err) {
+        console.warn("[confirmContextoAndStart] bloqueo check:", err);
       }
     }
-
-    // Ducha directa: salta preparación y va a escribir
-    if (pendingStartMode === "ducha") {
-      setWelcomeShown(true);
-      setWelcomeText(WELCOME_MESSAGE);
-      if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
-      setPhase("arquitecto");
-      return;
-    }
-
-    setPhase("preparacion");
   };
 
   const handlePrepSubmit = () => {
