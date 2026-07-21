@@ -3064,15 +3064,17 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     );
     persistVehiclesRef();
     setExpandedId(vehicleId);
+    // Bienvenida en el gesto de apertura (antes de Firebase): VoiceBootstrap ya
+    // desbloqueó en pointerdown; no esperar la red o la bienvenida se pierde.
+    if (firstActivation) {
+      void requestNotificationPermission();
+      unlockSpeechSynthesis(true);
+      queueMicrotask(() =>
+        speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
+      );
+    }
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor: situacionCupoAnchor ?? null });
-      if (firstActivation) {
-        void requestNotificationPermission();
-        unlockSpeechSynthesis(true);
-        queueMicrotask(() =>
-          speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
-        );
-      }
       toast.success(retoNumero > 1 ? RING_COPY.siguienteRonda : RING_COPY.ring, {
         description: `${lifted.length} subtarea(s) · meta ${objetivoHora} (${sum} min repartidos)`,
         style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },

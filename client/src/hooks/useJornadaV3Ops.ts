@@ -566,19 +566,20 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       );
       persistVehiclesRef();
       setExpandedId(vehicleId);
+      // Bienvenida en el gesto (antes de Firebase) — igual que useDesglosadorManager.
+      if (firstActivation) {
+        void requestNotificationPermission();
+        unlockSpeechSynthesis(true);
+        queueMicrotask(() =>
+          speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
+        );
+      }
       try {
         await updateVehicle(userId, vehicleId, {
           subTareas,
           situacionCronometro,
           situacionCupoAnchor: situacionCupoAnchor ?? null,
         });
-        if (firstActivation) {
-          void requestNotificationPermission();
-          unlockSpeechSynthesis(true);
-          queueMicrotask(() =>
-            speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
-          );
-        }
         toast.success(retoNumero > 1 ? RING_COPY.siguienteRonda : RING_COPY.ring, {
           description: `${lifted.length} subtarea(s) · meta ${objetivoHora} (${sum} min repartidos)`,
           style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
