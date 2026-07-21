@@ -26,17 +26,9 @@ export default function TerminalConsole({
   testId = "terminal-console",
 }: TerminalConsoleProps) {
   const [scanLines, setScanLines] = useState<string[]>([]);
-  const [cursorVisible, setCursorVisible] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scanIndexRef = useRef(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCursorVisible((v) => !v);
-    }, 530);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     if (value.length > 0 && value.length % 12 === 0) {
@@ -45,31 +37,6 @@ export default function TerminalConsole({
       scanIndexRef.current++;
     }
   }, [value]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const raw = e.target.value;
-    const withoutPrefix = raw.startsWith("> ") ? raw.slice(2) : raw;
-    onChange(withoutPrefix);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    if (textarea.selectionStart <= 2 && (e.key === "Backspace" || e.key === "Delete")) {
-      e.preventDefault();
-    }
-    if (textarea.selectionStart < 2 && e.key === "ArrowLeft") {
-      e.preventDefault();
-    }
-  };
-
-  const handleClick = () => {
-    const textarea = textareaRef.current;
-    if (textarea && textarea.selectionStart < 2) {
-      textarea.selectionStart = 2;
-      textarea.selectionEnd = 2;
-    }
-  };
 
   return (
     <div
@@ -103,19 +70,41 @@ export default function TerminalConsole({
         <span style={{ marginLeft: "8px" }}>sistemicar@espejo:~$</span>
       </div>
 
-      <div style={{ position: "relative", padding: "12px" }}>
+      <div
+        style={{
+          position: "relative",
+          padding: "12px",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "8px",
+        }}
+        onClick={() => textareaRef.current?.focus()}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            color: "#00FFC3",
+            fontFamily: "'Courier New', 'Fira Code', monospace",
+            fontSize: "14px",
+            lineHeight: "1.6",
+            userSelect: "none",
+            flexShrink: 0,
+            paddingTop: "1px",
+          }}
+        >
+          &gt;
+        </span>
         <textarea
           ref={textareaRef}
           data-testid={`${testId}-input`}
-          value={`> ${value}`}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onClick={handleClick}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder={`> ${placeholder}`}
+          placeholder={placeholder}
           rows={5}
           style={{
+            flex: 1,
             width: "100%",
             background: "transparent",
             border: "none",
@@ -125,7 +114,7 @@ export default function TerminalConsole({
             fontSize: "14px",
             lineHeight: "1.6",
             resize: "vertical",
-            caretColor: isFocused && cursorVisible ? "#00FFC3" : "transparent",
+            caretColor: "#00FFC3",
           }}
         />
 
@@ -134,7 +123,7 @@ export default function TerminalConsole({
             style={{
               position: "absolute",
               top: "12px",
-              left: "12px",
+              left: "32px",
               color: "rgba(0, 255, 195, 0.25)",
               fontFamily: "'Courier New', 'Fira Code', monospace",
               fontSize: "14px",
@@ -144,7 +133,7 @@ export default function TerminalConsole({
               gap: "2px",
             }}
           >
-            <span>&gt; {placeholder}</span>
+            <span>{placeholder}</span>
             <motion.span
               animate={{ opacity: [1, 0] }}
               transition={{ duration: 0.53, repeat: Infinity, repeatType: "reverse" }}

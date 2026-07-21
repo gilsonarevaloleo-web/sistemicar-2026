@@ -2119,7 +2119,7 @@ export default function Espejo() {
                                     </p>
                                   </motion.div>
                                 ) : currentStep === 0 ? (
-                                  welcomeText.length < WELCOME_MESSAGE.length ? (
+                                  !welcomeShown && welcomeText.length < WELCOME_MESSAGE.length ? (
                                     <div
                                       className="rounded-xl p-4 min-h-[180px] relative"
                                       style={{ backgroundColor: "rgba(0,0,0,0.85)", border: `1px solid ${CYAN_NEON}20` }}
@@ -2132,6 +2132,23 @@ export default function Espejo() {
                                           style={{ display: "inline-block" }}
                                         >▌</motion.span>
                                       </p>
+                                      <button
+                                        type="button"
+                                        data-testid="btn-saltar-welcome"
+                                        onClick={() => {
+                                          setWelcomeText(WELCOME_MESSAGE);
+                                          setWelcomeShown(true);
+                                        }}
+                                        className="mt-4 text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+                                        style={{
+                                          backgroundColor: `${CYAN_NEON}12`,
+                                          border: `1px solid ${CYAN_NEON}35`,
+                                          color: CYAN_NEON,
+                                          fontFamily: "monospace",
+                                        }}
+                                      >
+                                        Escribir ahora
+                                      </button>
                                     </div>
                                   ) : (
                                     <>
