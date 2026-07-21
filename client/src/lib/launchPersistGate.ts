@@ -8,7 +8,7 @@
  * - idle real (requestIdleCallback); forzado solo a los 3 min como red de seguridad
  */
 
-export type LaunchPersistKind = "remote" | "pillars" | "centinela";
+export type LaunchPersistKind = "remote" | "local" | "pillars" | "centinela";
 
 type PendingLaunchWork = {
   vehicleId: string;

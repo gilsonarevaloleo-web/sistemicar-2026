@@ -1101,7 +1101,8 @@ function VehicleCard({
     if (!ruta) return;
     onDesglosadorUpdate(
       vehicle.id,
-      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s))
+      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s)),
+      { launchPaint: true }
     );
   }, [vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate]);
 

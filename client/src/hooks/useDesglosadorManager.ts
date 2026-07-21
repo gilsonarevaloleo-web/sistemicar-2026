@@ -2007,7 +2007,14 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const handleDesglosadorUpdate = useCallback((
     vehicleId: string,
     updatedSubs: SubVehiculo[],
-    opts?: { resetDepth?: boolean; silentDepth?: boolean; force?: boolean; rutaCruzadoOnly?: boolean }
+    opts?: {
+      resetDepth?: boolean;
+      silentDepth?: boolean;
+      force?: boolean;
+      rutaCruzadoOnly?: boolean;
+      /** Activación / paint de lanzamiento: no programar depth@3.2s ni sync@450ms. */
+      launchPaint?: boolean;
+    }
   ) => {
     if (!user) return;
     const prevVehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -2027,7 +2034,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     ) {
       console.warn("[Desglosador] Ignorando actualización obsoleta de subs", vehicleId);
       return;
-  }
+    }
     for (const sub of updatedSubs) {
       if (sub.status !== "cumplido") continue;
       const prevSub = prevVehicle.subVehiculos?.find(s => s.id === sub.id);
@@ -2054,7 +2061,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     // percibía como congelamiento. Los updates que NO cambian el sub activo
     // (cruces de ruta cada tick) siguen como transición no urgente.
     const activeSubChanged = prevActiveId !== nextActiveId;
-    if (activeSubChanged || opts?.force) {
+    if (activeSubChanged || opts?.force || opts?.launchPaint) {
       setVehicles(newVehicles);
     } else {
       startTransition(() => {
@@ -2062,26 +2069,36 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       });
     }
     vehiclesRef.current = newVehicles;
-    scheduleSaveLocalVehicles(newVehicles);
 
-    const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
-    if (prevTimer) clearTimeout(prevTimer);
-    desglosadorSyncTimersRef.current.set(
-      vehicleId,
-      setTimeout(() => {
-        desglosadorSyncTimersRef.current.delete(vehicleId);
-        const latest = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!latest?.subVehiculos?.length || latest.status !== "activo") return;
-        void updateVehicle(user.uid, vehicleId, {
-          subVehiculos: latest.subVehiculos,
-          desglosadorBloqueDepthPsGranted: latest.desglosadorBloqueDepthPsGranted,
-        }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
-      }, 450)
-    );
+    // Launch / solo cruces de ruta: no stringify ni sync Firebase en la ventana 0–4s.
+    if (!opts?.launchPaint && !opts?.rutaCruzadoOnly) {
+      scheduleSaveLocalVehicles(newVehicles);
 
+      const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
+      if (prevTimer) clearTimeout(prevTimer);
+      desglosadorSyncTimersRef.current.set(
+        vehicleId,
+        setTimeout(() => {
+          desglosadorSyncTimersRef.current.delete(vehicleId);
+          const latest = vehiclesRef.current.find(v => v.id === vehicleId);
+          if (!latest?.subVehiculos?.length || latest.status !== "activo") return;
+          void updateVehicle(user.uid, vehicleId, {
+            subVehiculos: latest.subVehiculos,
+            desglosadorBloqueDepthPsGranted: latest.desglosadorBloqueDepthPsGranted,
+          }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
+        }, 450)
+      );
+    }
+
+    // Depth@3.2s mataba el reloj ~00:00:03 tras launch/auto-activate.
+    // Hub 60s basta durante medición; depth on-tap solo en cierre real o reset.
+    if (opts?.launchPaint || opts?.rutaCruzadoOnly) {
+      return;
+    }
     if (opts?.resetDepth) {
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
-    } else {
+    } else if (activeSubChanged) {
+      // Cierre/activación de sub: diferir depth al gate (gesto), no a 3.2s fijos.
       scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
     }
   }, [user]);
