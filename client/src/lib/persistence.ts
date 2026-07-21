@@ -865,6 +865,11 @@ export function scheduleVehicleRemotePersist(
   void persistVehicleToFirebase(userId, provisionalId, vehicle, clientRequestId, aperturaAt);
 }
 
+/**
+ * Persist remoto post-pintado local.
+ * Usa setDoc(provisionalId) para NO remapear id → evita saveLocal + vehicles-updated
+ * (~13s en mobile: sombra + addDoc remap mataba ambos desglosadores).
+ */
 async function persistVehicleToFirebase(
   userId: string,
   provisionalId: string,
@@ -886,29 +891,23 @@ async function persistVehicleToFirebase(
       payload.tiempoInicio = Timestamp.fromDate(payload.tiempoInicio);
     }
     payload.createdAt = serverTimestamp();
-    const docRef = await addDoc(collection(db, path), payload);
-    const latestLocal = getLocalVehicles();
-    const updatedLocal = latestLocal.map(v =>
-      v.id === provisionalId ? { ...v, id: docRef.id } : v
-    );
-    const remapped = updatedLocal.find(v => v.id === docRef.id);
-    saveLocalVehicles(updatedLocal);
-    backupToLocal("vehicles", updatedLocal);
-    window.dispatchEvent(new CustomEvent("vehicles-updated"));
-    console.log(`[addVehicle] Firebase OK → ${docRef.id}`);
-    if (remapped && remapped.status !== "activo") {
-      notifyVehicleClosed(docRef.id, remapped.clientRequestId);
+    // Id estable = provisional: sin remap, sin stringify de flota, sin event storm.
+    await setDoc(doc(db, path, provisionalId), payload);
+    console.log(`[addVehicle] Firebase OK (quiet setDoc) → ${provisionalId}`);
+    const local = getLocalVehicles().find(v => v.id === provisionalId);
+    if (local && local.status !== "activo") {
+      notifyVehicleClosed(provisionalId, local.clientRequestId);
       const { updateDoc } = await import("firebase/firestore");
       await updateDoc(
-        doc(db, path, docRef.id),
+        doc(db, path, provisionalId),
         omitUndefined({
-          status: remapped.status,
-          ...(remapped.cierreAt != null ? { cierreAt: remapped.cierreAt } : {}),
-          ...(remapped.duracionFinal != null ? { duracionFinal: remapped.duracionFinal } : {}),
-          ...(remapped.cierreManual != null ? { cierreManual: remapped.cierreManual } : {}),
+          status: local.status,
+          ...(local.cierreAt != null ? { cierreAt: local.cierreAt } : {}),
+          ...(local.duracionFinal != null ? { duracionFinal: local.duracionFinal } : {}),
+          ...(local.cierreManual != null ? { cierreManual: local.cierreManual } : {}),
         })
       );
-      console.log(`[addVehicle] Cierre local sincronizado tras remap → ${docRef.id}`);
+      console.log(`[addVehicle] Cierre local sincronizado (sin remap) → ${provisionalId}`);
     }
   } catch (error) {
     console.error("[addVehicle] Firebase background error:", error);

@@ -10,3 +10,24 @@ export function scheduleSaveLocalVehicles(vehicles: Vehicle[]): void {
     }
   });
 }
+
+/**
+ * Post-lanzamiento: stringify de flota fuera del cluster expand/Firebase.
+ * Si se pasa un getter, lee el snapshot al disparar (no el del launch): evita pisar Cumplido.
+ */
+export const LAUNCH_LOCAL_SAVE_DELAY_MS = 1_500;
+
+export function scheduleSaveLocalVehiclesAfterLaunch(
+  vehiclesOrGetter: Vehicle[] | (() => Vehicle[]),
+  delayMs = LAUNCH_LOCAL_SAVE_DELAY_MS
+): void {
+  globalThis.setTimeout(() => {
+    try {
+      const vehicles =
+        typeof vehiclesOrGetter === "function" ? vehiclesOrGetter() : vehiclesOrGetter;
+      saveLocalVehicles(vehicles);
+    } catch {
+      /* quota */
+    }
+  }, delayMs);
+}

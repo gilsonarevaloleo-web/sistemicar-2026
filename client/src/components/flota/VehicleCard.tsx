@@ -1015,6 +1015,7 @@ function VehicleCard({
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
     if (isFreshRing) {
+      // Esperar idle real: el fallback a 900ms cancelaba la bienvenida (cancelPrevious).
       let spoke = false;
       const trySpeak = () => {
         if (cancelled || spoke) return;
@@ -1024,7 +1025,7 @@ function VehicleCard({
         scheduleSpeak();
       };
       unsubIdle = subscribeSpeechQueueIdle(trySpeak);
-      fallbackTimer = setTimeout(trySpeak, 900);
+      fallbackTimer = setTimeout(trySpeak, 14_000);
     } else {
       scheduleSpeak();
     }
