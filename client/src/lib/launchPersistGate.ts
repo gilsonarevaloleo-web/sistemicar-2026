@@ -2,10 +2,12 @@
  * Persist remoto post-lanzamiento SIN bomba a N segundos.
  *
  * Mover el delay (4→6→12→13→28) solo movía el congelamiento del reloj conquista.
- * Aquí el setDoc quiet / pilares se disparan cuando el operador NO está mid-tick:
+ * Idle en foreground también disparaba el golpe ~00:00:03 entre ticks del reloj.
+ *
+ * Solo se vacía cuando el operador NO está mid-tick de medición:
  * - pestaña oculta / pagehide
  * - primer cierre de sub (Cumplido/Fallado) del vehículo
- * - idle real (requestIdleCallback); forzado solo a los 3 min como red de seguridad
+ * - red de seguridad a 3 min (setDoc async; no stringify forzado en foreground temprano)
  */
 
 export type LaunchPersistKind = "remote" | "local" | "pillars" | "centinela";
@@ -18,18 +20,10 @@ type PendingLaunchWork = {
 
 const pending: PendingLaunchWork[] = [];
 let listenersArmed = false;
-let idleHandle: number | null = null;
 let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Red de seguridad — no es la estrategia; solo si nunca hubo idle/oculto/cierre. */
+/** Red de seguridad — solo si nunca hubo oculto/cierre. */
 export const LAUNCH_PERSIST_SAFETY_MS = 180_000;
-
-function clearIdle(): void {
-  if (idleHandle != null && typeof cancelIdleCallback !== "undefined") {
-    cancelIdleCallback(idleHandle);
-    idleHandle = null;
-  }
-}
 
 function clearSafety(): void {
   if (safetyTimer != null) {
@@ -40,7 +34,6 @@ function clearSafety(): void {
 
 function disarmIfEmpty(): void {
   if (pending.length > 0) return;
-  clearIdle();
   clearSafety();
   if (!listenersArmed || typeof document === "undefined") return;
   document.removeEventListener("visibilitychange", onVisibility);
@@ -48,10 +41,7 @@ function disarmIfEmpty(): void {
   listenersArmed = false;
 }
 
-function flushAll(reason: string): void {
-  if (pending.length === 0) return;
-  const batch = pending.splice(0, pending.length);
-  disarmIfEmpty();
+function flushBatch(batch: PendingLaunchWork[], reason: string): void {
   for (const item of batch) {
     try {
       item.run();
@@ -59,6 +49,42 @@ function flushAll(reason: string): void {
       console.warn(`[launchPersistGate] ${item.kind}/${reason}`, e);
     }
   }
+}
+
+function flushAll(reason: string): void {
+  if (pending.length === 0) return;
+  const batch = pending.splice(0, pending.length);
+  disarmIfEmpty();
+  flushBatch(batch, reason);
+}
+
+/** Seguridad: en foreground solo remote/centinela/pillars (red); local stringify espera oculto/cierre. */
+function flushSafetyForeground(): void {
+  if (pending.length === 0) return;
+  const runNow: PendingLaunchWork[] = [];
+  const keep: PendingLaunchWork[] = [];
+  for (const item of pending) {
+    if (item.kind === "local") keep.push(item);
+    else runNow.push(item);
+  }
+  pending.length = 0;
+  pending.push(...keep);
+  if (pending.length === 0) {
+    disarmIfEmpty();
+  } else {
+    // Sigue armado por el stringify local pendiente.
+    clearSafety();
+    safetyTimer = setTimeout(() => {
+      safetyTimer = null;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        flushAll("safety-hidden");
+      } else {
+        // Último recurso: también local, pero lejos del arranque.
+        flushAll("safety-final");
+      }
+    }, LAUNCH_PERSIST_SAFETY_MS);
+  }
+  flushBatch(runNow, "safety-foreground");
 }
 
 function flushVehicle(vehicleId: string, reason: string): void {
@@ -71,13 +97,7 @@ function flushVehicle(vehicleId: string, reason: string): void {
   pending.length = 0;
   pending.push(...keep);
   disarmIfEmpty();
-  for (const item of runNow) {
-    try {
-      item.run();
-    } catch (e) {
-      console.warn(`[launchPersistGate] ${item.kind}/${reason}`, e);
-    }
-  }
+  flushBatch(runNow, reason);
 }
 
 function onVisibility(): void {
@@ -90,49 +110,31 @@ function onPageHide(): void {
   flushAll("pagehide");
 }
 
-function armIdleSafety(): void {
-  clearIdle();
-  clearSafety();
-  if (typeof requestIdleCallback !== "undefined") {
-    const schedule = () => {
-      idleHandle = requestIdleCallback(
-        deadline => {
-          idleHandle = null;
-          if (pending.length === 0) return;
-          if (
-            (typeof document !== "undefined" && document.visibilityState === "hidden") ||
-            deadline.timeRemaining() > 12 ||
-            deadline.didTimeout
-          ) {
-            flushAll(deadline.didTimeout ? "idle-timeout-safety" : "idle");
-            return;
-          }
-          schedule();
-        },
-        { timeout: LAUNCH_PERSIST_SAFETY_MS }
-      ) as unknown as number;
-    };
-    schedule();
-    return;
-  }
-  safetyTimer = setTimeout(() => flushAll("timeout-safety"), LAUNCH_PERSIST_SAFETY_MS);
-}
-
 function ensureListeners(): void {
-  if (listenersArmed || typeof document === "undefined") return;
-  listenersArmed = true;
-  document.addEventListener("visibilitychange", onVisibility);
-  window.addEventListener("pagehide", onPageHide);
-  armIdleSafety();
+  if (typeof document === "undefined") return;
+  if (!listenersArmed) {
+    listenersArmed = true;
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+  }
+  if (safetyTimer == null && pending.length > 0) {
+    safetyTimer = setTimeout(() => {
+      safetyTimer = null;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        flushAll("safety-hidden");
+      } else {
+        flushSafetyForeground();
+      }
+    }, LAUNCH_PERSIST_SAFETY_MS);
+  }
 }
 
-/** Encola trabajo de launch; no usa setTimeout(28s). */
+/** Encola trabajo de launch; no usa setTimeout(28s) ni idle en foreground. */
 export function enqueueLaunchPersistWork(
   vehicleId: string,
   kind: LaunchPersistKind,
   run: () => void
 ): void {
-  // Un solo pending por vehículo+kind (re-lanzamientos).
   for (let i = pending.length - 1; i >= 0; i--) {
     if (pending[i].vehicleId === vehicleId && pending[i].kind === kind) {
       pending.splice(i, 1);
@@ -150,7 +152,12 @@ export function flushLaunchPersistOnSubClose(vehicleId: string): void {
 /** Solo tests. */
 export function resetLaunchPersistGateForTests(): void {
   pending.length = 0;
-  disarmIfEmpty();
+  clearSafety();
+  if (listenersArmed && typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pagehide", onPageHide);
+    listenersArmed = false;
+  }
 }
 
 /** Solo tests. */

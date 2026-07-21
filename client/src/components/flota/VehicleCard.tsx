@@ -489,6 +489,7 @@ import {
   DesglosadorSubCloseButtons,
   type DesglosadorSubClosePayload,
 } from "@/components/planeacion/DesglosadorSubCloseButtons";
+import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
@@ -1199,9 +1200,7 @@ function VehicleCard({
     const { subs: allSubs, closedSub, nextActiveSubId } = built;
 
     // Gesto seguro: vaciar persist launch pendiente (sin bomba a N s).
-    void import("@/lib/launchPersistGate").then(m => {
-      m.flushLaunchPersistOnSubClose(vehicle.id);
-    });
+    flushLaunchPersistOnSubClose(vehicle.id);
 
     const veredicto = computeSubCloseVerdict(closedSub);
     setUltimoCierreSub({
