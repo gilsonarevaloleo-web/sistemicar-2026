@@ -856,6 +856,10 @@ export default function Espejo() {
     try {
       const contextoLabel = CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General";
       const pacienteActual = selectedPacienteId ? pacientesLista.find(p => p.id === selectedPacienteId) : null;
+      const respuestasParaIA = {
+        ...respuestas,
+        ...(eje2MensajeText ? { diagnostico_clinico: eje2MensajeText } : {}),
+      };
       const response = await fetch("/api/espejo-doctor-ia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -863,7 +867,7 @@ export default function Espejo() {
           eje,
           texto,
           contexto: contextoLabel,
-          respuestas_previas: respuestas,
+          respuestas_previas: respuestasParaIA,
           preparacion: prepTexto,
           paciente_codigo: pacienteActual?.codigoActual || null,
           paciente_nivel: pacienteActual?.nivelMadurez || null,
@@ -1016,7 +1020,15 @@ export default function Espejo() {
     finalTranscriptRef.current = "";
     lastAnalyzedTranscriptRef.current = "";
     const eje = EJES[currentStep];
-    const newRespuestas = { ...respuestas, [eje.id]: texto.trim() };
+    // Guardar el texto clínico de la IA cuando exista (no solo la nota del usuario)
+    let contenidoEje = texto.trim();
+    if (currentStep === 1 && (eje2MensajeText || cleanedMensaje)) {
+      contenidoEje = eje2MensajeText || cleanedMensaje || contenidoEje;
+    }
+    if (currentStep === 2 && (calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje)) {
+      contenidoEje = calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || contenidoEje;
+    }
+    const newRespuestas = { ...respuestas, [eje.id]: contenidoEje };
     setRespuestas(newRespuestas);
     setCurrentTexto("");
     setIaFeedback(null);
@@ -1027,6 +1039,10 @@ export default function Espejo() {
     
     if (currentStep < EJES.length - 1) {
       setCurrentStep(prev => prev + 1);
+      // Al llegar al Eje 3, no bloquear el botón por oxidación previa
+      if (currentStep + 1 === 2) {
+        setOxidacionDetectada(false);
+      }
     } else {
       await awardSovereigntyPoints(user.uid, FIXED_POINTS, "Espejo Soberano: Sesión Completa +58 PS");
       await incrementModulePoints(user.uid, "espejo", 1).catch(() => {});
@@ -1204,23 +1220,40 @@ export default function Espejo() {
     }
     
     const eje = EJES[currentStep];
+    const costoEje = currentStep === 2
+      ? (eje3DynamicCost ?? eje.costo)
+      : eje.costo;
     
-    if (eje.costo > 0 && credits < eje.costo && !esOwnerUser) {
+    if (costoEje > 0 && credits < costoEje && !esOwnerUser) {
       setIaBlocked(true);
-      toast.error(`Este eje requiere ${eje.costo} crédito${eje.costo > 1 ? "s" : ""}`, {
+      toast.error(`Este eje requiere ${costoEje} crédito${costoEje > 1 ? "s" : ""}`, {
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
       return;
     }
 
+    // Eje 1: escanea y se queda mostrando feedback
     if (currentStep === 0) {
       await consultarDoctorIA("registro_carga", texto, 0);
       return;
     }
-    
-    if (eje.costo > 0) {
-      const result = await consultarDoctorIA(eje.id, texto, eje.costo);
-      if (result && !result.puede_avanzar) return;
+
+    // Eje 2: diagnóstico — se queda mostrando el análisis (no avanzar solo)
+    if (currentStep === 1) {
+      await consultarDoctorIA("diagnostico_clinico", texto, costoEje);
+      return;
+    }
+
+    // Eje 3: protocolo — se queda en CalibrationPanel con el protocolo entregado
+    if (currentStep === 2) {
+      setOxidacionDetectada(false);
+      const result = await consultarDoctorIA("protocolo_calibracion", texto, costoEje);
+      if (!result) {
+        toast.error("No se pudo generar el protocolo. Revisa créditos e intenta de nuevo.", {
+          style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
+        });
+      }
+      return;
     }
     
     await advanceToNextStep(texto);
@@ -1321,6 +1354,10 @@ export default function Espejo() {
     setWelcomeText(WELCOME_MESSAGE);
     setShowMuro(false);
     setPhase("arquitecto");
+    toast.success("Ducha Mental lista — escribe tu registro", {
+      style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
+      duration: 2500,
+    });
 
     // Bloqueo Eje 3 en segundo plano (no debe impedir escribir)
     if (user) {
@@ -2415,8 +2452,10 @@ export default function Espejo() {
                                   )
                                 ) : currentStep === 2 && iaFeedback?.mensaje ? (
                                   <CalibrationPanel
-                                    habito24h={cleanedMensaje ?? iaFeedback.mensaje}
-                                    onConfirm={() => advanceToNextStep(currentTexto || cleanedMensaje || iaFeedback?.mensaje || "Protocolo aceptado")}
+                                    habito24h={calibracionDoctorText || cleanedMensaje || iaFeedback.mensaje}
+                                    onConfirm={() => advanceToNextStep(
+                                      calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || currentTexto || "Protocolo aceptado"
+                                    )}
                                   />
                                 ) : (
                                   <>
@@ -2829,11 +2868,38 @@ export default function Espejo() {
                                         );
                                       })()}
                                     </div>
+                                  ) : currentStep === 1 && (iaFeedback?.mensaje || eje2MensajeText) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const costProto = eje3DynamicCost ?? EJES[2]?.costo ?? 4;
+                                        if (costProto > 0 && credits < costProto && !esOwnerUser) {
+                                          setIaBlocked(true);
+                                          toast.error(`Protocolo requiere ${costProto} crédito${costProto > 1 ? "s" : ""}`, {
+                                            style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
+                                          });
+                                          return;
+                                        }
+                                        setOxidacionDetectada(false);
+                                        advanceToNextStep(eje2MensajeText || cleanedMensaje || currentTexto.trim());
+                                      }}
+                                      className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${RED_ALERT} 0%, ${GOLD} 100%)`,
+                                        color: "#000",
+                                        fontFamily: "monospace",
+                                      }}
+                                      data-testid="btn-continuar-protocolo"
+                                    >
+                                      <ChevronRight size={14} />
+                                      CONTINUAR AL PROTOCOLO
+                                      <span className="ml-1 text-[10px] opacity-70">— Eje 3</span>
+                                    </button>
                                   ) : !(currentStep === 2 && iaFeedback?.mensaje) && !(currentStep === 2 && bloqueoEje3 && bloqueoEje3.hasta > Date.now()) && (
                                     <div className="flex flex-col gap-2 w-full flex-1">
                                       <button
                                         onClick={handleSubmitStep}
-                                        disabled={currentTexto.trim().length < 5 || iaLoading || (currentStep === 2 && oxidacionDetectada && !iaFeedback)}
+                                        disabled={currentTexto.trim().length < 5 || iaLoading}
                                         className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-30 flex items-center justify-center gap-2"
                                         style={{ 
                                           background: `linear-gradient(135deg, ${eje.color} 0%, ${GOLD} 100%)`,
@@ -2845,12 +2911,7 @@ export default function Espejo() {
                                         {iaLoading ? (
                                           <>
                                             <Loader2 size={14} className="animate-spin" />
-                                            PROCESSING...
-                                          </>
-                                        ) : currentStep === 2 && oxidacionDetectada && !iaFeedback ? (
-                                          <>
-                                            <Zap size={12} />
-                                            SISTEMA EN OXIDACIÓN — Genera voltaje primero
+                                            {currentStep === 2 ? "GENERANDO PROTOCOLO..." : "PROCESSING..."}
                                           </>
                                         ) : (
                                           <>
@@ -2859,7 +2920,12 @@ export default function Espejo() {
                                               <>
                                                 INVERTIR 1 CRÉDITO — Diagnóstico{pataDetectada ? ` · ${pataDetectada}` : ""}{nivelSeñal ? ` · ${nivelSeñal.toUpperCase()}` : ""}
                                               </>
-                                            ) : "COMPLETAR_SESIÓN"}
+                                            ) : (
+                                              <>
+                                                ENTREGAR PROTOCOLO
+                                                <span className="ml-1 text-[10px] opacity-70">— {eje3DynamicCost ?? eje.costo} créd.</span>
+                                              </>
+                                            )}
                                           </>
                                         )}
                                       </button>
@@ -3797,13 +3863,18 @@ export default function Espejo() {
               </div>
 
               <button
-                onClick={() => confirmContextoAndStart(selectedContexto || "trabajo")}
+                type="button"
+                onClick={() => {
+                  const ctx = selectedContexto || "trabajo";
+                  setSelectedContexto(ctx);
+                  void confirmContextoAndStart(ctx);
+                }}
                 className="w-full py-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                 style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
                 data-testid="btn-confirmar-contexto"
               >
                 <Heart size={16} />
-                {selectedContexto ? "Entrar al Santuario" : "Continuar a Ducha Mental"}
+                Entrar a escribir — Ducha Mental
               </button>
               
               <button
