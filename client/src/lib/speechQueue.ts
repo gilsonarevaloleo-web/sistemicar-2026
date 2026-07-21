@@ -258,6 +258,7 @@ class VoiceEngine {
   hardReset(opts?: { revokeUnlock?: boolean }): void {
     this.clearPauseTimer();
     this.clearStuckTimer();
+    this.clearPauseWatch();
     for (const item of this.queue) {
       if (item.key) this.activeKeys.delete(item.key);
       if (item.releaseKey) this.activeKeys.delete(item.releaseKey);
