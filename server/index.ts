@@ -2351,7 +2351,7 @@ PATA 4 — ORIGEN (Identidad / Propósito / Liderazgo):
 [Declaración de identidad o ritual de reconocimiento soberano. Qué afirmar exactamente, cuándo (hora del día), en qué contexto físico, con qué frecuencia esta semana.]
 
 Usa las MATRICES_REPROGRAMACION para el Código de Diagnóstico detectado en el Eje 2 y el hábito de 24h específico para esa interfaz.
-AL FINAL añade en línea separada: "Protocolo de seguimiento disponible en tu Planificación Soberana."`
+AL FINAL añade en línea separada: "Puedes guardar este protocolo en tu expediente. Activar seguimiento en Planificación/Jornada es opcional."`
       }
     };
 
@@ -2494,7 +2494,7 @@ INSTRUCCIONES DE DIAGNÓSTICO:
    - NEGATIVO (-): miedo, dolor, conflicto, deuda, rabia, bloqueo, fracaso
    - POSITIVO (+): quiero, proyecto, construyo, avanzo, deseo, veo
    - NEUTRO (0): "bien", "normal", "tranquilo", "estable", "cumpliendo", sin verbos fuertes
-   Si NEUTRO → oxidacion_detectada: true → advierte de Estatismo Biológico Crónico → bloquea Eje 3
+   Si NEUTRO → oxidacion_detectada: true → advierte de Estatismo Biológico, PERO NUNCA bloquees la entrega del protocolo en Eje 3.
 
 2. DETECTA PROFUNDIDAD (1-10):
    - 1-3: Superficial (frases genéricas, evasión)
@@ -2519,9 +2519,9 @@ INSTRUCCIONES DE DIAGNÓSTICO:
    - CIERRE: Propuesta de La Llave con costo_llave según pata_material.
 
 6. Para EJE "protocolo_calibracion":
-   - Requiere profundidad >= 4.
-   - Sigue OBLIGATORIAMENTE la MISIÓN IA de este eje (ver arriba): protocolo organizado en las 4 PATAS DE CURACIÓN (ESTABILIDAD / CONEXIÓN / VISIÓN / ORIGEN) con acciones específicas, horarios y métricas para cada una.
-   - Si oxidacion_detectada: true → NO prescribir, advertir que primero hay que generar voltaje.
+   - SIEMPRE entrega un protocolo completo en las 4 PATAS (ESTABILIDAD / CONEXIÓN / VISIÓN / ORIGEN) con acciones específicas, horarios y métricas.
+   - Si oxidacion_detectada: true → incluye una advertencia breve al inicio, pero AUN ASÍ prescribe el protocolo completo. Nunca respondas solo "Registro procesado".
+   - Planificación/Jornada son OPCIONALES: no digas que el usuario debe abrir esos módulos para recibir el protocolo.
 
 7. Si bloqueo total ("no sé", evasivas):
    "Soberano, el sistema detecta un circuito en pausa. El hardware se descomprime al registrar la estática."
@@ -2553,10 +2553,25 @@ Responde en formato JSON estricto:
     const maxTokens = eje === "protocolo_calibracion" ? 1000 : eje === "diagnostico_clinico" ? 1200 : 500;
     const content = await callGemini(prompt, maxTokens) || '{}';
 
+    const fallbackProtocolo = `PROTOCOLO DE CALIBRACIÓN
+
+PATA 1 — ESTABILIDAD: 10 min de descarga somática hoy + una acción concreta de 15 min que reduzca la carga registrada.
+PATA 2 — CONEXIÓN: una frase clara a alguien relevante, o 5 min de silencio estratégico sin chats.
+PATA 3 — VISIÓN: escribe interferencia activa, decisión de la semana y evidencia de mañana.
+PATA 4 — ORIGEN: afirmación al despertar — "Calibro mi voltaje con hechos, no con ruido."
+
+Puedes guardar este protocolo en tu expediente. Activar seguimiento en Planificación/Jornada es opcional.
+Estado de Interfaz: Descomprimiendo. Voltaje residual: 45%. Procede.`;
+
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        let mensaje = parsed.mensaje || "";
+        if (eje === "protocolo_calibracion" && (!mensaje || /registro procesado/i.test(mensaje) || mensaje.length < 80)) {
+          mensaje = fallbackProtocolo;
+        }
+        if (!mensaje) mensaje = "Registro procesado.";
         res.json({
           profundidad: parsed.profundidad || 5,
           puede_avanzar: parsed.puede_avanzar !== undefined ? parsed.puede_avanzar : true,
@@ -2564,11 +2579,11 @@ Responde en formato JSON estricto:
           codigo_343: parsed.codigo_343 || null,
           pata_material: parsed.pata_material || null,
           costo_llave: parsed.costo_llave || null,
-          oxidacion_detectada: parsed.oxidacion_detectada || false,
+          oxidacion_detectada: eje === "protocolo_calibracion" ? false : (parsed.oxidacion_detectada || false),
           pata_detectada: parsed.pata_detectada || null,
           nivel_señal: parsed.nivel_señal || "latente",
           recomendacion_sesion: parsed.recomendacion_sesion || "continuar",
-          mensaje: parsed.mensaje || "Registro procesado.",
+          mensaje,
           confrontacion: parsed.confrontacion || null,
           codigo_diagnostico: parsed.codigo_diagnostico || null,
           interfaz_primaria: parsed.interfaz_primaria || null,
@@ -2576,14 +2591,18 @@ Responde en formato JSON estricto:
           firma_salida: parsed.firma_salida || "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede."
         });
       } else {
-        res.json({ profundidad: 5, puede_avanzar: true, polaridad: "NEUTRO", codigo_343: null, pata_material: null, costo_llave: null, oxidacion_detectada: false, pata_detectada: null, nivel_señal: "latente", recomendacion_sesion: "continuar", mensaje: "Registro procesado.", confrontacion: null, codigo_diagnostico: null, interfaz_primaria: null, interfaz_secundaria: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
+        res.json({ profundidad: 5, puede_avanzar: true, polaridad: "NEUTRO", codigo_343: null, pata_material: null, costo_llave: null, oxidacion_detectada: false, pata_detectada: null, nivel_señal: "latente", recomendacion_sesion: "continuar", mensaje: eje === "protocolo_calibracion" ? fallbackProtocolo : "Registro procesado.", confrontacion: null, codigo_diagnostico: null, interfaz_primaria: null, interfaz_secundaria: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
       }
     } catch {
-      res.json({ profundidad: 5, puede_avanzar: true, polaridad: "NEUTRO", codigo_343: null, pata_material: null, costo_llave: null, oxidacion_detectada: false, pata_detectada: null, nivel_señal: "latente", recomendacion_sesion: "continuar", mensaje: "Registro procesado.", confrontacion: null, codigo_diagnostico: null, interfaz_primaria: null, interfaz_secundaria: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
+      res.json({ profundidad: 5, puede_avanzar: true, polaridad: "NEUTRO", codigo_343: null, pata_material: null, costo_llave: null, oxidacion_detectada: false, pata_detectada: null, nivel_señal: "latente", recomendacion_sesion: "continuar", mensaje: eje === "protocolo_calibracion" ? fallbackProtocolo : "Registro procesado.", confrontacion: null, codigo_diagnostico: null, interfaz_primaria: null, interfaz_secundaria: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
     }
   } catch (error) {
     console.error("Espejo Doctor IA error:", error);
-    res.json({ profundidad: 5, puede_avanzar: true, mensaje: "Tu reflexión ha sido registrada. Continúa con el siguiente eje. Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede.", confrontacion: null, eco_sensorial: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
+    const ejeFail = req.body?.eje;
+    const failMsg = ejeFail === "protocolo_calibracion"
+      ? `PROTOCOLO DE CALIBRACIÓN\n\nPATA 1 — ESTABILIDAD: 10 min de descarga + 1 acción concreta hoy.\nPATA 2 — CONEXIÓN: una frase clara o silencio estratégico.\nPATA 3 — VISIÓN: escribe interferencia, decisión y evidencia.\nPATA 4 — ORIGEN: afirmación soberana al despertar.\n\nPuedes guardar este protocolo. Planificación/Jornada son opcionales.\nEstado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede.`
+      : "Tu reflexión ha sido registrada. Continúa con el siguiente eje. Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede.";
+    res.json({ profundidad: 5, puede_avanzar: true, mensaje: failMsg, confrontacion: null, eco_sensorial: null, firma_salida: "Estado de Interfaz: Descomprimiendo. Voltaje residual: 50%. Procede." });
   }
 });
 

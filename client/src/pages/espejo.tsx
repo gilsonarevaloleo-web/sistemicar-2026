@@ -222,6 +222,52 @@ const SOVEREIGNTY_ACCEPTED_KEY = "sistemicar_espejo_soberania";
 const STORAGE_KEY = "sistemicar_espejo_sesiones";
 const PRIVACY_KEY = "sistemicar_espejo_privacy";
 
+function isMensajeProtocoloDebil(mensaje: string | null | undefined): boolean {
+  const t = (mensaje || "").trim();
+  if (t.length < 80) return true;
+  return /registro procesado|continúa con el siguiente eje|tu reflexión ha sido registrada/i.test(t);
+}
+
+function buildProtocoloFallback(opts: {
+  contexto?: string | null;
+  ducha?: string;
+  diagnostico?: string;
+  notaUsuario?: string;
+  pata?: string | null;
+}): string {
+  const zona = opts.pata || "ESTABILIDAD";
+  const contexto = opts.contexto || "General";
+  const ducha = (opts.ducha || "").trim().slice(0, 280);
+  const diag = (opts.diagnostico || "").trim().slice(0, 280);
+  const nota = (opts.notaUsuario || "").trim().slice(0, 200);
+
+  return `PROTOCOLO DE CALIBRACIÓN — ${contexto}
+Raíz activa: ${zona}
+
+PATA 1 — ESTABILIDAD (Cuerpo / Recursos)
+Hoy, en los próximos 24h: 10 minutos de descarga somática.
+1) Siéntate o camina sin pantalla.
+2) Nombra en voz alta la carga que registraste${ducha ? `: "${ducha.slice(0, 120)}${ducha.length > 120 ? "…" : ""}"` : "."}
+3) Elige UNA acción concreta de 15 minutos que reduzca esa carga (ordenar, pagar, escribir, mover el cuerpo).
+
+PATA 2 — CONEXIÓN (Vínculos / Comunicación)
+Antes de dormir: una frase clara a alguien relevante o, si no aplica, 5 minutos de silencio sin responder chats.
+Frase sugerida: "Hoy estoy trabajando un patrón concreto; mañana te cuento con más claridad."
+
+PATA 3 — VISIÓN (Claridad / Dirección)
+Escribe 3 líneas:
+1) Qué interferencia sigue activa.
+2) Qué decisión de esta semana la reduce.
+3) Qué evidencia verás mañana si el protocolo funcionó.
+${diag ? `\nAncla de diagnóstico:\n${diag.slice(0, 200)}${diag.length > 200 ? "…" : ""}\n` : ""}${nota ? `\nAjuste que pediste:\n${nota}\n` : ""}
+PATA 4 — ORIGEN (Identidad / Mando)
+Afirmación de cierre (mañana al despertar, 60 segundos):
+"Yo calibro mi voltaje con hechos, no con ruido. Hoy ejecuto una sola acción de la pata ${zona}."
+
+Métrica 24h: marca hecho/no hecho en cada pata. No requiere Planificación ni Jornada para valer.
+Estado de Interfaz: Descomprimiendo. Voltaje residual: 42%. Procede.`;
+}
+
 interface IAResponse {
   profundidad: number;
   puede_avanzar: boolean;
@@ -391,6 +437,8 @@ export default function Espejo() {
   const [seguimientoActivado, setSeguimientoActivado] = useState(false);
   const [calibracionDoctorText, setCalibracionDoctorText] = useState<string | null>(null);
   const [seguimientoLoading, setSeguimientoLoading] = useState(false);
+  const [protocoloGuardando, setProtocoloGuardando] = useState(false);
+  const [protocoloGuardado, setProtocoloGuardado] = useState(false);
   const [eje2MensajeText, setEje2MensajeText] = useState<string | null>(null);
   const [show5DayModal, setShow5DayModal] = useState(false);
   const [plan5Dias, setPlan5Dias] = useState<Array<{ dayNum: number; titulo: string; hora: string }>>([]);
@@ -995,14 +1043,25 @@ export default function Espejo() {
       }
       return data;
     } catch (error) {
+      const fallbackMsg = eje === "protocolo_calibracion"
+        ? buildProtocoloFallback({
+            contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label,
+            ducha: respuestas.registro_carga,
+            diagnostico: eje2MensajeText || respuestas.diagnostico_clinico,
+            notaUsuario: texto,
+            pata: pataDetectada,
+          })
+        : "Registro procesado. Continúa con el siguiente eje.";
       const fallback: IAResponse = {
         profundidad: 5,
         puede_avanzar: true,
-        mensaje: "Registro procesado. Continúa con el siguiente eje.",
+        oxidacion_detectada: false,
+        mensaje: fallbackMsg,
         confrontacion: null
       };
-      setCleanedMensaje(null);
+      setCleanedMensaje(fallbackMsg);
       setIaFeedback(fallback);
+      if (eje === "protocolo_calibracion") setCalibracionDoctorText(fallbackMsg);
       if (eje === "registro_carga") setEje1FeedbackShown(true);
       return fallback;
     } finally {
@@ -1244,19 +1303,115 @@ export default function Espejo() {
       return;
     }
 
-    // Eje 3: protocolo — se queda en CalibrationPanel con el protocolo entregado
+    // Eje 3: protocolo — siempre mostrar en pantalla (con fallback si la IA falla)
     if (currentStep === 2) {
       setOxidacionDetectada(false);
+      setProtocoloGuardado(false);
       const result = await consultarDoctorIA("protocolo_calibracion", texto, costoEje);
-      if (!result) {
-        toast.error("No se pudo generar el protocolo. Revisa créditos e intenta de nuevo.", {
-          style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
-        });
-      }
+      const raw = result?.mensaje || calibracionDoctorText || cleanedMensaje || "";
+      const protocolo = isMensajeProtocoloDebil(raw)
+        ? buildProtocoloFallback({
+            contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label,
+            ducha: respuestas.registro_carga,
+            diagnostico: eje2MensajeText || respuestas.diagnostico_clinico,
+            notaUsuario: texto,
+            pata: pataDetectada,
+          })
+        : raw;
+      setCalibracionDoctorText(protocolo);
+      setCleanedMensaje(protocolo);
+      setIaFeedback({
+        profundidad: result?.profundidad ?? 7,
+        puede_avanzar: true,
+        oxidacion_detectada: false,
+        mensaje: protocolo,
+        confrontacion: null,
+        codigo_diagnostico: result?.codigo_diagnostico ?? lastDiagCode,
+        interfaz_primaria: result?.interfaz_primaria ?? null,
+        interfaz_secundaria: result?.interfaz_secundaria ?? null,
+        firma_salida: result?.firma_salida ?? null,
+      });
+      toast.success("Protocolo entregado en pantalla", {
+        description: "Puedes guardarlo ahora. Planificación/Jornada son opcionales.",
+        style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD },
+      });
       return;
     }
     
     await advanceToNextStep(texto);
+  };
+
+  const handleGuardarProtocolo = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+    const protocolo = (calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || "").trim();
+    if (!protocolo || isMensajeProtocoloDebil(protocolo)) {
+      toast.error("Aún no hay protocolo para guardar. Toca ENTREGAR PROTOCOLO primero.");
+      return;
+    }
+    setProtocoloGuardando(true);
+    try {
+      const fecha = new Date();
+      const PS = 15;
+      const contenido = {
+        registro_carga: respuestas.registro_carga || "",
+        diagnostico_clinico: eje2MensajeText || respuestas.diagnostico_clinico || "",
+        protocolo_calibracion: protocolo,
+        preparacion: prepTexto.trim() || undefined,
+      };
+      await awardSovereigntyPoints(user.uid, PS, "Espejo v5 — Protocolo guardado");
+      await addExpedienteClinico(user.uid, {
+        fecha,
+        seccion_afectada: pataDetectada ? [pataDetectada] : (selectedContexto ? [selectedContexto] : []),
+        codigo_diagnostico: lastDiagCode || "",
+        interfaz_primaria: "",
+        interfaz_secundaria: "",
+        respuestas: {
+          registro_carga: contenido.registro_carga,
+          diagnostico_clinico: contenido.diagnostico_clinico,
+          protocolo_calibracion: protocolo,
+        },
+        estado_habito: false,
+        vibracion_final: 40,
+        tipo_sesion: "asistida",
+        timestamp_inicio: sessionStartTime || Date.now(),
+        timestamp_fin: Date.now(),
+      });
+      const sessionId = await addEspejoSession(user.uid, {
+        fecha,
+        modo: "arquitecto",
+        contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+        pacienteId: selectedPacienteId ?? undefined,
+        tipo_sesion: "asistida",
+        timestamp_inicio: sessionStartTime || Date.now(),
+        timestamp_fin: Date.now(),
+        contenido,
+        puntos: PS,
+        vibracion_final: 40,
+      });
+      setSesiones(prev => [{
+        id: sessionId,
+        fecha,
+        modo: "arquitecto",
+        contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+        tipo_sesion: "asistida",
+        contenido,
+        puntos: PS,
+        vibracion_final: 40,
+      }, ...prev.filter(s => s.id !== sessionId)]);
+      setProtocoloGuardado(true);
+      toast.success("Protocolo guardado — disponible en Historial", {
+        description: "Planificación y Jornada siguen siendo opcionales.",
+        style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
+      });
+    } catch (err) {
+      console.error("[guardarProtocolo]", err);
+      toast.error("No se pudo guardar el protocolo. Intenta de nuevo.");
+    } finally {
+      setProtocoloGuardando(false);
+    }
   };
 
   const forceAdvance = async () => {
@@ -1348,6 +1503,8 @@ export default function Espejo() {
     setVoiceTranscript("");
     setVoiceAnalisis(null);
     lastAnalyzedTranscriptRef.current = "";
+    setProtocoloGuardado(false);
+    setProtocoloGuardando(false);
 
     // Siempre a Ducha Mental escribiendo: sin welcome ni muro bloqueando
     setWelcomeShown(true);
@@ -1503,13 +1660,10 @@ export default function Espejo() {
       });
       setProtocolo5DiasActivado(true);
       setShow5DayModal(false);
-      toast.success("Protocolo de 5 Días activado — revisa Planificación.", {
+      toast.success("Protocolo de 5 Días listo en Planificación (opcional).", {
+        description: "Puedes seguir en Espejo y entregar el Protocolo del Eje 3 sin ir a Planificación.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => {
-        beginViewTransition();
-        navigate("/planeacion");
-      }, 1200);
     } catch {
       toast.error("Error al activar el protocolo. Intenta de nuevo.");
     } finally {
@@ -1546,13 +1700,10 @@ export default function Espejo() {
       await requestNotificationPermission();
       scheduleEspejoFollowup(habitoText);
       setSeguimientoActivado(true);
-      toast.success("Seguimiento activado — revisa Planificación.", {
+      toast.success("Seguimiento preparado (opcional).", {
+        description: "Tu protocolo ya está. Ir a Planificación es opcional.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => {
-        beginViewTransition();
-        navigate("/planeacion");
-      }, 1200);
     } catch {
       toast.error("Error al activar seguimiento. Intenta de nuevo.");
     } finally {
@@ -2116,7 +2267,7 @@ export default function Espejo() {
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-[10px] uppercase tracking-widest" style={{ color: CYAN_NEON, fontFamily: "monospace" }}>Diagnóstico Clínico — 3 Ejes</span>
                       <span className="text-[10px] font-bold" style={{ color: CYAN_NEON, fontFamily: "monospace" }}>
-                        {currentStep}/{EJES.length}
+                        {currentStep + 1}/{EJES.length}
                       </span>
                     </div>
                     <div className="flex gap-1">
@@ -2453,6 +2604,9 @@ export default function Espejo() {
                                 ) : currentStep === 2 && iaFeedback?.mensaje ? (
                                   <CalibrationPanel
                                     habito24h={calibracionDoctorText || cleanedMensaje || iaFeedback.mensaje}
+                                    onSave={handleGuardarProtocolo}
+                                    saving={protocoloGuardando}
+                                    saved={protocoloGuardado}
                                     onConfirm={() => advanceToNextStep(
                                       calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || currentTexto || "Protocolo aceptado"
                                     )}
@@ -2696,14 +2850,14 @@ export default function Espejo() {
                                   >
                                     <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: `${GOLD}12`, borderBottom: `1px solid ${GOLD}20` }}>
                                       <ListChecks size={11} style={{ color: GOLD }} />
-                                      <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: GOLD, fontFamily: "monospace" }}>PROTOCOLO_5_DÍAS — Acción Requerida</span>
+                                      <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: GOLD, fontFamily: "monospace" }}>PROTOCOLO_5_DÍAS — Opcional</span>
                                     </div>
                                     <div className="p-3" style={{ backgroundColor: `${GOLD}04` }}>
                                       <p className="text-[10px] leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
-                                        El Doctor ha generado tu protocolo. Puedes copiarlo o activarlo directamente en tu Planificación con sub-tareas editables para cada día.
+                                        No es obligatorio para continuar al Protocolo (Eje 3). Si quieres, puedes copiarlo o activarlo en Planificación después.
                                       </p>
                                       <p className="text-[9px] leading-relaxed mb-3 px-2 py-1.5 rounded-lg" style={{ color: `${GOLD}CC`, fontFamily: "monospace", backgroundColor: `${GOLD}08`, border: `1px dashed ${GOLD}30` }}>
-                                        Con Arquitecto, el Doctor vigila tu cumplimiento en tiempo real y ajusta el protocolo si fallas. Sin Arquitecto, el control es tuyo.
+                                        Con Arquitecto, el Doctor puede vigilar el cumplimiento. Sin activarlo, igual puedes pedir La Llave y guardar el protocolo.
                                       </p>
                                       <div className="flex gap-2">
                                         <button
@@ -2729,7 +2883,7 @@ export default function Espejo() {
                                           data-testid="btn-activar-protocolo-5dias"
                                         >
                                           <Layers size={10} />
-                                          ACTIVAR EN PLANIFICACIÓN
+                                          ACTIVAR EN PLANIFICACIÓN (opc.)
                                           <ArrowRight size={10} />
                                         </button>
                                       </div>
@@ -3236,7 +3390,7 @@ export default function Espejo() {
                         <div className="flex items-center gap-2 py-2">
                           <CheckCircle size={12} style={{ color: GOLD }} />
                           <span className="text-[10px] font-bold" style={{ color: GOLD, fontFamily: "monospace" }}>
-                            ACTIVADO — Redirigiendo a Planificación…
+                            SEGUIMIENTO LISTO (Planificación opcional)
                           </span>
                         </div>
                       ) : (
@@ -3253,7 +3407,7 @@ export default function Espejo() {
                             <CalendarPlus size={12} />
                           )}
                           <span className="text-[11px]">
-                            {seguimientoLoading ? "ACTIVANDO…" : "ACTIVAR_EN_PLANIFICACIÓN"}
+                            {seguimientoLoading ? "ACTIVANDO…" : "ACTIVAR SEGUIMIENTO (OPCIONAL)"}
                           </span>
                           {!seguimientoLoading && <ArrowRight size={11} />}
                         </button>
