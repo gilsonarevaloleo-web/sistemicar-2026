@@ -101,7 +101,7 @@ function trySpeak(key: string): void {
   if (entry.attempts === 1) {
     unlockSpeechSynthesis(true);
   } else {
-    warmupSpeechSynthesis(false);
+    warmupSpeechSynthesis(true, false);
   }
   recoverSpeechQueue();
 

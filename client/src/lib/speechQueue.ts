@@ -468,11 +468,7 @@ class VoiceEngine {
         phraseStartedFallbackTimer = null;
       }
       // Solo el último item del batch trae releaseKey (= batchKey).
-      // Mid-batch guarda key pero no debe liberarlo o los reintentos pierden el hold.
       if (item.releaseKey) this.activeKeys.delete(item.releaseKey);
-      else if (item.key && !item.releaseKey) {
-        /* mid-batch: hold permanece hasta releaseKey o stuck */
-      }
       this.speaking = false;
       this.currentItem = null;
       this.clearStuckTimer();
