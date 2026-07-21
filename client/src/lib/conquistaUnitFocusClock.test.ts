@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildUnitFocusLap,
   formatUnitFocusElapsed,
   unitFocusElapsedMs,
 } from "./conquistaUnitFocusClock.ts";
@@ -21,5 +22,16 @@ describe("conquistaUnitFocusClock", () => {
   it("elapsed no es negativo", () => {
     assert.equal(unitFocusElapsedMs(1000, 500), 0);
     assert.equal(unitFocusElapsedMs(1000, 2500), 1500);
+  });
+
+  it("vuelta: split = delta desde la anterior", () => {
+    const lap1 = buildUnitFocusLap(1, 12_000, 0);
+    assert.equal(lap1.n, 1);
+    assert.equal(lap1.absoluteMs, 12_000);
+    assert.equal(lap1.splitMs, 12_000);
+
+    const lap2 = buildUnitFocusLap(2, 30_000, 12_000);
+    assert.equal(lap2.splitMs, 18_000);
+    assert.equal(lap2.absoluteMs, 30_000);
   });
 });

@@ -1,17 +1,22 @@
 /**
  * Overlay naranja: cronómetro de unidad para conquista.
- * Al cerrar se apaga (no corre en segundo plano). Cero persistencia.
+ * Sonido al segundo (Tik) + vueltas. Al cerrar se apaga (no corre en segundo plano).
+ * Cero persistencia.
  */
-import { useEffect, useState, useCallback, type MouseEvent } from "react";
+import { useEffect, useState, useCallback, useRef, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, X, Focus } from "lucide-react";
+import { RotateCcw, X, Focus, Timer } from "lucide-react";
 import { NARANJA } from "@/components/flota/vehicleCardShared";
 import {
+  buildUnitFocusLap,
   formatUnitFocusElapsed,
   unitFocusElapsedMs,
+  type UnitFocusLap,
 } from "@/lib/conquistaUnitFocusClock";
 import { hardwareClockNow } from "@/lib/hardwareClock";
+import { playTikTapTone } from "@/lib/tikTapTone";
+import { isTikSoundEnabled } from "@/lib/tikSound";
 
 type Props = {
   open: boolean;
@@ -26,25 +31,65 @@ export function ConquistaUnitFocusOverlay({
 }: Props) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => hardwareClockNow());
+  const [laps, setLaps] = useState<UnitFocusLap[]>([]);
+  const lastTickSecRef = useRef<number>(-1);
 
   useEffect(() => {
     if (!open) {
       setStartedAt(null);
+      setLaps([]);
+      lastTickSecRef.current = -1;
       return;
     }
     const t0 = hardwareClockNow();
     setStartedAt(t0);
     setNowMs(t0);
+    setLaps([]);
+    lastTickSecRef.current = 0;
+    // Unlock audio en el gesto de apertura.
+    if (isTikSoundEnabled()) playTikTapTone();
     const id = window.setInterval(() => setNowMs(hardwareClockNow()), 250);
     return () => window.clearInterval(id);
   }, [open]);
+
+  const elapsed =
+    startedAt != null ? unitFocusElapsedMs(startedAt, nowMs) : 0;
+  const elapsedSec = Math.floor(elapsed / 1000);
+
+  useEffect(() => {
+    if (!open || startedAt == null) return;
+    if (elapsedSec <= 0) {
+      lastTickSecRef.current = 0;
+      return;
+    }
+    if (elapsedSec === lastTickSecRef.current) return;
+    lastTickSecRef.current = elapsedSec;
+    playTikTapTone();
+  }, [open, startedAt, elapsedSec]);
 
   const handleReset = useCallback((e: MouseEvent) => {
     e.stopPropagation();
     const t0 = hardwareClockNow();
     setStartedAt(t0);
     setNowMs(t0);
+    setLaps([]);
+    lastTickSecRef.current = 0;
   }, []);
+
+  const handleLap = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      if (startedAt == null) return;
+      const abs = unitFocusElapsedMs(startedAt, hardwareClockNow());
+      if (abs < 200) return;
+      setLaps(prev => {
+        const prevAbs = prev.length > 0 ? prev[prev.length - 1]!.absoluteMs : 0;
+        const lap = buildUnitFocusLap(prev.length + 1, abs, prevAbs);
+        return [...prev, lap];
+      });
+    },
+    [startedAt]
+  );
 
   const handleClose = useCallback(
     (e?: MouseEvent) => {
@@ -54,9 +99,8 @@ export function ConquistaUnitFocusOverlay({
     [onClose]
   );
 
-  const elapsed =
-    startedAt != null ? unitFocusElapsedMs(startedAt, nowMs) : 0;
   const display = formatUnitFocusElapsed(elapsed);
+  const lapsNewestFirst = [...laps].reverse();
 
   if (typeof document === "undefined") return null;
 
@@ -88,7 +132,7 @@ export function ConquistaUnitFocusOverlay({
           </button>
 
           <div
-            className="flex flex-col items-center gap-6 px-6"
+            className="flex flex-col items-center gap-5 px-6 w-full max-w-md"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 opacity-80">
@@ -115,25 +159,79 @@ export function ConquistaUnitFocusOverlay({
             </p>
 
             <p
-              className="text-[10px] font-bold uppercase tracking-wider text-center max-w-[16rem]"
+              className="text-[10px] font-bold uppercase tracking-wider text-center max-w-[18rem]"
               style={{ color: "rgba(0,0,0,0.65)" }}
             >
-              Mide esta unidad. Reinicia al terminar. Al salir se apaga.
+              Tik cada segundo. Vuelta marca el tramo. Al salir se apaga.
             </p>
 
-            <button
-              type="button"
-              onClick={handleReset}
-              className="mt-2 flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider"
-              style={{
-                backgroundColor: "rgba(0,0,0,0.88)",
-                color: accentColor,
-              }}
-              data-testid="conquista-unit-focus-reset"
-            >
-              <RotateCcw size={16} strokeWidth={2.5} />
-              Reiniciar
-            </button>
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider"
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.88)",
+                  color: accentColor,
+                }}
+                data-testid="conquista-unit-focus-reset"
+              >
+                <RotateCcw size={16} strokeWidth={2.5} />
+                Reiniciar
+              </button>
+              <button
+                type="button"
+                onClick={handleLap}
+                className="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-black text-sm uppercase tracking-wider"
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.55)",
+                  color: "#000",
+                  border: "2px solid rgba(0,0,0,0.75)",
+                }}
+                data-testid="conquista-unit-focus-lap"
+              >
+                <Timer size={16} strokeWidth={2.5} />
+                Vuelta
+              </button>
+            </div>
+
+            {lapsNewestFirst.length > 0 && (
+              <div
+                className="w-full max-h-[28vh] overflow-y-auto rounded-2xl px-3 py-2 space-y-1"
+                style={{ backgroundColor: "rgba(0,0,0,0.18)" }}
+                data-testid="conquista-unit-focus-laps"
+              >
+                {lapsNewestFirst.map(lap => (
+                  <div
+                    key={lap.n}
+                    className="flex items-center justify-between gap-3 py-1.5 border-b last:border-b-0"
+                    style={{ borderColor: "rgba(0,0,0,0.12)" }}
+                  >
+                    <span
+                      className="text-[11px] font-black uppercase tracking-wider"
+                      style={{ color: "rgba(0,0,0,0.7)" }}
+                    >
+                      Vuelta {lap.n}
+                    </span>
+                    <span
+                      className="text-sm font-black tabular-nums"
+                      style={{
+                        color: "#000",
+                        fontFamily: "JetBrains Mono, ui-monospace, monospace",
+                      }}
+                    >
+                      {formatUnitFocusElapsed(lap.splitMs)}
+                    </span>
+                    <span
+                      className="text-[10px] font-bold tabular-nums"
+                      style={{ color: "rgba(0,0,0,0.5)" }}
+                    >
+                      {formatUnitFocusElapsed(lap.absoluteMs)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <button
               type="button"

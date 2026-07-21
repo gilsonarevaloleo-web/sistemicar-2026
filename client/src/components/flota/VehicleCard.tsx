@@ -277,6 +277,7 @@ import {
   suggestedSec,
   computeSubCloseVerdict,
   validateSubCloseCantidad,
+  sumDesglosadorUnitCycle,
   type SubCloseVerdict,
 } from "@/lib/desglosadorClock";
 import DesglosadorDuracionPanel from "@/components/DesglosadorDuracionPanel";
@@ -1827,6 +1828,7 @@ function VehicleCard({
                   const deltaPerdiendo = hasSugerido && deltaTotalSec > 5;
                   const deltaColor = deltaGanando ? "#00C851" : deltaPerdiendo ? "#FF3131" : "#D4AF37";
                   const deltaLabel = deltaGanando ? `↓ ${fmtSec(Math.abs(deltaTotalSec))} ganado` : deltaPerdiendo ? `↑ ${fmtSec(deltaTotalSec)} extra` : "→ en tiempo";
+                  const unitCycle = sumDesglosadorUnitCycle(subs);
                   const psProfundidad = vehicle.desglosadorBloqueDepthPsGranted ?? 0;
                   const subsPsGranted = sumDesglosadorSubsPsAlreadyGranted(subs);
                   const totalPS = estimateDesglosadorSessionPs(subs, psProfundidad);
@@ -1878,6 +1880,30 @@ function VehicleCard({
                             </div>
                           )}
                         </div>
+
+                        {unitCycle.stepsCounted > 0 && (
+                          <div
+                            className="flex items-center justify-between px-2.5 py-2 rounded-lg"
+                            style={{ backgroundColor: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.35)" }}
+                            data-testid="desglosador-unit-cycle-done"
+                          >
+                            <div>
+                              <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: "#FB923C" }}>
+                                1 unidad completa
+                              </p>
+                              <p className="text-[7px] font-bold" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                Suma seg/unidad de {unitCycle.stepsCounted}/{unitCycle.stepsTotal} pasos
+                                {unitCycle.allRef ? " · ref" : unitCycle.hasMeasured ? " · medido" : ""}
+                              </p>
+                            </div>
+                            <p
+                              className="text-lg font-black font-mono tabular-nums"
+                              style={{ color: "#FB923C" }}
+                            >
+                              {fmtSec(Math.round(unitCycle.totalSec))}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Time vs Suggested breakdown (if available) */}
                         {hasSugerido && (
@@ -2000,6 +2026,11 @@ function VehicleCard({
                   >
                     {(clockUi) => {
                 const sessionElapsedSec = clockUi.sessionElapsedSec;
+                const unitCycle = sumDesglosadorUnitCycle(subs);
+                const unitCycleLabel =
+                  unitCycle.stepsCounted > 0
+                    ? formatMMSS(Math.round(unitCycle.totalSec))
+                    : "—";
 
                 return (
                   <div className="pt-3 space-y-3">
@@ -2030,9 +2061,18 @@ function VehicleCard({
                           accentColor={flotaColor}
                         />
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
                         <span className="text-[8px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.82)" }}>{cumplidos + fallados}/{subs.length}</span>
                         <span className="text-[8px] font-mono font-bold" style={{ color: clockUi.futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "#FDBA74" }}>🏁 CICLO: {clockUi.futuroCicloLabel}</span>
+                        <span
+                          className="text-[8px] font-mono font-bold"
+                          style={{ color: unitCycle.stepsCounted > 0 ? "#FB923C" : "rgba(255,255,255,0.45)" }}
+                          title="Suma de seg/unidad de cada sub = 1 producto completo"
+                          data-testid="desglosador-unit-cycle-live"
+                        >
+                          1 und: {unitCycleLabel}
+                          {unitCycle.allRef ? " ·ref" : ""}
+                        </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSubTasksCollapsed(c => !c); }}
                           className="p-1 rounded-md transition-colors hover:bg-white/10"
