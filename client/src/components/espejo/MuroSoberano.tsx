@@ -26,10 +26,9 @@ export default function MuroSoberano({ onFirmar, userId }: MuroSoberanoProps) {
   const handleSolicitar = async () => {
     if (!canActivate) return;
     setAccesoConcedido(true);
+    try { localStorage.setItem(MURO_LS_KEY, "true"); } catch {}
     if (userId) {
       await setMuroFirmado(userId).catch((e) => { console.warn("[MuroSoberano] setMuroFirmado falló:", e); });
-    } else {
-      try { localStorage.setItem(MURO_LS_KEY, "true"); } catch {}
     }
     setTimeout(() => {
       onFirmar();

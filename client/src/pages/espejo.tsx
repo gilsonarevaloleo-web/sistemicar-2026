@@ -296,7 +296,7 @@ interface SesionEspejo {
   fecha: Date;
   modo: "arquitecto";
   contexto?: string;
-  tipo_sesion?: "autonoma" | "asistida";
+  tipo_sesion?: "autonoma" | "asistida" | "ducha_mental";
   timestamp_inicio?: number;
   timestamp_fin?: number;
   contenido: {
@@ -339,6 +339,8 @@ export default function Espejo() {
   const [showCelebracion, setShowCelebracion] = useState(false);
   const [selectedContexto, setSelectedContexto] = useState<string | null>(null);
   const [showContextoSelector, setShowContextoSelector] = useState(false);
+  /** "ducha" = acceso libre al Eje 1 (gratis); "full" = sesión completa con paywall */
+  const [pendingStartMode, setPendingStartMode] = useState<"ducha" | "full">("full");
   const [showConfetti, setShowConfetti] = useState(false);
   const [userRank, setUserRank] = useState("Iniciado");
   const [expandedSesion, setExpandedSesion] = useState<string | null>(null);
@@ -574,8 +576,12 @@ export default function Espejo() {
   };
 
   const userEmail = getUserEmail();
-  const esOwnerUser = isOwner(userEmail);
+  const esOwnerUser = isOwner(userEmail) || isOwner(user?.email);
   const esAccesoTotal = isPremium || esOwnerUser;
+
+  useEffect(() => {
+    if (esOwnerUser) setShowMuro(false);
+  }, [esOwnerUser]);
 
   useEffect(() => {
     if (esOwnerUser && user && credits === 0) {
@@ -1111,47 +1117,66 @@ export default function Espejo() {
   };
 
   const handleCerrarDuchaMental = async () => {
-    if (!user) return;
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     if (isVoiceRecording) cleanupVoiceRecording();
     const PS_DUCHA = 10;
-    const textoRegistrado = respuestas.registro_carga || currentTexto.trim();
+    const textoRegistrado = (respuestas.registro_carga || currentTexto).trim();
+    if (textoRegistrado.length < 5) {
+      toast.error("Escribe al menos 5 caracteres para guardar la ducha");
+      return;
+    }
     const vibracionFinal = nivelSeñal === "critica" ? 15 : nivelSeñal === "activa" ? 35 : nivelSeñal === "insuficiente" ? 20 : 30;
+    const fecha = new Date();
+    const prep = prepTexto.trim();
+    const sessionPayload = {
+      fecha,
+      modo: "arquitecto" as const,
+      contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+      pacienteId: selectedPacienteId ?? undefined,
+      tipo_sesion: "ducha_mental" as const,
+      timestamp_inicio: sessionStartTime || Date.now(),
+      timestamp_fin: Date.now(),
+      contenido: {
+        registro_carga: textoRegistrado,
+        ...(prep ? { preparacion: prep } : {}),
+      },
+      puntos: PS_DUCHA,
+      vibracion_final: vibracionFinal,
+    };
     try {
       await awardSovereigntyPoints(user.uid, PS_DUCHA, "Espejo v5 — Ducha Mental");
-      addExpedienteClinico(user.uid, {
-        fecha: new Date(),
-        seccion_afectada: pataDetectada ? [pataDetectada] : [],
+      await addExpedienteClinico(user.uid, {
+        fecha,
+        seccion_afectada: pataDetectada ? [pataDetectada] : (selectedContexto ? [selectedContexto] : []),
         codigo_diagnostico: "",
         interfaz_primaria: "",
         interfaz_secundaria: "",
-        respuestas: { registro_carga: textoRegistrado },
+        respuestas: prep
+          ? { registro_carga: textoRegistrado, preparacion: prep }
+          : { registro_carga: textoRegistrado },
         estado_habito: false,
         vibracion_final: vibracionFinal,
         tipo_sesion: "ducha_mental",
-        timestamp_inicio: sessionStartTime,
+        timestamp_inicio: sessionStartTime || Date.now(),
         timestamp_fin: Date.now()
-      }).catch(err => console.error("[cerrarDuchaMental] expediente:", err));
-      addEspejoSession(user.uid, {
-        fecha: new Date(),
-        modo: "arquitecto",
-        pacienteId: selectedPacienteId ?? undefined,
-        tipo_sesion: "ducha_mental",
-        timestamp_inicio: sessionStartTime,
-        timestamp_fin: Date.now(),
-        contenido: { registro_carga: textoRegistrado },
-        puntos: PS_DUCHA,
-        vibracion_final: vibracionFinal
-      }).catch(err => console.error("[cerrarDuchaMental] espejoSession:", err));
-      toast.success(`+${PS_DUCHA} PS — Ducha Mental registrada`, {
-        description: pataDetectada
-          ? `Zona ${pataDetectada} procesada. Regresa más seguido para profundizar el diagnóstico.`
-          : "Registro procesado. La frecuencia de las duchas crea el patrón.",
+      });
+      const sessionId = await addEspejoSession(user.uid, sessionPayload);
+      setSesiones(prev => [{
+        id: sessionId,
+        ...sessionPayload,
+      }, ...prev.filter(s => s.id !== sessionId)]);
+      toast.success(`+${PS_DUCHA} PS — Ducha Mental guardada`, {
+        description: "Puedes revisarla en Historial o Expedientes Clínicos.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
         duration: 5000
       });
       setCurrentStep(0);
       setRespuestas({});
       setCurrentTexto("");
+      setPrepTexto("");
       setIaFeedback(null);
       setIaBlocked(false);
       setEje1FeedbackShown(false);
@@ -1164,10 +1189,10 @@ export default function Espejo() {
       setVoiceTranscript("");
       setVoiceAnalisis(null);
       lastAnalyzedTranscriptRef.current = "";
-      setPhase("landing");
+      setPhase("historial");
     } catch (err) {
       console.error("[cerrarDuchaMental] Error:", err);
-      toast.error("Error al cerrar la sesión.");
+      toast.error("Error al guardar la ducha. Intenta de nuevo.");
     }
   };
 
@@ -1208,12 +1233,14 @@ export default function Espejo() {
     await advanceToNextStep(texto);
   };
 
-  const startArquitectoMode = () => {
+  const startArquitectoMode = (mode: "ducha" | "full" = "full") => {
+    const resolved: "ducha" | "full" = mode === "ducha" ? "ducha" : "full";
+    setPendingStartMode(resolved);
     if (!user) {
       setShowLoginModal(true);
       return;
     }
-    if (!prospectoVerificado && !verificandoProspecto) {
+    if (!prospectoVerificado && !verificandoProspecto && !esOwnerUser) {
       setShowDatosGate(true);
       return;
     }
@@ -1221,25 +1248,43 @@ export default function Espejo() {
       setShowSovereigntyPopup(true);
       return;
     }
-    if (!esAccesoTotal) {
+    // Ducha Mental es gratuita: no exige paywall de sesión completa
+    if (resolved === "full" && !esAccesoTotal) {
       setShowPaywall(true);
       return;
     }
     setShowContextoSelector(true);
   };
 
+  const startFromEje = (ejeIndex: number) => {
+    if (ejeIndex === 0) {
+      startArquitectoMode("ducha");
+      return;
+    }
+    if (!esAccesoTotal) {
+      toast.message("Primero completa la Ducha Mental (gratis) o activa el acceso completo.", {
+        description: EJES[ejeIndex]?.label || "Eje bloqueado",
+      });
+      startArquitectoMode("ducha");
+      return;
+    }
+    startArquitectoMode("full");
+  };
+
   const acceptSovereignty = () => {
     setSovereigntyAccepted(true);
     localStorage.setItem(SOVEREIGNTY_ACCEPTED_KEY, "true");
     setShowSovereigntyPopup(false);
-    if (!esAccesoTotal) {
+    if (pendingStartMode === "full" && !esAccesoTotal) {
       setShowPaywall(true);
     } else {
       setShowContextoSelector(true);
     }
   };
 
-  const confirmContextoAndStart = async () => {
+  const confirmContextoAndStart = async (contextoOverride?: string | null) => {
+    const contexto = contextoOverride || selectedContexto || "trabajo";
+    setSelectedContexto(contexto);
     if (isVoiceRecording) cleanupVoiceRecording();
     setShowContextoSelector(false);
     setCurrentStep(0);
@@ -1285,6 +1330,15 @@ export default function Espejo() {
       }
     }
 
+    // Ducha directa: salta preparación y va a escribir
+    if (pendingStartMode === "ducha") {
+      setWelcomeShown(true);
+      setWelcomeText(WELCOME_MESSAGE);
+      if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
+      setPhase("arquitecto");
+      return;
+    }
+
     setPhase("preparacion");
   };
 
@@ -1293,6 +1347,16 @@ export default function Espejo() {
       toast.error("Describe dónde sientes el ruido");
       return;
     }
+    if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
+    setPhase("arquitecto");
+  };
+
+  const handlePrepSkipToDucha = () => {
+    if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
     setPhase("arquitecto");
   };
 
@@ -1668,7 +1732,7 @@ export default function Espejo() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={startArquitectoMode}
+                  onClick={() => startArquitectoMode("full")}
                   className="w-full p-6 rounded-2xl text-left transition-all border relative overflow-hidden"
                   style={{ 
                     backgroundColor: DARK_BG,
@@ -1717,19 +1781,30 @@ export default function Espejo() {
                   3 EJES CLÍNICOS
                 </p>
                 <div className="flex gap-2">
-                  {EJES.map((eje) => {
+                  {EJES.map((eje, index) => {
                     const Icon = eje.icon;
+                    const isDucha = index === 0;
                     return (
-                      <div 
+                      <button
+                        type="button"
                         key={eje.id}
-                        className="flex-1 py-3 rounded-xl text-center"
-                        style={{ backgroundColor: `${eje.color}08`, border: `1px solid ${eje.color}20` }}
+                        onClick={() => startFromEje(index)}
+                        className="flex-1 py-3 rounded-xl text-center transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        style={{
+                          backgroundColor: `${eje.color}08`,
+                          border: `1px solid ${eje.color}35`,
+                          cursor: "pointer",
+                        }}
+                        data-testid={`btn-eje-landing-${eje.id}`}
                       >
                         <Icon size={18} className="mx-auto mb-1" style={{ color: eje.color }} />
-                        <span className="text-[9px] font-bold" style={{ color: eje.color, fontFamily: "monospace" }}>
+                        <span className="text-[9px] font-bold block" style={{ color: eje.color, fontFamily: "monospace" }}>
                           {eje.label}
                         </span>
-                      </div>
+                        <span className="text-[8px] block mt-0.5" style={{ color: `${eje.color}70`, fontFamily: "monospace" }}>
+                          {isDucha ? "Gratis · Entrar" : esAccesoTotal ? "Entrar" : "Requiere acceso"}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -1929,6 +2004,21 @@ export default function Espejo() {
               >
                 <Heart size={18} />
                 Iniciar Diagnóstico Clínico
+              </button>
+              <button
+                type="button"
+                onClick={handlePrepSkipToDucha}
+                className="w-full mt-3 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: `${CYAN_NEON}10`,
+                  border: `1px solid ${CYAN_NEON}35`,
+                  color: CYAN_NEON,
+                  fontFamily: "monospace",
+                }}
+                data-testid="btn-ir-ducha-desde-prep"
+              >
+                <Droplets size={16} />
+                Ir directo a Ducha Mental
               </button>
             </div>
           </motion.div>
@@ -2740,38 +2830,58 @@ export default function Espejo() {
                                       })()}
                                     </div>
                                   ) : !(currentStep === 2 && iaFeedback?.mensaje) && !(currentStep === 2 && bloqueoEje3 && bloqueoEje3.hasta > Date.now()) && (
-                                    <button
-                                      onClick={handleSubmitStep}
-                                      disabled={currentTexto.trim().length < 5 || iaLoading || (currentStep === 2 && oxidacionDetectada && !iaFeedback)}
-                                      className="flex-1 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-                                      style={{ 
-                                        background: `linear-gradient(135deg, ${eje.color} 0%, ${GOLD} 100%)`,
-                                        color: "#000",
-                                        fontFamily: "monospace"
-                                      }}
-                                      data-testid={`btn-submit-${eje.id}`}
-                                    >
-                                      {iaLoading ? (
-                                        <>
-                                          <Loader2 size={14} className="animate-spin" />
-                                          PROCESSING...
-                                        </>
-                                      ) : currentStep === 2 && oxidacionDetectada && !iaFeedback ? (
-                                        <>
-                                          <Zap size={12} />
-                                          SISTEMA EN OXIDACIÓN — Genera voltaje primero
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Send size={14} />
-                                          {currentStep === 0 ? "ESCANEAR REGISTRO" : currentStep === 1 ? (
-                                            <>
-                                              INVERTIR 1 CRÉDITO — Diagnóstico{pataDetectada ? ` · ${pataDetectada}` : ""}{nivelSeñal ? ` · ${nivelSeñal.toUpperCase()}` : ""}
-                                            </>
-                                          ) : "COMPLETAR_SESIÓN"}
-                                        </>
+                                    <div className="flex flex-col gap-2 w-full flex-1">
+                                      <button
+                                        onClick={handleSubmitStep}
+                                        disabled={currentTexto.trim().length < 5 || iaLoading || (currentStep === 2 && oxidacionDetectada && !iaFeedback)}
+                                        className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                                        style={{ 
+                                          background: `linear-gradient(135deg, ${eje.color} 0%, ${GOLD} 100%)`,
+                                          color: "#000",
+                                          fontFamily: "monospace"
+                                        }}
+                                        data-testid={`btn-submit-${eje.id}`}
+                                      >
+                                        {iaLoading ? (
+                                          <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            PROCESSING...
+                                          </>
+                                        ) : currentStep === 2 && oxidacionDetectada && !iaFeedback ? (
+                                          <>
+                                            <Zap size={12} />
+                                            SISTEMA EN OXIDACIÓN — Genera voltaje primero
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Send size={14} />
+                                            {currentStep === 0 ? "ESCANEAR REGISTRO" : currentStep === 1 ? (
+                                              <>
+                                                INVERTIR 1 CRÉDITO — Diagnóstico{pataDetectada ? ` · ${pataDetectada}` : ""}{nivelSeñal ? ` · ${nivelSeñal.toUpperCase()}` : ""}
+                                              </>
+                                            ) : "COMPLETAR_SESIÓN"}
+                                          </>
+                                        )}
+                                      </button>
+                                      {currentStep === 0 && currentTexto.trim().length >= 5 && !iaLoading && (
+                                        <button
+                                          type="button"
+                                          onClick={handleCerrarDuchaMental}
+                                          className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                          style={{
+                                            backgroundColor: `${CYAN_NEON}12`,
+                                            border: `1px solid ${CYAN_NEON}40`,
+                                            color: CYAN_NEON,
+                                            fontFamily: "monospace",
+                                          }}
+                                          data-testid="btn-guardar-ducha-mental"
+                                        >
+                                          <Droplets size={14} />
+                                          GUARDAR DUCHA MENTAL
+                                          <span className="text-[10px] opacity-70 ml-1">+10 PS · Revisable</span>
+                                        </button>
                                       )}
-                                    </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -3262,13 +3372,23 @@ export default function Espejo() {
                         ) : (
                           <div className="text-xs text-slate-400">
                             {sesion.modo === "arquitecto" ? (
-                              <p className={isExpanded ? "" : "line-clamp-1"}>
-                                {(sesion.contenido as any).afloramiento || (sesion.contenido as any).comparativa || (sesion.contenido as any).percibo || (sesion.contenido as any).transformo}
+                              <p className={isExpanded ? "" : "line-clamp-2"}>
+                                {(sesion.contenido as any).registro_carga
+                                  || (sesion.contenido as any).afloramiento
+                                  || (sesion.contenido as any).comparativa
+                                  || (sesion.contenido as any).percibo
+                                  || (sesion.contenido as any).transformo
+                                  || (sesion.tipo_sesion === "ducha_mental" ? "Ducha Mental guardada" : "Sesión sin texto")}
                               </p>
                             ) : (
                               <p className={isExpanded ? "" : "line-clamp-1"}>
                                 {sesion.contenido.fragmentos?.[0]}
                               </p>
+                            )}
+                            {sesion.tipo_sesion === "ducha_mental" && (
+                              <span className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded" style={{ color: CYAN_NEON, backgroundColor: `${CYAN_NEON}12`, border: `1px solid ${CYAN_NEON}30`, fontFamily: "monospace" }}>
+                                DUCHA MENTAL
+                              </span>
                             )}
                           </div>
                         )}
@@ -3283,6 +3403,17 @@ export default function Espejo() {
                             className="border-t border-white/10"
                           >
                             <div className="p-4 space-y-3">
+                              {(sesion.contenido as any).preparacion && (
+                                <div className="p-3 rounded-xl" style={{ backgroundColor: `${WARM_ROSE}10` }}>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Wind size={12} style={{ color: WARM_ROSE }} />
+                                    <span className="text-[10px] font-bold" style={{ color: WARM_ROSE }}>
+                                      CONTEXTO PREVIO
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white/80">{(sesion.contenido as any).preparacion}</p>
+                                </div>
+                              )}
                               {EJES.map(eje => {
                                 const Icon = eje.icon;
                                 const contenido = sesion.contenido[eje.id as keyof typeof sesion.contenido];
@@ -3666,14 +3797,13 @@ export default function Espejo() {
               </div>
 
               <button
-                onClick={confirmContextoAndStart}
-                disabled={!selectedContexto}
-                className="w-full py-4 rounded-xl font-bold text-sm disabled:opacity-30 transition-all flex items-center justify-center gap-2"
+                onClick={() => confirmContextoAndStart(selectedContexto || "trabajo")}
+                className="w-full py-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                 style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
                 data-testid="btn-confirmar-contexto"
               >
                 <Heart size={16} />
-                Entrar al Santuario
+                {selectedContexto ? "Entrar al Santuario" : "Continuar a Ducha Mental"}
               </button>
               
               <button
