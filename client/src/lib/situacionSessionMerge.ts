@@ -212,6 +212,24 @@ export function preferLocalSubTareasInVehicleList(
   return changed ? out : merged;
 }
 
+/** Tras eco Firebase post-setDoc, conserva subVehiculos locales (reloj conquista activo). */
+export function preferLocalSubVehiculosInVehicleList(
+  merged: Vehicle[],
+  localSources: Vehicle[]
+): Vehicle[] {
+  let changed = false;
+  const out = merged.map(m => {
+    const local = localSources.find(l => l.id === m.id);
+    if (!local || !shouldPreferLocalSubVehiculos(m, local)) return m;
+    changed = true;
+    return {
+      ...m,
+      subVehiculos: mergeSubVehiculosById(m.subVehiculos, local.subVehiculos),
+    };
+  });
+  return changed ? out : merged;
+}
+
 export function shouldPreferLocalSubTareas(firebaseV: Vehicle, localV: Vehicle): boolean {
   if (firebaseV.tipoFlota !== "situacion" && localV.tipoFlota !== "situacion") return false;
   const localSubs = localV.subTareas ?? [];

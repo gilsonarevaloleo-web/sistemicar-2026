@@ -1197,6 +1197,11 @@ function VehicleCard({
     if (!built) return;
     const { subs: allSubs, closedSub, nextActiveSubId } = built;
 
+    // Gesto seguro: vaciar persist launch pendiente (sin bomba a N s).
+    void import("@/lib/launchPersistGate").then(m => {
+      m.flushLaunchPersistOnSubClose(vehicle.id);
+    });
+
     const veredicto = computeSubCloseVerdict(closedSub);
     setUltimoCierreSub({
       subId: closedSub.id,

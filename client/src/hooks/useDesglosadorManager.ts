@@ -51,6 +51,7 @@ import {
 import { runShadowTask, runShadowTaskAsync } from "@/lib/desglosadorShadow";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { paintSituacionRingRowCloseOptimistic } from "@/lib/situacionRingCloseMs0";
+import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
 import {
   registerDesglosadorDepthReconciler,
   scheduleDesglosadorDepthOnTap,
@@ -3133,6 +3134,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     // ms0: pinta cierre + ancla nueva ANTES de cualquier await (reinicio de reloj).
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
+    flushLaunchPersistOnSubClose(vehicleId);
     const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     const subTareasPainted = painted.subTareas ?? list;
     const anchorPainted = painted.situacionCupoAnchor ?? null;
@@ -3298,6 +3300,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
+    flushLaunchPersistOnSubClose(vehicleId);
     const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
