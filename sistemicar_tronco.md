@@ -88,6 +88,7 @@ TTS y sonidos **nunca** dentro de `useEffect` de render ni en handlers síncrono
 - Cleanup obligatorio al desmontar vehículo (`cancelUbicacionVoiceForVehicle`)
 - **Jul 2026 — voz por temporizador OFF por defecto** (`timerDrivenVoice.ts`): umbrales, 2 min, cupo, sobra y fila auto **no** llaman `speechSynthesis` durante medición. Quedan chime/vibración/notify. Solo voz atada a gesto (bienvenida, intro post-Cumplido). Reactivar: `localStorage.sistemicar_timer_voice=1`.
 - Persist launch: `setDoc(provisionalId)` quiet — **prohibido** `addDoc` + remap + `vehicles-updated` en el hot path post-medida (clavo ~13 s en ambos desglosadores).
+- Firma flota (`vehiclesReactiveSignature`): **debe** incluir `situacionCupoAnchor` + `resultadoSituacion` de filas cron. Si se omiten, Cumplido/Fallado no cambia la firma → React salta el setState y la UI queda en 0/3 (regresión circular anti-freeze).
 
 #### 4. UI espejo — Cero lógica de negocio en caliente
 
