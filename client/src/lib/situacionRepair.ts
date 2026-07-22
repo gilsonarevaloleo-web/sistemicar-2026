@@ -95,11 +95,26 @@ export function getPlaneacionCrashCount(): number {
   }
 }
 
-/** Firma estable para evitar setState/reconcile en bucle cuando Firebase repite el mismo snapshot. */
+/**
+ * Firma estable para reconcile/disco/React.
+ * Debe incluir ancla + resultado de filas del ring: si se omiten, Cumplido/Fallado
+ * no cambia la firma → useFlotaVehiclesShallow salta setState y el reloj queda en deuda.
+ */
 export function vehiclesReactiveSignature(vehicles: Vehicle[]): string {
   return vehicles
     .map(v => {
       const sc = v.situacionCronometro;
+      const anchor = v.situacionCupoAnchor;
+      const cronSig = (v.subTareas ?? [])
+        .filter(st => st.enDesgloseCronometro)
+        .map(
+          st =>
+            `${st.id}.${st.resultadoSituacion ?? "p"}.${st.minutosCupo ?? 0}.${st.cerradaAt ?? 0}`
+        )
+        .join(",");
+      const desgSig = (v.subVehiculos ?? [])
+        .map(s => `${s.id}.${s.status}.${s.aperturaAt ?? 0}`)
+        .join(",");
       return [
         v.id,
         v.status,
@@ -111,8 +126,11 @@ export function vehiclesReactiveSignature(vehicles: Vehicle[]): string {
         sc?.bloqueInicioAt ?? 0,
         sc?.retosCompletados ?? 0,
         sc?.depthBlockPsGranted ?? 0,
+        anchor?.subTareaId ?? "",
+        anchor?.startedAt ?? 0,
+        cronSig,
+        desgSig,
         v.subTareas?.length ?? 0,
-        v.subVehiculos?.filter(s => s.status === "activo").length ?? 0,
       ].join(":");
     })
     .sort()

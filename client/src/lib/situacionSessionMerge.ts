@@ -111,7 +111,9 @@ function pickSituacionCupoAnchor(
   if (fb?.subTareaId && !local?.subTareaId) return fb;
   if (fb?.subTareaId && local?.subTareaId) {
     if (local.subTareaId === fb.subTareaId) {
-      return (local.startedAt ?? 0) <= (fb.startedAt ?? 0) ? local : fb;
+      // Preferir startedAt más reciente: un handoff ms0 (now) no debe perderse
+      // frente a un snapshot FB con ancla vieja de la misma fila (deuda fantasma).
+      return (local.startedAt ?? 0) >= (fb.startedAt ?? 0) ? local : fb;
     }
     return local;
   }

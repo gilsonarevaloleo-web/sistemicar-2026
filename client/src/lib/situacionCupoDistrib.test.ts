@@ -401,6 +401,29 @@ describe("resolveCronometroCupoAnchor", () => {
     assert.equal((next as { startedAt: number }).startedAt, now);
   });
 
+  it("forceResetSameRow tras deuda: startedAt=now (no hereda ancla vencida)", () => {
+    const now = 3_000_000;
+    const debtStartedAt = now - 7 * 60_000 - 56_000; // ~7:56 sobre cupo 5 → deuda
+    const subs = [
+      {
+        ...st("a", 5),
+        enDesgloseCronometro: true,
+        resultadoSituacion: "cumplido" as const,
+        cerradaAt: now,
+      },
+      { ...st("b", 5), enDesgloseCronometro: true, resultadoSituacion: "pendiente" as const },
+    ];
+    const cur = { subTareaId: "a", startedAt: debtStartedAt };
+    const next = resolveCronometroCupoAnchor(subs, cur, { forceResetSameRow: true, now });
+    assert.ok(next && next !== "unchanged");
+    assert.equal(next.subTareaId, "b");
+    assert.equal(next.startedAt, now);
+    assert.ok(
+      next.startedAt > debtStartedAt,
+      "handoff debe mintar startedAt fresco; si falla el island muestra DEUDA ACUMULADA"
+    );
+  });
+
   it("no cambia si la fila actual aún tiene cupo", () => {
     const now = 1_000_000;
     const subs = [st("a", 5), st("b", 10)];
