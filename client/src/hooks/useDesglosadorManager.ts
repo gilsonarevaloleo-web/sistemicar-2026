@@ -530,7 +530,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
               });
             setVehicles(patchOne);
             vehiclesRef.current = patchOne(vehiclesRef.current);
-            saveLocalVehicles(vehiclesRef.current);
+            scheduleSaveLocalVehicles(vehiclesRef.current);
             const subVehiculos = vehiclesRef.current.find(v => v.id === payload.vehicleId)?.subVehiculos;
             if (subVehiculos) {
               void updateVehicle(user.uid, payload.vehicleId, { subVehiculos }).catch(e =>
@@ -3188,14 +3188,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     vehiclesRef.current = vehiclesRef.current.map(v =>
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
-    persistVehiclesRef();
+    // Disco fuera del gesto: no pelear remount/tick del island con JSON flota.
+    scheduleSaveLocalVehicles(vehiclesRef.current);
     recordDecision(user.uid, {
       key: decisionKeySubSituacion(vehicleId, subTareaId),
       kind: "sub_situacion",
       vehicleId,
       ts: now,
     });
-    burstConcienciaClockTick(1);
+    // burst ya disparado en paintSituacionRingRowCloseOptimistic
 
     void runShadowTaskAsync(async () => {
       let finalSubTareas = subTareas;
@@ -3216,7 +3217,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
               ? { ...v, subTareas: finalSubTareas, situacionCronometro, situacionCupoAnchor }
               : v
           );
-          persistVehiclesRef();
+          scheduleSaveLocalVehicles(vehiclesRef.current);
         }
       }
       try {
@@ -3306,26 +3307,28 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     vehiclesRef.current = vehiclesRef.current.map(v =>
       v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
     );
-    persistVehiclesRef();
-    burstConcienciaClockTick(1);
-    try {
-      await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
-      // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset = no-op.
-      if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
-      if (bloqueListo) {
-        toast.info("Ronda completada", {
-          description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,
-          duration: 4500,
-        });
-      } else {
-        toast.info(
-          minutosPerdidos > 0 ? `Fallado · −${minutosPerdidos} min en cola` : "Fallado (sin PS de fila)",
-          { description: targetSub.texto, duration: 2200 }
-        );
+    scheduleSaveLocalVehicles(vehiclesRef.current);
+    // burst ya disparado en paintSituacionRingRowCloseOptimistic
+    void runShadowTaskAsync(async () => {
+      try {
+        await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
+        // Ancla ya reajustada arriba de forma síncrona; sync sin forceReset = no-op.
+        if (!bloqueListo) void handleSyncSituacionCupoAnchor(vehicleId);
+        if (bloqueListo) {
+          toast.info("Ronda completada", {
+            description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,
+            duration: 4500,
+          });
+        } else {
+          toast.info(
+            minutosPerdidos > 0 ? `Fallado · −${minutosPerdidos} min en cola` : "Fallado (sin PS de fila)",
+            { description: targetSub.texto, duration: 2200 }
+          );
+        }
+      } catch (e) {
+        console.error("[handleSituacionCronometroFallado]", e);
       }
-    } catch (e) {
-      console.error("[handleSituacionCronometroFallado]", e);
-    }
+    });
   };
 
   const handleSituacionCronometroReservar = async (vehicleId: string, subTareaId: string) => {

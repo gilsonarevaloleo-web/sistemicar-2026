@@ -218,6 +218,7 @@ import {
   dispatchDesglosadorRutaBandVoice,
   dispatchDesglosadorSubIntroVoiceOnce,
 } from "@/lib/desglosadorVoiceDispatch";
+import { runShadowTask } from "@/lib/desglosadorShadow";
 import {
   computeSafeRemainingMs,
   computeSafeRemainingSec,
@@ -1209,20 +1210,25 @@ function VehicleCard({
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
       rutaUmbralAlertKeysRef.current.clear();
-      const nextSub = allSubs.find(s => s.id === nextActiveSubId);
-      if (nextSub) {
-        dispatchDesglosadorSubIntroVoiceOnce(
-          vehicle.id,
-          nextSub.id,
-          nextSub.aperturaAt ?? now,
-          nextSub.titulo,
-          Boolean(nextSub.rutaEnfoque?.activa)
-        );
-        subVehiculosRef.current = allSubs;
-      }
+      subVehiculosRef.current = allSubs;
     }
+    // ms0: paint primero; voz del siguiente sub en sombra (no pelear remount del island).
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
     burstConcienciaClockTick(1);
+    if (nextActiveSubId) {
+      const nextSub = allSubs.find(s => s.id === nextActiveSubId);
+      if (nextSub) {
+        runShadowTask(() => {
+          dispatchDesglosadorSubIntroVoiceOnce(
+            vehicle.id,
+            nextSub.id,
+            nextSub.aperturaAt ?? now,
+            nextSub.titulo,
+            Boolean(nextSub.rutaEnfoque?.activa)
+          );
+        });
+      }
+    }
     const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
     if (allDone) {
       setDesglosadorSummary(true);
@@ -1926,10 +1932,8 @@ function VehicleCard({
                     activeSub={activeSub}
                     onSubVehicleRestanteChange={handleSubVehicleRestanteChange}
                   >
-                    {(clockUi) => (
-                  <VehicleCardLiveNow>
-                    {(nowMs) => {
-                const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
+                    {(clockUi) => {
+                const sessionElapsedSec = clockUi.sessionElapsedSec;
 
                 return (
                   <div className="pt-3 space-y-3">
@@ -2415,8 +2419,6 @@ function VehicleCard({
                   </div>
                 );
                     }}
-                  </VehicleCardLiveNow>
-                    )}
                   </DesglosadorSubLiveIsland>
                 );
               })()}
