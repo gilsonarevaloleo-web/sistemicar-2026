@@ -91,7 +91,8 @@ export function speakRingBienvenida(retoNumero: number, key?: string): void {
   unlockGpsVoice();
   prefetchGpsClips(clipIds);
   void playGpsClipIds(clipIds).then(result => {
-    if (result.ok) return;
+    if (result.ok || result.reason === "aborted") return;
+    // Solo TTS si el pack GPS no está desplegado / no es audio real.
     speakSituacionVoiceReliable(ttsKey, ringBienvenidaParts(retoNumero), true);
   });
 }

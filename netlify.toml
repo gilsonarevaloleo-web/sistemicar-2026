@@ -26,6 +26,12 @@
   status = 200
   force = true
 
+# Clips GPS — no reescribir a index.html si el archivo existe
+[[redirects]]
+  from = "/voice/*"
+  to = "/voice/:splat"
+  status = 200
+
 # SPA (wouter)
 [[redirects]]
   from = "/*"

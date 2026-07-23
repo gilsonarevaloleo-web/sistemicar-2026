@@ -87,7 +87,7 @@ TTS y sonidos **nunca** dentro de `useEffect` de render ni en handlers síncrono
 - Un solo canal de retry por app; **prohibido** `pointerdown` global por frase
 - Cleanup obligatorio al desmontar vehículo (`cancelUbicacionVoiceForVehicle`)
 - **Jul 2026 — voz por temporizador TTS OFF** (`timerDrivenVoice.ts`): umbrales/2 min/cupo **no** usan `speechSynthesis` durante medición.
-- **Jul 2026 — voz tipo GPS** (`gpsVoice.ts` + `/public/voice/*.mp3`): bienvenida del ring, intro conquista y bandas van por **Web Audio** (AudioContext desbloqueado en gesto). No pelea con Firebase/persist. TTS solo como fallback si falta el clip.
+- **Jul 2026 — voz tipo GPS** (`gpsVoice.ts` + `client/public/voice/*.mp3`): bienvenida del ring, intro conquista y bandas van por **HTMLAudioElement** (desbloqueo en gesto). Los mp3 **deben** vivir en `client/public/voice/` (Vite root = `client/`); si están en `/public` raíz, Netlify sirve `index.html` y el GPS “falla en silencio”. TTS solo como fallback si el clip no es audio real.
 - Persist launch: `setDoc(provisionalId)` quiet — **prohibido** `addDoc` + remap + `vehicles-updated` en el hot path post-medida (clavo ~13 s en ambos desglosadores).
 - **Prohibido bomba temporal post-lanzamiento** (`setTimeout(4s/13s/28s)`): solo movía el clavo del reloj conquista. Persist remoto / pilares / centinela van por `launchPersistGate` (pestaña oculta, idle real, o primer Cumplido/Fallado).
 - Firma flota (`vehiclesReactiveSignature`): **debe** incluir `situacionCupoAnchor` + `resultadoSituacion` de filas cron. Si se omiten, Cumplido/Fallado no cambia la firma → React salta el setState y la UI queda en 0/3 (regresión circular anti-freeze).

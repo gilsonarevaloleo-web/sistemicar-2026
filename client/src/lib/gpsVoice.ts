@@ -1,160 +1,169 @@
 /**
- * Voz tipo GPS — Web Audio + clips precargados.
+ * Voz tipo GPS — HTMLAudioElement + clips precargados en /voice/*.mp3.
  *
- * Por qué: speechSynthesis del navegador se cuelga / exige gesto / pelea con el
- * hilo principal. Los GPS (y Maps) hablan con audio de sesión (AudioContext /
- * HTMLAudioElement) desbloqueado una vez; luego pueden anunciar sin bloquear UI.
+ * Patrón GPS/Maps: desbloquear audio en un gesto y reproducir archivos,
+ * sin speechSynthesis en el hot path.
  *
- * Flujo:
- * 1. unlockGpsVoice() en el mismo gesto del operador (pointerdown / abrir ring)
- * 2. playGpsClipIds([...]) reproduce mp3 de /voice/ sin pasar por speechSynthesis
- * 3. Si el clip falta o AudioContext falla → el caller puede caer a TTS
+ * Importante: los mp3 viven en `client/public/voice/` (Vite root = client/).
  */
 
 const VOICE_BASE = "/voice";
 
-let sharedCtx: AudioContext | null = null;
 let unlocked = false;
-const bufferCache = new Map<string, AudioBuffer>();
-const inflight = new Map<string, Promise<AudioBuffer | null>>();
-let playToken = 0;
+let playGeneration = 0;
+let sharedPlayer: HTMLAudioElement | null = null;
+/** Evita que un play abortado por supersede dispare TTS de fallback. */
+const activePlayControllers = new Set<{ gen: number }>();
 
-function getAudioContextClass(): typeof AudioContext | null {
-  if (typeof window === "undefined") return null;
-  return (
-    window.AudioContext ||
-    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext ||
-    null
-  );
-}
-
-function ensureCtx(): AudioContext | null {
-  const AC = getAudioContextClass();
-  if (!AC) return null;
-  if (!sharedCtx || sharedCtx.state === "closed") {
-    sharedCtx = new AC();
+function ensurePlayer(): HTMLAudioElement | null {
+  if (typeof window === "undefined" || typeof Audio === "undefined") return null;
+  if (!sharedPlayer) {
+    sharedPlayer = new Audio();
+    sharedPlayer.preload = "auto";
+    sharedPlayer.setAttribute("playsinline", "true");
   }
-  return sharedCtx;
+  return sharedPlayer;
 }
 
 /** Desbloquea la sesión de audio (obligatorio en móvil). Llamar en gesto. */
 export function unlockGpsVoice(): void {
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  const resume = () => {
-    unlocked = true;
-  };
-  if (ctx.state === "suspended") {
-    void ctx.resume().then(resume).catch(resume);
-  } else {
-    resume();
-  }
-  // Beep inaudible: algunos WebViews solo marcan "user activated" tras start().
+  const player = ensurePlayer();
+  if (!player) return;
+  unlocked = true;
+  // Play silencioso: marca user-activation para plays posteriores (incl. timers).
   try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    gain.gain.value = 0.0001;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.02);
+    const prevVolume = player.volume;
+    const prevSrc = player.src;
+    player.volume = 0.001;
+    // data-uri wav silencioso (~0.1s) — no depende de /voice/ estando desplegado
+    player.src =
+      "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+    void player.play().then(
+      () => {
+        player.pause();
+        player.volume = prevVolume || 1;
+        if (prevSrc) player.src = prevSrc;
+      },
+      () => {
+        player.volume = prevVolume || 1;
+      }
+    );
   } catch {
     /* noop */
   }
 }
 
 export function isGpsVoiceUnlocked(): boolean {
-  return unlocked && !!sharedCtx && sharedCtx.state !== "closed";
+  return unlocked;
 }
 
 export function gpsClipUrl(clipId: string): string {
   return `${VOICE_BASE}/${clipId}.mp3`;
 }
 
-async function loadBuffer(clipId: string): Promise<AudioBuffer | null> {
-  const cached = bufferCache.get(clipId);
-  if (cached) return cached;
-  const pending = inflight.get(clipId);
-  if (pending) return pending;
-
-  const job = (async () => {
-    const ctx = ensureCtx();
-    if (!ctx) return null;
-    try {
-      const res = await fetch(gpsClipUrl(clipId), { cache: "force-cache" });
-      if (!res.ok) return null;
-      const raw = await res.arrayBuffer();
-      const buf = await ctx.decodeAudioData(raw.slice(0));
-      bufferCache.set(clipId, buf);
-      return buf;
-    } catch {
-      return null;
-    } finally {
-      inflight.delete(clipId);
-    }
-  })();
-
-  inflight.set(clipId, job);
-  return job;
+function isLikelyMp3(bytes: Uint8Array): boolean {
+  if (bytes.length < 3) return false;
+  // ID3 tag
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
+  // MPEG frame sync
+  if (bytes[0] === 0xff && (bytes[1]! & 0xe0) === 0xe0) return true;
+  return false;
 }
 
-/** Precarga clips en idle (tras unlock). */
+async function assertClipReachable(clipId: string): Promise<boolean> {
+  try {
+    const res = await fetch(gpsClipUrl(clipId), { method: "GET", cache: "no-cache" });
+    if (!res.ok) return false;
+    const type = (res.headers.get("content-type") || "").toLowerCase();
+    if (type.includes("text/html")) return false;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return isLikelyMp3(buf);
+  } catch {
+    return false;
+  }
+}
+
+/** Precarga clips (HEAD/GET) tras unlock — no envenena con HTML del SPA. */
 export function prefetchGpsClips(clipIds: string[]): void {
   if (typeof window === "undefined") return;
   for (const id of clipIds) {
-    void loadBuffer(id);
+    void assertClipReachable(id);
   }
 }
 
 export type GpsPlayResult = {
   ok: boolean;
-  reason?: "no-ctx" | "locked" | "missing-clip" | "aborted";
+  reason?: "no-audio" | "locked" | "missing-clip" | "aborted" | "play-error";
 };
 
+function playOneOnPlayer(player: HTMLAudioElement, url: string): Promise<"ok" | "error"> {
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (result: "ok" | "error") => {
+      if (settled) return;
+      settled = true;
+      player.onended = null;
+      player.onerror = null;
+      resolve(result);
+    };
+    player.onended = () => finish("ok");
+    player.onerror = () => finish("error");
+    player.src = url;
+    player.currentTime = 0;
+    player.volume = 1;
+    void player.play().then(
+      () => {
+        /* onended resolve */
+      },
+      () => finish("error")
+    );
+  });
+}
+
 /**
- * Reproduce clips en secuencia (como turn-by-turn del GPS).
- * Cancela una reproducción anterior del motor GPS al empezar otra.
+ * Reproduce clips en secuencia (turn-by-turn).
+ * Una nueva llamada cancela la anterior (gen++); la anterior devuelve `aborted`
+ * y NO debe caer a TTS.
  */
 export async function playGpsClipIds(clipIds: string[]): Promise<GpsPlayResult> {
   const ids = clipIds.map(s => s.trim()).filter(Boolean);
   if (ids.length === 0) return { ok: false, reason: "missing-clip" };
 
   unlockGpsVoice();
-  const ctx = ensureCtx();
-  if (!ctx) return { ok: false, reason: "no-ctx" };
-  if (ctx.state === "suspended") {
-    try {
-      await ctx.resume();
-    } catch {
-      return { ok: false, reason: "locked" };
+  const player = ensurePlayer();
+  if (!player) return { ok: false, reason: "no-audio" };
+
+  const gen = ++playGeneration;
+  const handle = { gen };
+  activePlayControllers.add(handle);
+
+  try {
+    // Verificar el primero: si el SPA devolvió HTML, fallar limpio → TTS fallback.
+    const firstOk = await assertClipReachable(ids[0]!);
+    if (gen !== playGeneration) return { ok: false, reason: "aborted" };
+    if (!firstOk) return { ok: false, reason: "missing-clip" };
+
+    for (const id of ids) {
+      if (gen !== playGeneration) return { ok: false, reason: "aborted" };
+      const result = await playOneOnPlayer(player, gpsClipUrl(id));
+      if (gen !== playGeneration) return { ok: false, reason: "aborted" };
+      if (result !== "ok") return { ok: false, reason: "play-error" };
     }
+    return { ok: true };
+  } finally {
+    activePlayControllers.delete(handle);
   }
-  unlocked = true;
-
-  const token = ++playToken;
-  for (const id of ids) {
-    if (token !== playToken) return { ok: false, reason: "aborted" };
-    const buf = await loadBuffer(id);
-    if (!buf) return { ok: false, reason: "missing-clip" };
-    if (token !== playToken) return { ok: false, reason: "aborted" };
-
-    await new Promise<void>(resolve => {
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.onended = () => resolve();
-      try {
-        src.start();
-      } catch {
-        resolve();
-      }
-    });
-  }
-  return { ok: true };
 }
 
 export function stopGpsVoice(): void {
-  playToken += 1;
+  playGeneration += 1;
+  if (sharedPlayer) {
+    try {
+      sharedPlayer.pause();
+    } catch {
+      /* noop */
+    }
+  }
 }
 
 /** Packs de clips alineados a los guiones de producto. */
@@ -174,16 +183,17 @@ export function ringBienvenidaClipIds(retoNumero: number): string[] {
 
 /** Solo tests. */
 export function resetGpsVoiceForTests(): void {
-  playToken += 1;
+  playGeneration += 1;
   unlocked = false;
-  bufferCache.clear();
-  inflight.clear();
-  if (sharedCtx && sharedCtx.state !== "closed") {
+  activePlayControllers.clear();
+  if (sharedPlayer) {
     try {
-      void sharedCtx.close();
+      sharedPlayer.pause();
+      sharedPlayer.removeAttribute("src");
+      sharedPlayer.load();
     } catch {
       /* noop */
     }
   }
-  sharedCtx = null;
+  sharedPlayer = null;
 }

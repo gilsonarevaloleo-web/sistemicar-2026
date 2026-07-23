@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Genera clips MP3 de voz tipo GPS (gTTS) en public/voice/.
+"""Genera clips MP3 de voz tipo GPS (gTTS) en client/public/voice/.
+
+Vite root = client/ → los estáticos deben vivir en client/public/ (NO /public raíz).
 
 Uso:
   pip install gTTS
@@ -15,7 +17,7 @@ except ImportError as e:
     raise SystemExit("Instalá gTTS: pip install gTTS") from e
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "public" / "voice"
+OUT = ROOT / "client" / "public" / "voice"
 
 CLIPS: dict[str, str] = {
     "ring-bienvenida-1a": "Bienvenido al entrenamiento de enfoque real.",
@@ -38,7 +40,7 @@ def main() -> None:
         path = OUT / f"{key}.mp3"
         print(f"→ {path.relative_to(ROOT)}")
         gTTS(text=text, lang="es", tld="com").save(str(path))
-    print(f"OK ({len(CLIPS)} clips)")
+    print(f"OK ({len(CLIPS)} clips) → {OUT.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

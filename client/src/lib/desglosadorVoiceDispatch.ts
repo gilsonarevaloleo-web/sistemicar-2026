@@ -48,8 +48,8 @@ export function dispatchDesglosadorSubIntroVoice(
   unlockGpsVoice();
   prefetchGpsClips(clipIds);
   void playGpsClipIds(clipIds).then(result => {
-    if (result.ok) {
-      onSpoken?.();
+    if (result.ok || result.reason === "aborted") {
+      if (result.ok) onSpoken?.();
       return;
     }
     // Fallback TTS (incluye título dinámico) si el pack GPS no cargó.
@@ -103,8 +103,8 @@ export function dispatchDesglosadorRutaBandVoice(
       : [...GPS_CLIP_PACKS.conquistaLimite];
   unlockGpsVoice();
   void playGpsClipIds(clipIds).then(result => {
-    if (result.ok) {
-      onSpoken?.();
+    if (result.ok || result.reason === "aborted") {
+      if (result.ok) onSpoken?.();
       return;
     }
     // Solo si el operador reactivó timer TTS y faltan clips.
