@@ -1,4 +1,5 @@
 import { saveLocalVehicles, type Vehicle } from "@/lib/persistence";
+import { enqueueLaunchPersistWork } from "@/lib/launchPersistGate";
 
 /** Persiste flota en localStorage fuera del hilo de navegación / tap. */
 export function scheduleSaveLocalVehicles(vehicles: Vehicle[]): void {
@@ -12,17 +13,16 @@ export function scheduleSaveLocalVehicles(vehicles: Vehicle[]): void {
 }
 
 /**
- * Post-lanzamiento: stringify de flota ANTES del cluster expand/Firebase.
- * Antes 2200 ms chocaba con shadow 3200 y Firebase launchPaint 2200 → Aw Snap ~4s.
+ * Post-lanzamiento: stringify de flota vía gate (oculto/idle/cierre),
+ * no setTimeout(1.5s) — ese golpe contribuía al clavo ~00:00:01–03.
  * Si se pasa un getter, lee el snapshot al disparar (no el del launch): evita pisar Cumplido.
  */
-export const LAUNCH_LOCAL_SAVE_DELAY_MS = 1_500;
-
 export function scheduleSaveLocalVehiclesAfterLaunch(
   vehiclesOrGetter: Vehicle[] | (() => Vehicle[]),
-  delayMs = LAUNCH_LOCAL_SAVE_DELAY_MS
+  vehicleId?: string
 ): void {
-  globalThis.setTimeout(() => {
+  const id = vehicleId ?? "__launch_local__";
+  enqueueLaunchPersistWork(id, "local", () => {
     try {
       const vehicles =
         typeof vehiclesOrGetter === "function" ? vehiclesOrGetter() : vehiclesOrGetter;
@@ -30,5 +30,5 @@ export function scheduleSaveLocalVehiclesAfterLaunch(
     } catch {
       /* quota */
     }
-  }, delayMs);
+  });
 }

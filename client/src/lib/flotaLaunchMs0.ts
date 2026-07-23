@@ -3,12 +3,8 @@ import { generateStableUuid } from "@/lib/stableUuid";
 import { suppressGhostReconcileAfterLaunch } from "@/lib/ghostReconcileScheduler";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { scheduleSaveLocalVehiclesAfterLaunch } from "@/lib/deferredVehicleSave";
-import {
-  runShadowTaskAfterLaunch,
-  runDeferredLaunchTask,
-  LAUNCH_SHADOW_DELAY_MS,
-  LAUNCH_CENTINELA_ARCHIVE_DELAY_MS,
-} from "@/lib/desglosadorShadow";
+import { runShadowTask } from "@/lib/desglosadorShadow";
+import { enqueueLaunchPersistWork } from "@/lib/launchPersistGate";
 import { enqueueConcienciaWork } from "@/lib/concienciaScheduler";
 import {
   closeCentinelasBeforeConsciousLaunch,
@@ -109,7 +105,7 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   });
 
   // Disco fuera de la ventana toast/expand — lee ref al disparar (no snapshot del launch).
-  scheduleSaveLocalVehiclesAfterLaunch(() => vehiclesRef.current);
+  scheduleSaveLocalVehiclesAfterLaunch(() => vehiclesRef.current, newVehicleId);
   suppressGhostReconcileAfterLaunch();
 
   // Burst de reloj fuera del frame del gesto (móvil: evita cascada de anillo/métricas).
@@ -166,8 +162,8 @@ export type FlotaLaunchShadowParams = {
 /**
  * Sombra post-lanzamiento:
  * - NO llama addVehicle (ya pintamos + disco after-launch).
- * - Solo persist remoto quiet (setDoc id provisional; sin remap/event).
- * - Centinela: suppress barato ya; archive Firebase mucho después del persist.
+ * - Persist remoto quiet + pilares + centinela vía launchPersistGate
+ *   (oculto/idle/cierre de sub) — sin bomba a 28s que clava el reloj conquista.
  */
 export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void {
   const { userId, vehiclePayload, provisionalId, clientRequestId, vehiclesSnapshot } = params;
@@ -177,13 +173,15 @@ export function scheduleFlotaLaunchShadow(params: FlotaLaunchShadowParams): void
   resetCentinelaTimerState();
   recordConsciousVehicleLaunch();
 
-  runShadowTaskAfterLaunch(() => {
+  enqueueLaunchPersistWork(provisionalId, "remote", () => {
     scheduleVehicleRemotePersist(userId, provisionalId, vehiclePayload, clientRequestId);
-  }, LAUNCH_SHADOW_DELAY_MS);
+  });
 
-  runDeferredLaunchTask(() => {
-    void closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
-  }, LAUNCH_CENTINELA_ARCHIVE_DELAY_MS);
+  enqueueLaunchPersistWork(provisionalId, "centinela", () => {
+    runShadowTask(() => {
+      void closeCentinelasBeforeConsciousLaunch(userId, vehiclesSnapshot);
+    });
+  });
 }
 
 export type FlotaLaunchPillarShadowParams = {
@@ -199,7 +197,7 @@ export type FlotaLaunchPillarShadowParams = {
   markPeldano?: () => void | Promise<void>;
 };
 
-/** Pilares (PS, termo, proyecto) siempre en sombra tras ms0 estable. */
+/** Pilares (PS, termo, proyecto) en el mismo gate — no a N+2 segundos. */
 export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowParams): void {
   const {
     bonoTemple,
@@ -210,8 +208,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
     recordVehiculoInicio,
     markPeldano,
   } = params;
-  // Tras persist remoto quiet, no en el mismo segundo.
-  runShadowTaskAfterLaunch(() => {
+  enqueueLaunchPersistWork(vehicleId, "pillars", () => {
     void (async () => {
       if (markPeldano) await markPeldano();
       if (intensidadEnergetica && recordVehiculoInicio) {
@@ -221,7 +218,7 @@ export function scheduleFlotaLaunchPillarShadow(params: FlotaLaunchPillarShadowP
         await safeAwardPS(10, "VOLUNTAD SOBRE EL HORARIO: " + titulo);
       }
     })();
-  }, LAUNCH_SHADOW_DELAY_MS + 2_000);
+  });
 }
 
 export function newFlotaLaunchIds(): { provisionalId: string; clientRequestId: string } {

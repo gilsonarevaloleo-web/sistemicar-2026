@@ -871,7 +871,7 @@ export function scheduleVehicleRemotePersist(
 /**
  * Persist remoto post-pintado local.
  * Usa setDoc(provisionalId) para NO remapear id → evita saveLocal + vehicles-updated
- * (~13s en mobile: LAUNCH_SHADOW_DELAY + addDoc remap mataba el desglosador).
+ * (~13s en mobile: sombra/LAUNCH_SHADOW + addDoc remap mataba el desglosador).
  */
 async function persistVehicleToFirebase(
   userId: string,

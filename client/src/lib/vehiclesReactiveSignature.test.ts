@@ -36,7 +36,7 @@ describe("vehiclesReactiveSignature", () => {
     assert.notEqual(vehiclesReactiveSignature([base]), vehiclesReactiveSignature([next]));
   });
 
-  it("cambia al Cumplido: ancla startedAt y resultadoSituacion (no skip de disco)", () => {
+  it("cambia al Cumplido: ancla startedAt y resultadoSituacion (no skip de disco/React)", () => {
     const base = veh({
       id: "s1",
       status: "activo",
@@ -75,7 +75,49 @@ describe("vehiclesReactiveSignature", () => {
     assert.notEqual(
       vehiclesReactiveSignature([base]),
       vehiclesReactiveSignature([afterCumplido]),
-      "sin este cambio el flush a disco se saltaba y el reloj no reiniciaba"
+      "sin este cambio el flush a disco se saltaba y la UI podía quedar en 0/3"
+    );
+  });
+
+  it("cambia al Fallado de la misma forma", () => {
+    const base = veh({
+      id: "s2",
+      status: "activo",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1, depthBlockPsGranted: 0 } as never,
+      situacionCupoAnchor: { subTareaId: "a", startedAt: 1000 },
+      subTareas: [
+        {
+          id: "a",
+          texto: "A",
+          completada: false,
+          creadaAt: 0,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 13,
+        },
+        {
+          id: "b",
+          texto: "B",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 12,
+        },
+      ],
+    });
+    const afterFallado = {
+      ...base,
+      situacionCupoAnchor: { subTareaId: "b", startedAt: 2500 },
+      subTareas: [
+        { ...base.subTareas![0]!, resultadoSituacion: "fallado" as const, cerradaAt: 2500 },
+        base.subTareas![1]!,
+      ],
+    } as Vehicle;
+    assert.notEqual(
+      vehiclesReactiveSignature([base]),
+      vehiclesReactiveSignature([afterFallado])
     );
   });
 });

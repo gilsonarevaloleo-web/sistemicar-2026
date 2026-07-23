@@ -494,6 +494,7 @@ import {
   DesglosadorSubCloseButtons,
   type DesglosadorSubClosePayload,
 } from "@/components/planeacion/DesglosadorSubCloseButtons";
+import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
 import { buildDesglosadorSubClose } from "@/lib/desglosadorSubClose";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import { calcularMetricasAnilloConciencia, calcularBalanceConquistaJornada, buildConcienciaTimeline, computeLiveEntropy, armEntropyGapOnConsciousClose, formatMinutosJornada, resetLiveEntropyMonotonic } from "@/engines/ConcienciaEngine";
@@ -1136,6 +1137,7 @@ function VehicleCard({
     onDesglosadorUpdate(
       vehicle.id,
       subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s)),
+      // Mid-ciclo: no marcar launchPaint (eso es solo el primer paint post-lanzamiento).
       { silentDepth: true }
     );
   }, [vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate]);
@@ -1232,6 +1234,9 @@ function VehicleCard({
     );
     if (!built) return;
     const { subs: allSubs, closedSub, nextActiveSubId } = built;
+
+    // Gesto seguro: vaciar persist launch pendiente (sin bomba a N s).
+    flushLaunchPersistOnSubClose(vehicle.id);
 
     const veredicto = computeSubCloseVerdict(closedSub);
     setUltimoCierreSub({

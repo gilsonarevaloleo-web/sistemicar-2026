@@ -1,10 +1,9 @@
 /**
  * Profundidad horaria del desglosador — un solo hub de fondo (no un intervalo por tarjeta).
+ * Sin setTimeout(3200): esa bomba clavaba el reloj conquista ~00:00:03.
  */
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
-
-/** Tras launch: lejos del cluster 1.5–5.5 s (antes 3200 chocaba con sombra). */
-const DEPTH_ON_TAP_DEFER_MS = 8_000;
+import { enqueueLaunchPersistWork } from "@/lib/launchPersistGate";
 
 export type DesglosadorDepthReconcileFn = (
   vehicleId: string,
@@ -46,17 +45,20 @@ function ensureDepthHub(): void {
   }, DEPTH_HUB_INTERVAL_MS);
 }
 
-/** Tras tap / mutación local — PS de profundidad en sombra. */
+/**
+ * Tras tap / mutación local — PS de profundidad en el gate (gesto/oculto/idle),
+ * no a 3.2s fijos (clavo ~00:00:03).
+ */
 export function scheduleDesglosadorDepthOnTap(
   vehicleId: string,
   options?: { silent?: boolean; resetGranted?: number }
 ): void {
   if (!reconcileFn) return;
-  globalThis.setTimeout(() => {
+  enqueueLaunchPersistWork(vehicleId, "pillars", () => {
     runShadowTaskAsync(() => {
       void reconcileFn!(vehicleId, options);
     });
-  }, DEPTH_ON_TAP_DEFER_MS);
+  });
 }
 
 /** Solo tests. */

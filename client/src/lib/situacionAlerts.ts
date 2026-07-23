@@ -8,6 +8,7 @@ import {
 import { isSituacionAlertsEnabled } from "./tikSound";
 import { ringBienvenidaParts, ringTiempoSobraParts } from "./ringEnfoqueReal";
 import { speakSituacionVoiceReliable } from "./ubicacionVoiceReliable";
+import { isTimerDrivenVoiceEnabled } from "./timerDrivenVoice";
 
 function trimSubText(text: string, max = 48): string {
   const t = text.trim();
@@ -30,6 +31,8 @@ export function fireSituacion2MinAlert(params: {
     tag: `situacion-2m-${params.vehicleId}-${params.tagKey}`,
     vehicleId: params.vehicleId,
   });
+  // Voz por temporizador OFF: chime/vibración bastan durante medición.
+  if (!isTimerDrivenVoiceEnabled()) return;
   speakSituacionVoiceReliable(
     `2m-${params.tagKey}`,
     [`Dos minutos para la fila: ${fila}`],
@@ -59,6 +62,7 @@ export function fireSituacionCupoAlert(params: {
     requireInteraction: !params.escalation,
     vehicleId: params.vehicleId,
   });
+  if (!isTimerDrivenVoiceEnabled()) return;
   const phrase = params.escalation
     ? `Aún pendiente en ${fila}. Marca cumplido o incumplido.`
     : `Cupo alcanzado. Marca cumplido o incumplido en ${fila}`;
@@ -84,6 +88,10 @@ export function speakRingTiempoSobra(
   key?: string,
   onSpoken?: () => void
 ): () => void {
+  if (!isTimerDrivenVoiceEnabled()) {
+    onSpoken?.();
+    return () => {};
+  }
   return speakSituacionVoiceReliable(
     key ?? `ring-sobra-${minutosSobra}`,
     ringTiempoSobraParts(minutosSobra),
@@ -97,6 +105,11 @@ export function speakSituacionFilaEnFoco(
   filaTexto: string,
   opts?: { intro?: boolean; key?: string; onSpoken?: () => void }
 ): () => void {
+  // Auto-fila es el disparador típico post-medida → fuera hasta reactivar timer voice.
+  if (!isTimerDrivenVoiceEnabled()) {
+    opts?.onSpoken?.();
+    return () => {};
+  }
   const fila = trimSubText(filaTexto, 56);
   if (!fila) return () => {};
   const phrases = opts?.intro

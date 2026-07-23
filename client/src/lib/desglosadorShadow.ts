@@ -15,17 +15,16 @@ export function runShadowTaskAsync(fn: () => void | Promise<void>): void {
 }
 
 /**
- * Post-lanzamiento: lejos del paint/expand y del cluster ~12s
- * (métricas heavy mobile timeout, centinela retro, voice safety).
- * El clavo a ~13s era sombra@12s + addDoc remap/stringify — ahora persist quiet + más lejos.
+ * @deprecated No usar delays fijos post-lanzamiento — clavaban el reloj conquista (4→6→13→28s).
+ * Usar `enqueueLaunchPersistWork` / `flushLaunchPersistOnSubClose` (`launchPersistGate.ts`).
+ * Constantes conservadas solo por compatibilidad de imports legacy.
  */
 export const LAUNCH_SHADOW_DELAY_MS = 28_000;
-/** Archivo de centinelas: después del persist remoto, no en el mismo golpe. */
+/** @deprecated Preferir launchPersistGate. */
 export const LAUNCH_CENTINELA_ARCHIVE_DELAY_MS = 36_000;
 
 /**
- * Tarea diferida de lanzamiento — SOLO setTimeout (sin requestIdleCallback).
- * El idle con timeout forzado puede disparar justo cuando el hilo ya está saturado.
+ * @deprecated Preferir launchPersistGate (evento / oculto / cierre), no bomba temporal.
  */
 export function runDeferredLaunchTask(fn: () => void, delayMs: number): void {
   globalThis.setTimeout(() => {
@@ -37,8 +36,14 @@ export function runDeferredLaunchTask(fn: () => void, delayMs: number): void {
   }, delayMs);
 }
 
-/** Persistencia remota post-lanzamiento — fuera de la ventana crítica de UI. */
-export function runShadowTaskAfterLaunch(fn: () => void, delayMs = LAUNCH_SHADOW_DELAY_MS): void {
+/**
+ * @deprecated Preferir launchPersistGate (evento / oculto / cierre), no bomba temporal.
+ */
+export function runShadowTaskAfterLaunch(fn: () => void, delayMs = 0): void {
+  if (delayMs <= 0) {
+    runShadowTask(fn);
+    return;
+  }
   runDeferredLaunchTask(() => {
     void Promise.resolve().then(fn);
   }, delayMs);

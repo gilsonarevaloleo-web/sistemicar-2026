@@ -51,6 +51,7 @@ import {
 import { runShadowTask, runShadowTaskAsync } from "@/lib/desglosadorShadow";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { paintSituacionRingRowCloseOptimistic } from "@/lib/situacionRingCloseMs0";
+import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
 import {
   registerDesglosadorDepthReconciler,
   scheduleDesglosadorDepthOnTap,
@@ -2011,7 +2012,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       silentDepth?: boolean;
       force?: boolean;
       rutaCruzadoOnly?: boolean;
-      /** Pintado post-lanzamiento: no forzar reconcile urgente ni Firebase inmediato. */
+      /** Activación / paint de lanzamiento: no programar depth ni sync Firebase inmediato. */
       launchPaint?: boolean;
     }
   ) => {
@@ -2074,35 +2075,37 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       });
     }
     vehiclesRef.current = newVehicles;
-    // launchPaint: el disco after-launch (1.5s) ya cubre el snapshot; no re-stringify aquí.
-    if (!opts?.launchPaint) {
+
+    // Launch / solo cruces de ruta: no stringify ni sync Firebase en la ventana 0–4s.
+    if (!opts?.launchPaint && !opts?.rutaCruzadoOnly) {
       scheduleSaveLocalVehicles(newVehicles);
+
+      const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
+      if (prevTimer) clearTimeout(prevTimer);
+      desglosadorSyncTimersRef.current.set(
+        vehicleId,
+        setTimeout(() => {
+          desglosadorSyncTimersRef.current.delete(vehicleId);
+          const latest = vehiclesRef.current.find(v => v.id === vehicleId);
+          if (!latest?.subVehiculos?.length || latest.status !== "activo") return;
+          void updateVehicle(user.uid, vehicleId, {
+            subVehiculos: latest.subVehiculos,
+            desglosadorBloqueDepthPsGranted: latest.desglosadorBloqueDepthPsGranted,
+          }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
+        }, 450)
+      );
     }
 
-    const prevTimer = desglosadorSyncTimersRef.current.get(vehicleId);
-    if (prevTimer) clearTimeout(prevTimer);
-    // launchPaint: Firebase a 4s (antes 2.2s chocaba con disco/sombra → Aw Snap ~4s).
-    const firebaseDelayMs = opts?.launchPaint ? 4_000 : 450;
-    desglosadorSyncTimersRef.current.set(
-      vehicleId,
-      setTimeout(() => {
-        desglosadorSyncTimersRef.current.delete(vehicleId);
-        const latest = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!latest?.subVehiculos?.length || latest.status !== "activo") return;
-        void updateVehicle(user.uid, vehicleId, {
-          subVehiculos: latest.subVehiculos,
-          desglosadorBloqueDepthPsGranted: latest.desglosadorBloqueDepthPsGranted,
-        }).catch(e => console.warn("[Desglosador] sync Firebase subs:", e));
-      }, firebaseDelayMs)
-    );
-
-    // Profundidad a los 4s es noop (hace falta 1h); no encolar en launchPaint.
-    if (!opts?.launchPaint) {
-      if (opts?.resetDepth) {
-        scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
-      } else {
-        scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
-      }
+    // Depth@3.2s mataba el reloj ~00:00:03 tras launch/auto-activate.
+    // Hub 60s basta durante medición; depth on-tap solo en cierre real o reset.
+    if (opts?.launchPaint || opts?.rutaCruzadoOnly) {
+      return;
+    }
+    if (opts?.resetDepth) {
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: true, resetGranted: 0 });
+    } else if (activeSubChanged) {
+      // Cierre/activación de sub: diferir depth al gate (gesto), no a 3.2s fijos.
+      scheduleDesglosadorDepthOnTap(vehicleId, { silent: opts?.silentDepth ?? true });
     }
   }, [user]);
 
@@ -3163,6 +3166,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
 
     // ms0: pinta cierre + ancla nueva ANTES de cualquier await (reinicio de reloj).
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
+    flushLaunchPersistOnSubClose(vehicleId);
     const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     const subTareasPainted = painted.subTareas ?? list;
     const anchorPainted = painted.situacionCupoAnchor ?? null;
@@ -3279,6 +3283,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           situacionCronometro,
           situacionCupoAnchor,
         });
+        // Ancla ya reajustada en ms0; sync sin forceReset = no-op / puede pisar.
         await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
         if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
         if (bloqueListo) {
@@ -3327,6 +3332,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
+    flushLaunchPersistOnSubClose(vehicleId);
     const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
