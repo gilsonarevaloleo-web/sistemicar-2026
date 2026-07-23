@@ -9,10 +9,12 @@ import {
 
 describe("previewOps", () => {
   const originalWindow = globalThis.window;
-  let store: Map<string, string>;
+  let sessionStore: Map<string, string>;
+  let localStore: Map<string, string>;
 
   beforeEach(() => {
-    store = new Map();
+    sessionStore = new Map();
+    localStore = new Map();
     // @ts-expect-error test stub
     globalThis.window = {
       location: {
@@ -22,15 +24,26 @@ describe("previewOps", () => {
         hash: "",
       },
       history: { replaceState: () => {} },
+      dispatchEvent: () => true,
     };
     // @ts-expect-error test stub
     globalThis.sessionStorage = {
-      getItem: (k: string) => store.get(k) ?? null,
+      getItem: (k: string) => sessionStore.get(k) ?? null,
       setItem: (k: string, v: string) => {
-        store.set(k, v);
+        sessionStore.set(k, v);
       },
       removeItem: (k: string) => {
-        store.delete(k);
+        sessionStore.delete(k);
+      },
+    };
+    // @ts-expect-error test stub
+    globalThis.localStorage = {
+      getItem: (k: string) => localStore.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        localStore.set(k, v);
+      },
+      removeItem: (k: string) => {
+        localStore.delete(k);
       },
     };
   });
@@ -51,10 +64,12 @@ describe("previewOps", () => {
     assert.equal(isPreviewOpsUnlocked(), false);
   });
 
-  it("unlock solo en preview", () => {
+  it("unlock solo en preview (session + local)", () => {
     assert.equal(isPreviewOpsUnlocked(), false);
     setPreviewOpsUnlocked(true);
     assert.equal(isPreviewOpsUnlocked(), true);
+    assert.equal(sessionStore.get("sistemicar_preview_ops_v1"), "1");
+    assert.equal(localStore.get("sistemicar_preview_ops_v1"), "1");
     setPreviewOpsUnlocked(false);
     assert.equal(isPreviewOpsUnlocked(), false);
   });

@@ -10,6 +10,10 @@ import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3Suspens
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
+import {
+  consumePreviewOpsQueryUnlock,
+  isPreviewOpsUnlocked,
+} from "@/lib/previewOps";
 import type { ModuleId } from "@shared/moduleAccess";
 
 interface AppUser {
@@ -149,11 +153,23 @@ function ModuleRoute({
   const [, navigate] = useLocation();
   const [progression, setProgression] = useState<UserProgression | null>(null);
   const [checkingTier, setCheckingTier] = useState(true);
+  const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
 
   const ownerBypass = isOwnerEmail(user?.email);
 
+  useEffect(() => {
+    const sync = () => setPreviewOps(isPreviewOpsUnlocked());
+    sync();
+    window.addEventListener("sistemicar-preview-ops", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("sistemicar-preview-ops", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
   const hasAccess = (prog: UserProgression | null): boolean => {
-    if (ownerBypass) return true;
+    if (ownerBypass || isPreviewOpsUnlocked() || previewOps) return true;
     const args = [prog?.subscriptionPlan, user?.email, prog?.rank, prog?.activeModules] as const;
     if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
@@ -166,7 +182,7 @@ function ModuleRoute({
       return;
     }
 
-    if (ownerBypass) {
+    if (ownerBypass || isPreviewOpsUnlocked()) {
       setCheckingTier(false);
       return;
     }
@@ -177,18 +193,19 @@ function ModuleRoute({
         (prog) => {
           setProgression(prog);
           setCheckingTier(false);
-          if (!hasAccess(prog)) {
+          // Preview ops: nunca mandar a /pagos (sesión distinta a producción).
+          if (!isPreviewOpsUnlocked() && !hasAccess(prog)) {
             navigate("/pagos");
           }
         },
         () => {
           setCheckingTier(false);
-          if (!ownerBypass) navigate("/pagos");
+          if (!ownerBypass && !isPreviewOpsUnlocked()) navigate("/pagos");
         }
       );
       return () => unsub();
     }
-  }, [user, loading, navigate, ownerBypass, requiredModule]);
+  }, [user, loading, navigate, ownerBypass, requiredModule, previewOps]);
 
   useEffect(() => {
     if (!checkingTier) return;
@@ -205,7 +222,7 @@ function ModuleRoute({
     </div>
   );
 
-  if (ownerBypass && !loading) {
+  if ((ownerBypass || previewOps || isPreviewOpsUnlocked()) && !loading && user) {
     return <Component />;
   }
 
@@ -476,6 +493,13 @@ function VoiceBootstrap() {
 
 function App() {
   useEffect(() => {
+    // Deploy preview: ?preview_ops=1 desbloquea ANTES de que ModuleRoute mande a /pagos.
+    if (consumePreviewOpsQueryUnlock()) {
+      if (window.location.pathname === "/menu" || window.location.pathname === "/") {
+        window.location.replace("/planeacion");
+        return;
+      }
+    }
     const report = runStartupStorageHygiene();
     if (report && report.removedKeys > 0) {
       console.info(`[storage] Poda al inicio: ${report.removedKeys} claves (~${Math.round(report.freedBytesEstimate / 1024)} KB)`);

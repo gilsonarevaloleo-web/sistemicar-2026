@@ -49,6 +49,7 @@ import {
   isPreviewOpsUnlocked,
   setPreviewOpsUnlocked,
   consumePreviewOpsQueryUnlock,
+  goPreviewJornada,
 } from "@/lib/previewOps";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { toast } from "sonner";
@@ -733,20 +734,10 @@ export default function MenuPrincipal() {
                   <button
                     type="button"
                     onClick={() => {
-                      setPreviewOpsUnlocked(true);
-                      setPreviewUnlocked(true);
-                      toast.success("Entrando a Jornada…", {
-                        description: "Sesión de prueba en este preview.",
-                        style: {
-                          backgroundColor: "#0a0a0a",
-                          border: "1px solid #D4AF37",
-                          color: "#D4AF37",
-                        },
-                      });
-                      // Entrar directo: en móvil el tile queda abajo y parece “bloqueado”.
-                      window.setTimeout(() => navigate("/planeacion"), 80);
+                      // Hard navigation: ModuleRoute ya no manda a /pagos si preview ops está ON.
+                      goPreviewJornada(true);
                     }}
-                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider"
+                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider relative z-50"
                     style={{ backgroundColor: GOLD, color: "#000" }}
                     data-testid="button-preview-unlock-jornada"
                   >

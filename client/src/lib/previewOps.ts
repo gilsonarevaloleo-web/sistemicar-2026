@@ -1,9 +1,9 @@
 /**
  * Desbloqueo operativo solo en Deploy Preview de Netlify.
  * El preview no comparte la sesión/cookies de sistemicar.app; sin esto el menú
- * queda sin Jornada y parece “incompleto”.
+ * queda sin Jornada y ModuleRoute redirige a /pagos.
  *
- * Atajo: ?preview_ops=1 en la URL desbloquea al cargar (útil para PRs de voz/jornada).
+ * Atajo: ?preview_ops=1 desbloquea al cargar (App + menú) y abre Jornada.
  */
 
 const STORAGE_KEY = "sistemicar_preview_ops_v1";
@@ -14,13 +14,23 @@ export function isDeployPreviewHost(): boolean {
   return host.endsWith(".netlify.app") && host.includes("deploy-preview");
 }
 
+function readUnlockFlag(): boolean {
+  try {
+    if (sessionStorage.getItem(STORAGE_KEY) === "1") return true;
+  } catch {
+    /* noop */
+  }
+  try {
+    if (localStorage.getItem(STORAGE_KEY) === "1") return true;
+  } catch {
+    /* noop */
+  }
+  return false;
+}
+
 export function isPreviewOpsUnlocked(): boolean {
   if (!isDeployPreviewHost()) return false;
-  try {
-    return sessionStorage.getItem(STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
+  return readUnlockFlag();
 }
 
 export function setPreviewOpsUnlocked(on: boolean): void {
@@ -31,9 +41,23 @@ export function setPreviewOpsUnlocked(on: boolean): void {
   } catch {
     /* noop */
   }
+  try {
+    if (on) localStorage.setItem(STORAGE_KEY, "1");
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* noop */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("sistemicar-preview-ops", { detail: { on } }));
+  } catch {
+    /* noop */
+  }
 }
 
-/** Si la URL trae ?preview_ops=1 (o true), desbloquea ops de preview. */
+/**
+ * Consume ?preview_ops=1|true|on.
+ * @returns true si desbloqueó en esta llamada.
+ */
 export function consumePreviewOpsQueryUnlock(): boolean {
   if (!isDeployPreviewHost() || typeof window === "undefined") return false;
   try {
@@ -48,4 +72,15 @@ export function consumePreviewOpsQueryUnlock(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Entrada dura a Jornada (evita que wouter + ModuleRoute fallen en silencio). */
+export function goPreviewJornada(hard = true): void {
+  setPreviewOpsUnlocked(true);
+  if (typeof window === "undefined") return;
+  if (hard) {
+    window.location.assign("/planeacion");
+    return;
+  }
+  window.location.href = "/planeacion";
 }
