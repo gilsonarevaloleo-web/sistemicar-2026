@@ -219,14 +219,16 @@ J4 **filtra** la flota al entrar: ignora descanso/verdad en UI (pueden existir e
 
 Inventario + arquitectura + fuera-de-alcance.
 
-### Fase 1 — Esqueleto sin voz
+### Fase 1 — Esqueleto sin voz ✅ (implementado)
 
-1. Ruta `/jornada-v4` + shell vacío + import guard.
-2. Extraer/adaptar kernels puros (tests unitarios primero).
-3. Core flota filtrada + ops mínimas (lanzar no hace falta al inicio: operar vehículos ya activos).
-4. Islands Conquista + Situacional con wall-clock.
+1. Ruta `/jornada-v4` + shell + import guard.
+2. Kernels puros (`conquistaKernel`, `situacionKernel`) + tests.
+3. Core flota filtrada + ops ms0/sombra (`useJornada4Core`, `useJornada4Ops`).
+4. Cards delgadas + tick wall-clock (`jornada4Tick`).
 5. PS en sombra al cerrar sub/ciclo/bloque.
-6. Checklist móvil: abrir, cerrar 5 subs, ocultar 30s, volver, cerrar bloque — sin freeze.
+6. Menú principal → Jornada V4.
+
+**Pendiente de validación en móvil:** abrir, cerrar 5 subs, ocultar 30s, volver, cerrar bloque — sin freeze.
 
 ### Fase 2 — Completar operación
 

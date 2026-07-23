@@ -28,6 +28,7 @@ import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
 const Planeacion = lazyWithRetry(() => import("@/pages/planeacion"));
 const PlaneacionV3 = lazyWithRetry(() => import("@/pages/planeacionV3"));
+const JornadaV4 = lazyWithRetry(() => import("@/pages/jornadaV4"));
 import Esperanza from "@/pages/esperanza";
 import Rewards from "@/pages/rewards";
 import Analytics from "@/pages/analytics";
@@ -326,6 +327,20 @@ function JornadaV3ModuleRoute() {
   );
 }
 
+function JornadaV4ModuleRoute() {
+  return (
+    <JornadaErrorBoundary>
+      <Suspense fallback={<JornadaV3SuspenseFallback />}>
+        <ModuleRoute
+          component={JornadaV4}
+          requiredModule="planificacion_base"
+          loadingFallback={<JornadaShell statusLine="Dual Kernel · verificando acceso…" />}
+        />
+      </Suspense>
+    </JornadaErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <Layout>
@@ -357,6 +372,9 @@ function Router() {
         </Route>
         <Route path="/planeacion-v3">
           <JornadaV3ModuleRoute />
+        </Route>
+        <Route path="/jornada-v4">
+          <JornadaV4ModuleRoute />
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />

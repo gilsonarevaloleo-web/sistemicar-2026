@@ -66,7 +66,7 @@ import { useAuthContext } from "@/App";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
-import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V3_PATH, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
 import { resetVoicePlaybackCache } from "@/lib/voicePlaybackCacheReset";
 
@@ -137,6 +137,14 @@ function buildMenuItems(
       icon: Zap,
       route: JORNADA_V3_PATH,
       color: "#D4AF37",
+    });
+    items.push({
+      id: "jornada-v4",
+      title: `${JORNADA_MODULE.titleUpper} V4`,
+      subtitle: "Dual Kernel · conquista + situacional",
+      icon: Zap,
+      route: JORNADA_V4_PATH,
+      color: "#c4a35a",
     });
   }
 
@@ -814,8 +822,10 @@ export default function MenuPrincipal() {
                       if (
                         item.id === "planificacion" ||
                         item.id === "jornada-v3" ||
+                        item.id === "jornada-v4" ||
                         item.route === "/planeacion" ||
-                        item.route === JORNADA_V3_PATH
+                        item.route === JORNADA_V3_PATH ||
+                        item.route === JORNADA_V4_PATH
                       ) {
                         prefetchJornadaChunk();
                       }

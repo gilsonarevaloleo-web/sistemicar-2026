@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { MutableRefObject } from "react";
 import type { Vehicle } from "./persistence.ts";
 import { paintSituacionRingRowCloseOptimistic } from "./situacionRingCloseMs0.ts";
-import { computeSituacionTimerUi } from "../components/planeacion/situacionRelojIsland.tsx";
+import { computeSituacionTimerUi } from "../lib/situacionTimerUi.ts";
 
 function makeVehicle(now: number): Vehicle {
   return {
