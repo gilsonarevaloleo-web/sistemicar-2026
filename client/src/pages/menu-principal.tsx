@@ -48,6 +48,7 @@ import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
   setPreviewOpsUnlocked,
+  previewPlaneacionHref,
 } from "@/lib/previewOps";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { toast } from "sonner";
@@ -102,7 +103,11 @@ const MODULO_ICONS: Record<string, MenuItem["icon"]> = {
   proximo: Sparkles,
 };
 
-function buildMenuItems(progression: UserProgression | null, email: string | null): MenuItem[] {
+function buildMenuItems(
+  progression: UserProgression | null,
+  email: string | null,
+  previewOps = false
+): MenuItem[] {
   const accessArgs = [progression?.subscriptionPlan, email, progression?.rank, progression?.activeModules] as const;
   const items: MenuItem[] = [
     {
@@ -115,7 +120,7 @@ function buildMenuItems(progression: UserProgression | null, email: string | nul
     },
   ];
 
-  if (hasPlanificacionBaseAccess(...accessArgs)) {
+  if (previewOps || hasPlanificacionBaseAccess(...accessArgs)) {
     items.push({
       id: "planificacion",
       title: JORNADA_MODULE.titleUpper,
@@ -134,7 +139,7 @@ function buildMenuItems(progression: UserProgression | null, email: string | nul
     });
   }
 
-  if (hasSoberaniaDiaAccess(...accessArgs)) {
+  if (previewOps || hasSoberaniaDiaAccess(...accessArgs)) {
     items.push({
       id: "proyectos",
       title: "PROYECTOS",
@@ -699,7 +704,7 @@ export default function MenuPrincipal() {
           <div>
         {/* Grid principal del espectro - filtrado por tier */}
         {(() => {
-          const menuItems = buildMenuItems(progression, userEmail);
+          const menuItems = buildMenuItems(progression, userEmail, previewUnlocked);
           const tienePlanificacion =
             previewUnlocked ||
             hasPlanificacionBaseAccess(
@@ -726,21 +731,32 @@ export default function MenuPrincipal() {
                     <span style={{ color: GOLD }}>sistemicar.app</span>. Por eso no ves Jornada —
                     no es que falte construir.
                   </p>
+                  <p className="text-[9px] text-slate-500 mb-3 leading-relaxed">
+                    Si los clics no responden: cierra la barra blanca «Collaborate» de Netlify (X)
+                    o usa Ctrl+\ / ⌘+\ .
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
-                      setPreviewOpsUnlocked(true);
+                      const ok = setPreviewOpsUnlocked(true);
+                      if (!ok) {
+                        toast.error("No se pudo desbloquear este preview", {
+                          description: "Recarga la página o prueba en otra pestaña.",
+                        });
+                        return;
+                      }
                       setPreviewUnlocked(true);
-                      toast.success("Jornada desbloqueada en este preview", {
-                        description: "Entra a Jornada o Jornada V3 para probar.",
+                      toast.success("Entrando a Jornada…", {
                         style: {
                           backgroundColor: "#0a0a0a",
                           border: "1px solid #D4AF37",
                           color: "#D4AF37",
                         },
                       });
+                      // Un solo gesto: ir directo a Jornada (drawer ya oculto por bootstrap).
+                      window.location.assign(previewPlaneacionHref());
                     }}
-                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider"
+                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider relative z-50"
                     style={{ backgroundColor: GOLD, color: "#000" }}
                     data-testid="button-preview-unlock-jornada"
                   >
@@ -1054,10 +1070,10 @@ export default function MenuPrincipal() {
             const accessArgs = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
             const navItems = [
               { icon: Eye, color: SPECTRUM.ROJO, route: "/espejo", label: "Espejo" },
-              ...(hasPlanificacionBaseAccess(...accessArgs)
+              ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
                 ? [{ icon: Heart, color: SPECTRUM.VERDE, route: "/planeacion", label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
-              ...(hasSoberaniaDiaAccess(...accessArgs)
+              ...(previewUnlocked || hasSoberaniaDiaAccess(...accessArgs)
                 ? [{ icon: Layers, color: "#38BDF8", route: "/proyectos", label: "Proyectos" }]
                 : []),
             ];
