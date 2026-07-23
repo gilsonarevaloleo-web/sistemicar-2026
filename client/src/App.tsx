@@ -10,6 +10,7 @@ import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3Suspens
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
+import { isPreviewOpsUnlocked } from "@/lib/previewOps";
 import type { ModuleId } from "@shared/moduleAccess";
 
 interface AppUser {
@@ -151,9 +152,11 @@ function ModuleRoute({
   const [checkingTier, setCheckingTier] = useState(true);
 
   const ownerBypass = isOwnerEmail(user?.email);
+  // Deploy Preview: sessionStorage unlock — pintar Jornada sin esperar Firebase tier.
+  const previewBypass = isPreviewOpsUnlocked();
 
   const hasAccess = (prog: UserProgression | null): boolean => {
-    if (ownerBypass) return true;
+    if (ownerBypass || previewBypass) return true;
     const args = [prog?.subscriptionPlan, user?.email, prog?.rank, prog?.activeModules] as const;
     if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
@@ -166,7 +169,7 @@ function ModuleRoute({
       return;
     }
 
-    if (ownerBypass) {
+    if (ownerBypass || previewBypass) {
       setCheckingTier(false);
       return;
     }
@@ -183,12 +186,13 @@ function ModuleRoute({
         },
         () => {
           setCheckingTier(false);
-          if (!ownerBypass) navigate("/pagos");
+          // Preview unlock: no mandar a /pagos si Firebase progression falla.
+          if (!ownerBypass && !isPreviewOpsUnlocked()) navigate("/pagos");
         }
       );
       return () => unsub();
     }
-  }, [user, loading, navigate, ownerBypass, requiredModule]);
+  }, [user, loading, navigate, ownerBypass, previewBypass, requiredModule]);
 
   useEffect(() => {
     if (!checkingTier) return;
@@ -205,7 +209,7 @@ function ModuleRoute({
     </div>
   );
 
-  if (ownerBypass && !loading) {
+  if ((ownerBypass || previewBypass) && !loading) {
     return <Component />;
   }
 

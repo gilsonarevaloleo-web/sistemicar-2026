@@ -263,7 +263,7 @@ export default function MenuPrincipal() {
   useEffect(() => {
     if (!user?.uid) return;
     const args = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
-    if (!hasPlanificacionBaseAccess(...args)) return;
+    if (!previewUnlocked && !hasPlanificacionBaseAccess(...args)) return;
     const run = () => prefetchJornadaChunk();
     if (typeof requestIdleCallback !== "undefined") {
       const id = requestIdleCallback(run, { timeout: 2500 });
@@ -271,7 +271,7 @@ export default function MenuPrincipal() {
     }
     const t = window.setTimeout(run, 400);
     return () => clearTimeout(t);
-  }, [user?.uid, userEmail, progression?.subscriptionPlan, progression?.rank, progression?.activeModules]);
+  }, [user?.uid, userEmail, progression?.subscriptionPlan, progression?.rank, progression?.activeModules, previewUnlocked]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -753,8 +753,11 @@ export default function MenuPrincipal() {
                           color: "#D4AF37",
                         },
                       });
-                      // Un solo gesto: ir directo a Jornada (drawer ya oculto por bootstrap).
-                      window.location.assign(previewPlaneacionHref());
+                      // Soft navigate — NUNCA location.assign aquí: el cold-boot remonta
+                      // App + SegmentAttention + Centinela + parse del monolito planeacion
+                      // y congela el hilo en móvil (BRIEF_BLOQUEO_HILO_PRINCIPAL).
+                      prefetchJornadaChunk();
+                      navigate(previewPlaneacionHref());
                     }}
                     className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider relative z-50"
                     style={{ backgroundColor: GOLD, color: "#000" }}

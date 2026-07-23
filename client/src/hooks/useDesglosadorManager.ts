@@ -326,11 +326,15 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
 
   useEffect(() => {
-    try {
-      repairStuckSituacionVehicles();
-    } catch {
-      /* noop */
-    }
+    // Tras primer paint — JSON.parse de flota no debe competir con Suspense→mount.
+    const id = window.setTimeout(() => {
+      try {
+        repairStuckSituacionVehicles();
+      } catch {
+        /* noop */
+      }
+    }, 0);
+    return () => clearTimeout(id);
   }, []);
 
   const vehicles = useFlotaVehiclesShallow(user?.uid);
@@ -757,32 +761,36 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     setSituacionDesgloseCelebration(null);
     setDesglosadorTiempoCelebration(null);
     closingInProgressRef.current.clear();
-    try {
-      const nowMs = Date.now();
-      const storeLocal = getFlotaVehicles();
-      const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
-      const byId = new Map(localRaw.map(v => [v.id, v]));
-      const localActivos = localRaw.filter(
-        v =>
-          v.status === "activo" &&
-          !v.autoVerdad &&
-          !wasVehicleRecentlyClosed(v.id) &&
-          !isOrphanDesglosadorInterrupt(v, byId) &&
-          shouldPreserveLocalActivo(v, nowMs)
-      );
-      if (localActivos.length > 0) {
-        setVehicles(prev => {
-          const ids = new Set(prev.map(v => v.id));
-          const crqs = new Set(prev.map(v => v.clientRequestId).filter(Boolean));
-          const add = localActivos.filter(
-            la => !ids.has(la.id) && !(la.clientRequestId && crqs.has(la.clientRequestId))
-          );
-          return add.length > 0 ? [...add, ...prev] : prev;
-        });
+    // Diferir merge de activos locales un frame — priorizar primer paint de Jornada.
+    const id = window.setTimeout(() => {
+      try {
+        const nowMs = Date.now();
+        const storeLocal = getFlotaVehicles();
+        const localRaw = storeLocal.length > 0 ? storeLocal : getLocalVehicles();
+        const byId = new Map(localRaw.map(v => [v.id, v]));
+        const localActivos = localRaw.filter(
+          v =>
+            v.status === "activo" &&
+            !v.autoVerdad &&
+            !wasVehicleRecentlyClosed(v.id) &&
+            !isOrphanDesglosadorInterrupt(v, byId) &&
+            shouldPreserveLocalActivo(v, nowMs)
+        );
+        if (localActivos.length > 0) {
+          setVehicles(prev => {
+            const ids = new Set(prev.map(v => v.id));
+            const crqs = new Set(prev.map(v => v.clientRequestId).filter(Boolean));
+            const add = localActivos.filter(
+              la => !ids.has(la.id) && !(la.clientRequestId && crqs.has(la.clientRequestId))
+            );
+            return add.length > 0 ? [...add, ...prev] : prev;
+          });
+        }
+      } catch (e) {
+        console.warn("[Planeacion] sync local activos:", e);
       }
-    } catch (e) {
-      console.warn("[Planeacion] sync local activos:", e);
-    }
+    }, 0);
+    return () => clearTimeout(id);
   }, []);
 
   const orphanInterruptSweepRef = useRef<Set<string>>(new Set());

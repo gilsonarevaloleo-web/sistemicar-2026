@@ -55,7 +55,10 @@ export function hideNetlifyDrawerIfNeeded(): boolean {
   }
 }
 
-/** Entrada a Jornada tras unlock — un solo gesto, drawer ya oculto. */
+/**
+ * Entrada a Jornada tras unlock — soft navigate (wouter), no location.assign.
+ * Full reload remonta motores globales + parse del chunk planeacion y congela móvil.
+ */
 export function previewPlaneacionHref(): string {
   return "/planeacion?ntl-drawer-state=hidden";
 }
