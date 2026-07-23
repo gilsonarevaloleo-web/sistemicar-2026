@@ -86,7 +86,8 @@ TTS y sonidos **nunca** dentro de `useEffect` de render ni en handlers síncrono
 - Despachar con `enqueueDesglosadorVoicePassive` / cola en `speechQueue.ts`
 - Un solo canal de retry por app; **prohibido** `pointerdown` global por frase
 - Cleanup obligatorio al desmontar vehículo (`cancelUbicacionVoiceForVehicle`)
-- **Jul 2026 — voz por temporizador OFF por defecto** (`timerDrivenVoice.ts`): umbrales, 2 min, cupo, sobra y fila auto **no** llaman `speechSynthesis` durante medición. Quedan chime/vibración/notify. Solo voz atada a gesto (bienvenida, intro post-Cumplido). Reactivar: `localStorage.sistemicar_timer_voice=1`.
+- **Jul 2026 — voz por temporizador TTS OFF** (`timerDrivenVoice.ts`): umbrales/2 min/cupo **no** usan `speechSynthesis` durante medición.
+- **Jul 2026 — voz tipo GPS** (`gpsVoice.ts` + `/public/voice/*.mp3`): bienvenida del ring, intro conquista y bandas van por **Web Audio** (AudioContext desbloqueado en gesto). No pelea con Firebase/persist. TTS solo como fallback si falta el clip.
 - Persist launch: `setDoc(provisionalId)` quiet — **prohibido** `addDoc` + remap + `vehicles-updated` en el hot path post-medida (clavo ~13 s en ambos desglosadores).
 - **Prohibido bomba temporal post-lanzamiento** (`setTimeout(4s/13s/28s)`): solo movía el clavo del reloj conquista. Persist remoto / pilares / centinela van por `launchPersistGate` (pestaña oculta, idle real, o primer Cumplido/Fallado).
 - Firma flota (`vehiclesReactiveSignature`): **debe** incluir `situacionCupoAnchor` + `resultadoSituacion` de filas cron. Si se omiten, Cumplido/Fallado no cambia la firma → React salta el setState y la UI queda en 0/3 (regresión circular anti-freeze).

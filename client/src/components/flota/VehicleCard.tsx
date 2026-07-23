@@ -935,16 +935,16 @@ function VehicleCard({
       );
       const activated = repaired[pendingIdx];
       if (activated) {
-        // Voz intro tras paint (corto): supervivencia ya no silencia TTS.
+        // Intro GPS tras paint corto — ya no exige rutaActiva (antes se perdía a 700ms).
         window.setTimeout(() => {
           dispatchDesglosadorSubIntroVoiceOnce(
             vehicle.id,
             activated.id,
             activated.aperturaAt ?? now,
             activated.titulo,
-            Boolean(activated.rutaEnfoque?.activa)
+            true
           );
-        }, 700);
+        }, 280);
       }
     }
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj, vehicle.id, onDesglosadorUpdate]);
@@ -1280,8 +1280,7 @@ function VehicleCard({
             vehicle.id,
             nextSub.id,
             nextSub.aperturaAt ?? now,
-            nextSub.titulo,
-            Boolean(nextSub.rutaEnfoque?.activa)
+            nextSub.titulo
           );
         });
       }

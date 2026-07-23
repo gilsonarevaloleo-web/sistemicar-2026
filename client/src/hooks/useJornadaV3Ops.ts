@@ -566,13 +566,11 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       );
       persistVehiclesRef();
       setExpandedId(vehicleId);
-      // Bienvenida en el gesto (antes de Firebase) — igual que useDesglosadorManager.
+      // Bienvenida en el gesto (sync): GPS Web Audio + fallback TTS.
       if (firstActivation) {
         void requestNotificationPermission();
         unlockSpeechSynthesis(true);
-        queueMicrotask(() =>
-          speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
-        );
+        speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`);
       }
       try {
         await updateVehicle(userId, vehicleId, {

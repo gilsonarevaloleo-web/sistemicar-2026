@@ -9,6 +9,12 @@ import { isSituacionAlertsEnabled } from "./tikSound";
 import { ringBienvenidaParts, ringTiempoSobraParts } from "./ringEnfoqueReal";
 import { speakSituacionVoiceReliable } from "./ubicacionVoiceReliable";
 import { isTimerDrivenVoiceEnabled } from "./timerDrivenVoice";
+import {
+  playGpsClipIds,
+  prefetchGpsClips,
+  ringBienvenidaClipIds,
+  unlockGpsVoice,
+} from "./gpsVoice";
 
 function trimSubText(text: string, max = 48): string {
   const t = text.trim();
@@ -73,13 +79,21 @@ export function fireSituacionCupoAlert(params: {
   );
 }
 
-/** Ritual de entrada al ring de enfoque real (situacional). */
+/**
+ * Ritual de entrada al ring de enfoque real (situacional).
+ * Preferencia GPS (Web Audio + mp3): no depende de speechSynthesis.
+ * Si el pack falla → fallback TTS atado al gesto.
+ */
 export function speakRingBienvenida(retoNumero: number, key?: string): void {
-  speakSituacionVoiceReliable(
-    key ?? `ring-bienvenida-${retoNumero}-${Date.now()}`,
-    ringBienvenidaParts(retoNumero),
-    true
-  );
+  if (!isSituacionAlertsEnabled()) return;
+  const clipIds = ringBienvenidaClipIds(retoNumero);
+  const ttsKey = key ?? `ring-bienvenida-${retoNumero}-${Date.now()}`;
+  unlockGpsVoice();
+  prefetchGpsClips(clipIds);
+  void playGpsClipIds(clipIds).then(result => {
+    if (result.ok) return;
+    speakSituacionVoiceReliable(ttsKey, ringBienvenidaParts(retoNumero), true);
+  });
 }
 
 /** Invitación cuando la cola está vacía y sobra mucho tiempo en la meta. */

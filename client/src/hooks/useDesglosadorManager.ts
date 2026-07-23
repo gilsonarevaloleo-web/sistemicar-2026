@@ -2159,8 +2159,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       vehicleId,
       subs[targetIdx].id,
       now,
-      subs[targetIdx].titulo,
-      Boolean(subs[targetIdx].rutaEnfoque?.activa)
+      subs[targetIdx].titulo
     );
     toast.success("Sub en curso", {
       description: cleanSubTitulo(subs[targetIdx].titulo),
@@ -2199,8 +2198,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
         vehicleId,
         newSub.id,
         newSub.aperturaAt,
-        newSub.titulo,
-        Boolean(newSub.rutaEnfoque?.activa)
+        newSub.titulo
       );
     }
     toast.success("Subtarea añadida", {
@@ -3067,14 +3065,12 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     );
     persistVehiclesRef();
     setExpandedId(vehicleId);
-    // Bienvenida en el gesto de apertura (antes de Firebase): VoiceBootstrap ya
-    // desbloqueó en pointerdown; no esperar la red o la bienvenida se pierde.
+    // Bienvenida en el gesto (sync): GPS Web Audio + fallback TTS. No diferir
+    // a microtask/red — eso perdía la frase en móvil.
     if (firstActivation) {
       void requestNotificationPermission();
       unlockSpeechSynthesis(true);
-      queueMicrotask(() =>
-        speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`)
-      );
+      speakRingBienvenida(retoNumero, `ring-bienvenida-${vehicleId}-${bloqueInicioAt}`);
     }
     try {
       await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor: situacionCupoAnchor ?? null });

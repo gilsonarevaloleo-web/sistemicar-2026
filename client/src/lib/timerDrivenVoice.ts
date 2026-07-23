@@ -1,14 +1,12 @@
 /**
- * Enfoque nuevo (jul 2026): la voz por temporizador/umbrales quedó fuera de control
- * en móvil (cola TTS + retries + cancelPrevious compitiendo con persist/Firebase).
+ * Enfoque jul 2026 + GPS (jul 2026):
+ * - speechSynthesis por temporizador OFF (congelaba móvil).
+ * - Coaching estable = clips Web Audio (`gpsVoice.ts` + `/public/voice/*.mp3`),
+ *   mismo patrón que un GPS: desbloquear AudioContext una vez y hablar sin
+ *   pelear con el hilo principal.
+ * - TTS del navegador queda como fallback de gesto si falta el pack.
  *
- * Mientras el presupuesto de hilo principal no esté cerrado, SOLO se permite voz
- * atada a gesto del operador (abrir ring, Cumplido/Fallado, intro post-tap).
- * Alertas por reloj (bandas, 2 min, cupo, sobra, fila auto) → chime/vibración/notify,
- * sin speechSynthesis.
- *
- * Reactivar: set TIMER_DRIVEN_VOICE_ENABLED = true o localStorage
- * `sistemicar_timer_voice=1` + hard refresh.
+ * Reactivar TTS por reloj (legado): localStorage `sistemicar_timer_voice=1`.
  */
 
 const TIMER_VOICE_LS_KEY = "sistemicar_timer_voice";

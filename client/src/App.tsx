@@ -445,6 +445,13 @@ function VoiceBootstrap() {
     const stopWatchdog = installSpeechStuckWatchdog();
     const unlock = () => {
       unlockSpeechSynthesis(true);
+      void import("@/lib/gpsVoice").then(m => {
+        m.unlockGpsVoice();
+        m.prefetchGpsClips([
+          ...m.GPS_CLIP_PACKS.ringBienvenidaPrimera,
+          ...m.GPS_CLIP_PACKS.conquistaIntro,
+        ]);
+      });
       retryAllPendingUbicacionVoice();
     };
     const onRecoveryShortcut = (e: KeyboardEvent) => {
