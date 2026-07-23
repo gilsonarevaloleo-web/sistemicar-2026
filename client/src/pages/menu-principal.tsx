@@ -48,6 +48,7 @@ import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
   setPreviewOpsUnlocked,
+  consumePreviewOpsQueryUnlock,
 } from "@/lib/previewOps";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { toast } from "sonner";
@@ -191,7 +192,10 @@ export default function MenuPrincipal() {
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [secretInput, setSecretInput] = useState("");
   const [certification, setCertification] = useState<UserCertification | null>(null);
-  const [previewUnlocked, setPreviewUnlocked] = useState(() => isPreviewOpsUnlocked());
+  const [previewUnlocked, setPreviewUnlocked] = useState(() => {
+    consumePreviewOpsQueryUnlock();
+    return isPreviewOpsUnlocked();
+  });
 
   useEffect(() => {
     if (isFirebaseConfigured()) {
@@ -723,28 +727,30 @@ export default function MenuPrincipal() {
                 >
                   <p className="text-[11px] text-slate-300 mb-2 leading-relaxed">
                     Este preview de Netlify no trae tu sesión de{" "}
-                    <span style={{ color: GOLD }}>sistemicar.app</span>. Por eso no ves Jornada —
-                    no es que falte construir.
+                    <span style={{ color: GOLD }}>sistemicar.app</span>. Tocá el botón
+                    amarillo para entrar a Jornada y probar este PR (voz, desglosador, etc.).
                   </p>
                   <button
                     type="button"
                     onClick={() => {
                       setPreviewOpsUnlocked(true);
                       setPreviewUnlocked(true);
-                      toast.success("Jornada desbloqueada en este preview", {
-                        description: "Entra a Jornada o Jornada V3 para probar.",
+                      toast.success("Entrando a Jornada…", {
+                        description: "Sesión de prueba en este preview.",
                         style: {
                           backgroundColor: "#0a0a0a",
                           border: "1px solid #D4AF37",
                           color: "#D4AF37",
                         },
                       });
+                      // Entrar directo: en móvil el tile queda abajo y parece “bloqueado”.
+                      window.setTimeout(() => navigate("/planeacion"), 80);
                     }}
                     className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider"
                     style={{ backgroundColor: GOLD, color: "#000" }}
                     data-testid="button-preview-unlock-jornada"
                   >
-                    Desbloquear Jornada en este preview
+                    Desbloquear y abrir Jornada
                   </button>
                 </div>
               )}
