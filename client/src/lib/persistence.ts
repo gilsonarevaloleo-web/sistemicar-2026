@@ -6367,6 +6367,7 @@ export interface ExpedienteClinico {
   respuestas: Record<string, string>;
   estado_habito: boolean;
   vibracion_final: number;
+  tipo_sesion?: "autonoma" | "asistida" | "ducha_mental";
   timestamp_inicio: number;
   timestamp_fin: number;
   userId: string;

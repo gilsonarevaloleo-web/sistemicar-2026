@@ -4,11 +4,21 @@ import { motion } from "framer-motion";
 interface CalibrationPanelProps {
   habito24h: string;
   onConfirm: () => void;
+  onSave?: () => void | Promise<void>;
+  saving?: boolean;
+  saved?: boolean;
 }
 
-export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPanelProps) {
+export default function CalibrationPanel({
+  habito24h,
+  onConfirm,
+  onSave,
+  saving = false,
+  saved = false,
+}: CalibrationPanelProps) {
   const [timeLeft, setTimeLeft] = useState(24 * 60 * 60);
   const [confirmed, setConfirmed] = useState(false);
+  const [copied, setCopied] = useState(false);
   const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
@@ -29,6 +39,16 @@ export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPa
   const handleConfirm = () => {
     setConfirmed(true);
     onConfirm();
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(habito24h);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
@@ -69,6 +89,16 @@ export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPa
         >
           Protocolo de Calibración
         </span>
+        <p
+          style={{
+            margin: "8px 0 0",
+            fontFamily: "monospace",
+            fontSize: 10,
+            color: "rgba(255,255,255,0.45)",
+          }}
+        >
+          Entregado · puedes guardarlo sin abrir Planificación ni Jornada
+        </p>
       </div>
 
       <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -80,23 +110,25 @@ export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPa
             fontSize: 48,
             fontWeight: 700,
             color: "#D4AF37",
-            letterSpacing: 6,
-            textShadow: "0 0 20px rgba(212,175,55,0.4)",
+            letterSpacing: 4,
+            lineHeight: 1,
           }}
-          data-testid="text-countdown-timer"
+          data-testid="text-countdown-24h"
         >
           {pad(hours)}:{pad(minutes)}:{pad(seconds)}
         </motion.div>
-        <span
+        <div
           style={{
             fontFamily: "monospace",
             fontSize: 10,
             color: "rgba(212,175,55,0.5)",
-            letterSpacing: 2,
+            letterSpacing: 3,
+            marginTop: 6,
+            textTransform: "uppercase",
           }}
         >
-          VENTANA DE EJECUCIÓN
-        </span>
+          Ventana de ejecución 24h
+        </div>
       </div>
 
       <div
@@ -104,8 +136,10 @@ export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPa
           border: "1px solid rgba(212,175,55,0.3)",
           borderRadius: 8,
           padding: 16,
-          marginBottom: 24,
+          marginBottom: 16,
           background: "rgba(212,175,55,0.03)",
+          maxHeight: 320,
+          overflowY: "auto",
         }}
         data-testid="text-habito-24h"
       >
@@ -119,47 +153,113 @@ export default function CalibrationPanel({ habito24h, onConfirm }: CalibrationPa
             textTransform: "uppercase",
           }}
         >
-          Hábito 24h Asignado
+          Protocolo prescrito
         </div>
         <p
           style={{
             color: "#e0e0e0",
-            fontSize: 15,
-            lineHeight: 1.6,
+            fontSize: 14,
+            lineHeight: 1.65,
             margin: 0,
             whiteSpace: "pre-wrap",
+            fontFamily: "monospace",
           }}
         >
           {habito24h}
         </p>
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.02, boxShadow: "0 0 25px rgba(212,175,55,0.3)" }}
-        whileTap={{ scale: 0.97 }}
-        onClick={handleConfirm}
-        disabled={confirmed}
-        style={{
-          width: "100%",
-          padding: "14px 24px",
-          background: confirmed
-            ? "rgba(212,175,55,0.15)"
-            : "linear-gradient(135deg, #D4AF37, #b8962e)",
-          color: confirmed ? "#D4AF37" : "#0A0A0A",
-          border: "none",
-          borderRadius: 8,
-          fontFamily: "monospace",
-          fontSize: 14,
-          fontWeight: 700,
-          letterSpacing: 2,
-          textTransform: "uppercase",
-          cursor: confirmed ? "default" : "pointer",
-          transition: "all 0.3s ease",
-        }}
-        data-testid="button-confirm-execution"
-      >
-        {confirmed ? "✓ EJECUCIÓN CONFIRMADA" : "CONFIRMAR EJECUCIÓN"}
-      </motion.button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {onSave && (
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => void onSave()}
+            disabled={saving || saved}
+            style={{
+              width: "100%",
+              padding: "12px 20px",
+              background: saved ? "rgba(0,255,195,0.12)" : "rgba(0,255,195,0.1)",
+              color: "#00FFC3",
+              border: "1px solid rgba(0,255,195,0.4)",
+              borderRadius: 8,
+              fontFamily: "monospace",
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: 1.5,
+              textTransform: "uppercase",
+              cursor: saving || saved ? "default" : "pointer",
+              opacity: saving ? 0.6 : 1,
+            }}
+            data-testid="btn-guardar-protocolo"
+          >
+            {saved ? "✓ Protocolo guardado" : saving ? "Guardando…" : "Guardar protocolo"}
+          </motion.button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            width: "100%",
+            padding: "10px 20px",
+            background: "transparent",
+            color: "rgba(255,255,255,0.55)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 8,
+            fontFamily: "monospace",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            cursor: "pointer",
+          }}
+          data-testid="btn-copiar-protocolo"
+        >
+          {copied ? "✓ Copiado" : "Copiar protocolo"}
+        </button>
+
+        <motion.button
+          whileHover={{ scale: 1.02, boxShadow: "0 0 25px rgba(212,175,55,0.3)" }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleConfirm}
+          disabled={confirmed}
+          style={{
+            width: "100%",
+            padding: "14px 24px",
+            background: confirmed
+              ? "rgba(212,175,55,0.15)"
+              : "linear-gradient(135deg, #D4AF37, #b8962e)",
+            color: confirmed ? "#D4AF37" : "#0A0A0A",
+            border: "none",
+            borderRadius: 8,
+            fontFamily: "monospace",
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+            cursor: confirmed ? "default" : "pointer",
+            transition: "all 0.3s ease",
+          }}
+          data-testid="button-confirm-execution"
+        >
+          {confirmed ? "✓ EJECUCIÓN CONFIRMADA" : "CONFIRMAR Y CERRAR SESIÓN"}
+        </motion.button>
+
+        <p
+          style={{
+            margin: 0,
+            textAlign: "center",
+            fontFamily: "monospace",
+            fontSize: 9,
+            color: "rgba(255,255,255,0.35)",
+            lineHeight: 1.4,
+          }}
+        >
+          Planificación y Jornada son opcionales. Puedes activarlas después si quieres seguimiento.
+        </p>
+      </div>
     </motion.div>
   );
 }
