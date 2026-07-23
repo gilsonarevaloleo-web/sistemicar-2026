@@ -88,4 +88,17 @@ describe("computeDesglosadorSubClockUi", () => {
     const ui = computeDesglosadorSubClockUi(v, sub2, t0 + 5_000);
     assert.equal(ui.subTimerDisplay, "00:00:05");
   });
+
+  it("incluye nowMs y sessionElapsedSec desde el mismo tick", () => {
+    const sub: SubVehiculo = {
+      id: "s1",
+      titulo: "A",
+      status: "activo",
+      aperturaAt: 1_000_000,
+    };
+    const v = vehicle({ aperturaAt: 1_000_000, subVehiculos: [sub] });
+    const ui = computeDesglosadorSubClockUi(v, sub, 1_183_000);
+    assert.equal(ui.nowMs, 1_183_000);
+    assert.equal(ui.sessionElapsedSec, 183);
+  });
 });

@@ -49,6 +49,15 @@ export function situacionRelojDebeMostrarse(
   return false;
 }
 
+/** True si `subTareaId` es la única fila pendiente del ring. */
+export function isUltimaPendienteCronometro(
+  subTareas: SubTarea[] | undefined,
+  subTareaId: string
+): boolean {
+  const pending = filasCronometroOrdenadas(subTareas || []).filter(situacionFilaCronometroPendiente);
+  return pending.length === 1 && pending[0]!.id === subTareaId;
+}
+
 /** Hora objetivo del reloj situacional: fila en foco, o primera fila del cronómetro mientras sincroniza ancla. */
 export function situacionTargetMsReloj(
   vehicle: Pick<Vehicle, "tipoFlota" | "subTareas" | "situacionCronometro" | "situacionCupoAnchor" | "aperturaAt">,
@@ -63,7 +72,13 @@ export function situacionTargetMsReloj(
   if (anchor?.subTareaId) {
     const sub = subs.find(s => s.id === anchor.subTareaId);
     if (sub && situacionFilaEnFocoPendiente(sub) && (sub.minutosCupo ?? 0) > 0) {
-      return anchor.startedAt + sub.minutosCupo! * 60000;
+      const planned = anchor.startedAt + sub.minutosCupo! * 60000;
+      const meta = sc?.horaFinContratoMs ?? sc?.horaFinMs;
+      // Última en cola: TERMINA FOCO se guía por la meta sellada (no se queda corto).
+      if (meta != null && isUltimaPendienteCronometro(subs, anchor.subTareaId) && planned < meta) {
+        return meta;
+      }
+      return planned;
     }
   }
 
@@ -162,7 +177,15 @@ export function resolveCronometroCupoAnchor(
   const cronPending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
   if (cronPending.length === 0) return null;
 
-  if (cur?.subTareaId && !opts?.forceResetSameRow) {
+  // Cumplido/Fallado: siempre ancla nueva con startedAt=now sobre la primera pendiente.
+  // Sin esto, la deuda de la fila cerrada se hereda y el island muestra DEUDA ACUMULADA.
+  if (opts?.forceResetSameRow) {
+    const first = cronPending.find(st => (st.minutosCupo ?? 0) > 0) ?? cronPending[0];
+    if (!first) return null;
+    return { subTareaId: first.id, startedAt: now };
+  }
+
+  if (cur?.subTareaId) {
     const curSub = subTareas.find(s => s.id === cur.subTareaId);
     if (curSub && situacionFilaCronometroPendiente(curSub) && (curSub.minutosCupo ?? 0) > 0) {
       if (computeSafeRemainingMs(cur.startedAt, curSub.minutosCupo ?? 0, now) > 0) return "unchanged";
@@ -175,7 +198,7 @@ export function resolveCronometroCupoAnchor(
 
   const first = cronPending.find(st => (st.minutosCupo ?? 0) > 0) ?? cronPending[0];
   if (!first) return null;
-  if (cur?.subTareaId === first.id && !opts?.forceResetSameRow) return "unchanged";
+  if (cur?.subTareaId === first.id) return "unchanged";
   return { subTareaId: first.id, startedAt: now };
 }
 
@@ -458,7 +481,42 @@ function inicioMsFilaCronometro(
   return bloqueInicioAt;
 }
 
-/** Copia virtual: minutos ganados en foco → cupo extra en cola (solo dentro del margen hasta meta). */
+/**
+ * Rellena cupos pendientes hasta el tiempo de pared a la meta.
+ * El sobrante va a la última fila flexible (o a la última pendiente).
+ * Con ancla: cuenta solo el resto del foco (no el cupo ya consumido).
+ */
+export function expandirColaCronometroHastaMeta(
+  subTareas: SubTarea[],
+  horaFinContratoMs: number,
+  nowMs: number = Date.now(),
+  anchor?: { subTareaId: string; startedAt: number } | null
+): SubTarea[] {
+  const wallMin = situacionWallMinHastaMeta(horaFinContratoMs, nowMs);
+  if (wallMin == null || wallMin <= 0) return subTareas;
+
+  const pending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
+  if (pending.length === 0) return subTareas;
+
+  let committedMin = 0;
+  for (const st of pending) {
+    const cupo = st.minutosCupo ?? 0;
+    if (anchor?.subTareaId === st.id) {
+      const elapsed = Math.floor(Math.max(0, nowMs - anchor.startedAt) / 60000);
+      committedMin += Math.max(0, cupo - elapsed);
+    } else {
+      committedMin += cupo;
+    }
+  }
+  const slack = Math.max(0, wallMin - committedMin);
+  if (slack <= 0) return subTareas;
+
+  const lastFlex =
+    [...pending].reverse().find(st => !isCupoFijo(st)) ?? pending[pending.length - 1]!;
+  return transferirMinutosAlFoco(subTareas, lastFlex.id, slack);
+}
+
+/** Copia virtual: minutos ganados en foco → cupo extra en cola; si no hay cola, estira el foco a la meta. */
 function aplicarPreviewTiempoGanado(
   subTareas: SubTarea[],
   anchor: { subTareaId: string; startedAt: number },
@@ -471,20 +529,30 @@ function aplicarPreviewTiempoGanado(
   if (cupoMin <= 0) return subTareas;
   const elapsedMin = Math.floor(Math.max(0, now - anchor.startedAt) / 60000);
   const minutosVirtualesGanados = Math.max(0, cupoMin - elapsedMin);
-  if (minutosVirtualesGanados <= 0) return subTareas;
 
-  let toQueue = minutosVirtualesGanados;
-  if (horaFinContratoMs != null) {
-    const wallMin = situacionWallMinHastaMeta(horaFinContratoMs, now) ?? 0;
-    const focusRemainMin = Math.max(0, cupoMin - elapsedMin);
-    const othersMin = sumMinutosCronometroPendientes(subTareas) - cupoMin;
-    const slack = Math.max(0, wallMin - focusRemainMin - othersMin);
-    toQueue = Math.min(minutosVirtualesGanados, slack);
+  let next = subTareas;
+  if (minutosVirtualesGanados > 0) {
+    let toQueue = minutosVirtualesGanados;
+    if (horaFinContratoMs != null) {
+      const wallMin = situacionWallMinHastaMeta(horaFinContratoMs, now) ?? 0;
+      const focusRemainMin = Math.max(0, cupoMin - elapsedMin);
+      const othersMin = sumMinutosCronometroPendientes(subTareas) - cupoMin;
+      const slack = Math.max(0, wallMin - focusRemainMin - othersMin);
+      toQueue = Math.min(minutosVirtualesGanados, slack);
+    }
+    if (toQueue > 0) {
+      const others = repartirDeltaMinutosEnCola(subTareas, toQueue, {
+        excludeSubTareaIds: [anchor.subTareaId],
+      });
+      // Sin cola posterior: el preview no podía “repartir”; el estirado a meta lo cubre abajo.
+      next = others.repartido > 0 ? others.subTareas : subTareas;
+    }
   }
-  if (toQueue <= 0) return subTareas;
-  return repartirDeltaMinutosEnCola(subTareas, toQueue, {
-    excludeSubTareaIds: [anchor.subTareaId],
-  }).subTareas;
+
+  if (horaFinContratoMs != null) {
+    next = expandirColaCronometroHastaMeta(next, horaFinContratoMs, now, anchor);
+  }
+  return next;
 }
 
 /** Suma minutos de preview repartidos en filas pendientes posteriores al foco. */
@@ -753,6 +821,13 @@ export function aplicarTiempoGanadoAlCumplir(
     }
   }
 
+  // Tras repartir: si aún falta pared hasta la meta, estirar la última pendiente.
+  if (horaFinContratoMs != null && next.some(situacionFilaCronometroPendiente)) {
+    const resolved = resolveCronometroCupoAnchor(next, anchor, { forceResetSameRow: true, now });
+    const expandAnchor = resolved === "unchanged" ? (anchor ?? null) : resolved;
+    next = expandirColaCronometroHastaMeta(next, horaFinContratoMs, now, expandAnchor);
+  }
+
   return { subTareas: next, minutosGanados, saldoAdelantoMin };
 }
 
@@ -894,17 +969,23 @@ export function applyCupoManualYRedistribuir(
   return redistribuirMinutosSituacionCronometro(afterManual, totalBudgetMin);
 }
 
-/** Comprime cupos pendientes si exceden el tiempo de pared hasta la meta. */
+/** Comprime o estira cupos pendientes para alinearse al tiempo de pared hasta la meta. */
 export function reacomodarColaCronometroAMeta(
   subTareas: SubTarea[],
   horaFinContratoMs: number,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  anchor?: { subTareaId: string; startedAt: number } | null
 ): SubTarea[] {
   const wallMin = situacionWallMinHastaMeta(horaFinContratoMs, nowMs);
   if (wallMin == null || wallMin <= 0) return subTareas;
   const pendingSum = sumMinutosCronometroPendientes(subTareas);
-  if (pendingSum <= wallMin) return subTareas;
-  return redistribuirMinutosSituacionCronometro(subTareas, Math.max(1, wallMin));
+  if (pendingSum > wallMin) {
+    return redistribuirMinutosSituacionCronometro(subTareas, Math.max(1, wallMin));
+  }
+  if (pendingSum < wallMin) {
+    return expandirColaCronometroHastaMeta(subTareas, horaFinContratoMs, nowMs, anchor);
+  }
+  return subTareas;
 }
 
 export function totalBudgetMinFromCronometro(

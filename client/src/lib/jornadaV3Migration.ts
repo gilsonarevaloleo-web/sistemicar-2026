@@ -11,6 +11,11 @@ export function buildJornadaV3MigrationChecklist(): JornadaV3ChecklistItem[] {
   const chunkOk = getJornadaChunkLoadPhase() === "loaded";
   return [
     { id: "chunk", label: "V3 abre en este dispositivo (chunk cargado)", pass: chunkOk },
+    {
+      id: "shell-core",
+      label: "Shell V3 sin manager (FlotaCore + V3Ops + lazy session)",
+      pass: chunkOk,
+    },
     { id: "launch", label: "Lanzar conquista/enfoque sin freeze post-toast", pass: false },
     { id: "clock", label: "Reloj avanza 60s sin tocar pantalla", pass: false },
     { id: "close-sub", label: "Cerrar sub conquista → siguiente activo", pass: false },

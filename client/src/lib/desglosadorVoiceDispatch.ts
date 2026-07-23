@@ -11,6 +11,7 @@ import {
   buildDesglosadorSubClosePhrases,
   buildSituacionFilaClosePhrases,
 } from "@/lib/desglosadorSubCloseVoice";
+import { isTimerDrivenVoiceEnabled } from "@/lib/timerDrivenVoice";
 
 export function dispatchDesglosadorVoice(
   key: string,
@@ -66,6 +67,11 @@ export function dispatchDesglosadorRutaBandVoice(
   banda: Extract<RutaBandaId, "concentrado" | "limite">,
   onSpoken?: () => void
 ): void {
+  // Umbrales durante medición: chime en VehicleCard; TTS off (timer voice).
+  if (!isTimerDrivenVoiceEnabled()) {
+    onSpoken?.();
+    return;
+  }
   const key = `${vehicleId}:ruta-${subId}-${banda}`;
   dispatchDesglosadorVoice(key, rutaVozPartsForBanda(banda), {
     cancelPrevious: false,

@@ -111,7 +111,9 @@ function pickSituacionCupoAnchor(
   if (fb?.subTareaId && !local?.subTareaId) return fb;
   if (fb?.subTareaId && local?.subTareaId) {
     if (local.subTareaId === fb.subTareaId) {
-      return (local.startedAt ?? 0) <= (fb.startedAt ?? 0) ? local : fb;
+      // Preferir startedAt más reciente: un handoff ms0 (now) no debe perderse
+      // frente a un snapshot FB con ancla vieja de la misma fila (deuda fantasma).
+      return (local.startedAt ?? 0) >= (fb.startedAt ?? 0) ? local : fb;
     }
     return local;
   }
@@ -208,6 +210,24 @@ export function preferLocalSubTareasInVehicleList(
     if (!local || !shouldPreferLocalSubTareas(m, local)) return m;
     changed = true;
     return { ...m, subTareas: mergeSubTareasById(m.subTareas, local.subTareas) };
+  });
+  return changed ? out : merged;
+}
+
+/** Tras eco Firebase post-setDoc, conserva subVehiculos locales (reloj conquista activo). */
+export function preferLocalSubVehiculosInVehicleList(
+  merged: Vehicle[],
+  localSources: Vehicle[]
+): Vehicle[] {
+  let changed = false;
+  const out = merged.map(m => {
+    const local = localSources.find(l => l.id === m.id);
+    if (!local || !shouldPreferLocalSubVehiculos(m, local)) return m;
+    changed = true;
+    return {
+      ...m,
+      subVehiculos: mergeSubVehiculosById(m.subVehiculos, local.subVehiculos),
+    };
   });
   return changed ? out : merged;
 }

@@ -96,9 +96,12 @@ function deferUntilPostCallAudioAllowed(fn: () => void): boolean {
 
 const PHRASE_ENQUEUE_DEDUP_MS = 90_000;
 const STUCK_SPEAK_MS = 45_000;
+/** Si Chrome no dispara onstart (hilo saturado), no esperar 45s. */
+const NO_START_RECOVER_MS = 2_800;
 const WARMUP_REFRESH_MS = 20 * 60_000;
 const VOICES_LOAD_WAIT_MS = 450;
 const PHRASE_STARTED_FALLBACK_MS = 8_000;
+const PAUSE_WATCH_MS = 400;
 
 function getSynth(): SpeechSynthesis | null {
   if (typeof window === "undefined") return null;
@@ -167,6 +170,7 @@ class VoiceEngine {
   private activeKeys = new Set<string>();
   private stuckTimer: ReturnType<typeof setTimeout> | null = null;
   private pauseTimer: ReturnType<typeof setTimeout> | null = null;
+  private pauseWatchTimer: ReturnType<typeof setInterval> | null = null;
   private pendingOnPhraseStarted: (() => void) | null = null;
   private pendingOnPhraseStartedArmed = false;
 
@@ -254,6 +258,7 @@ class VoiceEngine {
   hardReset(opts?: { revokeUnlock?: boolean }): void {
     this.clearPauseTimer();
     this.clearStuckTimer();
+    this.clearPauseWatch();
     for (const item of this.queue) {
       if (item.key) this.activeKeys.delete(item.key);
       if (item.releaseKey) this.activeKeys.delete(item.releaseKey);
@@ -322,12 +327,40 @@ class VoiceEngine {
     }
   }
 
+  private clearPauseWatch(): void {
+    if (this.pauseWatchTimer) {
+      clearInterval(this.pauseWatchTimer);
+      this.pauseWatchTimer = null;
+    }
+  }
+
+  /** Libera keys del item actual — evita deadlock de reintentos tras stuck sin onend. */
+  private releaseCurrentItemKeys(): void {
+    const item = this.currentItem;
+    if (!item) return;
+    if (item.releaseKey) this.activeKeys.delete(item.releaseKey);
+    if (item.key) this.activeKeys.delete(item.key);
+  }
+
+  private armPauseWatch(): void {
+    this.clearPauseWatch();
+    this.pauseWatchTimer = setInterval(() => {
+      if (!this.speaking) {
+        this.clearPauseWatch();
+        return;
+      }
+      resumeSynthIfPaused();
+    }, PAUSE_WATCH_MS);
+  }
+
   private armStuckReset(): void {
     this.clearStuckTimer();
     this.stuckTimer = setTimeout(() => {
       if (!this.speaking) return;
+      this.releaseCurrentItemKeys();
       this.speaking = false;
       this.currentItem = null;
+      this.clearPauseWatch();
       try {
         getSynth()?.cancel();
       } catch {
@@ -341,9 +374,11 @@ class VoiceEngine {
     const synth = getSynth();
     if (!synth) return;
     if (this.speaking && !synth.speaking && !synth.pending) {
+      this.releaseCurrentItemKeys();
       this.speaking = false;
       this.currentItem = null;
       this.clearStuckTimer();
+      this.clearPauseWatch();
     }
   }
 
@@ -398,15 +433,25 @@ class VoiceEngine {
     this.currentItem = item;
     this.speaking = true;
     this.armStuckReset();
+    this.armPauseWatch();
 
     let phraseRetries = 0;
     const maxPhraseRetries = 2;
     let phraseStartedHandled = false;
     let phraseStartedFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let noStartTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearNoStartTimer = () => {
+      if (noStartTimer) {
+        clearTimeout(noStartTimer);
+        noStartTimer = null;
+      }
+    };
 
     const firePhraseStartedOnce = () => {
       if (phraseStartedHandled) return;
       phraseStartedHandled = true;
+      clearNoStartTimer();
       if (phraseStartedFallbackTimer) {
         clearTimeout(phraseStartedFallbackTimer);
         phraseStartedFallbackTimer = null;
@@ -418,11 +463,17 @@ class VoiceEngine {
     };
 
     const finishItem = () => {
+      clearNoStartTimer();
+      if (phraseStartedFallbackTimer) {
+        clearTimeout(phraseStartedFallbackTimer);
+        phraseStartedFallbackTimer = null;
+      }
+      // Solo el último item del batch trae releaseKey (= batchKey).
       if (item.releaseKey) this.activeKeys.delete(item.releaseKey);
-      if (item.key && !item.releaseKey) this.activeKeys.delete(item.key);
       this.speaking = false;
       this.currentItem = null;
       this.clearStuckTimer();
+      this.clearPauseWatch();
 
       const pauseMs = item.pauseAfterMs ?? 0;
       const afterPause = () => {
@@ -446,6 +497,30 @@ class VoiceEngine {
     };
 
     const speakPhrase = () => {
+      clearNoStartTimer();
+      phraseStartedHandled = false;
+      resumeSynthIfPaused();
+      // Armar ANTES de speak: si onstart no llega, Chrome suele haber tragado la utterance.
+      noStartTimer = setTimeout(() => {
+        if (phraseStartedHandled || this.currentItem !== item) return;
+        logVoiceEvent("no-start-recover", { textLen: item.text.length, retries: phraseRetries });
+        resumeSynthIfPaused();
+        if (phraseRetries < maxPhraseRetries) {
+          phraseRetries += 1;
+          try {
+            getSynth()?.cancel();
+          } catch {
+            /* noop */
+          }
+          this.speaking = true;
+          this.armStuckReset();
+          warmupSpeechSynthesis(true);
+          window.setTimeout(speakPhrase, 220);
+          return;
+        }
+        finishItem();
+      }, NO_START_RECOVER_MS);
+
       const ok = speakUtterance(
         item.text,
         {
@@ -462,6 +537,7 @@ class VoiceEngine {
             finishItem();
           },
           onerror: () => {
+            clearNoStartTimer();
             if (phraseRetries < maxPhraseRetries) {
               phraseRetries += 1;
               this.speaking = false;
@@ -501,9 +577,11 @@ class VoiceEngine {
     const flagStuck = this.speaking && !synthSpeaking;
 
     if (flagStuck) {
+      this.releaseCurrentItemKeys();
       this.speaking = false;
       this.currentItem = null;
       this.clearStuckTimer();
+      this.clearPauseWatch();
     }
 
     if (this.queue.length > 0 && !this.speaking && !speechUnlocked) {
@@ -525,9 +603,11 @@ class VoiceEngine {
   }
 
   releaseAfterExternalCancel(): void {
+    this.releaseCurrentItemKeys();
     this.speaking = false;
     this.currentItem = null;
     this.clearStuckTimer();
+    this.clearPauseWatch();
     this.clearPhraseStartedCallback();
     notifySpeechQueueIdle();
   }
@@ -890,6 +970,7 @@ export function speakUbicacionQueue(
     items.push({
       text: phrase,
       channel,
+      key: batchKey,
       priority: channelPriority(channel),
       onPhraseStarted: i === 0 ? onPhraseStarted : undefined,
       releaseKey: batchKey && i === filtered.length - 1 ? batchKey : undefined,

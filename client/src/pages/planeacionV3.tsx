@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+/**
+ * Entrada liviana de Jornada V3 (paso 2 migración).
+ * Primer paint: flota core + lanzamiento — SIN useDesglosadorManager.
+ * Idle: lazy-load de planeacionV3Session (flota core + useJornadaV3Ops + shell).
+ */
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
 import { JornadaStuckProbe } from "@/components/jornada/JornadaStuckProbe";
-import JornadaShellV3 from "@/components/jornada/JornadaShellV3";
-import { FlotaLaunchPanel } from "@/components/jornada/FlotaLaunchPanel";
-import { JornadaV3MigrationChecklist } from "@/components/jornada/JornadaV3MigrationChecklist";
 import { JornadaV3BootStatus } from "@/components/jornada/JornadaV3BootStatus";
-import type { CrisolAterrizarPayload } from "@/components/jornada/CrisolModule";
-import { useDesglosadorManager } from "@/hooks/useDesglosadorManager";
-import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
+import { FlotaLaunchPanel } from "@/components/jornada/FlotaLaunchPanel";
+import { JornadaShell } from "@/components/jornada/JornadaShell";
+import { useJornadaFlotaCore } from "@/hooks/useJornadaFlotaCore";
 import {
   getPlanillaHoy,
-  getYesterdayDailyPointsTotal,
-  subscribeToDailyPoints,
   subscribeToPlanilla,
   type Planilla,
 } from "@/lib/persistence";
@@ -19,99 +19,40 @@ import { getJournalDateString } from "@/lib/segmentTime";
 import { beginJornadaViewMount, endJornadaViewMount } from "@/lib/jornadaRemount";
 import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { markJornadaChunkLoaded } from "@/lib/jornadaChunkBoot";
-import { cancelJornadaRemountGuard, unlockSpeechSynthesis, warmupSpeechSynthesis, recoverSpeechQueue } from "@/lib/speechQueue";
+import {
+  cancelJornadaRemountGuard,
+  unlockSpeechSynthesis,
+  warmupSpeechSynthesis,
+  recoverSpeechQueue,
+} from "@/lib/speechQueue";
 import { executeFlotaLaunch } from "@/lib/executeFlotaLaunch";
 import type { FlotaLaunchForm } from "@/lib/executeFlotaLaunch";
+import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+
+const PlaneacionV3Session = lazy(() => import("./planeacionV3Session"));
+
+const SESSION_IDLE_TIMEOUT_MS = 1_200;
 
 export default function PlaneacionV3() {
   const { user } = useAuthContext();
-  const [dailyPS, setDailyPS] = useState(0);
-  const [yesterdayPS, setYesterdayPS] = useState<number | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [planilla, setPlanilla] = useState<Planilla | null>(null);
   const [planillaFecha] = useState(() => getJournalDateString());
+  const [dailyPS, setDailyPS] = useState(0);
 
-  const { vehicles: vehicleState, modales, handlers } = useDesglosadorManager({
-    onDailyPsChange: setDailyPS,
-  });
-
-  const {
-    all: vehicles,
-    setVehicles,
-  } = vehicleState;
-
-  const {
-    expandedId,
-    setExpandedId,
-    situacionReserva,
-    vehiclesRef,
-    rehydrateFlotaFromLocalRef,
-  } = modales;
-
-  const {
-    handleReservaTacticaQuickAdd,
-    handleReservaRutaChange,
-    handleEnviarReservaASituacion,
-    handleToggleSubTarea,
-    handleSituacionCronometroCumplido,
-    handleSituacionCronometroFallado,
-    handleDesglosadorUpdate,
-    setupFlotaSubscription,
-    applyCentinelaArchiveLocally,
-    safeAwardPS,
-    recordVehiculoInicio,
-    scrollFlotaActivosIntoView,
-    resolverProyectoId,
-    optimisticVehiclesRef,
-    ghostReconcileRef,
-  } = handlers;
+  const core = useJornadaFlotaCore({ onDailyPsChange: setDailyPS });
+  const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
 
   const segmentoActivo = useMemo(() => {
     if (!planilla) return null;
     return planilla.segmentos.find(s => s.estado === "activo") ?? null;
   }, [planilla]);
 
-  const { proyectosHub, volcarMetricasAlHub } = useSegmentoProyectoVinculo(
-    user?.uid,
-    segmentoActivo
+  const resolverProyectoId = useCallback(
+    (_ctx: { proyectoId: string; peldanoId?: string } | null) =>
+      segmentoActivo?.proyectoVinculadoId ?? undefined,
+    [segmentoActivo]
   );
-
-  const imanProyectos = useMemo(
-    () =>
-      proyectosHub.map(p => ({
-        id: p.id,
-        titulo: p.titulo,
-        etiqueta: p.etiqueta,
-        color: p.color,
-      })),
-    [proyectosHub]
-  );
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = subscribeToDailyPoints(user.uid, data => setDailyPS(data.total), e =>
-      console.error(e)
-    );
-    return unsub;
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    getYesterdayDailyPointsTotal(user.uid)
-      .then(setYesterdayPS)
-      .catch(() => setYesterdayPS(0));
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    void getPlanillaHoy(user.uid).then(setPlanilla);
-    const unsub = subscribeToPlanilla(
-      user.uid,
-      planillaFecha,
-      p => setPlanilla(p),
-      e => console.error(e)
-    );
-    return unsub;
-  }, [user, planillaFecha]);
 
   useEffect(() => {
     clearJornadaFatalError();
@@ -125,13 +66,37 @@ export default function PlaneacionV3() {
     };
   }, []);
 
-  const handleAterrizarReserva = useCallback(
-    (payload: CrisolAterrizarPayload) =>
-      handleReservaTacticaQuickAdd(payload.texto, payload.ruta, payload.proyectoId),
-    [handleReservaTacticaQuickAdd]
-  );
+  useEffect(() => {
+    if (!user) return;
+    void getPlanillaHoy(user.uid).then(setPlanilla);
+    const unsub = subscribeToPlanilla(
+      user.uid,
+      planillaFecha,
+      p => setPlanilla(p),
+      e => console.error(e)
+    );
+    return unsub;
+  }, [user, planillaFecha]);
 
-  const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
+  /** Diferir chunk del manager: primer paint no parsea ~4k LOC del orquestador. */
+  useEffect(() => {
+    let cancelled = false;
+    const arm = () => {
+      if (!cancelled) setSessionReady(true);
+    };
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(arm, { timeout: SESSION_IDLE_TIMEOUT_MS });
+      return () => {
+        cancelled = true;
+        cancelIdleCallback(id);
+      };
+    }
+    const t = window.setTimeout(arm, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, []);
 
   const handleFlotaLaunch = useCallback(
     async (form: FlotaLaunchForm) => {
@@ -139,36 +104,22 @@ export default function PlaneacionV3() {
       return executeFlotaLaunch({
         userId: user.uid,
         form,
-        vehiclesRef,
-        setVehicles,
-        setExpandedId,
+        vehiclesRef: core.vehiclesRef,
+        setVehicles: core.setVehicles,
+        setExpandedId: core.setExpandedId,
         planilla,
         segmentoActivo,
         resolverProyectoId,
-        applyCentinelaArchiveLocally,
-        safeAwardPS,
-        recordVehiculoInicio,
-        scrollFlotaActivosIntoView,
-        optimisticVehiclesRef,
-        ghostReconcileRef,
+        applyCentinelaArchiveLocally: core.applyCentinelaArchiveLocally,
+        safeAwardPS: core.safeAwardPS,
+        recordVehiculoInicio: core.recordVehiculoInicio,
+        scrollFlotaActivosIntoView: core.scrollFlotaActivosIntoView,
+        optimisticVehiclesRef: core.optimisticVehiclesRef,
+        ghostReconcileRef: core.ghostReconcileRef,
         lastLaunchRef,
       });
     },
-    [
-      user,
-      vehiclesRef,
-      setVehicles,
-      setExpandedId,
-      planilla,
-      segmentoActivo,
-      resolverProyectoId,
-      applyCentinelaArchiveLocally,
-      safeAwardPS,
-      recordVehiculoInicio,
-      scrollFlotaActivosIntoView,
-      optimisticVehiclesRef,
-      ghostReconcileRef,
-    ]
+    [user, core, planilla, segmentoActivo, resolverProyectoId]
   );
 
   if (!user) {
@@ -187,39 +138,54 @@ export default function PlaneacionV3() {
     >
       <JornadaStuckProbe />
       <JornadaV3BootStatus />
-      <div className="px-3 pt-2 max-w-lg mx-auto">
-        <JornadaV3MigrationChecklist />
-      </div>
-      <JornadaShellV3
-        userId={user.uid}
-        segmentos={planilla?.segmentos ?? []}
-        segmentoActivoId={segmentoActivo?.id ?? null}
-        vehicles={vehicles}
-        vehiclesRef={vehiclesRef}
-        setVehicles={setVehicles}
-        expandedId={expandedId}
-        setExpandedId={setExpandedId}
-        todayPs={dailyPS}
-        yesterdayPs={yesterdayPS}
-        situacionReserva={situacionReserva}
-        imanProyectos={imanProyectos}
-        onAterrizarReserva={handleAterrizarReserva}
-        onReservaRutaChange={handleReservaRutaChange}
-        onEnviarReservaASituacion={handleEnviarReservaASituacion}
-        handleSituacionCronometroCumplido={handleSituacionCronometroCumplido}
-        handleSituacionCronometroFallado={handleSituacionCronometroFallado}
-        handleToggleSubTarea={handleToggleSubTarea}
-        handleDesglosadorUpdate={handleDesglosadorUpdate}
-        volcarMetricasAlHub={volcarMetricasAlHub}
-        rehydrateFlotaFromLocalRef={rehydrateFlotaFromLocalRef}
-        setupFlotaSubscription={setupFlotaSubscription}
-        flotaLaunchSlot={
-          <FlotaLaunchPanel
-            onLaunch={handleFlotaLaunch}
-            disabled={false}
-          />
-        }
-      />
+
+      {sessionReady ? (
+        <Suspense
+          fallback={
+            <JornadaV3BootFallback
+              activeCount={core.activeCount}
+              dailyPS={dailyPS}
+              onLaunch={handleFlotaLaunch}
+              statusLine="Cargando motores de operación…"
+            />
+          }
+        >
+          <PlaneacionV3Session />
+        </Suspense>
+      ) : (
+        <JornadaV3BootFallback
+          activeCount={core.activeCount}
+          dailyPS={dailyPS}
+          onLaunch={handleFlotaLaunch}
+          statusLine={`${JORNADA_MODULE.title} · shell listo · flota ${core.activeCount}`}
+        />
+      )}
+    </div>
+  );
+}
+
+function JornadaV3BootFallback({
+  activeCount,
+  dailyPS,
+  onLaunch,
+  statusLine,
+}: {
+  activeCount: number;
+  dailyPS: number;
+  onLaunch: (form: FlotaLaunchForm) => Promise<string | null>;
+  statusLine: string;
+}) {
+  return (
+    <div className="max-w-lg mx-auto px-3 py-4 space-y-4" data-testid="planeacion-v3-boot">
+      <JornadaShell statusLine={statusLine} />
+      <p className="text-[11px] text-slate-500 text-center">
+        PS hoy {dailyPS} · activos {activeCount}
+      </p>
+      <FlotaLaunchPanel onLaunch={onLaunch} disabled={false} />
+      <p className="text-[10px] text-slate-600 text-center leading-relaxed">
+        El ring y métricas llegan en idle — así el celular abre sin bajar el monolito de
+        planificación.
+      </p>
     </div>
   );
 }

@@ -86,6 +86,10 @@ TTS y sonidos **nunca** dentro de `useEffect` de render ni en handlers síncrono
 - Despachar con `enqueueDesglosadorVoicePassive` / cola en `speechQueue.ts`
 - Un solo canal de retry por app; **prohibido** `pointerdown` global por frase
 - Cleanup obligatorio al desmontar vehículo (`cancelUbicacionVoiceForVehicle`)
+- **Jul 2026 — voz por temporizador OFF por defecto** (`timerDrivenVoice.ts`): umbrales, 2 min, cupo, sobra y fila auto **no** llaman `speechSynthesis` durante medición. Quedan chime/vibración/notify. Solo voz atada a gesto (bienvenida, intro post-Cumplido). Reactivar: `localStorage.sistemicar_timer_voice=1`.
+- Persist launch: `setDoc(provisionalId)` quiet — **prohibido** `addDoc` + remap + `vehicles-updated` en el hot path post-medida (clavo ~13 s en ambos desglosadores).
+- **Prohibido bomba temporal post-lanzamiento** (`setTimeout(4s/13s/28s)`): solo movía el clavo del reloj conquista. Persist remoto / pilares / centinela van por `launchPersistGate` (pestaña oculta, idle real, o primer Cumplido/Fallado).
+- Firma flota (`vehiclesReactiveSignature`): **debe** incluir `situacionCupoAnchor` + `resultadoSituacion` de filas cron. Si se omiten, Cumplido/Fallado no cambia la firma → React salta el setState y la UI queda en 0/3 (regresión circular anti-freeze).
 
 #### 4. UI espejo — Cero lógica de negocio en caliente
 
@@ -129,7 +133,9 @@ Un coordinador serializa con **tope de ms por frame**:
 
 **No destruir entropía** para ganar FPS. **Presupuestarla** en idle.
 
-Estado: parcial — `mobilePerf.ts` throttle existe; scheduler unificado **pendiente** (ver brief § Capa A).
+Estado: **parcial+** — `concienciaScheduler.ts` serializa pulso UI + cola presupuestada (`enqueueConcienciaWork`); `SegmentAttentionBackground` encola el ciclo de segmentos. Persistencia con skip por firma (`vehiclesReactiveSignature`) y teardown situacional en sombra. Ver brief § Capa A/B/C.
+
+**Lanzamiento flota (`/planeacion`):** el toast es ms0 barato; el freeze clásico era la avalancha *después*. Timeline de control: disco **1.5 s**, Firebase `launchPaint` **4 s**, persist remoto quiet **28 s** (`setDoc` con id provisional — sin remap/`saveLocal`/`vehicles-updated`; el clavo a ~**13 s** era sombra@12s + `addDoc` remap), pilares **30 s**, archive centinela **36 s**. Expand móvil diferido para situacional y conquista grande. Sin segundo `VehicleCardLiveNow` anidado.
 
 ### B.4 Persistencia fuera del hot path
 
@@ -225,6 +231,10 @@ flowchart TB
 | `jornadaFlotaCache.ts` | Disco local flota |
 
 **Dirección de split (no más monolito):** shell ligero → cards lazy → métricas/anillo en tab diferido. Nuevas features **no** expanden `planeacion.tsx`; van a hook, lib pura o componente lazy.
+
+**V3 paso 2 (completado):** `/jornada-v3` entra por `planeacionV3.tsx` + `useJornadaFlotaCore` (sin manager). La sesión V3 (`planeacionV3Session.tsx`) usa `useJornadaFlotaCore` para flota y `useJornadaV3Ops` para ring/reserva/desglosador — `useDesglosadorManager` ha sido eliminado de la sesión V3. Test en `useJornadaFlotaCore.test.ts` garantiza que ni el entry ni la sesión importan el manager. Siguiente: partir conquista fuera del manager en la ruta `/planeacion` monolítica.
+
+**Foco unidad (conquista):** overlay naranja (`ConquistaUnitFocusOverlay`) — mide por unidad con Tik al segundo y vueltas (sin persistir); Reiniciar limpia. **1 unidad completa** = Σ (duración/cantidad) de cada sub del desglosador (producción por producto).
 
 ---
 

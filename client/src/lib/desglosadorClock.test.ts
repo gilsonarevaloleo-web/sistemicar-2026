@@ -8,6 +8,7 @@ import {
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   suggestedSec,
+  sumDesglosadorUnitCycle,
   validateSubCloseCantidad,
 } from "./desglosadorClock.ts";
 
@@ -244,5 +245,31 @@ describe("computeDesglosadorClocks mixed subs", () => {
     const ui = desglosadorSubTimerUiFromClocks(clocks, suggestedSec(active));
     assert.equal(ui.display, "00:00:02");
     assert.equal(ui.isCountdown, false);
+  });
+});
+
+describe("sumDesglosadorUnitCycle", () => {
+  it("suma seg/unidad medidos de cada sub (= 1 producto)", () => {
+    const subs: SubVehiculo[] = [
+      sub({ id: "pegar", titulo: "Pegar", duracionFinal: 300, cantidadLograda: 10 }), // 30s/u
+      sub({ id: "cortar", titulo: "Cortar", duracionFinal: 200, cantidadLograda: 10 }), // 20s/u
+      sub({ id: "marco", titulo: "Marco", duracionFinal: 400, cantidadLograda: 10 }), // 40s/u
+      sub({ id: "bandas", titulo: "Bandas", duracionFinal: 100, cantidadLograda: 10 }), // 10s/u
+    ];
+    const cycle = sumDesglosadorUnitCycle(subs);
+    assert.equal(cycle.totalSec, 100);
+    assert.equal(cycle.stepsCounted, 4);
+    assert.equal(cycle.hasMeasured, true);
+    assert.equal(cycle.allRef, false);
+  });
+
+  it("usa récord cuando aún no hay medido", () => {
+    const subs: SubVehiculo[] = [
+      sub({ id: "a", status: "pendiente", tiempoRecordMinPerUnit: 0.5 }), // 30s
+      sub({ id: "b", status: "pendiente", tiempoRecordMinPerUnit: 1 }), // 60s
+    ];
+    const cycle = sumDesglosadorUnitCycle(subs);
+    assert.equal(cycle.totalSec, 90);
+    assert.equal(cycle.allRef, true);
   });
 });

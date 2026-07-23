@@ -222,6 +222,52 @@ const SOVEREIGNTY_ACCEPTED_KEY = "sistemicar_espejo_soberania";
 const STORAGE_KEY = "sistemicar_espejo_sesiones";
 const PRIVACY_KEY = "sistemicar_espejo_privacy";
 
+function isMensajeProtocoloDebil(mensaje: string | null | undefined): boolean {
+  const t = (mensaje || "").trim();
+  if (t.length < 80) return true;
+  return /registro procesado|continúa con el siguiente eje|tu reflexión ha sido registrada/i.test(t);
+}
+
+function buildProtocoloFallback(opts: {
+  contexto?: string | null;
+  ducha?: string;
+  diagnostico?: string;
+  notaUsuario?: string;
+  pata?: string | null;
+}): string {
+  const zona = opts.pata || "ESTABILIDAD";
+  const contexto = opts.contexto || "General";
+  const ducha = (opts.ducha || "").trim().slice(0, 280);
+  const diag = (opts.diagnostico || "").trim().slice(0, 280);
+  const nota = (opts.notaUsuario || "").trim().slice(0, 200);
+
+  return `PROTOCOLO DE CALIBRACIÓN — ${contexto}
+Raíz activa: ${zona}
+
+PATA 1 — ESTABILIDAD (Cuerpo / Recursos)
+Hoy, en los próximos 24h: 10 minutos de descarga somática.
+1) Siéntate o camina sin pantalla.
+2) Nombra en voz alta la carga que registraste${ducha ? `: "${ducha.slice(0, 120)}${ducha.length > 120 ? "…" : ""}"` : "."}
+3) Elige UNA acción concreta de 15 minutos que reduzca esa carga (ordenar, pagar, escribir, mover el cuerpo).
+
+PATA 2 — CONEXIÓN (Vínculos / Comunicación)
+Antes de dormir: una frase clara a alguien relevante o, si no aplica, 5 minutos de silencio sin responder chats.
+Frase sugerida: "Hoy estoy trabajando un patrón concreto; mañana te cuento con más claridad."
+
+PATA 3 — VISIÓN (Claridad / Dirección)
+Escribe 3 líneas:
+1) Qué interferencia sigue activa.
+2) Qué decisión de esta semana la reduce.
+3) Qué evidencia verás mañana si el protocolo funcionó.
+${diag ? `\nAncla de diagnóstico:\n${diag.slice(0, 200)}${diag.length > 200 ? "…" : ""}\n` : ""}${nota ? `\nAjuste que pediste:\n${nota}\n` : ""}
+PATA 4 — ORIGEN (Identidad / Mando)
+Afirmación de cierre (mañana al despertar, 60 segundos):
+"Yo calibro mi voltaje con hechos, no con ruido. Hoy ejecuto una sola acción de la pata ${zona}."
+
+Métrica 24h: marca hecho/no hecho en cada pata. No requiere Planificación ni Jornada para valer.
+Estado de Interfaz: Descomprimiendo. Voltaje residual: 42%. Procede.`;
+}
+
 interface IAResponse {
   profundidad: number;
   puede_avanzar: boolean;
@@ -296,7 +342,7 @@ interface SesionEspejo {
   fecha: Date;
   modo: "arquitecto";
   contexto?: string;
-  tipo_sesion?: "autonoma" | "asistida";
+  tipo_sesion?: "autonoma" | "asistida" | "ducha_mental";
   timestamp_inicio?: number;
   timestamp_fin?: number;
   contenido: {
@@ -339,6 +385,8 @@ export default function Espejo() {
   const [showCelebracion, setShowCelebracion] = useState(false);
   const [selectedContexto, setSelectedContexto] = useState<string | null>(null);
   const [showContextoSelector, setShowContextoSelector] = useState(false);
+  /** "ducha" = acceso libre al Eje 1 (gratis); "full" = sesión completa con paywall */
+  const [pendingStartMode, setPendingStartMode] = useState<"ducha" | "full">("full");
   const [showConfetti, setShowConfetti] = useState(false);
   const [userRank, setUserRank] = useState("Iniciado");
   const [expandedSesion, setExpandedSesion] = useState<string | null>(null);
@@ -389,6 +437,8 @@ export default function Espejo() {
   const [seguimientoActivado, setSeguimientoActivado] = useState(false);
   const [calibracionDoctorText, setCalibracionDoctorText] = useState<string | null>(null);
   const [seguimientoLoading, setSeguimientoLoading] = useState(false);
+  const [protocoloGuardando, setProtocoloGuardando] = useState(false);
+  const [protocoloGuardado, setProtocoloGuardado] = useState(false);
   const [eje2MensajeText, setEje2MensajeText] = useState<string | null>(null);
   const [show5DayModal, setShow5DayModal] = useState(false);
   const [plan5Dias, setPlan5Dias] = useState<Array<{ dayNum: number; titulo: string; hora: string }>>([]);
@@ -574,8 +624,12 @@ export default function Espejo() {
   };
 
   const userEmail = getUserEmail();
-  const esOwnerUser = isOwner(userEmail);
+  const esOwnerUser = isOwner(userEmail) || isOwner(user?.email);
   const esAccesoTotal = isPremium || esOwnerUser;
+
+  useEffect(() => {
+    if (esOwnerUser) setShowMuro(false);
+  }, [esOwnerUser]);
 
   useEffect(() => {
     if (esOwnerUser && user && credits === 0) {
@@ -850,6 +904,10 @@ export default function Espejo() {
     try {
       const contextoLabel = CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General";
       const pacienteActual = selectedPacienteId ? pacientesLista.find(p => p.id === selectedPacienteId) : null;
+      const respuestasParaIA = {
+        ...respuestas,
+        ...(eje2MensajeText ? { diagnostico_clinico: eje2MensajeText } : {}),
+      };
       const response = await fetch("/api/espejo-doctor-ia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -857,7 +915,7 @@ export default function Espejo() {
           eje,
           texto,
           contexto: contextoLabel,
-          respuestas_previas: respuestas,
+          respuestas_previas: respuestasParaIA,
           preparacion: prepTexto,
           paciente_codigo: pacienteActual?.codigoActual || null,
           paciente_nivel: pacienteActual?.nivelMadurez || null,
@@ -985,14 +1043,25 @@ export default function Espejo() {
       }
       return data;
     } catch (error) {
+      const fallbackMsg = eje === "protocolo_calibracion"
+        ? buildProtocoloFallback({
+            contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label,
+            ducha: respuestas.registro_carga,
+            diagnostico: eje2MensajeText || respuestas.diagnostico_clinico,
+            notaUsuario: texto,
+            pata: pataDetectada,
+          })
+        : "Registro procesado. Continúa con el siguiente eje.";
       const fallback: IAResponse = {
         profundidad: 5,
         puede_avanzar: true,
-        mensaje: "Registro procesado. Continúa con el siguiente eje.",
+        oxidacion_detectada: false,
+        mensaje: fallbackMsg,
         confrontacion: null
       };
-      setCleanedMensaje(null);
+      setCleanedMensaje(fallbackMsg);
       setIaFeedback(fallback);
+      if (eje === "protocolo_calibracion") setCalibracionDoctorText(fallbackMsg);
       if (eje === "registro_carga") setEje1FeedbackShown(true);
       return fallback;
     } finally {
@@ -1010,7 +1079,15 @@ export default function Espejo() {
     finalTranscriptRef.current = "";
     lastAnalyzedTranscriptRef.current = "";
     const eje = EJES[currentStep];
-    const newRespuestas = { ...respuestas, [eje.id]: texto.trim() };
+    // Guardar el texto clínico de la IA cuando exista (no solo la nota del usuario)
+    let contenidoEje = texto.trim();
+    if (currentStep === 1 && (eje2MensajeText || cleanedMensaje)) {
+      contenidoEje = eje2MensajeText || cleanedMensaje || contenidoEje;
+    }
+    if (currentStep === 2 && (calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje)) {
+      contenidoEje = calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || contenidoEje;
+    }
+    const newRespuestas = { ...respuestas, [eje.id]: contenidoEje };
     setRespuestas(newRespuestas);
     setCurrentTexto("");
     setIaFeedback(null);
@@ -1021,6 +1098,10 @@ export default function Espejo() {
     
     if (currentStep < EJES.length - 1) {
       setCurrentStep(prev => prev + 1);
+      // Al llegar al Eje 3, no bloquear el botón por oxidación previa
+      if (currentStep + 1 === 2) {
+        setOxidacionDetectada(false);
+      }
     } else {
       await awardSovereigntyPoints(user.uid, FIXED_POINTS, "Espejo Soberano: Sesión Completa +58 PS");
       await incrementModulePoints(user.uid, "espejo", 1).catch(() => {});
@@ -1111,47 +1192,66 @@ export default function Espejo() {
   };
 
   const handleCerrarDuchaMental = async () => {
-    if (!user) return;
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
     if (isVoiceRecording) cleanupVoiceRecording();
     const PS_DUCHA = 10;
-    const textoRegistrado = respuestas.registro_carga || currentTexto.trim();
+    const textoRegistrado = (respuestas.registro_carga || currentTexto).trim();
+    if (textoRegistrado.length < 5) {
+      toast.error("Escribe al menos 5 caracteres para guardar la ducha");
+      return;
+    }
     const vibracionFinal = nivelSeñal === "critica" ? 15 : nivelSeñal === "activa" ? 35 : nivelSeñal === "insuficiente" ? 20 : 30;
+    const fecha = new Date();
+    const prep = prepTexto.trim();
+    const sessionPayload = {
+      fecha,
+      modo: "arquitecto" as const,
+      contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+      pacienteId: selectedPacienteId ?? undefined,
+      tipo_sesion: "ducha_mental" as const,
+      timestamp_inicio: sessionStartTime || Date.now(),
+      timestamp_fin: Date.now(),
+      contenido: {
+        registro_carga: textoRegistrado,
+        ...(prep ? { preparacion: prep } : {}),
+      },
+      puntos: PS_DUCHA,
+      vibracion_final: vibracionFinal,
+    };
     try {
       await awardSovereigntyPoints(user.uid, PS_DUCHA, "Espejo v5 — Ducha Mental");
-      addExpedienteClinico(user.uid, {
-        fecha: new Date(),
-        seccion_afectada: pataDetectada ? [pataDetectada] : [],
+      await addExpedienteClinico(user.uid, {
+        fecha,
+        seccion_afectada: pataDetectada ? [pataDetectada] : (selectedContexto ? [selectedContexto] : []),
         codigo_diagnostico: "",
         interfaz_primaria: "",
         interfaz_secundaria: "",
-        respuestas: { registro_carga: textoRegistrado },
+        respuestas: prep
+          ? { registro_carga: textoRegistrado, preparacion: prep }
+          : { registro_carga: textoRegistrado },
         estado_habito: false,
         vibracion_final: vibracionFinal,
         tipo_sesion: "ducha_mental",
-        timestamp_inicio: sessionStartTime,
+        timestamp_inicio: sessionStartTime || Date.now(),
         timestamp_fin: Date.now()
-      }).catch(err => console.error("[cerrarDuchaMental] expediente:", err));
-      addEspejoSession(user.uid, {
-        fecha: new Date(),
-        modo: "arquitecto",
-        pacienteId: selectedPacienteId ?? undefined,
-        tipo_sesion: "ducha_mental",
-        timestamp_inicio: sessionStartTime,
-        timestamp_fin: Date.now(),
-        contenido: { registro_carga: textoRegistrado },
-        puntos: PS_DUCHA,
-        vibracion_final: vibracionFinal
-      }).catch(err => console.error("[cerrarDuchaMental] espejoSession:", err));
-      toast.success(`+${PS_DUCHA} PS — Ducha Mental registrada`, {
-        description: pataDetectada
-          ? `Zona ${pataDetectada} procesada. Regresa más seguido para profundizar el diagnóstico.`
-          : "Registro procesado. La frecuencia de las duchas crea el patrón.",
+      });
+      const sessionId = await addEspejoSession(user.uid, sessionPayload);
+      setSesiones(prev => [{
+        id: sessionId,
+        ...sessionPayload,
+      }, ...prev.filter(s => s.id !== sessionId)]);
+      toast.success(`+${PS_DUCHA} PS — Ducha Mental guardada`, {
+        description: "Puedes revisarla en Historial o Expedientes Clínicos.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
         duration: 5000
       });
       setCurrentStep(0);
       setRespuestas({});
       setCurrentTexto("");
+      setPrepTexto("");
       setIaFeedback(null);
       setIaBlocked(false);
       setEje1FeedbackShown(false);
@@ -1164,10 +1264,10 @@ export default function Espejo() {
       setVoiceTranscript("");
       setVoiceAnalisis(null);
       lastAnalyzedTranscriptRef.current = "";
-      setPhase("landing");
+      setPhase("historial");
     } catch (err) {
       console.error("[cerrarDuchaMental] Error:", err);
-      toast.error("Error al cerrar la sesión.");
+      toast.error("Error al guardar la ducha. Intenta de nuevo.");
     }
   };
 
@@ -1179,26 +1279,139 @@ export default function Espejo() {
     }
     
     const eje = EJES[currentStep];
+    const costoEje = currentStep === 2
+      ? (eje3DynamicCost ?? eje.costo)
+      : eje.costo;
     
-    if (eje.costo > 0 && credits < eje.costo && !esOwnerUser) {
+    if (costoEje > 0 && credits < costoEje && !esOwnerUser) {
       setIaBlocked(true);
-      toast.error(`Este eje requiere ${eje.costo} crédito${eje.costo > 1 ? "s" : ""}`, {
+      toast.error(`Este eje requiere ${costoEje} crédito${costoEje > 1 ? "s" : ""}`, {
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
       return;
     }
 
+    // Eje 1: escanea y se queda mostrando feedback
     if (currentStep === 0) {
       await consultarDoctorIA("registro_carga", texto, 0);
       return;
     }
-    
-    if (eje.costo > 0) {
-      const result = await consultarDoctorIA(eje.id, texto, eje.costo);
-      if (result && !result.puede_avanzar) return;
+
+    // Eje 2: diagnóstico — se queda mostrando el análisis (no avanzar solo)
+    if (currentStep === 1) {
+      await consultarDoctorIA("diagnostico_clinico", texto, costoEje);
+      return;
+    }
+
+    // Eje 3: protocolo — siempre mostrar en pantalla (con fallback si la IA falla)
+    if (currentStep === 2) {
+      setOxidacionDetectada(false);
+      setProtocoloGuardado(false);
+      const result = await consultarDoctorIA("protocolo_calibracion", texto, costoEje);
+      const raw = result?.mensaje || calibracionDoctorText || cleanedMensaje || "";
+      const protocolo = isMensajeProtocoloDebil(raw)
+        ? buildProtocoloFallback({
+            contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label,
+            ducha: respuestas.registro_carga,
+            diagnostico: eje2MensajeText || respuestas.diagnostico_clinico,
+            notaUsuario: texto,
+            pata: pataDetectada,
+          })
+        : raw;
+      setCalibracionDoctorText(protocolo);
+      setCleanedMensaje(protocolo);
+      setIaFeedback({
+        profundidad: result?.profundidad ?? 7,
+        puede_avanzar: true,
+        oxidacion_detectada: false,
+        mensaje: protocolo,
+        confrontacion: null,
+        codigo_diagnostico: result?.codigo_diagnostico ?? lastDiagCode,
+        interfaz_primaria: result?.interfaz_primaria ?? null,
+        interfaz_secundaria: result?.interfaz_secundaria ?? null,
+        firma_salida: result?.firma_salida ?? null,
+      });
+      toast.success("Protocolo entregado en pantalla", {
+        description: "Puedes guardarlo ahora. Planificación/Jornada son opcionales.",
+        style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD },
+      });
+      return;
     }
     
     await advanceToNextStep(texto);
+  };
+
+  const handleGuardarProtocolo = async () => {
+    if (!user) {
+      setShowLoginModal(true);
+      return;
+    }
+    const protocolo = (calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || "").trim();
+    if (!protocolo || isMensajeProtocoloDebil(protocolo)) {
+      toast.error("Aún no hay protocolo para guardar. Toca ENTREGAR PROTOCOLO primero.");
+      return;
+    }
+    setProtocoloGuardando(true);
+    try {
+      const fecha = new Date();
+      const PS = 15;
+      const contenido = {
+        registro_carga: respuestas.registro_carga || "",
+        diagnostico_clinico: eje2MensajeText || respuestas.diagnostico_clinico || "",
+        protocolo_calibracion: protocolo,
+        preparacion: prepTexto.trim() || undefined,
+      };
+      await awardSovereigntyPoints(user.uid, PS, "Espejo v5 — Protocolo guardado");
+      await addExpedienteClinico(user.uid, {
+        fecha,
+        seccion_afectada: pataDetectada ? [pataDetectada] : (selectedContexto ? [selectedContexto] : []),
+        codigo_diagnostico: lastDiagCode || "",
+        interfaz_primaria: "",
+        interfaz_secundaria: "",
+        respuestas: {
+          registro_carga: contenido.registro_carga,
+          diagnostico_clinico: contenido.diagnostico_clinico,
+          protocolo_calibracion: protocolo,
+        },
+        estado_habito: false,
+        vibracion_final: 40,
+        tipo_sesion: "asistida",
+        timestamp_inicio: sessionStartTime || Date.now(),
+        timestamp_fin: Date.now(),
+      });
+      const sessionId = await addEspejoSession(user.uid, {
+        fecha,
+        modo: "arquitecto",
+        contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+        pacienteId: selectedPacienteId ?? undefined,
+        tipo_sesion: "asistida",
+        timestamp_inicio: sessionStartTime || Date.now(),
+        timestamp_fin: Date.now(),
+        contenido,
+        puntos: PS,
+        vibracion_final: 40,
+      });
+      setSesiones(prev => [{
+        id: sessionId,
+        fecha,
+        modo: "arquitecto",
+        contexto: CONTEXTOS.find(c => c.id === selectedContexto)?.label || "General",
+        tipo_sesion: "asistida",
+        contenido,
+        puntos: PS,
+        vibracion_final: 40,
+      }, ...prev.filter(s => s.id !== sessionId)]);
+      setProtocoloGuardado(true);
+      toast.success("Protocolo guardado — disponible en Historial", {
+        description: "Planificación y Jornada siguen siendo opcionales.",
+        style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
+      });
+    } catch (err) {
+      console.error("[guardarProtocolo]", err);
+      toast.error("No se pudo guardar el protocolo. Intenta de nuevo.");
+    } finally {
+      setProtocoloGuardando(false);
+    }
   };
 
   const forceAdvance = async () => {
@@ -1208,12 +1421,14 @@ export default function Espejo() {
     await advanceToNextStep(texto);
   };
 
-  const startArquitectoMode = () => {
+  const startArquitectoMode = (mode: "ducha" | "full" = "full") => {
+    const resolved: "ducha" | "full" = mode === "ducha" ? "ducha" : "full";
+    setPendingStartMode(resolved);
     if (!user) {
       setShowLoginModal(true);
       return;
     }
-    if (!prospectoVerificado && !verificandoProspecto) {
+    if (!prospectoVerificado && !verificandoProspecto && !esOwnerUser) {
       setShowDatosGate(true);
       return;
     }
@@ -1221,26 +1436,46 @@ export default function Espejo() {
       setShowSovereigntyPopup(true);
       return;
     }
-    if (!esAccesoTotal) {
+    // Ducha Mental es gratuita: no exige paywall de sesión completa
+    if (resolved === "full" && !esAccesoTotal) {
       setShowPaywall(true);
       return;
     }
     setShowContextoSelector(true);
   };
 
+  const startFromEje = (ejeIndex: number) => {
+    if (ejeIndex === 0) {
+      startArquitectoMode("ducha");
+      return;
+    }
+    if (!esAccesoTotal) {
+      toast.message("Primero completa la Ducha Mental (gratis) o activa el acceso completo.", {
+        description: EJES[ejeIndex]?.label || "Eje bloqueado",
+      });
+      startArquitectoMode("ducha");
+      return;
+    }
+    startArquitectoMode("full");
+  };
+
   const acceptSovereignty = () => {
     setSovereigntyAccepted(true);
     localStorage.setItem(SOVEREIGNTY_ACCEPTED_KEY, "true");
     setShowSovereigntyPopup(false);
-    if (!esAccesoTotal) {
+    if (pendingStartMode === "full" && !esAccesoTotal) {
       setShowPaywall(true);
     } else {
       setShowContextoSelector(true);
     }
   };
 
-  const confirmContextoAndStart = async () => {
+  const confirmContextoAndStart = async (contextoOverride?: string | null) => {
+    const contexto = contextoOverride || selectedContexto || "trabajo";
+    setSelectedContexto(contexto);
     if (isVoiceRecording) cleanupVoiceRecording();
+
+    // Cerrar modal y entrar YA a la escritura (no esperar Firebase)
     setShowContextoSelector(false);
     setCurrentStep(0);
     setRespuestas({});
@@ -1261,8 +1496,6 @@ export default function Espejo() {
     setRecomendacionSesion(null);
     setCodigo343(null);
     setActiveColor343(undefined);
-    setWelcomeShown(false);
-    setWelcomeText("");
     setActiveFase(null);
     setDoctorMarkerColor(null);
     setActiveIdentidad(null);
@@ -1270,22 +1503,37 @@ export default function Espejo() {
     setVoiceTranscript("");
     setVoiceAnalisis(null);
     lastAnalyzedTranscriptRef.current = "";
+    setProtocoloGuardado(false);
+    setProtocoloGuardando(false);
 
+    // Siempre a Ducha Mental escribiendo: sin welcome ni muro bloqueando
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
+    setShowMuro(false);
+    setPhase("arquitecto");
+    toast.success("Ducha Mental lista — escribe tu registro", {
+      style: { backgroundColor: "#0a0a0a", border: `1px solid ${CYAN_NEON}`, color: CYAN_NEON },
+      duration: 2500,
+    });
+
+    // Bloqueo Eje 3 en segundo plano (no debe impedir escribir)
     if (user) {
-      const bloqueoActivo = await getBloqueoEje3(user.uid);
-      if (bloqueoActivo) {
-        setBloqueoEje3(bloqueoActivo);
-      } else {
-        const bucle = await detectarBucleSabotaje(user.uid);
-        if (bucle && bucle.bloqueado) {
-          setBloqueoEje3({ codigo: bucle.codigo, veces: bucle.veces, hasta: bucle.hasta, activadoAt: Date.now() });
+      try {
+        const bloqueoActivo = await getBloqueoEje3(user.uid);
+        if (bloqueoActivo) {
+          setBloqueoEje3(bloqueoActivo);
         } else {
-          setBloqueoEje3(null);
+          const bucle = await detectarBucleSabotaje(user.uid);
+          if (bucle && bucle.bloqueado) {
+            setBloqueoEje3({ codigo: bucle.codigo, veces: bucle.veces, hasta: bucle.hasta, activadoAt: Date.now() });
+          } else {
+            setBloqueoEje3(null);
+          }
         }
+      } catch (err) {
+        console.warn("[confirmContextoAndStart] bloqueo check:", err);
       }
     }
-
-    setPhase("preparacion");
   };
 
   const handlePrepSubmit = () => {
@@ -1293,6 +1541,16 @@ export default function Espejo() {
       toast.error("Describe dónde sientes el ruido");
       return;
     }
+    if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
+    setPhase("arquitecto");
+  };
+
+  const handlePrepSkipToDucha = () => {
+    if (esOwnerUser || isMuroFirmado()) setShowMuro(false);
+    setWelcomeShown(true);
+    setWelcomeText(WELCOME_MESSAGE);
     setPhase("arquitecto");
   };
 
@@ -1402,13 +1660,10 @@ export default function Espejo() {
       });
       setProtocolo5DiasActivado(true);
       setShow5DayModal(false);
-      toast.success("Protocolo de 5 Días activado — revisa Planificación.", {
+      toast.success("Protocolo de 5 Días listo en Planificación (opcional).", {
+        description: "Puedes seguir en Espejo y entregar el Protocolo del Eje 3 sin ir a Planificación.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => {
-        beginViewTransition();
-        navigate("/planeacion");
-      }, 1200);
     } catch {
       toast.error("Error al activar el protocolo. Intenta de nuevo.");
     } finally {
@@ -1445,13 +1700,10 @@ export default function Espejo() {
       await requestNotificationPermission();
       scheduleEspejoFollowup(habitoText);
       setSeguimientoActivado(true);
-      toast.success("Seguimiento activado — revisa Planificación.", {
+      toast.success("Seguimiento preparado (opcional).", {
+        description: "Tu protocolo ya está. Ir a Planificación es opcional.",
         style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
       });
-      setTimeout(() => {
-        beginViewTransition();
-        navigate("/planeacion");
-      }, 1200);
     } catch {
       toast.error("Error al activar seguimiento. Intenta de nuevo.");
     } finally {
@@ -1668,7 +1920,7 @@ export default function Espejo() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={startArquitectoMode}
+                  onClick={() => startArquitectoMode("full")}
                   className="w-full p-6 rounded-2xl text-left transition-all border relative overflow-hidden"
                   style={{ 
                     backgroundColor: DARK_BG,
@@ -1717,19 +1969,30 @@ export default function Espejo() {
                   3 EJES CLÍNICOS
                 </p>
                 <div className="flex gap-2">
-                  {EJES.map((eje) => {
+                  {EJES.map((eje, index) => {
                     const Icon = eje.icon;
+                    const isDucha = index === 0;
                     return (
-                      <div 
+                      <button
+                        type="button"
                         key={eje.id}
-                        className="flex-1 py-3 rounded-xl text-center"
-                        style={{ backgroundColor: `${eje.color}08`, border: `1px solid ${eje.color}20` }}
+                        onClick={() => startFromEje(index)}
+                        className="flex-1 py-3 rounded-xl text-center transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        style={{
+                          backgroundColor: `${eje.color}08`,
+                          border: `1px solid ${eje.color}35`,
+                          cursor: "pointer",
+                        }}
+                        data-testid={`btn-eje-landing-${eje.id}`}
                       >
                         <Icon size={18} className="mx-auto mb-1" style={{ color: eje.color }} />
-                        <span className="text-[9px] font-bold" style={{ color: eje.color, fontFamily: "monospace" }}>
+                        <span className="text-[9px] font-bold block" style={{ color: eje.color, fontFamily: "monospace" }}>
                           {eje.label}
                         </span>
-                      </div>
+                        <span className="text-[8px] block mt-0.5" style={{ color: `${eje.color}70`, fontFamily: "monospace" }}>
+                          {isDucha ? "Gratis · Entrar" : esAccesoTotal ? "Entrar" : "Requiere acceso"}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -1930,6 +2193,21 @@ export default function Espejo() {
                 <Heart size={18} />
                 Iniciar Diagnóstico Clínico
               </button>
+              <button
+                type="button"
+                onClick={handlePrepSkipToDucha}
+                className="w-full mt-3 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: `${CYAN_NEON}10`,
+                  border: `1px solid ${CYAN_NEON}35`,
+                  color: CYAN_NEON,
+                  fontFamily: "monospace",
+                }}
+                data-testid="btn-ir-ducha-desde-prep"
+              >
+                <Droplets size={16} />
+                Ir directo a Ducha Mental
+              </button>
             </div>
           </motion.div>
         )}
@@ -1989,7 +2267,7 @@ export default function Espejo() {
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-[10px] uppercase tracking-widest" style={{ color: CYAN_NEON, fontFamily: "monospace" }}>Diagnóstico Clínico — 3 Ejes</span>
                       <span className="text-[10px] font-bold" style={{ color: CYAN_NEON, fontFamily: "monospace" }}>
-                        {currentStep}/{EJES.length}
+                        {currentStep + 1}/{EJES.length}
                       </span>
                     </div>
                     <div className="flex gap-1">
@@ -2119,7 +2397,7 @@ export default function Espejo() {
                                     </p>
                                   </motion.div>
                                 ) : currentStep === 0 ? (
-                                  welcomeText.length < WELCOME_MESSAGE.length ? (
+                                  !welcomeShown && welcomeText.length < WELCOME_MESSAGE.length ? (
                                     <div
                                       className="rounded-xl p-4 min-h-[180px] relative"
                                       style={{ backgroundColor: "rgba(0,0,0,0.85)", border: `1px solid ${CYAN_NEON}20` }}
@@ -2132,6 +2410,23 @@ export default function Espejo() {
                                           style={{ display: "inline-block" }}
                                         >▌</motion.span>
                                       </p>
+                                      <button
+                                        type="button"
+                                        data-testid="btn-saltar-welcome"
+                                        onClick={() => {
+                                          setWelcomeText(WELCOME_MESSAGE);
+                                          setWelcomeShown(true);
+                                        }}
+                                        className="mt-4 text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+                                        style={{
+                                          backgroundColor: `${CYAN_NEON}12`,
+                                          border: `1px solid ${CYAN_NEON}35`,
+                                          color: CYAN_NEON,
+                                          fontFamily: "monospace",
+                                        }}
+                                      >
+                                        Escribir ahora
+                                      </button>
                                     </div>
                                   ) : (
                                     <>
@@ -2308,8 +2603,13 @@ export default function Espejo() {
                                   )
                                 ) : currentStep === 2 && iaFeedback?.mensaje ? (
                                   <CalibrationPanel
-                                    habito24h={cleanedMensaje ?? iaFeedback.mensaje}
-                                    onConfirm={() => advanceToNextStep(currentTexto || cleanedMensaje || iaFeedback?.mensaje || "Protocolo aceptado")}
+                                    habito24h={calibracionDoctorText || cleanedMensaje || iaFeedback.mensaje}
+                                    onSave={handleGuardarProtocolo}
+                                    saving={protocoloGuardando}
+                                    saved={protocoloGuardado}
+                                    onConfirm={() => advanceToNextStep(
+                                      calibracionDoctorText || cleanedMensaje || iaFeedback?.mensaje || currentTexto || "Protocolo aceptado"
+                                    )}
                                   />
                                 ) : (
                                   <>
@@ -2550,14 +2850,14 @@ export default function Espejo() {
                                   >
                                     <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: `${GOLD}12`, borderBottom: `1px solid ${GOLD}20` }}>
                                       <ListChecks size={11} style={{ color: GOLD }} />
-                                      <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: GOLD, fontFamily: "monospace" }}>PROTOCOLO_5_DÍAS — Acción Requerida</span>
+                                      <span className="text-[9px] font-black tracking-widest uppercase" style={{ color: GOLD, fontFamily: "monospace" }}>PROTOCOLO_5_DÍAS — Opcional</span>
                                     </div>
                                     <div className="p-3" style={{ backgroundColor: `${GOLD}04` }}>
                                       <p className="text-[10px] leading-relaxed mb-3" style={{ color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
-                                        El Doctor ha generado tu protocolo. Puedes copiarlo o activarlo directamente en tu Planificación con sub-tareas editables para cada día.
+                                        No es obligatorio para continuar al Protocolo (Eje 3). Si quieres, puedes copiarlo o activarlo en Planificación después.
                                       </p>
                                       <p className="text-[9px] leading-relaxed mb-3 px-2 py-1.5 rounded-lg" style={{ color: `${GOLD}CC`, fontFamily: "monospace", backgroundColor: `${GOLD}08`, border: `1px dashed ${GOLD}30` }}>
-                                        Con Arquitecto, el Doctor vigila tu cumplimiento en tiempo real y ajusta el protocolo si fallas. Sin Arquitecto, el control es tuyo.
+                                        Con Arquitecto, el Doctor puede vigilar el cumplimiento. Sin activarlo, igual puedes pedir La Llave y guardar el protocolo.
                                       </p>
                                       <div className="flex gap-2">
                                         <button
@@ -2583,7 +2883,7 @@ export default function Espejo() {
                                           data-testid="btn-activar-protocolo-5dias"
                                         >
                                           <Layers size={10} />
-                                          ACTIVAR EN PLANIFICACIÓN
+                                          ACTIVAR EN PLANIFICACIÓN (opc.)
                                           <ArrowRight size={10} />
                                         </button>
                                       </div>
@@ -2722,39 +3022,86 @@ export default function Espejo() {
                                         );
                                       })()}
                                     </div>
-                                  ) : !(currentStep === 2 && iaFeedback?.mensaje) && !(currentStep === 2 && bloqueoEje3 && bloqueoEje3.hasta > Date.now()) && (
+                                  ) : currentStep === 1 && (iaFeedback?.mensaje || eje2MensajeText) ? (
                                     <button
-                                      onClick={handleSubmitStep}
-                                      disabled={currentTexto.trim().length < 5 || iaLoading || (currentStep === 2 && oxidacionDetectada && !iaFeedback)}
-                                      className="flex-1 py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-                                      style={{ 
-                                        background: `linear-gradient(135deg, ${eje.color} 0%, ${GOLD} 100%)`,
-                                        color: "#000",
-                                        fontFamily: "monospace"
+                                      type="button"
+                                      onClick={() => {
+                                        const costProto = eje3DynamicCost ?? EJES[2]?.costo ?? 4;
+                                        if (costProto > 0 && credits < costProto && !esOwnerUser) {
+                                          setIaBlocked(true);
+                                          toast.error(`Protocolo requiere ${costProto} crédito${costProto > 1 ? "s" : ""}`, {
+                                            style: { backgroundColor: "#0a0a0a", border: `1px solid ${GOLD}`, color: GOLD }
+                                          });
+                                          return;
+                                        }
+                                        setOxidacionDetectada(false);
+                                        advanceToNextStep(eje2MensajeText || cleanedMensaje || currentTexto.trim());
                                       }}
-                                      data-testid={`btn-submit-${eje.id}`}
+                                      className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${RED_ALERT} 0%, ${GOLD} 100%)`,
+                                        color: "#000",
+                                        fontFamily: "monospace",
+                                      }}
+                                      data-testid="btn-continuar-protocolo"
                                     >
-                                      {iaLoading ? (
-                                        <>
-                                          <Loader2 size={14} className="animate-spin" />
-                                          PROCESSING...
-                                        </>
-                                      ) : currentStep === 2 && oxidacionDetectada && !iaFeedback ? (
-                                        <>
-                                          <Zap size={12} />
-                                          SISTEMA EN OXIDACIÓN — Genera voltaje primero
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Send size={14} />
-                                          {currentStep === 0 ? "ESCANEAR REGISTRO" : currentStep === 1 ? (
-                                            <>
-                                              INVERTIR 1 CRÉDITO — Diagnóstico{pataDetectada ? ` · ${pataDetectada}` : ""}{nivelSeñal ? ` · ${nivelSeñal.toUpperCase()}` : ""}
-                                            </>
-                                          ) : "COMPLETAR_SESIÓN"}
-                                        </>
-                                      )}
+                                      <ChevronRight size={14} />
+                                      CONTINUAR AL PROTOCOLO
+                                      <span className="ml-1 text-[10px] opacity-70">— Eje 3</span>
                                     </button>
+                                  ) : !(currentStep === 2 && iaFeedback?.mensaje) && !(currentStep === 2 && bloqueoEje3 && bloqueoEje3.hasta > Date.now()) && (
+                                    <div className="flex flex-col gap-2 w-full flex-1">
+                                      <button
+                                        onClick={handleSubmitStep}
+                                        disabled={currentTexto.trim().length < 5 || iaLoading}
+                                        className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                                        style={{ 
+                                          background: `linear-gradient(135deg, ${eje.color} 0%, ${GOLD} 100%)`,
+                                          color: "#000",
+                                          fontFamily: "monospace"
+                                        }}
+                                        data-testid={`btn-submit-${eje.id}`}
+                                      >
+                                        {iaLoading ? (
+                                          <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            {currentStep === 2 ? "GENERANDO PROTOCOLO..." : "PROCESSING..."}
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Send size={14} />
+                                            {currentStep === 0 ? "ESCANEAR REGISTRO" : currentStep === 1 ? (
+                                              <>
+                                                INVERTIR 1 CRÉDITO — Diagnóstico{pataDetectada ? ` · ${pataDetectada}` : ""}{nivelSeñal ? ` · ${nivelSeñal.toUpperCase()}` : ""}
+                                              </>
+                                            ) : (
+                                              <>
+                                                ENTREGAR PROTOCOLO
+                                                <span className="ml-1 text-[10px] opacity-70">— {eje3DynamicCost ?? eje.costo} créd.</span>
+                                              </>
+                                            )}
+                                          </>
+                                        )}
+                                      </button>
+                                      {currentStep === 0 && currentTexto.trim().length >= 5 && !iaLoading && (
+                                        <button
+                                          type="button"
+                                          onClick={handleCerrarDuchaMental}
+                                          className="w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                          style={{
+                                            backgroundColor: `${CYAN_NEON}12`,
+                                            border: `1px solid ${CYAN_NEON}40`,
+                                            color: CYAN_NEON,
+                                            fontFamily: "monospace",
+                                          }}
+                                          data-testid="btn-guardar-ducha-mental"
+                                        >
+                                          <Droplets size={14} />
+                                          GUARDAR DUCHA MENTAL
+                                          <span className="text-[10px] opacity-70 ml-1">+10 PS · Revisable</span>
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -3043,7 +3390,7 @@ export default function Espejo() {
                         <div className="flex items-center gap-2 py-2">
                           <CheckCircle size={12} style={{ color: GOLD }} />
                           <span className="text-[10px] font-bold" style={{ color: GOLD, fontFamily: "monospace" }}>
-                            ACTIVADO — Redirigiendo a Planificación…
+                            SEGUIMIENTO LISTO (Planificación opcional)
                           </span>
                         </div>
                       ) : (
@@ -3060,7 +3407,7 @@ export default function Espejo() {
                             <CalendarPlus size={12} />
                           )}
                           <span className="text-[11px]">
-                            {seguimientoLoading ? "ACTIVANDO…" : "ACTIVAR_EN_PLANIFICACIÓN"}
+                            {seguimientoLoading ? "ACTIVANDO…" : "ACTIVAR SEGUIMIENTO (OPCIONAL)"}
                           </span>
                           {!seguimientoLoading && <ArrowRight size={11} />}
                         </button>
@@ -3245,13 +3592,23 @@ export default function Espejo() {
                         ) : (
                           <div className="text-xs text-slate-400">
                             {sesion.modo === "arquitecto" ? (
-                              <p className={isExpanded ? "" : "line-clamp-1"}>
-                                {(sesion.contenido as any).afloramiento || (sesion.contenido as any).comparativa || (sesion.contenido as any).percibo || (sesion.contenido as any).transformo}
+                              <p className={isExpanded ? "" : "line-clamp-2"}>
+                                {(sesion.contenido as any).registro_carga
+                                  || (sesion.contenido as any).afloramiento
+                                  || (sesion.contenido as any).comparativa
+                                  || (sesion.contenido as any).percibo
+                                  || (sesion.contenido as any).transformo
+                                  || (sesion.tipo_sesion === "ducha_mental" ? "Ducha Mental guardada" : "Sesión sin texto")}
                               </p>
                             ) : (
                               <p className={isExpanded ? "" : "line-clamp-1"}>
                                 {sesion.contenido.fragmentos?.[0]}
                               </p>
+                            )}
+                            {sesion.tipo_sesion === "ducha_mental" && (
+                              <span className="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded" style={{ color: CYAN_NEON, backgroundColor: `${CYAN_NEON}12`, border: `1px solid ${CYAN_NEON}30`, fontFamily: "monospace" }}>
+                                DUCHA MENTAL
+                              </span>
                             )}
                           </div>
                         )}
@@ -3266,6 +3623,17 @@ export default function Espejo() {
                             className="border-t border-white/10"
                           >
                             <div className="p-4 space-y-3">
+                              {(sesion.contenido as any).preparacion && (
+                                <div className="p-3 rounded-xl" style={{ backgroundColor: `${WARM_ROSE}10` }}>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Wind size={12} style={{ color: WARM_ROSE }} />
+                                    <span className="text-[10px] font-bold" style={{ color: WARM_ROSE }}>
+                                      CONTEXTO PREVIO
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white/80">{(sesion.contenido as any).preparacion}</p>
+                                </div>
+                              )}
                               {EJES.map(eje => {
                                 const Icon = eje.icon;
                                 const contenido = sesion.contenido[eje.id as keyof typeof sesion.contenido];
@@ -3649,14 +4017,18 @@ export default function Espejo() {
               </div>
 
               <button
-                onClick={confirmContextoAndStart}
-                disabled={!selectedContexto}
-                className="w-full py-4 rounded-xl font-bold text-sm disabled:opacity-30 transition-all flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => {
+                  const ctx = selectedContexto || "trabajo";
+                  setSelectedContexto(ctx);
+                  void confirmContextoAndStart(ctx);
+                }}
+                className="w-full py-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
                 style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
                 data-testid="btn-confirmar-contexto"
               >
                 <Heart size={16} />
-                Entrar al Santuario
+                Entrar a escribir — Ducha Mental
               </button>
               
               <button

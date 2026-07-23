@@ -24,8 +24,7 @@ export type VehicleCardMemoProps = {
   cierreEnergiaPendingVehicleId?: string | null;
 };
 
-/** Campos del ring que vehiclesReactiveSignature omite — sin esto Cumplido/Fallado no re-renderiza. */
-export function vehicleRingUiSignature(vehicle: Vehicle): string {
+/** Campos del ring (ancla/resultado) — respaldo memo; la firma flota también los incluye. */export function vehicleRingUiSignature(vehicle: Vehicle): string {
   if (vehicle.tipoFlota !== "situacion") return "";
   const sc = vehicle.situacionCronometro;
   const anchor = vehicle.situacionCupoAnchor;

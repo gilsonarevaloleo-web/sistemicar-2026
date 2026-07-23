@@ -7,7 +7,7 @@ import {
   type Vehicle,
 } from "@/lib/persistence";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
-import { preferLocalSubTareasInVehicleList } from "@/lib/situacionSessionMerge";
+import { preferLocalSubTareasInVehicleList, preferLocalSubVehiculosInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
 import { writeLocalFlota } from "@/services/jornadaFlotaCache";
 import { scheduleCoalescedNotify } from "@/lib/concienciaScheduler";
@@ -209,6 +209,7 @@ function applyIncomingSnapshot(
       isCloseInFlight: ctx.isCloseInFlight,
     });
     merged = preferLocalSubTareasInVehicleList(mergedRaw, current);
+    merged = preferLocalSubVehiculosInVehicleList(merged, current);
   } else {
     merged = data.length > 0 ? data : current;
   }

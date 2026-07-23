@@ -17,6 +17,11 @@ import type { SituacionReservaItem } from "@/lib/situacionReserva";
 import { subTareaFromImanItem } from "@/lib/imanPensamientos";
 import { RING_COPY, filtrarRingPendientes } from "@/lib/ringEnfoqueReal";
 import {
+  ConquistaUnitFocusButton,
+  ConquistaUnitFocusOverlay,
+} from "@/components/flota/ConquistaUnitFocusOverlay";
+import { NARANJA } from "@/components/flota/vehicleCardShared";
+import {
   computeActiveSubClocks,
   computeSubCloseVerdict,
   desglosadorSubClockKey,
@@ -622,6 +627,7 @@ function RingEnfoqueModuleInner(
 ) {
   const [localSubTareas, setLocalSubTareas] = useState(subTareas);
   const [localSubVehiculos, setLocalSubVehiculos] = useState(subVehiculos);
+  const [unitFocusOpen, setUnitFocusOpen] = useState(false);
   const cantidadValuesRef = useRef<Record<string, string>>({});
   const [closedVerdicts, setClosedVerdicts] = useState<
     Record<string, { verdict: SubCloseVerdict; deltaSec: number }>
@@ -770,6 +776,12 @@ function RingEnfoqueModuleInner(
             ? `${ringPendientes.length} ring`
             : `${pendientesSv.length} cola`}
         </span>
+        {mode === "tiempo" && (
+          <ConquistaUnitFocusButton
+            onOpen={() => setUnitFocusOpen(true)}
+            accentColor={NARANJA}
+          />
+        )}
       </header>
 
       <div className="px-3 py-2 space-y-2 max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain">
@@ -891,6 +903,13 @@ function RingEnfoqueModuleInner(
           </>
         )}
       </div>
+      {mode === "tiempo" && (
+        <ConquistaUnitFocusOverlay
+          open={unitFocusOpen}
+          onClose={() => setUnitFocusOpen(false)}
+          accentColor={NARANJA}
+        />
+      )}
     </section>
   );
 }
