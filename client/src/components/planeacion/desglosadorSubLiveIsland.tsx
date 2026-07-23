@@ -11,6 +11,9 @@ import {
 import { useIslandConcienciaClock } from "@/lib/useIslandConcienciaClock";
 
 export type DesglosadorSubClockUi = {
+  /** Reloj de pared del tick del island — un solo suscriptor (sin VehicleCardLiveNow anidado). */
+  nowMs: number;
+  sessionElapsedSec: number;
   subTimerDisplay: string;
   subTimerIsCountdown: boolean;
   subTimerExpired: boolean;
@@ -21,12 +24,12 @@ export type DesglosadorSubClockUi = {
   horaFinRemainSec: number | null;
   horaFinDeltaSec: number;
   liveAccumDeltaSec: number;
-  /** Duración de sesión — misma isla de tick (sin segundo LiveNow anidado). */
-  sessionElapsedSec: number;
 };
 
-export function emptyDesglosadorSubClockUi(): DesglosadorSubClockUi {
+export function emptyDesglosadorSubClockUi(nowMs = Date.now()): DesglosadorSubClockUi {
   return {
+    nowMs,
+    sessionElapsedSec: 0,
     subTimerDisplay: "",
     subTimerIsCountdown: false,
     subTimerExpired: false,
@@ -37,7 +40,6 @@ export function emptyDesglosadorSubClockUi(): DesglosadorSubClockUi {
     horaFinRemainSec: null,
     horaFinDeltaSec: 0,
     liveAccumDeltaSec: 0,
-    sessionElapsedSec: 0,
   };
 }
 
@@ -50,7 +52,7 @@ export function computeDesglosadorSubClockUi(
 ): DesglosadorSubClockUi {
   const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
   if (!activeSub.aperturaAt) {
-    return { ...emptyDesglosadorSubClockUi(), sessionElapsedSec };
+    return { ...emptyDesglosadorSubClockUi(nowMs), sessionElapsedSec };
   }
   const clocks = computeActiveSubClocks(nowMs, vehicle, activeSub);
   const obj = suggestedSec(activeSub);
@@ -69,6 +71,8 @@ export function computeDesglosadorSubClockUi(
   if (clocks.hasProjection && clocks.cycleEndAt != null && clocks.cycleRemainSec != null) {
     const horaFin = formatHHMM(clocks.cycleEndAt);
     return {
+      nowMs,
+      sessionElapsedSec,
       subTimerDisplay: timerUi.display,
       subTimerIsCountdown: timerUi.isCountdown,
       subTimerExpired: timerUi.expired,
@@ -79,11 +83,12 @@ export function computeDesglosadorSubClockUi(
       horaFinRemainSec: clocks.cycleRemainSec,
       horaFinDeltaSec: clocks.liveAccumDeltaSec,
       liveAccumDeltaSec: clocks.liveAccumDeltaSec,
-      sessionElapsedSec,
     };
   }
 
   return {
+    nowMs,
+    sessionElapsedSec,
     subTimerDisplay: timerUi.display,
     subTimerIsCountdown: timerUi.isCountdown,
     subTimerExpired: timerUi.expired,
@@ -94,7 +99,6 @@ export function computeDesglosadorSubClockUi(
     horaFinRemainSec: null,
     horaFinDeltaSec: 0,
     liveAccumDeltaSec: 0,
-    sessionElapsedSec,
   };
 }
 
@@ -106,15 +110,17 @@ function useDesglosadorSubClockUi(
   const clockKey = desglosadorSubClockKey(activeSub);
 
   return useMemo(() => {
+    const nowMs = Date.now();
     if (!activeSub?.aperturaAt) {
       return {
-        ...emptyDesglosadorSubClockUi(),
-        sessionElapsedSec: getDesglosadorSessionElapsedSec(vehicle),
+        ...emptyDesglosadorSubClockUi(nowMs),
+        sessionElapsedSec: getDesglosadorSessionElapsedSec(vehicle, nowMs),
       };
     }
-    return computeDesglosadorSubClockUi(vehicle, activeSub, Date.now());
-    // vehicle se lee en el tick; no listarlo entero o la isla pierde aislamiento.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- island: tick + activeSub
+    return computeDesglosadorSubClockUi(vehicle, activeSub, nowMs);
+    // Island: un suscriptor. `vehicle` del render actual; no meterlo en deps
+    // o cada setVehicles del padre re-pintaría el cronómetro sin tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tick/clockKey/activeSub
   }, [tick, clockKey, activeSub]);
 }
 

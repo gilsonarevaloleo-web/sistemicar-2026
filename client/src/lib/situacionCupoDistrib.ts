@@ -177,7 +177,15 @@ export function resolveCronometroCupoAnchor(
   const cronPending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
   if (cronPending.length === 0) return null;
 
-  if (cur?.subTareaId && !opts?.forceResetSameRow) {
+  // Cumplido/Fallado: siempre ancla nueva con startedAt=now sobre la primera pendiente.
+  // Sin esto, la deuda de la fila cerrada se hereda y el island muestra DEUDA ACUMULADA.
+  if (opts?.forceResetSameRow) {
+    const first = cronPending.find(st => (st.minutosCupo ?? 0) > 0) ?? cronPending[0];
+    if (!first) return null;
+    return { subTareaId: first.id, startedAt: now };
+  }
+
+  if (cur?.subTareaId) {
     const curSub = subTareas.find(s => s.id === cur.subTareaId);
     if (curSub && situacionFilaCronometroPendiente(curSub) && (curSub.minutosCupo ?? 0) > 0) {
       if (computeSafeRemainingMs(cur.startedAt, curSub.minutosCupo ?? 0, now) > 0) return "unchanged";
@@ -190,7 +198,7 @@ export function resolveCronometroCupoAnchor(
 
   const first = cronPending.find(st => (st.minutosCupo ?? 0) > 0) ?? cronPending[0];
   if (!first) return null;
-  if (cur?.subTareaId === first.id && !opts?.forceResetSameRow) return "unchanged";
+  if (cur?.subTareaId === first.id) return "unchanged";
   return { subTareaId: first.id, startedAt: now };
 }
 

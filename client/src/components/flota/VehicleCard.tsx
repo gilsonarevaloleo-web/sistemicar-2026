@@ -218,6 +218,7 @@ import {
   dispatchDesglosadorRutaBandVoice,
   dispatchDesglosadorSubIntroVoiceOnce,
 } from "@/lib/desglosadorVoiceDispatch";
+import { runShadowTask } from "@/lib/desglosadorShadow";
 import {
   computeSafeRemainingMs,
   computeSafeRemainingSec,
@@ -864,6 +865,21 @@ function VehicleCard({
 
   useEffect(() => {
     if (!onSyncSituacionCupoAnchor || vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return;
+    // No sync-idle si el ancla ya apunta a una fila pendiente con cupo vivo:
+    // tras Cumplido/Fallado el paint ms0 deja startedAt≈now; un sync sin forceReset
+    // sobre estado intermedio podía reafirmar anclas viejas vía merge/disco.
+    const anchor = vehicle.situacionCupoAnchor;
+    if (anchor?.subTareaId && (anchor.startedAt ?? 0) > 0) {
+      const sub = (vehicle.subTareas || []).find(s => s.id === anchor.subTareaId);
+      if (
+        sub &&
+        situacionFilaCronometroPendiente(sub) &&
+        (sub.minutosCupo ?? 0) > 0 &&
+        computeSafeRemainingMs(anchor.startedAt, sub.minutosCupo ?? 0) > 0
+      ) {
+        return;
+      }
+    }
     const run = () => {
       onSyncSituacionCupoAnchor(vehicle.id);
     };
@@ -873,7 +889,7 @@ function VehicleCard({
     }
     const retryTimer = window.setTimeout(run, 0);
     return () => clearTimeout(retryTimer);
-  }, [vehicle.id, vehicle.status, vehicle.tipoFlota, situacionSubWatchKey, onSyncSituacionCupoAnchor]);
+  }, [vehicle.id, vehicle.status, vehicle.tipoFlota, situacionSubWatchKey, situacionAnchorKey, onSyncSituacionCupoAnchor]);
 
   const desglosadorAutoActivateRef = useRef<Set<string>>(new Set());
   /** Ventana post-lanzamiento: evita ruta-repair + voz que saturan el hilo al abrir conquista. */
@@ -1251,20 +1267,25 @@ function VehicleCard({
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
       rutaUmbralAlertKeysRef.current.clear();
-      const nextSub = allSubs.find(s => s.id === nextActiveSubId);
-      if (nextSub) {
-        dispatchDesglosadorSubIntroVoiceOnce(
-          vehicle.id,
-          nextSub.id,
-          nextSub.aperturaAt ?? now,
-          nextSub.titulo,
-          Boolean(nextSub.rutaEnfoque?.activa)
-        );
-        subVehiculosRef.current = allSubs;
-      }
+      subVehiculosRef.current = allSubs;
     }
+    // ms0: paint primero; voz del siguiente sub en sombra (no pelear remount del island).
     onDesglosadorUpdate(vehicle.id, allSubs, { force: true });
     burstConcienciaClockTick(1);
+    if (nextActiveSubId) {
+      const nextSub = allSubs.find(s => s.id === nextActiveSubId);
+      if (nextSub) {
+        runShadowTask(() => {
+          dispatchDesglosadorSubIntroVoiceOnce(
+            vehicle.id,
+            nextSub.id,
+            nextSub.aperturaAt ?? now,
+            nextSub.titulo,
+            Boolean(nextSub.rutaEnfoque?.activa)
+          );
+        });
+      }
+    }
     const allDone = allSubs.every(s => s.status === "cumplido" || s.status === "fallado");
     if (allDone) {
       setDesglosadorSummary(true);

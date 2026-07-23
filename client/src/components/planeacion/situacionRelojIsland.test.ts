@@ -68,4 +68,36 @@ describe("computeSituacionTimerUi", () => {
     assert.equal(ui.display, "00:00:00");
     assert.equal(ui.debt, "00:01:00");
   });
+
+  it("tras handoff con startedAt=now: sin deuda aunque el bloque lleve minutos", () => {
+    const now = 5_000_000;
+    const bloqueInicio = now - 8 * 60_000;
+    const ui = computeSituacionTimerUi(
+      vehicle({
+        situacionCronometro: { activo: true, bloqueInicioAt: bloqueInicio },
+        situacionCupoAnchor: { subTareaId: "st2", startedAt: now },
+        subTareas: [
+          {
+            id: "st1",
+            texto: "Cerrada",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            minutosCupo: 5,
+            cerradaAt: now,
+          },
+          {
+            id: "st2",
+            texto: "Probar ring",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "pendiente",
+            minutosCupo: 5,
+          },
+        ],
+      } as Partial<Vehicle>),
+      now
+    );
+    assert.equal(ui.expired, false);
+    assert.equal(ui.debt, "");
+    assert.equal(ui.display, "00:05:00");
+  });
 });

@@ -75,7 +75,7 @@ describe("vehiclesReactiveSignature", () => {
     assert.notEqual(
       vehiclesReactiveSignature([base]),
       vehiclesReactiveSignature([afterCumplido]),
-      "sin este cambio el flush a disco se saltaba y la UI podía quedar en 0/3"
+      "sin este cambio el flush a disco se saltaba y la UI podía quedar en deuda"
     );
   });
 
@@ -118,6 +118,35 @@ describe("vehiclesReactiveSignature", () => {
     assert.notEqual(
       vehiclesReactiveSignature([base]),
       vehiclesReactiveSignature([afterFallado])
+    );
+  });
+
+  it("cambia solo al reset de startedAt en handoff (misma fila id distinta)", () => {
+    const before = veh({
+      id: "s1",
+      status: "activo",
+      tipoFlota: "situacion",
+      situacionCupoAnchor: { subTareaId: "b", startedAt: 1000 },
+      subTareas: [
+        {
+          id: "b",
+          texto: "Probar ring",
+          completada: false,
+          creadaAt: 0,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 5,
+        },
+      ],
+    });
+    const after = {
+      ...before,
+      situacionCupoAnchor: { subTareaId: "b", startedAt: 999_000 },
+    } as Vehicle;
+    assert.notEqual(
+      vehiclesReactiveSignature([before]),
+      vehiclesReactiveSignature([after]),
+      "startedAt fresco debe invalidar firma o el island conserva DEUDA ACUMULADA"
     );
   });
 });
