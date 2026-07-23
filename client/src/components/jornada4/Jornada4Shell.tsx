@@ -25,12 +25,21 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
       data-testid="jornada4-shell"
     >
       <div className="max-w-lg mx-auto">
-        <p
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: ACCENT, fontFamily: "Georgia, 'Times New Roman', serif" }}
-        >
-          {JORNADA_MODULE.titleUpper} V4
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: ACCENT, fontFamily: "Georgia, 'Times New Roman', serif" }}
+          >
+            {JORNADA_MODULE.titleUpper}
+          </p>
+          <span
+            className="px-2 py-0.5 text-[10px] font-bold tracking-wider"
+            style={{ backgroundColor: ACCENT, color: "#1a1408" }}
+            data-testid="jornada4-badge"
+          >
+            V4
+          </span>
+        </div>
         <h1
           className="mt-1 text-2xl leading-tight"
           style={{ color: INK, fontFamily: "Georgia, 'Times New Roman', serif" }}
@@ -38,11 +47,14 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
           Dual Kernel
         </h1>
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
-          Conquista · Situacional · Puntos — sin anillo ni voz
+          Solo 2 desglosadores: Conquista y Situacional (+ puntos)
+        </p>
+        <p className="mt-0.5 text-[10px]" style={{ color: MUTED }}>
+          Sin descanso · sin verdad · sin anillo · sin voz
         </p>
         <div className="mt-3 flex items-center gap-3 text-[11px]" style={{ color: MUTED }}>
           <span>
-            Activos <strong style={{ color: INK }}>{dualCount}</strong>
+            Activos V4 <strong style={{ color: INK }}>{dualCount}</strong>
           </span>
           <span aria-hidden>·</span>
           <span>

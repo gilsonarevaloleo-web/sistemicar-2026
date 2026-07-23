@@ -29,13 +29,13 @@ type Props = {
 export function Jornada4VehicleList({ vehicles, ops }: Props) {
   if (vehicles.length === 0) {
     return (
-      <div className="px-4 py-10 text-center" data-testid="jornada4-empty">
+      <div className="px-4 py-8 text-center" data-testid="jornada4-empty">
         <p className="text-sm" style={{ color: MUTED }}>
-          No hay desglosadores Dual Kernel activos.
+          Aún no hay desglosadores V4 activos.
         </p>
         <p className="mt-2 text-xs" style={{ color: MUTED }}>
-          Lanza Conquista (reloj desglosador) o Situacional desde Jornada / V3;
-          aquí solo se operan.
+          Usa <strong style={{ color: "#e8efe6" }}>Lanzar desglosador V4</strong> arriba.
+          No necesitas ir a V3 ni a Jornada clásica.
         </p>
       </div>
     );

@@ -1,16 +1,14 @@
 /**
  * Entrada liviana Jornada V4 (Dual Kernel).
- * Primer paint: shell + flota filtrada. Idle: sesión ops.
- * Sin voz, sin anillo, sin manager.
+ * Autónomo: lanza y opera solo Conquista + Situacional.
  */
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuthContext } from "@/App";
-import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
+import { Jornada4Shell, J4_COLORS } from "@/components/jornada4/Jornada4Shell";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { markJornadaChunkLoaded } from "@/lib/jornadaChunkBoot";
 import { beginJornadaViewMount, endJornadaViewMount } from "@/lib/jornadaRemount";
-import { J4_COLORS } from "@/components/jornada4/Jornada4Shell";
 
 const JornadaV4Session = lazy(() => import("./jornadaV4Session"));
 
@@ -53,7 +51,7 @@ export default function JornadaV4() {
         className="min-h-screen flex items-center justify-center text-sm"
         style={{ backgroundColor: J4_COLORS.PIZARRA, color: J4_COLORS.MUTED }}
       >
-        Inicia sesión para operar Dual Kernel.
+        Inicia sesión para operar Dual Kernel (V4).
       </div>
     );
   }
@@ -70,7 +68,7 @@ export default function JornadaV4() {
             <BootFallback
               dualCount={core.dualCount}
               dailyPS={core.dailyPS}
-              statusLine="Cargando kernels…"
+              statusLine="Cargando Dual Kernel…"
             />
           }
         >
@@ -80,7 +78,7 @@ export default function JornadaV4() {
         <BootFallback
           dualCount={core.dualCount}
           dailyPS={core.dailyPS}
-          statusLine="Shell listo · Dual Kernel"
+          statusLine="Estás en Jornada V4 · Dual Kernel"
         />
       )}
     </div>
@@ -99,6 +97,12 @@ function BootFallback({
   return (
     <div data-testid="jornada4-boot">
       <Jornada4Shell dualCount={dualCount} dailyPS={dailyPS} statusLine={statusLine} />
+      <p
+        className="max-w-lg mx-auto px-4 pt-6 text-center text-xs"
+        style={{ color: J4_COLORS.MUTED }}
+      >
+        Preparando lanzador… Solo Conquista y Situacional.
+      </p>
     </div>
   );
 }

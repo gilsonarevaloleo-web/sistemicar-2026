@@ -140,7 +140,7 @@ export function SituacionCard({
         </div>
       ) : (
         <p className="mt-4 text-sm" style={{ color: MUTED }}>
-          Sin filas en el ring. Abre el ring desde Jornada clásica o V3 por ahora.
+          Ring sin filas. Lanza de nuevo con filas, o cierra el bloque.
         </p>
       )}
     </article>

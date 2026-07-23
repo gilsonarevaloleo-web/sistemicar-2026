@@ -131,20 +131,20 @@ function buildMenuItems(
       color: SPECTRUM.VERDE,
     });
     items.push({
-      id: "jornada-v3",
-      title: `${JORNADA_MODULE.titleUpper} V3`,
-      subtitle: "Laboratorio modular · motor nuevo",
-      icon: Zap,
-      route: JORNADA_V3_PATH,
-      color: "#D4AF37",
-    });
-    items.push({
       id: "jornada-v4",
       title: `${JORNADA_MODULE.titleUpper} V4`,
-      subtitle: "Dual Kernel · conquista + situacional",
+      subtitle: "Dual Kernel · solo conquista + situacional",
       icon: Zap,
       route: JORNADA_V4_PATH,
       color: "#c4a35a",
+    });
+    items.push({
+      id: "jornada-v3",
+      title: `${JORNADA_MODULE.titleUpper} V3`,
+      subtitle: "Laboratorio modular (4 vehículos)",
+      icon: Zap,
+      route: JORNADA_V3_PATH,
+      color: "#D4AF37",
     });
   }
 

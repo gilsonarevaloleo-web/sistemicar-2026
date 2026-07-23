@@ -1,0 +1,54 @@
+/**
+ * Semilla de ring situacional al lanzar desde Dual Kernel.
+ * Deja el vehículo operable de inmediato (sin pasar por V3).
+ */
+import type { SubTarea, Vehicle } from "@/lib/persistence";
+import { redistribuirMinutosSituacionCronometro } from "@/lib/situacionCupoDistrib";
+
+export type SituacionRingSeed = {
+  subTareas: SubTarea[];
+  situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
+  situacionCupoAnchor: { subTareaId: string; startedAt: number };
+};
+
+export function buildSituacionRingSeed(opts: {
+  filas: string[];
+  minutosBloque: number;
+  now?: number;
+}): SituacionRingSeed | null {
+  const now = opts.now ?? Date.now();
+  const filas = opts.filas.map(f => f.trim()).filter(Boolean);
+  if (filas.length === 0) return null;
+  const minutosBloque = Math.max(1, Math.round(opts.minutosBloque));
+
+  let subTareas: SubTarea[] = filas.map((texto, i) => ({
+    id: `st_j4_${now}_${i}`,
+    texto,
+    completada: false,
+    creadaAt: now,
+    enDesgloseCronometro: true,
+    resultadoSituacion: "pendiente" as const,
+  }));
+
+  subTareas = redistribuirMinutosSituacionCronometro(subTareas, minutosBloque);
+  const firstId = subTareas[0]?.id;
+  if (!firstId) return null;
+
+  const horaFinMs = now + minutosBloque * 60_000;
+  return {
+    subTareas,
+    situacionCronometro: {
+      activo: true,
+      bloqueInicioAt: now,
+      horaFinMs,
+      horaFinContratoMs: horaFinMs,
+      retoNumero: 1,
+      retosCompletados: 0,
+      minutosGanadosReto: 0,
+      minutosGanadosSesion: 0,
+      saldoAdelantoMin: 0,
+      depthBlockPsGranted: 0,
+    },
+    situacionCupoAnchor: { subTareaId: firstId, startedAt: now },
+  };
+}

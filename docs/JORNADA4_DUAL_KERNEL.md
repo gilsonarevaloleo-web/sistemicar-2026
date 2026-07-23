@@ -227,12 +227,13 @@ Inventario + arquitectura + fuera-de-alcance.
 4. Cards delgadas + tick wall-clock (`jornada4Tick`).
 5. PS en sombra al cerrar sub/ciclo/bloque.
 6. Menú principal → Jornada V4.
+7. **Lanzador autónomo V4** (`Jornada4LaunchPanel` + `executeJornada4Launch`): solo Conquista/Situacional; situacional abre ring con filas al instante. No hace falta V3.
 
-**Pendiente de validación en móvil:** abrir, cerrar 5 subs, ocultar 30s, volver, cerrar bloque — sin freeze.
+**Cómo saber que estás en V4:** badge **V4** en el header + subtítulo «Solo 2 desglosadores». V3 sigue mostrando 4 tipos — eso es normal; Dual Kernel es otra ruta.
 
 ### Fase 2 — Completar operación
 
-- Crear/lanzar desglosador desde J4 (launch ms0 + persist gate quiet).
+- ~~Crear/lanzar desglosador desde J4~~ ✅ (lanzador autónomo)
 - Reorder, pausa, cierre de golpe (si se necesita).
 - Depth PS opcional (sombra).
 - Métricas PS del día (lectura simple, sin escalera).
