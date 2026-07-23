@@ -741,7 +741,11 @@ export function minutosGanadosEnVivoFoco(
   if (!focal || !situacionFilaCronometroPendiente(focal)) return 0;
   const cupoMin = focal.minutosCupo ?? 0;
   if (cupoMin <= 0) return 0;
-  const elapsedMin = Math.ceil(Math.max(0, now - anchor.startedAt) / 60000);
+  const elapsedMs = Math.max(0, now - anchor.startedAt);
+  // Tras handoff CUMPLIDO startedAt≈now: ceil(1ms/60s)=1 → “+9 min ganados” fantasma.
+  // No mostrar ganancia hasta cumplir al menos 1 min real en la fila.
+  if (elapsedMs < 60_000) return 0;
+  const elapsedMin = Math.ceil(elapsedMs / 60000);
   return Math.max(0, cupoMin - elapsedMin);
 }
 

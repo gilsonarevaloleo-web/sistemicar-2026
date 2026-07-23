@@ -15,6 +15,23 @@ export function runShadowTaskAsync(fn: () => void | Promise<void>): void {
 }
 
 /**
+ * Tras paint ms0 (CUMPLIDO/FALLADO): cede 2 frames para que el island del
+ * cronómetro remonte con startedAt fresco ANTES del merge/disco/Firebase.
+ * Sin esto el reloj queda clavado en ~cupo (p. ej. 00:09:59).
+ */
+export function yieldAfterPaint(): Promise<void> {
+  return new Promise(resolve => {
+    if (typeof requestAnimationFrame === "undefined") {
+      setTimeout(resolve, 0);
+      return;
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+/**
  * @deprecated No usar delays fijos post-lanzamiento — clavaban el reloj conquista (4→6→13→28s).
  * Usar `enqueueLaunchPersistWork` / `flushLaunchPersistOnSubClose` (`launchPersistGate.ts`).
  * Constantes conservadas solo por compatibilidad de imports legacy.

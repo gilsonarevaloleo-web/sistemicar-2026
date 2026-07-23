@@ -4,6 +4,8 @@
  * queda sin Jornada y ModuleRoute redirige a /pagos.
  *
  * Atajo: ?preview_ops=1 desbloquea al cargar (App + menú) y abre Jornada.
+ * Además: el drawer Collaborate de Netlify intercepta toques en móvil
+ * (“no funcionan los clic”). Se fuerza `ntl-drawer-state=hidden` al cargar.
  */
 
 const STORAGE_KEY = "sistemicar_preview_ops_v1";
@@ -33,17 +35,21 @@ export function isPreviewOpsUnlocked(): boolean {
   return readUnlockFlag();
 }
 
-export function setPreviewOpsUnlocked(on: boolean): void {
-  if (!isDeployPreviewHost()) return;
+/** @returns true si quedó persistido (o ya estaba). */
+export function setPreviewOpsUnlocked(on: boolean): boolean {
+  if (!isDeployPreviewHost()) return false;
+  let ok = false;
   try {
     if (on) sessionStorage.setItem(STORAGE_KEY, "1");
     else sessionStorage.removeItem(STORAGE_KEY);
+    ok = on ? sessionStorage.getItem(STORAGE_KEY) === "1" : true;
   } catch {
-    /* noop */
+    ok = false;
   }
   try {
     if (on) localStorage.setItem(STORAGE_KEY, "1");
     else localStorage.removeItem(STORAGE_KEY);
+    if (!ok) ok = on ? localStorage.getItem(STORAGE_KEY) === "1" : true;
   } catch {
     /* noop */
   }
@@ -52,6 +58,7 @@ export function setPreviewOpsUnlocked(on: boolean): void {
   } catch {
     /* noop */
   }
+  return ok;
 }
 
 /**
@@ -74,7 +81,34 @@ export function consumePreviewOpsQueryUnlock(): boolean {
   }
 }
 
-/** Entrada dura a Jornada (evita que wouter + ModuleRoute fallen en silencio). */
+/**
+ * El drawer Collaborate de Netlify tapa botones y come pointer events en móvil.
+ * `?ntl-drawer-state=hidden` lo deja fuera (docs Netlify) y persiste en la pestaña.
+ * @returns true si está redirigiendo (no montar React aún).
+ */
+export function hideNetlifyDrawerIfNeeded(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!isDeployPreviewHost()) return false;
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("ntl-drawer-state") === "hidden") return false;
+    url.searchParams.set("ntl-drawer-state", "hidden");
+    window.location.replace(url.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Entrada a Jornada tras unlock — soft navigate (wouter), no location.assign.
+ * Full reload remonta motores globales + parse del chunk planeacion y congela móvil.
+ */
+export function previewPlaneacionHref(): string {
+  return "/planeacion";
+}
+
+/** Entrada dura a Jornada (fallback si soft navigate falla). */
 export function goPreviewJornada(hard = true): void {
   setPreviewOpsUnlocked(true);
   if (typeof window === "undefined") return;

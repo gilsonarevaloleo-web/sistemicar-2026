@@ -118,3 +118,17 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Deploy Preview: drawer Collaborate de Netlify intercepta toques en móvil.
+   El bootstrap también fuerza ?ntl-drawer-state=hidden; esto es red de seguridad. */
+iframe[src*="app.netlify.com"],
+iframe[src*="netlify.com/drawer"],
+#netlify-monitor-modal,
+[data-netlify-drawer],
+[class*="netlify-drawer"] {
+  display: none !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+}

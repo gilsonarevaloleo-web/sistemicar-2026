@@ -156,6 +156,7 @@ function ModuleRoute({
   const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
 
   const ownerBypass = isOwnerEmail(user?.email);
+  const previewBypass = previewOps || isPreviewOpsUnlocked();
 
   useEffect(() => {
     const sync = () => setPreviewOps(isPreviewOpsUnlocked());
@@ -169,7 +170,7 @@ function ModuleRoute({
   }, []);
 
   const hasAccess = (prog: UserProgression | null): boolean => {
-    if (ownerBypass || isPreviewOpsUnlocked() || previewOps) return true;
+    if (ownerBypass || previewBypass || isPreviewOpsUnlocked()) return true;
     const args = [prog?.subscriptionPlan, user?.email, prog?.rank, prog?.activeModules] as const;
     if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
@@ -182,7 +183,7 @@ function ModuleRoute({
       return;
     }
 
-    if (ownerBypass || isPreviewOpsUnlocked()) {
+    if (ownerBypass || previewBypass || isPreviewOpsUnlocked()) {
       setCheckingTier(false);
       return;
     }
@@ -193,7 +194,6 @@ function ModuleRoute({
         (prog) => {
           setProgression(prog);
           setCheckingTier(false);
-          // Preview ops: nunca mandar a /pagos (sesión distinta a producción).
           if (!isPreviewOpsUnlocked() && !hasAccess(prog)) {
             navigate("/pagos");
           }
@@ -205,7 +205,7 @@ function ModuleRoute({
       );
       return () => unsub();
     }
-  }, [user, loading, navigate, ownerBypass, requiredModule, previewOps]);
+  }, [user, loading, navigate, ownerBypass, previewBypass, requiredModule, previewOps]);
 
   useEffect(() => {
     if (!checkingTier) return;
@@ -222,7 +222,7 @@ function ModuleRoute({
     </div>
   );
 
-  if ((ownerBypass || previewOps || isPreviewOpsUnlocked()) && !loading && user) {
+  if ((ownerBypass || previewBypass || isPreviewOpsUnlocked()) && !loading && user) {
     return <Component />;
   }
 

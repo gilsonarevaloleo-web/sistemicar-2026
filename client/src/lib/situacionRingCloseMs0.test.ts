@@ -50,7 +50,7 @@ describe("paintSituacionRingRowCloseOptimistic handoff", () => {
 
     const vehiclesRef = { current: [vehicle] } as MutableRefObject<Vehicle[]>;
     let painted: Vehicle[] = [];
-    paintSituacionRingRowCloseOptimistic(
+    const result = paintSituacionRingRowCloseOptimistic(
       vehiclesRef,
       next => {
         painted = typeof next === "function" ? next([vehicle]) : next;
@@ -62,6 +62,8 @@ describe("paintSituacionRingRowCloseOptimistic handoff", () => {
 
     const after = painted.find(v => v.id === "v1") ?? vehiclesRef.current.find(v => v.id === "v1");
     assert.ok(after);
+    assert.ok(result, "paint debe devolver stats de ganancia");
+    assert.equal(result!.bloqueListo, false);
     assert.equal(after.subTareas?.find(s => s.id === "a")?.resultadoSituacion, "cumplido");
     assert.equal(after.situacionCupoAnchor?.subTareaId, "b");
     assert.ok(

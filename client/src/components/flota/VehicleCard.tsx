@@ -1064,21 +1064,18 @@ function VehicleCard({
     let unsubIdle: (() => void) | undefined;
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
-    if (isFreshRing) {
-      // Esperar idle real: el fallback a 900ms cancelaba la bienvenida (cancelPrevious).
-      let spoke = false;
-      const trySpeak = () => {
-        if (cancelled || spoke) return;
-        spoke = true;
-        unsubIdle?.();
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        scheduleSpeak();
-      };
-      unsubIdle = subscribeSpeechQueueIdle(trySpeak);
-      fallbackTimer = setTimeout(trySpeak, 14_000);
-    } else {
+    // Tras CUMPLIDO mid-ring, hablar al instante pelea remount/tick del island en móvil.
+    // Siempre esperar idle (o fallback corto); ring fresco mantiene fallback largo.
+    let spoke = false;
+    const trySpeak = () => {
+      if (cancelled || spoke) return;
+      spoke = true;
+      unsubIdle?.();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       scheduleSpeak();
-    }
+    };
+    unsubIdle = subscribeSpeechQueueIdle(trySpeak);
+    fallbackTimer = setTimeout(trySpeak, isFreshRing ? 14_000 : 2_500);
 
     return () => {
       cancelled = true;
@@ -2774,7 +2771,7 @@ function VehicleCard({
                     if (!st || !(st.minutosCupo && st.minutosCupo > 0)) return null;
                     if (st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") !== "pendiente") return null;
                     if (!st.enDesgloseCronometro && st.completada) return null;
-                    const remainSec = computeSafeRemainingSec(anchor.startedAt, st.minutosCupo);
+                    const remainSec = computeSafeRemainingSec(anchor.startedAt, st.minutosCupo, nowMs);
                     const gananciaVivoMin = minutosGanadosEnVivoFoco(subs, anchor, nowMs);
                     const rm = Math.floor(remainSec / 60);
                     const rs = remainSec % 60;
