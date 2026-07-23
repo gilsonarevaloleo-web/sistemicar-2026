@@ -69,7 +69,7 @@ import {
   subTareaConPasoEjecutado,
   reservaEsEnviabeASituacion,
 } from "@/lib/imanPensamientos";
-import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import { runShadowTaskAsync, yieldAfterPaint } from "@/lib/desglosadorShadow";
 import { scheduleDesglosadorDepthOnTap } from "@/services/desglosadorDepthShadow";
 import { computeDesglosadorSessionDepthPS } from "@/lib/desglosadorDepth";
 import {
@@ -87,7 +87,6 @@ import {
   CYAN,
 } from "@/components/flota/vehicleCardShared";
 import { speakRingBienvenida } from "@/lib/situacionAlerts";
-import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { unlockSpeechSynthesis } from "@/lib/speechQueue";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
@@ -887,6 +886,10 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       const listCronOrder = list.filter(st => st.enDesgloseCronometro);
       const idx = listCronOrder.findIndex(st => st.id === subTareaId);
       const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
+      // Chime in gesture (don't wait for Firebase) — ms0 feedback.
+      void playSituacionChimes(chimesOnComplete);
+      await yieldAfterPaint();
+
       const now = Date.now();
       let sc = vehicle.situacionCronometro!;
       if (!sc.horaFinContratoMs && sc.horaFinMs) {
@@ -943,7 +946,9 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
           ? reanudarSituacionCronometroRing(scActivo)
           : scActivo;
       // Use the painted anchor (fresh startedAt). Only re-resolve if missing.
-      let situacionCupoAnchor = bloqueListo ? null : anchorPainted;
+      const anchorFresh =
+        vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? anchorPainted;
+      let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
       if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
         const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
           forceResetSameRow: true,
@@ -960,16 +965,14 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       vehiclesRef.current = vehiclesRef.current.map(v =>
         v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
       );
-      persistVehiclesRef();
+      scheduleSaveLocalVehicles(vehiclesRef.current);
       recordDecision(userId, {
         key: decisionKeySubSituacion(vehicleId, subTareaId),
         kind: "sub_situacion",
         vehicleId,
         ts: now,
       });
-      burstConcienciaClockTick(1);
-      // Chime in gesture (don't wait for Firebase) — ms0 feedback.
-      void playSituacionChimes(chimesOnComplete);
+      // burst already fired in paintSituacionRingRowCloseOptimistic
 
       void runShadowTaskAsync(async () => {
         let finalSubTareas = subTareas;
@@ -992,7 +995,7 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
                 ? { ...v, subTareas: finalSubTareas, situacionCronometro, situacionCupoAnchor }
                 : v
             );
-            persistVehiclesRef();
+            scheduleSaveLocalVehicles(vehiclesRef.current);
           }
         }
         try {
@@ -1046,7 +1049,6 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       vehicleById,
       vehiclesRef,
       setVehicles,
-      persistVehiclesRef,
       safeAwardPS,
       proyectosHub,
     ]
@@ -1070,6 +1072,7 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       // ms0: paint close + preserve painted anchor.
       paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
       const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
+      await yieldAfterPaint();
       const now = Date.now();
       const sc = vehicle.situacionCronometro!;
       const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -1081,7 +1084,9 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
         bloqueInicio
       );
       // Preserve ms0 anchor; only merge cupos from calculation.
-      const subTareas = (painted.subTareas ?? subTareasRaw.subTareas).map(st => {
+      const subTareasPainted =
+        vehiclesRef.current.find(v => v.id === vehicleId)?.subTareas ?? painted.subTareas;
+      const subTareas = (subTareasPainted ?? subTareasRaw.subTareas).map(st => {
         const g = subTareasRaw.subTareas.find(x => x.id === st.id);
         if (!g) return st;
         return {
@@ -1093,7 +1098,11 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
       let situacionCronometro =
         !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-      let situacionCupoAnchor = bloqueListo ? null : painted.situacionCupoAnchor ?? null;
+      const anchorFresh =
+        vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ??
+        painted.situacionCupoAnchor ??
+        null;
+      let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
       if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
         const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
           forceResetSameRow: true,
@@ -1110,32 +1119,33 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       vehiclesRef.current = vehiclesRef.current.map(v =>
         v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
       );
-      persistVehiclesRef();
-      burstConcienciaClockTick(1);
-      try {
-        await updateVehicle(userId, vehicleId, {
-          subTareas,
-          situacionCronometro,
-          situacionCupoAnchor,
-        });
-        if (bloqueListo) {
-          toast.info("Ronda completada", {
-            description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,
-            duration: 4500,
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(userId, vehicleId, {
+            subTareas,
+            situacionCronometro,
+            situacionCupoAnchor,
           });
-        } else {
-          toast.info(
-            minutosPerdidos > 0
-              ? `Fallado · −${minutosPerdidos} min en cola`
-              : "Fallado (sin PS de fila)",
-            { description: targetSub.texto, duration: 2200 }
-          );
+          if (bloqueListo) {
+            toast.info("Ronda completada", {
+              description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,
+              duration: 4500,
+            });
+          } else {
+            toast.info(
+              minutosPerdidos > 0
+                ? `Fallado · −${minutosPerdidos} min en cola`
+                : "Fallado (sin PS de fila)",
+              { description: targetSub.texto, duration: 2200 }
+            );
+          }
+        } catch (e) {
+          console.error("[handleSituacionCronometroFallado]", e);
         }
-      } catch (e) {
-        console.error("[handleSituacionCronometroFallado]", e);
-      }
+      });
     },
-    [userId, vehicleById, vehiclesRef, setVehicles, persistVehiclesRef]
+    [userId, vehicleById, vehiclesRef, setVehicles]
   );
 
   // ── handleReservaTacticaQuickAdd ─────────────────────────────────────────

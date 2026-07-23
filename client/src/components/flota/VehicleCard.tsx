@@ -2775,7 +2775,7 @@ function VehicleCard({
                     if (!st || !(st.minutosCupo && st.minutosCupo > 0)) return null;
                     if (st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") !== "pendiente") return null;
                     if (!st.enDesgloseCronometro && st.completada) return null;
-                    const remainSec = computeSafeRemainingSec(anchor.startedAt, st.minutosCupo);
+                    const remainSec = computeSafeRemainingSec(anchor.startedAt, st.minutosCupo, nowMs);
                     const gananciaVivoMin = minutosGanadosEnVivoFoco(subs, anchor, nowMs);
                     const rm = Math.floor(remainSec / 60);
                     const rs = remainSec % 60;

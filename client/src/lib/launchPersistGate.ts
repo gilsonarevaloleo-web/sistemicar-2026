@@ -6,7 +6,7 @@
  *
  * Solo se vacía cuando el operador NO está mid-tick de medición:
  * - pestaña oculta / pagehide
- * - primer cierre de sub (Cumplido/Fallado) del vehículo
+ * - primer cierre de sub (Cumplido/Fallado) del vehículo — diferido (no sync en el gesto)
  * - red de seguridad a 3 min (setDoc async; no stringify forzado en foreground temprano)
  */
 
@@ -21,6 +21,7 @@ type PendingLaunchWork = {
 const pending: PendingLaunchWork[] = [];
 let listenersArmed = false;
 let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+let deferredFlushHandles: Array<ReturnType<typeof setTimeout> | number> = [];
 
 /** Red de seguridad — solo si nunca hubo oculto/cierre. */
 export const LAUNCH_PERSIST_SAFETY_MS = 180_000;
@@ -144,15 +145,62 @@ export function enqueueLaunchPersistWork(
   ensureListeners();
 }
 
-/** Primer Cumplido/Fallado / cierre del desglosador — momento seguro con gesto. */
-export function flushLaunchPersistOnSubClose(vehicleId: string): void {
+/**
+ * Sync — solo tests / pagehide paths que ya están fuera del gesto.
+ * Preferir `flushLaunchPersistOnSubClose` en handlers de CUMPLIDO/FALLADO.
+ */
+export function flushLaunchPersistOnSubCloseSync(vehicleId: string): void {
   flushVehicle(vehicleId, "sub-close");
+}
+
+/**
+ * Primer Cumplido/Fallado / cierre del desglosador.
+ * DIFERIDO: nunca stringify/remote en el stack del gesto — pelea con el remount
+ * del cronómetro situacional (reloj clavado en 09:59 tras CUMPLIDO).
+ */
+export function flushLaunchPersistOnSubClose(vehicleId: string): void {
+  const run = () => flushVehicle(vehicleId, "sub-close");
+  if (typeof requestAnimationFrame !== "undefined") {
+    const raf = requestAnimationFrame(() => {
+      if (typeof requestIdleCallback !== "undefined") {
+        const idle = requestIdleCallback(run, { timeout: 1200 });
+        deferredFlushHandles.push(idle);
+      } else {
+        const t = setTimeout(run, 0);
+        deferredFlushHandles.push(t as unknown as number);
+      }
+    });
+    deferredFlushHandles.push(raf);
+    return;
+  }
+  const t = setTimeout(run, 0);
+  deferredFlushHandles.push(t as unknown as number);
 }
 
 /** Solo tests. */
 export function resetLaunchPersistGateForTests(): void {
   pending.length = 0;
   clearSafety();
+  for (const h of deferredFlushHandles) {
+    try {
+      cancelAnimationFrame(h as number);
+    } catch {
+      /* noop */
+    }
+    try {
+      clearTimeout(h as ReturnType<typeof setTimeout>);
+    } catch {
+      /* noop */
+    }
+    if (typeof cancelIdleCallback !== "undefined") {
+      try {
+        cancelIdleCallback(h as number);
+      } catch {
+        /* noop */
+      }
+    }
+  }
+  deferredFlushHandles = [];
   if (listenersArmed && typeof document !== "undefined") {
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("pagehide", onPageHide);

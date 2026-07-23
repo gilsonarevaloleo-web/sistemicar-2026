@@ -3,6 +3,7 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import {
   enqueueLaunchPersistWork,
   flushLaunchPersistOnSubClose,
+  flushLaunchPersistOnSubCloseSync,
   resetLaunchPersistGateForTests,
   countLaunchPersistPendingForTests,
 } from "./launchPersistGate.ts";
@@ -24,7 +25,7 @@ describe("launchPersistGate", () => {
     assert.equal(ran, 0);
   });
 
-  it("flush en cierre de sub ejecuta el persist pendiente", () => {
+  it("flush sync en cierre de sub ejecuta el persist pendiente", () => {
     let ran = 0;
     enqueueLaunchPersistWork("v1", "remote", () => {
       ran += 1;
@@ -32,8 +33,31 @@ describe("launchPersistGate", () => {
     enqueueLaunchPersistWork("v1", "pillars", () => {
       ran += 10;
     });
-    flushLaunchPersistOnSubClose("v1");
+    flushLaunchPersistOnSubCloseSync("v1");
     assert.equal(ran, 11);
+    assert.equal(countLaunchPersistPendingForTests(), 0);
+  });
+
+  it("flush deferido en CUMPLIDO no corre en el stack del gesto", async () => {
+    let ran = 0;
+    enqueueLaunchPersistWork("v1", "local", () => {
+      ran += 1;
+    });
+    flushLaunchPersistOnSubClose("v1");
+    assert.equal(ran, 0, "stringify no debe correr síncrono tras CUMPLIDO");
+    assert.equal(countLaunchPersistPendingForTests(), 1);
+    await new Promise<void>(resolve => {
+      const deadline = Date.now() + 2000;
+      const poll = () => {
+        if (ran > 0 || Date.now() > deadline) {
+          resolve();
+          return;
+        }
+        setTimeout(poll, 20);
+      };
+      poll();
+    });
+    assert.equal(ran, 1);
     assert.equal(countLaunchPersistPendingForTests(), 0);
   });
 
@@ -46,7 +70,7 @@ describe("launchPersistGate", () => {
     enqueueLaunchPersistWork("vb", "remote", () => {
       b += 1;
     });
-    flushLaunchPersistOnSubClose("va");
+    flushLaunchPersistOnSubCloseSync("va");
     assert.equal(a, 1);
     assert.equal(b, 0);
     assert.equal(countLaunchPersistPendingForTests(), 1);

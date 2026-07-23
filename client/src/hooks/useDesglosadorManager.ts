@@ -48,7 +48,7 @@ import {
   isDesglosadorLiquidationInFlight,
   scheduleGlobalCycleLiquidation,
 } from "@/lib/desglosadorCycleLiquidation";
-import { runShadowTask, runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import { runShadowTask, runShadowTaskAsync, yieldAfterPaint } from "@/lib/desglosadorShadow";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
 import { paintSituacionRingRowCloseOptimistic } from "@/lib/situacionRingCloseMs0";
 import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
@@ -3174,6 +3174,11 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
+    // Chime en el gesto (no esperar Firebase) — feedback ms0.
+    void playSituacionChimes(chimesOnComplete);
+    // Ceder 2 frames: remount del island con startedAt fresco antes del merge/disco.
+    await yieldAfterPaint();
+
     const now = Date.now();
     let sc = vehicle.situacionCronometro!;
     if (!sc.horaFinContratoMs && sc.horaFinMs) {
@@ -3229,7 +3234,10 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
         ? reanudarSituacionCronometroRing(scActivo)
         : scActivo;
     // Ancla: la del paint (startedAt fresco). Solo re-resolvemos si falta.
-    let situacionCupoAnchor = bloqueListo ? null : anchorPainted;
+    // Releer ancla post-yield por si un sync idle intentó tocar el vehículo.
+    const anchorFresh =
+      vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? anchorPainted;
+    let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
     if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
       const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
         forceResetSameRow: true,
@@ -3253,8 +3261,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       ts: now,
     });
     // burst ya disparado en paintSituacionRingRowCloseOptimistic
-    // Chime en el gesto (no esperar Firebase) — feedback ms0.
-    void playSituacionChimes(chimesOnComplete);
 
     void runShadowTaskAsync(async () => {
       let finalSubTareas = subTareas;
@@ -3335,6 +3341,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
     flushLaunchPersistOnSubClose(vehicleId);
     const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
+    await yieldAfterPaint();
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
@@ -3346,7 +3353,8 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       bloqueInicio
     );
     // Conservar ancla ms0 del paint; solo fusionar cupos del cálculo.
-    const subTareas = (painted.subTareas ?? subTareasRaw.subTareas).map(st => {
+    const subTareasPainted = vehiclesRef.current.find(v => v.id === vehicleId)?.subTareas ?? painted.subTareas;
+    const subTareas = (subTareasPainted ?? subTareasRaw.subTareas).map(st => {
       const g = subTareasRaw.subTareas.find(x => x.id === st.id);
       if (!g) return st;
       return {
@@ -3359,7 +3367,9 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
     let situacionCronometro =
       !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-    let situacionCupoAnchor = bloqueListo ? null : painted.situacionCupoAnchor ?? null;
+    const anchorFresh =
+      vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? painted.situacionCupoAnchor ?? null;
+    let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
     if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
       const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
         forceResetSameRow: true,
