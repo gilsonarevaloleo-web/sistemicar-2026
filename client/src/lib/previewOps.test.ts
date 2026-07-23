@@ -4,6 +4,7 @@ import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
   setPreviewOpsUnlocked,
+  consumePreviewOpsQueryUnlock,
 } from "./previewOps.ts";
 
 describe("previewOps", () => {
@@ -14,7 +15,13 @@ describe("previewOps", () => {
     store = new Map();
     // @ts-expect-error test stub
     globalThis.window = {
-      location: { hostname: "deploy-preview-1--admirable-moxie-9f923a.netlify.app" },
+      location: {
+        hostname: "deploy-preview-1--admirable-moxie-9f923a.netlify.app",
+        pathname: "/menu",
+        search: "",
+        hash: "",
+      },
+      history: { replaceState: () => {} },
     };
     // @ts-expect-error test stub
     globalThis.sessionStorage = {
@@ -38,7 +45,7 @@ describe("previewOps", () => {
 
   it("no desbloquea producción", () => {
     // @ts-expect-error test stub
-    globalThis.window = { location: { hostname: "sistemicar.app" } };
+    globalThis.window = { location: { hostname: "sistemicar.app", search: "" } };
     assert.equal(isDeployPreviewHost(), false);
     setPreviewOpsUnlocked(true);
     assert.equal(isPreviewOpsUnlocked(), false);
@@ -50,5 +57,12 @@ describe("previewOps", () => {
     assert.equal(isPreviewOpsUnlocked(), true);
     setPreviewOpsUnlocked(false);
     assert.equal(isPreviewOpsUnlocked(), false);
+  });
+
+  it("consumePreviewOpsQueryUnlock lee ?preview_ops=1", () => {
+    // @ts-expect-error test stub
+    globalThis.window.location.search = "?preview_ops=1";
+    assert.equal(consumePreviewOpsQueryUnlock(), true);
+    assert.equal(isPreviewOpsUnlocked(), true);
   });
 });
