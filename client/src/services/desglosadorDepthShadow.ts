@@ -3,8 +3,8 @@
  */
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
 
-/** Evita colisión con tick global #2 (~2 s post-lanzamiento). */
-const DEPTH_ON_TAP_DEFER_MS = 3200;
+/** Tras launch: lejos del cluster 1.5–5.5 s (antes 3200 chocaba con sombra). */
+const DEPTH_ON_TAP_DEFER_MS = 8_000;
 
 export type DesglosadorDepthReconcileFn = (
   vehicleId: string,

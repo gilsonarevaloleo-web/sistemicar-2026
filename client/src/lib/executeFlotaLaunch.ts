@@ -221,17 +221,23 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       scrollFlotaActivosIntoView,
     });
 
-    if (bonoTemple) {
-      toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
-        description: "Iniciaste en los últimos 15 min antes del descanso",
-        style: { backgroundColor: PIZARRA, border: `2px solid ${GOLD}`, color: GOLD },
-        duration: 4000,
+    const launchTitle = titulo;
+    const launchLabel = flotaConfig.label;
+    const launchPs = flotaConfig.psCierre;
+    const launchColor = flotaConfig.color;
+    const showTemple = bonoTemple;
+    requestAnimationFrame(() => {
+      toast.success(`"${launchTitle}" lanzado · ${launchLabel}`, {
+        description: launchPs,
+        style: { backgroundColor: PIZARRA, border: `1px solid ${launchColor}`, color: launchColor },
       });
-    }
-
-    toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
-      description: flotaConfig.psCierre,
-      style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color },
+      if (showTemple) {
+        toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
+          description: "Iniciaste en los últimos 15 min antes del descanso",
+          style: { backgroundColor: PIZARRA, border: `2px solid ${GOLD}`, color: GOLD },
+          duration: 4000,
+        });
+      }
     });
     registrarEvento(COMPONENTES.PLANIFICACION);
 

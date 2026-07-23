@@ -129,7 +129,9 @@ Un coordinador serializa con **tope de ms por frame**:
 
 **No destruir entropía** para ganar FPS. **Presupuestarla** en idle.
 
-Estado: parcial — `mobilePerf.ts` throttle existe; scheduler unificado **pendiente** (ver brief § Capa A).
+Estado: **parcial+** — `concienciaScheduler.ts` serializa pulso UI + cola presupuestada (`enqueueConcienciaWork`); `SegmentAttentionBackground` encola el ciclo de segmentos. Persistencia con skip por firma (`vehiclesReactiveSignature`) y teardown situacional en sombra. Ver brief § Capa A/B/C.
+
+**Lanzamiento flota (`/planeacion`):** el toast es ms0 barato; el freeze clásico era la avalancha *después*. Timeline de control: disco **1.5 s**, Firebase `launchPaint` **4 s**, persist remoto quiet **28 s** (`setDoc` con id provisional — sin remap/`saveLocal`/`vehicles-updated`; el clavo a ~**13 s** era sombra@12s + `addDoc` remap), pilares **30 s**, archive centinela **36 s**. Expand móvil diferido para situacional y conquista grande. Sin segundo `VehicleCardLiveNow` anidado.
 
 ### B.4 Persistencia fuera del hot path
 
@@ -225,6 +227,10 @@ flowchart TB
 | `jornadaFlotaCache.ts` | Disco local flota |
 
 **Dirección de split (no más monolito):** shell ligero → cards lazy → métricas/anillo en tab diferido. Nuevas features **no** expanden `planeacion.tsx`; van a hook, lib pura o componente lazy.
+
+**V3 paso 2 (completado):** `/jornada-v3` entra por `planeacionV3.tsx` + `useJornadaFlotaCore` (sin manager). La sesión V3 (`planeacionV3Session.tsx`) usa `useJornadaFlotaCore` para flota y `useJornadaV3Ops` para ring/reserva/desglosador — `useDesglosadorManager` ha sido eliminado de la sesión V3. Test en `useJornadaFlotaCore.test.ts` garantiza que ni el entry ni la sesión importan el manager. Siguiente: partir conquista fuera del manager en la ruta `/planeacion` monolítica.
+
+**Foco unidad (conquista):** overlay naranja (`ConquistaUnitFocusOverlay`) — mide por unidad con Tik al segundo y vueltas (sin persistir); Reiniciar limpia. **1 unidad completa** = Σ (duración/cantidad) de cada sub del desglosador (producción por producto).
 
 ---
 

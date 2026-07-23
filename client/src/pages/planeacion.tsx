@@ -539,6 +539,7 @@ import {
 import { buildFlotaActivosRenderList } from "@/flota/flotaRenderUtils";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { EntropiaDebugPanel, isEntropyDebugEnabled } from "@/components/EntropiaDebugPanel";
+import { PerfDebugPanel, isPerfDebugEnabled } from "@/components/jornada/PerfDebugPanel";
 import { hasActiveConsciousJornadaProcess } from "@/lib/jornadaConsciousGuard";
 import {
   buildDesglosadorNestedPausePatch,
@@ -1186,7 +1187,7 @@ export default function Planeacion() {
   }, [planilla, segmentoActivo]);
 
   const showEntropyDebug = useMemo(() => isEntropyDebugEnabled(), []);
-
+  const showPerfDebug = useMemo(() => isPerfDebugEnabled(), []);
 
   useEffect(() => {
     if (!user) return;
@@ -1876,28 +1877,35 @@ export default function Planeacion() {
         proyectoLaunchRef.current = null;
       }
 
-      if (relojTiempo === "desglosador" && user) {
-        const filteredSubs = desglosadorSubs.filter(s => s.titulo.trim());
-        if (filteredSubs[0]?.titulo.trim()) {
+      // Toasts post-paint: no saturar el frame del lanzamiento de conquista.
+      const launchLabel = flotaConfig.label;
+      const launchPs = flotaConfig.psCierre;
+      const launchTitle = titulo.trim();
+      const showDepthToast =
+        relojTiempo === "desglosador" &&
+        !!user &&
+        desglosadorSubs.some(s => s.titulo.trim());
+      const showTempleToast = bonoTemple;
+      requestAnimationFrame(() => {
+        toast.success(`"${launchTitle}" lanzado · ${launchLabel}`, {
+          description: launchPs,
+          style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color },
+        });
+        if (showTempleToast) {
+          toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
+            description: "Iniciaste en los últimos 15 min antes del descanso",
+            style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
+            duration: 4000,
+          });
+        }
+        if (showDepthToast) {
           toast.info("Profundidad de sesión", {
-            description: "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
+            description:
+              "Cada sub cumplido suma +2 PS (y ruta si aplica) en tu barra. Profundidad: +4, +6, +8… por hora completa de sesión.",
             style: { backgroundColor: PIZARRA, border: `1px solid rgba(212,175,55,0.35)`, color: GOLD },
             duration: 4500,
           });
         }
-      }
-
-      if (bonoTemple) {
-        toast.success("VOLUNTAD SOBRE EL HORARIO +10 PS", {
-          description: "Iniciaste en los últimos 15 min antes del descanso",
-          style: { backgroundColor: PIZARRA, border: `2px solid ${NARANJA}`, color: NARANJA },
-          duration: 4000
-        });
-      }
-
-      toast.success(`"${titulo}" lanzado · ${flotaConfig.label}`, {
-        description: flotaConfig.psCierre,
-        style: { backgroundColor: PIZARRA, border: `1px solid ${flotaConfig.color}`, color: flotaConfig.color }
       });
       registrarEvento(COMPONENTES.PLANIFICACION);
       deferFlotaFormReset(resetForm);
@@ -6102,6 +6110,7 @@ export default function Planeacion() {
             vehicles={vehicles}
           />
         )}
+        {showPerfDebug && <PerfDebugPanel />}
       </div>
     </div>
   );

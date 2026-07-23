@@ -278,3 +278,73 @@ export function computeSubCloseVerdict(sub: SubVehiculo): {
     realSec,
   };
 }
+
+/**
+ * Segundos por unidad de un sub (takt del paso).
+ * Medido: duracionFinal / cantidadLograda.
+ * Referencia: tiempoRecordMinPerUnit × 60 (si no hay medido).
+ */
+export function subSecPerUnit(
+  sub: SubVehiculo,
+  mode: "measured" | "ref" | "best" = "best"
+): number | null {
+  const measured =
+    sub.duracionFinal != null &&
+    sub.duracionFinal > 0 &&
+    sub.cantidadLograda != null &&
+    sub.cantidadLograda > 0
+      ? sub.duracionFinal / sub.cantidadLograda
+      : null;
+  const ref =
+    sub.tiempoRecordMinPerUnit != null && sub.tiempoRecordMinPerUnit > 0
+      ? sub.tiempoRecordMinPerUnit * 60
+      : null;
+
+  if (mode === "measured") return measured;
+  if (mode === "ref") return ref;
+  return measured ?? ref;
+}
+
+export type UnitCycleSum = {
+  /** Σ seg/unidad de cada sub (cadena completa = 1 producto). */
+  totalSec: number;
+  /** Cuántos pasos aportaron a la suma. */
+  stepsCounted: number;
+  /** Total de subs del desglosador. */
+  stepsTotal: number;
+  /** true si al menos un paso usó medido (no solo récord). */
+  hasMeasured: boolean;
+  /** true si la suma es solo referencia (aún sin cierres medidos). */
+  allRef: boolean;
+};
+
+/**
+ * Tiempo de 1 unidad completa del desglosador = suma de (seg/unidad) de cada sub.
+ * Ejemplo: pegar + cortar + marco + bandas → duración del armado de 1 bolsillo.
+ */
+export function sumDesglosadorUnitCycle(subs: SubVehiculo[]): UnitCycleSum {
+  let totalSec = 0;
+  let stepsCounted = 0;
+  let measuredCount = 0;
+  let refOnlyCount = 0;
+
+  for (const sub of subs) {
+    const measured = subSecPerUnit(sub, "measured");
+    const ref = subSecPerUnit(sub, "ref");
+    const value = measured ?? ref;
+    if (value == null || !Number.isFinite(value) || value <= 0) continue;
+    totalSec += value;
+    stepsCounted += 1;
+    if (measured != null) measuredCount += 1;
+    else if (ref != null) refOnlyCount += 1;
+  }
+
+  return {
+    totalSec,
+    stepsCounted,
+    stepsTotal: subs.length,
+    hasMeasured: measuredCount > 0,
+    allRef: measuredCount === 0 && refOnlyCount > 0,
+  };
+}
+

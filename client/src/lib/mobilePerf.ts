@@ -26,17 +26,22 @@ export function setJornadaFullModeEnabled(enabled: boolean): void {
 }
 
 /**
- * Modo supervivencia móvil: voz, anillo live y catch-up de entropía desactivados.
+ * Modo supervivencia móvil: anillo live pesado y catch-up de entropía diferidos.
  * Activo por defecto en dispositivos coarse hasta que el operador active modo completo.
+ * No silencia pilares de voz (tronco A.2) — eso lo deciden los toggles por canal.
  */
 export function shouldRunMobileSurvival(): boolean {
   if (!isMobilePerfMode()) return false;
   return !isJornadaFullModeEnabled();
 }
 
-/** Voz TTS permitida (desglosador, ubicación, warmup). */
+/**
+ * Voz TTS permitida a nivel de presupuesto móvil.
+ * Supervivencia NO la apaga: los canales (situación / desglosador / puerta) siguen
+ * en `tikSound.ts`. Apagar voz aquí dejaba el celular mudo tras meses de freeze.
+ */
 export function shouldAllowJornadaVoice(): boolean {
-  return !shouldRunMobileSurvival();
+  return true;
 }
 
 /** En móvil omitimos drop-shadow en SVG (costoso en GPU). */

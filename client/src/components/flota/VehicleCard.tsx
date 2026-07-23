@@ -277,9 +277,14 @@ import {
   suggestedSec,
   computeSubCloseVerdict,
   validateSubCloseCantidad,
+  sumDesglosadorUnitCycle,
   type SubCloseVerdict,
 } from "@/lib/desglosadorClock";
 import DesglosadorDuracionPanel from "@/components/DesglosadorDuracionPanel";
+import {
+  ConquistaUnitFocusButton,
+  ConquistaUnitFocusOverlay,
+} from "@/components/flota/ConquistaUnitFocusOverlay";
 import {
   aplicarTiempoGanadoAlCumplir,
   absorberSaldoAdelantoEnFoco,
@@ -629,6 +634,7 @@ function VehicleCard({
   const [remainingUnits, setRemainingUnits] = useState<number | null>(null);
   const [subVehicleRestante, setSubVehicleRestante] = useState<number | null>(null);
   const [desglosadorSummary, setDesglosadorSummary] = useState(false);
+  const [unitFocusOpen, setUnitFocusOpen] = useState(false);
   const subtasksExpandedStorageKey = `sistemicar_subtasks_expanded_${vehicle.id}`;
   const [subTasksCollapsed, setSubTasksCollapsed] = useState(() => {
     if (vehicle.tipoFlota === "situacion" && vehicle.situacionCronometro?.activo === true) return false;
@@ -744,7 +750,10 @@ function VehicleCard({
   }, []);
 
   const handleSubVehicleRestanteChange = useCallback((n: number | null) => {
-    setSubVehicleRestante(n);
+    // No re-renderizar el VehicleCard (~3.7k LOC) en el tick urgente del reloj.
+    startTransition(() => {
+      setSubVehicleRestante(n);
+    });
   }, []);
 
   const playChime = useCallback(() => {
@@ -866,6 +875,16 @@ function VehicleCard({
   }, [vehicle.id, vehicle.status, vehicle.tipoFlota, situacionSubWatchKey, onSyncSituacionCupoAnchor]);
 
   const desglosadorAutoActivateRef = useRef<Set<string>>(new Set());
+  /** Ventana post-lanzamiento: evita ruta-repair + voz que saturan el hilo al abrir conquista. */
+  const desglosadorLaunchGraceUntilRef = useRef(0);
+  useEffect(() => {
+    if (vehicle.tipoReloj === "desglosador" && vehicle.status === "activo") {
+      const ageMs = Date.now() - (vehicle.aperturaAt ?? 0);
+      if (ageMs >= 0 && ageMs < 4_000) {
+        desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
+      }
+    }
+  }, [vehicle.id, vehicle.tipoReloj, vehicle.status, vehicle.aperturaAt]);
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !onDesglosadorUpdate) return;
@@ -885,16 +904,30 @@ function VehicleCard({
       );
       activeSubIdForRutaRef.current = null;
       prevSubRestanteRutaRef.current = null;
-      onDesglosadorUpdate(vehicle.id, repaired, { launchPaint: true });
+      const ageMs = Date.now() - (vehicle.aperturaAt ?? 0);
+      const isLaunchWindow = ageMs >= 0 && ageMs < 4_000;
+      if (isLaunchWindow) {
+        desglosadorLaunchGraceUntilRef.current = Date.now() + 2_500;
+      }
+      // launchPaint SOLO en el primer paint post-lanzamiento.
+      // Mid-ciclo (tras Cumplido) debe ser force urgente o el reloj no remonta.
+      onDesglosadorUpdate(
+        vehicle.id,
+        repaired,
+        isLaunchWindow ? { launchPaint: true } : { force: true }
+      );
       const activated = repaired[pendingIdx];
       if (activated) {
-        dispatchDesglosadorSubIntroVoiceOnce(
-          vehicle.id,
-          activated.id,
-          activated.aperturaAt ?? now,
-          activated.titulo,
-          Boolean(activated.rutaEnfoque?.activa)
-        );
+        // Voz intro tras paint (corto): supervivencia ya no silencia TTS.
+        window.setTimeout(() => {
+          dispatchDesglosadorSubIntroVoiceOnce(
+            vehicle.id,
+            activated.id,
+            activated.aperturaAt ?? now,
+            activated.titulo,
+            Boolean(activated.rutaEnfoque?.activa)
+          );
+        }, 700);
       }
     }
   }, [vehicle.subVehiculos, vehicle.status, vehicle.tipoReloj, vehicle.id, onDesglosadorUpdate]);
@@ -1015,6 +1048,7 @@ function VehicleCard({
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
     if (isFreshRing) {
+      // Esperar idle real: el fallback a 900ms cancelaba la bienvenida (cancelPrevious).
       let spoke = false;
       const trySpeak = () => {
         if (cancelled || spoke) return;
@@ -1024,7 +1058,7 @@ function VehicleCard({
         scheduleSpeak();
       };
       unsubIdle = subscribeSpeechQueueIdle(trySpeak);
-      fallbackTimer = setTimeout(trySpeak, 900);
+      fallbackTimer = setTimeout(trySpeak, 14_000);
     } else {
       scheduleSpeak();
     }
@@ -1089,6 +1123,7 @@ function VehicleCard({
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || !onDesglosadorUpdate) return;
+    if (Date.now() < desglosadorLaunchGraceUntilRef.current) return;
     const subsNow = subVehiculosRef.current ?? [];
     const activeSub = subsNow.find(s => s.status === "activo");
     if (!activeSub || activeSub.rutaEnfoque?.activa) return;
@@ -1100,12 +1135,14 @@ function VehicleCard({
     if (!ruta) return;
     onDesglosadorUpdate(
       vehicle.id,
-      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s))
+      subsNow.map(s => (s.id === activeSub.id ? { ...s, rutaEnfoque: ruta } : s)),
+      { silentDepth: true }
     );
   }, [vehicle.tipoReloj, vehicle.status, vehicle.subVehiculos, vehicle.id, onDesglosadorUpdate]);
 
   useEffect(() => {
     if (vehicle.tipoReloj !== "desglosador" || vehicle.status !== "activo" || subVehicleRestante === null) return;
+    if (Date.now() < desglosadorLaunchGraceUntilRef.current) return;
     const subsNow = subVehiculosRef.current ?? [];
     const activeSub = subsNow.find(s => s.status === "activo");
     if (!activeSub?.rutaEnfoque?.activa || !onDesglosadorUpdate) {
@@ -1125,7 +1162,7 @@ function VehicleCard({
         const updated = subsNow.map(s =>
           s.id === activeSub.id ? { ...s, rutaEnfoque: repaired } : s
         );
-        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true });
+        onDesglosadorUpdate(vehicle.id, updated, { rutaCruzadoOnly: true, silentDepth: true });
       }
       return;
     }
@@ -1310,17 +1347,47 @@ function VehicleCard({
   }, [expanded]);
 
   // A1: montaje en dos fases. Al expandir, el contenedor se abre de inmediato
-  // (barato) y el subárbol pesado del desglosador se monta en el frame siguiente
-  // vía requestAnimationFrame, sacando el trabajo de reconciliación del gesto.
+  // (barato) y el subárbol pesado (conquista + situacional) se monta fuera del
+  // frame del expand — si no, el toast de lanzamiento "congela" el celular.
   const [heavyBodyReady, setHeavyBodyReady] = useState(false);
   useEffect(() => {
     if (!expanded) {
       setHeavyBodyReady(false);
       return;
     }
-    const raf = requestAnimationFrame(() => setHeavyBodyReady(true));
-    return () => cancelAnimationFrame(raf);
-  }, [expanded]);
+    let raf2 = 0;
+    let idleHandle: number | ReturnType<typeof setTimeout> | null = null;
+    const isHeavyBody =
+      vehicle.tipoReloj === "desglosador" || vehicle.tipoFlota === "situacion";
+    const mountHeavy = () => {
+      if (!mountedRef.current) return;
+      setHeavyBodyReady(true);
+    };
+    const raf1 = requestAnimationFrame(() => {
+      if (!isHeavyBody) {
+        mountHeavy();
+        return;
+      }
+      raf2 = requestAnimationFrame(() => {
+        if (typeof requestIdleCallback !== "undefined") {
+          idleHandle = requestIdleCallback(mountHeavy, { timeout: 900 });
+        } else {
+          idleHandle = setTimeout(mountHeavy, 80);
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      if (idleHandle != null) {
+        if (typeof cancelIdleCallback !== "undefined" && typeof idleHandle === "number") {
+          cancelIdleCallback(idleHandle);
+        } else {
+          clearTimeout(idleHandle);
+        }
+      }
+    };
+  }, [expanded, vehicle.tipoReloj, vehicle.tipoFlota]);
 
   // A3: el histórico se parsea de localStorage una sola vez cuando el cuerpo
   // pesado está listo (no en cada render ni en el frame del tap), y solo para
@@ -1675,11 +1742,17 @@ function VehicleCard({
                 {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (
                   <VehicleCardLiveNow>
                     {(nowMs) => (
-                      <DesglosadorDuracionPanel
-                        elapsedSec={getDesglosadorSessionElapsedSec(vehicle, nowMs)}
-                        depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
-                        compact
-                      />
+                      <span className="inline-flex items-center gap-1.5">
+                        <DesglosadorDuracionPanel
+                          elapsedSec={getDesglosadorSessionElapsedSec(vehicle, nowMs)}
+                          depthPsGranted={vehicle.desglosadorBloqueDepthPsGranted ?? 0}
+                          compact
+                        />
+                        <ConquistaUnitFocusButton
+                          onOpen={() => setUnitFocusOpen(true)}
+                          accentColor={flotaColor}
+                        />
+                      </span>
                     )}
                   </VehicleCardLiveNow>
                 )}
@@ -1755,6 +1828,7 @@ function VehicleCard({
                   const deltaPerdiendo = hasSugerido && deltaTotalSec > 5;
                   const deltaColor = deltaGanando ? "#00C851" : deltaPerdiendo ? "#FF3131" : "#D4AF37";
                   const deltaLabel = deltaGanando ? `↓ ${fmtSec(Math.abs(deltaTotalSec))} ganado` : deltaPerdiendo ? `↑ ${fmtSec(deltaTotalSec)} extra` : "→ en tiempo";
+                  const unitCycle = sumDesglosadorUnitCycle(subs);
                   const psProfundidad = vehicle.desglosadorBloqueDepthPsGranted ?? 0;
                   const subsPsGranted = sumDesglosadorSubsPsAlreadyGranted(subs);
                   const totalPS = estimateDesglosadorSessionPs(subs, psProfundidad);
@@ -1806,6 +1880,30 @@ function VehicleCard({
                             </div>
                           )}
                         </div>
+
+                        {unitCycle.stepsCounted > 0 && (
+                          <div
+                            className="flex items-center justify-between px-2.5 py-2 rounded-lg"
+                            style={{ backgroundColor: "rgba(249,115,22,0.1)", border: "1px solid rgba(249,115,22,0.35)" }}
+                            data-testid="desglosador-unit-cycle-done"
+                          >
+                            <div>
+                              <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: "#FB923C" }}>
+                                1 unidad completa
+                              </p>
+                              <p className="text-[7px] font-bold" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                Suma seg/unidad de {unitCycle.stepsCounted}/{unitCycle.stepsTotal} pasos
+                                {unitCycle.allRef ? " · ref" : unitCycle.hasMeasured ? " · medido" : ""}
+                              </p>
+                            </div>
+                            <p
+                              className="text-lg font-black font-mono tabular-nums"
+                              style={{ color: "#FB923C" }}
+                            >
+                              {fmtSec(Math.round(unitCycle.totalSec))}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Time vs Suggested breakdown (if available) */}
                         {hasSugerido && (
@@ -1926,10 +2024,13 @@ function VehicleCard({
                     activeSub={activeSub}
                     onSubVehicleRestanteChange={handleSubVehicleRestanteChange}
                   >
-                    {(clockUi) => (
-                  <VehicleCardLiveNow>
-                    {(nowMs) => {
-                const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
+                    {(clockUi) => {
+                const sessionElapsedSec = clockUi.sessionElapsedSec;
+                const unitCycle = sumDesglosadorUnitCycle(subs);
+                const unitCycleLabel =
+                  unitCycle.stepsCounted > 0
+                    ? formatMMSS(Math.round(unitCycle.totalSec))
+                    : "—";
 
                 return (
                   <div className="pt-3 space-y-3">
@@ -1955,10 +2056,23 @@ function VehicleCard({
                       <div className="flex items-center gap-2">
                         <ListTodo size={12} style={{ color: flotaColor }} />
                         <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>MODO EJECUCIÓN</span>
+                        <ConquistaUnitFocusButton
+                          onOpen={() => setUnitFocusOpen(true)}
+                          accentColor={flotaColor}
+                        />
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
                         <span className="text-[8px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.82)" }}>{cumplidos + fallados}/{subs.length}</span>
                         <span className="text-[8px] font-mono font-bold" style={{ color: clockUi.futuroCicloLabel === "—" ? "rgba(255,255,255,0.45)" : "#FDBA74" }}>🏁 CICLO: {clockUi.futuroCicloLabel}</span>
+                        <span
+                          className="text-[8px] font-mono font-bold"
+                          style={{ color: unitCycle.stepsCounted > 0 ? "#FB923C" : "rgba(255,255,255,0.45)" }}
+                          title="Suma de seg/unidad de cada sub = 1 producto completo"
+                          data-testid="desglosador-unit-cycle-live"
+                        >
+                          1 und: {unitCycleLabel}
+                          {unitCycle.allRef ? " ·ref" : ""}
+                        </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSubTasksCollapsed(c => !c); }}
                           className="p-1 rounded-md transition-colors hover:bg-white/10"
@@ -2415,8 +2529,6 @@ function VehicleCard({
                   </div>
                 );
                     }}
-                  </VehicleCardLiveNow>
-                    )}
                   </DesglosadorSubLiveIsland>
                 );
               })()}
@@ -3720,6 +3832,13 @@ function VehicleCard({
           </motion.div>
         );
       })()}
+      {vehicle.tipoReloj === "desglosador" && vehicle.status === "activo" && (
+        <ConquistaUnitFocusOverlay
+          open={unitFocusOpen}
+          onClose={() => setUnitFocusOpen(false)}
+          accentColor={flotaColor}
+        />
+      )}
     </motion.div>
   );
 }

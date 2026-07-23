@@ -26,6 +26,8 @@ import {
   initLocalVehiclesFlushListeners as initVehicleDebounceFlushListeners,
   scheduleDebouncedWrite,
 } from "./vehicleLocalStorageDebounce";
+import { vehiclesReactiveSignature } from "./vehiclesReactiveSignature";
+import { recordPerfSample } from "./jornadaPerfStats";
 import type { RutaBandaId, RutaCruzadaSnapshot, RutaEnfoqueState } from "./rutaEnfoque";
 import type { RutaSeguimientoPatron } from "./rutaSeguimiento";
 export type { RutaBandaId, RutaCruzadaSnapshot, RutaEnfoqueState } from "./rutaEnfoque";
@@ -63,6 +65,7 @@ import {
   modulesGrantedByPlan,
   isOwnerEmail as _isOwnerEmail,
 } from "@shared/moduleAccess";
+import { isPreviewOpsUnlocked } from "./previewOps";
 
 export interface AcervoEntry {
   id: string;
@@ -865,6 +868,11 @@ export function scheduleVehicleRemotePersist(
   void persistVehicleToFirebase(userId, provisionalId, vehicle, clientRequestId, aperturaAt);
 }
 
+/**
+ * Persist remoto post-pintado local.
+ * Usa setDoc(provisionalId) para NO remapear id → evita saveLocal + vehicles-updated
+ * (~13s en mobile: LAUNCH_SHADOW_DELAY + addDoc remap mataba el desglosador).
+ */
 async function persistVehicleToFirebase(
   userId: string,
   provisionalId: string,
@@ -886,29 +894,22 @@ async function persistVehicleToFirebase(
       payload.tiempoInicio = Timestamp.fromDate(payload.tiempoInicio);
     }
     payload.createdAt = serverTimestamp();
-    const docRef = await addDoc(collection(db, path), payload);
-    const latestLocal = getLocalVehicles();
-    const updatedLocal = latestLocal.map(v =>
-      v.id === provisionalId ? { ...v, id: docRef.id } : v
-    );
-    const remapped = updatedLocal.find(v => v.id === docRef.id);
-    saveLocalVehicles(updatedLocal);
-    backupToLocal("vehicles", updatedLocal);
-    window.dispatchEvent(new CustomEvent("vehicles-updated"));
-    console.log(`[addVehicle] Firebase OK → ${docRef.id}`);
-    if (remapped && remapped.status !== "activo") {
-      notifyVehicleClosed(docRef.id, remapped.clientRequestId);
-      const { updateDoc } = await import("firebase/firestore");
+    // Id estable = provisional: sin remap, sin stringify de flota, sin event storm.
+    await setDoc(doc(db, path, provisionalId), payload);
+    console.log(`[addVehicle] Firebase OK (quiet setDoc) → ${provisionalId}`);
+    const local = getLocalVehicles().find(v => v.id === provisionalId);
+    if (local && local.status !== "activo") {
+      notifyVehicleClosed(provisionalId, local.clientRequestId);
       await updateDoc(
-        doc(db, path, docRef.id),
+        doc(db, path, provisionalId),
         omitUndefined({
-          status: remapped.status,
-          ...(remapped.cierreAt != null ? { cierreAt: remapped.cierreAt } : {}),
-          ...(remapped.duracionFinal != null ? { duracionFinal: remapped.duracionFinal } : {}),
-          ...(remapped.cierreManual != null ? { cierreManual: remapped.cierreManual } : {}),
+          status: local.status,
+          ...(local.cierreAt != null ? { cierreAt: local.cierreAt } : {}),
+          ...(local.duracionFinal != null ? { duracionFinal: local.duracionFinal } : {}),
+          ...(local.cierreManual != null ? { cierreManual: local.cierreManual } : {}),
         })
       );
-      console.log(`[addVehicle] Cierre local sincronizado tras remap → ${docRef.id}`);
+      console.log(`[addVehicle] Cierre local sincronizado (sin remap) → ${provisionalId}`);
     }
   } catch (error) {
     console.error("[addVehicle] Firebase background error:", error);
@@ -948,13 +949,41 @@ export function mergeMissingLocalActives(sorted: Vehicle[], nowMs = Date.now()):
   return merged;
 }
 
+/** Última firma escrita a disco — evita JSON.stringify repetido (Capa B). */
+let lastWrittenVehiclesSig: string | null = null;
+let lastLocalVehiclesWriteAt = 0;
+let localVehiclesWriteSkipCount = 0;
+let localVehiclesWriteCount = 0;
+
+export function getLocalVehiclesWriteStats(): {
+  lastWrittenSig: string | null;
+  lastWriteAt: number;
+  writeCount: number;
+  skipCount: number;
+} {
+  return {
+    lastWrittenSig: lastWrittenVehiclesSig,
+    lastWriteAt: lastLocalVehiclesWriteAt,
+    writeCount: localVehiclesWriteCount,
+    skipCount: localVehiclesWriteSkipCount,
+  };
+}
+
+/** Solo tests. */
+export function resetLocalVehiclesWriteStatsForTests(): void {
+  lastWrittenVehiclesSig = null;
+  lastLocalVehiclesWriteAt = 0;
+  localVehiclesWriteSkipCount = 0;
+  localVehiclesWriteCount = 0;
+}
+
 export function saveLocalVehicles(vehicles: Vehicle[]): boolean {
   initLocalVehiclesFlushListeners();
   scheduleDebouncedWrite(() => flushLocalVehiclesNow(vehicles));
   return true;
 }
 
-/** Escritura síncrona inmediata (cierres críticos, beforeunload). */
+/** Escritura síncrona inmediata (beforeunload / visibility hidden). */
 export function flushLocalVehicles(vehicles?: Vehicle[]): boolean {
   if (vehicles) {
     return flushDebouncedWrite(() => flushLocalVehiclesNow(vehicles));
@@ -972,6 +1001,7 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
   // Per-ID tracking (not a global time window): only skip preservation for vehicle IDs
   // that were explicitly closed recently. A NEW vehicle created immediately after closing
   // another has a different ID and is always protected.
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const current = getLocalVehicles();
   vehicles = enforceLocalClosedOverrides(vehicles, current);
   const newIds = new Set(vehicles.map(v => v.id));
@@ -993,16 +1023,39 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
     console.warn(`[saveLocalVehicles] Preservando ${preserved.length} activo(s) no presentes en datos nuevos:`, preserved.map(v => `${v.id}:${v.titulo}`));
     vehicles = [...preserved, ...vehicles];
   }
+
+  const nextSig = vehiclesReactiveSignature(vehicles);
+  if (nextSig === lastWrittenVehiclesSig) {
+    localVehiclesWriteSkipCount += 1;
+    recordPerfSample("diskFlushSkip", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  }
+
   const payload = JSON.stringify(vehicles);
-  if (safeSetItem(VEHICLES_KEY, payload)) return true;
+  const markWritten = (): boolean => {
+    lastWrittenVehiclesSig = nextSig;
+    lastLocalVehiclesWriteAt = Date.now();
+    localVehiclesWriteCount += 1;
+    recordPerfSample("diskFlush", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  };
+
+  if (safeSetItem(VEHICLES_KEY, payload)) return markWritten();
 
   emergencyPruneStorage({ aggressive: true });
-  if (safeSetItem(VEHICLES_KEY, payload)) return true;
+  if (safeSetItem(VEHICLES_KEY, payload)) return markWritten();
 
   const activos = vehicles.filter(v => v.status === "activo");
   const recientes = vehicles.filter(v => v.status !== "activo").slice(0, 40);
-  const trimmed = JSON.stringify([...activos, ...recientes]);
-  if (safeSetItem(VEHICLES_KEY, trimmed)) return true;
+  const trimmedList = [...activos, ...recientes];
+  const trimmed = JSON.stringify(trimmedList);
+  if (safeSetItem(VEHICLES_KEY, trimmed)) {
+    lastWrittenVehiclesSig = vehiclesReactiveSignature(trimmedList);
+    lastLocalVehiclesWriteAt = Date.now();
+    localVehiclesWriteCount += 1;
+    recordPerfSample("diskFlushTrimmed", (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
+    return true;
+  }
 
   console.error("[saveLocalVehicles] Reintento recortado falló");
   return false;
@@ -2378,6 +2431,8 @@ export function hasPlanificacionBaseAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  // Deploy Preview Netlify: sesión distinta a producción; ver previewOps.ts
+  if (isPreviewOpsUnlocked()) return true;
   return _hasPlanificacionBaseAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
@@ -2387,6 +2442,7 @@ export function hasSoberaniaDiaAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  if (isPreviewOpsUnlocked()) return true;
   return _hasSoberaniaDiaAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
@@ -2396,6 +2452,7 @@ export function hasOperativoAccess(
   rank?: UserRank | null,
   activeModules?: string[] | null
 ): boolean {
+  if (isPreviewOpsUnlocked()) return true;
   return _hasOperativoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 

@@ -53,3 +53,31 @@ export function buildDesglosadorSubClose(
 
   return { subs: allSubs, closedSub, nextActiveSubId };
 }
+
+/** Score compacto: cierres mandan; activo suma poco. */
+export function desglosadorSubsProgressScore(subs: SubVehiculo[] | undefined): number {
+  return (subs ?? []).reduce((acc, s) => {
+    if (s.status === "cumplido" || s.status === "fallado") return acc + 100;
+    if (s.status === "activo") return acc + 10;
+    return acc;
+  }, 0);
+}
+
+/**
+ * Evita que un snapshot diferido (launchPaint / ruta) pise un Cumplido más reciente.
+ * Misma familia que el reinicio de ancla situacional: el estado avanzado no retrocede.
+ */
+export function shouldAcceptDesglosadorSubsIncoming(
+  current: SubVehiculo[] | undefined,
+  incoming: SubVehiculo[],
+  opts?: { force?: boolean; launchPaint?: boolean }
+): boolean {
+  const curClosed = (current ?? []).filter(s => s.status === "cumplido" || s.status === "fallado").length;
+  const inClosed = incoming.filter(s => s.status === "cumplido" || s.status === "fallado").length;
+  if (inClosed < curClosed) return false;
+  const curProgress = desglosadorSubsProgressScore(current);
+  const inProgress = desglosadorSubsProgressScore(incoming);
+  if (opts?.launchPaint && inProgress < curProgress) return false;
+  if (!opts?.force && !opts?.launchPaint && inProgress < curProgress) return false;
+  return true;
+}

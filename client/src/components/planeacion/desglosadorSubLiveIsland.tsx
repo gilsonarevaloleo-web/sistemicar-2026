@@ -5,6 +5,7 @@ import {
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   formatHHMM,
+  getDesglosadorSessionElapsedSec,
   suggestedSec,
 } from "@/lib/desglosadorClock";
 import { useIslandConcienciaClock } from "@/lib/useIslandConcienciaClock";
@@ -20,6 +21,8 @@ export type DesglosadorSubClockUi = {
   horaFinRemainSec: number | null;
   horaFinDeltaSec: number;
   liveAccumDeltaSec: number;
+  /** Duración de sesión — misma isla de tick (sin segundo LiveNow anidado). */
+  sessionElapsedSec: number;
 };
 
 export function emptyDesglosadorSubClockUi(): DesglosadorSubClockUi {
@@ -34,6 +37,7 @@ export function emptyDesglosadorSubClockUi(): DesglosadorSubClockUi {
     horaFinRemainSec: null,
     horaFinDeltaSec: 0,
     liveAccumDeltaSec: 0,
+    sessionElapsedSec: 0,
   };
 }
 
@@ -44,7 +48,10 @@ export function computeDesglosadorSubClockUi(
   activeSub: SubVehiculo,
   nowMs: number
 ): DesglosadorSubClockUi {
-  if (!activeSub.aperturaAt) return emptyDesglosadorSubClockUi();
+  const sessionElapsedSec = getDesglosadorSessionElapsedSec(vehicle, nowMs);
+  if (!activeSub.aperturaAt) {
+    return { ...emptyDesglosadorSubClockUi(), sessionElapsedSec };
+  }
   const clocks = computeActiveSubClocks(nowMs, vehicle, activeSub);
   const obj = suggestedSec(activeSub);
   const timerUi = desglosadorSubTimerUiFromClocks(clocks, obj);
@@ -72,6 +79,7 @@ export function computeDesglosadorSubClockUi(
       horaFinRemainSec: clocks.cycleRemainSec,
       horaFinDeltaSec: clocks.liveAccumDeltaSec,
       liveAccumDeltaSec: clocks.liveAccumDeltaSec,
+      sessionElapsedSec,
     };
   }
 
@@ -86,6 +94,7 @@ export function computeDesglosadorSubClockUi(
     horaFinRemainSec: null,
     horaFinDeltaSec: 0,
     liveAccumDeltaSec: 0,
+    sessionElapsedSec,
   };
 }
 
@@ -95,15 +104,18 @@ function useDesglosadorSubClockUi(
 ): DesglosadorSubClockUi {
   const tick = useIslandConcienciaClock(Boolean(activeSub?.aperturaAt));
   const clockKey = desglosadorSubClockKey(activeSub);
-  
+
   return useMemo(() => {
-    // Si no hay sub-elemento activo o cambió la clave en pleno render, vaciamos el reloj inmediatamente
-    if (!activeSub?.aperturaAt) return emptyDesglosadorSubClockUi();
-    
+    if (!activeSub?.aperturaAt) {
+      return {
+        ...emptyDesglosadorSubClockUi(),
+        sessionElapsedSec: getDesglosadorSessionElapsedSec(vehicle),
+      };
+    }
     return computeDesglosadorSubClockUi(vehicle, activeSub, Date.now());
-  }, [tick, clockKey, activeSub]); // Agregamos activeSub para que limpie el render al cambiar de tarea
-    
- 
+    // vehicle se lee en el tick; no listarlo entero o la isla pierde aislamiento.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- island: tick + activeSub
+  }, [tick, clockKey, activeSub]);
 }
 
 /**

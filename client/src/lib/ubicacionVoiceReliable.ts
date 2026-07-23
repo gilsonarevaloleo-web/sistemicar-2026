@@ -97,10 +97,11 @@ function trySpeak(key: string): void {
   }
 
   entry.attempts += 1;
+  // Solo el primer intento reclama gesto; reintentos por timer no deben fingir unlock.
   if (entry.attempts === 1) {
     unlockSpeechSynthesis(true);
   } else {
-    warmupSpeechSynthesis(true);
+    warmupSpeechSynthesis(true, false);
   }
   recoverSpeechQueue();
 
