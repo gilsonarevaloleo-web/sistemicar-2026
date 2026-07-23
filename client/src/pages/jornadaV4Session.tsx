@@ -53,7 +53,7 @@ export default function JornadaV4Session() {
       <Jornada4Shell
         dualCount={core.dualCount}
         dailyPS={core.dailyPS}
-        statusLine="Estás en Dual Kernel · solo 2 desglosadores"
+        statusLine="La Flota Dual Kernel · Conquista + Enfoque"
       />
       <div className="max-w-lg mx-auto pt-2">
         <Jornada4LaunchPanel onLaunch={handleLaunch} />

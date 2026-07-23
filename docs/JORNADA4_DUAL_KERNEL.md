@@ -113,12 +113,15 @@ Lo que J4 **rechaza** del tronco filosófico como *runtime siempre montado*: ani
 
 ### Experiencia v1
 
-1. Abrir J4 → lista mínima de vehículos activos **solo** Conquista-desglosador y Situacional.
-2. Lanzar / operar unidades (conquista) o filas de cupo (situacional).
-3. Cerrar sub → +PS visible (toast ligero) → sombra liquida.
+1. Abrir J4 → **La Flota visible** (grid Conquista + Enfoque) como en Jornada clásica; solo esos 2 tipos.
+2. Lanzar vehículo → formulario con unidades/filas → aparece en **Vehículos activos** (card operable con lista + reloj).
+3. Cerrar sub/fila → +PS visible (toast ligero) → sombra liquida.
 4. Cerrar ciclo/bloque → +PS → teardown → listo.
-5. Sin anillo, sin escalera, sin disciplina, sin voz.
+5. Sin anillo, sin escalera, sin disciplina, sin voz (ni descanso/verdad).
 6. Si la pestaña pasa a segundo plano: **el tiempo no se clava**; al volver, el island recalcula por `Date.now()` (wall clock), no por “ticks perdidos”.
+
+> UI: chrome de La Flota / VehicleCard (grid, badges, listas, botones Cumplido/Fallado).  
+> Runtime: kernels Dual Kernel + import guard — **no** remontar `VehicleCard` monolítico ni voz/anillo.
 
 ### Capacidad “resistir en segundo plano”
 
@@ -144,7 +147,7 @@ flowchart TB
     SK["situacionKernel — FSM pura"]
     PS["psBridge — award en sombra"]
     Tick["jornada4Tick — wall clock + islands"]
-    UI["Cards delgadas + islands"]
+    UI["La Flota + cards operables (sin VehicleCard monolítico)"]
   end
 
   subgraph shared ["Libs del tronco — sin UI"]
@@ -185,7 +188,7 @@ flowchart TB
 | **Ops** | Wiring de gestos → kernels (sin manager) | `client/src/hooks/useJornada4Ops.ts` |
 | **Tick** | Un productor; islands suscriben; background = wall clock | `client/src/jornada4/jornada4Tick.ts` |
 | **PS bridge** | Solo sombra; idempotente | `client/src/jornada4/psBridge.ts` |
-| **Shell UI** | Lista + 2 cards delgadas (no `VehicleCard` 3.8k) | `client/src/pages/jornadaV4*.tsx` + `components/jornada4/*` |
+| **Shell UI** | La Flota (2 tipos) + cards operables con lista/reloj (no `VehicleCard` 3.8k) | `client/src/pages/jornadaV4*.tsx` + `components/jornada4/*` |
 | **Guardrails** | Tests que fallan si se importa anillo/voz/manager/escalera | `client/src/jornada4/jornada4ImportGuard.test.ts` |
 
 ### Contrato anti-freeze (J4)

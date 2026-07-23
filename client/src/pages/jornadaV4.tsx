@@ -12,7 +12,8 @@ import { beginJornadaViewMount, endJornadaViewMount } from "@/lib/jornadaRemount
 
 const JornadaV4Session = lazy(() => import("./jornadaV4Session"));
 
-const SESSION_IDLE_MS = 800;
+/** Idle corto: La Flota debe verse casi al instante (no “Preparando…” largo). */
+const SESSION_IDLE_MS = 120;
 
 export default function JornadaV4() {
   const { user } = useAuthContext();
@@ -101,7 +102,7 @@ function BootFallback({
         className="max-w-lg mx-auto px-4 pt-6 text-center text-xs"
         style={{ color: J4_COLORS.MUTED }}
       >
-        Preparando lanzador… Solo Conquista y Situacional.
+        Preparando La Flota… Conquista y Enfoque.
       </p>
     </div>
   );
