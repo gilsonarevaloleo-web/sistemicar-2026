@@ -82,7 +82,7 @@ describe("previewOps", () => {
     assert.equal(replacedHref, null);
   });
 
-  it("previewPlaneacionHref incluye drawer hidden", () => {
-    assert.equal(previewPlaneacionHref(), "/planeacion?ntl-drawer-state=hidden");
+  it("previewPlaneacionHref es path limpio (sin query)", () => {
+    assert.equal(previewPlaneacionHref(), "/planeacion");
   });
 });

@@ -197,6 +197,7 @@ export default function MenuPrincipal() {
   const [secretInput, setSecretInput] = useState("");
   const [certification, setCertification] = useState<UserCertification | null>(null);
   const [previewUnlocked, setPreviewUnlocked] = useState(() => isPreviewOpsUnlocked());
+  const [unlockingPreview, setUnlockingPreview] = useState(false);
 
   useEffect(() => {
     if (isFirebaseConfigured()) {
@@ -264,7 +265,9 @@ export default function MenuPrincipal() {
     if (!user?.uid) return;
     const args = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
     if (!previewUnlocked && !hasPlanificacionBaseAccess(...args)) return;
-    const run = () => prefetchJornadaChunk();
+    const run = () => {
+      void prefetchJornadaChunk();
+    };
     if (typeof requestIdleCallback !== "undefined") {
       const id = requestIdleCallback(run, { timeout: 2500 });
       return () => cancelIdleCallback(id);
@@ -272,6 +275,16 @@ export default function MenuPrincipal() {
     const t = window.setTimeout(run, 400);
     return () => clearTimeout(t);
   }, [user?.uid, userEmail, progression?.subscriptionPlan, progression?.rank, progression?.activeModules, previewUnlocked]);
+
+  // Preview: precargar chunk apenas se ve el banner — el gesto de unlock no debe
+  // esperar el parse de ~planeacion en el mismo frame del navigate.
+  useEffect(() => {
+    if (!isDeployPreviewHost() || previewUnlocked) return;
+    const t = window.setTimeout(() => {
+      void prefetchJornadaChunk();
+    }, 200);
+    return () => clearTimeout(t);
+  }, [previewUnlocked]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -737,7 +750,9 @@ export default function MenuPrincipal() {
                   </p>
                   <button
                     type="button"
+                    disabled={unlockingPreview}
                     onClick={() => {
+                      if (unlockingPreview) return;
                       const ok = setPreviewOpsUnlocked(true);
                       if (!ok) {
                         toast.error("No se pudo desbloquear este preview", {
@@ -746,24 +761,32 @@ export default function MenuPrincipal() {
                         return;
                       }
                       setPreviewUnlocked(true);
-                      toast.success("Entrando a Jornada…", {
+                      setUnlockingPreview(true);
+                      toast.success("Preparando Jornada…", {
                         style: {
                           backgroundColor: "#0a0a0a",
                           border: "1px solid #D4AF37",
                           color: "#D4AF37",
                         },
                       });
-                      // Soft navigate — NUNCA location.assign aquí: el cold-boot remonta
-                      // App + SegmentAttention + Centinela + parse del monolito planeacion
-                      // y congela el hilo en móvil (BRIEF_BLOQUEO_HILO_PRINCIPAL).
-                      prefetchJornadaChunk();
-                      navigate(previewPlaneacionHref());
+                      // Soft navigate — NUNCA location.assign: cold-boot congela móvil.
+                      // Esperar prefetch para que Suspense no parsee el monolito en el gesto.
+                      void (async () => {
+                        try {
+                          await prefetchJornadaChunk();
+                        } catch {
+                          /* navigate igual — Suspense reintentará */
+                        }
+                        navigate(previewPlaneacionHref());
+                      })();
                     }}
-                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider relative z-50"
+                    className="w-full py-3 rounded-xl text-[11px] font-bold uppercase tracking-wider relative z-50 disabled:opacity-70"
                     style={{ backgroundColor: GOLD, color: "#000" }}
                     data-testid="button-preview-unlock-jornada"
                   >
-                    Desbloquear Jornada en este preview
+                    {unlockingPreview
+                      ? "Preparando Jornada…"
+                      : "Desbloquear Jornada en este preview"}
                   </button>
                 </div>
               )}

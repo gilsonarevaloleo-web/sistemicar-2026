@@ -58,7 +58,8 @@ export function hideNetlifyDrawerIfNeeded(): boolean {
 /**
  * Entrada a Jornada tras unlock — soft navigate (wouter), no location.assign.
  * Full reload remonta motores globales + parse del chunk planeacion y congela móvil.
+ * Solo path: el drawer ya quedó oculto por bootstrap (`ntl-drawer-state` en session).
  */
 export function previewPlaneacionHref(): string {
-  return "/planeacion?ntl-drawer-state=hidden";
+  return "/planeacion";
 }

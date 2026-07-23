@@ -26,7 +26,9 @@ export function lazyWithRetry<T extends ComponentType<unknown>>(
 }
 
 /** Precarga chunks de Jornada (menú → transición más rápida). */
-export function prefetchJornadaChunk(): void {
-  void import("@/pages/planeacionV3");
-  void import("@/pages/planeacion");
+export function prefetchJornadaChunk(): Promise<void> {
+  return Promise.all([
+    import("@/pages/planeacionV3").catch(() => null),
+    import("@/pages/planeacion").catch(() => null),
+  ]).then(() => undefined);
 }
