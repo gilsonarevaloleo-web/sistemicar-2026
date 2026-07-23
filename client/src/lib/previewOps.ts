@@ -2,6 +2,9 @@
  * Desbloqueo operativo solo en Deploy Preview de Netlify.
  * El preview no comparte la sesión/cookies de sistemicar.app; sin esto el menú
  * queda sin Jornada y parece “incompleto”.
+ *
+ * Además: el drawer Collaborate de Netlify intercepta toques en móvil
+ * (“no funcionan los clic”). Se fuerza `ntl-drawer-state=hidden` al cargar.
  */
 
 const STORAGE_KEY = "sistemicar_preview_ops_v1";
@@ -21,12 +24,42 @@ export function isPreviewOpsUnlocked(): boolean {
   }
 }
 
-export function setPreviewOpsUnlocked(on: boolean): void {
-  if (!isDeployPreviewHost()) return;
+/** @returns true si quedó persistido (o ya estaba). */
+export function setPreviewOpsUnlocked(on: boolean): boolean {
+  if (!isDeployPreviewHost()) return false;
   try {
     if (on) sessionStorage.setItem(STORAGE_KEY, "1");
     else sessionStorage.removeItem(STORAGE_KEY);
+    return on ? sessionStorage.getItem(STORAGE_KEY) === "1" : true;
   } catch {
-    /* noop */
+    return false;
   }
+}
+
+/**
+ * El drawer Collaborate de Netlify tapa botones y come pointer events en móvil.
+ * `?ntl-drawer-state=hidden` lo deja fuera (docs Netlify) y persiste en la pestaña.
+ * @returns true si está redirigiendo (no montar React aún).
+ */
+export function hideNetlifyDrawerIfNeeded(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!isDeployPreviewHost()) return false;
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("ntl-drawer-state") === "hidden") return false;
+    url.searchParams.set("ntl-drawer-state", "hidden");
+    window.location.replace(url.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Entrada a Jornada tras unlock — soft navigate (wouter), no location.assign.
+ * Full reload remonta motores globales + parse del chunk planeacion y congela móvil.
+ * Solo path: el drawer ya quedó oculto por bootstrap (`ntl-drawer-state` en session).
+ */
+export function previewPlaneacionHref(): string {
+  return "/planeacion";
 }

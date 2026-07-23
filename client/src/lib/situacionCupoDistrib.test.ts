@@ -25,6 +25,7 @@ import {
   vehicleNeedsCupoAnchorSync,
   buildSellarDirectoEnRingState,
   expandirColaCronometroHastaMeta,
+  minutosGanadosEnVivoFoco,
 } from "./situacionCupoDistrib.ts";
 
 function st(id: string, minutosCupo: number, cupoFijo?: boolean): SubTarea {
@@ -585,5 +586,27 @@ describe("buildSellarDirectoEnRingState", () => {
     assert.equal(r.subTareas.length, 2);
     assert.equal(r.situacionCupoAnchor?.subTareaId, "foco");
     assert.equal(r.anchorStillValid, true);
+  });
+});
+
+describe("minutosGanadosEnVivoFoco", () => {
+  it("no muestra ganancia fantasma en el primer minuto tras handoff", () => {
+    const now = 2_000_000;
+    const subs = [
+      { ...st("a", 10), enDesgloseCronometro: true, resultadoSituacion: "pendiente" as const },
+    ];
+    const anchor = { subTareaId: "a", startedAt: now };
+    assert.equal(minutosGanadosEnVivoFoco(subs, anchor, now + 1_000), 0);
+    assert.equal(minutosGanadosEnVivoFoco(subs, anchor, now + 59_999), 0);
+  });
+
+  it("tras 1+ min muestra cupo restante redondeado", () => {
+    const now = 2_000_000;
+    const subs = [
+      { ...st("a", 10), enDesgloseCronometro: true, resultadoSituacion: "pendiente" as const },
+    ];
+    const anchor = { subTareaId: "a", startedAt: now };
+    assert.equal(minutosGanadosEnVivoFoco(subs, anchor, now + 60_000), 9);
+    assert.equal(minutosGanadosEnVivoFoco(subs, anchor, now + 90_000), 8);
   });
 });

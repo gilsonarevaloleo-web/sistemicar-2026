@@ -4,17 +4,27 @@ import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
   setPreviewOpsUnlocked,
+  hideNetlifyDrawerIfNeeded,
+  previewPlaneacionHref,
 } from "./previewOps.ts";
 
 describe("previewOps", () => {
   const originalWindow = globalThis.window;
   let store: Map<string, string>;
+  let replacedHref: string | null;
 
   beforeEach(() => {
     store = new Map();
+    replacedHref = null;
     // @ts-expect-error test stub
     globalThis.window = {
-      location: { hostname: "deploy-preview-1--admirable-moxie-9f923a.netlify.app" },
+      location: {
+        hostname: "deploy-preview-13--admirable-moxie-9f923a.netlify.app",
+        href: "https://deploy-preview-13--admirable-moxie-9f923a.netlify.app/",
+        replace(url: string) {
+          replacedHref = url;
+        },
+      },
     };
     // @ts-expect-error test stub
     globalThis.sessionStorage = {
@@ -38,17 +48,41 @@ describe("previewOps", () => {
 
   it("no desbloquea producción", () => {
     // @ts-expect-error test stub
-    globalThis.window = { location: { hostname: "sistemicar.app" } };
+    globalThis.window = {
+      location: {
+        hostname: "sistemicar.app",
+        href: "https://sistemicar.app/",
+        replace() {},
+      },
+    };
     assert.equal(isDeployPreviewHost(), false);
-    setPreviewOpsUnlocked(true);
+    assert.equal(setPreviewOpsUnlocked(true), false);
     assert.equal(isPreviewOpsUnlocked(), false);
   });
 
-  it("unlock solo en preview", () => {
+  it("unlock solo en preview y reporta éxito", () => {
     assert.equal(isPreviewOpsUnlocked(), false);
-    setPreviewOpsUnlocked(true);
+    assert.equal(setPreviewOpsUnlocked(true), true);
     assert.equal(isPreviewOpsUnlocked(), true);
-    setPreviewOpsUnlocked(false);
+    assert.equal(setPreviewOpsUnlocked(false), true);
     assert.equal(isPreviewOpsUnlocked(), false);
+  });
+
+  it("hideNetlifyDrawerIfNeeded redirige si falta el query", () => {
+    assert.equal(hideNetlifyDrawerIfNeeded(), true);
+    assert.ok(replacedHref);
+    assert.match(replacedHref!, /ntl-drawer-state=hidden/);
+  });
+
+  it("hideNetlifyDrawerIfNeeded no-op si ya está oculto", () => {
+    // @ts-expect-error test stub
+    globalThis.window.location.href =
+      "https://deploy-preview-13--admirable-moxie-9f923a.netlify.app/?ntl-drawer-state=hidden";
+    assert.equal(hideNetlifyDrawerIfNeeded(), false);
+    assert.equal(replacedHref, null);
+  });
+
+  it("previewPlaneacionHref es path limpio (sin query)", () => {
+    assert.equal(previewPlaneacionHref(), "/planeacion");
   });
 });

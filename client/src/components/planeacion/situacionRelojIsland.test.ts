@@ -100,4 +100,35 @@ describe("computeSituacionTimerUi", () => {
     assert.equal(ui.debt, "");
     assert.equal(ui.display, "00:05:00");
   });
+
+  it("tras handoff el reloj baja con el tiempo de pared (no se clava en cupo-1s)", () => {
+    const handoffAt = 5_000_000;
+    const cupoMin = 10;
+    const v = vehicle({
+      situacionCronometro: { activo: true, bloqueInicioAt: handoffAt - 60_000 },
+      situacionCupoAnchor: { subTareaId: "st2", startedAt: handoffAt },
+      subTareas: [
+        {
+          id: "st1",
+          texto: "Cerrada",
+          enDesgloseCronometro: true,
+          resultadoSituacion: "cumplido",
+          minutosCupo: 5,
+          cerradaAt: handoffAt,
+        },
+        {
+          id: "st2",
+          texto: "Probar cumplido",
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: cupoMin,
+        },
+      ],
+    } as Partial<Vehicle>);
+    const t0 = computeSituacionTimerUi(v, handoffAt + 1_000);
+    const t3 = computeSituacionTimerUi(v, handoffAt + 3_000);
+    assert.equal(t0.display, "00:09:59");
+    assert.equal(t3.display, "00:09:57");
+    assert.notEqual(t0.display, t3.display, "startedAt estable → remaining debe bajar ~1s/s");
+  });
 });

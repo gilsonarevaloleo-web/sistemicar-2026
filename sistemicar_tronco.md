@@ -88,8 +88,10 @@ TTS y sonidos **nunca** dentro de `useEffect` de render ni en handlers síncrono
 - Cleanup obligatorio al desmontar vehículo (`cancelUbicacionVoiceForVehicle`)
 - **Jul 2026 — voz por temporizador OFF por defecto** (`timerDrivenVoice.ts`): umbrales, 2 min, cupo, sobra y fila auto **no** llaman `speechSynthesis` durante medición. Quedan chime/vibración/notify. Solo voz atada a gesto (bienvenida, intro post-Cumplido). Reactivar: `localStorage.sistemicar_timer_voice=1`.
 - Persist launch: `setDoc(provisionalId)` quiet — **prohibido** `addDoc` + remap + `vehicles-updated` en el hot path post-medida (clavo ~13 s en ambos desglosadores).
-- **Prohibido bomba temporal post-lanzamiento** (`setTimeout(4s/13s/28s)`): solo movía el clavo del reloj conquista. Persist remoto / pilares / centinela van por `launchPersistGate` (pestaña oculta, idle real, o primer Cumplido/Fallado).
+- **Prohibido bomba temporal post-lanzamiento** (`setTimeout(4s/13s/28s)`): solo movía el clavo del reloj conquista. Persist remoto / pilares / centinela van por `launchPersistGate` (pestaña oculta, o primer Cumplido/Fallado tras **quiet 15s** — nunca `JSON.stringify` local en ese flush; el idle≤1.2s de PR #13 aún clavaba el tick ~cupo).
 - Firma flota (`vehiclesReactiveSignature`): **debe** incluir `situacionCupoAnchor` + `resultadoSituacion` de filas cron. Si se omiten, Cumplido/Fallado no cambia la firma → React salta el setState y la UI queda en 0/3 (regresión circular anti-freeze).
+- **Jul 2026 — handoff CUMPLIDO:** paint ms0 (una sola `aplicarTiempoGanado`) → chime → `yieldAfterPaint` → solo patch de `situacionCronometro` → disco/Firebase en sombra. Sin segundo merge de cupos. Voz fila-en-foco siempre espera idle (fallback 2.5s mid-ring).
+- **Jul 2026 — Deploy Preview Netlify:** el drawer Collaborate come toques en móvil. Bootstrap fuerza `?ntl-drawer-state=hidden` antes de montar React; unlock de Jornada navega directo a `/planeacion`.
 
 #### 4. UI espejo — Cero lógica de negocio en caliente
 

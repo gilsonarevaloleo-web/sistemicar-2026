@@ -84,6 +84,28 @@ export function SegmentAttentionBackground() {
       e => console.error("[SegmentAttentionBackground] progression", e)
     );
 
+    // Preview unlock: hasPlanificacionBaseAccess pasa a true vía sessionStorage
+    // sin nuevo snapshot de progression. No forzar tick aquí — INITIAL_TICK_DEFER
+    // y el intervalo siguen; solo sincronizar el flag tras el primer paint.
+    const syncPreviewAccessId = window.setTimeout(() => {
+      if (!progressionRef.current) {
+        hasAccessRef.current = hasPlanificacionBaseAccess(
+          null,
+          user.email,
+          null,
+          null
+        );
+        return;
+      }
+      const p = progressionRef.current;
+      hasAccessRef.current = hasPlanificacionBaseAccess(
+        p?.subscriptionPlan,
+        user.email,
+        p?.rank,
+        p?.activeModules
+      );
+    }, INITIAL_TICK_DEFER_MS);
+
     const unsubNotificationState = registerNotificationStateProvider(() => {
       if (!planillaRef.current) return null;
       return {
@@ -228,6 +250,7 @@ export function SegmentAttentionBackground() {
       releaseFlota();
       unregisterForce();
       unregisterVoiceVisible();
+      clearTimeout(syncPreviewAccessId);
       clearTimeout(initialTickId);
       clearInterval(intervalId);
       stopConcienciaScheduler();
