@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { Plus, Rocket, Trash2, X } from "lucide-react";
 import { FLOTA_CONFIG } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
@@ -22,9 +22,30 @@ function makeSub(): DesglosadorSubFormRow {
   };
 }
 
+/** Altura visible del viewport (teclado móvil) → el sheet no se esconde detrás. */
+function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => {
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setInset(covered);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+    };
+  }, []);
+  return inset;
+}
+
 /**
  * Lanzador Dual Kernel con La Flota visible (solo Conquista + Enfoque).
- * Misma lectura que /planeacion: grid → formulario → Lanzar vehículo.
+ * Sheet móvil: header + scroll + CTA fijo (no se pierde bajo teclado/nav).
  */
 export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   onLaunch,
@@ -38,6 +59,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filas, setFilas] = useState<string[]>([""]);
   const [minutos, setMinutos] = useState(30);
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
+  const keyboardInset = useKeyboardInset();
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const reset = useCallback(() => {
     setTipo(null);
@@ -155,20 +186,30 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3"
-          style={{ backgroundColor: "rgba(0,0,0,0.78)" }}
+          className="fixed inset-0 z-[220] flex items-end sm:items-center justify-center"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.82)",
+            paddingBottom: keyboardInset > 0 ? keyboardInset : undefined,
+          }}
           onClick={() => !saving && reset()}
+          data-testid="jornada4-launch-overlay"
         >
           <div
-            className="w-full max-w-md rounded-2xl border overflow-hidden max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-md flex flex-col rounded-t-2xl sm:rounded-2xl border overflow-hidden"
             style={{
               backgroundColor: PIZARRA,
               borderColor: "rgba(255,255,255,0.1)",
+              maxHeight:
+                keyboardInset > 0
+                  ? `min(92vh, calc(100dvh - ${keyboardInset}px - 8px))`
+                  : "min(92vh, 100dvh - 1rem)",
+              marginBottom: keyboardInset > 0 ? 0 : "max(0.5rem, env(safe-area-inset-bottom))",
             }}
             onClick={e => e.stopPropagation()}
             data-testid="jornada4-launch-panel"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            {/* Header fijo */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
               <div>
                 <p
                   className="text-[10px] font-black uppercase tracking-widest"
@@ -184,12 +225,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 type="button"
                 onClick={() => !saving && reset()}
                 className="p-2 rounded-lg hover:bg-white/5"
+                aria-label="Cerrar"
               >
                 <X size={16} style={{ color: MUTED }} />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            {/* Cuerpo scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
               {!tipo ? (
                 <div className="grid grid-cols-2 gap-2">
                   {V4_TIPOS.map(t => {
@@ -266,45 +309,71 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   </div>
 
                   {tipo === "tiempo" ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <p className="text-[9px] uppercase tracking-wider" style={{ color: MUTED }}>
                         Unidades del desglosador
                       </p>
                       {subs.map((sub, idx) => (
-                        <div key={sub.tempId} className="flex gap-1.5 items-center">
-                          <input
-                            value={sub.titulo}
-                            onChange={e => {
-                              const next = [...subs];
-                              next[idx] = { ...sub, titulo: e.target.value };
-                              setSubs(next);
-                            }}
-                            placeholder={`Unidad ${idx + 1}`}
-                            className="flex-1 p-2 rounded-lg bg-black/40 border text-xs focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
-                          />
-                          <input
-                            value={sub.cantidadObjetivo}
-                            onChange={e => {
-                              const next = [...subs];
-                              next[idx] = { ...sub, cantidadObjetivo: e.target.value };
-                              setSubs(next);
-                            }}
-                            placeholder="u"
-                            inputMode="numeric"
-                            className="w-12 p-2 rounded-lg bg-black/40 border text-xs text-center focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
-                            aria-label={`Cantidad unidad ${idx + 1}`}
-                          />
-                          {subs.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
-                              className="p-2 rounded-lg hover:bg-white/5"
+                        <div
+                          key={sub.tempId}
+                          className="rounded-xl border p-3 space-y-2"
+                          style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.35)" }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase" style={{ color: MUTED }}>
+                              Unidad {idx + 1}
+                            </span>
+                            {subs.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
+                                className="p-1.5 rounded-lg hover:bg-white/5"
+                                aria-label={`Quitar unidad ${idx + 1}`}
+                              >
+                                <Trash2 size={12} style={{ color: MUTED }} />
+                              </button>
+                            ) : null}
+                          </div>
+                          <div>
+                            <label
+                              className="text-[8px] uppercase tracking-wider block mb-1"
+                              style={{ color: MUTED }}
                             >
-                              <Trash2 size={12} style={{ color: MUTED }} />
-                            </button>
-                          ) : null}
+                              Nombre
+                            </label>
+                            <input
+                              value={sub.titulo}
+                              onChange={e => {
+                                const next = [...subs];
+                                next[idx] = { ...sub, titulo: e.target.value };
+                                setSubs(next);
+                              }}
+                              placeholder={`Ej: Armar pretina`}
+                              className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                            />
+                          </div>
+                          <div>
+                            <label
+                              className="text-[8px] uppercase tracking-wider block mb-1"
+                              style={{ color: MUTED }}
+                            >
+                              Cantidad (opcional)
+                            </label>
+                            <input
+                              value={sub.cantidadObjetivo}
+                              onChange={e => {
+                                const next = [...subs];
+                                next[idx] = { ...sub, cantidadObjetivo: e.target.value };
+                                setSubs(next);
+                              }}
+                              placeholder="Ej: 9"
+                              inputMode="numeric"
+                              className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                              aria-label={`Cantidad unidad ${idx + 1}`}
+                            />
+                          </div>
                         </div>
                       ))}
                       <button
@@ -317,7 +386,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div>
                         <label
                           className="text-[9px] uppercase tracking-wider mb-1 block"
@@ -340,7 +409,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           className="text-[9px] flex items-center gap-2"
                           style={{ color: MUTED }}
                         >
-                          Min
+                          Min bloque
                           <input
                             type="number"
                             min={5}
@@ -349,7 +418,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             onChange={e =>
                               setMinutos(Math.max(5, Number(e.target.value) || 30))
                             }
-                            className="w-14 p-1 rounded-lg bg-black/40 border text-xs text-right focus:outline-none"
+                            className="w-14 p-1.5 rounded-lg bg-black/40 border text-xs text-right focus:outline-none"
                             style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
                           />
                         </label>
@@ -364,7 +433,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               setFilas(next);
                             }}
                             placeholder={`Fila ${idx + 1}`}
-                            className="flex-1 p-2 rounded-lg bg-black/40 border text-xs focus:outline-none"
+                            className="flex-1 p-2.5 rounded-lg bg-black/40 border text-sm focus:outline-none"
                             style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
                           />
                           {filas.length > 1 ? (
@@ -388,24 +457,44 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       </button>
                     </div>
                   )}
-
-                  <button
-                    type="button"
-                    disabled={!canLaunch || saving}
-                    onClick={() => void handleLaunch()}
-                    className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider disabled:opacity-40 touch-manipulation"
-                    style={{
-                      backgroundColor: `${FLOTA_CONFIG[tipo].color}18`,
-                      color: FLOTA_CONFIG[tipo].color,
-                      border: `1px solid ${FLOTA_CONFIG[tipo].color}40`,
-                    }}
-                    data-testid="jornada4-launch-submit"
-                  >
-                    {saving ? "Lanzando…" : "Lanzar vehículo"}
-                  </button>
                 </>
               )}
             </div>
+
+            {/* CTA fijo: siempre visible sobre teclado / nav */}
+            {tipo ? (
+              <div
+                className="shrink-0 border-t border-white/5 px-4 pt-3"
+                style={{
+                  paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                  backgroundColor: PIZARRA,
+                }}
+              >
+                {!canLaunch ? (
+                  <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
+                    {tipo === "tiempo"
+                      ? "Escribe nombre de misión + al menos una unidad"
+                      : "Escribe nombre de misión + al menos una fila"}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={!canLaunch || saving}
+                  onClick={() => void handleLaunch()}
+                  className="w-full py-3.5 rounded-xl text-[11px] font-black uppercase tracking-wider disabled:opacity-40 touch-manipulation"
+                  style={{
+                    backgroundColor: canLaunch
+                      ? FLOTA_CONFIG[tipo].color
+                      : `${FLOTA_CONFIG[tipo].color}18`,
+                    color: canLaunch ? "#0a0a0a" : FLOTA_CONFIG[tipo].color,
+                    border: `1px solid ${FLOTA_CONFIG[tipo].color}40`,
+                  }}
+                  data-testid="jornada4-launch-submit"
+                >
+                  {saving ? "Lanzando…" : "Lanzar vehículo"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

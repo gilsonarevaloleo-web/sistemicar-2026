@@ -49,7 +49,11 @@ export default function JornadaV4Session() {
   );
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#0b0f0c" }} data-testid="jornada4-session">
+    <div
+      className="min-h-screen pb-28"
+      style={{ backgroundColor: "#0a0a0a" }}
+      data-testid="jornada4-session"
+    >
       <Jornada4Shell
         dualCount={core.dualCount}
         dailyPS={core.dailyPS}
