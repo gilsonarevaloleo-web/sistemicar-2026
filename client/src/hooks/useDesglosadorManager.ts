@@ -81,15 +81,12 @@ import { suppressSituacionFilaVoiceAfterSellar } from "@/lib/ringSellarVoiceSupp
 import { RING_COPY, reanudarSituacionCronometroRing, ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { getDesglosadorSessionElapsedSec } from "@/lib/desglosadorClock";
 import {
-  aplicarTiempoGanadoAlCumplir,
-  absorberSaldoAdelantoEnFoco,
   applyCupoManualYRedistribuir,
   quitarMinutosHaciaFoco,
   redistribuirMinutosSituacionCronometro,
   remainingCronometroBudgetMin,
   cerrarCronometroDeGolpe,
   resolveCronometroCupoAnchor,
-  registrarCierreFalladoCronometro,
   extraerSubTareaAReserva,
   isCupoFijo,
   resolveFocusSubTareaId,
@@ -106,7 +103,6 @@ import {
   situacionMinutosHastaObjetivoHora,
   situacionObjetivoHoraToContratoMs,
   resolveDefaultObjetivoHoraParaRing,
-  describeRepartoGananciaEnCola,
 } from "@/lib/situacionGanancia";
 import type { PuntoCeroSession } from "@/lib/puntoCeroTypes";
 import {
@@ -3165,18 +3161,21 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
 
     // ms0: pinta cierre + ancla nueva ANTES de cualquier await (reinicio de reloj).
-    paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
+    // Una sola pasada de aplicarTiempoGanado — el segundo merge post-yield clavaba el tick.
+    const paint = paintSituacionRingRowCloseOptimistic(
+      vehiclesRef,
+      setVehicles,
+      vehicleId,
+      subTareaId,
+      "cumplido"
+    );
+    if (!paint) return;
     flushLaunchPersistOnSubClose(vehicleId);
-    const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
-    const subTareasPainted = painted.subTareas ?? list;
-    const anchorPainted = painted.situacionCupoAnchor ?? null;
 
     const listCronOrder = list.filter(st => st.enDesgloseCronometro);
     const idx = listCronOrder.findIndex(st => st.id === subTareaId);
     const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
-    // Chime en el gesto (no esperar Firebase) — feedback ms0.
     void playSituacionChimes(chimesOnComplete);
-    // Ceder 2 frames: remount del island con startedAt fresco antes del merge/disco.
     await yieldAfterPaint();
 
     const now = Date.now();
@@ -3184,42 +3183,19 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!sc.horaFinContratoMs && sc.horaFinMs) {
       sc = { ...sc, horaFinContratoMs: sc.horaFinMs };
     }
+    const live = vehiclesRef.current.find(v => v.id === vehicleId);
+    const subTareas = live?.subTareas ?? paint.subTareas;
+    const situacionCupoAnchor = paint.bloqueListo
+      ? null
+      : (live?.situacionCupoAnchor ?? paint.situacionCupoAnchor);
+    const minutosGanados = paint.minutosGanados;
+    const saldoAdelantoMin = paint.saldoAdelantoMin;
+    const bloqueListo = paint.bloqueListo;
     const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
-
-    // Ganancia / saldo: calcular sobre snapshot pre-cierre; ancla final = la pintada (forceReset).
-    let workingList = list;
-    if ((sc.saldoAdelantoMin ?? 0) > 0) {
-      const absorbed = absorberSaldoAdelantoEnFoco(workingList, sc.saldoAdelantoMin!, vehicle.situacionCupoAnchor);
-      workingList = absorbed.subTareas;
-      sc = { ...sc, saldoAdelantoMin: absorbed.saldoRestante };
-    }
-    const gained = aplicarTiempoGanadoAlCumplir(
-      workingList,
-      subTareaId,
-      vehicle.situacionCupoAnchor,
-      now,
-      bloqueInicio,
-      sc.horaFinContratoMs ?? sc.horaFinMs
-    );
-    // Preferir filas ya pintadas (resultado + cupos) para no pisar el ancla ms0.
-    const subTareas = subTareasPainted.map(st => {
-      const g = gained.subTareas.find(x => x.id === st.id);
-      if (!g) return st;
-      return {
-        ...st,
-        minutosCupo: g.minutosCupo ?? st.minutosCupo,
-        minutosObjetivoCupo: g.minutosObjetivoCupo ?? st.minutosObjetivoCupo,
-        bonusMinutosCola: g.bonusMinutosCola ?? st.bonusMinutosCola,
-      };
-    });
-    const minutosGanados = gained.minutosGanados;
-    const saldoAdelantoMin = gained.saldoAdelantoMin;
-    const repartoColaDesc = describeRepartoGananciaEnCola(workingList, gained.subTareas, subTareaId);
     const elapsedSec = Math.floor((now - bloqueInicio) / 1000);
     const totalDepthPs = computeDesglosadorSessionDepthPS(elapsedSec);
     const prevGranted = sc.depthBlockPsGranted ?? 0;
     const deltaDepth = totalDepthPs - prevGranted;
-    const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
     const scActivo = {
       ...sc,
       depthBlockPsGranted: totalDepthPs,
@@ -3229,40 +3205,27 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       retoNumero: sc.retoNumero ?? 1,
       retosCompletados: sc.retosCompletados ?? 0,
     };
-    let situacionCronometro =
+    const situacionCronometro =
       !bloqueListo && scActivo.activo !== true
         ? reanudarSituacionCronometroRing(scActivo)
         : scActivo;
-    // Ancla: la del paint (startedAt fresco). Solo re-resolvemos si falta.
-    // Releer ancla post-yield por si un sync idle intentó tocar el vehículo.
-    const anchorFresh =
-      vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? anchorPainted;
-    let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
-    if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
-      const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-        forceResetSameRow: true,
-        now,
-      });
-      situacionCupoAnchor =
-        resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
-    }
+
+    // Solo cronómetro — filas/ancla ya pintadas; no remount del island con nueva identidad de subs.
     setVehicles(prev =>
-      prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
+      prev.map(v => (v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v))
     );
     vehiclesRef.current = vehiclesRef.current.map(v =>
-      v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+      v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
     );
-    // Disco fuera del gesto: no pelear remount/tick del island con JSON flota.
-    scheduleSaveLocalVehicles(vehiclesRef.current);
     recordDecision(user.uid, {
       key: decisionKeySubSituacion(vehicleId, subTareaId),
       kind: "sub_situacion",
       vehicleId,
       ts: now,
     });
-    // burst ya disparado en paintSituacionRingRowCloseOptimistic
 
     void runShadowTaskAsync(async () => {
+      scheduleSaveLocalVehicles(vehiclesRef.current);
       let finalSubTareas = subTareas;
       let pasoNumero: number | null = null;
       const updatedSub = subTareas.find(st => st.id === subTareaId);
@@ -3290,7 +3253,6 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           situacionCronometro,
           situacionCupoAnchor,
         });
-        // Ancla ya reajustada en ms0; sync sin forceReset = no-op / puede pisar.
         await safeAwardPS(4, `Sub-tarea (cronómetro): ${targetSub.texto}`);
         if (deltaDepth > 0) await safeAwardPS(deltaDepth, `Profundidad bloque situación: ${vehicle.titulo}`);
         if (bloqueListo) {
@@ -3306,9 +3268,7 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
           });
         } else if (minutosGanados > 0) {
           toast.success(`+4 PS · +${minutosGanados} min ganados`, {
-            description:
-              repartoColaDesc ??
-              "Tiempo sumado al cupo de la cola o de la fila en foco",
+            description: "Tiempo sumado al cupo de la cola o de la fila en foco",
             style: { backgroundColor: PIZARRA, border: `1px solid ${VERDE}`, color: VERDE },
             duration: 3400,
           });
@@ -3338,58 +3298,37 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     if (!vehicle?.subTareas || vehicle.tipoFlota !== "situacion" || !ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return;
     const targetSub = vehicle.subTareas.find(st => st.id === subTareaId);
     if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente") return;
-    paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
+    const paint = paintSituacionRingRowCloseOptimistic(
+      vehiclesRef,
+      setVehicles,
+      vehicleId,
+      subTareaId,
+      "fallado"
+    );
+    if (!paint) return;
     flushLaunchPersistOnSubClose(vehicleId);
-    const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
     await yieldAfterPaint();
     const now = Date.now();
     const sc = vehicle.situacionCronometro!;
-    const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
-    const subTareasRaw = registrarCierreFalladoCronometro(
-      vehicle.subTareas,
-      subTareaId,
-      vehicle.situacionCupoAnchor,
-      now,
-      bloqueInicio
-    );
-    // Conservar ancla ms0 del paint; solo fusionar cupos del cálculo.
-    const subTareasPainted = vehiclesRef.current.find(v => v.id === vehicleId)?.subTareas ?? painted.subTareas;
-    const subTareas = (subTareasPainted ?? subTareasRaw.subTareas).map(st => {
-      const g = subTareasRaw.subTareas.find(x => x.id === st.id);
-      if (!g) return st;
-      return {
-        ...st,
-        minutosCupo: g.minutosCupo ?? st.minutosCupo,
-        minutosObjetivoCupo: g.minutosObjetivoCupo ?? st.minutosObjetivoCupo,
-      };
-    });
-    const minutosPerdidos = subTareasRaw.minutosPerdidos;
-    const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
-    let situacionCronometro =
+    const live = vehiclesRef.current.find(v => v.id === vehicleId);
+    const subTareas = live?.subTareas ?? paint.subTareas;
+    const situacionCupoAnchor = paint.bloqueListo
+      ? null
+      : (live?.situacionCupoAnchor ?? paint.situacionCupoAnchor);
+    const minutosPerdidos = paint.minutosPerdidos;
+    const bloqueListo = paint.bloqueListo;
+    const situacionCronometro =
       !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-    const anchorFresh =
-      vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? painted.situacionCupoAnchor ?? null;
-    let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
-    if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
-      const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-        forceResetSameRow: true,
-        now,
-      });
-      situacionCupoAnchor =
-        resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
-    }
     setVehicles(prev =>
-      prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v))
+      prev.map(v => (v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v))
     );
     vehiclesRef.current = vehiclesRef.current.map(v =>
-      v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+      v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
     );
-    scheduleSaveLocalVehicles(vehiclesRef.current);
-    // burst ya disparado en paintSituacionRingRowCloseOptimistic
     void runShadowTaskAsync(async () => {
+      scheduleSaveLocalVehicles(vehiclesRef.current);
       try {
         await updateVehicle(user.uid, vehicleId, { subTareas, situacionCronometro, situacionCupoAnchor });
-        // Ancla ya reajustada en ms0; sync sin forceReset = no-op / puede pisar.
         if (bloqueListo) {
           toast.info("Ronda completada", {
             description: `Usa «${RING_COPY.cerrarRing}» para sellar la ronda o añade más filas al ring.`,

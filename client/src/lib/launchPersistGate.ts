@@ -6,7 +6,8 @@
  *
  * Solo se vacía cuando el operador NO está mid-tick de medición:
  * - pestaña oculta / pagehide
- * - primer cierre de sub (Cumplido/Fallado) del vehículo — diferido (no sync en el gesto)
+ * - primer cierre de sub (Cumplido/Fallado): remote/pillars/centinela tras quiet window;
+ *   **nunca** stringify local en ese flush (pelea con remount del reloj de la fila #2)
  * - red de seguridad a 3 min (setDoc async; no stringify forzado en foreground temprano)
  */
 
@@ -25,6 +26,12 @@ let deferredFlushHandles: Array<ReturnType<typeof setTimeout> | number> = [];
 
 /** Red de seguridad — solo si nunca hubo oculto/cierre. */
 export const LAUNCH_PERSIST_SAFETY_MS = 180_000;
+
+/**
+ * Tras CUMPLIDO/FALLADO el island de la siguiente fila necesita segundos quietos.
+ * Flush launch a ≤1.2s (PR #13) aún clavaba el tick ~cupo (00:05:44 / 00:09:59).
+ */
+export const SUB_CLOSE_PERSIST_QUIET_MS = 15_000;
 
 function clearSafety(): void {
   if (safetyTimer != null) {
@@ -88,17 +95,31 @@ function flushSafetyForeground(): void {
   flushBatch(runNow, "safety-foreground");
 }
 
-function flushVehicle(vehicleId: string, reason: string): void {
+function flushVehicle(vehicleId: string, reason: string, kinds?: LaunchPersistKind[]): void {
   const keep: PendingLaunchWork[] = [];
   const runNow: PendingLaunchWork[] = [];
+  const allow = kinds ? new Set(kinds) : null;
   for (const item of pending) {
-    if (item.vehicleId === vehicleId) runNow.push(item);
-    else keep.push(item);
+    if (item.vehicleId === vehicleId && (!allow || allow.has(item.kind))) {
+      runNow.push(item);
+    } else {
+      keep.push(item);
+    }
   }
   pending.length = 0;
   pending.push(...keep);
   disarmIfEmpty();
   flushBatch(runNow, reason);
+}
+
+/** Descarta pending de un kind (p. ej. local en CUMPLIDO — el handler ya agenda su propio save). */
+function dropVehicleKind(vehicleId: string, kind: LaunchPersistKind): void {
+  for (let i = pending.length - 1; i >= 0; i--) {
+    if (pending[i].vehicleId === vehicleId && pending[i].kind === kind) {
+      pending.splice(i, 1);
+    }
+  }
+  disarmIfEmpty();
 }
 
 function onVisibility(): void {
@@ -155,25 +176,14 @@ export function flushLaunchPersistOnSubCloseSync(vehicleId: string): void {
 
 /**
  * Primer Cumplido/Fallado / cierre del desglosador.
- * DIFERIDO: nunca stringify/remote en el stack del gesto — pelea con el remount
- * del cronómetro situacional (reloj clavado en 09:59 tras CUMPLIDO).
+ * - Descarta stringify `local` de launch (el cierre ya agenda su propio save).
+ * - Remote/pillars/centinela tras quiet window — nunca en el stack del gesto ni a ≤1.2s.
  */
 export function flushLaunchPersistOnSubClose(vehicleId: string): void {
-  const run = () => flushVehicle(vehicleId, "sub-close");
-  if (typeof requestAnimationFrame !== "undefined") {
-    const raf = requestAnimationFrame(() => {
-      if (typeof requestIdleCallback !== "undefined") {
-        const idle = requestIdleCallback(run, { timeout: 1200 });
-        deferredFlushHandles.push(idle);
-      } else {
-        const t = setTimeout(run, 0);
-        deferredFlushHandles.push(t as unknown as number);
-      }
-    });
-    deferredFlushHandles.push(raf);
-    return;
-  }
-  const t = setTimeout(run, 0);
+  dropVehicleKind(vehicleId, "local");
+  const run = () =>
+    flushVehicle(vehicleId, "sub-close-quiet", ["remote", "pillars", "centinela"]);
+  const t = setTimeout(run, SUB_CLOSE_PERSIST_QUIET_MS);
   deferredFlushHandles.push(t as unknown as number);
 }
 
@@ -211,4 +221,9 @@ export function resetLaunchPersistGateForTests(): void {
 /** Solo tests. */
 export function countLaunchPersistPendingForTests(): number {
   return pending.length;
+}
+
+/** Solo tests — cuenta por kind. */
+export function countLaunchPersistPendingByKindForTests(kind: LaunchPersistKind): number {
+  return pending.filter(p => p.kind === kind).length;
 }

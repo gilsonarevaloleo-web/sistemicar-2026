@@ -25,16 +25,14 @@ import {
 } from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { paintSituacionRingRowCloseOptimistic } from "@/lib/situacionRingCloseMs0";
+import { flushLaunchPersistOnSubClose } from "@/lib/launchPersistGate";
 import {
-  aplicarTiempoGanadoAlCumplir,
-  registrarCierreFalladoCronometro,
   resolveCronometroCupoAnchor,
   redistribuirMinutosSituacionCronometro,
   remainingCronometroBudgetMin,
   isCupoFijo,
   situacionFilaCronometroPendiente,
   vehicleNeedsCupoAnchorSync,
-  absorberSaldoAdelantoEnFoco,
 } from "@/lib/situacionCupoDistrib";
 import {
   addSituacionReserva,
@@ -54,7 +52,6 @@ import {
   RING_COPY,
 } from "@/lib/ringEnfoqueReal";
 import {
-  describeRepartoGananciaEnCola,
   situacionContratoFinMs,
   situacionObjetivoHoraToContratoMs,
   situacionMinutosHastaObjetivoHora,
@@ -877,16 +874,20 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente")
         return;
 
-      // ms0: pinta cierre + ancla nueva ANTES de cualquier await (reinicio de reloj).
-      paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "cumplido");
-      const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
-      const subTareasPainted = painted.subTareas ?? list;
-      const anchorPainted = painted.situacionCupoAnchor ?? null;
+      // ms0: paint once — no second aplicarTiempoGanado after yield (PR #13 still froze).
+      const paint = paintSituacionRingRowCloseOptimistic(
+        vehiclesRef,
+        setVehicles,
+        vehicleId,
+        subTareaId,
+        "cumplido"
+      );
+      if (!paint) return;
+      flushLaunchPersistOnSubClose(vehicleId);
 
       const listCronOrder = list.filter(st => st.enDesgloseCronometro);
       const idx = listCronOrder.findIndex(st => st.id === subTareaId);
       const chimesOnComplete = idx >= 0 ? Math.max(1, listCronOrder.length - idx) : 1;
-      // Chime in gesture (don't wait for Firebase) — ms0 feedback.
       void playSituacionChimes(chimesOnComplete);
       await yieldAfterPaint();
 
@@ -895,43 +896,19 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       if (!sc.horaFinContratoMs && sc.horaFinMs) {
         sc = { ...sc, horaFinContratoMs: sc.horaFinMs };
       }
+      const live = vehiclesRef.current.find(v => v.id === vehicleId);
+      const subTareas = live?.subTareas ?? paint.subTareas;
+      const situacionCupoAnchor = paint.bloqueListo
+        ? null
+        : (live?.situacionCupoAnchor ?? paint.situacionCupoAnchor);
+      const minutosGanados = paint.minutosGanados;
+      const saldoAdelantoMin = paint.saldoAdelantoMin;
+      const bloqueListo = paint.bloqueListo;
       const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
-
-      let workingList = list;
-      if ((sc.saldoAdelantoMin ?? 0) > 0) {
-        const absorbed = absorberSaldoAdelantoEnFoco(
-          workingList,
-          sc.saldoAdelantoMin!,
-          vehicle.situacionCupoAnchor
-        );
-        workingList = absorbed.subTareas;
-        sc = { ...sc, saldoAdelantoMin: absorbed.saldoRestante };
-      }
-      const gained = aplicarTiempoGanadoAlCumplir(
-        workingList,
-        subTareaId,
-        vehicle.situacionCupoAnchor,
-        now,
-        bloqueInicio,
-        sc.horaFinContratoMs ?? sc.horaFinMs
-      );
-      // Prefer rows already painted (result + cupos) to not overwrite the ms0 anchor.
-      const subTareas = subTareasPainted.map(st => {
-        const g = gained.subTareas.find(x => x.id === st.id);
-        if (!g) return st;
-        return {
-          ...st,
-          minutosCupo: g.minutosCupo ?? st.minutosCupo,
-        };
-      });
-      const minutosGanados = gained.minutosGanados;
-      const saldoAdelantoMin = gained.saldoAdelantoMin;
-      const repartoColaDesc = describeRepartoGananciaEnCola(workingList, gained.subTareas, subTareaId);
       const elapsedSec = Math.floor((now - bloqueInicio) / 1000);
       const totalDepthPs = computeDesglosadorSessionDepthPS(elapsedSec);
       const prevGranted = sc.depthBlockPsGranted ?? 0;
       const deltaDepth = totalDepthPs - prevGranted;
-      const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
       const scActivo = {
         ...sc,
         depthBlockPsGranted: totalDepthPs,
@@ -941,40 +918,28 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
         retoNumero: sc.retoNumero ?? 1,
         retosCompletados: sc.retosCompletados ?? 0,
       };
-      let situacionCronometro =
+      const situacionCronometro =
         !bloqueListo && scActivo.activo !== true
           ? reanudarSituacionCronometroRing(scActivo)
           : scActivo;
-      // Use the painted anchor (fresh startedAt). Only re-resolve if missing.
-      const anchorFresh =
-        vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ?? anchorPainted;
-      let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
-      if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
-        const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-          forceResetSameRow: true,
-          now,
-        });
-        situacionCupoAnchor =
-          resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
-      }
+
       setVehicles(prev =>
         prev.map(v =>
-          v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+          v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
         )
       );
       vehiclesRef.current = vehiclesRef.current.map(v =>
-        v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+        v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
       );
-      scheduleSaveLocalVehicles(vehiclesRef.current);
       recordDecision(userId, {
         key: decisionKeySubSituacion(vehicleId, subTareaId),
         kind: "sub_situacion",
         vehicleId,
         ts: now,
       });
-      // burst already fired in paintSituacionRingRowCloseOptimistic
 
       void runShadowTaskAsync(async () => {
+        scheduleSaveLocalVehicles(vehiclesRef.current);
         let finalSubTareas = subTareas;
         let pasoNumero: number | null = null;
         const updatedSub = subTareas.find(st => st.id === subTareaId);
@@ -1020,8 +985,7 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
             });
           } else if (minutosGanados > 0) {
             toast.success(`+4 PS · +${minutosGanados} min ganados`, {
-              description:
-                repartoColaDesc ?? "Tiempo sumado al cupo de la cola o de la fila en foco",
+              description: "Tiempo sumado al cupo de la cola o de la fila en foco",
               style: { backgroundColor: PIZARRA, border: `1px solid ${VERDE}`, color: VERDE },
               duration: 3400,
             });
@@ -1069,58 +1033,37 @@ export function useJornadaV3Ops(params: UseJornadaV3OpsParams): {
       if (!targetSub?.enDesgloseCronometro || (targetSub.resultadoSituacion ?? "pendiente") !== "pendiente")
         return;
 
-      // ms0: paint close + preserve painted anchor.
-      paintSituacionRingRowCloseOptimistic(vehiclesRef, setVehicles, vehicleId, subTareaId, "fallado");
-      const painted = vehiclesRef.current.find(v => v.id === vehicleId) ?? vehicle;
+      const paint = paintSituacionRingRowCloseOptimistic(
+        vehiclesRef,
+        setVehicles,
+        vehicleId,
+        subTareaId,
+        "fallado"
+      );
+      if (!paint) return;
+      flushLaunchPersistOnSubClose(vehicleId);
       await yieldAfterPaint();
       const now = Date.now();
       const sc = vehicle.situacionCronometro!;
-      const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
-      const subTareasRaw = registrarCierreFalladoCronometro(
-        vehicle.subTareas,
-        subTareaId,
-        vehicle.situacionCupoAnchor,
-        now,
-        bloqueInicio
-      );
-      // Preserve ms0 anchor; only merge cupos from calculation.
-      const subTareasPainted =
-        vehiclesRef.current.find(v => v.id === vehicleId)?.subTareas ?? painted.subTareas;
-      const subTareas = (subTareasPainted ?? subTareasRaw.subTareas).map(st => {
-        const g = subTareasRaw.subTareas.find(x => x.id === st.id);
-        if (!g) return st;
-        return {
-          ...st,
-          minutosCupo: g.minutosCupo ?? st.minutosCupo,
-        };
-      });
-      const minutosPerdidos = subTareasRaw.minutosPerdidos;
-      const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
-      let situacionCronometro =
+      const live = vehiclesRef.current.find(v => v.id === vehicleId);
+      const subTareas = live?.subTareas ?? paint.subTareas;
+      const situacionCupoAnchor = paint.bloqueListo
+        ? null
+        : (live?.situacionCupoAnchor ?? paint.situacionCupoAnchor);
+      const minutosPerdidos = paint.minutosPerdidos;
+      const bloqueListo = paint.bloqueListo;
+      const situacionCronometro =
         !bloqueListo && sc.activo !== true ? reanudarSituacionCronometroRing(sc) : sc;
-      const anchorFresh =
-        vehiclesRef.current.find(v => v.id === vehicleId)?.situacionCupoAnchor ??
-        painted.situacionCupoAnchor ??
-        null;
-      let situacionCupoAnchor = bloqueListo ? null : anchorFresh;
-      if (!bloqueListo && !situacionCupoAnchor?.subTareaId) {
-        const resolvedAnchor = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
-          forceResetSameRow: true,
-          now,
-        });
-        situacionCupoAnchor =
-          resolvedAnchor === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolvedAnchor;
-      }
       setVehicles(prev =>
         prev.map(v =>
-          v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+          v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
         )
       );
       vehiclesRef.current = vehiclesRef.current.map(v =>
-        v.id === vehicleId ? { ...v, subTareas, situacionCronometro, situacionCupoAnchor } : v
+        v.id === vehicleId ? { ...v, situacionCronometro, situacionCupoAnchor } : v
       );
-      scheduleSaveLocalVehicles(vehiclesRef.current);
       void runShadowTaskAsync(async () => {
+        scheduleSaveLocalVehicles(vehiclesRef.current);
         try {
           await updateVehicle(userId, vehicleId, {
             subTareas,
