@@ -7,17 +7,31 @@ import { useEffect, useRef, useState } from "react";
 
 export const CONCIENCIA_CLOCK_TICK_EVENT = "sistemicar-conciencia-clock-tick";
 
+/**
+ * Sticky: una vez detectado coarse/móvil en la sesión, NO volver a false.
+ * Rotar a landscape suele cruzar max-width:768 → antes se apagaba el modo
+ * supervivencia justo cuando hay 1–2 desglosadores midiendo (freeze).
+ */
+let stickyCoarseSession: boolean | null = null;
+
 /** Móvil / pantalla estrecha: métricas densas cada 5 s, puntero cada 1 s. */
 export function isCoarseConcienciaDevice(): boolean {
   if (typeof window === "undefined") return false;
+  if (stickyCoarseSession === true) return true;
   try {
-    return (
+    const coarse =
       window.matchMedia("(pointer: coarse)").matches ||
-      window.matchMedia("(max-width: 768px)").matches
-    );
+      window.matchMedia("(max-width: 768px)").matches;
+    if (coarse) stickyCoarseSession = true;
+    return coarse;
   } catch {
     return false;
   }
+}
+
+/** Solo tests. */
+export function resetCoarseConcienciaStickyForTests(): void {
+  stickyCoarseSession = null;
 }
 
 export function dispatchConcienciaClockTick(): void {

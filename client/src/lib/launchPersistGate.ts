@@ -8,7 +8,11 @@
  * - pestaña oculta / pagehide
  * - primer cierre de sub (Cumplido/Fallado) del vehículo
  * - red de seguridad a 3 min (setDoc async; no stringify forzado en foreground temprano)
+ *
+ * Rotación: visibility/pagehide durante orientation quiet se aplaza (~1.2s).
  */
+
+import { isOrientationQuiet, runWhenOrientationSettled } from "@/lib/orientationQuietGate";
 
 export type LaunchPersistKind = "remote" | "local" | "pillars" | "centinela";
 
@@ -102,11 +106,19 @@ function flushVehicle(vehicleId: string, reason: string): void {
 
 function onVisibility(): void {
   if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    if (isOrientationQuiet()) {
+      runWhenOrientationSettled(() => flushAll("visibility-hidden-settled"));
+      return;
+    }
     flushAll("visibility-hidden");
   }
 }
 
 function onPageHide(): void {
+  if (isOrientationQuiet()) {
+    runWhenOrientationSettled(() => flushAll("pagehide-settled"));
+    return;
+  }
   flushAll("pagehide");
 }
 

@@ -226,7 +226,9 @@ import {
   hardwareClockNow,
   hardwareElapsedMs,
 } from "@/lib/hardwareClock";
-import { isMobilePerfMode, MOBILE_PERF } from "@/lib/mobilePerf";
+import { isMobilePerfMode, situacionCupoPollMs } from "@/lib/mobilePerf";
+import { getFlotaVehicles } from "@/flota/flotaStore";
+import { getOperationalActives } from "@/lib/vehicleOperationalSlots";
 import {
   registerSituacionSessionCleanup,
   resetSituacionSessionTeardownGate,
@@ -1015,7 +1017,9 @@ function VehicleCard({
       }, SITUACION_CUPO_ESCALATION_MS);
     };
     run();
-    const intervalId = window.setInterval(run, 2000);
+    const ops = getOperationalActives(getFlotaVehicles()).length;
+    const pollMs = situacionCupoPollMs(ops);
+    const intervalId = window.setInterval(run, pollMs);
     return () => {
       clearInterval(intervalId);
       clearEscalation();

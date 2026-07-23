@@ -36,9 +36,11 @@ import {
   setSchedulerUiClockMs,
   stopConcienciaScheduler,
 } from "@/lib/concienciaScheduler";
-import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival } from "@/lib/mobilePerf";
+import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival, isDualOperationalLoad } from "@/lib/mobilePerf";
+import { isOrientationQuiet } from "@/lib/orientationQuietGate";
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
+import { getOperationalActives } from "@/lib/vehicleOperationalSlots";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -209,13 +211,21 @@ export function SegmentAttentionBackground() {
     };
 
     const unregisterVoiceVisible = registerVoiceVisibleHandler(() => {
+      // Rotación / resize: no saturar con burst + tick forzado mientras el layout asienta.
+      if (isOrientationQuiet()) {
+        resetInterval();
+        return;
+      }
       const flushed = flushMissedPuertaVoiceOnVisible();
       if (flushed > 0) {
         console.log(`[Voz] Reproduciendo ${flushed} aviso(s) de segundo plano`);
       }
       resetInterval();
-      burstConcienciaClockTick(isMobilePerfMode() ? 1 : 3, isMobilePerfMode() ? 200 : 120);
-      scheduleTick({ force: true });
+      const dual = isDualOperationalLoad(getOperationalActives(vehiclesRef.current).length);
+      const bursts = dual || isMobilePerfMode() ? 1 : 3;
+      const gap = isMobilePerfMode() ? 200 : 120;
+      burstConcienciaClockTick(bursts, gap);
+      scheduleTick({ force: !dual });
       if (user) requestGhostReconcileAfterVehicleAction(user.uid);
     });
 

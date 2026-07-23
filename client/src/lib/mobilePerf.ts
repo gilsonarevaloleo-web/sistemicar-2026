@@ -1,10 +1,27 @@
 import { isCoarseConcienciaDevice } from "./concienciaClock";
+import { MAX_OPERATIONAL_SLOTS } from "./vehicleOperationalSlots";
 
 const JORNADA_FULL_MODE_KEY = "sistemicar_jornada_full_mode";
 
 /** Móvil / pantalla táctil estrecha: modo rendimiento conservador. */
 export function isMobilePerfMode(): boolean {
   return isCoarseConcienciaDevice();
+}
+
+/**
+ * Conquista + situacional (o 2 misiones operativas) a la vez:
+ * ambos desglosadores SÍ están soportados (MAX_OPERATIONAL_SLOTS=2),
+ * pero el celular necesita cadencias más lentas para no saturar el hilo.
+ */
+export function isDualOperationalLoad(activeOperationalCount: number): boolean {
+  return activeOperationalCount >= MAX_OPERATIONAL_SLOTS;
+}
+
+/** Intervalo de sondeo de cupo situacional (ms). Más lento con 2 slots llenos. */
+export function situacionCupoPollMs(activeOperationalCount: number): number {
+  if (isDualOperationalLoad(activeOperationalCount)) return 4_000;
+  if (isMobilePerfMode()) return 2_500;
+  return 2_000;
 }
 
 /** Modo completo (anillo live, voz, entropía catch-up) activado por el operador en móvil. */
@@ -59,4 +76,7 @@ export const MOBILE_PERF = {
   /** Reloj global del anillo en foreground (móvil) — 1 s para segunderos nativos. */
   CLOCK_MS_FOREGROUND: 1_000,
   SKIP_RETRO_CENTINELA: true,
+  /** Con 2 desglosadores: menos bursts al volver de visibility/rotación. */
+  DUAL_SLOT_CLOCK_BURSTS: 1,
+  DUAL_SLOT_CUPO_POLL_MS: 4_000,
 } as const;

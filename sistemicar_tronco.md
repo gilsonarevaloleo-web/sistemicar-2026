@@ -130,10 +130,13 @@ Un coordinador serializa con **tope de ms por frame**:
 | Ciclo segmentos/entropía (`runSegmentAttentionCycle`) | 10–25 s | Media — producto Base |
 | Catch-up anillo / timeline | idle, bajo demanda | Baja |
 | Persistencia flota | debounce 500 ms + flush en cierre | Baja |
+| Rotación / resize | quiet 1.2 s — aplaza flush disco y bursts | Alta — anti-freeze móvil |
 
 **No destruir entropía** para ganar FPS. **Presupuestarla** en idle.
 
 Estado: **parcial+** — `concienciaScheduler.ts` serializa pulso UI + cola presupuestada (`enqueueConcienciaWork`); `SegmentAttentionBackground` encola el ciclo de segmentos. Persistencia con skip por firma (`vehiclesReactiveSignature`) y teardown situacional en sombra. Ver brief § Capa A/B/C.
+
+**Jul 2026 — dual desglosadores + orientación:** `MAX_OPERATIONAL_SLOTS=2` (conquista + situacional) es contrato de producto. El freeze al girar el celular / con ambos midiendo era saturación: `max-width:768` apagaba supervivencia en landscape + flush síncrono en `visibilitychange`. Mitigación: sticky coarse (`isCoarseConcienciaDevice`), `orientationQuietGate` (aplaza disco/bursts ~1.2s), cupo situacional más lento con 2 slots (`situacionCupoPollMs`).
 
 **Lanzamiento flota (`/planeacion`):** el toast es ms0 barato; el freeze clásico era la avalancha *después*. Timeline de control: disco **1.5 s**, Firebase `launchPaint` **4 s**, persist remoto quiet **28 s** (`setDoc` con id provisional — sin remap/`saveLocal`/`vehicles-updated`; el clavo a ~**13 s** era sombra@12s + `addDoc` remap), pilares **30 s**, archive centinela **36 s**. Expand móvil diferido para situacional y conquista grande. Sin segundo `VehicleCardLiveNow` anidado.
 

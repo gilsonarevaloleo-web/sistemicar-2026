@@ -1,5 +1,7 @@
 /** Debounce de escritura local de flota — sin dependencias Firebase. */
 
+import { runWhenOrientationSettled } from "./orientationQuietGate";
+
 export const LOCAL_VEHICLES_DEBOUNCE_MS = 500;
 
 let pendingWrite: (() => boolean) | null = null;
@@ -43,9 +45,10 @@ export function resetDebouncedWriteState(): void {
 export function initLocalVehiclesFlushListeners(flushPending: () => void): void {
   if (listenersInit || typeof window === "undefined") return;
   listenersInit = true;
+  const flushSettled = () => runWhenOrientationSettled(flushPending);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushPending();
+    if (document.visibilityState === "hidden") flushSettled();
   });
   window.addEventListener("beforeunload", flushPending);
-  window.addEventListener("pagehide", flushPending);
+  window.addEventListener("pagehide", flushSettled);
 }

@@ -76,6 +76,7 @@ import { unlockSpeechSynthesis } from "@/lib/speechQueue";
 import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speechRecovery";
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
+import { installOrientationQuietGate } from "@/lib/orientationQuietGate";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -441,6 +442,7 @@ function SovereigntyListener() {
 function VoiceBootstrap() {
   useEffect(() => {
     const stopLifecycle = installVoiceLifecycleHub();
+    const stopOrientationQuiet = installOrientationQuietGate();
     ensureUbicacionVoiceRetryHub();
     const stopWatchdog = installSpeechStuckWatchdog();
     const unlock = () => {
@@ -458,6 +460,7 @@ function VoiceBootstrap() {
     window.addEventListener("keydown", onRecoveryShortcut, { capture: true });
     return () => {
       stopLifecycle();
+      stopOrientationQuiet();
       stopWatchdog();
       window.removeEventListener("pointerdown", unlock, { capture: true });
       window.removeEventListener("keydown", unlock, { capture: true });

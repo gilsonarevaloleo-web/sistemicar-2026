@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue, startTransition } from "react";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
+import { runWhenOrientationSettled } from "@/lib/orientationQuietGate";
 import { scheduleRecordBannerClear } from "@/lib/recordBannerTimer";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
@@ -696,6 +697,10 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
       saveLocalVehicles(vehiclesRef.current);
       parkActiveVehiclesForResume(vehiclesRef.current);
     };
+    const flushToLocalSettled = () => {
+      // Rotación dispara visibility/pagehide: aplazar stringify si estamos en quiet.
+      runWhenOrientationSettled(flushToLocal);
+    };
     const rehydrateFromLocal = () => {
       const nowMs = Date.now();
       const dayStart = getJournalDayStartMs(nowMs);
@@ -741,16 +746,16 @@ export function useDesglosadorManager(options?: UseDesglosadorManagerOptions) {
     rehydrateFlotaFromLocalRef.current = rehydrateFromLocal;
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        flushToLocal();
+        flushToLocalSettled();
         return;
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", flushToLocal);
+    window.addEventListener("pagehide", flushToLocalSettled);
     return () => {
       rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", flushToLocal);
+      window.removeEventListener("pagehide", flushToLocalSettled);
     };
   }, [user]);
 

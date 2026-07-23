@@ -29,6 +29,7 @@ import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileSch
 import { recordFocusBandEvent } from "@/lib/focusBandLedger";
 import { BLOOD, PIZARRA } from "@/components/flota/vehicleCardShared";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
+import { runWhenOrientationSettled } from "@/lib/orientationQuietGate";
 import { startTransition } from "react";
 
 export type JornadaFlotaCore = {
@@ -128,15 +129,16 @@ export function useJornadaFlotaCore(options?: {
       });
     };
     rehydrateFlotaFromLocalRef.current = rehydrateFromLocal;
+    const flushToLocalSettled = () => runWhenOrientationSettled(flushToLocal);
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") flushToLocal();
+      if (document.visibilityState === "hidden") flushToLocalSettled();
     };
     document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", flushToLocal);
+    window.addEventListener("pagehide", flushToLocalSettled);
     return () => {
       rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", flushToLocal);
+      window.removeEventListener("pagehide", flushToLocalSettled);
     };
   }, [user, setVehicles]);
 
