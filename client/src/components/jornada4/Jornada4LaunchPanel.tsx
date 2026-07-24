@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { Plus, Rocket, Trash2, X } from "lucide-react";
-import { FLOTA_CONFIG } from "@/components/flota/vehicleCardShared";
+import { FLOTA_CONFIG, getSubVehicleRecordSuggestions } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
@@ -313,69 +313,173 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <p className="text-[9px] uppercase tracking-wider" style={{ color: MUTED }}>
                         Unidades del desglosador
                       </p>
-                      {subs.map((sub, idx) => (
-                        <div
-                          key={sub.tempId}
-                          className="rounded-xl border p-3 space-y-2"
-                          style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.35)" }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-black uppercase" style={{ color: MUTED }}>
-                              Unidad {idx + 1}
-                            </span>
-                            {subs.length > 1 ? (
-                              <button
-                                type="button"
-                                onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
-                                className="p-1.5 rounded-lg hover:bg-white/5"
-                                aria-label={`Quitar unidad ${idx + 1}`}
+                      {subs.map((sub, idx) => {
+                        const suggestions = getSubVehicleRecordSuggestions(sub.titulo);
+                        const cant = Number(sub.cantidadObjetivo) || 0;
+                        const record = sub.tiempoRecordMinPerUnit;
+                        const projMin =
+                          cant > 0 && record && record > 0
+                            ? Math.round(cant * record)
+                            : null;
+                        return (
+                          <div
+                            key={sub.tempId}
+                            className="rounded-xl border p-3 space-y-2"
+                            style={{
+                              borderColor: "rgba(255,255,255,0.08)",
+                              backgroundColor: "rgba(0,0,0,0.35)",
+                            }}
+                            data-testid={`jornada4-launch-sub-${idx}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span
+                                className="text-[9px] font-black uppercase"
+                                style={{ color: MUTED }}
                               >
-                                <Trash2 size={12} style={{ color: MUTED }} />
-                              </button>
-                            ) : null}
+                                Unidad {idx + 1}
+                              </span>
+                              {subs.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
+                                  className="p-1.5 rounded-lg hover:bg-white/5"
+                                  aria-label={`Quitar unidad ${idx + 1}`}
+                                >
+                                  <Trash2 size={12} style={{ color: MUTED }} />
+                                </button>
+                              ) : null}
+                            </div>
+                            <div>
+                              <label
+                                className="text-[8px] uppercase tracking-wider block mb-1"
+                                style={{ color: MUTED }}
+                              >
+                                Nombre
+                              </label>
+                              <input
+                                value={sub.titulo}
+                                onChange={e => {
+                                  const next = [...subs];
+                                  next[idx] = { ...sub, titulo: e.target.value };
+                                  setSubs(next);
+                                }}
+                                placeholder="Ej: Armar pretina"
+                                className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                                style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                              />
+                              {suggestions.length > 0 ? (
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {suggestions.map(s => (
+                                    <button
+                                      key={`${s.titulo}-${s.minPerUnit}`}
+                                      type="button"
+                                      onClick={() => {
+                                        const next = [...subs];
+                                        next[idx] = {
+                                          ...sub,
+                                          titulo: s.titulo,
+                                          tiempoRecordMinPerUnit: s.minPerUnit,
+                                        };
+                                        setSubs(next);
+                                      }}
+                                      className="text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
+                                      style={{
+                                        backgroundColor: "rgba(249,115,22,0.12)",
+                                        color: "#f97316",
+                                        border: "1px solid rgba(249,115,22,0.35)",
+                                      }}
+                                      data-testid={`jornada4-record-chip-${idx}`}
+                                    >
+                                      {s.titulo.slice(0, 18)}
+                                      {s.titulo.length > 18 ? "…" : ""} ·{" "}
+                                      {s.minPerUnit.toFixed(1)} MIN/U
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label
+                                  className="text-[8px] uppercase tracking-wider block mb-1"
+                                  style={{ color: MUTED }}
+                                >
+                                  Cantidad
+                                </label>
+                                <input
+                                  value={sub.cantidadObjetivo}
+                                  onChange={e => {
+                                    const next = [...subs];
+                                    next[idx] = {
+                                      ...sub,
+                                      cantidadObjetivo: e.target.value,
+                                    };
+                                    setSubs(next);
+                                  }}
+                                  placeholder="Ej: 9"
+                                  inputMode="numeric"
+                                  className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                                  style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                                  aria-label={`Cantidad unidad ${idx + 1}`}
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  className="text-[8px] uppercase tracking-wider block mb-1"
+                                  style={{ color: MUTED }}
+                                >
+                                  Récord MIN/U
+                                </label>
+                                <input
+                                  value={
+                                    sub.tiempoRecordMinPerUnit != null
+                                      ? String(sub.tiempoRecordMinPerUnit)
+                                      : ""
+                                  }
+                                  onChange={e => {
+                                    const raw = e.target.value.trim();
+                                    const next = [...subs];
+                                    const n = Number(raw);
+                                    next[idx] = {
+                                      ...sub,
+                                      tiempoRecordMinPerUnit:
+                                        raw === "" || !Number.isFinite(n) || n <= 0
+                                          ? undefined
+                                          : n,
+                                    };
+                                    setSubs(next);
+                                  }}
+                                  placeholder="Ej: 1.5"
+                                  inputMode="decimal"
+                                  className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                                  style={{
+                                    color: INK,
+                                    borderColor: record
+                                      ? "rgba(249,115,22,0.45)"
+                                      : "rgba(255,255,255,0.1)",
+                                  }}
+                                  aria-label={`Récord min/u unidad ${idx + 1}`}
+                                  data-testid={`jornada4-launch-record-${idx}`}
+                                />
+                              </div>
+                            </div>
+                            {record ? (
+                              <p
+                                className="text-[9px] font-mono font-bold"
+                                style={{ color: GOLD }}
+                                data-testid={`jornada4-launch-proj-${idx}`}
+                              >
+                                Récord: {record.toFixed(1)} MIN/U
+                                {projMin != null ? ` — ≈${projMin} min obj` : " — escribe cuántas unidades"}
+                              </p>
+                            ) : (
+                              <p className="text-[8px]" style={{ color: MUTED }}>
+                                Sin récord = primer ciclo (medición al Cumplido)
+                              </p>
+                            )}
                           </div>
-                          <div>
-                            <label
-                              className="text-[8px] uppercase tracking-wider block mb-1"
-                              style={{ color: MUTED }}
-                            >
-                              Nombre
-                            </label>
-                            <input
-                              value={sub.titulo}
-                              onChange={e => {
-                                const next = [...subs];
-                                next[idx] = { ...sub, titulo: e.target.value };
-                                setSubs(next);
-                              }}
-                              placeholder={`Ej: Armar pretina`}
-                              className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
-                              style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
-                            />
-                          </div>
-                          <div>
-                            <label
-                              className="text-[8px] uppercase tracking-wider block mb-1"
-                              style={{ color: MUTED }}
-                            >
-                              Cantidad (opcional)
-                            </label>
-                            <input
-                              value={sub.cantidadObjetivo}
-                              onChange={e => {
-                                const next = [...subs];
-                                next[idx] = { ...sub, cantidadObjetivo: e.target.value };
-                                setSubs(next);
-                              }}
-                              placeholder="Ej: 9"
-                              inputMode="numeric"
-                              className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
-                              style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
-                              aria-label={`Cantidad unidad ${idx + 1}`}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <button
                         type="button"
                         onClick={() => setSubs([...subs, makeSub()])}

@@ -1,19 +1,26 @@
-import { useMemo, useState } from "react";
-import { Check, Clock, X as XIcon, Zap } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { FLOTA_CONFIG, NARANJA } from "@/components/flota/vehicleCardShared";
-import { computeDesglosadorClocks } from "@/lib/desglosadorClock";
+import { FLOTA_CONFIG, GOLD, NARANJA } from "@/components/flota/vehicleCardShared";
+import {
+  computeDesglosadorClocks,
+  desglosadorSubTimerUiFromClocks,
+  formatHHMM,
+  formatMMSS,
+  suggestedSec,
+} from "@/lib/desglosadorClock";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import {
   conquistaActiveSub,
   conquistaProgressLabel,
 } from "@/jornada4/conquistaKernel";
-import { formatHms } from "@/jornada4/format";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
+const VIOLET = "#8B5CF6";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
+const CYAN = "#00FFC3";
 const flotaColor = FLOTA_CONFIG.tiempo.color;
 
 type Props = {
@@ -29,7 +36,13 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick
-    [tick, active?.id, active?.aperturaAt, vehicle.id]
+    [tick, active?.id, active?.aperturaAt, vehicle.id, vehicle.subVehiculos]
+  );
+
+  const objSecs = active ? suggestedSec(active) : null;
+  const timerUi = useMemo(
+    () => desglosadorSubTimerUiFromClocks(clocks, objSecs),
+    [clocks, objSecs]
   );
 
   const subs = vehicle.subVehiculos ?? [];
@@ -37,8 +50,30 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
   const doneCount = subs.filter(s => s.status === "cumplido" || s.status === "fallado").length;
   const progressPct = subs.length > 0 ? Math.round((doneCount / subs.length) * 100) : 0;
 
-  const [cantidad, setCantidad] = useState("");
   const hasCantidadObj = active?.cantidadObjetivo != null && active.cantidadObjetivo > 0;
+  const hasRecord =
+    active?.tiempoRecordMinPerUnit != null && active.tiempoRecordMinPerUnit > 0;
+
+  const [cantidad, setCantidad] = useState("");
+
+  useEffect(() => {
+    setCantidad("");
+  }, [active?.id]);
+
+  const restanteManual = hasCantidadObj
+    ? Math.max(0, (active!.cantidadObjetivo ?? 0) - (Number(cantidad) || 0))
+    : null;
+  const restante =
+    hasRecord && clocks.unitsRemaining != null ? clocks.unitsRemaining : restanteManual;
+
+  const timerDisplay =
+    timerUi.isCountdown && timerUi.expired
+      ? `+${timerUi.display}`
+      : timerUi.display || "00:00:00";
+
+  const refLabel = objSecs != null ? formatMMSS(objSecs) : null;
+  const futuroSub = clocks.subEndAt != null ? formatHHMM(clocks.subEndAt) : "—";
+  const futuroCiclo = clocks.cycleEndAt != null ? formatHHMM(clocks.cycleEndAt) : "—";
 
   return (
     <article
@@ -88,85 +123,310 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
       <div className="px-3 pb-3 space-y-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
         {active ? (
           <div
-            className="mt-3 p-3 rounded-xl border-2 space-y-3"
+            className="mt-3 rounded-xl border-2 overflow-hidden"
             style={{
-              backgroundColor: "rgba(249,115,22,0.06)",
+              backgroundColor: `${flotaColor}08`,
               borderColor: flotaColor,
-              boxShadow: `0 0 16px ${flotaColor}18`,
+              boxShadow: `0 0 16px ${flotaColor}20`,
             }}
+            data-testid="j4-conquista-active"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>
-                  Unidad activa
-                </p>
-                <p className="text-sm font-bold mt-0.5 truncate" style={{ color: INK }}>
-                  {active.titulo || "Sin título"}
-                </p>
-                {hasCantidadObj ? (
-                  <p className="text-[10px] mt-0.5" style={{ color: MUTED }}>
-                    Objetivo {active.cantidadObjetivo} u
-                  </p>
-                ) : null}
-              </div>
-              <div className="text-right">
-                <p
-                  className="text-2xl font-black tabular-nums tracking-tight"
-                  style={{ color: flotaColor, fontFamily: "ui-monospace, monospace" }}
+            <div className="p-3 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black shrink-0"
+                  style={{ backgroundColor: flotaColor, color: "#000" }}
                 >
-                  {formatHms(clocks.subElapsedSec)}
-                </p>
-                {clocks.subRemainingSec != null ? (
-                  <p className="text-[10px] flex items-center justify-end gap-1" style={{ color: MUTED }}>
-                    <Clock size={10} /> quedan {formatHms(clocks.subRemainingSec)}
-                  </p>
+                  ▶
+                </span>
+                <span className="text-sm font-black flex-1 min-w-0 truncate" style={{ color: INK }}>
+                  {active.titulo || "Sin título"}
+                </span>
+                {hasCantidadObj ? (
+                  <span
+                    className="text-[8px] font-mono px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: `${flotaColor}15`, color: flotaColor }}
+                  >
+                    obj: {active.cantidadObjetivo}
+                  </span>
+                ) : null}
+                {refLabel ? (
+                  <span
+                    className="text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest"
+                    style={{
+                      backgroundColor: "rgba(139,92,246,0.15)",
+                      color: VIOLET,
+                      border: "1px solid rgba(139,92,246,0.3)",
+                    }}
+                  >
+                    ref {refLabel}
+                  </span>
                 ) : null}
               </div>
-            </div>
 
-            {hasCantidadObj ? (
-              <div>
-                <label className="text-[8px] font-black uppercase tracking-wider block mb-1" style={{ color: MUTED }}>
-                  Cantidad realizada
-                </label>
-                <input
-                  value={cantidad}
-                  onChange={e => setCantidad(e.target.value)}
-                  placeholder={String(active.cantidadObjetivo)}
-                  inputMode="numeric"
-                  className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
-                  style={{ color: INK, borderColor: `${flotaColor}40` }}
-                  data-testid="j4-conquista-cantidad"
-                />
+              {/* Reloj de unidad — countdown / overtime / elapsed */}
+              <div className="space-y-1" data-testid="j4-conquista-unit-clock">
+                <div
+                  className="flex items-center justify-center gap-2 py-3 rounded-lg"
+                  style={{
+                    backgroundColor: timerUi.expired
+                      ? "rgba(255,49,49,0.08)"
+                      : `${flotaColor}10`,
+                  }}
+                >
+                  <Timer
+                    size={12}
+                    style={{ color: timerUi.expired ? "#FF3131" : flotaColor }}
+                  />
+                  <span
+                    className="text-2xl font-black tracking-wider tabular-nums"
+                    style={{
+                      color: timerUi.expired ? "#FF3131" : flotaColor,
+                      fontFamily: "ui-monospace, monospace",
+                    }}
+                    data-testid="j4-conquista-timer-display"
+                  >
+                    {timerDisplay}
+                  </span>
+                </div>
+
+                {hasCantidadObj && hasRecord ? (
+                  <p
+                    className="text-[9px] text-center font-mono font-bold leading-snug"
+                    style={{ color: "rgba(255,255,255,0.88)" }}
+                    data-testid="j4-conquista-record-formula"
+                  >
+                    <span style={{ color: flotaColor }}>{active.cantidadObjetivo} u</span>
+                    {" × "}
+                    <span style={{ color: flotaColor }}>
+                      {active.tiempoRecordMinPerUnit!.toFixed(1)} MIN/U
+                    </span>
+                    {" = "}
+                    <span style={{ color: GOLD }}>
+                      {Math.round(
+                        (active.cantidadObjetivo ?? 0) * (active.tiempoRecordMinPerUnit ?? 0)
+                      )}{" "}
+                      min obj
+                    </span>
+                  </p>
+                ) : null}
+
+                {(clocks.liveAccumDeltaSec < -5 || clocks.liveAccumDeltaSec > 5) &&
+                clocks.hasProjection ? (
+                  <div
+                    className="flex items-center justify-center gap-2 py-1.5 rounded-lg"
+                    style={{
+                      backgroundColor:
+                        clocks.liveAccumDeltaSec < 0
+                          ? "rgba(0,200,81,0.08)"
+                          : "rgba(255,49,49,0.08)",
+                      border: `1px solid ${
+                        clocks.liveAccumDeltaSec < 0
+                          ? "rgba(0,200,81,0.25)"
+                          : "rgba(255,49,49,0.25)"
+                      }`,
+                    }}
+                  >
+                    <span
+                      className="text-[9px] font-black uppercase tracking-widest"
+                      style={{
+                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
+                      }}
+                    >
+                      {clocks.liveAccumDeltaSec < 0 ? "↓" : "↑"}
+                    </span>
+                    <span
+                      className="text-[13px] font-black tabular-nums"
+                      style={{
+                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                    >
+                      {Math.floor(Math.abs(clocks.liveAccumDeltaSec) / 60)}m{" "}
+                      {String(Math.abs(clocks.liveAccumDeltaSec) % 60).padStart(2, "0")}s
+                    </span>
+                    <span
+                      className="text-[9px] font-black uppercase tracking-widest"
+                      style={{
+                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
+                      }}
+                    >
+                      {clocks.liveAccumDeltaSec < 0 ? "ganando" : "perdiendo"}
+                    </span>
+                  </div>
+                ) : null}
+
+                <div className="flex justify-between items-center px-1 pt-0.5">
+                  <div>
+                    <p
+                      className="text-[7px] font-black uppercase tracking-widest"
+                      style={{ color: "#6EE7B7" }}
+                    >
+                      Termina a las
+                    </p>
+                    <p
+                      className="text-[11px] font-black tabular-nums"
+                      style={{
+                        color: futuroSub === "—" ? "rgba(255,255,255,0.45)" : CYAN,
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                      data-testid="j4-conquista-termina"
+                    >
+                      {futuroSub}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className="text-[7px] font-black uppercase tracking-widest"
+                      style={{ color: "rgba(255,255,255,0.72)" }}
+                    >
+                      Ciclo global
+                    </p>
+                    <p
+                      className="text-[11px] font-black tabular-nums"
+                      style={{
+                        color:
+                          futuroCiclo === "—" ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.9)",
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                      data-testid="j4-conquista-ciclo"
+                    >
+                      {futuroCiclo}
+                    </p>
+                  </div>
+                </div>
               </div>
-            ) : null}
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
-                onClick={() => {
-                  const n = cantidad.trim() ? Number(cantidad) : undefined;
-                  onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
-                  setCantidad("");
-                }}
-                data-testid="j4-conquista-cumplido"
-              >
-                Cumplido
-              </button>
-              <button
-                type="button"
-                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                style={{ backgroundColor: "transparent", color: BAD, border: `1px solid ${BAD}60` }}
-                onClick={() => {
-                  onFallado();
-                  setCantidad("");
-                }}
-                data-testid="j4-conquista-fallado"
-              >
-                Fallado
-              </button>
+              {hasCantidadObj ? (
+                <div className="space-y-2">
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-wider block"
+                    style={{ color: "rgba(255,255,255,0.78)" }}
+                  >
+                    Cant. lograda
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCantidad(v => String(Math.max(0, Number(v || 0) - 1)))
+                      }
+                      className="w-10 h-10 rounded-lg flex items-center justify-center font-black transition-all active:scale-95"
+                      style={{
+                        backgroundColor: "rgba(139,92,246,0.15)",
+                        color: VIOLET,
+                        border: "1px solid rgba(139,92,246,0.35)",
+                      }}
+                      aria-label="Menos"
+                    >
+                      <Minus size={16} />
+                    </button>
+                    <input
+                      type="number"
+                      value={cantidad}
+                      onChange={e => setCantidad(e.target.value)}
+                      placeholder="¿cuántas?"
+                      className="flex-1 bg-black/30 text-sm p-2 rounded border border-white/10 focus:outline-none text-center font-bold"
+                      style={{ color: INK, fontFamily: "ui-monospace, monospace" }}
+                      data-testid="j4-conquista-cantidad"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCantidad(v => String(Number(v || 0) + 1))}
+                      className="w-10 h-10 rounded-lg flex items-center justify-center font-black transition-all active:scale-95"
+                      style={{
+                        backgroundColor: "rgba(139,92,246,0.15)",
+                        color: VIOLET,
+                        border: "1px solid rgba(139,92,246,0.35)",
+                      }}
+                      aria-label="Más"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  <div className="text-center py-1" data-testid="j4-conquista-restante">
+                    <p
+                      className="text-[8px] font-bold uppercase tracking-widest mb-0.5"
+                      style={{ color: "rgba(255,255,255,0.75)", fontFamily: "monospace" }}
+                    >
+                      Restante
+                    </p>
+                    <span
+                      className="text-3xl font-black tracking-wider tabular-nums"
+                      style={{
+                        color: restante === 0 ? OK : VIOLET,
+                        fontFamily: "ui-monospace, monospace",
+                        textShadow:
+                          restante === 0
+                            ? "0 0 12px rgba(34,197,94,0.5)"
+                            : "0 0 12px rgba(139,92,246,0.5)",
+                      }}
+                    >
+                      {restante ?? "—"}
+                    </span>
+                    {hasRecord ? (
+                      <p
+                        className="text-[8px] mt-0.5 font-mono font-bold"
+                        style={{ color: "rgba(255,255,255,0.78)" }}
+                      >
+                        Ritmo:{" "}
+                        <span style={{ color: "#C4B5FD" }}>
+                          {active.tiempoRecordMinPerUnit!.toFixed(1)} min/unidad
+                        </span>{" "}
+                        (récord)
+                      </p>
+                    ) : (
+                      <p
+                        className="text-[8px] mt-0.5 font-mono"
+                        style={{ color: "rgba(255,255,255,0.62)" }}
+                      >
+                        Sin récord · primer ciclo · Cumplido asume todo el objetivo
+                      </p>
+                    )}
+                    {restante === 0 && hasCantidadObj ? (
+                      <p
+                        className="text-[8px] font-black uppercase tracking-widest mt-0.5"
+                        style={{ color: OK, fontFamily: "monospace" }}
+                      >
+                        Objetivo alcanzado
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                  style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
+                  onClick={() => {
+                    const n = cantidad.trim() ? Number(cantidad) : undefined;
+                    onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
+                    setCantidad("");
+                  }}
+                  data-testid="j4-conquista-cumplido"
+                >
+                  Cumplido
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: BAD,
+                    border: `1px solid ${BAD}60`,
+                  }}
+                  onClick={() => {
+                    onFallado();
+                    setCantidad("");
+                  }}
+                  data-testid="j4-conquista-fallado"
+                >
+                  Fallado
+                </button>
+              </div>
             </div>
           </div>
         ) : cycleReady ? (
@@ -187,7 +447,11 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
             <button
               type="button"
               className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
-              style={{ backgroundColor: "rgba(212,175,55,0.18)", color: "#D4AF37", border: "1px solid rgba(212,175,55,0.4)" }}
+              style={{
+                backgroundColor: "rgba(212,175,55,0.18)",
+                color: "#D4AF37",
+                border: "1px solid rgba(212,175,55,0.4)",
+              }}
               onClick={onCerrarCiclo}
               data-testid="j4-conquista-cerrar-ciclo"
             >
@@ -209,6 +473,14 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
               const isActive = sv.status === "activo";
               const done = sv.status === "cumplido";
               const fail = sv.status === "fallado";
+              const recordLine =
+                sv.cantidadObjetivo && sv.tiempoRecordMinPerUnit
+                  ? `${sv.cantidadObjetivo}×${sv.tiempoRecordMinPerUnit.toFixed(1)}m/u · ≈${Math.round(
+                      sv.cantidadObjetivo * sv.tiempoRecordMinPerUnit
+                    )}m`
+                  : sv.cantidadObjetivo
+                    ? `${sv.cantidadObjetivo} u`
+                    : null;
               return (
                 <div
                   key={sv.id}
@@ -240,14 +512,17 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
                     >
                       {sv.titulo || `Unidad ${idx + 1}`}
                     </p>
+                    {recordLine ? (
+                      <p
+                        className="text-[8px] font-mono font-bold"
+                        style={{ color: isActive ? flotaColor : MUTED }}
+                      >
+                        {sv.cantidadLograda != null
+                          ? `${sv.cantidadLograda}/${sv.cantidadObjetivo}`
+                          : recordLine}
+                      </p>
+                    ) : null}
                   </div>
-                  {sv.cantidadObjetivo != null && sv.cantidadObjetivo > 0 ? (
-                    <span className="text-[9px] font-mono font-bold" style={{ color: MUTED }}>
-                      {sv.cantidadLograda != null
-                        ? `${sv.cantidadLograda}/${sv.cantidadObjetivo}`
-                        : `${sv.cantidadObjetivo} u`}
-                    </span>
-                  ) : null}
                   <span
                     className="text-[8px] font-black uppercase"
                     style={{
