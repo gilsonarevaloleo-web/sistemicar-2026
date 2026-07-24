@@ -7,14 +7,20 @@ import {
 import { updateVehicle, type Vehicle } from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
+import {
+  situacionMinutosHastaObjetivoHora,
+  situacionObjetivoHoraToContratoMs,
+} from "@/lib/situacionGanancia";
 import { buildSituacionRingSeed } from "./situacionLaunchSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
   /** Filas del ring (solo situacional Dual Kernel). */
   situacionFilas?: string[];
-  /** Minutos totales del bloque ring (default 30). */
+  /** @deprecated Preferir situacionObjetivoHora (HH:mm). */
   situacionMinutosBloque?: number;
+  /** Hora de término del ring (HH:mm) — no minutos ciegos. */
+  situacionObjetivoHora?: string;
 };
 
 export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form"> & {
@@ -31,7 +37,8 @@ export async function executeJornada4Launch(
   const { form, vehiclesRef, setVehicles, userId, ...rest } = params;
   const {
     situacionFilas,
-    situacionMinutosBloque = 30,
+    situacionMinutosBloque,
+    situacionObjetivoHora,
     ...baseForm
   } = form;
 
@@ -45,9 +52,20 @@ export async function executeJornada4Launch(
   if (!id) return null;
 
   if (baseForm.tipoFlota === "situacion") {
+    const now = Date.now();
+    const hora = situacionObjetivoHora?.trim();
+    const fromHora = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;
+    const contratoMs = hora ? situacionObjetivoHoraToContratoMs(hora, now) : null;
+    const minutosBloque =
+      fromHora ??
+      (situacionMinutosBloque != null && situacionMinutosBloque > 0
+        ? Math.round(situacionMinutosBloque)
+        : 30);
     const seed = buildSituacionRingSeed({
       filas: situacionFilas ?? [],
-      minutosBloque: situacionMinutosBloque,
+      minutosBloque,
+      now,
+      horaFinMs: contratoMs ?? undefined,
     });
     if (seed) {
       paintSituacionSeed(id, seed, vehiclesRef, setVehicles);

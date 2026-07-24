@@ -5,6 +5,7 @@ import { useCallback, useRef } from "react";
 import { useAuthContext } from "@/App";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
+import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
@@ -61,6 +62,7 @@ export default function JornadaV4Session() {
       />
       <div className="max-w-lg mx-auto pt-2">
         <Jornada4LaunchPanel onLaunch={handleLaunch} />
+        <Jornada4Boveda />
         <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />
       </div>
     </div>

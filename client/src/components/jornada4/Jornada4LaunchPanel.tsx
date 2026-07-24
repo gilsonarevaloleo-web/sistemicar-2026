@@ -1,17 +1,30 @@
-import { memo, useCallback, useEffect, useState } from "react";
-import { ListTodo, Plus, Rocket, Trash2, X } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Clock, ListTodo, Plus, Rocket, Trash2, X } from "lucide-react";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
   getDesglosadorMisionData,
   getDesglosadorHistorico,
+  getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
+import {
+  projectDesglosadorEndFromSubs,
+  projectUnitEndLabel,
+} from "@/jornada4/desglosadorProjection";
+import {
+  resolveDefaultObjetivoHoraParaRing,
+  situacionMinutosHastaObjetivoHora,
+} from "@/lib/situacionGanancia";
+import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
+const ORANGE = "#f97316";
+const CYAN = "#00FFC3";
+const EMERALD = "#50C878";
 const V4_TIPOS = ["tiempo", "situacion"] as const;
 
 type Props = {
@@ -25,6 +38,11 @@ function makeSub(): DesglosadorSubFormRow {
     titulo: "",
     cantidadObjetivo: "",
   };
+}
+
+function defaultHoraPlus(minutes: number): string {
+  const d = new Date(Date.now() + minutes * 60_000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 /** Altura visible del viewport (teclado móvil) → el sheet no se esconde detrás. */
@@ -62,11 +80,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [titulo, setTitulo] = useState("");
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
-  const [minutos, setMinutos] = useState(30);
+  const [conquistaHoraFin, setConquistaHoraFin] = useState("");
+  const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
+    resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30)
+  );
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
   const [showMissionSugs, setShowMissionSugs] = useState(false);
   const [historialSubs, setHistorialSubs] = useState<string[]>([]);
+  const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const keyboardInset = useKeyboardInset();
+  const tick = useJornada4Tick(open && tipo === "tiempo");
 
   useEffect(() => {
     if (!open) return;
@@ -90,22 +113,35 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       ? getDesglosadorMisionData(titulo, 5)
       : [];
 
+  const projection = useMemo(() => {
+    void tick;
+    return projectDesglosadorEndFromSubs(subs);
+  }, [subs, tick]);
+
+  const situacionMinHasta = useMemo(() => {
+    if (!situacionHoraFin.trim()) return null;
+    return situacionMinutosHastaObjetivoHora(situacionHoraFin.trim());
+  }, [situacionHoraFin, tick]);
+
   const reset = useCallback(() => {
     setTipo(null);
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);
-    setMinutos(30);
+    setConquistaHoraFin("");
+    setSituacionHoraFin(resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30));
     setTerminoDetalle("Al cerrar este bloque");
     setShowMissionSugs(false);
     setHistorialSubs([]);
+    setActiveSubSugIdx(null);
     setOpen(false);
   }, []);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
-    if (t === "situacion" && !terminoDetalle.trim()) {
-      setTerminoDetalle("Al cerrar este bloque");
+    if (t === "situacion") {
+      setSituacionHoraFin(resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30));
+      if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
   }, [terminoDetalle]);
@@ -115,7 +151,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     tipo != null &&
     (tipo === "tiempo"
       ? subs.some(s => s.titulo.trim())
-      : filas.some(f => f.trim()));
+      : filas.some(f => f.trim()) && situacionMinHasta != null);
 
   const handleLaunch = useCallback(async () => {
     if (!tipo || saving || !canLaunch) return;
@@ -126,14 +162,46 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         tipoFlota: tipo,
         desglosadorSubs: tipo === "tiempo" ? subs : undefined,
         situacionFilas: tipo === "situacion" ? filas : undefined,
-        situacionMinutosBloque: tipo === "situacion" ? minutos : undefined,
-        terminoDetalle: tipo === "situacion" ? terminoDetalle : undefined,
+        situacionObjetivoHora: tipo === "situacion" ? situacionHoraFin.trim() : undefined,
+        terminoDetalle:
+          tipo === "situacion"
+            ? terminoDetalle
+            : conquistaHoraFin.trim() || undefined,
       });
       if (id) reset();
     } finally {
       setSaving(false);
     }
-  }, [tipo, saving, canLaunch, onLaunch, titulo, subs, filas, minutos, terminoDetalle, reset]);
+  }, [
+    tipo,
+    saving,
+    canLaunch,
+    onLaunch,
+    titulo,
+    subs,
+    filas,
+    situacionHoraFin,
+    terminoDetalle,
+    conquistaHoraFin,
+    reset,
+  ]);
+
+  const autofillRecord = (idx: number, tituloSub: string) => {
+    const sug = getSubVehicleRecordSuggestions(tituloSub);
+    if (sug.length === 0) return;
+    const exact = sug.find(s => s.titulo.toLowerCase() === tituloSub.trim().toLowerCase());
+    const match = exact ?? sug[0]!;
+    const record =
+      getHistoricalVehicleData(match.titulo).bestMinPerUnit ?? match.minPerUnit;
+    if (!(record > 0)) return;
+    setSubs(prev =>
+      prev.map((s, i) =>
+        i === idx && !s.tiempoRecordMinPerUnit
+          ? { ...s, tiempoRecordMinPerUnit: record }
+          : s
+      )
+    );
+  };
 
   return (
     <div className="px-4 pb-3 space-y-3" data-testid="jornada4-launch">
@@ -230,7 +298,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
             onClick={e => e.stopPropagation()}
             data-testid="jornada4-launch-panel"
           >
-            {/* Header fijo */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/5">
               <div>
                 <p
@@ -253,7 +320,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               </button>
             </div>
 
-            {/* Cuerpo scrollable */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
               {!tipo ? (
                 <div className="grid grid-cols-2 gap-2">
@@ -307,8 +373,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
                   <div>
                     <label
-                      className="text-[9px] uppercase tracking-wider block mb-1"
-                      style={{ color: MUTED }}
+                      className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                      style={{ color: GOLD }}
                     >
                       Nombre de la misión
                     </label>
@@ -330,12 +396,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         placeholder={
                           tipo === "tiempo" ? "Ej: Producción del día" : "Ej: Enfoque de la tarde"
                         }
-                        className="w-full p-3 rounded-xl bg-black/40 border text-sm focus:outline-none"
+                        className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
                         style={{
                           color: INK,
                           borderColor: titulo
                             ? FLOTA_CONFIG[tipo].color
-                            : "rgba(255,255,255,0.1)",
+                            : "rgba(255,255,255,0.14)",
                         }}
                         autoFocus
                         data-testid="jornada4-launch-titulo"
@@ -451,101 +517,199 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
                   {tipo === "tiempo" ? (
                     <div className="space-y-3">
-                      <p className="text-[9px] uppercase tracking-wider" style={{ color: MUTED }}>
-                        Unidades del desglosador
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p
+                          className="text-[10px] font-black uppercase tracking-wider"
+                          style={{ color: ORANGE }}
+                        >
+                          Unidades del desglosador
+                        </p>
+                        <p className="text-[8px]" style={{ color: MUTED }}>
+                          Nombre · Cantidad · Récord
+                        </p>
+                      </div>
+
+                      {/* Meta de ciclo en hora real (opcional) */}
+                      <div
+                        className="rounded-xl border-2 p-3 space-y-2"
+                        style={{
+                          borderColor: `${CYAN}35`,
+                          backgroundColor: "rgba(0,255,195,0.05)",
+                        }}
+                        data-testid="jornada4-conquista-hora-fin"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock size={12} style={{ color: CYAN }} />
+                          <label
+                            className="text-[10px] font-black uppercase tracking-wider"
+                            style={{ color: CYAN }}
+                          >
+                            Termina a las (meta del ciclo)
+                          </label>
+                        </div>
+                        <input
+                          type="time"
+                          value={conquistaHoraFin}
+                          onChange={e => setConquistaHoraFin(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-black/60 border-2 text-lg font-mono font-black tabular-nums focus:outline-none"
+                          style={{
+                            color: INK,
+                            borderColor: conquistaHoraFin ? CYAN : "rgba(255,255,255,0.12)",
+                          }}
+                          data-testid="jornada4-launch-hora-fin-conquista"
+                        />
+                        <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                          Elige la hora de pared en que quieres cerrar el desglosador.
+                          La proyección abajo suma las unidades (cant × MIN/U).
+                        </p>
+                      </div>
+
                       {subs.map((sub, idx) => {
                         const suggestions = getSubVehicleRecordSuggestions(sub.titulo);
-                        const cant = Number(sub.cantidadObjetivo) || 0;
-                        const record = sub.tiempoRecordMinPerUnit;
-                        const projMin =
-                          cant > 0 && record && record > 0
-                            ? Math.round(cant * record)
-                            : null;
+                        const unitProj = projectUnitEndLabel(
+                          sub.cantidadObjetivo,
+                          sub.tiempoRecordMinPerUnit
+                        );
+                        const showSug = activeSubSugIdx === idx && suggestions.length > 0;
                         return (
                           <div
                             key={sub.tempId}
-                            className="rounded-xl border p-3 space-y-2"
+                            className="rounded-2xl border-2 p-3.5 space-y-3"
                             style={{
-                              borderColor: "rgba(255,255,255,0.08)",
-                              backgroundColor: "rgba(0,0,0,0.35)",
+                              borderColor: sub.titulo.trim()
+                                ? `${ORANGE}45`
+                                : "rgba(255,255,255,0.12)",
+                              backgroundColor: "rgba(249,115,22,0.06)",
+                              boxShadow: sub.titulo.trim()
+                                ? `0 0 18px rgba(249,115,22,0.08)`
+                                : undefined,
                             }}
                             data-testid={`jornada4-launch-sub-${idx}`}
                           >
                             <div className="flex items-center justify-between">
-                              <span
-                                className="text-[9px] font-black uppercase"
-                                style={{ color: MUTED }}
-                              >
-                                Unidad {idx + 1}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black"
+                                  style={{ backgroundColor: `${ORANGE}25`, color: ORANGE }}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span
+                                  className="text-[11px] font-black uppercase tracking-wider"
+                                  style={{ color: ORANGE }}
+                                >
+                                  Unidad {idx + 1}
+                                </span>
+                              </div>
                               {subs.length > 1 ? (
                                 <button
                                   type="button"
                                   onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
-                                  className="p-1.5 rounded-lg hover:bg-white/5"
+                                  className="p-2 rounded-lg hover:bg-white/5"
                                   aria-label={`Quitar unidad ${idx + 1}`}
                                 >
-                                  <Trash2 size={12} style={{ color: MUTED }} />
+                                  <Trash2 size={14} style={{ color: MUTED }} />
                                 </button>
                               ) : null}
                             </div>
+
                             <div>
                               <label
-                                className="text-[8px] uppercase tracking-wider block mb-1"
-                                style={{ color: MUTED }}
+                                className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                                style={{ color: INK }}
                               >
-                                Nombre
+                                Nombre de la subtarea
                               </label>
-                              <input
-                                value={sub.titulo}
-                                onChange={e => {
-                                  const next = [...subs];
-                                  next[idx] = { ...sub, titulo: e.target.value };
-                                  setSubs(next);
-                                }}
-                                placeholder="Ej: Armar pretina"
-                                className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
-                                style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
-                              />
-                              {suggestions.length > 0 ? (
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                  {suggestions.map(s => (
-                                    <button
-                                      key={`${s.titulo}-${s.minPerUnit}`}
-                                      type="button"
-                                      onClick={() => {
-                                        const next = [...subs];
-                                        next[idx] = {
-                                          ...sub,
-                                          titulo: s.titulo,
-                                          tiempoRecordMinPerUnit: s.minPerUnit,
-                                        };
-                                        setSubs(next);
-                                      }}
-                                      className="text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
-                                      style={{
-                                        backgroundColor: "rgba(249,115,22,0.12)",
-                                        color: "#f97316",
-                                        border: "1px solid rgba(249,115,22,0.35)",
-                                      }}
-                                      data-testid={`jornada4-record-chip-${idx}`}
-                                    >
-                                      {s.titulo.slice(0, 18)}
-                                      {s.titulo.length > 18 ? "…" : ""} ·{" "}
-                                      {s.minPerUnit.toFixed(1)} MIN/U
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : null}
+                              <div className="relative">
+                                <input
+                                  value={sub.titulo}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setSubs(prev =>
+                                      prev.map((s, i) =>
+                                        i === idx
+                                          ? {
+                                              ...s,
+                                              titulo: val,
+                                              tiempoRecordMinPerUnit: undefined,
+                                            }
+                                          : s
+                                      )
+                                    );
+                                    setActiveSubSugIdx(val.trim().length >= 2 ? idx : null);
+                                  }}
+                                  onFocus={() => {
+                                    if (sub.titulo.trim().length >= 2) setActiveSubSugIdx(idx);
+                                  }}
+                                  onBlur={() => {
+                                    if (sub.titulo.trim().length >= 2 && !sub.tiempoRecordMinPerUnit) {
+                                      autofillRecord(idx, sub.titulo);
+                                    }
+                                    setTimeout(() => setActiveSubSugIdx(null), 150);
+                                  }}
+                                  placeholder={`Sub-tarea ${idx + 1}…`}
+                                  className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-base focus:outline-none"
+                                  style={{
+                                    color: INK,
+                                    borderColor: sub.titulo.trim()
+                                      ? ORANGE
+                                      : "rgba(255,255,255,0.16)",
+                                  }}
+                                  data-testid={`jornada4-launch-sub-nombre-${idx}`}
+                                />
+                                {showSug ? (
+                                  <div
+                                    className="absolute left-0 right-0 top-full mt-1 z-40 rounded-xl border overflow-hidden max-h-40 overflow-y-auto"
+                                    style={{
+                                      backgroundColor: "#0f0f0f",
+                                      borderColor: `${ORANGE}40`,
+                                      boxShadow: "0 4px 20px rgba(0,0,0,0.8)",
+                                    }}
+                                  >
+                                    {suggestions.map((s, si) => (
+                                      <button
+                                        key={`${s.titulo}-${si}`}
+                                        type="button"
+                                        onMouseDown={e => {
+                                          e.preventDefault();
+                                          setSubs(prev =>
+                                            prev.map((row, i) =>
+                                              i === idx
+                                                ? {
+                                                    ...row,
+                                                    titulo: s.titulo,
+                                                    tiempoRecordMinPerUnit: s.minPerUnit,
+                                                  }
+                                                : row
+                                            )
+                                          );
+                                          setActiveSubSugIdx(null);
+                                        }}
+                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/5"
+                                      >
+                                        <span className="text-sm truncate mr-2" style={{ color: INK }}>
+                                          {s.titulo}
+                                        </span>
+                                        <span
+                                          className="text-[10px] font-black shrink-0"
+                                          style={{ color: ORANGE }}
+                                        >
+                                          {s.minPerUnit.toFixed(1)} MIN/U
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+
+                            <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <label
-                                  className="text-[8px] uppercase tracking-wider block mb-1"
-                                  style={{ color: MUTED }}
+                                  className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                                  style={{ color: INK }}
                                 >
-                                  Cantidad
+                                  Cantidad (u)
                                 </label>
                                 <input
                                   value={sub.cantidadObjetivo}
@@ -559,15 +723,21 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                   }}
                                   placeholder="Ej: 9"
                                   inputMode="numeric"
-                                  className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
-                                  style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                                  className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-lg font-mono font-black text-center focus:outline-none"
+                                  style={{
+                                    color: INK,
+                                    borderColor: sub.cantidadObjetivo
+                                      ? ORANGE
+                                      : "rgba(255,255,255,0.16)",
+                                  }}
                                   aria-label={`Cantidad unidad ${idx + 1}`}
+                                  data-testid={`jornada4-launch-sub-cant-${idx}`}
                                 />
                               </div>
                               <div>
                                 <label
-                                  className="text-[8px] uppercase tracking-wider block mb-1"
-                                  style={{ color: MUTED }}
+                                  className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                                  style={{ color: INK }}
                                 >
                                   Récord MIN/U
                                 </label>
@@ -592,84 +762,176 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                   }}
                                   placeholder="Ej: 1.5"
                                   inputMode="decimal"
-                                  className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                                  className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-lg font-mono font-black text-center focus:outline-none"
                                   style={{
                                     color: INK,
-                                    borderColor: record
-                                      ? "rgba(249,115,22,0.45)"
-                                      : "rgba(255,255,255,0.1)",
+                                    borderColor: sub.tiempoRecordMinPerUnit
+                                      ? ORANGE
+                                      : "rgba(255,255,255,0.16)",
                                   }}
                                   aria-label={`Récord min/u unidad ${idx + 1}`}
                                   data-testid={`jornada4-launch-record-${idx}`}
                                 />
                               </div>
                             </div>
-                            {record ? (
-                              <p
-                                className="text-[9px] font-mono font-bold"
-                                style={{ color: GOLD }}
+
+                            {unitProj ? (
+                              <div
+                                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                style={{
+                                  backgroundColor: "rgba(212,175,55,0.1)",
+                                  border: "1px solid rgba(212,175,55,0.28)",
+                                }}
                                 data-testid={`jornada4-launch-proj-${idx}`}
                               >
-                                Récord: {record.toFixed(1)} MIN/U
-                                {projMin != null ? ` — ≈${projMin} min obj` : " — escribe cuántas unidades"}
+                                <span className="text-[9px] font-mono font-bold" style={{ color: GOLD }}>
+                                  ≈{unitProj.projMin} min obj
+                                </span>
+                                <span
+                                  className="text-[11px] font-black font-mono tabular-nums"
+                                  style={{ color: CYAN }}
+                                >
+                                  Fin ≈ {unitProj.finLabel}
+                                </span>
+                              </div>
+                            ) : sub.tiempoRecordMinPerUnit ? (
+                              <p className="text-[9px] font-mono font-bold" style={{ color: GOLD }}>
+                                Récord: {sub.tiempoRecordMinPerUnit.toFixed(1)} MIN/U — escribe
+                                cuántas unidades
                               </p>
                             ) : (
-                              <p className="text-[8px]" style={{ color: MUTED }}>
-                                Sin récord = primer ciclo (medición al Cumplido)
+                              <p className="text-[9px]" style={{ color: MUTED }}>
+                                Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
                           </div>
                         );
                       })}
+
+                      {projection ? (
+                        <div
+                          className="flex items-center justify-between px-3.5 py-2.5 rounded-xl"
+                          style={{
+                            backgroundColor: "rgba(212,175,55,0.1)",
+                            border: "1px solid rgba(212,175,55,0.28)",
+                          }}
+                          data-testid="jornada4-launch-total-estimado"
+                        >
+                          <span className="text-[9px] font-mono font-black uppercase" style={{ color: GOLD }}>
+                            Total estimado
+                          </span>
+                          <span
+                            className="text-[12px] font-black font-mono tabular-nums"
+                            style={{ color: GOLD }}
+                          >
+                            {projection.totalMin} min · Fin ≈ {projection.finLabel}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[9px] text-center" style={{ color: MUTED }}>
+                          Completa cantidad + récord en las unidades para ver Fin ≈ hora real
+                        </p>
+                      )}
+
+                      {conquistaHoraFin && projection ? (
+                        <p
+                          className="text-[9px] text-center font-mono"
+                          style={{
+                                color:
+                              situacionMinutosHastaObjetivoHora(conquistaHoraFin) != null &&
+                              (situacionMinutosHastaObjetivoHora(conquistaHoraFin) ?? 0) <
+                                projection.totalMin
+                                ? "#FF3131"
+                                : EMERALD,
+                          }}
+                          data-testid="jornada4-launch-meta-vs-proy"
+                        >
+                          Meta {conquistaHoraFin} · proyección {projection.finLabel}
+                        </p>
+                      ) : null}
+
                       <button
                         type="button"
                         onClick={() => setSubs([...subs, makeSub()])}
-                        className="flex items-center gap-1 text-[8px] font-black uppercase"
-                        style={{ color: MUTED }}
+                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        style={{
+                          backgroundColor: `${ORANGE}12`,
+                          color: ORANGE,
+                          border: `1px dashed ${ORANGE}45`,
+                        }}
                       >
-                        <Plus size={10} /> Añadir unidad
+                        <Plus size={12} /> Añadir unidad
                       </button>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       <div>
                         <label
-                          className="text-[9px] uppercase tracking-wider mb-1 block"
-                          style={{ color: MUTED }}
+                          className="text-[10px] font-black uppercase tracking-wider mb-1.5 block"
+                          style={{ color: GOLD }}
                         >
                           Criterio de cierre
                         </label>
                         <input
                           value={terminoDetalle}
                           onChange={e => setTerminoDetalle(e.target.value)}
-                          className="w-full p-3 rounded-xl bg-black/40 border text-sm focus:outline-none"
-                          style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                          className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                          style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
                         />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[9px] uppercase tracking-wider" style={{ color: MUTED }}>
-                          Filas del ring
+
+                      <div
+                        className="rounded-xl border-2 p-3 space-y-2"
+                        style={{
+                          borderColor: `${CYAN}35`,
+                          backgroundColor: "rgba(0,255,195,0.05)",
+                        }}
+                        data-testid="jornada4-situacion-hora-fin"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock size={12} style={{ color: CYAN }} />
+                          <label
+                            className="text-[10px] font-black uppercase tracking-wider"
+                            style={{ color: CYAN }}
+                          >
+                            Termina a las (meta del ring)
+                          </label>
+                        </div>
+                        <input
+                          type="time"
+                          value={situacionHoraFin}
+                          onChange={e => setSituacionHoraFin(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-black/60 border-2 text-lg font-mono font-black tabular-nums focus:outline-none"
+                          style={{
+                            color: INK,
+                            borderColor: situacionMinHasta != null ? CYAN : "#FF313155",
+                          }}
+                          data-testid="jornada4-launch-hora-fin-situacion"
+                        />
+                        <p className="text-[9px] font-mono" style={{ color: MUTED }}>
+                          {situacionMinHasta != null
+                            ? `${situacionMinHasta} min hasta la meta · cupos se reparte al lanzar`
+                            : "Elige una hora futura (no minutos ciegos)"}
                         </p>
-                        <label
-                          className="text-[9px] flex items-center gap-2"
-                          style={{ color: MUTED }}
-                        >
-                          Min bloque
-                          <input
-                            type="number"
-                            min={5}
-                            max={180}
-                            value={minutos}
-                            onChange={e =>
-                              setMinutos(Math.max(5, Number(e.target.value) || 30))
-                            }
-                            className="w-14 p-1.5 rounded-lg bg-black/40 border text-xs text-right focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
-                          />
-                        </label>
                       </div>
+
+                      <p
+                        className="text-[10px] font-black uppercase tracking-wider"
+                        style={{ color: FLOTA_CONFIG.situacion.color }}
+                      >
+                        Filas del ring
+                      </p>
                       {filas.map((fila, idx) => (
-                        <div key={idx} className="flex gap-1.5 items-center">
+                        <div key={idx} className="flex gap-2 items-center">
+                          <span
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                            style={{
+                              backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
+                              color: FLOTA_CONFIG.situacion.color,
+                            }}
+                          >
+                            {idx + 1}
+                          </span>
                           <input
                             value={fila}
                             onChange={e => {
@@ -678,8 +940,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               setFilas(next);
                             }}
                             placeholder={`Fila ${idx + 1}`}
-                            className="flex-1 p-2.5 rounded-lg bg-black/40 border text-sm focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.08)" }}
+                            className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                            style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
                           />
                           {filas.length > 1 ? (
                             <button
@@ -687,7 +949,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               onClick={() => setFilas(filas.filter((_, i) => i !== idx))}
                               className="p-2 rounded-lg hover:bg-white/5"
                             >
-                              <Trash2 size={12} style={{ color: MUTED }} />
+                              <Trash2 size={14} style={{ color: MUTED }} />
                             </button>
                           ) : null}
                         </div>
@@ -695,10 +957,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <button
                         type="button"
                         onClick={() => setFilas([...filas, ""])}
-                        className="flex items-center gap-1 text-[8px] font-black uppercase"
-                        style={{ color: MUTED }}
+                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        style={{
+                          backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
+                          color: FLOTA_CONFIG.situacion.color,
+                          border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
+                        }}
                       >
-                        <Plus size={10} /> Añadir fila
+                        <Plus size={12} /> Añadir fila
                       </button>
                     </div>
                   )}
@@ -706,7 +972,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               )}
             </div>
 
-            {/* CTA fijo: siempre visible sobre teclado / nav */}
             {tipo ? (
               <div
                 className="shrink-0 border-t border-white/5 px-4 pt-3"
@@ -715,11 +980,21 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   backgroundColor: PIZARRA,
                 }}
               >
+                {tipo === "tiempo" && projection ? (
+                  <p
+                    className="mb-2 text-center text-[10px] font-mono font-black"
+                    style={{ color: GOLD }}
+                    data-testid="jornada4-launch-cta-proy"
+                  >
+                    Fin proyectado ≈ {projection.finLabel}
+                    {conquistaHoraFin ? ` · meta ${conquistaHoraFin}` : ""}
+                  </p>
+                ) : null}
                 {!canLaunch ? (
                   <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
                     {tipo === "tiempo"
                       ? "Escribe nombre de misión + al menos una unidad"
-                      : "Escribe nombre de misión + al menos una fila"}
+                      : "Escribe misión + filas + hora de término"}
                   </p>
                 ) : null}
                 <button

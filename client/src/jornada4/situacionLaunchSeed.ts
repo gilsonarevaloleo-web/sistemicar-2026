@@ -15,6 +15,8 @@ export function buildSituacionRingSeed(opts: {
   filas: string[];
   minutosBloque: number;
   now?: number;
+  /** Si se pasa, fija el contrato a esa hora (meta HH:mm convertida). */
+  horaFinMs?: number;
 }): SituacionRingSeed | null {
   const now = opts.now ?? Date.now();
   const filas = opts.filas.map(f => f.trim()).filter(Boolean);
@@ -34,7 +36,10 @@ export function buildSituacionRingSeed(opts: {
   const firstId = subTareas[0]?.id;
   if (!firstId) return null;
 
-  const horaFinMs = now + minutosBloque * 60_000;
+  const horaFinMs =
+    opts.horaFinMs != null && opts.horaFinMs > now
+      ? opts.horaFinMs
+      : now + minutosBloque * 60_000;
   return {
     subTareas,
     situacionCronometro: {
