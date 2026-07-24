@@ -1,6 +1,11 @@
 import { memo, useCallback, useEffect, useState } from "react";
-import { Plus, Rocket, Trash2, X } from "lucide-react";
-import { FLOTA_CONFIG, getSubVehicleRecordSuggestions } from "@/components/flota/vehicleCardShared";
+import { ListTodo, Plus, Rocket, Trash2, X } from "lucide-react";
+import {
+  FLOTA_CONFIG,
+  getSubVehicleRecordSuggestions,
+  getDesglosadorMisionData,
+  getDesglosadorHistorico,
+} from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
@@ -59,6 +64,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filas, setFilas] = useState<string[]>([""]);
   const [minutos, setMinutos] = useState(30);
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
+  const [showMissionSugs, setShowMissionSugs] = useState(false);
+  const [historialSubs, setHistorialSubs] = useState<string[]>([]);
   const keyboardInset = useKeyboardInset();
 
   useEffect(() => {
@@ -70,6 +77,19 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (tipo !== "tiempo" || titulo.trim().length < 3) {
+      setHistorialSubs([]);
+      return;
+    }
+    setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
+  }, [titulo, tipo]);
+
+  const missionSuggestions =
+    tipo === "tiempo" && titulo.trim().length >= 2
+      ? getDesglosadorMisionData(titulo, 5)
+      : [];
+
   const reset = useCallback(() => {
     setTipo(null);
     setTitulo("");
@@ -77,6 +97,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setFilas([""]);
     setMinutos(30);
     setTerminoDetalle("Al cerrar este bloque");
+    setShowMissionSugs(false);
+    setHistorialSubs([]);
     setOpen(false);
   }, []);
 
@@ -290,23 +312,142 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     >
                       Nombre de la misión
                     </label>
-                    <input
-                      value={titulo}
-                      onChange={e => setTitulo(e.target.value)}
-                      placeholder={
-                        tipo === "tiempo" ? "Ej: Producción del día" : "Ej: Enfoque de la tarde"
-                      }
-                      className="w-full p-3 rounded-xl bg-black/40 border text-sm focus:outline-none"
-                      style={{
-                        color: INK,
-                        borderColor: titulo
-                          ? FLOTA_CONFIG[tipo].color
-                          : "rgba(255,255,255,0.1)",
-                      }}
-                      autoFocus
-                      data-testid="jornada4-launch-titulo"
-                    />
+                    <div className="relative">
+                      <input
+                        value={titulo}
+                        onChange={e => {
+                          setTitulo(e.target.value);
+                          if (tipo === "tiempo") {
+                            setShowMissionSugs(e.target.value.trim().length >= 2);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (tipo === "tiempo" && titulo.trim().length >= 2) {
+                            setShowMissionSugs(true);
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
+                        placeholder={
+                          tipo === "tiempo" ? "Ej: Producción del día" : "Ej: Enfoque de la tarde"
+                        }
+                        className="w-full p-3 rounded-xl bg-black/40 border text-sm focus:outline-none"
+                        style={{
+                          color: INK,
+                          borderColor: titulo
+                            ? FLOTA_CONFIG[tipo].color
+                            : "rgba(255,255,255,0.1)",
+                        }}
+                        autoFocus
+                        data-testid="jornada4-launch-titulo"
+                      />
+                      {tipo === "tiempo" && showMissionSugs && missionSuggestions.length > 0 ? (
+                        <div
+                          className="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border overflow-hidden max-h-48 overflow-y-auto"
+                          style={{
+                            backgroundColor: "#0f0f0f",
+                            borderColor: `${GOLD}40`,
+                            boxShadow: `0 4px 20px ${GOLD}20`,
+                          }}
+                          data-testid="jornada4-mission-suggestions"
+                        >
+                          {missionSuggestions.map((s, i) => (
+                            <button
+                              key={`${s.titulo}-${i}`}
+                              type="button"
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                setTitulo(s.titulo);
+                                setShowMissionSugs(false);
+                              }}
+                              className="w-full flex flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-white/5"
+                              data-testid={`jornada4-mission-sug-${i}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <ListTodo size={10} style={{ color: GOLD }} />
+                                <span className="text-sm truncate" style={{ color: INK }}>
+                                  {s.titulo}
+                                </span>
+                              </div>
+                              {s.subs.length > 0 ? (
+                                <div className="pl-4 flex flex-wrap gap-x-1 items-center">
+                                  {s.subs.map((sub, j) => (
+                                    <span
+                                      key={j}
+                                      className="text-[8px] font-mono whitespace-nowrap"
+                                      style={{ color: "rgba(212,175,55,0.55)" }}
+                                    >
+                                      {j > 0 ? (
+                                        <span style={{ color: "rgba(255,255,255,0.2)" }}>→ </span>
+                                      ) : null}
+                                      {sub.nombre}
+                                      {sub.duracionMin != null
+                                        ? ` · ${Math.round(sub.duracionMin)}m`
+                                        : ""}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
+
+                  {tipo === "tiempo" && historialSubs.length > 0 ? (
+                    <div
+                      className="rounded-xl border p-3 space-y-2"
+                      style={{
+                        borderColor: `${GOLD}35`,
+                        backgroundColor: "rgba(212,175,55,0.06)",
+                      }}
+                      data-testid="jornada4-secuencia-habitual"
+                    >
+                      <p
+                        className="text-[9px] font-black uppercase tracking-widest"
+                        style={{ color: GOLD }}
+                      >
+                        Tu secuencia habitual
+                      </p>
+                      <ol className="space-y-1">
+                        {historialSubs.map((name, i) => (
+                          <li
+                            key={`${name}-${i}`}
+                            className="text-[11px] font-mono flex gap-2"
+                            style={{ color: INK }}
+                          >
+                            <span style={{ color: GOLD }}>{i + 1}.</span>
+                            <span className="truncate">{name}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubs(
+                            historialSubs.map((t, i) => {
+                              const sug = getSubVehicleRecordSuggestions(t, 1)[0];
+                              return {
+                                tempId: `sub_${Date.now()}_${i}`,
+                                titulo: t,
+                                cantidadObjetivo: "",
+                                tiempoRecordMinPerUnit: sug?.minPerUnit,
+                              };
+                            })
+                          );
+                        }}
+                        className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
+                        style={{
+                          backgroundColor: `${GOLD}22`,
+                          color: GOLD,
+                          border: `1px solid ${GOLD}45`,
+                        }}
+                        data-testid="jornada4-usar-secuencia"
+                      >
+                        Usar esta secuencia
+                      </button>
+                    </div>
+                  ) : null}
 
                   {tipo === "tiempo" ? (
                     <div className="space-y-3">

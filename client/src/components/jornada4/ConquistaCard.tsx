@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
+import { Check, ListPlus, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { FLOTA_CONFIG, GOLD, NARANJA } from "@/components/flota/vehicleCardShared";
+import {
+  FLOTA_CONFIG,
+  GOLD,
+  NARANJA,
+  getSubVehicleRecordSuggestions,
+} from "@/components/flota/vehicleCardShared";
 import {
   computeDesglosadorClocks,
   desglosadorSubTimerUiFromClocks,
@@ -23,14 +28,27 @@ const INK = "#f1f5f9";
 const CYAN = "#00FFC3";
 const flotaColor = FLOTA_CONFIG.tiempo.color;
 
+type AddSubForm = {
+  titulo: string;
+  cantidadObjetivo: string;
+  tiempoRecordMinPerUnit?: number;
+};
+
 type Props = {
   vehicle: Vehicle;
   onCumplido: (cantidad?: number) => void;
   onFallado: () => void;
   onCerrarCiclo: () => void;
+  onAddSub?: (form: AddSubForm) => void;
 };
 
-export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }: Props) {
+export function ConquistaCard({
+  vehicle,
+  onCumplido,
+  onFallado,
+  onCerrarCiclo,
+  onAddSub,
+}: Props) {
   const active = conquistaActiveSub(vehicle);
   const tick = useJornada4Tick(Boolean(active?.aperturaAt));
   const clocks = useMemo(
@@ -55,10 +73,28 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
     active?.tiempoRecordMinPerUnit != null && active.tiempoRecordMinPerUnit > 0;
 
   const [cantidad, setCantidad] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addTitulo, setAddTitulo] = useState("");
+  const [addCant, setAddCant] = useState("");
+  const [addRecord, setAddRecord] = useState<number | undefined>();
+  const [showAddSugs, setShowAddSugs] = useState(false);
 
   useEffect(() => {
     setCantidad("");
   }, [active?.id]);
+
+  const addSuggestions =
+    addTitulo.trim().length >= 2
+      ? getSubVehicleRecordSuggestions(addTitulo, 5)
+      : [];
+
+  const resetAdd = () => {
+    setAddTitulo("");
+    setAddCant("");
+    setAddRecord(undefined);
+    setShowAdd(false);
+    setShowAddSugs(false);
+  };
 
   const restanteManual = hasCantidadObj
     ? Math.max(0, (active!.cantidadObjetivo ?? 0) - (Number(cantidad) || 0))
@@ -534,6 +570,148 @@ export function ConquistaCard({ vehicle, onCumplido, onFallado, onCerrarCiclo }:
                 </div>
               );
             })}
+          </div>
+        ) : null}
+
+        {onAddSub && vehicle.status === "activo" && !cycleReady ? (
+          <div className="pt-1" data-testid="j4-conquista-add-sub">
+            {!showAdd ? (
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                style={{
+                  backgroundColor: "rgba(249,115,22,0.08)",
+                  color: flotaColor,
+                  border: `1px solid ${flotaColor}35`,
+                }}
+              >
+                <ListPlus size={12} /> Añadir subtarea
+              </button>
+            ) : (
+              <div
+                className="rounded-xl border p-3 space-y-2"
+                style={{ borderColor: `${flotaColor}30`, backgroundColor: "rgba(0,0,0,0.4)" }}
+              >
+                <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>
+                  Nueva subtarea
+                </p>
+                <div className="relative">
+                  <input
+                    value={addTitulo}
+                    onChange={e => {
+                      setAddTitulo(e.target.value);
+                      setShowAddSugs(e.target.value.trim().length >= 2);
+                    }}
+                    onFocus={() => setShowAddSugs(addTitulo.trim().length >= 2)}
+                    onBlur={() => setTimeout(() => setShowAddSugs(false), 150)}
+                    placeholder="Nombre de la unidad…"
+                    className="w-full p-2.5 rounded-lg bg-black/50 border text-sm focus:outline-none"
+                    style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                    data-testid="j4-add-sub-titulo"
+                  />
+                  {showAddSugs && addSuggestions.length > 0 ? (
+                    <div
+                      className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl border overflow-hidden max-h-40 overflow-y-auto"
+                      style={{
+                        backgroundColor: "#0f0f0f",
+                        borderColor: `${flotaColor}40`,
+                        boxShadow: `0 4px 20px ${flotaColor}20`,
+                      }}
+                    >
+                      {addSuggestions.map((s, i) => (
+                        <button
+                          key={`${s.titulo}-${i}`}
+                          type="button"
+                          onMouseDown={e => {
+                            e.preventDefault();
+                            setAddTitulo(s.titulo);
+                            setAddRecord(s.minPerUnit);
+                            setShowAddSugs(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/5"
+                          data-testid={`j4-add-sub-sug-${i}`}
+                        >
+                          <span className="text-xs truncate" style={{ color: INK }}>
+                            {s.titulo}
+                          </span>
+                          <span
+                            className="text-[9px] font-mono font-bold ml-2 shrink-0"
+                            style={{ color: flotaColor }}
+                          >
+                            {s.minPerUnit.toFixed(1)} MIN/U
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={addCant}
+                    onChange={e => setAddCant(e.target.value)}
+                    placeholder="Cantidad"
+                    inputMode="numeric"
+                    className="w-full p-2 rounded-lg bg-black/50 border text-xs focus:outline-none"
+                    style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                  />
+                  <input
+                    value={addRecord != null ? String(addRecord) : ""}
+                    onChange={e => {
+                      const raw = e.target.value.trim();
+                      const n = Number(raw);
+                      setAddRecord(
+                        raw === "" || !Number.isFinite(n) || n <= 0 ? undefined : n
+                      );
+                    }}
+                    placeholder="Récord MIN/U"
+                    inputMode="decimal"
+                    className="w-full p-2 rounded-lg bg-black/50 border text-xs focus:outline-none"
+                    style={{ color: INK, borderColor: "rgba(255,255,255,0.1)" }}
+                  />
+                </div>
+                {addRecord != null ? (
+                  <p className="text-[8px] font-mono font-bold" style={{ color: GOLD }}>
+                    Récord: {addRecord.toFixed(1)} MIN/U
+                    {Number(addCant) > 0
+                      ? ` — ≈${Math.round(Number(addCant) * addRecord)} min`
+                      : " — escribe cuántas unidades"}
+                  </p>
+                ) : null}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={!addTitulo.trim()}
+                    onClick={() => {
+                      if (!addTitulo.trim() || !onAddSub) return;
+                      onAddSub({
+                        titulo: addTitulo.trim(),
+                        cantidadObjetivo: addCant,
+                        tiempoRecordMinPerUnit: addRecord,
+                      });
+                      resetAdd();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider disabled:opacity-40"
+                    style={{
+                      backgroundColor: `${flotaColor}22`,
+                      color: flotaColor,
+                      border: `1px solid ${flotaColor}40`,
+                    }}
+                    data-testid="j4-add-sub-submit"
+                  >
+                    Añadir a la cola
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetAdd}
+                    className="px-3 py-2.5 rounded-xl text-[9px] font-black uppercase"
+                    style={{ color: MUTED }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

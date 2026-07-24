@@ -22,6 +22,10 @@ type Ops = {
     status: "cumplido" | "fallado"
   ) => Promise<void>;
   closeSituacionBlock: (vehicleId: string) => Promise<void>;
+  addConquistaSub: (
+    vehicleId: string,
+    form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
+  ) => Promise<void>;
 };
 
 type Props = {
@@ -89,15 +93,16 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
             {vehicles.map(v => {
               if (isConquistaDesglosador(v)) {
                 return (
-                  <ConquistaCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplido={cantidad =>
-                      void ops.closeConquistaSub(v.id, "cumplido", cantidad)
-                    }
-                    onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
-                    onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
-                  />
+                <ConquistaCard
+                  key={v.id}
+                  vehicle={v}
+                  onCumplido={cantidad =>
+                    void ops.closeConquistaSub(v.id, "cumplido", cantidad)
+                  }
+                  onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
+                  onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+                  onAddSub={form => void ops.addConquistaSub(v.id, form)}
+                />
                 );
               }
               if (isSituacionDesglosador(v)) {

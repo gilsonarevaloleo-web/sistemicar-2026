@@ -26,6 +26,12 @@ import {
   awardSituacionBlockPs,
 } from "@/jornada4/psBridge";
 import { burstJornada4Tick } from "@/jornada4/jornada4Tick";
+import {
+  recordDesglosadorCycleHistory,
+  recordDesglosadorSubHistory,
+} from "@/lib/vehicleHistoryStore";
+import { buildDesglosadorSubFromRuntime } from "@/components/flota/vehicleCardShared";
+import type { DesglosadorSubFormRow as SharedSubForm } from "@/components/flota/vehicleCardShared";
 
 const PIZARRA = "#0a0a0a";
 const EMERALD = "#00C851";
@@ -90,6 +96,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               subVehiculos: patch.subVehiculos,
             }, { skipLocalSync: true });
             if (status === "cumplido") {
+              recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
               const awarded = await awardConquistaSubPs(
                 vehicle.titulo,
                 patch.closedSub,
@@ -163,6 +170,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               cierreAt: patch.cierreAt,
               subVehiculos: patch.subVehiculos,
             }, { skipLocalSync: true });
+            recordDesglosadorCycleHistory(
+              {
+                titulo: vehicle.titulo,
+                subVehiculos: patch.subVehiculos,
+                aperturaAt: vehicle.aperturaAt,
+                cierreAt: patch.cierreAt,
+              },
+              userId
+            );
             const { cyclePs } = await awardConquistaCyclePs(
               vehicleId,
               vehicle.titulo,
@@ -324,10 +340,54 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle, safeAwardPS]
   );
 
+  const addConquistaSub = useCallback(
+    async (vehicleId: string, form: SharedSubForm) => {
+      if (!userId) return;
+      const key = `add:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || vehicle.status !== "activo") return;
+        const existing = vehicle.subVehiculos ?? [];
+        const hasActive = existing.some(s => s.status === "activo");
+        const newSub = buildDesglosadorSubFromRuntime(form, existing, {
+          activate: !hasActive,
+        });
+        const nextSubs = [...existing, newSub];
+        paintVehicle(vehicleId, { subVehiculos: nextSubs });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              { subVehiculos: nextSubs },
+              { skipLocalSync: true }
+            );
+            toast.message(
+              newSub.status === "activo"
+                ? "Unidad activa"
+                : "Unidad añadida a la cola",
+              { duration: 1800 }
+            );
+          } catch (e) {
+            console.error("[jornada4.addConquistaSub]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
   return {
     closeConquistaSub,
     closeConquistaCycle,
     closeSituacionRow,
     closeSituacionBlock,
+    addConquistaSub,
   };
 }
