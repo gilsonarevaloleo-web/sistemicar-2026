@@ -30,6 +30,10 @@ const V4_TIPOS = ["tiempo", "situacion"] as const;
 type Props = {
   onLaunch: (form: Jornada4LaunchForm) => Promise<string | null>;
   disabled?: boolean;
+  /** Hora fin del segmento activo → meta default del ring. */
+  segmentoHoraFin?: string | null;
+  /** Nombre del segmento activo (chip en launcher). */
+  segmentoActivoNombre?: string | null;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -73,6 +77,8 @@ function useKeyboardInset(): number {
 export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   onLaunch,
   disabled = false,
+  segmentoHoraFin = null,
+  segmentoActivoNombre = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,7 +88,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filas, setFilas] = useState<string[]>([""]);
   const [conquistaHoraFin, setConquistaHoraFin] = useState("");
   const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
-    resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30)
+    resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
   const [showMissionSugs, setShowMissionSugs] = useState(false);
@@ -123,28 +129,43 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     return situacionMinutosHastaObjetivoHora(situacionHoraFin.trim());
   }, [situacionHoraFin, tick]);
 
+  useEffect(() => {
+    if (tipo === "situacion") {
+      setSituacionHoraFin(
+        resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
+          defaultHoraPlus(30)
+      );
+    }
+  }, [segmentoHoraFin, tipo]);
+
   const reset = useCallback(() => {
     setTipo(null);
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);
     setConquistaHoraFin("");
-    setSituacionHoraFin(resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30));
+    setSituacionHoraFin(
+      resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
+        defaultHoraPlus(30)
+    );
     setTerminoDetalle("Al cerrar este bloque");
     setShowMissionSugs(false);
     setHistorialSubs([]);
     setActiveSubSugIdx(null);
     setOpen(false);
-  }, []);
+  }, [segmentoHoraFin]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
     if (t === "situacion") {
-      setSituacionHoraFin(resolveDefaultObjetivoHoraParaRing() ?? defaultHoraPlus(30));
+      setSituacionHoraFin(
+        resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
+          defaultHoraPlus(30)
+      );
       if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
-  }, [terminoDetalle]);
+  }, [terminoDetalle, segmentoHoraFin]);
 
   const canLaunch =
     titulo.trim().length > 0 &&
@@ -213,6 +234,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
             {FLOTA_SELECTOR_DISCRIMINATOR}
           </p>
+          {segmentoActivoNombre ? (
+            <p
+              className="text-[9px] mt-1 font-bold"
+              style={{ color: EMERALD }}
+              data-testid="jornada4-launch-seg-chip"
+            >
+              Lanza en · {segmentoActivoNombre}
+              {segmentoHoraFin ? ` · meta ${segmentoHoraFin}` : ""}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
