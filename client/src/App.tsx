@@ -479,6 +479,13 @@ function VoiceBootstrap() {
     ensureUbicacionVoiceRetryHub();
     const stopWatchdog = installSpeechStuckWatchdog();
     const unlock = () => {
+      // Dual Kernel: sin voz/prefetch GPS — evita pelear con gestos Cumplido/Fallado.
+      if (
+        window.location.pathname === "/jornada-v4" ||
+        window.location.pathname.startsWith("/jornada-v4?")
+      ) {
+        return;
+      }
       unlockSpeechSynthesis(true);
       void import("@/lib/gpsVoice").then(m => {
         m.unlockGpsVoice();

@@ -53,11 +53,16 @@ export async function executeJornada4Launch(
       paintSituacionSeed(id, seed, vehiclesRef, setVehicles);
       void runShadowTaskAsync(async () => {
         try {
-          await updateVehicle(userId, id, {
-            subTareas: seed.subTareas,
-            situacionCronometro: seed.situacionCronometro,
-            situacionCupoAnchor: seed.situacionCupoAnchor,
-          });
+          await updateVehicle(
+            userId,
+            id,
+            {
+              subTareas: seed.subTareas,
+              situacionCronometro: seed.situacionCronometro,
+              situacionCupoAnchor: seed.situacionCupoAnchor,
+            },
+            { skipLocalSync: true }
+          );
         } catch (e) {
           console.error("[executeJornada4Launch] seed situacion", e);
         }

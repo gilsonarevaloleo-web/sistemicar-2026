@@ -75,7 +75,11 @@ interface CierreData {
 export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location] = useLocation();
-  const isPlanificacion = location === "/planeacion" || location.startsWith("/planeacion?");
+  const isPlanificacion =
+    location === "/planeacion" ||
+    location.startsWith("/planeacion?") ||
+    location === "/jornada-v4" ||
+    location.startsWith("/jornada-v4?");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cierreData, setCierreData] = useState<CierreData | null>(null);
@@ -91,9 +95,9 @@ export function CierreJornadaModal() {
   const [dailySovereigntyPoints, setDailySovereigntyPoints] = useState(0);
   const [dailyPointsLogs, setDailyPointsLogs] = useState<SovereigntyPointsLog[]>([]);
 
-  // Suscribirse a los puntos del día en tiempo real
+  // Sin listeners en /planeacion ni Dual Kernel (la UI ya no monta el modal ahí).
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     
     const unsubscribe = subscribeToDailyPoints(
       user.uid,
@@ -107,60 +111,60 @@ export function CierreJornadaModal() {
     );
     
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToEnergyLogs(
       user.uid,
       (data) => setEnergyLogs(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToAliados(
       user.uid,
       (data) => setAliados(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToAlquimiaEntries(
       user.uid,
       (data) => setAlquimias(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToProgression(
       user.uid,
       (data) => setProgression(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToVehicles(
       user.uid,
       (data) => setVehicles(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isPlanificacion) return;
     const unsubscribe = subscribeToPlanilla(
       user.uid,
       getLimaDateString(),
@@ -168,7 +172,7 @@ export function CierreJornadaModal() {
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user]);
+  }, [user, isPlanificacion]);
 
   const todayVehicles = useMemo(
     () => filterVehiclesForAnilloCoverage(vehicles, Date.now()),

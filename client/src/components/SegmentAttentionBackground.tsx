@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { useAuthContext } from "@/App";
 import {
   getPlanillaHoy,
@@ -39,6 +40,7 @@ import {
 import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival } from "@/lib/mobilePerf";
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
+import { isJornada4Path } from "@/lib/jornadaBrand";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -55,10 +57,12 @@ const SEGMENT_WORK_KEY = "segment-attention-cycle";
 
 /**
  * Motor global de segmentos: puertas, entropía y cierres por cruce.
- * Sigue activo en cualquier ruta de la app (no solo /planeacion).
+ * Activo en casi toda la app — **pausado en Dual Kernel (`/jornada-v4`)**.
  */
 export function SegmentAttentionBackground() {
   const { user } = useAuthContext();
+  const [location] = useLocation();
+  const dualKernelQuiet = isJornada4Path(location);
   const planillaRef = useRef<Planilla | null>(null);
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaFechaRef = useRef(getJournalDateString());
@@ -68,7 +72,7 @@ export function SegmentAttentionBackground() {
   const progressionRef = useRef<UserProgression | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || dualKernelQuiet) return;
 
     const unsubProg = subscribeToProgression(
       user.uid,
@@ -256,7 +260,7 @@ export function SegmentAttentionBackground() {
       stopConcienciaScheduler();
       cancelAllNotifications();
     };
-  }, [user]);
+  }, [user, dualKernelQuiet]);
 
   return null;
 }

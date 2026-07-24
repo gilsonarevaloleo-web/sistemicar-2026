@@ -88,7 +88,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           try {
             await updateVehicle(userId, vehicleId, {
               subVehiculos: patch.subVehiculos,
-            });
+            }, { skipLocalSync: true });
             if (status === "cumplido") {
               const awarded = await awardConquistaSubPs(
                 vehicle.titulo,
@@ -162,7 +162,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               status: patch.status,
               cierreAt: patch.cierreAt,
               subVehiculos: patch.subVehiculos,
-            });
+            }, { skipLocalSync: true });
             const { cyclePs } = await awardConquistaCyclePs(
               vehicleId,
               vehicle.titulo,
@@ -220,7 +220,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               subTareas: patch.subTareas,
               situacionCupoAnchor: patch.situacionCupoAnchor,
               situacionCronometro: patch.situacionCronometro,
-            });
+            }, { skipLocalSync: true });
             if (status === "cumplido") {
               const awarded = await awardSituacionFilaPs(
                 patch.closedSubTexto,
@@ -296,7 +296,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               subTareas: patch.subTareas,
               situacionCronometro: patch.situacionCronometro,
               situacionCupoAnchor: patch.situacionCupoAnchor,
-            });
+            }, { skipLocalSync: true });
             const awarded = await awardSituacionBlockPs(
               vehicle.titulo,
               patch.status,

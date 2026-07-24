@@ -1,6 +1,9 @@
 /**
  * Entrada liviana Jornada V4 (Dual Kernel).
  * Autónomo: lanza y opera solo Conquista + Situacional.
+ *
+ * Importante: un solo `useJornada4Core` vivo a la vez (boot XOR sesión)
+ * para no duplicar suscriptores del flotaStore.
  */
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuthContext } from "@/App";
@@ -18,7 +21,6 @@ const SESSION_IDLE_MS = 120;
 export default function JornadaV4() {
   const { user } = useAuthContext();
   const [sessionReady, setSessionReady] = useState(false);
-  const core = useJornada4Core();
 
   useEffect(() => {
     clearJornadaFatalError();
@@ -67,8 +69,8 @@ export default function JornadaV4() {
         <Suspense
           fallback={
             <BootFallback
-              dualCount={core.dualCount}
-              dailyPS={core.dailyPS}
+              dualCount={0}
+              dailyPS={0}
               statusLine="Cargando Dual Kernel…"
             />
           }
@@ -76,13 +78,21 @@ export default function JornadaV4() {
           <JornadaV4Session />
         </Suspense>
       ) : (
-        <BootFallback
-          dualCount={core.dualCount}
-          dailyPS={core.dailyPS}
-          statusLine="Estás en Jornada V4 · Dual Kernel"
-        />
+        <JornadaV4Boot />
       )}
     </div>
+  );
+}
+
+/** Boot con core — se desmonta al montar la sesión (un solo subscriber). */
+function JornadaV4Boot() {
+  const core = useJornada4Core();
+  return (
+    <BootFallback
+      dualCount={core.dualCount}
+      dailyPS={core.dailyPS}
+      statusLine="Estás en Jornada V4 · Dual Kernel"
+    />
   );
 }
 

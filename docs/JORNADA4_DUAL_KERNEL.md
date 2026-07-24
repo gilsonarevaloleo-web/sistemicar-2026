@@ -74,7 +74,7 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `AnilloConciencia*` | Mapa del día ≠ operación de unidad/cupo |
 | `escaleraConcienciaEngine` | Métricas derivadas; no cierran unidades |
 | `disciplinaEngine` / `puntualidadEngine` | Acopla segmentos al hot path |
-| `SegmentAttentionBackground` en la ruta J4 | Motor global que sigue corriendo y satura |
+| `SegmentAttentionBackground` en la ruta J4 | Pausado al entrar a `/jornada-v4` (App shell); se reanuda al salir |
 | `useDesglosadorManager` | Orquestador monolítico; V3 ya demostró que se puede partir |
 | Voz | Históricamente deja listeners / pelea con gestos; fase posterior |
 
@@ -162,7 +162,7 @@ flowchart TB
     ES[Escalera]
     DI[Disciplina]
     VO[Voz / speechQueue]
-    SA[SegmentAttention en esta ruta]
+    SA[SegmentAttention pausado en V4]
   end
 
   Shell --> Core
@@ -268,6 +268,18 @@ Solo bajo kill-switch y fuera del hot path de cierre:
 V4 **no** es un fork filosófico del embudo: es un **corte de runtime**. Cuando Dual Kernel sea estable en móvil, se decide si V3/classic delegan operación de desglose a estos kernels o se retiran de la ruta caliente.
 
 ---
+
+## 7.1 Quiet App shell en `/jornada-v4`
+
+Al entrar a Dual Kernel se pausan (no solo se omiten del bundle):
+
+- `SegmentAttentionBackground` + `concienciaScheduler`
+- `CentinelaEngine` (intervalo 1s + listeners)
+- listeners de `CierreJornadaModal`
+- FAB `DoctorIAChat`
+- prefetch/unlock de voz GPS
+
+Cierres V4 usan `updateVehicle(..., { skipLocalSync: true })` para no disparar `vehicles-updated` tras haber pintado flotaStore.
 
 ## 8. Criterios de éxito (J4)
 
