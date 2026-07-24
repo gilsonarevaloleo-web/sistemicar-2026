@@ -26,6 +26,12 @@ type Ops = {
     vehicleId: string,
     form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
   ) => Promise<void>;
+  addSituacionFila: (vehicleId: string, texto: string) => Promise<void>;
+  setSituacionCupo: (
+    vehicleId: string,
+    subTareaId: string,
+    minutos: number | undefined
+  ) => Promise<void>;
 };
 
 type Props = {
@@ -113,6 +119,8 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onCumplido={id => void ops.closeSituacionRow(v.id, id, "cumplido")}
                     onFallado={id => void ops.closeSituacionRow(v.id, id, "fallado")}
                     onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
+                    onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
+                    onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
                   />
                 );
               }

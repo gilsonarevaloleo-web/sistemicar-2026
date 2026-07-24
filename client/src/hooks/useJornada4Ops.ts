@@ -32,6 +32,14 @@ import {
 } from "@/lib/vehicleHistoryStore";
 import { buildDesglosadorSubFromRuntime } from "@/components/flota/vehicleCardShared";
 import type { DesglosadorSubFormRow as SharedSubForm } from "@/components/flota/vehicleCardShared";
+import {
+  applyCupoManualYRedistribuir,
+  buildSellarDirectoEnRingState,
+  remainingCronometroBudgetMin,
+  resolveCronometroCupoAnchor,
+  totalBudgetMinFromCronometro,
+} from "@/lib/situacionCupoDistrib";
+import { isSituacionDesglosador } from "@/jornada4/filters";
 
 const PIZARRA = "#0a0a0a";
 const EMERALD = "#00C851";
@@ -244,8 +252,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               );
               toast.success(
                 awarded > 0
-                  ? `+${awarded} PS · fila`
-                  : "Fila cumplida",
+                  ? patch.minutosGanados > 0
+                    ? `+${awarded} PS · +${patch.minutosGanados} min ganados`
+                    : `+${awarded} PS · fila`
+                  : patch.minutosGanados > 0
+                    ? `+${patch.minutosGanados} min ganados → cola`
+                    : "Fila cumplida",
                 {
                   style: {
                     backgroundColor: PIZARRA,
@@ -383,11 +395,119 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle]
   );
 
+  const addSituacionFila = useCallback(
+    async (vehicleId: string, texto: string) => {
+      if (!userId) return;
+      const key = `sellar:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || !isSituacionDesglosador(vehicle)) return;
+        const result = buildSellarDirectoEnRingState(vehicle, texto);
+        if (!result.ok) {
+          toast.error(
+            result.reason === "empty_text"
+              ? "Escribe el texto de la fila"
+              : "No se pudo sellar en el ring",
+            {
+              style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+            }
+          );
+          return;
+        }
+        paintVehicle(vehicleId, {
+          subTareas: result.subTareas,
+          situacionCronometro: result.situacionCronometro,
+          situacionCupoAnchor: result.situacionCupoAnchor,
+        });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              {
+                subTareas: result.subTareas,
+                situacionCronometro: result.situacionCronometro,
+                situacionCupoAnchor: result.situacionCupoAnchor,
+              },
+              { skipLocalSync: true }
+            );
+            toast.message("Sellado en ring · tiempo redistribuido", { duration: 1800 });
+          } catch (e) {
+            console.error("[jornada4.addSituacionFila]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const setSituacionCupo = useCallback(
+    async (vehicleId: string, subTareaId: string, minutos: number | undefined) => {
+      if (!userId) return;
+      const key = `cupo:${vehicleId}:${subTareaId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || !isSituacionDesglosador(vehicle) || !vehicle.subTareas) return;
+        const sc = vehicle.situacionCronometro;
+        if (sc?.activo !== true) return;
+        const now = Date.now();
+        const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
+        const budget =
+          remainingCronometroBudgetMin(sc, vehicle.subTareas, now) ??
+          totalBudgetMinFromCronometro(
+            vehicle.subTareas,
+            bloqueInicio,
+            sc.horaFinContratoMs ?? sc.horaFinMs
+          );
+        const subTareas = applyCupoManualYRedistribuir(
+          vehicle.subTareas,
+          subTareaId,
+          minutos,
+          budget
+        );
+        const resolved = resolveCronometroCupoAnchor(subTareas, vehicle.situacionCupoAnchor, {
+          now,
+        });
+        const situacionCupoAnchor =
+          resolved === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolved;
+
+        paintVehicle(vehicleId, { subTareas, situacionCupoAnchor });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              { subTareas, situacionCupoAnchor },
+              { skipLocalSync: true }
+            );
+          } catch (e) {
+            console.error("[jornada4.setSituacionCupo]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
   return {
     closeConquistaSub,
     closeConquistaCycle,
     closeSituacionRow,
     closeSituacionBlock,
     addConquistaSub,
+    addSituacionFila,
+    setSituacionCupo,
   };
 }
