@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, ListPlus, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
+import { Check, Focus, ListPlus, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import {
   FLOTA_CONFIG,
@@ -7,6 +7,9 @@ import {
   NARANJA,
   getSubVehicleRecordSuggestions,
 } from "@/components/flota/vehicleCardShared";
+import {
+  ConquistaUnitFocusOverlay,
+} from "@/components/flota/ConquistaUnitFocusOverlay";
 import {
   computeDesglosadorClocks,
   desglosadorSubTimerUiFromClocks,
@@ -73,6 +76,7 @@ export function ConquistaCard({
     active?.tiempoRecordMinPerUnit != null && active.tiempoRecordMinPerUnit > 0;
 
   const [cantidad, setCantidad] = useState("");
+  const [unitFocusOpen, setUnitFocusOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [addTitulo, setAddTitulo] = useState("");
   const [addCant, setAddCant] = useState("");
@@ -143,6 +147,25 @@ export function ConquistaCard({
             </span>
           </div>
         </div>
+
+        {/* FOCO unidad — cronómetro grande con Tik, sin récord (siempre disponible) */}
+        {vehicle.status === "activo" ? (
+          <button
+            type="button"
+            onClick={() => setUnitFocusOpen(true)}
+            className="mt-3 w-full py-3.5 rounded-xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-wider touch-manipulation"
+            style={{
+              backgroundColor: NARANJA,
+              color: "#0a0a0a",
+              boxShadow: `0 0 18px ${NARANJA}55`,
+            }}
+            data-testid="j4-conquista-foco-open"
+            title="Cronómetro de unidad — no guarda récord"
+          >
+            <Focus size={16} strokeWidth={2.5} />
+            Foco unidad · Tik + vueltas
+          </button>
+        ) : null}
 
         <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
           <div
@@ -715,6 +738,12 @@ export function ConquistaCard({
           </div>
         ) : null}
       </div>
+
+      <ConquistaUnitFocusOverlay
+        open={unitFocusOpen}
+        onClose={() => setUnitFocusOpen(false)}
+        accentColor={NARANJA}
+      />
     </article>
   );
 }
