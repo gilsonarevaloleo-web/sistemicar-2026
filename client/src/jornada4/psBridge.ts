@@ -47,9 +47,14 @@ export async function awardConquistaCyclePs(
 
 export async function awardSituacionFilaPs(
   texto: string,
-  award: AwardPsFn
+  award: AwardPsFn,
+  subTareaId?: string
 ): Promise<number> {
-  const ok = await award(J4_SITUACION_FILA_PS, `J4 situacional · ${texto}`);
+  const idSuffix = subTareaId ? ` [${subTareaId}]` : "";
+  const ok = await award(
+    J4_SITUACION_FILA_PS,
+    `J4 situacional · ${texto}${idSuffix}`
+  );
   return ok ? J4_SITUACION_FILA_PS : 0;
 }
 

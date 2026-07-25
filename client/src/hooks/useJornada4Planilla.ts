@@ -1,12 +1,15 @@
 /**
  * Planilla del día + rutinas para Dual Kernel.
  * CRUD puro vía persistence — sin conciencia / voz / disciplina.
+ * Incluye tick ligero de atención (auto-apertura + entropía) porque
+ * SegmentAttentionBackground está pausado en /jornada-v4.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   applyPlantillaToday,
   addPlantillaRutina,
+  deductSovereigntyPoints,
   deletePlantillaRutina,
   savePlanilla,
   subscribePlantillasRutina,
@@ -28,6 +31,12 @@ import {
   isWithinPuertaWindow,
 } from "@/lib/segmentAttentionEngine";
 import { setActiveSegmento, registrarEvento, COMPONENTES } from "@/lib/evento-universal";
+import {
+  applyJornada4SegmentAttention,
+  collectAutoAperturaSegIds,
+  findSegmentNombre,
+} from "@/jornada4/segmentAttentionLite";
+import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 
 const PIZARRA = "#0a0a0a";
 const BLOOD = "#FF2A2A";
@@ -52,10 +61,20 @@ export type UseJornada4PlanillaParams = {
   safeAwardPS: (amount: number, source: string) => Promise<boolean>;
 };
 
+const ATTENTION_TICK_MIN_GAP_MS = 12_000;
+
 export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4PlanillaParams) {
   const [planilla, setPlanilla] = useState<Planilla | null>(null);
   const [plantillasRutina, setPlantillasRutina] = useState<PlantillaRutina[]>([]);
   const [busySegId, setBusySegId] = useState<string | null>(null);
+  const planillaRef = useRef<Planilla | null>(null);
+  const attentionBusyRef = useRef(false);
+  const lastAttentionAtRef = useRef(0);
+  const attentionTick = useJornada4Tick(Boolean(userId && planilla));
+
+  useEffect(() => {
+    planillaRef.current = planilla;
+  }, [planilla]);
 
   useEffect(() => {
     if (!userId) {
@@ -82,6 +101,92 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
       setPlantillasRutina(list);
     });
   }, [userId]);
+
+  /** Auto-apertura / entropía sin voz (SegmentAttentionBackground pausado en V4). */
+  useEffect(() => {
+    if (!userId || !planillaRef.current) return;
+    const now = Date.now();
+    if (attentionBusyRef.current) return;
+    if (now - lastAttentionAtRef.current < ATTENTION_TICK_MIN_GAP_MS) return;
+
+    const current = planillaRef.current;
+    const result = applyJornada4SegmentAttention(current, now);
+    if (!result.changed) {
+      lastAttentionAtRef.current = now;
+      return;
+    }
+
+    attentionBusyRef.current = true;
+    lastAttentionAtRef.current = now;
+    setPlanilla(result.planilla);
+    planillaRef.current = result.planilla;
+
+    void (async () => {
+      try {
+        await savePlanilla(userId, result.planilla);
+
+        const autoIds = collectAutoAperturaSegIds(result.events);
+        for (const segId of autoIds) {
+          setActiveSegmento(userId, segId);
+          const nombre = findSegmentNombre(result.planilla.segmentos, segId);
+          try {
+            await deductSovereigntyPoints(
+              userId,
+              2,
+              "Puerta sistema (entropía): " + nombre
+            );
+          } catch (e) {
+            console.error("[j4.attention] deductPS", e);
+          }
+          toast.error(`ENTROPÍA: ${nombre}`, {
+            description:
+              "Puerta abierta por el sistema. −2 PS. Cierra con intención (±5 min del fin) para recuperar +2 PS.",
+            style: {
+              backgroundColor: PIZARRA,
+              border: `1px solid ${BLOOD}`,
+              color: BLOOD,
+            },
+            duration: 6500,
+          });
+        }
+
+        for (const ev of result.events) {
+          if (ev.type !== "entropia") continue;
+          toast.error(`ENTROPÍA: ${ev.nombre}`, {
+            description:
+              ev.reason === "past_end"
+                ? "No cerraste a tiempo. 0 PS de cierre consciente."
+                : "Ventana de segmento perdida sin puerta consciente.",
+            style: {
+              backgroundColor: PIZARRA,
+              border: `1px solid ${BLOOD}`,
+              color: BLOOD,
+            },
+            duration: 5500,
+          });
+        }
+
+        if (result.dayRollover) {
+          toast.error("Jornada cerrada", {
+            description:
+              "Segmentos activos pasaron a entropía al cambiar el día.",
+            style: {
+              backgroundColor: PIZARRA,
+              border: `1px solid ${BLOOD}`,
+              color: BLOOD,
+            },
+            duration: 5500,
+          });
+        }
+      } catch (e) {
+        console.error("[j4.attention]", e);
+        setPlanilla(current);
+        planillaRef.current = current;
+      } finally {
+        attentionBusyRef.current = false;
+      }
+    })();
+  }, [userId, attentionTick, planilla?.fecha, planilla?.segmentos?.length]);
 
   const segmentoActivo = useMemo(
     () => planilla?.segmentos.find(s => s.estado === "activo") ?? null,
@@ -219,11 +324,11 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         }
         setPlanilla(saved);
         setActiveSegmento(userId, segId);
-        toast.success("+2 PS · puerta abierta", {
+        const ok = await safeAwardPS(2, "Puerta de atención: " + seg.nombre);
+        toast.success(ok ? "+2 PS · puerta abierta" : "Puerta abierta", {
           description: seg.nombre,
           style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
         });
-        void safeAwardPS(2, "Puerta de atención: " + seg.nombre);
         void registrarEvento(COMPONENTES.PLANIFICACION);
       } catch (e) {
         console.error("[j4.activarSegmento]", e);
@@ -286,11 +391,13 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         }
         setPlanilla(saved);
         if (segmentoActivo?.id === segId) setActiveSegmento(userId, null);
-        toast.success("+2 PS · cierre consciente", {
-          description: seg.nombre,
+        const ok = await safeAwardPS(2, "Cierre consciente: " + seg.nombre);
+        toast.success(ok ? "+2 PS · cierre consciente" : "Cierre consciente", {
+          description: seg.puertaSistema
+            ? `${seg.nombre} · Recuperaste los 2 PS de entropía`
+            : seg.nombre,
           style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
         });
-        void safeAwardPS(2, "Cierre consciente: " + seg.nombre);
         void registrarEvento(COMPONENTES.PLANIFICACION);
       } catch (e) {
         console.error("[j4.cerrarSegmento]", e);
