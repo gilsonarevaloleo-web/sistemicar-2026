@@ -81,6 +81,7 @@ import { unlockSpeechSynthesis } from "@/lib/speechQueue";
 import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speechRecovery";
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
+import { isJornada4WindowPath } from "@/lib/jornadaBrand";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -478,23 +479,45 @@ function VoiceBootstrap() {
     const stopLifecycle = installVoiceLifecycleHub();
     ensureUbicacionVoiceRetryHub();
     const stopWatchdog = installSpeechStuckWatchdog();
-    const unlock = () => {
-      // Dual Kernel: sin voz/prefetch GPS — evita pelear con gestos Cumplido/Fallado.
-      if (
-        window.location.pathname === "/jornada-v4" ||
-        window.location.pathname.startsWith("/jornada-v4?")
-      ) {
-        return;
+    /** Una sola vez: antes, cada keydown en /proyectos reimportaba GPS + prefetch y congelaba el input. */
+    let unlocked = false;
+    const detachUnlockListeners = () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return true;
       }
+      return !!target.closest("input, textarea, [contenteditable='true'], [role='textbox']");
+    };
+    const isVoiceQuietPath = (): boolean => {
+      if (isJornada4WindowPath()) return true;
+      const p = window.location.pathname;
+      // Hub de proyectos: crear/editar no necesita TTS/GPS; el unlock en cada gesto congelaba el input.
+      return p === "/proyectos" || p.startsWith("/proyectos/");
+    };
+    const unlock = (e: Event) => {
+      // Dual Kernel + Hub /proyectos: sin voz/prefetch GPS.
+      if (isVoiceQuietPath()) return;
+      // Otros forms: no despertar voz al tipar.
+      if (isTypingTarget(e.target)) return;
+      if (unlocked) return;
+      unlocked = true;
+      detachUnlockListeners();
       unlockSpeechSynthesis(true);
-      void import("@/lib/gpsVoice").then(m => {
-        m.unlockGpsVoice();
-        m.prefetchGpsClips([
-          ...m.GPS_CLIP_PACKS.ringBienvenidaPrimera,
-          ...m.GPS_CLIP_PACKS.conquistaIntro,
-        ]);
-      });
-      retryAllPendingUbicacionVoice();
+      // Prefetch fuera del gesto crítico para no robar el hilo al teclado móvil.
+      window.setTimeout(() => {
+        void import("@/lib/gpsVoice").then(m => {
+          m.unlockGpsVoice();
+          m.prefetchGpsClips([
+            ...m.GPS_CLIP_PACKS.ringBienvenidaPrimera,
+            ...m.GPS_CLIP_PACKS.conquistaIntro,
+          ]);
+        });
+        retryAllPendingUbicacionVoice();
+      }, 0);
     };
     const onRecoveryShortcut = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "v") {
@@ -508,8 +531,7 @@ function VoiceBootstrap() {
     return () => {
       stopLifecycle();
       stopWatchdog();
-      window.removeEventListener("pointerdown", unlock, { capture: true });
-      window.removeEventListener("keydown", unlock, { capture: true });
+      detachUnlockListeners();
       window.removeEventListener("keydown", onRecoveryShortcut, { capture: true });
     };
   }, []);
