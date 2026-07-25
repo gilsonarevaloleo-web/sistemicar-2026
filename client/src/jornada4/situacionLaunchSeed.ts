@@ -17,11 +17,14 @@ export function buildSituacionRingSeed(opts: {
   now?: number;
   /** Si se pasa, fija el contrato a esa hora (meta HH:mm convertida). */
   horaFinMs?: number;
+  /** Proyecto / centro vinculado (enfoque del ring). */
+  proyectoEnfoqueId?: string;
 }): SituacionRingSeed | null {
   const now = opts.now ?? Date.now();
   const filas = opts.filas.map(f => f.trim()).filter(Boolean);
   if (filas.length === 0) return null;
   const minutosBloque = Math.max(1, Math.round(opts.minutosBloque));
+  const proyectoEnfoqueId = opts.proyectoEnfoqueId?.trim() || undefined;
 
   let subTareas: SubTarea[] = filas.map((texto, i) => ({
     id: `st_j4_${now}_${i}`,
@@ -30,6 +33,7 @@ export function buildSituacionRingSeed(opts: {
     creadaAt: now,
     enDesgloseCronometro: true,
     resultadoSituacion: "pendiente" as const,
+    ...(proyectoEnfoqueId ? { proyectoId: proyectoEnfoqueId } : {}),
   }));
 
   subTareas = redistribuirMinutosSituacionCronometro(subTareas, minutosBloque);
@@ -53,6 +57,7 @@ export function buildSituacionRingSeed(opts: {
       minutosGanadosSesion: 0,
       saldoAdelantoMin: 0,
       depthBlockPsGranted: 0,
+      ...(proyectoEnfoqueId ? { proyectoEnfoqueId } : {}),
     },
     situacionCupoAnchor: { subTareaId: firstId, startedAt: now },
   };

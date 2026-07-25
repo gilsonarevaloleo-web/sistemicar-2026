@@ -9,6 +9,8 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import type { Proyecto } from "@/lib/proyectos";
 import type { PlantillaRutina, SegmentoV5 } from "@/lib/persistence";
 import {
   getSegmentCalendarDayStartMs,
@@ -26,6 +28,7 @@ const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
 const BLOOD = "#991b1b";
 const BLOOD_BRIGHT = "#FF2A2A";
 const EMERALD = "#00C851";
+const CYAN = "#00FFC3";
 const DIAS = ["D", "L", "M", "X", "J", "V", "S"] as const;
 
 type PlanillaApi = ReturnType<typeof useJornada4Planilla>;
@@ -41,6 +44,8 @@ type Props = {
   onGuardarRutina: PlanillaApi["guardarComoRutina"];
   onCargarRutina: PlanillaApi["cargarRutina"];
   onEliminarRutina: PlanillaApi["eliminarRutina"];
+  /** Hub de proyectos (mismo store que Jornada clásica). */
+  proyectosHub?: Proyecto[];
   /** Ventanas ±5 min abiertas (desde useJornada4PuertaAlerts). */
   ventanaAbrirIds?: Set<string>;
   ventanaCerrarIds?: Set<string>;
@@ -67,6 +72,7 @@ export function Jornada4SegmentosPanel({
   onGuardarRutina,
   onCargarRutina,
   onEliminarRutina,
+  proyectosHub = [],
   ventanaAbrirIds,
   ventanaCerrarIds,
   onRequestNotifPermission,
@@ -80,6 +86,7 @@ export function Jornada4SegmentosPanel({
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFin, setHoraFin] = useState("");
   const [color, setColor] = useState<string>(J4_SEGMENT_COLORS[0]);
+  const [proyectoId, setProyectoId] = useState("");
   const [saving, setSaving] = useState(false);
   const [rutinaNombre, setRutinaNombre] = useState("");
   const [rutinaDias, setRutinaDias] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -87,6 +94,12 @@ export function Jornada4SegmentosPanel({
 
   const count = planilla?.segmentos.length ?? 0;
   const segmentos = planilla?.segmentos ?? [];
+
+  const proyectoTituloById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of proyectosHub) map.set(p.id, p.titulo);
+    return map;
+  }, [proyectosHub]);
 
   const nowMs = useMemo(() => {
     void tick;
@@ -99,6 +112,7 @@ export function Jornada4SegmentosPanel({
     setHoraInicio("");
     setHoraFin("");
     setColor(J4_SEGMENT_COLORS[0]);
+    setProyectoId("");
     setShowCrear(false);
   };
 
@@ -106,7 +120,13 @@ export function Jornada4SegmentosPanel({
     if (saving) return;
     setSaving(true);
     try {
-      const ok = await onAdd({ nombre, horaInicio, horaFin, color });
+      const ok = await onAdd({
+        nombre,
+        horaInicio,
+        horaFin,
+        color,
+        proyectoVinculadoId: proyectoId || undefined,
+      });
       if (ok) resetForm();
     } finally {
       setSaving(false);
@@ -473,6 +493,13 @@ export function Jornada4SegmentosPanel({
                     />
                   </div>
                 </div>
+                <SegmentoProyectoSelect
+                  value={proyectoId}
+                  onChange={setProyectoId}
+                  proyectos={proyectosHub}
+                  compact
+                  testId="jornada4-seg-proyecto"
+                />
                 <div className="flex gap-1.5">
                   {J4_SEGMENT_COLORS.map(c => (
                     <button
@@ -586,6 +613,23 @@ export function Jornada4SegmentosPanel({
                         <p className="min-w-0 flex-1 text-sm font-semibold truncate" style={{ color: INK }}>
                           {seg.nombre}
                         </p>
+                        {seg.proyectoVinculadoId ? (
+                          <span
+                            className="text-[8px] font-bold truncate max-w-[5.5rem] px-1.5 py-0.5 rounded border shrink-0"
+                            style={{
+                              color: CYAN,
+                              borderColor: "rgba(0,255,195,0.3)",
+                              backgroundColor: "rgba(0,255,195,0.08)",
+                            }}
+                            title={
+                              proyectoTituloById.get(seg.proyectoVinculadoId) ??
+                              seg.proyectoVinculadoId
+                            }
+                            data-testid={`jornada4-seg-proy-${seg.id}`}
+                          >
+                            {proyectoTituloById.get(seg.proyectoVinculadoId) ?? "Proyecto"}
+                          </span>
+                        ) : null}
                         {badge ? (
                           <span
                             className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0"

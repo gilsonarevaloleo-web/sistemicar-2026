@@ -1,5 +1,5 @@
 /**
- * Sesión Dual Kernel — segmentos + alertas puerta + PS diarios + flota.
+ * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
@@ -13,6 +13,7 @@ import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
+import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
   type Jornada4LaunchForm,
@@ -35,6 +36,8 @@ export default function JornadaV4Session() {
     userId: user?.uid,
     safeAwardPS: core.safeAwardPS,
   });
+  const { proyectosHub, proyectoVinculadoActivo, resolverProyectoId } =
+    useSegmentoProyectoVinculo(user?.uid, planillaApi.segmentoActivo);
   const puertaWindows = useJornada4PuertaAlerts(planillaApi.planilla, Boolean(user));
   const ops = useJornada4Ops({
     userId: user?.uid,
@@ -79,8 +82,7 @@ export default function JornadaV4Session() {
         setExpandedId: core.setExpandedId,
         planilla: planillaApi.planilla,
         segmentoActivo: planillaApi.segmentoActivo,
-        resolverProyectoId: () =>
-          planillaApi.segmentoActivo?.proyectoVinculadoId ?? undefined,
+        resolverProyectoId,
         applyCentinelaArchiveLocally: core.applyCentinelaArchiveLocally,
         safeAwardPS: core.safeAwardPS,
         recordVehiculoInicio: core.recordVehiculoInicio,
@@ -90,11 +92,19 @@ export default function JornadaV4Session() {
         lastLaunchRef,
       });
     },
-    [user, core, planillaApi.planilla, planillaApi.segmentoActivo]
+    [user, core, planillaApi.planilla, planillaApi.segmentoActivo, resolverProyectoId]
   );
 
   const statusLine = planillaApi.segmentoActivo
-    ? `Segmento activo · ${planillaApi.segmentoActivo.nombre} · ${planillaApi.segmentoActivo.horaInicio}–${planillaApi.segmentoActivo.horaFin}`
+    ? [
+        `Segmento · ${planillaApi.segmentoActivo.nombre}`,
+        `${planillaApi.segmentoActivo.horaInicio}–${planillaApi.segmentoActivo.horaFin}`,
+        proyectoVinculadoActivo
+          ? `Proyecto · ${proyectoVinculadoActivo.titulo}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : "La Flota Dual Kernel · Conquista + Enfoque";
 
   return (
@@ -121,6 +131,7 @@ export default function JornadaV4Session() {
           onGuardarRutina={planillaApi.guardarComoRutina}
           onCargarRutina={planillaApi.cargarRutina}
           onEliminarRutina={planillaApi.eliminarRutina}
+          proyectosHub={proyectosHub}
           ventanaAbrirIds={puertaWindows.abrirIds}
           ventanaCerrarIds={puertaWindows.cerrarIds}
           notifPermission={notifPermission}
@@ -139,7 +150,13 @@ export default function JornadaV4Session() {
         <Jornada4LaunchPanel
           onLaunch={handleLaunch}
           segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
-          segmentoActivoNombre={planillaApi.segmentoActivo?.nombre ?? null}
+          segmentoActivoNombre={
+            planillaApi.segmentoActivo
+              ? proyectoVinculadoActivo
+                ? `${planillaApi.segmentoActivo.nombre} · ${proyectoVinculadoActivo.titulo}`
+                : planillaApi.segmentoActivo.nombre
+              : null
+          }
         />
         <Jornada4Boveda />
         <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />

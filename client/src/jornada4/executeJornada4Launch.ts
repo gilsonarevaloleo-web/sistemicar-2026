@@ -61,11 +61,17 @@ export async function executeJornada4Launch(
       (situacionMinutosBloque != null && situacionMinutosBloque > 0
         ? Math.round(situacionMinutosBloque)
         : 30);
+    const launched = vehiclesRef.current.find(v => v.id === id);
+    const proyectoEnfoqueId =
+      launched?.proyectoId?.trim() ||
+      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
+      undefined;
     const seed = buildSituacionRingSeed({
       filas: situacionFilas ?? [],
       minutosBloque,
       now,
       horaFinMs: contratoMs ?? undefined,
+      proyectoEnfoqueId,
     });
     if (seed) {
       paintSituacionSeed(id, seed, vehiclesRef, setVehicles);

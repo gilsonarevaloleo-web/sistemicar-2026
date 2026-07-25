@@ -94,6 +94,7 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
       horaInicio: string;
       horaFin: string;
       color: string;
+      proyectoVinculadoId?: string;
     }) => {
       if (!userId) {
         toast.error("Inicia sesión para programar segmentos");
@@ -112,6 +113,7 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
       }
 
       const fecha = getJournalDateString();
+      const proyectoId = input.proyectoVinculadoId?.trim() || undefined;
       const seg: SegmentoV5 = {
         id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         nombre,
@@ -122,6 +124,7 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         estado: "pendiente",
         eventos: [],
         psGanados: 0,
+        ...(proyectoId ? { proyectoVinculadoId: proyectoId } : {}),
       };
 
       const planillaBase: Planilla = planilla ?? {
@@ -315,6 +318,9 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
           horaFin: s.horaFin,
           color: s.color,
           icono: s.icono,
+          ...(s.proyectoVinculadoId
+            ? { proyectoVinculadoId: s.proyectoVinculadoId }
+            : {}),
         }));
         const nueva = await addPlantillaRutina(userId, {
           nombre: trimmed,
