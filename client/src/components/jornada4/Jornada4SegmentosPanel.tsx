@@ -41,6 +41,11 @@ type Props = {
   onGuardarRutina: PlanillaApi["guardarComoRutina"];
   onCargarRutina: PlanillaApi["cargarRutina"];
   onEliminarRutina: PlanillaApi["eliminarRutina"];
+  /** Ventanas ±5 min abiertas (desde useJornada4PuertaAlerts). */
+  ventanaAbrirIds?: Set<string>;
+  ventanaCerrarIds?: Set<string>;
+  onRequestNotifPermission?: () => void;
+  notifPermission?: NotificationPermission | "unsupported";
 };
 
 function estadoLabel(seg: SegmentoV5): string | null {
@@ -62,6 +67,10 @@ export function Jornada4SegmentosPanel({
   onGuardarRutina,
   onCargarRutina,
   onEliminarRutina,
+  ventanaAbrirIds,
+  ventanaCerrarIds,
+  onRequestNotifPermission,
+  notifPermission = "default",
 }: Props) {
   const [open, setOpen] = useState(true);
   const [showCrear, setShowCrear] = useState(false);
@@ -106,6 +115,12 @@ export function Jornada4SegmentosPanel({
 
   return (
     <div className="px-4 pb-3" data-testid="jornada4-segmentos">
+      <style>{`
+        @keyframes j4-puerta-pulse {
+          0%, 100% { box-shadow: 0 0 10px rgba(0,200,81,0.12); }
+          50% { box-shadow: 0 0 22px rgba(0,200,81,0.35); }
+        }
+      `}</style>
       <div
         className="rounded-xl border overflow-hidden"
         style={{ backgroundColor: PIZARRA, borderColor: `${BLOOD}40` }}
@@ -206,6 +221,47 @@ export function Jornada4SegmentosPanel({
                 <Plus size={12} /> Nuevo Segmento
               </button>
             </div>
+
+            {(ventanaAbrirIds?.size ?? 0) > 0 || (ventanaCerrarIds?.size ?? 0) > 0 ? (
+              <div
+                className="rounded-xl border px-3 py-2.5 space-y-1"
+                style={{
+                  borderColor: "rgba(0,200,81,0.4)",
+                  backgroundColor: "rgba(0,200,81,0.1)",
+                  boxShadow: "0 0 16px rgba(0,200,81,0.12)",
+                  animation: "j4-puerta-pulse 1.6s ease-in-out infinite",
+                }}
+                data-testid="jornada4-puerta-banner"
+              >
+                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: EMERALD }}>
+                  {(ventanaAbrirIds?.size ?? 0) > 0
+                    ? "Ventana ±5 min · abre la puerta"
+                    : "Ventana ±5 min · cierra con intención"}
+                </p>
+                <p className="text-[9px]" style={{ color: MUTED }}>
+                  Sin voz en Dual Kernel — toast + pulso en la tarjeta
+                  {notifPermission === "granted" ? " + notificación" : ""}.
+                </p>
+              </div>
+            ) : null}
+
+            {onRequestNotifPermission &&
+            notifPermission !== "granted" &&
+            notifPermission !== "unsupported" ? (
+              <button
+                type="button"
+                onClick={onRequestNotifPermission}
+                className="w-full py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider border"
+                style={{
+                  borderColor: "rgba(212,175,55,0.3)",
+                  color: GOLD,
+                  backgroundColor: "rgba(212,175,55,0.06)",
+                }}
+                data-testid="jornada4-enable-notif"
+              >
+                Activar avisos del sistema (reemplazo de voz)
+              </button>
+            ) : null}
 
             {showGuardar && count > 0 ? (
               <div
@@ -476,17 +532,23 @@ export function Jornada4SegmentosPanel({
                   const isPendiente = seg.estado === "pendiente";
                   const isClosed = seg.estado === "cerrado_manual";
                   const badge = estadoLabel(seg);
-                  const puertaOpen = isWithinPuertaWindow(nowMs, seg.horaInicio, dayStart);
-                  const cierreOpen = seg.horaFin
-                    ? isWithinSegmentTimeMargin(
-                        nowMs,
-                        seg.horaInicio,
-                        seg.horaFin,
-                        "fin",
-                        5,
-                        dayStart
-                      )
-                    : true;
+                  const puertaOpen =
+                    ventanaAbrirIds?.has(seg.id) ??
+                    isWithinPuertaWindow(nowMs, seg.horaInicio, dayStart);
+                  const cierreOpen =
+                    ventanaCerrarIds?.has(seg.id) ??
+                    (seg.horaFin
+                      ? isWithinSegmentTimeMargin(
+                          nowMs,
+                          seg.horaInicio,
+                          seg.horaFin,
+                          "fin",
+                          5,
+                          dayStart
+                        )
+                      : true);
+                  const inAlertWindow =
+                    (isPendiente && puertaOpen) || (isActive && Boolean(cierreOpen));
                   const busy = busySegId === seg.id;
                   return (
                     <div
@@ -494,10 +556,19 @@ export function Jornada4SegmentosPanel({
                       className="rounded-2xl border p-3.5"
                       style={{
                         backgroundColor: "rgba(0,0,0,0.4)",
-                        borderColor: isActive
-                          ? "rgba(0,200,81,0.35)"
-                          : "rgba(255,255,255,0.08)",
-                        boxShadow: isActive ? "0 0 12px rgba(0,200,81,0.08)" : undefined,
+                        borderColor: inAlertWindow
+                          ? "rgba(0,200,81,0.55)"
+                          : isActive
+                            ? "rgba(0,200,81,0.35)"
+                            : "rgba(255,255,255,0.08)",
+                        boxShadow: inAlertWindow
+                          ? "0 0 18px rgba(0,200,81,0.22)"
+                          : isActive
+                            ? "0 0 12px rgba(0,200,81,0.08)"
+                            : undefined,
+                        animation: inAlertWindow
+                          ? "j4-puerta-pulse 1.6s ease-in-out infinite"
+                          : undefined,
                       }}
                       data-testid={`jornada4-seg-card-${seg.id}`}
                     >
