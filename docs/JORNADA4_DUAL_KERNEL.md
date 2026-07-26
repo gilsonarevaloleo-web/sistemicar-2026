@@ -39,6 +39,8 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `client/src/lib/desglosadorReorder.ts` | Reorden de unidades |
 | `client/src/lib/desglosadorPointsAward.ts` | PS por sub + ciclo |
 | `client/src/jornada4/desglosadorProfundidad.ts` | PS profundidad Dual Kernel: **2 PS × cada sub** (1 sub = 2, 10 subs = 20) |
+| `client/src/jornada4/coberturaHuecosLog.ts` | Historial liviano de huecos (eventos gap_open/close; sin anillo ni tick 1s) |
+| `client/src/lib/pulsoCoberturaCompute.ts` | Pulso lite (idle); no en ms0 |
 | `client/src/lib/desglosadorDepth.ts` | Curva horaria clásica (J4 no la usa; profundidad = por sub) |
 | `client/src/lib/desglosadorCycleLiquidation.ts` | Liquidación ciclo (sombra) |
 | `client/src/lib/desglosadorShadow.ts` | Primitiva `runShadowTask` / `yieldAfterPaint` |
