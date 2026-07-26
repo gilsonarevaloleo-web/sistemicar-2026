@@ -15,7 +15,7 @@ import { buildSituacionRingSeed } from "./situacionLaunchSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
-  /** Filas del ring (solo situacional Dual Kernel). */
+  /** Filas del ring (solo situacional Dual Kernel en modo desglose). */
   situacionFilas?: string[];
   /** @deprecated Preferir situacionObjetivoHora (HH:mm). */
   situacionMinutosBloque?: number;
@@ -28,8 +28,8 @@ export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form">
 };
 
 /**
- * Lanza Conquista desglosador o Situacional con ring listo.
- * Situacional: si hay filas, abre el cronómetro al instante (sin V3).
+ * Lanza Conquista/Situacional en modo rápido (sin desglose) o desglose (subs/ring).
+ * Situacional desglose: si hay filas, abre el cronómetro al instante (sin V3).
  */
 export async function executeJornada4Launch(
   params: ExecuteJornada4LaunchParams
@@ -51,7 +51,8 @@ export async function executeJornada4Launch(
   });
   if (!id) return null;
 
-  if (baseForm.tipoFlota === "situacion") {
+  const modo = baseForm.modo ?? "desglose";
+  if (baseForm.tipoFlota === "situacion" && modo === "desglose") {
     const now = Date.now();
     const hora = situacionObjetivoHora?.trim();
     const fromHora = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;

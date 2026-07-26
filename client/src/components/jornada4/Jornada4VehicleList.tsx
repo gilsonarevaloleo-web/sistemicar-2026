@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { isConquistaDesglosador, isSituacionDesglosador } from "@/jornada4/filters";
+import {
+  isConquistaDesglosador,
+  isSituacionDesglosador,
+  isVehiculoRapido,
+} from "@/jornada4/filters";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
+import { RapidoCard } from "./RapidoCard";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { MUTED, INK, GOLD } = J4_COLORS;
@@ -22,6 +27,10 @@ type Ops = {
     status: "cumplido" | "fallado"
   ) => Promise<void>;
   closeSituacionBlock: (vehicleId: string) => Promise<void>;
+  closeRapidoVehicle: (
+    vehicleId: string,
+    status: "cumplido" | "archivado"
+  ) => Promise<void>;
   addConquistaSub: (
     vehicleId: string,
     form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
@@ -124,10 +133,20 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                   />
                 );
               }
+              if (isVehiculoRapido(v)) {
+                return (
+                  <RapidoCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplir={() => void ops.closeRapidoVehicle(v.id, "cumplido")}
+                    onArchivar={() => void ops.closeRapidoVehicle(v.id, "archivado")}
+                  />
+                );
+              }
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · sin anillo · sin voz
+              Dual Kernel · rápido o desglose · sin anillo · sin voz
             </p>
           </div>
         ) : null}

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, ListTodo, Plus, Rocket, Trash2, X } from "lucide-react";
+import { Clock, ListTodo, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
@@ -8,12 +8,16 @@ import {
   getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
-import type { DesglosadorSubFormRow } from "@/lib/executeFlotaLaunch";
+import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
 import {
   projectDesglosadorEndFromSubs,
   projectUnitEndLabel,
 } from "@/jornada4/desglosadorProjection";
+import {
+  desglosadorProfundidadLabel,
+  desglosadorProfundidadPotencialPs,
+} from "@/jornada4/desglosadorProfundidad";
 import {
   resolveDefaultObjetivoHoraParaRing,
   situacionMinutosHastaObjetivoHora,
@@ -83,10 +87,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tipo, setTipo] = useState<(typeof V4_TIPOS)[number] | null>(null);
+  const [modo, setModo] = useState<FlotaLaunchModo>("desglose");
   const [titulo, setTitulo] = useState("");
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
-  const [conquistaHoraFin, setConquistaHoraFin] = useState("");
   const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
     resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
@@ -95,7 +99,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [historialSubs, setHistorialSubs] = useState<string[]>([]);
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const keyboardInset = useKeyboardInset();
-  const tick = useJornada4Tick(open && tipo === "tiempo");
+  const tick = useJornada4Tick(open && tipo === "tiempo" && modo === "desglose");
 
   useEffect(() => {
     if (!open) return;
@@ -107,22 +111,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [open]);
 
   useEffect(() => {
-    if (tipo !== "tiempo" || titulo.trim().length < 3) {
+    if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
       setHistorialSubs([]);
       return;
     }
     setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
-  }, [titulo, tipo]);
+  }, [titulo, tipo, modo]);
 
   const missionSuggestions =
-    tipo === "tiempo" && titulo.trim().length >= 2
+    tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
       ? getDesglosadorMisionData(titulo, 5)
       : [];
 
   const projection = useMemo(() => {
     void tick;
+    if (modo !== "desglose") return null;
     return projectDesglosadorEndFromSubs(subs);
-  }, [subs, tick]);
+  }, [subs, tick, modo]);
+
+  const profundidadePs = useMemo(() => {
+    const n = subs.filter(s => s.titulo.trim()).length;
+    return desglosadorProfundidadPotencialPs(n);
+  }, [subs]);
 
   const situacionMinHasta = useMemo(() => {
     if (!situacionHoraFin.trim()) return null;
@@ -130,20 +140,20 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [situacionHoraFin, tick]);
 
   useEffect(() => {
-    if (tipo === "situacion") {
+    if (tipo === "situacion" && modo === "desglose") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
           defaultHoraPlus(30)
       );
     }
-  }, [segmentoHoraFin, tipo]);
+  }, [segmentoHoraFin, tipo, modo]);
 
   const reset = useCallback(() => {
     setTipo(null);
+    setModo("desglose");
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);
-    setConquistaHoraFin("");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
         defaultHoraPlus(30)
@@ -157,6 +167,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
+    setModo("desglose");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -170,9 +181,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const canLaunch =
     titulo.trim().length > 0 &&
     tipo != null &&
-    (tipo === "tiempo"
-      ? subs.some(s => s.titulo.trim())
-      : filas.some(f => f.trim()) && situacionMinHasta != null);
+    (modo === "rapido"
+      ? true
+      : tipo === "tiempo"
+        ? subs.some(s => s.titulo.trim())
+        : filas.some(f => f.trim()) && situacionMinHasta != null);
 
   const handleLaunch = useCallback(async () => {
     if (!tipo || saving || !canLaunch) return;
@@ -181,13 +194,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       const id = await onLaunch({
         titulo,
         tipoFlota: tipo,
-        desglosadorSubs: tipo === "tiempo" ? subs : undefined,
-        situacionFilas: tipo === "situacion" ? filas : undefined,
-        situacionObjetivoHora: tipo === "situacion" ? situacionHoraFin.trim() : undefined,
-        terminoDetalle:
-          tipo === "situacion"
-            ? terminoDetalle
-            : conquistaHoraFin.trim() || undefined,
+        modo,
+        desglosadorSubs: tipo === "tiempo" && modo === "desglose" ? subs : undefined,
+        situacionFilas: tipo === "situacion" && modo === "desglose" ? filas : undefined,
+        situacionObjetivoHora:
+          tipo === "situacion" && modo === "desglose" ? situacionHoraFin.trim() : undefined,
+        terminoDetalle: tipo === "situacion" ? terminoDetalle : undefined,
       });
       if (id) reset();
     } finally {
@@ -195,6 +207,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     }
   }, [
     tipo,
+    modo,
     saving,
     canLaunch,
     onLaunch,
@@ -203,7 +216,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     filas,
     situacionHoraFin,
     terminoDetalle,
-    conquistaHoraFin,
     reset,
   ]);
 
@@ -402,6 +414,75 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </button>
                   </div>
 
+                  <div
+                    className="grid grid-cols-2 gap-2"
+                    data-testid="jornada4-launch-modo"
+                  >
+                    {(
+                      [
+                        {
+                          id: "rapido" as const,
+                          label: "Rápido",
+                          hint: "Sin desglose · 1 misión",
+                          icon: Zap,
+                        },
+                        {
+                          id: "desglose" as const,
+                          label: tipo === "tiempo" ? "Desglosador" : "Ring",
+                          hint:
+                            tipo === "tiempo"
+                              ? "Subs + tiempo"
+                              : "Filas + meta",
+                          icon: ListTodo,
+                        },
+                      ] as const
+                    ).map(opt => {
+                      const Icon = opt.icon;
+                      const active = modo === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setModo(opt.id)}
+                          className="p-3 rounded-xl border text-left touch-manipulation"
+                          style={{
+                            borderColor: active
+                              ? `${FLOTA_CONFIG[tipo].color}55`
+                              : "rgba(255,255,255,0.1)",
+                            backgroundColor: active
+                              ? `${FLOTA_CONFIG[tipo].color}12`
+                              : "rgba(255,255,255,0.02)",
+                          }}
+                          data-testid={`jornada4-launch-modo-${opt.id}`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Icon
+                              size={12}
+                              style={{
+                                color: active
+                                  ? FLOTA_CONFIG[tipo].color
+                                  : MUTED,
+                              }}
+                            />
+                            <span
+                              className="text-[10px] font-black uppercase"
+                              style={{
+                                color: active
+                                  ? FLOTA_CONFIG[tipo].color
+                                  : MUTED,
+                              }}
+                            >
+                              {opt.label}
+                            </span>
+                          </div>
+                          <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                            {opt.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div>
                     <label
                       className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
@@ -414,18 +495,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         value={titulo}
                         onChange={e => {
                           setTitulo(e.target.value);
-                          if (tipo === "tiempo") {
+                          if (tipo === "tiempo" && modo === "desglose") {
                             setShowMissionSugs(e.target.value.trim().length >= 2);
                           }
                         }}
                         onFocus={() => {
-                          if (tipo === "tiempo" && titulo.trim().length >= 2) {
+                          if (
+                            tipo === "tiempo" &&
+                            modo === "desglose" &&
+                            titulo.trim().length >= 2
+                          ) {
                             setShowMissionSugs(true);
                           }
                         }}
                         onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
                         placeholder={
-                          tipo === "tiempo" ? "Ej: Producción del día" : "Ej: Enfoque de la tarde"
+                          modo === "rapido"
+                            ? tipo === "tiempo"
+                              ? "Ej: Llamar a un cliente"
+                              : "Ej: Cerrar el correo"
+                            : tipo === "tiempo"
+                              ? "Ej: Producción del día"
+                              : "Ej: Enfoque de la tarde"
                         }
                         className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
                         style={{
@@ -491,7 +582,43 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </div>
                   </div>
 
-                  {tipo === "tiempo" && historialSubs.length > 0 ? (
+                  {modo === "rapido" && tipo === "situacion" ? (
+                    <div>
+                      <label
+                        className="text-[10px] font-black uppercase tracking-wider mb-1.5 block"
+                        style={{ color: GOLD }}
+                      >
+                        Criterio de cierre
+                      </label>
+                      <input
+                        value={terminoDetalle}
+                        onChange={e => setTerminoDetalle(e.target.value)}
+                        className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                        style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
+                        data-testid="jornada4-launch-criterio-rapido"
+                      />
+                      <p className="mt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
+                        Vehículo rápido: sin filas ni ring. Cumples o archivas directo.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {modo === "rapido" && tipo === "tiempo" ? (
+                    <p
+                      className="text-[9px] leading-snug rounded-xl border px-3 py-2.5"
+                      style={{
+                        color: MUTED,
+                        borderColor: "rgba(255,255,255,0.08)",
+                        backgroundColor: "rgba(255,255,255,0.03)",
+                      }}
+                      data-testid="jornada4-launch-rapido-hint"
+                    >
+                      Vehículo rápido: sin unidades ni meta de ciclo. Solo el nombre —
+                      cumples o archivas cuando termines.
+                    </p>
+                  ) : null}
+
+                  {tipo === "tiempo" && modo === "desglose" && historialSubs.length > 0 ? (
                     <div
                       className="rounded-xl border p-3 space-y-2"
                       style={{
@@ -546,7 +673,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </div>
                   ) : null}
 
-                  {tipo === "tiempo" ? (
+                  {tipo === "tiempo" && modo === "desglose" ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <p
@@ -560,39 +687,22 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       </div>
 
-                      {/* Meta de ciclo en hora real (opcional) */}
                       <div
-                        className="rounded-xl border-2 p-3 space-y-2"
+                        className="rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2"
                         style={{
-                          borderColor: `${CYAN}35`,
-                          backgroundColor: "rgba(0,255,195,0.05)",
+                          borderColor: `${GOLD}35`,
+                          backgroundColor: "rgba(212,175,55,0.08)",
                         }}
-                        data-testid="jornada4-conquista-hora-fin"
+                        data-testid="jornada4-launch-profundidad"
                       >
-                        <div className="flex items-center gap-2">
-                          <Clock size={12} style={{ color: CYAN }} />
-                          <label
-                            className="text-[10px] font-black uppercase tracking-wider"
-                            style={{ color: CYAN }}
-                          >
-                            Termina a las (meta del ciclo)
-                          </label>
-                        </div>
-                        <input
-                          type="time"
-                          value={conquistaHoraFin}
-                          onChange={e => setConquistaHoraFin(e.target.value)}
-                          className="w-full p-3 rounded-xl bg-black/60 border-2 text-lg font-mono font-black tabular-nums focus:outline-none"
-                          style={{
-                            color: INK,
-                            borderColor: conquistaHoraFin ? CYAN : "rgba(255,255,255,0.12)",
-                          }}
-                          data-testid="jornada4-launch-hora-fin-conquista"
-                        />
-                        <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                          Elige la hora de pared en que quieres cerrar el desglosador.
-                          La proyección abajo suma las unidades (cant × MIN/U).
-                        </p>
+                        <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: GOLD }}>
+                          {desglosadorProfundidadLabel(
+                            subs.filter(s => s.titulo.trim()).length
+                          )}
+                        </span>
+                        <span className="text-[11px] font-black font-mono" style={{ color: GOLD }}>
+                          {profundidadePs} PS
+                        </span>
                       </div>
 
                       {subs.map((sub, idx) => {
@@ -864,23 +974,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       )}
 
-                      {conquistaHoraFin && projection ? (
-                        <p
-                          className="text-[9px] text-center font-mono"
-                          style={{
-                                color:
-                              situacionMinutosHastaObjetivoHora(conquistaHoraFin) != null &&
-                              (situacionMinutosHastaObjetivoHora(conquistaHoraFin) ?? 0) <
-                                projection.totalMin
-                                ? "#FF3131"
-                                : EMERALD,
-                          }}
-                          data-testid="jornada4-launch-meta-vs-proy"
-                        >
-                          Meta {conquistaHoraFin} · proyección {projection.finLabel}
-                        </p>
-                      ) : null}
-
                       <button
                         type="button"
                         onClick={() => setSubs([...subs, makeSub()])}
@@ -894,7 +987,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         <Plus size={12} /> Añadir unidad
                       </button>
                     </div>
-                  ) : (
+                  ) : tipo === "situacion" && modo === "desglose" ? (
                     <div className="space-y-3">
                       <div>
                         <label
@@ -998,7 +1091,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         <Plus size={12} /> Añadir fila
                       </button>
                     </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>
@@ -1011,21 +1104,32 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   backgroundColor: PIZARRA,
                 }}
               >
-                {tipo === "tiempo" && projection ? (
+                {tipo === "tiempo" && modo === "desglose" && projection ? (
                   <p
                     className="mb-2 text-center text-[10px] font-mono font-black"
                     style={{ color: GOLD }}
                     data-testid="jornada4-launch-cta-proy"
                   >
                     Fin proyectado ≈ {projection.finLabel}
-                    {conquistaHoraFin ? ` · meta ${conquistaHoraFin}` : ""}
+                    {profundidadePs > 0 ? ` · profundidad ${profundidadePs} PS` : ""}
+                  </p>
+                ) : null}
+                {tipo === "tiempo" && modo === "desglose" && !projection && profundidadePs > 0 ? (
+                  <p
+                    className="mb-2 text-center text-[10px] font-mono font-black"
+                    style={{ color: GOLD }}
+                    data-testid="jornada4-launch-cta-profundidad"
+                  >
+                    Profundidad {profundidadePs} PS
                   </p>
                 ) : null}
                 {!canLaunch ? (
                   <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
-                    {tipo === "tiempo"
-                      ? "Escribe nombre de misión + al menos una unidad"
-                      : "Escribe misión + filas + hora de término"}
+                    {modo === "rapido"
+                      ? "Escribe el nombre de la misión"
+                      : tipo === "tiempo"
+                        ? "Escribe nombre de misión + al menos una unidad"
+                        : "Escribe misión + filas + hora de término"}
                   </p>
                 ) : null}
                 <button
@@ -1042,7 +1146,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   }}
                   data-testid="jornada4-launch-submit"
                 >
-                  {saving ? "Lanzando…" : "Lanzar vehículo"}
+                  {saving
+                    ? "Lanzando…"
+                    : modo === "rapido"
+                      ? "Lanzar rápido"
+                      : "Lanzar vehículo"}
                 </button>
               </div>
             ) : null}

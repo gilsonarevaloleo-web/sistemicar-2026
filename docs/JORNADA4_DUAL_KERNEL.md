@@ -38,7 +38,8 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `client/src/lib/desglosadorSubClose.ts` | Payload de cierre de sub |
 | `client/src/lib/desglosadorReorder.ts` | Reorden de unidades |
 | `client/src/lib/desglosadorPointsAward.ts` | PS por sub + ciclo |
-| `client/src/lib/desglosadorDepth.ts` | PS profundidad (opcional; puede ir a sombra o diferirse) |
+| `client/src/jornada4/desglosadorProfundidad.ts` | PS profundidad Dual Kernel: **2 PS × cada sub** (1 sub = 2, 10 subs = 20) |
+| `client/src/lib/desglosadorDepth.ts` | Curva horaria clásica (J4 no la usa; profundidad = por sub) |
 | `client/src/lib/desglosadorCycleLiquidation.ts` | Liquidación ciclo (sombra) |
 | `client/src/lib/desglosadorShadow.ts` | Primitiva `runShadowTask` / `yieldAfterPaint` |
 | `client/src/components/planeacion/desglosadorSubLiveIsland.tsx` | Island 1s (UI espejo) |

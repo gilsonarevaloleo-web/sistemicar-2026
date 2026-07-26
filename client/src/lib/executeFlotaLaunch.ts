@@ -76,10 +76,15 @@ export type DesglosadorSubFormRow = {
   tiempoRecordMinPerUnit?: number;
 };
 
+/** `rapido` = sin desglose (1 misión, sin forzar subs/filas). `desglose` = desglosador/ring. */
+export type FlotaLaunchModo = "rapido" | "desglose";
+
 export type FlotaLaunchForm = {
   titulo: string;
   tipoFlota: "tiempo" | "situacion";
   terminoDetalle?: string;
+  /** Default: desglose si hay subs; si se pasa explícito, manda. */
+  modo?: FlotaLaunchModo;
   desglosadorSubs?: DesglosadorSubFormRow[];
 };
 
@@ -154,12 +159,15 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     let detalle = "";
     let criterio: CriterioFin = "circunstancia";
     let tipoTermino: TipoTerminoRapido = "situacion";
-    const relojTiempo = tipoFlota === "tiempo" ? ("desglosador" as const) : undefined;
+    const desglosadorSubs = (form.desglosadorSubs ?? []).filter(s => s.titulo.trim());
+    const modo: FlotaLaunchModo = form.modo ?? "desglose";
+    const esDesglose = modo === "desglose";
+    const relojTiempo =
+      tipoFlota === "tiempo" && esDesglose ? ("desglosador" as const) : undefined;
 
     if (tipoFlota === "tiempo") {
       criterio = "tiempo";
       tipoTermino = "hora";
-      // Meta opcional HH:mm — misma semántica que el reloj proyectivo clásico
       detalle = form.terminoDetalle?.trim() || "";
     } else {
       criterio = "circunstancia";
@@ -167,8 +175,7 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       detalle = form.terminoDetalle?.trim() || "Al cerrar este bloque";
     }
 
-    const desglosadorSubs = (form.desglosadorSubs ?? []).filter(s => s.titulo.trim());
-    if (tipoFlota === "tiempo" && desglosadorSubs.length === 0) {
+    if (tipoFlota === "tiempo" && esDesglose && desglosadorSubs.length === 0) {
       toast.error("Añade al menos un sub al desglosador");
       return null;
     }

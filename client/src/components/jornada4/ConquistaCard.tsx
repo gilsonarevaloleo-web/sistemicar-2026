@@ -22,6 +22,10 @@ import {
   conquistaActiveSub,
   conquistaProgressLabel,
 } from "@/jornada4/conquistaKernel";
+import {
+  desglosadorProfundidadGanadaPs,
+  desglosadorProfundidadPotencialPs,
+} from "@/jornada4/desglosadorProfundidad";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -70,6 +74,8 @@ export function ConquistaCard({
   const cycleReady = subs.every(s => s.status === "cumplido" || s.status === "fallado");
   const doneCount = subs.filter(s => s.status === "cumplido" || s.status === "fallado").length;
   const progressPct = subs.length > 0 ? Math.round((doneCount / subs.length) * 100) : 0;
+  const profundidadPotencial = desglosadorProfundidadPotencialPs(subs.length);
+  const profundidadGanada = desglosadorProfundidadGanadaPs(subs);
 
   const hasCantidadObj = active?.cantidadObjetivo != null && active.cantidadObjetivo > 0;
   const hasRecord =
@@ -142,12 +148,20 @@ export function ConquistaCard({
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
               Desglosador · {conquistaProgressLabel(vehicle)}
+              {profundidadPotencial > 0
+                ? ` · profundidad ${profundidadGanada}/${profundidadPotencial} PS`
+                : ""}
             </p>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Zap size={10} style={{ color: flotaColor }} />
-            <span className="text-xs font-black" style={{ color: flotaColor }}>
-              PS
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <div className="flex items-center gap-1">
+              <Zap size={10} style={{ color: flotaColor }} />
+              <span className="text-xs font-black" style={{ color: flotaColor }}>
+                {profundidadPotencial} PS
+              </span>
+            </div>
+            <span className="text-[8px] font-mono" style={{ color: MUTED }}>
+              {subs.length}×2
             </span>
           </div>
         </div>
