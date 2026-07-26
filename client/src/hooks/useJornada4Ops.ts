@@ -5,7 +5,10 @@
 import { useCallback, useRef, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
+  addVehicle,
+  notifyVehicleClosed,
   updateVehicle,
+  wasVehicleRecentlyClosed,
   type Vehicle,
 } from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
@@ -39,12 +42,41 @@ import {
   resolveCronometroCupoAnchor,
   totalBudgetMinFromCronometro,
 } from "@/lib/situacionCupoDistrib";
-import { isSituacionDesglosador } from "@/jornada4/filters";
+import { isConquistaDesglosador, isSituacionRing } from "@/jornada4/filters";
+import {
+  buildDesglosadorNestedPausePatch,
+  resumeDesglosadorFromNestedPause,
+} from "@/lib/nestedContextStack";
+import {
+  firstPendingCronometroTexto,
+  firstPendingSubVehiculoTitulo,
+  reorderSubTareasCronometro,
+  reorderSubVehiculos,
+  type ReorderDirection,
+} from "@/lib/desglosadorReorder";
+import {
+  assertCanOpenVehicle,
+  formatOperationalSlotsBlockMessage,
+} from "@/lib/vehicleOperationalSlots";
+import {
+  closeCentinelasBeforeConsciousLaunch,
+} from "@/lib/centinelaEngine";
+import { generateStableUuid } from "@/lib/stableUuid";
+import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 
 const PIZARRA = "#0a0a0a";
 const EMERALD = "#00C851";
 const BLOOD = "#FF2A2A";
 const PLATA = "#C0C0C0";
+const CYAN = "#00FFC3";
+const VIOLET = "#8B5CF6";
+
+const STUB_EJES = {
+  enfoque: { text: "", trifecta: "omitir" as const },
+  conflicto: { text: "", trifecta: "omitir" as const },
+  pasos: { text: "", trifecta: "omitir" as const },
+  limite: { text: "", trifecta: "omitir" as const },
+};
 
 export type UseJornada4OpsParams = {
   userId: string | undefined;
@@ -96,57 +128,59 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         paintVehicle(vehicleId, { subVehiculos: patch.subVehiculos });
         flushLaunchPersistOnSubClose(vehicleId);
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
 
-        // PS primero (local); Firebase no debe bloquear la barra del día.
-        void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
-          let subsForRemote = patch.subVehiculos;
-          try {
-            if (status === "cumplido") {
-              recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
-              const awarded = await awardConquistaSubPs(
-                vehicle.titulo,
-                patch.closedSub,
-                safeAwardPS
+        // PS al instante (sin requestIdleCallback) — la barra no puede esperar al idle.
+        let subsForRemote = patch.subVehiculos;
+        try {
+          if (status === "cumplido") {
+            recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
+            const awarded = await awardConquistaSubPs(
+              vehicle.titulo,
+              patch.closedSub,
+              safeAwardPS
+            );
+            if (awarded > 0) {
+              subsForRemote = patch.subVehiculos.map(s =>
+                s.id === patch.closedSub.id ? { ...s, psOtorgados: awarded } : s
               );
-              if (awarded > 0) {
-                subsForRemote = patch.subVehiculos.map(s =>
-                  s.id === patch.closedSub.id ? { ...s, psOtorgados: awarded } : s
-                );
-                paintVehicle(vehicleId, { subVehiculos: subsForRemote });
-                scheduleSaveLocalVehicles(vehiclesRef.current);
-                toast.success(`+${awarded} PS · unidad`, {
-                  style: {
-                    backgroundColor: PIZARRA,
-                    border: `1px solid ${EMERALD}`,
-                    color: EMERALD,
-                  },
-                  duration: 2200,
-                });
-              }
-            } else {
-              toast.info("Unidad fallada", {
+              paintVehicle(vehicleId, { subVehiculos: subsForRemote });
+              scheduleSaveLocalVehicles(vehiclesRef.current);
+              toast.success(`+${awarded} PS · unidad`, {
                 style: {
                   backgroundColor: PIZARRA,
-                  border: `1px solid ${PLATA}`,
-                  color: PLATA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
                 },
-                duration: 1800,
+                duration: 2200,
               });
             }
-            if (patch.cycleReady) {
-              toast.message("Ciclo listo — cierra el desglosador", {
-                duration: 3200,
-              });
-            }
-          } catch (e) {
-            console.error("[jornada4.closeConquistaSub] PS", e);
+          } else {
+            toast.info("Unidad fallada", {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${PLATA}`,
+                color: PLATA,
+              },
+              duration: 1800,
+            });
           }
+          if (patch.cycleReady) {
+            toast.message("Ciclo listo — cierra el desglosador", {
+              duration: 3200,
+            });
+          }
+        } catch (e) {
+          console.error("[jornada4.closeConquistaSub] PS", e);
+        }
+
+        const remoteSubs = subsForRemote;
+        void runShadowTaskAsync(async () => {
           try {
             await updateVehicle(
               userId,
               vehicleId,
-              { subVehiculos: subsForRemote },
+              { subVehiculos: remoteSubs },
               { skipLocalSync: true }
             );
           } catch (e) {
@@ -183,43 +217,42 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           subVehiculos: patch.subVehiculos,
         });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          recordDesglosadorCycleHistory(
+            {
+              titulo: vehicle.titulo,
+              subVehiculos: patch.subVehiculos,
+              aperturaAt: vehicle.aperturaAt,
+              cierreAt: patch.cierreAt,
+            },
+            userId
+          );
+          const settled = await awardConquistaCyclePs(
+            vehicleId,
+            vehicle.titulo,
+            patch.subVehiculos,
+            safeAwardPS
+          );
+          toast.success(
+            settled.cyclePs > 0
+              ? `Ciclo cerrado · +${settled.cyclePs} PS`
+              : "Ciclo cerrado",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2800,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeConquistaCycle] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
-          let cyclePs = 0;
-          try {
-            recordDesglosadorCycleHistory(
-              {
-                titulo: vehicle.titulo,
-                subVehiculos: patch.subVehiculos,
-                aperturaAt: vehicle.aperturaAt,
-                cierreAt: patch.cierreAt,
-              },
-              userId
-            );
-            const settled = await awardConquistaCyclePs(
-              vehicleId,
-              vehicle.titulo,
-              patch.subVehiculos,
-              safeAwardPS
-            );
-            cyclePs = settled.cyclePs;
-            toast.success(
-              cyclePs > 0
-                ? `Ciclo cerrado · +${cyclePs} PS`
-                : "Ciclo cerrado",
-              {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2800,
-              }
-            );
-          } catch (e) {
-            console.error("[jornada4.closeConquistaCycle] PS", e);
-          }
           try {
             await updateVehicle(
               userId,
@@ -261,47 +294,48 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         flushLaunchPersistOnSubClose(vehicleId);
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          if (status === "cumplido") {
+            const awarded = await awardSituacionFilaPs(
+              patch.closedSubTexto,
+              safeAwardPS,
+              subTareaId
+            );
+            toast.success(
+              awarded > 0
+                ? patch.minutosGanados > 0
+                  ? `+${awarded} PS · +${patch.minutosGanados} min ganados`
+                  : `+${awarded} PS · fila`
+                : patch.minutosGanados > 0
+                  ? `+${patch.minutosGanados} min ganados → cola`
+                  : "Fila cumplida",
+              {
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
+                },
+                duration: 2200,
+              }
+            );
+          } else {
+            toast.info(
+              patch.minutosPerdidos > 0
+                ? `Fallado · −${patch.minutosPerdidos} min`
+                : "Fila fallada",
+              { duration: 2000 }
+            );
+          }
+          if (patch.bloqueListo) {
+            toast.message("Ring listo — cierra el bloque", { duration: 3200 });
+          }
+        } catch (e) {
+          console.error("[jornada4.closeSituacionRow] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
-          try {
-            if (status === "cumplido") {
-              const awarded = await awardSituacionFilaPs(
-                patch.closedSubTexto,
-                safeAwardPS,
-                subTareaId
-              );
-              toast.success(
-                awarded > 0
-                  ? patch.minutosGanados > 0
-                    ? `+${awarded} PS · +${patch.minutosGanados} min ganados`
-                    : `+${awarded} PS · fila`
-                  : patch.minutosGanados > 0
-                    ? `+${patch.minutosGanados} min ganados → cola`
-                    : "Fila cumplida",
-                {
-                  style: {
-                    backgroundColor: PIZARRA,
-                    border: `1px solid ${EMERALD}`,
-                    color: EMERALD,
-                  },
-                  duration: 2200,
-                }
-              );
-            } else {
-              toast.info(
-                patch.minutosPerdidos > 0
-                  ? `Fallado · −${patch.minutosPerdidos} min`
-                  : "Fila fallada",
-                { duration: 2000 }
-              );
-            }
-            if (patch.bloqueListo) {
-              toast.message("Ring listo — cierra el bloque", { duration: 3200 });
-            }
-          } catch (e) {
-            console.error("[jornada4.closeSituacionRow] PS", e);
-          }
           try {
             await updateVehicle(
               userId,
@@ -349,29 +383,30 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           situacionCupoAnchor: patch.situacionCupoAnchor,
         });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          const awarded = await awardSituacionBlockPs(
+            vehicle.titulo,
+            patch.status,
+            safeAwardPS
+          );
+          toast.success(
+            awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2800,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeSituacionBlock] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
-          try {
-            const awarded = await awardSituacionBlockPs(
-              vehicle.titulo,
-              patch.status,
-              safeAwardPS
-            );
-            toast.success(
-              awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
-              {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2800,
-              }
-            );
-          } catch (e) {
-            console.error("[jornada4.closeSituacionBlock] PS", e);
-          }
           try {
             await updateVehicle(
               userId,
@@ -447,7 +482,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       inFlightRef.current.add(key);
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle || !isSituacionDesglosador(vehicle)) return;
+        if (!vehicle || !isSituacionRing(vehicle)) return;
         const result = buildSellarDirectoEnRingState(vehicle, texto);
         if (!result.ok) {
           toast.error(
@@ -499,7 +534,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       inFlightRef.current.add(key);
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle || !isSituacionDesglosador(vehicle) || !vehicle.subTareas) return;
+        if (!vehicle || !isSituacionRing(vehicle) || !vehicle.subTareas) return;
         const sc = vehicle.situacionCronometro;
         if (sc?.activo !== true) return;
         const now = Date.now();
@@ -545,6 +580,359 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle]
   );
 
+  const reorderConquistaSubs = useCallback(
+    (vehicleId: string, movedId: string, direction: ReorderDirection) => {
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle?.subVehiculos || !isConquistaDesglosador(vehicle)) return;
+      if (vehicle.interrupcionActiva) {
+        toast.info("Desglosador en pausa", {
+          description: "Cierra la interrupción o reanúdalo antes de reordenar.",
+          duration: 3200,
+        });
+        return;
+      }
+      const next = reorderSubVehiculos(vehicle.subVehiculos, movedId, direction);
+      if (!next) return;
+      paintVehicle(vehicleId, { subVehiculos: next });
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      const nextTitulo = firstPendingSubVehiculoTitulo(next);
+      toast.info("Orden actualizado", {
+        description: nextTitulo
+          ? `Próximo tras el activo: ${nextTitulo}`
+          : "Cola de unidades reordenada",
+        style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+        duration: 2200,
+      });
+      if (!userId) return;
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            vehicleId,
+            { subVehiculos: next },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[jornada4.reorderConquistaSubs]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const reorderSituacionFilas = useCallback(
+    (vehicleId: string, movedId: string, direction: ReorderDirection) => {
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle?.subTareas || !isSituacionRing(vehicle)) return;
+      const next = reorderSubTareasCronometro(vehicle.subTareas, movedId, direction);
+      if (!next) return;
+      paintVehicle(vehicleId, { subTareas: next });
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      const nextTexto = firstPendingCronometroTexto(next);
+      toast.info("Orden actualizado", {
+        description: nextTexto ? `Sigue: ${nextTexto}` : "Cola del ring reordenada",
+        style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+        duration: 2200,
+      });
+      if (!userId) return;
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            vehicleId,
+            { subTareas: next },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[jornada4.reorderSituacionFilas]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const pausaInterrupcion = useCallback(
+    async (vehicleId: string, tituloInterrupcion: string) => {
+      if (!userId || !tituloInterrupcion.trim()) return;
+      const key = `pause:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle || !isConquistaDesglosador(vehicle) || vehicle.interrupcionActiva) return;
+
+      const existingInterrupt = vehiclesRef.current.find(
+        v =>
+          v.status === "activo" &&
+          !v.autoVerdad &&
+          v.vehiculoPadreDesglosadorId === vehicleId &&
+          !wasVehicleRecentlyClosed(v.id)
+      );
+      if (existingInterrupt) {
+        toast.error("Ya hay una interrupción activa", {
+          description: "Ciérrala arriba antes de lanzar otra.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+        });
+        return;
+      }
+
+      const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "interrupcion", {
+        parentDesglosadorId: vehicleId,
+      });
+      if (!slotsCheck.allowed) {
+        toast.error("Límite de misiones", {
+          description: formatOperationalSlotsBlockMessage(slotsCheck),
+          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+          duration: 5500,
+        });
+        return;
+      }
+
+      const nestedPause = buildDesglosadorNestedPausePatch(vehicle, "interrupcion_situacion");
+      if (!nestedPause) {
+        toast.error("No hay unidad activa para pausar");
+        return;
+      }
+
+      inFlightRef.current.add(key);
+      try {
+        const activeSub = (vehicle.subVehiculos || []).find(s => s.status === "activo");
+        let restanteUnidades: number | undefined;
+        if (activeSub?.aperturaAt && activeSub.cantidadObjetivo && activeSub.tiempoRecordMinPerUnit) {
+          const elapsedSec = Math.floor((Date.now() - activeSub.aperturaAt) / 1000);
+          const done = Math.floor(elapsedSec / 60 / activeSub.tiempoRecordMinPerUnit);
+          restanteUnidades = Math.max(0, activeSub.cantidadObjetivo - done);
+        }
+        const pausedPatch = {
+          ...nestedPause,
+          desglosadorPausa: {
+            ...nestedPause.desglosadorPausa,
+            restanteUnidades,
+          },
+        };
+
+        void closeCentinelasBeforeConsciousLaunch(userId, vehiclesRef.current);
+
+        const provisionalInterruptId = generateStableUuid();
+        const clientRequestId = `crq_${generateStableUuid()}`;
+        const interruptVehicle: Vehicle = {
+          id: provisionalInterruptId,
+          titulo: tituloInterrupcion.trim(),
+          criterioFin: "circunstancia",
+          criterioDetalle: "Interrupción",
+          tiempoInicio: new Date(),
+          createdAt: new Date(),
+          userId,
+          status: "activo",
+          ejes: STUB_EJES,
+          tipoTerminoRapido: "situacion",
+          tipoFlota: "situacion",
+          aperturaAt: Date.now(),
+          excluirDeHistorial: true,
+          vehiculoPadreDesglosadorId: vehicleId,
+          clientRequestId,
+        };
+
+        const pausedList = vehiclesRef.current.map(v =>
+          v.id === vehicleId ? { ...v, ...pausedPatch } : v
+        );
+        const optimisticList = [interruptVehicle, ...pausedList];
+        vehiclesRef.current = optimisticList;
+        setVehicles(optimisticList);
+        scheduleSaveLocalVehicles(optimisticList);
+        burstJornada4Tick();
+
+        toast.success("Interrupción lanzada", {
+          description: "Cierra la situación arriba (Cumplido o Incumplido) para reanudar.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
+          duration: 4200,
+        });
+
+        try {
+          void updateVehicle(userId, vehicleId, pausedPatch, { skipLocalSync: true }).catch(e =>
+            console.warn("[jornada4.pausa] parent", e)
+          );
+          const { id: realId } = await addVehicle(
+            userId,
+            {
+              titulo: tituloInterrupcion.trim(),
+              criterioFin: "circunstancia",
+              criterioDetalle: "Interrupción",
+              tiempoInicio: new Date(),
+              ejes: STUB_EJES,
+              tipoTerminoRapido: "situacion",
+              tipoFlota: "situacion",
+              aperturaAt: Date.now(),
+              excluirDeHistorial: true,
+              vehiculoPadreDesglosadorId: vehicleId,
+            },
+            { provisionalId: provisionalInterruptId, clientRequestId }
+          );
+          if (realId !== provisionalInterruptId) {
+            const synced = vehiclesRef.current.map(v =>
+              v.id === provisionalInterruptId ? { ...v, id: realId } : v
+            );
+            vehiclesRef.current = synced;
+            setVehicles(synced);
+          }
+        } catch {
+          const rolledBack = vehiclesRef.current
+            .filter(v => v.id !== provisionalInterruptId)
+            .map(v =>
+              v.id === vehicleId
+                ? { ...v, desglosadorPausa: undefined, interrupcionActiva: false }
+                : v
+            );
+          vehiclesRef.current = rolledBack;
+          setVehicles(rolledBack);
+          scheduleSaveLocalVehicles(rolledBack);
+          toast.error("No se pudo lanzar la interrupción", {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+          });
+        }
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, setVehicles]
+  );
+
+  const resumeDesglosador = useCallback(
+    async (parentId: string) => {
+      if (!userId) return;
+      const openInterrupt = vehiclesRef.current.find(
+        v =>
+          v.status === "activo" &&
+          !v.autoVerdad &&
+          v.vehiculoPadreDesglosadorId === parentId &&
+          !wasVehicleRecentlyClosed(v.id)
+      );
+      if (openInterrupt) {
+        toast.error("Cierra la interrupción activa arriba", {
+          description: "Usa Cumplido o Incumplido en el vehículo de interrupción.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
+          duration: 4000,
+        });
+        return;
+      }
+      const parent = vehiclesRef.current.find(v => v.id === parentId);
+      if (!parent?.desglosadorPausa && !parent?.interrupcionActiva) return;
+
+      let patch: Partial<Vehicle>;
+      if (parent.desglosadorPausa) {
+        const nestedResume = resumeDesglosadorFromNestedPause(parent);
+        patch = nestedResume ?? { desglosadorPausa: undefined, interrupcionActiva: false };
+      } else {
+        patch = { desglosadorPausa: undefined, interrupcionActiva: false };
+      }
+
+      paintVehicle(parentId, patch);
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      toast.info("Desglosador reanudado", {
+        description: "Tiempo recuperado tras la interrupción.",
+        style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+        duration: 3200,
+      });
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(userId, parentId, patch, { skipLocalSync: true });
+        } catch (e) {
+          console.error("[jornada4.resumeDesglosador]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const closeExpressVehicle = useCallback(
+    async (vehicleId: string, status: "cumplido" | "archivado") => {
+      if (!userId) return;
+      const key = `ex:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || vehicle.status !== "activo") return;
+        const cierreAt = Date.now();
+        const parentId = vehicle.vehiculoPadreDesglosadorId;
+
+        paintVehicle(vehicleId, { status, cierreAt });
+        notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+        await yieldAfterPaint();
+
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            const amount = vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "situacion");
+            if (amount > 0) {
+              const ok = await safeAwardPS(
+                amount,
+                status === "cumplido"
+                  ? `Situación: ${vehicle.titulo}`
+                  : `Archivado: ${vehicle.titulo}`
+              );
+              toast.success(
+                ok
+                  ? status === "cumplido"
+                    ? `+${amount} PS · Cumplido`
+                    : `Archivado · +${amount} PS`
+                  : status === "cumplido"
+                    ? "Cumplido"
+                    : "Archivado",
+                {
+                  style: {
+                    backgroundColor: PIZARRA,
+                    border: `1px solid ${status === "cumplido" ? EMERALD : PLATA}`,
+                    color: status === "cumplido" ? EMERALD : PLATA,
+                  },
+                  duration: 2400,
+                }
+              );
+            } else {
+              toast.info(status === "cumplido" ? "Cumplido" : "Archivado", { duration: 1800 });
+            }
+          } catch (e) {
+            console.error("[jornada4.closeExpressVehicle] PS", e);
+          }
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              { status, cierreAt },
+              { skipLocalSync: true }
+            );
+          } catch (e) {
+            console.error("[jornada4.closeExpressVehicle] remote", e);
+          }
+
+          if (parentId) {
+            const parent = vehiclesRef.current.find(v => v.id === parentId);
+            if (parent && (parent.desglosadorPausa || parent.interrupcionActiva)) {
+              const resume =
+                resumeDesglosadorFromNestedPause(parent) ?? {
+                  desglosadorPausa: undefined,
+                  interrupcionActiva: false,
+                };
+              paintVehicle(parentId, resume);
+              scheduleSaveLocalVehicles(vehiclesRef.current);
+              toast.info("Desglosador reanudado", {
+                description: "Tras cerrar la interrupción.",
+                style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+                duration: 2800,
+              });
+              try {
+                await updateVehicle(userId, parentId, resume, { skipLocalSync: true });
+              } catch (e) {
+                console.error("[jornada4.closeExpressVehicle] resume parent", e);
+              }
+            }
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+  );
+
   return {
     closeConquistaSub,
     closeConquistaCycle,
@@ -553,5 +941,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     addConquistaSub,
     addSituacionFila,
     setSituacionCupo,
+    reorderConquistaSubs,
+    reorderSituacionFilas,
+    pausaInterrupcion,
+    resumeDesglosador,
+    closeExpressVehicle,
   };
 }

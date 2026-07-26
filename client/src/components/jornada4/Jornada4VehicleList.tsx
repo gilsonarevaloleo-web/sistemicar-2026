@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { isConquistaDesglosador, isSituacionDesglosador } from "@/jornada4/filters";
+import {
+  isConquistaDesglosador,
+  isExpressSituacion,
+  isSituacionRing,
+} from "@/jornada4/filters";
+import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
+import { InterruptCard } from "./InterruptCard";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { MUTED, INK, GOLD } = J4_COLORS;
@@ -31,6 +37,22 @@ type Ops = {
     vehicleId: string,
     subTareaId: string,
     minutos: number | undefined
+  ) => Promise<void>;
+  reorderConquistaSubs: (
+    vehicleId: string,
+    movedId: string,
+    direction: ReorderDirection
+  ) => void;
+  reorderSituacionFilas: (
+    vehicleId: string,
+    movedId: string,
+    direction: ReorderDirection
+  ) => void;
+  pausaInterrupcion: (vehicleId: string, titulo: string) => Promise<void>;
+  resumeDesglosador: (parentId: string) => Promise<void>;
+  closeExpressVehicle: (
+    vehicleId: string,
+    status: "cumplido" | "archivado"
   ) => Promise<void>;
 };
 
@@ -99,19 +121,34 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
             {vehicles.map(v => {
               if (isConquistaDesglosador(v)) {
                 return (
-                <ConquistaCard
-                  key={v.id}
-                  vehicle={v}
-                  onCumplido={cantidad =>
-                    void ops.closeConquistaSub(v.id, "cumplido", cantidad)
-                  }
-                  onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
-                  onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
-                  onAddSub={form => void ops.addConquistaSub(v.id, form)}
-                />
+                  <ConquistaCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={cantidad =>
+                      void ops.closeConquistaSub(v.id, "cumplido", cantidad)
+                    }
+                    onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
+                    onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+                    onAddSub={form => void ops.addConquistaSub(v.id, form)}
+                    onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+                    onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
+                    onReorderSubs={(movedId, direction) =>
+                      ops.reorderConquistaSubs(v.id, movedId, direction)
+                    }
+                  />
                 );
               }
-              if (isSituacionDesglosador(v)) {
+              if (isExpressSituacion(v)) {
+                return (
+                  <InterruptCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={() => void ops.closeExpressVehicle(v.id, "cumplido")}
+                    onIncumplido={() => void ops.closeExpressVehicle(v.id, "archivado")}
+                  />
+                );
+              }
+              if (isSituacionRing(v)) {
                 return (
                   <SituacionCard
                     key={v.id}
@@ -121,13 +158,16 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
                     onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
                     onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
+                    onReorderFilas={(movedId, direction) =>
+                      ops.reorderSituacionFilas(v.id, movedId, direction)
+                    }
                   />
                 );
               }
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · sin anillo · sin voz
+              Dual Kernel · pausa · reorden · sin voz
             </p>
           </div>
         ) : null}

@@ -161,11 +161,14 @@ export function useJornadaFlotaCore(options?: {
     async (amount: number, source: string): Promise<boolean> => {
       if (!user) return false;
       try {
+        // awardSovereigntyPoints escribe local + dispara evento antes de Firebase.
         await awardSovereigntyPoints(user.uid, amount, source);
         onDailyPsChange?.(getDailyPointsLocalSync(user.uid).total);
         return true;
       } catch (e) {
         console.error("[useJornadaFlotaCore.safeAwardPS]", e);
+        // Local pudo haberse guardado antes del throw: refrescar barra igual.
+        onDailyPsChange?.(getDailyPointsLocalSync(user.uid).total);
         toast.error("PS no registrados — reintenta", {
           style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
         });

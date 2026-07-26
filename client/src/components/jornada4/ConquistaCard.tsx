@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Focus, ListPlus, Minus, Plus, Timer, X as XIcon, Zap } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Focus,
+  ListPlus,
+  Minus,
+  Plus,
+  Timer,
+  X as XIcon,
+  Zap,
+} from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import {
   FLOTA_CONFIG,
   GOLD,
   NARANJA,
+  cleanSubTitulo,
   getSubVehicleRecordSuggestions,
 } from "@/components/flota/vehicleCardShared";
 import {
@@ -22,6 +34,7 @@ import {
   conquistaActiveSub,
   conquistaProgressLabel,
 } from "@/jornada4/conquistaKernel";
+import type { ReorderDirection } from "@/lib/desglosadorReorder";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -43,6 +56,9 @@ type Props = {
   onFallado: () => void;
   onCerrarCiclo: () => void;
   onAddSub?: (form: AddSubForm) => void;
+  onPausaInterrupcion?: (titulo: string) => void;
+  onResumeDesglosador?: () => void;
+  onReorderSubs?: (movedId: string, direction: ReorderDirection) => void;
 };
 
 export function ConquistaCard({
@@ -51,9 +67,15 @@ export function ConquistaCard({
   onFallado,
   onCerrarCiclo,
   onAddSub,
+  onPausaInterrupcion,
+  onResumeDesglosador,
+  onReorderSubs,
 }: Props) {
   const active = conquistaActiveSub(vehicle);
-  const tick = useJornada4Tick(Boolean(active?.aperturaAt));
+  const paused =
+    vehicle.interrupcionActiva === true ||
+    (vehicle.subVehiculos ?? []).some(s => s.status === "nested_paused");
+  const tick = useJornada4Tick(Boolean(active?.aperturaAt) && !paused);
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick
@@ -67,6 +89,7 @@ export function ConquistaCard({
   );
 
   const subs = vehicle.subVehiculos ?? [];
+  const pendientes = subs.filter(s => s.status === "pendiente");
   const cycleReady = subs.every(s => s.status === "cumplido" || s.status === "fallado");
   const doneCount = subs.filter(s => s.status === "cumplido" || s.status === "fallado").length;
   const progressPct = subs.length > 0 ? Math.round((doneCount / subs.length) * 100) : 0;
@@ -82,6 +105,10 @@ export function ConquistaCard({
   const [addCant, setAddCant] = useState("");
   const [addRecord, setAddRecord] = useState<number | undefined>();
   const [showAddSugs, setShowAddSugs] = useState(false);
+  const [showPausaForm, setShowPausaForm] = useState(false);
+  const [pausaTitulo, setPausaTitulo] = useState("");
+  const [pausaEnviando, setPausaEnviando] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
 
   useEffect(() => {
     setCantidad("");
@@ -469,38 +496,148 @@ export function ConquistaCard({
                 </div>
               ) : null}
 
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                  style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
-                  onClick={() => {
-                    const n = cantidad.trim() ? Number(cantidad) : undefined;
-                    onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
-                    setCantidad("");
-                  }}
-                  data-testid="j4-conquista-cumplido"
-                >
-                  Cumplido
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                  style={{
-                    backgroundColor: "transparent",
-                    color: BAD,
-                    border: `1px solid ${BAD}60`,
-                  }}
-                  onClick={() => {
-                    onFallado();
-                    setCantidad("");
-                  }}
-                  data-testid="j4-conquista-fallado"
-                >
-                  Fallado
-                </button>
-              </div>
+              {!paused && onPausaInterrupcion ? (
+                <div className="mb-1">
+                  {!showPausaForm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowPausaForm(true)}
+                      className="w-full py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: "rgba(0,255,195,0.08)",
+                        color: CYAN,
+                        border: "1px solid rgba(0,255,195,0.25)",
+                      }}
+                      data-testid="j4-conquista-pausa"
+                    >
+                      Pausar e interrumpir
+                    </button>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <input
+                        value={pausaTitulo}
+                        onChange={e => setPausaTitulo(e.target.value)}
+                        placeholder="Tarea que interrumpe..."
+                        className="flex-1 px-2 py-1.5 rounded bg-black/40 border text-white text-[10px] focus:outline-none"
+                        style={{ borderColor: "rgba(0,255,195,0.25)" }}
+                        data-testid="j4-conquista-pausa-input"
+                      />
+                      <button
+                        type="button"
+                        disabled={pausaEnviando || !pausaTitulo.trim()}
+                        onClick={() => {
+                          if (pausaEnviando || !pausaTitulo.trim()) return;
+                          setPausaEnviando(true);
+                          void Promise.resolve(onPausaInterrupcion(pausaTitulo.trim())).finally(
+                            () => {
+                              setPausaEnviando(false);
+                              setPausaTitulo("");
+                              setShowPausaForm(false);
+                            }
+                          );
+                        }}
+                        className="px-2 py-1.5 rounded text-[9px] font-bold disabled:opacity-40"
+                        style={{ backgroundColor: "rgba(0,255,195,0.2)", color: CYAN }}
+                        data-testid="j4-conquista-pausa-go"
+                      >
+                        {pausaEnviando ? "…" : "Ir"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPausaForm(false);
+                          setPausaTitulo("");
+                        }}
+                        className="px-2 text-slate-500 text-[9px]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {paused ? (
+                <div className="space-y-1.5">
+                  <p
+                    className="text-[8px] text-center uppercase tracking-wider"
+                    style={{ color: CYAN }}
+                  >
+                    Desglosador en pausa — cierra la interrupción arriba
+                  </p>
+                  {onResumeDesglosador ? (
+                    <button
+                      type="button"
+                      onClick={onResumeDesglosador}
+                      className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: "rgba(139,92,246,0.12)",
+                        color: VIOLET,
+                        border: "1px solid rgba(139,92,246,0.35)",
+                      }}
+                      data-testid="j4-conquista-resume"
+                    >
+                      Reanudar desglosador ahora
+                    </button>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                    style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
+                    onClick={() => {
+                      const n = cantidad.trim() ? Number(cantidad) : undefined;
+                      onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
+                      setCantidad("");
+                    }}
+                    data-testid="j4-conquista-cumplido"
+                  >
+                    Cumplido
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                    style={{
+                      backgroundColor: "transparent",
+                      color: BAD,
+                      border: `1px solid ${BAD}60`,
+                    }}
+                    onClick={() => {
+                      onFallado();
+                      setCantidad("");
+                    }}
+                    data-testid="j4-conquista-fallado"
+                  >
+                    Fallado
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        ) : paused ? (
+          <div
+            className="mt-3 p-3 rounded-xl border space-y-2"
+            style={{ borderColor: `${CYAN}40`, backgroundColor: "rgba(0,255,195,0.06)" }}
+          >
+            <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: CYAN }}>
+              En pausa por interrupción
+            </p>
+            {onResumeDesglosador ? (
+              <button
+                type="button"
+                onClick={onResumeDesglosador}
+                className="w-full py-2 rounded-lg text-[9px] font-bold uppercase"
+                style={{
+                  backgroundColor: "rgba(139,92,246,0.12)",
+                  color: VIOLET,
+                  border: "1px solid rgba(139,92,246,0.35)",
+                }}
+              >
+                Reanudar desglosador ahora
+              </button>
+            ) : null}
           </div>
         ) : cycleReady ? (
           <div
@@ -539,13 +676,37 @@ export function ConquistaCard({
 
         {subs.length > 0 ? (
           <div className="space-y-1.5" data-testid={`j4-conquista-subs-${vehicle.id}`}>
-            <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
-              Unidades
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
+                Unidades
+                {pendientes.length > 0 && !paused ? (
+                  <span className="font-normal normal-case ml-1" style={{ color: "rgba(255,255,255,0.45)" }}>
+                    · sigue: {cleanSubTitulo(pendientes[0].titulo)}
+                  </span>
+                ) : null}
+              </p>
+              {pendientes.length >= 2 && !paused && onReorderSubs ? (
+                <button
+                  type="button"
+                  onClick={() => setReorderMode(m => !m)}
+                  className="text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: reorderMode ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.06)",
+                    color: reorderMode ? VIOLET : "rgba(255,255,255,0.55)",
+                    border: `1px solid ${reorderMode ? "rgba(139,92,246,0.4)" : "rgba(255,255,255,0.12)"}`,
+                  }}
+                  data-testid="j4-conquista-reorder-toggle"
+                >
+                  {reorderMode ? "Listo" : "Reordenar cola"}
+                </button>
+              ) : null}
+            </div>
             {subs.map((sv, idx) => {
               const isActive = sv.status === "activo";
               const done = sv.status === "cumplido";
               const fail = sv.status === "fallado";
+              const isPending = sv.status === "pendiente";
+              const pIdx = isPending ? pendientes.findIndex(p => p.id === sv.id) : -1;
               const recordLine =
                 sv.cantidadObjetivo && sv.tiempoRecordMinPerUnit
                   ? `${sv.cantidadObjetivo}×${sv.tiempoRecordMinPerUnit.toFixed(1)}m/u · ≈${Math.round(
@@ -563,6 +724,30 @@ export function ConquistaCard({
                     borderColor: isActive ? `${flotaColor}45` : "rgba(255,255,255,0.06)",
                   }}
                 >
+                  {reorderMode && isPending && !paused && onReorderSubs && pIdx >= 0 ? (
+                    <div className="flex flex-col gap-0.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        disabled={pIdx === 0}
+                        onClick={() => onReorderSubs(sv.id, "up")}
+                        className="p-0.5 rounded disabled:opacity-25"
+                        title="Subir en cola"
+                        data-testid={`j4-conquista-reorder-up-${sv.id}`}
+                      >
+                        <ChevronUp size={12} style={{ color: MUTED }} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pIdx === pendientes.length - 1}
+                        onClick={() => onReorderSubs(sv.id, "down")}
+                        className="p-0.5 rounded disabled:opacity-25"
+                        title="Bajar en cola"
+                        data-testid={`j4-conquista-reorder-down-${sv.id}`}
+                      >
+                        <ChevronDown size={12} style={{ color: MUTED }} />
+                      </button>
+                    </div>
+                  ) : null}
                   <span
                     className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black shrink-0"
                     style={{
@@ -602,7 +787,7 @@ export function ConquistaCard({
                       color: done ? OK : fail ? BAD : isActive ? flotaColor : MUTED,
                     }}
                   >
-                    {sv.status}
+                    {sv.status === "nested_paused" ? "pausa" : sv.status}
                   </span>
                 </div>
               );

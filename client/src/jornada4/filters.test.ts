@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { filterJornada4Vehicles, isJornada4Vehicle } from "./filters.ts";
+import {
+  filterJornada4Vehicles,
+  isExpressSituacion,
+  isJornada4Vehicle,
+  isSituacionRing,
+} from "./filters.ts";
 import type { Vehicle } from "../lib/persistence.ts";
 
 function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
@@ -29,5 +34,32 @@ describe("jornada4 filters", () => {
     );
     assert.equal(isJornada4Vehicle(list[0]), true);
     assert.equal(isJornada4Vehicle(list[3]), false);
+  });
+
+  it("distingue ring situacional de interrupción express", () => {
+    const ring = v({
+      id: "r",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: Date.now() },
+      subTareas: [
+        {
+          id: "st1",
+          texto: "Fila",
+          completada: false,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    const interrupt = v({
+      id: "i",
+      tipoFlota: "situacion",
+      tipoTerminoRapido: "situacion",
+      vehiculoPadreDesglosadorId: "parent",
+    });
+    assert.equal(isSituacionRing(ring), true);
+    assert.equal(isExpressSituacion(ring), false);
+    assert.equal(isSituacionRing(interrupt), false);
+    assert.equal(isExpressSituacion(interrupt), true);
   });
 });
