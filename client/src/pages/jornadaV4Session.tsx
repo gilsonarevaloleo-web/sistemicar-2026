@@ -9,10 +9,12 @@ import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosP
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
+import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
+import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
@@ -44,6 +46,13 @@ export default function JornadaV4Session() {
     vehiclesRef: core.vehiclesRef,
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
+  });
+
+  const pulsoModel = usePulsoCobertura({
+    segmentos: planillaApi.planilla?.segmentos ?? [],
+    vehicles: core.vehicles,
+    segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
+    enabled: Boolean(user && planillaApi.planilla),
   });
 
   useEffect(() => {
@@ -120,6 +129,10 @@ export default function JornadaV4Session() {
       />
       <div className="max-w-lg mx-auto pt-2">
         <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
+        <PulsoCobertura
+          model={pulsoModel}
+          showCta={Boolean(planillaApi.segmentoActivo)}
+        />
         <Jornada4SegmentosPanel
           planilla={planillaApi.planilla}
           plantillasRutina={planillaApi.plantillasRutina}

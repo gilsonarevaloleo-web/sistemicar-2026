@@ -19,6 +19,7 @@ import {
   situacionMinutosHastaObjetivoHora,
 } from "@/lib/situacionGanancia";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
@@ -105,6 +106,20 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  /** Pulso / CTA externos: abrir sheet sin recomputar conciencia. */
+  useEffect(() => {
+    const onOpen = () => {
+      if (disabled) return;
+      setOpen(true);
+      const el = document.querySelector('[data-testid="jornada4-launch"]');
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    };
+    window.addEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+    return () => window.removeEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+  }, [disabled]);
 
   useEffect(() => {
     if (tipo !== "tiempo" || titulo.trim().length < 3) {

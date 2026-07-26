@@ -45,7 +45,7 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
           La Flota · Dual Kernel
         </h1>
         <p className="mt-1 text-[11px] leading-snug" style={{ color: MUTED }}>
-          Conquista y Enfoque operables — sin descanso, verdad, anillo ni voz
+          Conquista y Enfoque — pulso lite de cobertura · sin anillo SVG ni voz
         </p>
         <div className="mt-3 flex items-center gap-3 text-[11px]" style={{ color: MUTED }}>
           <span>
