@@ -18,8 +18,10 @@ const COLORS = {
 
 export type PulsoCoberturaProps = {
   model: PulsoCoberturaModel;
-  /** Si false, oculta el CTA (p.ej. sin planilla). */
+  /** Si false, oculta el CTA de lanzar. */
   showCta?: boolean;
+  /** True cuando aún no hay segmentos del día. */
+  sinSegmentos?: boolean;
   onInsistirLanzar?: () => void;
   className?: string;
 };
@@ -27,6 +29,7 @@ export type PulsoCoberturaProps = {
 export const PulsoCobertura = memo(function PulsoCobertura({
   model,
   showCta = true,
+  sinSegmentos = false,
   onInsistirLanzar,
   className = "",
 }: PulsoCoberturaProps) {
@@ -41,6 +44,14 @@ export const PulsoCobertura = memo(function PulsoCobertura({
   const conquistaW = Math.max(0, Math.min(100, model.coberturaPct));
   const entropiaW = Math.max(0, 100 - conquistaW);
 
+  const hint = sinSegmentos
+    ? "Crea un segmento del día y ábrelo: aquí verás consciente vs inconsciente."
+    : model.consciousNow
+      ? "Hay vehículo cubriendo conciencia ahora."
+      : model.needsLaunch
+        ? "Segmento activo sin vehículo — el tiempo planificado se vuelve inconsciente."
+        : "Sin cobertura consciente en este instante.";
+
   return (
     <section
       className={`px-4 pb-3 ${className}`.trim()}
@@ -51,7 +62,7 @@ export const PulsoCobertura = memo(function PulsoCobertura({
         className="rounded-xl px-3 py-2.5"
         style={{
           border: `1px solid ${
-            model.needsLaunch ? "rgba(255,42,42,0.35)" : "rgba(212,175,55,0.18)"
+            model.needsLaunch ? "rgba(255,42,42,0.35)" : "rgba(212,175,55,0.28)"
           }`,
           background:
             "linear-gradient(135deg, rgba(12,12,14,0.95) 0%, rgba(20,16,28,0.9) 100%)",
@@ -137,12 +148,12 @@ export const PulsoCobertura = memo(function PulsoCobertura({
           ) : null}
         </div>
 
-        <p className="mt-1.5 text-[10px] leading-snug" style={{ color: COLORS.muted }}>
-          {model.consciousNow
-            ? "Hay vehículo cubriendo conciencia ahora."
-            : model.needsLaunch
-              ? "Segmento activo sin vehículo — el tiempo planificado se vuelve inconsciente."
-              : "Sin cobertura consciente en este instante."}
+        <p
+          className="mt-1.5 text-[10px] leading-snug"
+          style={{ color: COLORS.muted }}
+          data-testid="pulso-cobertura-hint"
+        >
+          {hint}
         </p>
 
         {showCta && model.needsLaunch ? (

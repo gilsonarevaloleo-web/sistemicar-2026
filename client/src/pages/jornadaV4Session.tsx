@@ -132,6 +132,7 @@ export default function JornadaV4Session() {
         <PulsoCobertura
           model={pulsoModel}
           showCta={Boolean(planillaApi.segmentoActivo)}
+          sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
         />
         <Jornada4SegmentosPanel
           planilla={planillaApi.planilla}
