@@ -51,13 +51,20 @@ describe("Jornada 4 Dual Kernel import guard", () => {
       assert.equal(session.includes(ban), false, `jornadaV4Session.tsx no debe contener ${ban}`);
     }
     assert.match(session, /useJornada4Ops/);
-    // Pulso lite vive fuera del árbol Dual Kernel (components/jornada + hook propio).
+    // Pulso / Disciplina lite viven fuera del árbol Dual Kernel.
     assert.match(session, /PulsoCobertura/);
     assert.match(session, /usePulsoCobertura/);
+    assert.match(session, /DisciplinaLite/);
+    assert.match(session, /useDisciplinaLite/);
     assert.equal(
       session.includes('from "@/engines/ConcienciaEngine"'),
       false,
       "sesión no debe importar ConcienciaEngine directo — solo vía Pulso idle"
+    );
+    assert.equal(
+      session.includes('from "@/lib/disciplinaEngine"'),
+      false,
+      "sesión no debe importar disciplinaEngine directo — solo vía Disciplina lite idle"
     );
   });
 

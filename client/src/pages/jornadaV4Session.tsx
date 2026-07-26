@@ -9,7 +9,9 @@ import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosP
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
+import { DisciplinaLite } from "@/components/jornada/DisciplinaLite";
 import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
+import { useDisciplinaLite } from "@/hooks/useDisciplinaLite";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
@@ -49,6 +51,13 @@ export default function JornadaV4Session() {
   });
 
   const pulsoModel = usePulsoCobertura({
+    segmentos: planillaApi.planilla?.segmentos ?? [],
+    vehicles: core.vehicles,
+    segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
+    enabled: Boolean(user && planillaApi.planilla),
+  });
+
+  const disciplinaModel = useDisciplinaLite({
     segmentos: planillaApi.planilla?.segmentos ?? [],
     vehicles: core.vehicles,
     segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
@@ -133,6 +142,10 @@ export default function JornadaV4Session() {
           model={pulsoModel}
           showCta={Boolean(planillaApi.segmentoActivo)}
           sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
+        />
+        <DisciplinaLite
+          model={disciplinaModel}
+          showCta={Boolean(planillaApi.segmentoActivo)}
         />
         <Jornada4SegmentosPanel
           planilla={planillaApi.planilla}
