@@ -41,7 +41,16 @@ import {
   totalBudgetMinFromCronometro,
 } from "@/lib/situacionCupoDistrib";
 import { isSituacionDesglosador, isVehiculoRapido } from "@/jornada4/filters";
+import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
+
+function noteHuecoAfterClose(vehicles: Vehicle[]): void {
+  try {
+    reconcileCoberturaHuecos({ vehicles });
+  } catch {
+    /* non-fatal */
+  }
+}
 
 const PIZARRA = "#0a0a0a";
 const EMERALD = "#00C851";
@@ -205,6 +214,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               patch.subVehiculos,
               safeAwardPS
             );
+            noteHuecoAfterClose(vehiclesRef.current);
             toast.success(
               cyclePs > 0
                 ? `Ciclo cerrado · +${cyclePs} PS · profundidad ${depthPs} PS`
@@ -344,6 +354,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               patch.status,
               safeAwardPS
             );
+            noteHuecoAfterClose(vehiclesRef.current);
             toast.success(
               awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
               {
@@ -493,6 +504,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 `J4 rápido · ${status} · ${vehicle.titulo}`
               );
             }
+            noteHuecoAfterClose(vehiclesRef.current);
             toast.success(
               amount > 0
                 ? `Cerrado · +${amount} PS`

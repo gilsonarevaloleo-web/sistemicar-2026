@@ -13,6 +13,7 @@ import {
 } from "@/lib/situacionGanancia";
 import { buildSituacionRingSeed } from "./situacionLaunchSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
+import { reconcileCoberturaHuecos } from "./coberturaHuecosLog";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
   /** Filas del ring (solo situacional Dual Kernel en modo desglose). */
@@ -50,6 +51,16 @@ export async function executeJornada4Launch(
     form: baseForm,
   });
   if (!id) return null;
+
+  // Historial de huecos: transición barata post-paint (no computeLiveEntropy).
+  try {
+    reconcileCoberturaHuecos({
+      vehicles: vehiclesRef.current,
+      coverTitulo: baseForm.titulo.trim(),
+    });
+  } catch {
+    /* non-fatal */
+  }
 
   const modo = baseForm.modo ?? "desglose";
   if (baseForm.tipoFlota === "situacion" && modo === "desglose") {

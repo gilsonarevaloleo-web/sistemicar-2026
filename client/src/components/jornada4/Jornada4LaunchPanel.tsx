@@ -23,6 +23,7 @@ import {
   situacionMinutosHastaObjetivoHora,
 } from "@/lib/situacionGanancia";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
@@ -109,6 +110,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  useEffect(() => {
+    const onOpen = () => {
+      setTipo(null);
+      setOpen(true);
+    };
+    window.addEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+    return () => window.removeEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+  }, []);
 
   useEffect(() => {
     if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
