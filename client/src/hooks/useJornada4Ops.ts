@@ -119,61 +119,80 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         flushLaunchPersistOnSubClose(vehicleId);
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
 
-        void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
-          try {
-            await updateVehicle(userId, vehicleId, {
-              subVehiculos: patch.subVehiculos,
-              desglosadorBloqueDepthPsGranted: depthPs,
-            }, { skipLocalSync: true });
-            if (status === "cumplido") {
-              recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
-              try {
-                await syncDesglosadorSubToProyectoHub(
-                  userId,
-                  vehicle,
-                  patch.closedSub,
-                  status,
-                  segmentoRef.current
-                );
-              } catch (hubErr) {
-                console.error("[jornada4.closeConquistaSub] hub", hubErr);
-              }
-              const awarded = await awardConquistaSubPs(
-                vehicle.titulo,
+        // PS al instante (sin requestIdleCallback) — la barra no puede esperar al idle.
+        let subsForRemote = patch.subVehiculos;
+        try {
+          if (status === "cumplido") {
+            recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
+            try {
+              await syncDesglosadorSubToProyectoHub(
+                userId,
+                vehicle,
                 patch.closedSub,
-                safeAwardPS
+                status,
+                segmentoRef.current
               );
-              if (awarded > 0) {
-                toast.success(
-                  `+${awarded} PS · profundidad ${depthPs} PS`,
-                  {
-                  style: {
-                    backgroundColor: PIZARRA,
-                    border: `1px solid ${EMERALD}`,
-                    color: EMERALD,
-                  },
-                  duration: 2200,
-                });
-              }
-            } else {
-              toast.info("Unidad fallada", {
+            } catch (hubErr) {
+              console.error("[jornada4.closeConquistaSub] hub", hubErr);
+            }
+            const awarded = await awardConquistaSubPs(
+              vehicle.titulo,
+              patch.closedSub,
+              safeAwardPS
+            );
+            if (awarded > 0) {
+              subsForRemote = patch.subVehiculos.map(s =>
+                s.id === patch.closedSub.id ? { ...s, psOtorgados: awarded } : s
+              );
+              paintVehicle(vehicleId, {
+                subVehiculos: subsForRemote,
+                desglosadorBloqueDepthPsGranted: depthPs,
+              });
+              scheduleSaveLocalVehicles(vehiclesRef.current);
+              toast.success(`+${awarded} PS · profundidad ${depthPs} PS`, {
                 style: {
                   backgroundColor: PIZARRA,
-                  border: `1px solid ${PLATA}`,
-                  color: PLATA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
                 },
-                duration: 1800,
+                duration: 2200,
               });
             }
-            if (patch.cycleReady) {
-              toast.message("Ciclo listo — cierra el desglosador", {
-                duration: 3200,
-              });
-            }
+          } else {
+            toast.info("Unidad fallada", {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${PLATA}`,
+                color: PLATA,
+              },
+              duration: 1800,
+            });
+          }
+          if (patch.cycleReady) {
+            toast.message("Ciclo listo — cierra el desglosador", {
+              duration: 3200,
+            });
+          }
+        } catch (e) {
+          console.error("[jornada4.closeConquistaSub] PS", e);
+        }
+
+        const remoteSubs = subsForRemote;
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              {
+                subVehiculos: remoteSubs,
+                desglosadorBloqueDepthPsGranted: depthPs,
+              },
+              { skipLocalSync: true }
+            );
           } catch (e) {
-            console.error("[jornada4.closeConquistaSub]", e);
+            console.error("[jornada4.closeConquistaSub] remote", e);
           }
         });
       } finally {
@@ -208,49 +227,61 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           desglosadorBloqueDepthPsGranted: depthPs,
         });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        let cyclePs = 0;
+        try {
+          recordDesglosadorCycleHistory(
+            {
+              titulo: vehicle.titulo,
+              subVehiculos: patch.subVehiculos,
+              aperturaAt: vehicle.aperturaAt,
+              cierreAt: patch.cierreAt,
+            },
+            userId
+          );
+          const settled = await awardConquistaCyclePs(
+            vehicleId,
+            vehicle.titulo,
+            patch.subVehiculos,
+            safeAwardPS
+          );
+          cyclePs = settled.cyclePs;
+          noteHuecoAfterClose(vehiclesRef.current);
+          toast.success(
+            cyclePs > 0
+              ? `Ciclo cerrado · +${cyclePs} PS · profundidad ${depthPs} PS`
+              : depthPs > 0
+                ? `Ciclo cerrado · profundidad ${depthPs} PS`
+                : "Ciclo cerrado",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2800,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeConquistaCycle] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
-            await updateVehicle(userId, vehicleId, {
-              status: patch.status,
-              cierreAt: patch.cierreAt,
-              subVehiculos: patch.subVehiculos,
-              desglosadorBloqueDepthPsGranted: depthPs,
-            }, { skipLocalSync: true });
-            recordDesglosadorCycleHistory(
-              {
-                titulo: vehicle.titulo,
-                subVehiculos: patch.subVehiculos,
-                aperturaAt: vehicle.aperturaAt,
-                cierreAt: patch.cierreAt,
-              },
-              userId
-            );
-            const { cyclePs } = await awardConquistaCyclePs(
+            await updateVehicle(
+              userId,
               vehicleId,
-              vehicle.titulo,
-              patch.subVehiculos,
-              safeAwardPS
-            );
-            noteHuecoAfterClose(vehiclesRef.current);
-            toast.success(
-              cyclePs > 0
-                ? `Ciclo cerrado · +${cyclePs} PS · profundidad ${depthPs} PS`
-                : depthPs > 0
-                  ? `Ciclo cerrado · profundidad ${depthPs} PS`
-                  : "Ciclo cerrado",
               {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2800,
-              }
+                status: patch.status,
+                cierreAt: patch.cierreAt,
+                subVehiculos: patch.subVehiculos,
+                desglosadorBloqueDepthPsGranted: depthPs,
+              },
+              { skipLocalSync: true }
             );
           } catch (e) {
-            console.error("[jornada4.closeConquistaCycle]", e);
+            console.error("[jornada4.closeConquistaCycle] remote", e);
           }
         });
       } finally {
@@ -279,15 +310,50 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         flushLaunchPersistOnSubClose(vehicleId);
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        let subsForRemote = patch.subTareas;
+        try {
+          if (status === "cumplido") {
+            const awarded = await awardSituacionFilaPs(
+              patch.closedSubTexto,
+              safeAwardPS,
+              subTareaId
+            );
+            toast.success(
+              awarded > 0
+                ? patch.minutosGanados > 0
+                  ? `+${awarded} PS · +${patch.minutosGanados} min ganados`
+                  : `+${awarded} PS · fila`
+                : patch.minutosGanados > 0
+                  ? `+${patch.minutosGanados} min ganados → cola`
+                  : "Fila cumplida",
+              {
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
+                },
+                duration: 2200,
+              }
+            );
+          } else {
+            toast.info(
+              patch.minutosPerdidos > 0
+                ? `Fallado · −${patch.minutosPerdidos} min`
+                : "Fila fallada",
+              { duration: 2000 }
+            );
+          }
+          if (patch.bloqueListo) {
+            toast.message("Ring listo — cierra el bloque", { duration: 3200 });
+          }
+        } catch (e) {
+          console.error("[jornada4.closeSituacionRow] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
-            await updateVehicle(userId, vehicleId, {
-              subTareas: patch.subTareas,
-              situacionCupoAnchor: patch.situacionCupoAnchor,
-              situacionCronometro: patch.situacionCronometro,
-            }, { skipLocalSync: true });
             const closedSub = patch.subTareas.find(s => s.id === subTareaId);
             if (closedSub) {
               try {
@@ -299,58 +365,29 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                   Date.now()
                 );
                 if (hub.pasoNumero != null && closedSub.pasoEjecutadoNumero == null) {
-                  const nextSubs = patch.subTareas.map(s =>
+                  subsForRemote = patch.subTareas.map(s =>
                     s.id === subTareaId
                       ? { ...s, pasoEjecutadoNumero: hub.pasoNumero! }
                       : s
                   );
-                  paintVehicle(vehicleId, { subTareas: nextSubs });
-                  await updateVehicle(
-                    userId,
-                    vehicleId,
-                    { subTareas: nextSubs },
-                    { skipLocalSync: true }
-                  );
+                  paintVehicle(vehicleId, { subTareas: subsForRemote });
                 }
               } catch (hubErr) {
                 console.error("[jornada4.closeSituacionRow] hub", hubErr);
               }
             }
-            if (status === "cumplido") {
-              const awarded = await awardSituacionFilaPs(
-                patch.closedSubTexto,
-                safeAwardPS
-              );
-              toast.success(
-                awarded > 0
-                  ? patch.minutosGanados > 0
-                    ? `+${awarded} PS · +${patch.minutosGanados} min ganados`
-                    : `+${awarded} PS · fila`
-                  : patch.minutosGanados > 0
-                    ? `+${patch.minutosGanados} min ganados → cola`
-                    : "Fila cumplida",
-                {
-                  style: {
-                    backgroundColor: PIZARRA,
-                    border: `1px solid ${EMERALD}`,
-                    color: EMERALD,
-                  },
-                  duration: 2200,
-                }
-              );
-            } else {
-              toast.info(
-                patch.minutosPerdidos > 0
-                  ? `Fallado · −${patch.minutosPerdidos} min`
-                  : "Fila fallada",
-                { duration: 2000 }
-              );
-            }
-            if (patch.bloqueListo) {
-              toast.message("Ring listo — cierra el bloque", { duration: 3200 });
-            }
+            await updateVehicle(
+              userId,
+              vehicleId,
+              {
+                subTareas: subsForRemote,
+                situacionCupoAnchor: patch.situacionCupoAnchor,
+                situacionCronometro: patch.situacionCronometro,
+              },
+              { skipLocalSync: true }
+            );
           } catch (e) {
-            console.error("[jornada4.closeSituacionRow]", e);
+            console.error("[jornada4.closeSituacionRow] remote", e);
           }
         });
       } finally {
@@ -385,36 +422,46 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           situacionCupoAnchor: patch.situacionCupoAnchor,
         });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          const awarded = await awardSituacionBlockPs(
+            vehicle.titulo,
+            patch.status,
+            safeAwardPS
+          );
+          noteHuecoAfterClose(vehiclesRef.current);
+          toast.success(
+            awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2800,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeSituacionBlock] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
-            await updateVehicle(userId, vehicleId, {
-              status: patch.status,
-              cierreAt: patch.cierreAt,
-              subTareas: patch.subTareas,
-              situacionCronometro: patch.situacionCronometro,
-              situacionCupoAnchor: patch.situacionCupoAnchor,
-            }, { skipLocalSync: true });
-            const awarded = await awardSituacionBlockPs(
-              vehicle.titulo,
-              patch.status,
-              safeAwardPS
-            );
-            noteHuecoAfterClose(vehiclesRef.current);
-            toast.success(
-              awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
+            await updateVehicle(
+              userId,
+              vehicleId,
               {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2800,
-              }
+                status: patch.status,
+                cierreAt: patch.cierreAt,
+                subTareas: patch.subTareas,
+                situacionCronometro: patch.situacionCronometro,
+                situacionCupoAnchor: patch.situacionCupoAnchor,
+              },
+              { skipLocalSync: true }
             );
           } catch (e) {
-            console.error("[jornada4.closeSituacionBlock]", e);
+            console.error("[jornada4.closeSituacionBlock] remote", e);
           }
         });
       } finally {
@@ -545,33 +592,38 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         }
         paintVehicle(vehicleId, patch);
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          const amount = vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "hora");
+          if (amount > 0) {
+            await safeAwardPS(amount, `J4 rápido · ${status} · ${vehicle.titulo}`);
+          }
+          noteHuecoAfterClose(vehiclesRef.current);
+          toast.success(
+            amount > 0
+              ? `Cerrado · +${amount} PS`
+              : status === "cumplido"
+                ? "Misión cumplida"
+                : "Misión archivada",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2400,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeRapidoVehicle] PS", e);
+        }
 
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
             await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
-            const amount = vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "hora");
-            if (amount > 0) {
-              await safeAwardPS(amount, `J4 rápido · ${status} · ${vehicle.titulo}`);
-            }
-            noteHuecoAfterClose(vehiclesRef.current);
-            toast.success(
-              amount > 0
-                ? `Cerrado · +${amount} PS`
-                : status === "cumplido"
-                  ? "Misión cumplida"
-                  : "Misión archivada",
-              {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2400,
-              }
-            );
           } catch (e) {
-            console.error("[jornada4.closeRapidoVehicle]", e);
+            console.error("[jornada4.closeRapidoVehicle] remote", e);
           }
         });
       } finally {
@@ -601,26 +653,33 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         );
         paintVehicle(vehicleId, { subTareas });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          if (status === "cumplido") {
+            const awarded = await awardSituacionFilaPs(
+              subTareas.find(s => s.id === subTareaId)?.texto ?? "fila",
+              safeAwardPS,
+              subTareaId
+            );
+            toast.success(awarded > 0 ? `+${awarded} PS · fila` : "Fila cumplida", {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2000,
+            });
+          }
+        } catch (e) {
+          console.error("[jornada4.closeSituacionLibreFila] PS", e);
+        }
+
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
             await updateVehicle(userId, vehicleId, { subTareas }, { skipLocalSync: true });
-            if (status === "cumplido") {
-              const awarded = await awardSituacionFilaPs(
-                subTareas.find(s => s.id === subTareaId)?.texto ?? "fila",
-                safeAwardPS
-              );
-              toast.success(awarded > 0 ? `+${awarded} PS · fila` : "Fila cumplida", {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2000,
-              });
-            }
           } catch (e) {
-            console.error("[jornada4.closeSituacionLibreFila]", e);
+            console.error("[jornada4.closeSituacionLibreFila] remote", e);
           }
         });
       } finally {
@@ -648,8 +707,31 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const status = anyOk ? ("cumplido" as const) : ("archivado" as const);
         paintVehicle(vehicleId, { status, cierreAt });
         await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          noteHuecoAfterClose(vehiclesRef.current);
+          const awarded = await awardSituacionBlockPs(
+            vehicle.titulo,
+            status,
+            safeAwardPS
+          );
+          toast.success(
+            awarded > 0 ? `Lista cerrada · +${awarded} PS` : "Lista cerrada",
+            {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
+              },
+              duration: 2400,
+            }
+          );
+        } catch (e) {
+          console.error("[jornada4.closeSituacionLibreBloque] PS", e);
+        }
+
         void runShadowTaskAsync(async () => {
-          scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
             await updateVehicle(
               userId,
@@ -657,25 +739,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               { status, cierreAt },
               { skipLocalSync: true }
             );
-            noteHuecoAfterClose(vehiclesRef.current);
-            const awarded = await awardSituacionBlockPs(
-              vehicle.titulo,
-              status,
-              safeAwardPS
-            );
-            toast.success(
-              awarded > 0 ? `Lista cerrada · +${awarded} PS` : "Lista cerrada",
-              {
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${EMERALD}`,
-                  color: EMERALD,
-                },
-                duration: 2400,
-              }
-            );
           } catch (e) {
-            console.error("[jornada4.closeSituacionLibreBloque]", e);
+            console.error("[jornada4.closeSituacionLibreBloque] remote", e);
           }
         });
       } finally {
