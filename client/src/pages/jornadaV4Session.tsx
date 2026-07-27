@@ -2,11 +2,12 @@
  * Sesión Dual Kernel — orden de zonas:
  * 01 Operar → 02 Cobertura → 03 Plan → 04 Métricas
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import { Jornada4SectionLabel } from "@/components/jornada4/Jornada4SectionLabel";
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
+import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
@@ -17,12 +18,14 @@ import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
+import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
   type Jornada4LaunchForm,
 } from "@/jornada4/executeJornada4Launch";
+import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import {
   ensureJornada4NotificationPermission,
@@ -77,6 +80,14 @@ export default function JornadaV4Session() {
     segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
     enabled: Boolean(user && planillaApi.planilla),
   });
+
+  const disciplinaTick = useJornada4Tick(Boolean(user && planillaApi.planilla));
+  const disciplinaModel = useMemo(() => {
+    void disciplinaTick;
+    return computeDisciplinaPlanDia({
+      segmentos: planillaApi.planilla?.segmentos ?? [],
+    });
+  }, [planillaApi.planilla, disciplinaTick]);
 
   const bumpHuecos = useCallback(() => {
     setHuecosRefresh(n => n + 1);
@@ -273,13 +284,14 @@ export default function JornadaV4Session() {
           }}
         />
 
-        {/* 04 · MÉTRICAS — PS y bóveda */}
+        {/* 04 · MÉTRICAS — disciplina del plan, PS y bóveda */}
         <Jornada4SectionLabel
           step="04"
           title="Métricas"
-          hint="PS del día y récords"
+          hint="Disciplina del plan, PS y récords"
           testId="jornada4-zone-metricas"
         />
+        <Jornada4DisciplinaCard model={disciplinaModel} />
         <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
         <Jornada4Boveda />
       </div>

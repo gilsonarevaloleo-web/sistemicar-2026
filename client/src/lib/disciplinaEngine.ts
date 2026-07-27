@@ -60,7 +60,10 @@ export type DisciplinaPuntualidad = {
 
 export type DisciplinaDia = {
   segmentos: SegmentoDisciplina[];
-  /** 50 % cobertura + 50 % puntualidad cuando hay base; 0 en pre-jornada. */
+  /**
+   * % del día = suma de (100/N)×puntualidad por entrada del plan.
+   * N segmentos ⇒ cada puerta vale 100/N; la tardanza en minutos resta del 100 de esa entrada.
+   */
   indiceDisciplina: number;
   faseJornada: DisciplinaFaseJornada;
   cobertura: DisciplinaCobertura;
@@ -141,12 +144,11 @@ function detectMontajeCruce(vehicles: Vehicle[], segmento: SegmentoV5): Vehicle[
 function computeScoreSegmento(
   sinEntrada: boolean,
   deltaDesdeInicioMin: number | null,
-  duracionMin: number
+  _duracionMin: number
 ): number {
-  if (sinEntrada || deltaDesdeInicioMin == null || duracionMin <= 0) return 0;
-  return Math.round(
-    Math.max(0, 100 - (deltaDesdeInicioMin / duracionMin) * 100)
-  );
+  if (sinEntrada || deltaDesdeInicioMin == null) return 0;
+  // Cada minuto de tardanza resta 1 del 100 (20 min → 80, 30 → 70).
+  return Math.max(0, Math.round(100 - deltaDesdeInicioMin));
 }
 
 function tipoKey(v: Vehicle): string {
@@ -212,9 +214,12 @@ export function computeDisciplinaDia(params: {
     const primer = primerVehiculoPorApertura(enVentana);
     const primerEntradaAt = primer?.aperturaAt ?? null;
 
+    // Entrada del plan = puerta abierta; si no hay, primer vehículo consciente.
+    const entradaPlanAt = puertaAbiertaAt ?? primerEntradaAt;
+
     const deltaDesdeInicioMin =
-      primerEntradaAt != null
-        ? Math.max(0, Math.round((primerEntradaAt - start) / 60000))
+      entradaPlanAt != null
+        ? Math.max(0, Math.round((entradaPlanAt - start) / 60000))
         : null;
 
     const deltaDesdePuertaMin =
@@ -222,7 +227,7 @@ export function computeDisciplinaDia(params: {
         ? Math.max(0, Math.round((primerEntradaAt - puertaAbiertaAt) / 60000))
         : null;
 
-    const sinEntrada = evaluable && primerEntradaAt == null;
+    const sinEntrada = evaluable && entradaPlanAt == null;
 
     const invasores =
       nowMs >= start ? detectMontajeInvasores(vehicles, seg, start, nowMs) : [];
@@ -242,14 +247,16 @@ export function computeDisciplinaDia(params: {
       horaFin: seg.horaFin,
       puertaAbiertaAt,
       puertaManual,
-      primerEntradaAt,
-      primerEntradaTipo: primer
-        ? {
-            tipoFlota: primer.tipoFlota,
-            tipoReloj: primer.tipoReloj,
-            titulo: primer.titulo,
-          }
-        : {},
+      primerEntradaAt: entradaPlanAt,
+      primerEntradaTipo: puertaAbiertaAt
+        ? { tipoFlota: "puerta", tipoReloj: "plan", titulo: seg.nombre }
+        : primer
+          ? {
+              tipoFlota: primer.tipoFlota,
+              tipoReloj: primer.tipoReloj,
+              titulo: primer.titulo,
+            }
+          : {},
       deltaDesdeInicioMin,
       deltaDesdePuertaMin,
       sinEntrada,
@@ -326,7 +333,8 @@ export function computeDisciplinaDia(params: {
     deltaMedioMin: deltaMedioDesdeInicioMin,
   };
 
-  const indiceDisciplina = computeIndiceDisciplinaCompuesto(coberturaPct, puntualidadPct);
+  // Índice = suma de (100/N) × puntualidad_i. Cada cupo del plan aporta su peso.
+  const indiceDisciplina = computeIndiceDisciplinaPlan(segmentosOut, segmentosTotales);
 
   return {
     segmentos: segmentosOut,
@@ -344,6 +352,30 @@ export function computeDisciplinaDia(params: {
   };
 }
 
+/**
+ * Disciplina del plan: 100% ÷ N segmentos.
+ * Cada entrada contabilizada aporta (100/N)×(puntualidad/100).
+ * Se suma al avanzar el día (2ª puntual suma; 1ª tardía ya restó).
+ */
+function computeIndiceDisciplinaPlan(
+  segmentos: SegmentoDisciplina[],
+  total: number
+): number {
+  if (total <= 0) return 0;
+  const peso = 100 / total;
+  let sum = 0;
+  for (const s of segmentos) {
+    // Cupos futuros (no iniciados) no suman aún.
+    if (!s.evaluable && !s.enCurso) continue;
+    // En curso sin entrada: aún no cierra el cupo.
+    if (s.enCurso && s.primerEntradaAt == null) continue;
+    const score = s.sinEntrada ? 0 : s.scoreSegmento;
+    sum += peso * (score / 100);
+  }
+  return Math.round(sum);
+}
+
+/** @deprecated Preferir computeIndiceDisciplinaPlan (peso por segmento del día). */
 function computeIndiceDisciplinaCompuesto(
   coberturaPct: number | null,
   puntualidadPct: number | null
@@ -354,7 +386,10 @@ function computeIndiceDisciplinaCompuesto(
   return Math.round(0.5 * coberturaPct + 0.5 * puntualidadPct);
 }
 
-/** Valor principal para UI — evita mostrar 0 como fallo en pre-jornada. */
+// Mantener export interno usable en tests legacy si hace falta.
+void computeIndiceDisciplinaCompuesto;
+
+/** Valor principal para UI — % del plan (100÷N × puntualidad acumulada). */
 export function formatDisciplinaValorPrincipal(d: DisciplinaDia): string {
   if (d.faseJornada === "pre_jornada") {
     const n = d.cobertura.segmentosTotales;
@@ -363,10 +398,7 @@ export function formatDisciplinaValorPrincipal(d: DisciplinaDia): string {
     }
     return n > 0 ? `${n} segmentos` : "—";
   }
-  if (d.cobertura.base > 0) {
-    return `${d.cobertura.conEntrada}/${d.cobertura.base}`;
-  }
-  return String(d.indiceDisciplina);
+  return `${d.indiceDisciplina}%`;
 }
 
 export function formatDisciplinaSubheadline(d: DisciplinaDia): string {

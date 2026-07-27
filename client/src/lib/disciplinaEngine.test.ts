@@ -51,7 +51,7 @@ describe("isTrabajoConsciente", () => {
 describe("computeDisciplinaDia", () => {
   const limaDayStart = getLimaDayStartMs(Date.UTC(2026, 4, 18, 15, 0, 0));
 
-  it("delta 60 min desde inicio con score intermedio", () => {
+  it("delta 60 min desde inicio: puntualidad 40 (100−60) y peso 100%", () => {
     const { start, end } = segmentWindowMs("08:00", "10:00", limaDayStart);
     const segmentos = [seg({ id: "s1", nombre: "Costura", horaInicio: "08:00", horaFin: "10:00", activadoAt: start + 2 * 60000, estado: "activo" })];
     const apertura = start + 60 * 60000;
@@ -66,14 +66,72 @@ describe("computeDisciplinaDia", () => {
       }),
     ];
     const r = computeDisciplinaDia({ segmentos, vehicles, dayStartMs: limaDayStart, nowMs });
-    assert.equal(r.segmentos[0]?.deltaDesdeInicioMin, 60);
-    assert.equal(r.segmentos[0]?.scoreSegmento, 50);
+    // Entrada del plan = puerta (activadoAt +2 min), no el vehículo a +60.
+    assert.equal(r.segmentos[0]?.deltaDesdeInicioMin, 2);
+    assert.equal(r.segmentos[0]?.scoreSegmento, 98);
     assert.equal(r.segmentos[0]?.sinEntrada, false);
     assert.equal(r.cobertura.conEntrada, 1);
     assert.equal(r.cobertura.base, 1);
-    assert.equal(r.puntualidad.pct, 50);
-    assert.equal(r.indiceDisciplina, 75);
+    assert.equal(r.puntualidad.pct, 98);
+    assert.equal(r.indiceDisciplina, 98);
     assert.equal(r.faseJornada, "cierre");
+  });
+
+  it("sin puerta: tardanza del vehículo 20 min → score 80 e índice 80 (1 seg)", () => {
+    const { start, end } = segmentWindowMs("08:00", "10:00", limaDayStart);
+    const segmentos = [seg({ id: "s1", nombre: "Costura", horaInicio: "08:00", horaFin: "10:00" })];
+    const vehicles = [
+      veh({
+        id: "v1",
+        tipoFlota: "tiempo",
+        aperturaAt: start + 20 * 60_000,
+      }),
+    ];
+    const r = computeDisciplinaDia({
+      segmentos,
+      vehicles,
+      dayStartMs: limaDayStart,
+      nowMs: end + 60000,
+    });
+    assert.equal(r.segmentos[0]?.deltaDesdeInicioMin, 20);
+    assert.equal(r.segmentos[0]?.scoreSegmento, 80);
+    assert.equal(r.indiceDisciplina, 80);
+  });
+
+  it("5 segmentos: 1ª +20 min (80) + 2ª puntual → índice 36", () => {
+    const s1 = segmentWindowMs("08:00", "09:00", limaDayStart);
+    const s2 = segmentWindowMs("09:00", "10:00", limaDayStart);
+    const s3 = segmentWindowMs("10:00", "11:00", limaDayStart);
+    const segmentos = [
+      seg({
+        id: "a",
+        nombre: "A",
+        horaInicio: "08:00",
+        horaFin: "09:00",
+        estado: "cerrado_manual",
+        activadoAt: s1.start + 20 * 60_000,
+      }),
+      seg({
+        id: "b",
+        nombre: "B",
+        horaInicio: "09:00",
+        horaFin: "10:00",
+        estado: "activo",
+        activadoAt: s2.start,
+      }),
+      seg({ id: "c", nombre: "C", horaInicio: "11:00", horaFin: "12:00" }),
+      seg({ id: "d", nombre: "D", horaInicio: "13:00", horaFin: "14:00" }),
+      seg({ id: "e", nombre: "E", horaInicio: "15:00", horaFin: "16:00" }),
+    ];
+    const r = computeDisciplinaDia({
+      segmentos,
+      vehicles: [],
+      dayStartMs: limaDayStart,
+      nowMs: s2.start + 5 * 60_000,
+    });
+    assert.equal(r.segmentos[0]?.scoreSegmento, 80);
+    assert.equal(r.segmentos[1]?.scoreSegmento, 100);
+    assert.equal(r.indiceDisciplina, 36);
   });
 
   it("cuenta entrada temporal aunque segmentoOrigen sea otro", () => {
