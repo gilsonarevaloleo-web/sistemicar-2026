@@ -24,6 +24,8 @@ import {
 } from "@/lib/situacionGanancia";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
+import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
@@ -39,6 +41,10 @@ type Props = {
   segmentoHoraFin?: string | null;
   /** Nombre del segmento activo (chip en launcher). */
   segmentoActivoNombre?: string | null;
+  /** Hub de proyectos para dirección (segmento / vehículo / sub). */
+  proyectosHub?: Proyecto[];
+  /** Dirección por defecto del segmento activo. */
+  defaultProyectoId?: string | null;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -84,6 +90,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   disabled = false,
   segmentoHoraFin = null,
   segmentoActivoNombre = null,
+  proyectosHub = [],
+  defaultProyectoId = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +100,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [titulo, setTitulo] = useState("");
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
+  const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
+  const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
   const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
     resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
@@ -164,6 +174,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);
+    setFilasProyectoIds([""]);
+    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
         defaultHoraPlus(30)
@@ -173,12 +185,13 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setHistorialSubs([]);
     setActiveSubSugIdx(null);
     setOpen(false);
-  }, [segmentoHoraFin]);
+  }, [segmentoHoraFin, defaultProyectoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
     // Primera lista = Independiente / Lista libre (como el clásico).
     setModo("rapido");
+    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -187,7 +200,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
-  }, [terminoDetalle, segmentoHoraFin]);
+  }, [terminoDetalle, segmentoHoraFin, defaultProyectoId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setVehiculoProyectoId(prev => prev || defaultProyectoId?.trim() || "");
+  }, [open, defaultProyectoId]);
 
   const canLaunch =
     tipo != null &&
@@ -209,6 +227,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     if (!tipo || saving || !canLaunch) return;
     setSaving(true);
     try {
+      const dirVehiculo = vehiculoProyectoId.trim() || undefined;
       const id = await onLaunch(
         tipo === "tiempo" && modo === "rapido"
           ? {
@@ -216,6 +235,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               tipoFlota: "tiempo",
               modo: "rapido",
               tareasIndependientes: subs,
+              ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
             }
           : tipo === "situacion" && modo === "rapido"
             ? {
@@ -223,7 +243,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 tipoFlota: "situacion",
                 modo: "rapido",
                 situacionFilas: filas,
+                situacionFilasProyectoIds: filasProyectoIds,
                 terminoDetalle,
+                ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
               }
             : {
                 titulo,
@@ -231,9 +253,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 modo,
                 desglosadorSubs: tipo === "tiempo" ? subs : undefined,
                 situacionFilas: tipo === "situacion" ? filas : undefined,
+                situacionFilasProyectoIds:
+                  tipo === "situacion" ? filasProyectoIds : undefined,
                 situacionObjetivoHora:
                   tipo === "situacion" ? situacionHoraFin.trim() : undefined,
                 terminoDetalle: tipo === "situacion" ? terminoDetalle : undefined,
+                ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
               }
       );
       if (id) reset();
@@ -249,6 +274,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     titulo,
     subs,
     filas,
+    filasProyectoIds,
+    vehiculoProyectoId,
     situacionHoraFin,
     terminoDetalle,
     reset,
@@ -521,6 +548,22 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     })}
                   </div>
 
+                  {/* Dirección del vehículo (hereda segmento; se puede cambiar). */}
+                  <SegmentoProyectoSelect
+                    value={vehiculoProyectoId}
+                    onChange={setVehiculoProyectoId}
+                    proyectos={proyectosHub}
+                    compact
+                    label="Dirección del vehículo"
+                    emptyLabel={
+                      defaultProyectoId
+                        ? "Heredar del segmento"
+                        : "Sin dirección"
+                    }
+                    hint="Default = segmento. Cámbialo si esta misión es de otro proyecto."
+                    testId="jornada4-launch-dir-vehiculo"
+                  />
+
                   {/* Nombre de misión: solo desglosador / ring (en independiente el nombre ES la tarea) */}
                   {modo === "desglose" ? (
                   <div>
@@ -763,6 +806,24 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               />
                             </div>
                           </div>
+                          <SegmentoProyectoSelect
+                            value={sub.proyectoId ?? ""}
+                            onChange={id => {
+                              setSubs(prev =>
+                                prev.map((s, i) =>
+                                  i === idx
+                                    ? { ...s, proyectoId: id || undefined }
+                                    : s
+                                )
+                              );
+                            }}
+                            proyectos={proyectosHub}
+                            compact
+                            label="Dirección de esta tarea"
+                            emptyLabel="Heredar del vehículo"
+                            hint="Si es de otro proyecto, cámbiala aquí — evita ruido en peldaños."
+                            testId={`jornada4-launch-indep-dir-${idx}`}
+                          />
                         </div>
                       ))}
                       <button
@@ -801,43 +862,67 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         Tareas
                       </p>
                       {filas.map((fila, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
-                          <span
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
-                            style={{
-                              backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
-                              color: FLOTA_CONFIG.situacion.color,
-                            }}
-                          >
-                            {idx + 1}
-                          </span>
-                          <input
-                            value={fila}
-                            onChange={e => {
-                              const next = [...filas];
-                              next[idx] = e.target.value;
-                              setFilas(next);
-                            }}
-                            placeholder={`Tarea ${idx + 1}`}
-                            className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
-                            autoFocus={idx === 0}
-                            data-testid={`jornada4-launch-libre-fila-${idx}`}
-                          />
-                          {filas.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => setFilas(filas.filter((_, i) => i !== idx))}
-                              className="p-2 rounded-lg hover:bg-white/5"
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex gap-2 items-center">
+                            <span
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                              style={{
+                                backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
+                                color: FLOTA_CONFIG.situacion.color,
+                              }}
                             >
-                              <Trash2 size={14} style={{ color: MUTED }} />
-                            </button>
-                          ) : null}
+                              {idx + 1}
+                            </span>
+                            <input
+                              value={fila}
+                              onChange={e => {
+                                const next = [...filas];
+                                next[idx] = e.target.value;
+                                setFilas(next);
+                              }}
+                              placeholder={`Tarea ${idx + 1}`}
+                              className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
+                              autoFocus={idx === 0}
+                              data-testid={`jornada4-launch-libre-fila-${idx}`}
+                            />
+                            {filas.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilas(filas.filter((_, i) => i !== idx));
+                                  setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/5"
+                              >
+                                <Trash2 size={14} style={{ color: MUTED }} />
+                              </button>
+                            ) : null}
+                          </div>
+                          <SegmentoProyectoSelect
+                            value={filasProyectoIds[idx] ?? ""}
+                            onChange={id => {
+                              setFilasProyectoIds(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = id;
+                                return next;
+                              });
+                            }}
+                            proyectos={proyectosHub}
+                            compact
+                            label="Dirección de esta fila"
+                            emptyLabel="Heredar del vehículo"
+                            testId={`jornada4-launch-libre-dir-${idx}`}
+                          />
                         </div>
                       ))}
                       <button
                         type="button"
-                        onClick={() => setFilas([...filas, ""])}
+                        onClick={() => {
+                          setFilas([...filas, ""]);
+                          setFilasProyectoIds([...filasProyectoIds, ""]);
+                        }}
                         className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
                           backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
@@ -1177,6 +1262,24 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
+                            <SegmentoProyectoSelect
+                              value={sub.proyectoId ?? ""}
+                              onChange={id => {
+                                setSubs(prev =>
+                                  prev.map((s, i) =>
+                                    i === idx
+                                      ? { ...s, proyectoId: id || undefined }
+                                      : s
+                                  )
+                                );
+                              }}
+                              proyectos={proyectosHub}
+                              compact
+                              label="Dirección de esta unidad"
+                              emptyLabel="Heredar del vehículo"
+                              hint="Sub ≠ proyecto del segmento → elige aquí."
+                              testId={`jornada4-launch-sub-dir-${idx}`}
+                            />
                           </div>
                         );
                       })}
@@ -1278,41 +1381,65 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         Filas del ring
                       </p>
                       {filas.map((fila, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
-                          <span
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
-                            style={{
-                              backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
-                              color: FLOTA_CONFIG.situacion.color,
-                            }}
-                          >
-                            {idx + 1}
-                          </span>
-                          <input
-                            value={fila}
-                            onChange={e => {
-                              const next = [...filas];
-                              next[idx] = e.target.value;
-                              setFilas(next);
-                            }}
-                            placeholder={`Fila ${idx + 1}`}
-                            className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
-                          />
-                          {filas.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => setFilas(filas.filter((_, i) => i !== idx))}
-                              className="p-2 rounded-lg hover:bg-white/5"
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex gap-2 items-center">
+                            <span
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                              style={{
+                                backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
+                                color: FLOTA_CONFIG.situacion.color,
+                              }}
                             >
-                              <Trash2 size={14} style={{ color: MUTED }} />
-                            </button>
-                          ) : null}
+                              {idx + 1}
+                            </span>
+                            <input
+                              value={fila}
+                              onChange={e => {
+                                const next = [...filas];
+                                next[idx] = e.target.value;
+                                setFilas(next);
+                              }}
+                              placeholder={`Fila ${idx + 1}`}
+                              className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
+                            />
+                            {filas.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilas(filas.filter((_, i) => i !== idx));
+                                  setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/5"
+                              >
+                                <Trash2 size={14} style={{ color: MUTED }} />
+                              </button>
+                            ) : null}
+                          </div>
+                          <SegmentoProyectoSelect
+                            value={filasProyectoIds[idx] ?? ""}
+                            onChange={id => {
+                              setFilasProyectoIds(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = id;
+                                return next;
+                              });
+                            }}
+                            proyectos={proyectosHub}
+                            compact
+                            label="Dirección de esta fila"
+                            emptyLabel="Heredar del vehículo"
+                            testId={`jornada4-launch-ring-dir-${idx}`}
+                          />
                         </div>
                       ))}
                       <button
                         type="button"
-                        onClick={() => setFilas([...filas, ""])}
+                        onClick={() => {
+                          setFilas([...filas, ""]);
+                          setFilasProyectoIds([...filasProyectoIds, ""]);
+                        }}
                         className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
                           backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,

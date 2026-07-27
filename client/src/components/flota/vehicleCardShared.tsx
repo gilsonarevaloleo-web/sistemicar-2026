@@ -211,6 +211,8 @@ export type DesglosadorSubFormRow = {
   cantidadObjetivo: string;
   tiempoRecordMinPerUnit?: number;
   rutaEnfoqueActiva?: boolean;
+  /** Dirección de proyecto de esta unidad (opcional; hereda vehículo/segmento). */
+  proyectoId?: string;
 };
 
 export function buildDesglosadorSubFromForm(
@@ -222,6 +224,7 @@ export function buildDesglosadorSubFromForm(
   const record = s.tiempoRecordMinPerUnit;
   const rutaEnfoque =
     resolveRutaEnfoqueForSub(cant, record, undefined, { enabled: s.rutaEnfoqueActiva !== false }) ?? undefined;
+  const proyectoId = s.proyectoId?.trim() || undefined;
   return {
     id: `sv_${idSuffix}_${idx}`,
     titulo: s.titulo.trim(),
@@ -232,6 +235,7 @@ export function buildDesglosadorSubFromForm(
     tiempoSugeridoSeg:
       cant && record && cant > 0 ? Math.round(cant * record * 60) : undefined,
     rutaEnfoque,
+    ...(proyectoId ? { proyectoId } : {}),
   };
 }
 
@@ -247,6 +251,7 @@ export function buildDesglosadorSubFromRuntime(
     resolveRutaEnfoqueForSub(cant, record, undefined, { enabled: form.rutaEnfoqueActiva !== false }) ?? undefined;
   const activate = opts?.activate ?? false;
   const now = Date.now();
+  const proyectoId = form.proyectoId?.trim() || undefined;
   return {
     id: `sv_${now}_${existingSubs.length}`,
     titulo: form.titulo.trim(),
@@ -257,6 +262,7 @@ export function buildDesglosadorSubFromRuntime(
     tiempoSugeridoSeg:
       cant && record && cant > 0 ? Math.round(cant * record * 60) : undefined,
     rutaEnfoque,
+    ...(proyectoId ? { proyectoId } : {}),
   };
 }
 

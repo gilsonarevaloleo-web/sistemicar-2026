@@ -12,6 +12,8 @@ export type SituacionLibreSeed = {
 
 export function buildSituacionLibreSeed(opts: {
   filas: string[];
+  /** Dirección por fila (vacío = hereda default). */
+  filasProyectoIds?: Array<string | undefined>;
   now?: number;
   proyectoEnfoqueId?: string;
 }): SituacionLibreSeed | null {
@@ -19,16 +21,21 @@ export function buildSituacionLibreSeed(opts: {
   const filas = opts.filas.map(f => f.trim()).filter(Boolean);
   if (filas.length === 0) return null;
   const proyectoEnfoqueId = opts.proyectoEnfoqueId?.trim() || undefined;
+  const ids = opts.filasProyectoIds ?? [];
 
-  const subTareas: SubTarea[] = filas.map((texto, i) => ({
-    id: `st_j4_libre_${now}_${i}`,
-    texto,
-    completada: false,
-    creadaAt: now,
-    enDesgloseCronometro: false,
-    resultadoSituacion: "pendiente" as const,
-    ...(proyectoEnfoqueId ? { proyectoId: proyectoEnfoqueId } : {}),
-  }));
+  const subTareas: SubTarea[] = filas.map((texto, i) => {
+    const filaId = ids[i]?.trim() || undefined;
+    const proyectoId = filaId || proyectoEnfoqueId;
+    return {
+      id: `st_j4_libre_${now}_${i}`,
+      texto,
+      completada: false,
+      creadaAt: now,
+      enDesgloseCronometro: false,
+      resultadoSituacion: "pendiente" as const,
+      ...(proyectoId ? { proyectoId } : {}),
+    };
+  });
 
   return {
     subTareas,

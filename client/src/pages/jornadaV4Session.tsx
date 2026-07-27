@@ -57,6 +57,7 @@ export default function JornadaV4Session() {
     vehiclesRef: core.vehiclesRef,
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
+    segmentoActivo: planillaApi.segmentoActivo,
   });
 
   // Un gesto desbloquea AudioContext (móvil) para que el timbre de puerta suene.
@@ -232,6 +233,8 @@ export default function JornadaV4Session() {
                 : planillaApi.segmentoActivo.nombre
               : null
           }
+          proyectosHub={proyectosHub}
+          defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? null}
         />
 
         {/* 02 · COBERTURA — urgencia + revisión de huecos */}

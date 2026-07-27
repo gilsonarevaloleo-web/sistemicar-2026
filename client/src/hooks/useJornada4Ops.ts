@@ -6,6 +6,7 @@ import { useCallback, useRef, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
   updateVehicle,
+  type SegmentoV5,
   type Vehicle,
 } from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
@@ -44,6 +45,8 @@ import { isSituacionDesglosador, isConquistaRapido, isSituacionListaLibre } from
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 import type { SubTarea } from "@/lib/persistence";
+import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
+import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
 
 function noteHuecoAfterClose(vehicles: Vehicle[]): void {
   try {
@@ -63,11 +66,15 @@ export type UseJornada4OpsParams = {
   vehiclesRef: MutableRefObject<Vehicle[]>;
   setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void;
   safeAwardPS: (amount: number, source: string) => Promise<boolean>;
+  /** Segmento activo — fallback de dirección para peldaños/pasos. */
+  segmentoActivo?: SegmentoV5 | null;
 };
 
 export function useJornada4Ops(params: UseJornada4OpsParams) {
-  const { userId, vehiclesRef, setVehicles, safeAwardPS } = params;
+  const { userId, vehiclesRef, setVehicles, safeAwardPS, segmentoActivo = null } = params;
   const inFlightRef = useRef(new Set<string>());
+  const segmentoRef = useRef(segmentoActivo);
+  segmentoRef.current = segmentoActivo;
 
   const paintVehicle = useCallback(
     (vehicleId: string, patch: Partial<Vehicle>) => {
@@ -122,6 +129,17 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             }, { skipLocalSync: true });
             if (status === "cumplido") {
               recordDesglosadorSubHistory(vehicle.titulo, patch.closedSub, userId);
+              try {
+                await syncDesglosadorSubToProyectoHub(
+                  userId,
+                  vehicle,
+                  patch.closedSub,
+                  status,
+                  segmentoRef.current
+                );
+              } catch (hubErr) {
+                console.error("[jornada4.closeConquistaSub] hub", hubErr);
+              }
               const awarded = await awardConquistaSubPs(
                 vehicle.titulo,
                 patch.closedSub,
@@ -270,6 +288,34 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               situacionCupoAnchor: patch.situacionCupoAnchor,
               situacionCronometro: patch.situacionCronometro,
             }, { skipLocalSync: true });
+            const closedSub = patch.subTareas.find(s => s.id === subTareaId);
+            if (closedSub) {
+              try {
+                const hub = await syncRingDecisionToProyectoHub(
+                  userId,
+                  vehicle,
+                  closedSub,
+                  status,
+                  Date.now()
+                );
+                if (hub.pasoNumero != null && closedSub.pasoEjecutadoNumero == null) {
+                  const nextSubs = patch.subTareas.map(s =>
+                    s.id === subTareaId
+                      ? { ...s, pasoEjecutadoNumero: hub.pasoNumero! }
+                      : s
+                  );
+                  paintVehicle(vehicleId, { subTareas: nextSubs });
+                  await updateVehicle(
+                    userId,
+                    vehicleId,
+                    { subTareas: nextSubs },
+                    { skipLocalSync: true }
+                  );
+                }
+              } catch (hubErr) {
+                console.error("[jornada4.closeSituacionRow] hub", hubErr);
+              }
+            }
             if (status === "cumplido") {
               const awarded = await awardSituacionFilaPs(
                 patch.closedSubTexto,

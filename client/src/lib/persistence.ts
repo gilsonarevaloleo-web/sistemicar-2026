@@ -546,6 +546,11 @@ export interface SubVehiculo {
   excluirDeHistorial?: boolean;
   /** PS ya sumados a la barra diaria por este sub (evita doble conteo). */
   psOtorgados?: number;
+  /**
+   * Dirección de proyecto de esta unidad (prioridad sobre vehículo/segmento).
+   * Evita ruido en peldaños cuando el sub no pertenece al proyecto del segmento.
+   */
+  proyectoId?: string;
 }
 
 export interface EnergiaOscuraEntry {

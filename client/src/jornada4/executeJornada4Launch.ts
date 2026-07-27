@@ -20,6 +20,8 @@ import { reconcileCoberturaHuecos } from "./coberturaHuecosLog";
 export type Jornada4LaunchForm = FlotaLaunchForm & {
   /** Filas situacionales (lista libre o ring). */
   situacionFilas?: string[];
+  /** Dirección por fila situacional (paralelo a situacionFilas). */
+  situacionFilasProyectoIds?: Array<string | undefined>;
   /** @deprecated Preferir situacionObjetivoHora (HH:mm). */
   situacionMinutosBloque?: number;
   /** Hora de término del ring (HH:mm) — no minutos ciegos. */
@@ -47,6 +49,7 @@ export async function executeJornada4Launch(
   const { form, vehiclesRef, setVehicles, userId, ...rest } = params;
   const {
     situacionFilas,
+    situacionFilasProyectoIds,
     situacionMinutosBloque,
     situacionObjetivoHora,
     tareasIndependientes,
@@ -98,6 +101,11 @@ export async function executeJornada4Launch(
           modo: "rapido",
           cantidadObjetivo: Number.isFinite(cant) && cant > 0 ? cant : undefined,
           tiempoRecordMinPerUnit: task.tiempoRecordMinPerUnit,
+          ...(task.proyectoId?.trim()
+            ? { proyectoId: task.proyectoId.trim() }
+            : baseForm.proyectoId?.trim()
+              ? { proyectoId: baseForm.proyectoId.trim() }
+              : {}),
         },
       });
       if (!id) {
@@ -154,11 +162,13 @@ export async function executeJornada4Launch(
         : 30);
     const launched = vehiclesRef.current.find(v => v.id === id);
     const proyectoEnfoqueId =
+      baseForm.proyectoId?.trim() ||
       launched?.proyectoId?.trim() ||
       rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
       undefined;
     const seed = buildSituacionRingSeed({
       filas: situacionFilas ?? [],
+      filasProyectoIds: situacionFilasProyectoIds,
       minutosBloque,
       now,
       horaFinMs: contratoMs ?? undefined,
@@ -188,11 +198,13 @@ export async function executeJornada4Launch(
   if (baseForm.tipoFlota === "situacion" && modo === "rapido") {
     const launched = vehiclesRef.current.find(v => v.id === id);
     const proyectoEnfoqueId =
+      baseForm.proyectoId?.trim() ||
       launched?.proyectoId?.trim() ||
       rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
       undefined;
     const seed = buildSituacionLibreSeed({
       filas: situacionFilas ?? [],
+      filasProyectoIds: situacionFilasProyectoIds,
       proyectoEnfoqueId,
     });
     if (seed) {

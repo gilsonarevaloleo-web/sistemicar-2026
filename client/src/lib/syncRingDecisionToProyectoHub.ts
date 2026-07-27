@@ -6,6 +6,7 @@ import {
 } from "./proyectos";
 import { enumerateRingDecisions, rawDecisionFromSubTarea, type DecisionStatus } from "./ringDecisionTranscript";
 import { markImanReservaEjecutada } from "./situacionReserva";
+import { resolveDireccionProyecto } from "./resolveDireccionProyecto";
 
 /** Volca una decisión del ring/taller al proyecto y al peldaño vinculado. */
 export async function syncRingDecisionToProyectoHub(
@@ -19,7 +20,10 @@ export async function syncRingDecisionToProyectoHub(
   const [enumerated] = enumerateRingDecisions([raw]);
   if (!enumerated) return { pasoNumero: null };
 
-  const proyectoId = sub.proyectoId?.trim() ?? vehicle.proyectoId?.trim();
+  const proyectoId = resolveDireccionProyecto({
+    subProyectoId: sub.proyectoId,
+    vehicleProyectoId: vehicle.proyectoId,
+  });
   let pasoNumero: number | null = null;
 
   if (proyectoId) {

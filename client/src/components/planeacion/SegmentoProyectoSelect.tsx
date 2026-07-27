@@ -7,9 +7,15 @@ type Props = {
   className?: string;
   testId?: string;
   compact?: boolean;
+  /** Etiqueta del campo (segmento / vehículo / sub). */
+  label?: string;
+  /** Texto de la opción vacía. */
+  emptyLabel?: string;
+  /** Hint opcional bajo el select. */
+  hint?: string;
 };
 
-/** Selector tech-noir: vincular segmento a Proyecto o Centro del Hub. */
+/** Selector tech-noir: vincular segmento / vehículo / sub a Proyecto o Centro del Hub. */
 export function SegmentoProyectoSelect({
   value,
   onChange,
@@ -17,6 +23,9 @@ export function SegmentoProyectoSelect({
   className = "",
   testId = "select-segmento-proyecto",
   compact = false,
+  label = "Proyecto o Centro de Atención",
+  emptyLabel = "Sin vincular",
+  hint,
 }: Props) {
   return (
     <div className={className}>
@@ -27,7 +36,7 @@ export function SegmentoProyectoSelect({
             : "text-[9px] text-gray-500 uppercase tracking-wider mb-1 block"
         }
       >
-        Proyecto o Centro de Atención
+        {label}
       </label>
       <select
         value={value}
@@ -39,18 +48,20 @@ export function SegmentoProyectoSelect({
         }
         data-testid={testId}
       >
-        <option value="">Sin vincular</option>
+        <option value="">{emptyLabel}</option>
         {proyectos.map((p) => (
           <option key={p.id} value={p.id}>
             {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
           </option>
         ))}
       </select>
-      {proyectos.length === 0 && (
+      {hint ? (
+        <p className="text-[8px] text-gray-600 mt-1">{hint}</p>
+      ) : proyectos.length === 0 ? (
         <p className="text-[8px] text-gray-600 mt-1">
           Crea proyectos en el Hub para vincular este bloque.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

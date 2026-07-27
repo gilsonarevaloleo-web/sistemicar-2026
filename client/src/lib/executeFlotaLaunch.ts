@@ -74,6 +74,8 @@ export type DesglosadorSubFormRow = {
   titulo: string;
   cantidadObjetivo: string;
   tiempoRecordMinPerUnit?: number;
+  /** Dirección de proyecto de esta unidad (opcional). */
+  proyectoId?: string;
 };
 
 /** `rapido` = independientes (conquista: unidades sin secuencia; enfoque: lista libre). `desglose` = desglosador/ring. */
@@ -89,6 +91,11 @@ export type FlotaLaunchForm = {
   /** Conquista rápido: unidades de la tarea independiente (el título ES la tarea). */
   cantidadObjetivo?: number;
   tiempoRecordMinPerUnit?: number;
+  /**
+   * Dirección del vehículo (desglosador/misión).
+   * Si se omite, hereda del segmento activo vía resolverProyectoId.
+   */
+  proyectoId?: string;
 };
 
 export type ExecuteFlotaLaunchParams = {
@@ -204,7 +211,11 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       : null;
     const segActualNombre = segResuelto?.nombre ?? segmentoActivo?.nombre ?? undefined;
     const segActualId = segResuelto?.id ?? segmentoActivo?.id;
-    const resolvedProyectoId = resolverProyectoId(null);
+    const resolvedProyectoId = resolverProyectoId(
+      form.proyectoId?.trim()
+        ? { proyectoId: form.proyectoId.trim() }
+        : null
+    );
 
     const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
 
