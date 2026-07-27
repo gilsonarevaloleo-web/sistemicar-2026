@@ -1,29 +1,41 @@
+import { useState } from "react";
 import { Check, Zap, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { FLOTA_CONFIG, NARANJA, PLATA } from "@/components/flota/vehicleCardShared";
+import { FLOTA_CONFIG, NARANJA } from "@/components/flota/vehicleCardShared";
 import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
+const GOLD = "#D4AF37";
 
 type Props = {
   vehicle: Vehicle;
-  onCumplir: () => void;
+  onCumplir: (cantidad?: number) => void;
   onArchivar: () => void;
 };
 
 /**
- * Vehículo rápido — sin desglose ni ring.
- * Cierre directo Cumplir / Archivar (mismo modelo Express clásico).
+ * Conquista rápida — tarea independiente (= título).
+ * Se mide por unidades; no hay secuencia ni subs.
  */
 export function RapidoCard({ vehicle, onCumplir, onArchivar }: Props) {
-  const tipo = vehicle.tipoFlota === "situacion" ? "situacion" : "tiempo";
-  const cfg = FLOTA_CONFIG[tipo];
-  const accent = tipo === "situacion" ? PLATA : NARANJA;
-  const psCumple = vehicleMissionClosePS("cumplido", vehicle.tipoTerminoRapido ?? (tipo === "situacion" ? "situacion" : "hora"));
-  const psArch = vehicleMissionClosePS("archivado", vehicle.tipoTerminoRapido ?? (tipo === "situacion" ? "situacion" : "hora"));
+  const cfg = FLOTA_CONFIG.tiempo;
+  const accent = NARANJA;
+  const objetivo = vehicle.cantidadObjetivo;
+  const hasObj = objetivo != null && objetivo > 0;
+  const [cantidad, setCantidad] = useState(hasObj ? String(objetivo) : "");
+  const psCumple = vehicleMissionClosePS(
+    "cumplido",
+    vehicle.tipoTerminoRapido ?? "hora"
+  );
+  const psArch = vehicleMissionClosePS(
+    "archivado",
+    vehicle.tipoTerminoRapido ?? "hora"
+  );
+  const record =
+    vehicle.tiempoElegido ?? vehicle.recordSugerido ?? vehicle.mejorTiempoPorUnidad;
 
   return (
     <article
@@ -49,12 +61,13 @@ export function RapidoCard({ vehicle, onCumplir, onArchivar }: Props) {
                 className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase"
                 style={{ backgroundColor: "rgba(255,255,255,0.06)", color: MUTED }}
               >
-                Rápido
+                Independiente
               </span>
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              Sin desglose
-              {vehicle.criterioDetalle ? ` · ${vehicle.criterioDetalle}` : ""}
+              Sin secuencia
+              {hasObj ? ` · obj ${objetivo} u` : ""}
+              {record != null && record > 0 ? ` · ${Number(record).toFixed(1)} MIN/U` : ""}
             </p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -65,10 +78,39 @@ export function RapidoCard({ vehicle, onCumplir, onArchivar }: Props) {
           </div>
         </div>
 
+        {hasObj ? (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label
+                className="text-[9px] font-black uppercase tracking-wider block mb-1"
+                style={{ color: MUTED }}
+              >
+                Cantidad hecha
+              </label>
+              <input
+                value={cantidad}
+                onChange={e => setCantidad(e.target.value)}
+                inputMode="numeric"
+                className="w-full p-2.5 rounded-xl bg-black/50 border-2 text-center font-mono font-black text-base focus:outline-none"
+                style={{ color: INK, borderColor: cantidad ? accent : "rgba(255,255,255,0.12)" }}
+                data-testid="j4-rapido-cantidad"
+              />
+            </div>
+            <div className="flex items-end">
+              <p className="text-[9px] leading-snug pb-2" style={{ color: GOLD }}>
+                El nombre de la tarea es la misión — no hay subs ni orden.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={onCumplir}
+            onClick={() => {
+              const n = Number(cantidad);
+              onCumplir(Number.isFinite(n) && n > 0 ? n : undefined);
+            }}
             className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation flex items-center justify-center gap-1.5"
             style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
             data-testid="j4-rapido-cumplir"

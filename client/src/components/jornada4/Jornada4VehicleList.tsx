@@ -3,11 +3,13 @@ import { ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import {
   isConquistaDesglosador,
+  isConquistaRapido,
   isSituacionDesglosador,
-  isVehiculoRapido,
+  isSituacionListaLibre,
 } from "@/jornada4/filters";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
+import { SituacionLibreCard } from "./SituacionLibreCard";
 import { RapidoCard } from "./RapidoCard";
 import { J4_COLORS } from "./Jornada4Shell";
 
@@ -29,8 +31,16 @@ type Ops = {
   closeSituacionBlock: (vehicleId: string) => Promise<void>;
   closeRapidoVehicle: (
     vehicleId: string,
-    status: "cumplido" | "archivado"
+    status: "cumplido" | "archivado",
+    cantidad?: number
   ) => Promise<void>;
+  closeSituacionLibreFila: (
+    vehicleId: string,
+    subTareaId: string,
+    status: "cumplido" | "fallado"
+  ) => Promise<void>;
+  closeSituacionLibreBloque: (vehicleId: string) => Promise<void>;
+  addSituacionLibreFila: (vehicleId: string, texto: string) => Promise<void>;
   addConquistaSub: (
     vehicleId: string,
     form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
@@ -62,8 +72,8 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
           Sin vehículos activos
         </p>
         <p className="text-[9px]" style={{ color: MUTED }}>
-          Lanza uno desde <strong style={{ color: INK }}>La Flota</strong> arriba —
-          Conquista o Enfoque.
+          Lanza desde <strong style={{ color: INK }}>La Flota</strong> —
+          independientes, desglosador o ring.
         </p>
       </div>
     );
@@ -108,16 +118,16 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
             {vehicles.map(v => {
               if (isConquistaDesglosador(v)) {
                 return (
-                <ConquistaCard
-                  key={v.id}
-                  vehicle={v}
-                  onCumplido={cantidad =>
-                    void ops.closeConquistaSub(v.id, "cumplido", cantidad)
-                  }
-                  onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
-                  onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
-                  onAddSub={form => void ops.addConquistaSub(v.id, form)}
-                />
+                  <ConquistaCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={cantidad =>
+                      void ops.closeConquistaSub(v.id, "cumplido", cantidad)
+                    }
+                    onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
+                    onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+                    onAddSub={form => void ops.addConquistaSub(v.id, form)}
+                  />
                 );
               }
               if (isSituacionDesglosador(v)) {
@@ -133,12 +143,24 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                   />
                 );
               }
-              if (isVehiculoRapido(v)) {
+              if (isSituacionListaLibre(v)) {
+                return (
+                  <SituacionLibreCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={id => void ops.closeSituacionLibreFila(v.id, id, "cumplido")}
+                    onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
+                    onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
+                    onAddFila={texto => void ops.addSituacionLibreFila(v.id, texto)}
+                  />
+                );
+              }
+              if (isConquistaRapido(v)) {
                 return (
                   <RapidoCard
                     key={v.id}
                     vehicle={v}
-                    onCumplir={() => void ops.closeRapidoVehicle(v.id, "cumplido")}
+                    onCumplir={cant => void ops.closeRapidoVehicle(v.id, "cumplido", cant)}
                     onArchivar={() => void ops.closeRapidoVehicle(v.id, "archivado")}
                   />
                 );
@@ -146,7 +168,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · rápido o desglose · sin anillo · sin voz
+              Independiente · desglosador · lista libre · ring
             </p>
           </div>
         ) : null}

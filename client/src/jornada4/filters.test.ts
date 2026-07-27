@@ -3,8 +3,9 @@ import { describe, it } from "node:test";
 import {
   filterJornada4Vehicles,
   isJornada4Vehicle,
-  isVehiculoRapido,
+  isConquistaRapido,
   isSituacionDesglosador,
+  isSituacionListaLibre,
 } from "./filters.ts";
 import type { Vehicle } from "../lib/persistence.ts";
 
@@ -18,7 +19,7 @@ function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
 }
 
 describe("jornada4 filters", () => {
-  it("acepta conquista desglosador, situacion ring, y rápidos", () => {
+  it("acepta desglosador, ring, independientes y lista libre", () => {
     const list = [
       v({ id: "1", tipoFlota: "tiempo", tipoReloj: "desglosador" }),
       v({
@@ -30,8 +31,25 @@ describe("jornada4 filters", () => {
       v({ id: "4", tipoFlota: "descanso" }),
       v({ id: "5", tipoFlota: "verdad" }),
       v({ id: "6", tipoFlota: "situacion", status: "cumplido" }),
-      v({ id: "7", tipoFlota: "tiempo", tipoTerminoRapido: "hora" }),
-      v({ id: "8", tipoFlota: "situacion" }),
+      v({
+        id: "7",
+        tipoFlota: "tiempo",
+        tipoReloj: "produccion",
+        cantidadObjetivo: 5,
+      }),
+      v({
+        id: "8",
+        tipoFlota: "situacion",
+        subTareas: [
+          {
+            id: "a",
+            texto: "Fila",
+            completada: false,
+            creadaAt: 1,
+            enDesgloseCronometro: false,
+          },
+        ],
+      }),
     ];
     const dual = filterJornada4Vehicles(list);
     assert.deepEqual(
@@ -40,8 +58,8 @@ describe("jornada4 filters", () => {
     );
     assert.equal(isJornada4Vehicle(list[0]), true);
     assert.equal(isJornada4Vehicle(list[3]), false);
-    assert.equal(isVehiculoRapido(list[6]!), true);
-    assert.equal(isVehiculoRapido(list[7]!), true);
+    assert.equal(isConquistaRapido(list[6]!), true);
+    assert.equal(isSituacionListaLibre(list[7]!), true);
     assert.equal(isSituacionDesglosador(list[1]!), true);
     assert.equal(isSituacionDesglosador(list[7]!), false);
   });

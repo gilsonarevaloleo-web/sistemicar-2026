@@ -40,9 +40,10 @@ import {
   resolveCronometroCupoAnchor,
   totalBudgetMinFromCronometro,
 } from "@/lib/situacionCupoDistrib";
-import { isSituacionDesglosador, isVehiculoRapido } from "@/jornada4/filters";
+import { isSituacionDesglosador, isConquistaRapido, isSituacionListaLibre } from "@/jornada4/filters";
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
+import type { SubTarea } from "@/lib/persistence";
 
 function noteHuecoAfterClose(vehicles: Vehicle[]): void {
   try {
@@ -473,36 +474,39 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const closeRapidoVehicle = useCallback(
-    async (vehicleId: string, status: "cumplido" | "archivado") => {
+    async (
+      vehicleId: string,
+      status: "cumplido" | "archivado",
+      cantidad?: number
+    ) => {
       if (!userId) return;
       const key = `r:${vehicleId}`;
       if (inFlightRef.current.has(key)) return;
       inFlightRef.current.add(key);
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle || !isVehiculoRapido(vehicle)) return;
+        if (!vehicle || !isConquistaRapido(vehicle)) return;
         const cierreAt = Date.now();
-        paintVehicle(vehicleId, { status, cierreAt });
+        const patch: Partial<Vehicle> = { status, cierreAt };
+        if (cantidad != null && Number.isFinite(cantidad) && cantidad > 0) {
+          patch.resultadoPorUnidad = cantidad;
+          const apertura = vehicle.aperturaAt ?? cierreAt;
+          const durMin = Math.max(0, (cierreAt - apertura) / 60_000);
+          if (durMin > 0) {
+            patch.duracionFinal = durMin;
+            patch.mejorTiempoPorUnidad = durMin / cantidad;
+          }
+        }
+        paintVehicle(vehicleId, patch);
         await yieldAfterPaint();
 
         void runShadowTaskAsync(async () => {
           scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
-            await updateVehicle(
-              userId,
-              vehicleId,
-              { status, cierreAt },
-              { skipLocalSync: true }
-            );
-            const termino =
-              vehicle.tipoTerminoRapido ??
-              (vehicle.tipoFlota === "situacion" ? "situacion" : "hora");
-            const amount = vehicleMissionClosePS(status, termino);
+            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+            const amount = vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "hora");
             if (amount > 0) {
-              await safeAwardPS(
-                amount,
-                `J4 rápido · ${status} · ${vehicle.titulo}`
-              );
+              await safeAwardPS(amount, `J4 rápido · ${status} · ${vehicle.titulo}`);
             }
             noteHuecoAfterClose(vehiclesRef.current);
             toast.success(
@@ -529,6 +533,148 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       }
     },
     [userId, vehiclesRef, paintVehicle, safeAwardPS]
+  );
+
+  const closeSituacionLibreFila = useCallback(
+    async (vehicleId: string, subTareaId: string, status: "cumplido" | "fallado") => {
+      if (!userId) return;
+      const key = `sl:${vehicleId}:${subTareaId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || !isSituacionListaLibre(vehicle) || !vehicle.subTareas) return;
+        const subTareas = vehicle.subTareas.map(st =>
+          st.id === subTareaId
+            ? {
+                ...st,
+                completada: status === "cumplido",
+                resultadoSituacion: status,
+              }
+            : st
+        );
+        paintVehicle(vehicleId, { subTareas });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(userId, vehicleId, { subTareas }, { skipLocalSync: true });
+            if (status === "cumplido") {
+              const awarded = await awardSituacionFilaPs(
+                subTareas.find(s => s.id === subTareaId)?.texto ?? "fila",
+                safeAwardPS
+              );
+              toast.success(awarded > 0 ? `+${awarded} PS · fila` : "Fila cumplida", {
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
+                },
+                duration: 2000,
+              });
+            }
+          } catch (e) {
+            console.error("[jornada4.closeSituacionLibreFila]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+  );
+
+  const closeSituacionLibreBloque = useCallback(
+    async (vehicleId: string) => {
+      if (!userId) return;
+      const key = `slb:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || !isSituacionListaLibre(vehicle)) return;
+        const cierreAt = Date.now();
+        const anyOk = (vehicle.subTareas ?? []).some(
+          s =>
+            s.resultadoSituacion === "cumplido" ||
+            (s.completada && s.resultadoSituacion !== "fallado")
+        );
+        const status = anyOk ? ("cumplido" as const) : ("archivado" as const);
+        paintVehicle(vehicleId, { status, cierreAt });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              { status, cierreAt },
+              { skipLocalSync: true }
+            );
+            noteHuecoAfterClose(vehiclesRef.current);
+            const awarded = await awardSituacionBlockPs(
+              vehicle.titulo,
+              status,
+              safeAwardPS
+            );
+            toast.success(
+              awarded > 0 ? `Lista cerrada · +${awarded} PS` : "Lista cerrada",
+              {
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${EMERALD}`,
+                  color: EMERALD,
+                },
+                duration: 2400,
+              }
+            );
+          } catch (e) {
+            console.error("[jornada4.closeSituacionLibreBloque]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+  );
+
+  const addSituacionLibreFila = useCallback(
+    async (vehicleId: string, texto: string) => {
+      if (!userId) return;
+      const trimmed = texto.trim();
+      if (!trimmed) return;
+      const key = `sla:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || !isSituacionListaLibre(vehicle)) return;
+        const now = Date.now();
+        const row: SubTarea = {
+          id: `st_j4_libre_${now}`,
+          texto: trimmed,
+          completada: false,
+          creadaAt: now,
+          enDesgloseCronometro: false,
+          resultadoSituacion: "pendiente",
+        };
+        const subTareas = [...(vehicle.subTareas ?? []), row];
+        paintVehicle(vehicleId, { subTareas });
+        await yieldAfterPaint();
+        void runShadowTaskAsync(async () => {
+          scheduleSaveLocalVehicles(vehiclesRef.current);
+          try {
+            await updateVehicle(userId, vehicleId, { subTareas }, { skipLocalSync: true });
+          } catch (e) {
+            console.error("[jornada4.addSituacionLibreFila]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
   );
 
   const setSituacionCupo = useCallback(
@@ -591,6 +737,9 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     closeSituacionRow,
     closeSituacionBlock,
     closeRapidoVehicle,
+    closeSituacionLibreFila,
+    closeSituacionLibreBloque,
+    addSituacionLibreFila,
     addConquistaSub,
     addSituacionFila,
     setSituacionCupo,

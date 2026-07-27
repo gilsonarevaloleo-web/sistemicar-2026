@@ -158,6 +158,7 @@ export default function JornadaV4Session() {
     closeConquistaCycle: wrapClose(ops.closeConquistaCycle),
     closeSituacionBlock: wrapClose(ops.closeSituacionBlock),
     closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
+    closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
   };
 
   const statusLine = planillaApi.segmentoActivo

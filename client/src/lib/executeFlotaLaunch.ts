@@ -76,7 +76,7 @@ export type DesglosadorSubFormRow = {
   tiempoRecordMinPerUnit?: number;
 };
 
-/** `rapido` = sin desglose (1 misión, sin forzar subs/filas). `desglose` = desglosador/ring. */
+/** `rapido` = independientes (conquista: unidades sin secuencia; enfoque: lista libre). `desglose` = desglosador/ring. */
 export type FlotaLaunchModo = "rapido" | "desglose";
 
 export type FlotaLaunchForm = {
@@ -86,6 +86,9 @@ export type FlotaLaunchForm = {
   /** Default: desglose si hay subs; si se pasa explícito, manda. */
   modo?: FlotaLaunchModo;
   desglosadorSubs?: DesglosadorSubFormRow[];
+  /** Conquista rápido: unidades de la tarea independiente (el título ES la tarea). */
+  cantidadObjetivo?: number;
+  tiempoRecordMinPerUnit?: number;
 };
 
 export type ExecuteFlotaLaunchParams = {
@@ -162,8 +165,13 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     const desglosadorSubs = (form.desglosadorSubs ?? []).filter(s => s.titulo.trim());
     const modo: FlotaLaunchModo = form.modo ?? "desglose";
     const esDesglose = modo === "desglose";
+    // Conquista rápido = producción por unidades (tarea = título, sin secuencia).
     const relojTiempo =
-      tipoFlota === "tiempo" && esDesglose ? ("desglosador" as const) : undefined;
+      tipoFlota === "tiempo"
+        ? esDesglose
+          ? ("desglosador" as const)
+          : ("produccion" as const)
+        : undefined;
 
     if (tipoFlota === "tiempo") {
       criterio = "tiempo";
@@ -178,6 +186,14 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     if (tipoFlota === "tiempo" && esDesglose && desglosadorSubs.length === 0) {
       toast.error("Añade al menos un sub al desglosador");
       return null;
+    }
+
+    if (tipoFlota === "tiempo" && !esDesglose) {
+      const cant = form.cantidadObjetivo;
+      if (!(cant != null && Number.isFinite(cant) && cant > 0)) {
+        toast.error("Indica las unidades de la tarea rápida");
+        return null;
+      }
     }
 
     const bonoTemple = isNearDescanso(planilla);
@@ -207,6 +223,17 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
         relojTiempo === "desglosador"
           ? desglosadorSubs.map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
           : undefined,
+      ...(relojTiempo === "produccion" && form.cantidadObjetivo != null
+        ? {
+            cantidadObjetivo: form.cantidadObjetivo,
+            ...(form.tiempoRecordMinPerUnit != null && form.tiempoRecordMinPerUnit > 0
+              ? {
+                  recordSugerido: form.tiempoRecordMinPerUnit,
+                  tiempoElegido: form.tiempoRecordMinPerUnit,
+                }
+              : {}),
+          }
+        : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,

@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 import {
   executeFlotaLaunch,
+  type DesglosadorSubFormRow,
   type ExecuteFlotaLaunchParams,
   type FlotaLaunchForm,
 } from "@/lib/executeFlotaLaunch";
@@ -12,16 +13,22 @@ import {
   situacionObjetivoHoraToContratoMs,
 } from "@/lib/situacionGanancia";
 import { buildSituacionRingSeed } from "./situacionLaunchSeed";
+import { buildSituacionLibreSeed } from "./situacionLibreSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
 import { reconcileCoberturaHuecos } from "./coberturaHuecosLog";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
-  /** Filas del ring (solo situacional Dual Kernel en modo desglose). */
+  /** Filas situacionales (lista libre o ring). */
   situacionFilas?: string[];
   /** @deprecated Preferir situacionObjetivoHora (HH:mm). */
   situacionMinutosBloque?: number;
   /** Hora de término del ring (HH:mm) — no minutos ciegos. */
   situacionObjetivoHora?: string;
+  /**
+   * Conquista rápido: varias tareas independientes (cada una = su propio vehículo).
+   * Si hay más de una, se lanzan en serie (respetando tope de slots).
+   */
+  tareasIndependientes?: DesglosadorSubFormRow[];
 };
 
 export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form"> & {
@@ -29,8 +36,10 @@ export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form">
 };
 
 /**
- * Lanza Conquista/Situacional en modo rápido (sin desglose) o desglose (subs/ring).
- * Situacional desglose: si hay filas, abre el cronómetro al instante (sin V3).
+ * Lanza Conquista/Situacional en modo rápido o desglose.
+ * - Conquista rápido: tarea = título + unidades (sin secuencia).
+ * - Situacional libre: filas sin ring/meta.
+ * - Situacional ring: filas + meta sellada.
  */
 export async function executeJornada4Launch(
   params: ExecuteJornada4LaunchParams
@@ -40,29 +49,99 @@ export async function executeJornada4Launch(
     situacionFilas,
     situacionMinutosBloque,
     situacionObjetivoHora,
+    tareasIndependientes,
     ...baseForm
   } = form;
+
+  const modo = baseForm.modo ?? "desglose";
+
+  // Conquista rápido: N tareas independientes → N vehículos (o 1 si viene titulo+cantidad).
+  if (baseForm.tipoFlota === "tiempo" && modo === "rapido") {
+    const tasks = (tareasIndependientes ?? [])
+      .map(t => ({
+        ...t,
+        titulo: t.titulo.trim(),
+        cantidadObjetivo: t.cantidadObjetivo.trim(),
+      }))
+      .filter(t => t.titulo.length > 0);
+
+    const toLaunch =
+      tasks.length > 0
+        ? tasks
+        : baseForm.titulo.trim()
+          ? [
+              {
+                tempId: "single",
+                titulo: baseForm.titulo.trim(),
+                cantidadObjetivo:
+                  baseForm.cantidadObjetivo != null
+                    ? String(baseForm.cantidadObjetivo)
+                    : "",
+                tiempoRecordMinPerUnit: baseForm.tiempoRecordMinPerUnit,
+              },
+            ]
+          : [];
+
+    if (toLaunch.length === 0) return null;
+
+    let lastId: string | null = null;
+    for (const task of toLaunch) {
+      const cant = Number(task.cantidadObjetivo);
+      const id = await executeFlotaLaunch({
+        ...rest,
+        userId,
+        vehiclesRef,
+        setVehicles,
+        form: {
+          titulo: task.titulo,
+          tipoFlota: "tiempo",
+          modo: "rapido",
+          cantidadObjetivo: Number.isFinite(cant) && cant > 0 ? cant : undefined,
+          tiempoRecordMinPerUnit: task.tiempoRecordMinPerUnit,
+        },
+      });
+      if (!id) {
+        // Slot lleno u error — devolver lo ya lanzado.
+        break;
+      }
+      lastId = id;
+      try {
+        reconcileCoberturaHuecos({
+          vehicles: vehiclesRef.current,
+          coverTitulo: task.titulo,
+        });
+      } catch {
+        /* non-fatal */
+      }
+    }
+    return lastId;
+  }
+
+  const situacionTitulo =
+    baseForm.tipoFlota === "situacion" && modo === "rapido"
+      ? baseForm.titulo.trim() ||
+        (situacionFilas ?? []).map(f => f.trim()).find(Boolean) ||
+        "Lista libre"
+      : baseForm.titulo;
 
   const id = await executeFlotaLaunch({
     ...rest,
     userId,
     vehiclesRef,
     setVehicles,
-    form: baseForm,
+    form: { ...baseForm, titulo: situacionTitulo },
   });
   if (!id) return null;
 
-  // Historial de huecos: transición barata post-paint (no computeLiveEntropy).
   try {
     reconcileCoberturaHuecos({
       vehicles: vehiclesRef.current,
-      coverTitulo: baseForm.titulo.trim(),
+      coverTitulo: situacionTitulo.trim(),
     });
   } catch {
     /* non-fatal */
   }
 
-  const modo = baseForm.modo ?? "desglose";
   if (baseForm.tipoFlota === "situacion" && modo === "desglose") {
     const now = Date.now();
     const hora = situacionObjetivoHora?.trim();
@@ -100,7 +179,38 @@ export async function executeJornada4Launch(
             { skipLocalSync: true }
           );
         } catch (e) {
-          console.error("[executeJornada4Launch] seed situacion", e);
+          console.error("[executeJornada4Launch] seed situacion ring", e);
+        }
+      });
+    }
+  }
+
+  if (baseForm.tipoFlota === "situacion" && modo === "rapido") {
+    const launched = vehiclesRef.current.find(v => v.id === id);
+    const proyectoEnfoqueId =
+      launched?.proyectoId?.trim() ||
+      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
+      undefined;
+    const seed = buildSituacionLibreSeed({
+      filas: situacionFilas ?? [],
+      proyectoEnfoqueId,
+    });
+    if (seed) {
+      paintSituacionLibre(id, seed.subTareas, vehiclesRef, setVehicles);
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            id,
+            {
+              subTareas: seed.subTareas,
+              situacionCronometro: null,
+              situacionCupoAnchor: null,
+            },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[executeJornada4Launch] seed situacion libre", e);
         }
       });
     }
@@ -123,6 +233,29 @@ function paintSituacionSeed(
             subTareas: seed.subTareas,
             situacionCronometro: seed.situacionCronometro,
             situacionCupoAnchor: seed.situacionCupoAnchor,
+          }
+        : v
+    );
+  vehiclesRef.current = map(vehiclesRef.current);
+  setVehicles(map);
+  scheduleSaveLocalVehicles(vehiclesRef.current);
+  burstJornada4Tick();
+}
+
+function paintSituacionLibre(
+  vehicleId: string,
+  subTareas: NonNullable<Vehicle["subTareas"]>,
+  vehiclesRef: MutableRefObject<Vehicle[]>,
+  setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void
+): void {
+  const map = (list: Vehicle[]) =>
+    list.map(v =>
+      v.id === vehicleId
+        ? {
+            ...v,
+            subTareas,
+            situacionCronometro: undefined,
+            situacionCupoAnchor: undefined,
           }
         : v
     );
