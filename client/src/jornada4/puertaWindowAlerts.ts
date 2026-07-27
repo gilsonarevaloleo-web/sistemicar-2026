@@ -1,9 +1,14 @@
 /**
  * Alertas de ventana de puerta Dual Kernel — sin voz ni speechQueue.
- * Sustituye el recordatorio TTS clásico por toast + Notification + pulso UI.
+ * Anti-miopía: ordinal/total del día («3ª puerta de 8») en texto + Notification.
+ * Timbre: Web Audio one-shot (puertaChime) — no TTS.
  */
 import type { SegmentoV5 } from "@/lib/persistence";
-import { isWithinPuertaWindow } from "@/lib/segmentAttentionEngine";
+import {
+  isWithinPuertaWindow,
+  segmentOrdinalIndex,
+} from "@/lib/segmentAttentionEngine";
+import { buildPuertaEscalamientoLabel } from "@/lib/puertaAtencionVoice";
 import {
   getJournalDateString,
   getSegmentCalendarDayStartMs,
@@ -17,6 +22,10 @@ export type PuertaWindowAlert = {
   segId: string;
   nombre: string;
   horaRef: string;
+  ordinal: number;
+  total: number;
+  /** «tercera puerta de 8 del día» — conciencia del mapa diario. */
+  escalamiento: string;
   title: string;
   body: string;
   key: string;
@@ -67,7 +76,47 @@ export function collectOpenPuertaWindows(
   return { abrirIds, cerrarIds };
 }
 
-/** Nuevas alertas a disparar (dedup incluido). */
+function buildAlertForSeg(
+  seg: SegmentoV5,
+  kind: PuertaAlertKind,
+  segmentos: SegmentoV5[],
+  day: string
+): PuertaWindowAlert {
+  const total = Math.max(1, segmentos.length);
+  const ordinal = segmentOrdinalIndex(segmentos, seg.id);
+  const escalamiento = buildPuertaEscalamientoLabel(ordinal, total);
+  const horaRef = kind === "abrir" ? seg.horaInicio : seg.horaFin;
+  const key = `j4-${kind}:${day}:${seg.id}`;
+
+  if (kind === "abrir") {
+    return {
+      kind,
+      segId: seg.id,
+      nombre: seg.nombre,
+      horaRef,
+      ordinal,
+      total,
+      escalamiento,
+      title: `${escalamiento}`,
+      body: `${seg.nombre} · ventana ±5 min de ${seg.horaInicio}. Toca Abrir puerta.`,
+      key,
+    };
+  }
+  return {
+    kind,
+    segId: seg.id,
+    nombre: seg.nombre,
+    horaRef,
+    ordinal,
+    total,
+    escalamiento,
+    title: `${escalamiento} · cierra`,
+    body: `${seg.nombre} · ventana ±5 min de ${seg.horaFin}. Toca Cerrar puerta (+2 PS).`,
+    key,
+  };
+}
+
+/** Nuevas alertas a disparar (dedup incluido). Incluye escalamiento anti-miopía. */
 export function collectNewPuertaAlerts(
   segmentos: SegmentoV5[],
   nowMs = Date.now()
@@ -78,30 +127,14 @@ export function collectNewPuertaAlerts(
 
   for (const seg of segmentos) {
     if (abrirIds.has(seg.id)) {
-      const key = `j4-abrir:${day}:${seg.id}`;
-      if (!shouldDeliverPuertaAlertOnce(key, nowMs)) continue;
-      out.push({
-        kind: "abrir",
-        segId: seg.id,
-        nombre: seg.nombre,
-        horaRef: seg.horaInicio,
-        title: "Abre la puerta de atención",
-        body: `${seg.nombre} · ventana ±5 min de ${seg.horaInicio}. Toca Abrir puerta.`,
-        key,
-      });
+      const draft = buildAlertForSeg(seg, "abrir", segmentos, day);
+      if (!shouldDeliverPuertaAlertOnce(draft.key, nowMs)) continue;
+      out.push(draft);
     }
     if (cerrarIds.has(seg.id)) {
-      const key = `j4-cerrar:${day}:${seg.id}`;
-      if (!shouldDeliverPuertaAlertOnce(key, nowMs)) continue;
-      out.push({
-        kind: "cerrar",
-        segId: seg.id,
-        nombre: seg.nombre,
-        horaRef: seg.horaFin,
-        title: "Cierra el segmento con intención",
-        body: `${seg.nombre} · ventana ±5 min de ${seg.horaFin}. Toca Cerrar puerta (+2 PS).`,
-        key,
-      });
+      const draft = buildAlertForSeg(seg, "cerrar", segmentos, day);
+      if (!shouldDeliverPuertaAlertOnce(draft.key, nowMs)) continue;
+      out.push(draft);
     }
   }
   return out;

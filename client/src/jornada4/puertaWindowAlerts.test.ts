@@ -58,4 +58,39 @@ describe("puertaWindowAlerts", () => {
     assert.equal(alerts[0]!.kind, "abrir");
     assert.equal(collectNewPuertaAlerts(segments, now).length, 0);
   });
+
+  it("incluye escalamiento anti-miopía (ordinal/total del día)", () => {
+    resetPuertaAlertDedup();
+    const now = Date.now();
+    const hora = limaHHmm(now);
+    const segments = [
+      seg({
+        id: "a",
+        nombre: "Mañana",
+        horaInicio: "06:00",
+        horaFin: "08:00",
+        estado: "cerrado_manual",
+      }),
+      seg({
+        id: "b",
+        nombre: "Bloque vivo",
+        horaInicio: hora,
+        horaFin: "23:59",
+        estado: "pendiente",
+      }),
+      seg({
+        id: "c",
+        nombre: "Tarde",
+        horaInicio: "18:00",
+        horaFin: "20:00",
+        estado: "pendiente",
+      }),
+    ];
+    const alerts = collectNewPuertaAlerts(segments, now);
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0]!.ordinal, 2);
+    assert.equal(alerts[0]!.total, 3);
+    assert.match(alerts[0]!.escalamiento, /segunda puerta de 3 del día/);
+    assert.match(alerts[0]!.title, /segunda puerta de 3 del día/);
+  });
 });

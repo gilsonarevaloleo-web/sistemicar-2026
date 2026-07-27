@@ -16,7 +16,12 @@ import {
   getSegmentCalendarDayStartMs,
   isWithinSegmentTimeMargin,
 } from "@/lib/segmentTime";
-import { isWithinPuertaWindow } from "@/lib/segmentAttentionEngine";
+import {
+  isWithinPuertaWindow,
+  segmentOrdinalIndex,
+} from "@/lib/segmentAttentionEngine";
+import { buildPuertaEscalamientoLabel } from "@/lib/puertaAtencionVoice";
+import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import {
   J4_SEGMENT_COLORS,
@@ -106,6 +111,25 @@ export function Jornada4SegmentosPanel({
     return Date.now();
   }, [tick]);
   const dayStart = useMemo(() => getSegmentCalendarDayStartMs(nowMs), [nowMs]);
+
+  /** Segmento en ventana de alerta (para banner anti-miopía). */
+  const puertaFoco = useMemo(() => {
+    const abrirId = ventanaAbrirIds ? [...ventanaAbrirIds][0] : undefined;
+    const cerrarId = ventanaCerrarIds ? [...ventanaCerrarIds][0] : undefined;
+    const id = abrirId ?? cerrarId;
+    if (!id) return null;
+    const seg = segmentos.find(s => s.id === id);
+    if (!seg) return null;
+    const ordinal = segmentOrdinalIndex(segmentos, seg.id);
+    const total = Math.max(1, segmentos.length);
+    return {
+      seg,
+      kind: abrirId ? ("abrir" as const) : ("cerrar" as const),
+      escalamiento: buildPuertaEscalamientoLabel(ordinal, total),
+      ordinal,
+      total,
+    };
+  }, [ventanaAbrirIds, ventanaCerrarIds, segmentos]);
 
   const resetForm = () => {
     setNombre("");
@@ -242,7 +266,73 @@ export function Jornada4SegmentosPanel({
               </button>
             </div>
 
-            {(ventanaAbrirIds?.size ?? 0) > 0 || (ventanaCerrarIds?.size ?? 0) > 0 ? (
+            {/* Mapa del día — anti-miopía sin voz: ves las N puertas de un golpe. */}
+            {segmentos.length > 0 ? (
+              <div
+                className="rounded-xl border px-3 py-2.5 space-y-2"
+                style={{
+                  borderColor: "rgba(255,255,255,0.08)",
+                  backgroundColor: "rgba(0,0,0,0.25)",
+                }}
+                data-testid="jornada4-mapa-dia"
+              >
+                <p
+                  className="text-[9px] font-black uppercase tracking-wider"
+                  style={{ color: GOLD }}
+                >
+                  Mapa del día · {count} puerta{count === 1 ? "" : "s"}
+                </p>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {segmentos.map((seg, idx) => {
+                    const n = idx + 1;
+                    const isAct = seg.estado === "activo";
+                    const isDone =
+                      seg.estado === "cerrado_manual" || seg.estado === "entropia";
+                    const inWin =
+                      ventanaAbrirIds?.has(seg.id) || ventanaCerrarIds?.has(seg.id);
+                    return (
+                      <div
+                        key={seg.id}
+                        className="shrink-0 min-w-[2.75rem] rounded-lg border px-1.5 py-1.5 text-center"
+                        style={{
+                          borderColor: inWin
+                            ? "rgba(0,200,81,0.55)"
+                            : isAct
+                              ? "rgba(0,200,81,0.35)"
+                              : "rgba(255,255,255,0.1)",
+                          backgroundColor: inWin
+                            ? "rgba(0,200,81,0.12)"
+                            : isAct
+                              ? "rgba(0,200,81,0.06)"
+                              : "rgba(255,255,255,0.03)",
+                          opacity: isDone ? 0.45 : 1,
+                        }}
+                        title={`${n}/${count} · ${seg.nombre}`}
+                        data-testid={`jornada4-mapa-chip-${seg.id}`}
+                      >
+                        <p
+                          className="text-[11px] font-black tabular-nums"
+                          style={{ color: inWin || isAct ? EMERALD : INK }}
+                        >
+                          {n}
+                        </p>
+                        <p
+                          className="text-[7px] font-mono truncate max-w-[3.5rem]"
+                          style={{ color: MUTED }}
+                        >
+                          {seg.horaInicio}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                  Conciencia del día completo — sin miopía de un solo bloque.
+                </p>
+              </div>
+            ) : null}
+
+            {puertaFoco ? (
               <div
                 className="rounded-xl border px-3 py-2.5 space-y-1"
                 style={{
@@ -253,14 +343,23 @@ export function Jornada4SegmentosPanel({
                 }}
                 data-testid="jornada4-puerta-banner"
               >
-                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: EMERALD }}>
-                  {(ventanaAbrirIds?.size ?? 0) > 0
-                    ? "Ventana ±5 min · abre la puerta"
-                    : "Ventana ±5 min · cierra con intención"}
+                <p
+                  className="text-[11px] font-black tracking-wide capitalize"
+                  style={{ color: EMERALD }}
+                >
+                  {puertaFoco.escalamiento}
                 </p>
-                <p className="text-[9px]" style={{ color: MUTED }}>
-                  Sin voz en Dual Kernel — toast + pulso en la tarjeta
-                  {notifPermission === "granted" ? " + notificación" : ""}.
+                <p className="text-[10px] font-semibold" style={{ color: INK }}>
+                  {puertaFoco.seg.nombre}
+                  {" · "}
+                  {puertaFoco.kind === "abrir"
+                    ? "abre la puerta ahora"
+                    : "cierra con intención"}
+                </p>
+                <p className="text-[8px]" style={{ color: MUTED }}>
+                  Timbre + toast
+                  {notifPermission === "granted" ? " + notificación" : ""} — sin voz
+                  (anti-freeze).
                 </p>
               </div>
             ) : null}
@@ -270,7 +369,10 @@ export function Jornada4SegmentosPanel({
             notifPermission !== "unsupported" ? (
               <button
                 type="button"
-                onClick={onRequestNotifPermission}
+                onClick={() => {
+                  void unlockPuertaAudio();
+                  onRequestNotifPermission();
+                }}
                 className="w-full py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider border"
                 style={{
                   borderColor: "rgba(212,175,55,0.3)",
@@ -279,7 +381,7 @@ export function Jornada4SegmentosPanel({
                 }}
                 data-testid="jornada4-enable-notif"
               >
-                Activar avisos del sistema (reemplazo de voz)
+                Activar timbre y avisos del sistema
               </button>
             ) : null}
 
@@ -611,6 +713,12 @@ export function Jornada4SegmentosPanel({
                           <span>{seg.horaFin}</span>
                         </div>
                         <p className="min-w-0 flex-1 text-sm font-semibold truncate" style={{ color: INK }}>
+                          <span
+                            className="text-[9px] font-black tabular-nums mr-1.5"
+                            style={{ color: MUTED }}
+                          >
+                            {segmentOrdinalIndex(segmentos, seg.id)}/{segmentos.length}
+                          </span>
                           {seg.nombre}
                         </p>
                         {seg.proyectoVinculadoId ? (

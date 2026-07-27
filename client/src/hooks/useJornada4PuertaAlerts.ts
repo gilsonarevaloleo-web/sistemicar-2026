@@ -1,11 +1,13 @@
 /**
- * Tick wall-clock: toast + Notification cuando entra la ventana ±5 min.
- * Sin speechQueue / SegmentAttentionBackground.
+ * Tick wall-clock: timbre + vibración + toast + Notification.
+ * Sin speechQueue / SegmentAttentionBackground / TTS.
+ * Anti-miopía: el título lleva «Nª puerta de M del día».
  */
 import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import type { Planilla } from "@/lib/persistence";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { deliverPuertaSensory } from "@/jornada4/puertaChime";
 import {
   collectNewPuertaAlerts,
   collectOpenPuertaWindows,
@@ -37,9 +39,10 @@ export function useJornada4PuertaAlerts(planilla: Planilla | null, enabled = tru
 
     const alerts = collectNewPuertaAlerts(planilla.segmentos, now);
     for (const alert of alerts) {
+      deliverPuertaSensory(alert.kind);
       toast.message(alert.title, {
         description: alert.body,
-        duration: 8_000,
+        duration: 12_000,
         style: {
           backgroundColor: PIZARRA,
           border: `1px solid ${alert.kind === "abrir" ? EMERALD : GOLD}`,

@@ -88,7 +88,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tipo, setTipo] = useState<(typeof V4_TIPOS)[number] | null>(null);
-  const [modo, setModo] = useState<FlotaLaunchModo>("desglose");
+  const [modo, setModo] = useState<FlotaLaunchModo>("rapido");
   const [titulo, setTitulo] = useState("");
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
@@ -160,7 +160,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const reset = useCallback(() => {
     setTipo(null);
-    setModo("desglose");
+    setModo("rapido");
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);

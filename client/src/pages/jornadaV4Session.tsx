@@ -24,7 +24,10 @@ import {
   type Jornada4LaunchForm,
 } from "@/jornada4/executeJornada4Launch";
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
-import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
+import {
+  ensureJornada4NotificationPermission,
+} from "@/jornada4/puertaWindowAlerts";
+import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
 
 export default function JornadaV4Session() {
@@ -52,6 +55,21 @@ export default function JornadaV4Session() {
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
   });
+
+  // Un gesto desbloquea AudioContext (móvil) para que el timbre de puerta suene.
+  useEffect(() => {
+    const unlock = () => {
+      void unlockPuertaAudio();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true, passive: true });
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
 
   const pulsoModel = usePulsoCobertura({
     segmentos: planillaApi.planilla?.segmentos ?? [],
@@ -242,6 +260,7 @@ export default function JornadaV4Session() {
           ventanaCerrarIds={puertaWindows.cerrarIds}
           notifPermission={notifPermission}
           onRequestNotifPermission={() => {
+            void unlockPuertaAudio();
             void ensureJornada4NotificationPermission().then(ok => {
               setNotifPermission(
                 typeof Notification === "undefined"
