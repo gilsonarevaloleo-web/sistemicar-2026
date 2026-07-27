@@ -188,6 +188,7 @@ export default function JornadaV4Session() {
     closeConquistaCycle: wrapClose(ops.closeConquistaCycle),
     closeSituacionBlock: wrapClose(ops.closeSituacionBlock),
     closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
+    closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
     closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
   };
 

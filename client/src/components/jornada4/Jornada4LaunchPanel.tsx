@@ -102,6 +102,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filas, setFilas] = useState<string[]>([""]);
   const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
   const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
+  /** Conquista multi: un desglosador en secuencia vs N tareas independientes. */
+  const [conquistaMultiModo, setConquistaMultiModo] = useState<
+    "secuencia" | "independientes"
+  >("secuencia");
   const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
     resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
@@ -110,7 +114,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [historialSubs, setHistorialSubs] = useState<string[]>([]);
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const keyboardInset = useKeyboardInset();
-  const tick = useJornada4Tick(open && tipo === "tiempo" && modo === "desglose");
+  const tick = useJornada4Tick(open && tipo === "tiempo");
 
   useEffect(() => {
     if (!open) return;
@@ -145,9 +149,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const projection = useMemo(() => {
     void tick;
-    if (modo !== "desglose") return null;
+    if (tipo !== "tiempo") return null;
     return projectDesglosadorEndFromSubs(subs);
-  }, [subs, tick, modo]);
+  }, [subs, tick, tipo]);
 
   const profundidadePs = useMemo(() => {
     const n = subs.filter(s => s.titulo.trim()).length;
@@ -176,6 +180,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setFilas([""]);
     setFilasProyectoIds([""]);
     setVehiculoProyectoId(defaultProyectoId?.trim() || "");
+    setConquistaMultiModo("secuencia");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
         defaultHoraPlus(30)
@@ -189,8 +194,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
-    // Primera lista = Independiente / Lista libre (como el clásico).
-    setModo("rapido");
+    // Conquista = siempre desglosador (1 tarea → crece). Enfoque = lista libre primero.
+    setModo(t === "tiempo" ? "desglose" : "rapido");
+    setConquistaMultiModo("secuencia");
     setVehiculoProyectoId(defaultProyectoId?.trim() || "");
     if (t === "situacion") {
       setSituacionHoraFin(
@@ -209,16 +215,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const canLaunch =
     tipo != null &&
-    (modo === "rapido"
-      ? tipo === "tiempo"
-        ? subs.some(
-            s =>
-              s.titulo.trim() &&
-              Number(s.cantidadObjetivo) > 0
-          )
-        : filas.some(f => f.trim())
-      : tipo === "tiempo"
-        ? titulo.trim().length > 0 && subs.some(s => s.titulo.trim())
+    (tipo === "tiempo"
+      ? subs.some(
+          s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
+        )
+      : modo === "rapido"
+        ? filas.some(f => f.trim())
         : titulo.trim().length > 0 &&
           filas.some(f => f.trim()) &&
           situacionMinHasta != null);
@@ -228,39 +230,45 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setSaving(true);
     try {
       const dirVehiculo = vehiculoProyectoId.trim() || undefined;
-      const id = await onLaunch(
-        tipo === "tiempo" && modo === "rapido"
-          ? {
-              titulo: "",
-              tipoFlota: "tiempo",
-              modo: "rapido",
-              tareasIndependientes: subs,
-              ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
-            }
-          : tipo === "situacion" && modo === "rapido"
-            ? {
-                titulo: "",
-                tipoFlota: "situacion",
-                modo: "rapido",
-                situacionFilas: filas,
-                situacionFilasProyectoIds: filasProyectoIds,
-                terminoDetalle,
-                ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
-              }
-            : {
-                titulo,
-                tipoFlota: tipo,
-                modo,
-                desglosadorSubs: tipo === "tiempo" ? subs : undefined,
-                situacionFilas: tipo === "situacion" ? filas : undefined,
-                situacionFilasProyectoIds:
-                  tipo === "situacion" ? filasProyectoIds : undefined,
-                situacionObjetivoHora:
-                  tipo === "situacion" ? situacionHoraFin.trim() : undefined,
-                terminoDetalle: tipo === "situacion" ? terminoDetalle : undefined,
-                ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
-              }
+      const validSubs = subs.filter(
+        s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
       );
+
+      let id: string | null = null;
+      if (tipo === "tiempo") {
+        const asIndependientes =
+          validSubs.length > 1 && conquistaMultiModo === "independientes";
+        id = await onLaunch({
+          titulo: asIndependientes ? "" : validSubs[0]!.titulo.trim(),
+          tipoFlota: "tiempo",
+          modo: "desglose",
+          desglosadorSubs: asIndependientes ? undefined : validSubs,
+          tareasIndependientes: asIndependientes ? validSubs : undefined,
+          conquistaComoIndependientes: asIndependientes,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      } else if (modo === "rapido") {
+        id = await onLaunch({
+          titulo: "",
+          tipoFlota: "situacion",
+          modo: "rapido",
+          situacionFilas: filas,
+          situacionFilasProyectoIds: filasProyectoIds,
+          terminoDetalle,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      } else {
+        id = await onLaunch({
+          titulo,
+          tipoFlota: "situacion",
+          modo: "desglose",
+          situacionFilas: filas,
+          situacionFilasProyectoIds: filasProyectoIds,
+          situacionObjetivoHora: situacionHoraFin.trim(),
+          terminoDetalle,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      }
       if (id) reset();
     } finally {
       setSaving(false);
@@ -278,6 +286,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     vehiculoProyectoId,
     situacionHoraFin,
     terminoDetalle,
+    conquistaMultiModo,
     reset,
   ]);
 
@@ -476,6 +485,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </button>
                   </div>
 
+                  {tipo === "situacion" ? (
                   <div
                     className="grid grid-cols-2 gap-2"
                     data-testid="jornada4-launch-modo"
@@ -484,20 +494,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       [
                         {
                           id: "rapido" as const,
-                          label: tipo === "tiempo" ? "Independiente" : "Lista libre",
-                          hint:
-                            tipo === "tiempo"
-                              ? "Tarea = nombre · unidades · sin secuencia"
-                              : "Filas directas · sin meta ni presión",
+                          label: "Lista libre",
+                          hint: "Filas directas · sin meta ni presión",
                           icon: Zap,
                         },
                         {
                           id: "desglose" as const,
-                          label: tipo === "tiempo" ? "Desglosador" : "Ring",
-                          hint:
-                            tipo === "tiempo"
-                              ? "Misión + subs en secuencia"
-                              : "Filas + meta sellada",
+                          label: "Ring",
+                          hint: "Filas + meta sellada",
                           icon: ListTodo,
                         },
                       ] as const
@@ -547,6 +551,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       );
                     })}
                   </div>
+                  ) : (
+                  <div
+                    className="rounded-xl border px-3 py-2.5 space-y-1"
+                    style={{
+                      borderColor: `${ORANGE}35`,
+                      backgroundColor: "rgba(249,115,22,0.08)",
+                    }}
+                    data-testid="jornada4-conquista-modo-hint"
+                  >
+                    <p className="text-[10px] font-black uppercase" style={{ color: ORANGE }}>
+                      {subs.filter(s => s.titulo.trim()).length <= 1
+                        ? "Tarea única"
+                        : conquistaMultiModo === "secuencia"
+                          ? "Desglosador · secuencia"
+                          : "Independientes · sin secuencia"}
+                    </p>
+                    <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                      Una sola tarea = el nombre es la misión (sin repetir). Al añadir más,
+                      elige secuencia o independientes.
+                    </p>
+                  </div>
+                  )}
 
                   {/* Dirección del vehículo (hereda segmento; se puede cambiar). */}
                   <SegmentoProyectoSelect
@@ -564,8 +590,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     testId="jornada4-launch-dir-vehiculo"
                   />
 
-                  {/* Nombre de misión: solo desglosador / ring (en independiente el nombre ES la tarea) */}
-                  {modo === "desglose" ? (
+                  {/* Nombre de misión: solo ring (conquista usa el nombre de la 1ª unidad) */}
+                  {modo === "desglose" && tipo === "situacion" ? (
                   <div>
                     <label
                       className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
@@ -661,187 +687,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   </div>
                   ) : null}
 
-                  {modo === "rapido" && tipo === "tiempo" ? (
-                    <div className="space-y-3" data-testid="jornada4-launch-independientes">
-                      <p
-                        className="text-[9px] leading-snug rounded-xl border px-3 py-2.5"
-                        style={{
-                          color: MUTED,
-                          borderColor: "rgba(255,255,255,0.08)",
-                          backgroundColor: "rgba(255,255,255,0.03)",
-                        }}
-                      >
-                        Independiente: el nombre ES la tarea (no se repite abajo).
-                        Se mide por unidades. Si añades otra, es otra tarea aparte — sin secuencia.
-                      </p>
-                      {subs.map((sub, idx) => (
-                        <div
-                          key={sub.tempId}
-                          className="rounded-2xl border-2 p-3.5 space-y-3"
-                          style={{
-                            borderColor: sub.titulo.trim()
-                              ? `${ORANGE}45`
-                              : "rgba(255,255,255,0.12)",
-                            backgroundColor: "rgba(249,115,22,0.06)",
-                          }}
-                          data-testid={`jornada4-launch-indep-${idx}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span
-                              className="text-[11px] font-black uppercase tracking-wider"
-                              style={{ color: ORANGE }}
-                            >
-                              Tarea {idx + 1}
-                            </span>
-                            {subs.length > 1 ? (
-                              <button
-                                type="button"
-                                onClick={() => setSubs(subs.filter((_, i) => i !== idx))}
-                                className="p-2 rounded-lg hover:bg-white/5"
-                              >
-                                <Trash2 size={14} style={{ color: MUTED }} />
-                              </button>
-                            ) : null}
-                          </div>
-                          <div>
-                            <label
-                              className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
-                              style={{ color: INK }}
-                            >
-                              Nombre de la tarea
-                            </label>
-                            <input
-                              value={sub.titulo}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setSubs(prev =>
-                                  prev.map((s, i) =>
-                                    i === idx
-                                      ? { ...s, titulo: val, tiempoRecordMinPerUnit: undefined }
-                                      : s
-                                  )
-                                );
-                                if (val.trim().length >= 2) autofillRecord(idx, val);
-                              }}
-                              onBlur={() => {
-                                if (sub.titulo.trim().length >= 2 && !sub.tiempoRecordMinPerUnit) {
-                                  autofillRecord(idx, sub.titulo);
-                                }
-                              }}
-                              placeholder="Ej: Cerrado de costado"
-                              className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-base focus:outline-none"
-                              style={{
-                                color: INK,
-                                borderColor: sub.titulo.trim()
-                                  ? ORANGE
-                                  : "rgba(255,255,255,0.16)",
-                              }}
-                              autoFocus={idx === 0}
-                              data-testid={`jornada4-launch-indep-nombre-${idx}`}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label
-                                className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
-                                style={{ color: INK }}
-                              >
-                                Cantidad (u)
-                              </label>
-                              <input
-                                value={sub.cantidadObjetivo}
-                                onChange={e => {
-                                  const next = [...subs];
-                                  next[idx] = { ...sub, cantidadObjetivo: e.target.value };
-                                  setSubs(next);
-                                }}
-                                placeholder="Ej: 9"
-                                inputMode="numeric"
-                                className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-lg font-mono font-black text-center focus:outline-none"
-                                style={{
-                                  color: INK,
-                                  borderColor: sub.cantidadObjetivo
-                                    ? ORANGE
-                                    : "rgba(255,255,255,0.16)",
-                                }}
-                                data-testid={`jornada4-launch-indep-cant-${idx}`}
-                              />
-                            </div>
-                            <div>
-                              <label
-                                className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
-                                style={{ color: INK }}
-                              >
-                                Récord MIN/U
-                              </label>
-                              <input
-                                value={
-                                  sub.tiempoRecordMinPerUnit != null
-                                    ? String(sub.tiempoRecordMinPerUnit)
-                                    : ""
-                                }
-                                onChange={e => {
-                                  const raw = e.target.value.trim();
-                                  const n = Number(raw);
-                                  const next = [...subs];
-                                  next[idx] = {
-                                    ...sub,
-                                    tiempoRecordMinPerUnit:
-                                      raw === "" || !Number.isFinite(n) || n <= 0
-                                        ? undefined
-                                        : n,
-                                  };
-                                  setSubs(next);
-                                }}
-                                placeholder="Ej: 1.5"
-                                inputMode="decimal"
-                                className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-lg font-mono font-black text-center focus:outline-none"
-                                style={{
-                                  color: INK,
-                                  borderColor: sub.tiempoRecordMinPerUnit
-                                    ? ORANGE
-                                    : "rgba(255,255,255,0.16)",
-                                }}
-                                data-testid={`jornada4-launch-indep-record-${idx}`}
-                              />
-                            </div>
-                          </div>
-                          <SegmentoProyectoSelect
-                            value={sub.proyectoId ?? ""}
-                            onChange={id => {
-                              setSubs(prev =>
-                                prev.map((s, i) =>
-                                  i === idx
-                                    ? { ...s, proyectoId: id || undefined }
-                                    : s
-                                )
-                              );
-                            }}
-                            proyectos={proyectosHub}
-                            compact
-                            label="Dirección de esta tarea"
-                            emptyLabel="Heredar del vehículo"
-                            hint="Si es de otro proyecto, cámbiala aquí — evita ruido en peldaños."
-                            testId={`jornada4-launch-indep-dir-${idx}`}
-                          />
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setSubs([...subs, makeSub()])}
-                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                        style={{
-                          backgroundColor: `${ORANGE}12`,
-                          color: ORANGE,
-                          border: `1px dashed ${ORANGE}45`,
-                        }}
-                        data-testid="jornada4-launch-add-indep"
-                      >
-                        <Plus size={12} /> Añadir otra tarea independiente
-                      </button>
-                    </div>
-                  ) : null}
-
                   {modo === "rapido" && tipo === "situacion" ? (
                     <div className="space-y-3" data-testid="jornada4-launch-lista-libre">
                       <p
@@ -935,7 +780,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </div>
                   ) : null}
 
-                  {tipo === "tiempo" && modo === "desglose" && historialSubs.length > 0 ? (
+                  {tipo === "tiempo" && historialSubs.length > 0 ? (
                     <div
                       className="rounded-xl border p-3 space-y-2"
                       style={{
@@ -990,19 +835,70 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </div>
                   ) : null}
 
-                  {tipo === "tiempo" && modo === "desglose" ? (
+                  {tipo === "tiempo" ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <p
                           className="text-[10px] font-black uppercase tracking-wider"
                           style={{ color: ORANGE }}
                         >
-                          Unidades del desglosador
+                          {subs.filter(s => s.titulo.trim()).length <= 1
+                            ? "Tarea (nombre = misión)"
+                            : "Unidades del desglosador"}
                         </p>
                         <p className="text-[8px]" style={{ color: MUTED }}>
                           Nombre · Cantidad · Récord
                         </p>
                       </div>
+
+                      {subs.filter(s => s.titulo.trim()).length > 1 ? (
+                        <div
+                          className="grid grid-cols-2 gap-2"
+                          data-testid="jornada4-conquista-multi-modo"
+                        >
+                          {(
+                            [
+                              {
+                                id: "secuencia" as const,
+                                label: "Secuencia",
+                                hint: "Un desglosador · orden fijo",
+                              },
+                              {
+                                id: "independientes" as const,
+                                label: "Independientes",
+                                hint: "N misiones · sin secuencia",
+                              },
+                            ] as const
+                          ).map(opt => {
+                            const active = conquistaMultiModo === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setConquistaMultiModo(opt.id)}
+                                className="p-2.5 rounded-xl border text-left touch-manipulation"
+                                style={{
+                                  borderColor: active ? `${ORANGE}55` : "rgba(255,255,255,0.1)",
+                                  backgroundColor: active
+                                    ? "rgba(249,115,22,0.12)"
+                                    : "rgba(255,255,255,0.02)",
+                                }}
+                                data-testid={`jornada4-conquista-multi-${opt.id}`}
+                              >
+                                <span
+                                  className="text-[10px] font-black uppercase"
+                                  style={{ color: active ? ORANGE : MUTED }}
+                                >
+                                  {opt.label}
+                                </span>
+                                <p className="text-[8px] mt-0.5" style={{ color: MUTED }}>
+                                  {opt.hint}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
 
                       <div
                         className="rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2"
@@ -1463,7 +1359,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   backgroundColor: PIZARRA,
                 }}
               >
-                {tipo === "tiempo" && modo === "desglose" && projection ? (
+                {tipo === "tiempo" && projection ? (
                   <p
                     className="mb-2 text-center text-[10px] font-mono font-black"
                     style={{ color: GOLD }}
@@ -1473,7 +1369,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     {profundidadePs > 0 ? ` · profundidad ${profundidadePs} PS` : ""}
                   </p>
                 ) : null}
-                {tipo === "tiempo" && modo === "desglose" && !projection && profundidadePs > 0 ? (
+                {tipo === "tiempo" && !projection && profundidadePs > 0 ? (
                   <p
                     className="mb-2 text-center text-[10px] font-mono font-black"
                     style={{ color: GOLD }}
@@ -1484,12 +1380,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 ) : null}
                 {!canLaunch ? (
                   <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
-                    {modo === "rapido"
-                      ? tipo === "tiempo"
-                        ? "Nombre de tarea + unidades (cantidad)"
-                        : "Escribe al menos una tarea de la lista"
-                      : tipo === "tiempo"
-                        ? "Escribe nombre de misión + al menos una unidad"
+                    {tipo === "tiempo"
+                      ? "Nombre de la tarea + unidades (cantidad)"
+                      : modo === "rapido"
+                        ? "Escribe al menos una tarea de la lista"
                         : "Escribe misión + filas + hora de término"}
                   </p>
                 ) : null}
@@ -1509,11 +1403,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 >
                   {saving
                     ? "Lanzando…"
-                    : modo === "rapido"
-                      ? tipo === "tiempo"
-                        ? "Lanzar independiente(s)"
-                        : "Lanzar lista libre"
-                      : "Lanzar vehículo"}
+                    : tipo === "tiempo"
+                      ? subs.filter(s => s.titulo.trim()).length <= 1
+                        ? "Lanzar tarea"
+                        : conquistaMultiModo === "secuencia"
+                          ? "Lanzar desglosador"
+                          : "Lanzar independientes"
+                      : modo === "rapido"
+                        ? "Lanzar lista libre"
+                        : "Lanzar ring"}
                 </button>
               </div>
             ) : null}

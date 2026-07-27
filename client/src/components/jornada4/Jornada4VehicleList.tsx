@@ -73,7 +73,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
         </p>
         <p className="text-[9px]" style={{ color: MUTED }}>
           Lanza desde <strong style={{ color: INK }}>La Flota</strong> —
-          independientes, desglosador o ring.
+          conquista, lista libre o ring.
         </p>
       </div>
     );
@@ -168,7 +168,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Independiente · desglosador · lista libre · ring
+              Conquista · lista libre · ring
             </p>
           </div>
         ) : null}

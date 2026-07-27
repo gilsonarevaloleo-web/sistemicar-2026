@@ -121,6 +121,39 @@ describe("vehiclesReactiveSignature", () => {
     );
   });
 
+  it("cambia al Cumplido en lista libre (sin enDesgloseCronometro)", () => {
+    const base = veh({
+      id: "libre1",
+      status: "activo",
+      tipoFlota: "situacion",
+      subTareas: [
+        {
+          id: "a",
+          texto: "Previo",
+          completada: false,
+          creadaAt: 0,
+          enDesgloseCronometro: false,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    const after = {
+      ...base,
+      subTareas: [
+        {
+          ...base.subTareas![0]!,
+          completada: true,
+          resultadoSituacion: "cumplido" as const,
+        },
+      ],
+    } as Vehicle;
+    assert.notEqual(
+      vehiclesReactiveSignature([base]),
+      vehiclesReactiveSignature([after]),
+      "lista libre Cumplido debe invalidar firma o la UI no re-renderiza"
+    );
+  });
+
   it("cambia solo al reset de startedAt en handoff (misma fila id distinta)", () => {
     const before = veh({
       id: "s1",

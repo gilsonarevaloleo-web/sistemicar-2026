@@ -145,9 +145,22 @@ export function ConquistaCard({
               >
                 {FLOTA_CONFIG.tiempo.label}
               </span>
+              <span
+                className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase"
+                style={{
+                  backgroundColor:
+                    subs.length <= 1 ? "rgba(255,255,255,0.06)" : `${NARANJA}22`,
+                  color: subs.length <= 1 ? MUTED : NARANJA,
+                }}
+                data-testid="j4-conquista-fase"
+              >
+                {subs.length <= 1 ? "Tarea" : "Desglosador"}
+              </span>
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              Desglosador · {conquistaProgressLabel(vehicle)}
+              {subs.length <= 1
+                ? "Tarea única · añade subtarea para desglosar en secuencia"
+                : `Desglosador · secuencia · ${conquistaProgressLabel(vehicle)}`}
               {profundidadPotencial > 0
                 ? ` · profundidad ${profundidadGanada}/${profundidadPotencial} PS`
                 : ""}
@@ -637,7 +650,8 @@ export function ConquistaCard({
                   border: `1px solid ${flotaColor}35`,
                 }}
               >
-                <ListPlus size={12} /> Añadir subtarea
+                <ListPlus size={12} />{" "}
+                {subs.length <= 1 ? "Añadir unidad · pasa a desglosador" : "Añadir subtarea"}
               </button>
             ) : (
               <div
