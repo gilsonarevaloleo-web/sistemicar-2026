@@ -18,7 +18,7 @@ export const FLOTA_BRAND: Record<TipoFlota, FlotaBrandEntry> = {
   tiempo: {
     label: "Conquista",
     labelUpper: "CONQUISTA",
-    sublabel: "Objetivos medibles · unidades y ritmo",
+    sublabel: "Desglosador · misión + unidades",
     relojLabel: "Reloj proyectivo",
     psCierre: "PS al cumplir objetivo",
     vehiclePhrase: "conquista",
@@ -26,7 +26,7 @@ export const FLOTA_BRAND: Record<TipoFlota, FlotaBrandEntry> = {
   situacion: {
     label: "Enfoque",
     labelUpper: "ENFOQUE",
-    sublabel: "Decisiones selladas · ring y cupos",
+    sublabel: "Lista libre o ring con meta",
     relojLabel: "Meta y cupos",
     psCierre: "3-7 PS por esfuerzo activo",
     vehiclePhrase: "enfoque",

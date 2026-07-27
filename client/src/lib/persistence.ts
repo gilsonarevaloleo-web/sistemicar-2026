@@ -3186,43 +3186,44 @@ export async function awardSovereigntyPoints(
     console.error("[awardSovereigntyPoints] No se pudo persistir progresión (local):", error);
   }
 
-  if (isFirebaseConfigured() && db) {
-    try {
-      const path = getPrivatePath(userId, "sovereigntyPointsLog");
-      await addDoc(collection(db, path), {
-        ...logEntry,
-        timestamp: serverTimestamp()
-      });
-    } catch (error) {
-      console.error("Error saving SP log to Firebase:", error);
-    }
-  }
-
-  if (isFirebaseConfigured() && db) {
-    try {
-      const { updateDoc, getDocs, increment } = await import("firebase/firestore");
-      const pathProg = getPrivatePath(userId, "progression");
-      const snap = await getDocs(query(collection(db, pathProg)));
-      if (snap.empty) {
-        await updateProgression(userId, { sovereigntyPoints: newTotal });
-      } else {
-        const latest = pickLatestProgressionDoc(snap.docs);
-        const targetId = latest?.id ?? snap.docs[0].id;
-        await updateDoc(doc(db, pathProg, targetId), {
-          sovereigntyPoints: increment(roundedAmount),
-          updatedAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
-      console.error("[awardSovereigntyPoints] Error actualizando progresión:", error);
-    }
-  }
-
+  // Barra del día: notificar YA. Firebase no debe bloquear la UI (hang = PS “congelados”).
+  const uiTotal = getLocalProgression(userId).sovereigntyPoints || 0;
   window.dispatchEvent(new CustomEvent("sovereignty-points-awarded", {
-    detail: { amount: roundedAmount, source, newTotal: getLocalProgression(userId).sovereigntyPoints || 0 }
+    detail: { amount: roundedAmount, source, newTotal: uiTotal }
   }));
 
-  return { newTotal: getLocalProgression(userId).sovereigntyPoints || 0 };
+  if (isFirebaseConfigured() && db) {
+    void (async () => {
+      try {
+        const path = getPrivatePath(userId, "sovereigntyPointsLog");
+        await addDoc(collection(db, path), {
+          ...logEntry,
+          timestamp: serverTimestamp()
+        });
+      } catch (error) {
+        console.error("Error saving SP log to Firebase:", error);
+      }
+      try {
+        const { updateDoc, getDocs, increment } = await import("firebase/firestore");
+        const pathProg = getPrivatePath(userId, "progression");
+        const snap = await getDocs(query(collection(db, pathProg)));
+        if (snap.empty) {
+          await updateProgression(userId, { sovereigntyPoints: newTotal });
+        } else {
+          const latest = pickLatestProgressionDoc(snap.docs);
+          const targetId = latest?.id ?? snap.docs[0].id;
+          await updateDoc(doc(db, pathProg, targetId), {
+            sovereigntyPoints: increment(roundedAmount),
+            updatedAt: serverTimestamp()
+          });
+        }
+      } catch (error) {
+        console.error("[awardSovereigntyPoints] Error actualizando progresión:", error);
+      }
+    })();
+  }
+
+  return { newTotal: uiTotal };
 }
 
 /** Resta PS (penalización). No baja el total por debajo de 0. */
@@ -3262,45 +3263,47 @@ export async function deductSovereigntyPoints(
     console.error("[deductSovereigntyPoints] No se pudo persistir progresión (local):", error);
   }
 
-  if (isFirebaseConfigured() && db) {
-    try {
-      const path = getPrivatePath(userId, "sovereigntyPointsLog");
-      await addDoc(collection(db, path), {
-        ...logEntry,
-        timestamp: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("Error saving SP deduction log to Firebase:", error);
-    }
-  }
-
-  if (isFirebaseConfigured() && db && deducted > 0) {
-    try {
-      const { updateDoc, getDocs, increment } = await import("firebase/firestore");
-      const pathProg = getPrivatePath(userId, "progression");
-      const snap = await getDocs(query(collection(db, pathProg)));
-      if (snap.empty) {
-        await updateProgression(userId, { sovereigntyPoints: newTotal });
-      } else {
-        const latest = pickLatestProgressionDoc(snap.docs);
-        const targetId = latest?.id ?? snap.docs[0].id;
-        await updateDoc(doc(db, pathProg, targetId), {
-          sovereigntyPoints: increment(-deducted),
-          updatedAt: serverTimestamp(),
-        });
-      }
-    } catch (error) {
-      console.error("[deductSovereigntyPoints] Error actualizando progresión:", error);
-    }
-  }
-
+  const uiTotal = getLocalProgression(userId).sovereigntyPoints || 0;
   window.dispatchEvent(
     new CustomEvent("sovereignty-points-awarded", {
-      detail: { amount: -deducted, source, newTotal: getLocalProgression(userId).sovereigntyPoints || 0 },
+      detail: { amount: -deducted, source, newTotal: uiTotal },
     })
   );
 
-  return { newTotal: getLocalProgression(userId).sovereigntyPoints || 0, deducted };
+  if (isFirebaseConfigured() && db) {
+    void (async () => {
+      try {
+        const path = getPrivatePath(userId, "sovereigntyPointsLog");
+        await addDoc(collection(db, path), {
+          ...logEntry,
+          timestamp: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Error saving SP deduction log to Firebase:", error);
+      }
+      if (deducted > 0) {
+        try {
+          const { updateDoc, getDocs, increment } = await import("firebase/firestore");
+          const pathProg = getPrivatePath(userId, "progression");
+          const snap = await getDocs(query(collection(db, pathProg)));
+          if (snap.empty) {
+            await updateProgression(userId, { sovereigntyPoints: newTotal });
+          } else {
+            const latest = pickLatestProgressionDoc(snap.docs);
+            const targetId = latest?.id ?? snap.docs[0].id;
+            await updateDoc(doc(db, pathProg, targetId), {
+              sovereigntyPoints: increment(-deducted),
+              updatedAt: serverTimestamp(),
+            });
+          }
+        } catch (error) {
+          console.error("[deductSovereigntyPoints] Error actualizando progresión:", error);
+        }
+      }
+    })();
+  }
+
+  return { newTotal: uiTotal, deducted };
 }
 
 // Calcular inicio del día en Lima (UTC-5) - Función helper

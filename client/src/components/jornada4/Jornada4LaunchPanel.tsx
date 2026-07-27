@@ -216,9 +216,18 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const canLaunch =
     tipo != null &&
     (tipo === "tiempo"
-      ? subs.some(
-          s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
-        )
+      ? (() => {
+          const validSubs = subs.filter(
+            s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
+          );
+          if (validSubs.length === 0) return false;
+          // Independientes: cada unidad es su propia misión.
+          if (validSubs.length > 1 && conquistaMultiModo === "independientes") {
+            return true;
+          }
+          // Desglosador (secuencia): requiere nombre de misión.
+          return titulo.trim().length > 0;
+        })()
       : modo === "rapido"
         ? filas.some(f => f.trim())
         : titulo.trim().length > 0 &&
@@ -239,7 +248,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         const asIndependientes =
           validSubs.length > 1 && conquistaMultiModo === "independientes";
         id = await onLaunch({
-          titulo: asIndependientes ? "" : validSubs[0]!.titulo.trim(),
+          titulo: asIndependientes
+            ? ""
+            : titulo.trim() || validSubs[0]!.titulo.trim(),
           tipoFlota: "tiempo",
           modo: "desglose",
           desglosadorSubs: asIndependientes ? undefined : validSubs,
@@ -444,7 +455,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setTipo(t)}
+                        onClick={() => openTipo(t)}
                         className="p-3 rounded-xl border flex flex-col items-center gap-1.5 touch-manipulation"
                         style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }}
                         data-testid={`jornada4-launch-tipo-${t === "tiempo" ? "conquista" : "situacion"}`}
@@ -561,15 +572,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     data-testid="jornada4-conquista-modo-hint"
                   >
                     <p className="text-[10px] font-black uppercase" style={{ color: ORANGE }}>
-                      {subs.filter(s => s.titulo.trim()).length <= 1
-                        ? "Tarea única"
-                        : conquistaMultiModo === "secuencia"
-                          ? "Desglosador · secuencia"
-                          : "Independientes · sin secuencia"}
+                      {subs.filter(s => s.titulo.trim()).length > 1 &&
+                      conquistaMultiModo === "independientes"
+                        ? "Independientes · sin secuencia"
+                        : "Desglosador · secuencia"}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                      Una sola tarea = el nombre es la misión (sin repetir). Al añadir más,
-                      elige secuencia o independientes.
+                      Misión + unidades con cantidad y récord. Al añadir 2+ unidades puedes
+                      elegir secuencia (un desglosador) o independientes.
                     </p>
                   </div>
                   )}
@@ -590,8 +600,13 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     testId="jornada4-launch-dir-vehiculo"
                   />
 
-                  {/* Nombre de misión: solo ring (conquista usa el nombre de la 1ª unidad) */}
-                  {modo === "desglose" && tipo === "situacion" ? (
+                  {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
+                  {((tipo === "tiempo" &&
+                    !(
+                      subs.filter(s => s.titulo.trim()).length > 1 &&
+                      conquistaMultiModo === "independientes"
+                    )) ||
+                    (tipo === "situacion" && modo === "desglose")) ? (
                   <div>
                     <label
                       className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
@@ -842,9 +857,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           className="text-[10px] font-black uppercase tracking-wider"
                           style={{ color: ORANGE }}
                         >
-                          {subs.filter(s => s.titulo.trim()).length <= 1
-                            ? "Tarea (nombre = misión)"
-                            : "Unidades del desglosador"}
+                          Unidades del desglosador
                         </p>
                         <p className="text-[8px]" style={{ color: MUTED }}>
                           Nombre · Cantidad · Récord
@@ -1381,7 +1394,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 {!canLaunch ? (
                   <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
                     {tipo === "tiempo"
-                      ? "Nombre de la tarea + unidades (cantidad)"
+                      ? conquistaMultiModo === "independientes" &&
+                        subs.filter(s => s.titulo.trim()).length > 1
+                        ? "Cada unidad necesita nombre + cantidad"
+                        : "Misión + unidades (nombre y cantidad)"
                       : modo === "rapido"
                         ? "Escribe al menos una tarea de la lista"
                         : "Escribe misión + filas + hora de término"}
@@ -1404,11 +1420,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   {saving
                     ? "Lanzando…"
                     : tipo === "tiempo"
-                      ? subs.filter(s => s.titulo.trim()).length <= 1
-                        ? "Lanzar tarea"
-                        : conquistaMultiModo === "secuencia"
-                          ? "Lanzar desglosador"
-                          : "Lanzar independientes"
+                      ? conquistaMultiModo === "independientes" &&
+                        subs.filter(s => s.titulo.trim()).length > 1
+                        ? "Lanzar independientes"
+                        : "Lanzar desglosador"
                       : modo === "rapido"
                         ? "Lanzar lista libre"
                         : "Lanzar ring"}
