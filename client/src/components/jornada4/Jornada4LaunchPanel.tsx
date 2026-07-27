@@ -177,7 +177,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
-    setModo("desglose");
+    // Primera lista = Independiente / Lista libre (como el clásico).
+    setModo("rapido");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
