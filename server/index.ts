@@ -2230,7 +2230,7 @@ app.get("/api/mercadopago/test-link/:planId", async (req, res) => {
   }
 });
 
-registerEspejoV2Routes(app);
+registerEspejoV2Routes(app, { callGemini, parseGeminiJSON });
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
   try {

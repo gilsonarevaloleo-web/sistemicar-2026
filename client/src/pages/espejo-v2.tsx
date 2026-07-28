@@ -64,6 +64,9 @@ export default function EspejoV2() {
   const [log, setLog] = useState<TurnLog[]>([]);
   const [interruptBanner, setInterruptBanner] = useState<string | null>(null);
   const [mandate, setMandate] = useState<MandateState | null>(null);
+  const [devolucion, setDevolucion] = useState<string | null>(null);
+  const [senales, setSenales] = useState<string[]>([]);
+  const [reasoningSource, setReasoningSource] = useState<string | null>(null);
 
   const frictionText = useMemo(() => {
     if (!session) return buildFrictionLabel(1);
@@ -103,6 +106,9 @@ export default function EspejoV2() {
       setAccionMaxima("");
       setLog([]);
       setMandate(null);
+      setDevolucion(null);
+      setSenales([]);
+      setReasoningSource(null);
       setScreen("proceso");
     } catch (e: any) {
       setError(e.message || "Error de clasificación");
@@ -124,6 +130,12 @@ export default function EspejoV2() {
           phaseId: session.phaseId,
           respuesta,
           friction: session.friction,
+          queja: session.queja,
+          historial: log.map((t) => ({
+            phaseId: t.phaseId,
+            phaseLabel: t.phaseLabel,
+            respuesta: t.respuesta,
+          })),
           accionMinima: accionMinima || undefined,
           accionMaxima: accionMaxima || undefined,
         }),
@@ -151,6 +163,16 @@ export default function EspejoV2() {
         );
       } else {
         setInterruptBanner(null);
+      }
+
+      if (data.reasoning) {
+        setDevolucion(data.reasoning.devolucion || data.next?.devolucion || null);
+        setSenales(Array.isArray(data.reasoning.senales) ? data.reasoning.senales : []);
+        setReasoningSource(data.reasoning.source || null);
+      } else {
+        setDevolucion(data.next?.devolucion || null);
+        setSenales([]);
+        setReasoningSource(null);
       }
 
       if (data.next.mandate) {
@@ -193,7 +215,8 @@ export default function EspejoV2() {
         phaseIndex: data.next.phaseIndex,
         friction: data.next.friction,
         density: data.next.density,
-        prompt: data.next.prompt,
+        // En pantalla mostramos la pregunta; la devolución va en panel aparte.
+        prompt: data.reasoning?.pregunta || data.next.prompt,
       });
       setRespuesta("");
       if (data.next.phaseId !== "seriedad") {
@@ -220,6 +243,9 @@ export default function EspejoV2() {
     setLog([]);
     setMandate(null);
     setInterruptBanner(null);
+    setDevolucion(null);
+    setSenales([]);
+    setReasoningSource(null);
     setError(null);
   }
 
@@ -402,7 +428,36 @@ export default function EspejoV2() {
               >
                 FASE {session.phaseIndex}/5 — {labelForPhase(session.phaseId).toUpperCase()} ·{" "}
                 {isPoloPositivo ? "EXPULSIÓN GRAVITACIONAL" : "DENSIFICACIÓN"}
+                {reasoningSource && (
+                  <span className="ml-2 text-white/35">
+                    · RAZONAMIENTO: {reasoningSource.toUpperCase()}
+                  </span>
+                )}
               </div>
+
+              {devolucion && (
+                <div
+                  className="mb-4 rounded border border-[#D4AF37]/30 bg-[#D4AF37]/08 px-3 py-3 text-sm leading-relaxed text-[#F0E6C8]"
+                  data-testid="espejo-v2-devolucion"
+                >
+                  <p className="mb-1 text-[10px] tracking-widest text-[#D4AF37]">
+                    DEVOLUCIÓN DEL GOBERNADOR
+                  </p>
+                  {devolucion}
+                  {senales.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {senales.map((s) => (
+                        <span
+                          key={s}
+                          className="rounded border border-white/15 px-1.5 py-0.5 text-[9px] tracking-widest text-white/45"
+                        >
+                          {s.toUpperCase()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <p className="mb-4 text-sm leading-relaxed text-white/85">{session.prompt}</p>
 
@@ -480,6 +535,14 @@ export default function EspejoV2() {
               <p className="mb-3 text-[11px] tracking-[0.2em] text-[#D4AF37]">
                 DISPARO POLO POSITIVO — PROTOCOLO CERRADO
               </p>
+              {devolucion && (
+                <div className="mb-3 rounded border border-[#D4AF37]/30 bg-[#D4AF37]/08 px-3 py-3 text-sm text-[#F0E6C8]">
+                  <p className="mb-1 text-[10px] tracking-widest text-[#D4AF37]">
+                    DEVOLUCIÓN FINAL
+                  </p>
+                  {devolucion}
+                </div>
+              )}
               <div className="grid gap-3">
                 <PriorityPanel
                   title="ACCIÓN MÍNIMA (HOY)"
