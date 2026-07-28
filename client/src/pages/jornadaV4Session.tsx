@@ -190,6 +190,7 @@ export default function JornadaV4Session() {
     closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
     closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
     closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
+    closeExpressVehicle: wrapClose(ops.closeExpressVehicle),
   };
 
   const statusLine = planillaApi.segmentoActivo

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Flag, Lock, X as XIcon, Zap } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Flag, Lock, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
 import { computeSituacionTimerUi } from "@/lib/situacionTimerUi";
@@ -16,12 +16,14 @@ import {
   situacionPendingCronRows,
   situacionProgressLabel,
 } from "@/jornada4/situacionKernel";
+import type { ReorderDirection } from "@/lib/desglosadorReorder";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
 const GOLD = "#D4AF37";
+const VIOLET = "#8B5CF6";
 const flotaColor = FLOTA_CONFIG.situacion.color;
 
 type Props = {
@@ -31,6 +33,7 @@ type Props = {
   onCerrarBloque: () => void;
   onAddFila: (texto: string) => void;
   onSetCupo: (subTareaId: string, minutos: number | undefined) => void;
+  onReorderFilas?: (movedId: string, direction: ReorderDirection) => void;
 };
 
 export function SituacionCard({
@@ -40,8 +43,10 @@ export function SituacionCard({
   onCerrarBloque,
   onAddFila,
   onSetCupo,
+  onReorderFilas,
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
+  const [reorderMode, setReorderMode] = useState(false);
   const pending = situacionPendingCronRows(vehicle);
   const focusId = vehicle.situacionCupoAnchor?.subTareaId;
   const focus = pending.find(st => st.id === focusId) ?? pending[0] ?? null;
@@ -250,12 +255,33 @@ export function SituacionCard({
               <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
                 Desglose · cupos
               </p>
-              <p className="text-[8px] font-bold" style={{ color: MUTED }}>
-                Editar Min reparte el resto
-              </p>
+              <div className="flex items-center gap-2">
+                {pending.length >= 2 && onReorderFilas ? (
+                  <button
+                    type="button"
+                    onClick={() => setReorderMode(m => !m)}
+                    className="text-[7px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                    style={{
+                      backgroundColor: reorderMode
+                        ? "rgba(139,92,246,0.2)"
+                        : "rgba(255,255,255,0.06)",
+                      color: reorderMode ? VIOLET : "rgba(255,255,255,0.55)",
+                      border: `1px solid ${reorderMode ? "rgba(139,92,246,0.4)" : "rgba(255,255,255,0.12)"}`,
+                    }}
+                    data-testid="j4-situacion-reorder-toggle"
+                  >
+                    {reorderMode ? "Listo" : "Reordenar cola"}
+                  </button>
+                ) : (
+                  <p className="text-[8px] font-bold" style={{ color: MUTED }}>
+                    Editar Min reparte el resto
+                  </p>
+                )}
+              </div>
             </div>
             {cronRows.map((row, idx) => {
               const isPending = situacionFilaCronometroPendiente(row);
+              const pIdx = isPending ? pending.findIndex(p => p.id === row.id) : -1;
               const isFocus = focus?.id === row.id;
               const resultado =
                 row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
@@ -288,6 +314,30 @@ export function SituacionCard({
                   }}
                 >
                   <div className="flex items-center gap-2">
+                    {reorderMode && isPending && onReorderFilas && pIdx >= 0 ? (
+                      <div className="flex flex-col gap-0.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          disabled={pIdx === 0}
+                          onClick={() => onReorderFilas(row.id, "up")}
+                          className="p-0.5 rounded disabled:opacity-25"
+                          title="Subir en cola"
+                          data-testid={`j4-situacion-reorder-up-${row.id}`}
+                        >
+                          <ChevronUp size={12} style={{ color: MUTED }} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pIdx === pending.length - 1}
+                          onClick={() => onReorderFilas(row.id, "down")}
+                          className="p-0.5 rounded disabled:opacity-25"
+                          title="Bajar en cola"
+                          data-testid={`j4-situacion-reorder-down-${row.id}`}
+                        >
+                          <ChevronDown size={12} style={{ color: MUTED }} />
+                        </button>
+                      </div>
+                    ) : null}
                     <span
                       className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black shrink-0"
                       style={{
