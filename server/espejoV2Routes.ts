@@ -98,8 +98,8 @@ export function registerEspejoV2Routes(app: Express) {
       let interruptMessage: string | null = null;
       let nextPromptOverride: string | null = null;
 
-      // Refracción solo se evalúa al responder Fase 4 (Seriedad).
-      if (phaseId === "seriedad") {
+      // Refracción se evalúa en Fase 4 (Seriedad) o Fase 5 (Gobernador).
+      if (phaseId === "seriedad" || phaseId === "gobernador") {
         refraction = detectRefraction(respuesta);
         if (refraction.detected && refraction.rule) {
           friction = 2;
@@ -139,15 +139,26 @@ export function registerEspejoV2Routes(app: Express) {
         friction,
       );
 
+      const accionMinima = String(req.body?.accionMinima ?? "").trim() || null;
+      const accionMaxima = String(req.body?.accionMaxima ?? "").trim() || null;
+
       const mandate =
-        completed
+        completed || phaseId === "gobernador" || phaseId === "seriedad"
           ? {
+              accionMinima: accionMinima,
+              accionMaxima: accionMaxima,
               accionMinimaHint:
-                "Extrae de tu respuesta de Seriedad la Acción Mínima concreta de hoy.",
+                accionMinima ||
+                "La tarea atómica e inmediata de hoy (presencia, no entusiasmo).",
               accionMaximaHint:
-                "Extrae de tu respuesta de Seriedad la Acción Máxima que corta el problema de raíz.",
+                accionMaxima ||
+                "El movimiento estratégico que corta el problema de raíz.",
               gobernador: getPhasePrompt(activeCodigo, "gobernador"),
               frecuencia: ESPEJO_V2_CODIGOS[activeCodigo].frecuencia,
+              leyFriccion:
+                friction === 2
+                  ? "EL SISTEMA NO REQUIERE FE NI GANAS PARA EJECUTAR. LA ACCIÓN MÍNIMA EXIGE PRESENCIA, NO ENTUSIASMO."
+                  : null,
             }
           : null;
 
@@ -159,6 +170,8 @@ export function registerEspejoV2Routes(app: Express) {
           phaseLabel: phase.label,
           polo: phase.polo,
           respuesta,
+          accionMinima,
+          accionMaxima,
         },
         refraction: {
           detected: refraction.detected,
@@ -166,6 +179,9 @@ export function registerEspejoV2Routes(app: Express) {
           codigoSalto: refraction.rule?.codigoSalto ?? null,
           estrategia: refraction.rule?.estrategia ?? null,
           notification: interruptMessage,
+          banner: refraction.detected
+            ? `[INTERRUPCIÓN DE PROTOCOLO: REFRACCIÓN DETECTADA]\nLa resistencia no está en la tarea, está en tu reserva de energía vital. Se ha reencuadrado la frecuencia al CÓDIGO ${refraction.rule?.codigoSalto}.`
+            : null,
         },
         next: {
           codigo: activeCodigo,
@@ -176,7 +192,9 @@ export function registerEspejoV2Routes(app: Express) {
           friction,
           density,
           frictionLabel:
-            friction === 2 ? "NIVEL 2 (REFRACCIÓN REENCUADRADA)" : "NIVEL 1 (ESTÁNDAR)",
+            friction === 2
+              ? "FRICCIÓN: REFRACCIÓN DETECTADA (NIVEL 2)"
+              : "FRICCIÓN: ESTÁNDAR (NIVEL 1)",
           completed,
           mandate,
         },

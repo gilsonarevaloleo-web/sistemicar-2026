@@ -45,9 +45,7 @@ export interface EspejoV2CodigoDef {
 }
 
 export const ESPEJO_V2_ENTRY_PROMPT =
-  "Bienvenido a la Consola del Espejo (Sistemicar V2).\n" +
-  "Expresa con claridad la queja, el bloqueo o la interferencia que sientes hoy en tu realidad.\n" +
-  "¿Dónde sientes que tu esfuerzo no está traccionando o qué situación te hace sentir detenido?";
+  "Bienvenido a la Consola del Espejo (Sistemicar V2). Expresa con claridad la queja, el bloqueo o la interferencia que sientes hoy en tu realidad. ¿Dónde sientes que tu esfuerzo no está traccionando?";
 
 export const ESPEJO_V2_PHASES: EspejoV2PhaseDef[] = [
   { id: "claridad", index: 1, label: "Claridad", codigoFase: "Código 1", polo: "negativo" },
@@ -480,13 +478,25 @@ export const REFRACCION_MATRIX: RefractionRule[] = [
     estrategia: "Exige mover el cuerpo sin requerir fe previa.",
   },
   {
-    patterns: ["no se por donde", "no sé por dónde", "es un caos", "por donde empezar"],
+    patterns: [
+      "no se por donde",
+      "no sé por dónde",
+      "no se que hacer",
+      "no sé qué hacer",
+      "es un caos",
+      "por donde empezar",
+    ],
     diagnostico: "Sobrecarga por falta de orden de proceso.",
     codigoSalto: "1.5",
     estrategia: "Reduce el escenario a una sola métrica o número.",
   },
   {
-    patterns: ["miedo a equivocarme", "tengo miedo a equivocarme", "miedo a fallar"],
+    patterns: [
+      "miedo a equivocarme",
+      "tengo miedo a equivocarme",
+      "tengo miedo",
+      "miedo a fallar",
+    ],
     diagnostico: "Parálisis por juicio moral y perfeccionismo.",
     codigoSalto: "1.8",
     estrategia: "Elimina la culpa y exige corrección fría.",
@@ -555,11 +565,22 @@ function buildFrictionN2Prompt(rule: RefractionRule, codigo: EspejoV2CodigoDef):
   return `${base}\n\n${FRICTION_N2_RULE}`;
 }
 
-export function densityPercent(phaseIndex: number, friction: FrictionLevel): number {
-  // Phases 1–3 densify polo negativo; 4–5 discharge polo positivo.
-  const capped = Math.max(0, Math.min(5, phaseIndex));
-  const base = (capped / 5) * 100;
-  return friction === 2 ? Math.min(100, base + 12) : base;
+/**
+ * Densidad del Polo Negativo (spec paso 2):
+ * Fase 1 → 33%, Fase 2 → 66%, Fase 3 → 100%.
+ * Fases 4–5 mantienen saturación (expulsión gravitacional).
+ */
+export function densityPercent(phaseIndex: number, _friction: FrictionLevel = 1): number {
+  if (phaseIndex <= 0) return 0;
+  if (phaseIndex === 1) return 33;
+  if (phaseIndex === 2) return 66;
+  return 100;
+}
+
+export function frictionLabel(friction: FrictionLevel): string {
+  return friction === 2
+    ? "FRICCIÓN: REFRACCIÓN DETECTADA (NIVEL 2)"
+    : "FRICCIÓN: ESTÁNDAR (NIVEL 1)";
 }
 
 export function getPhasePrompt(codigoId: EspejoV2CodigoId, phaseId: EspejoV2PhaseId): string {
