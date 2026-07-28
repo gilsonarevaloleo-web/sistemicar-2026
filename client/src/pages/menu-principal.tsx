@@ -36,6 +36,7 @@ import {
   LogIn,
   Sprout,
   Radio,
+  Terminal,
 } from "lucide-react";
 import { Link } from "wouter";
 import { DataStatusPanel } from "@/components/data-status";
@@ -118,6 +119,14 @@ function buildMenuItems(
       icon: Eye,
       route: "/espejo",
       color: SPECTRUM.ROJO,
+    },
+    {
+      id: "espejo-v2",
+      title: "ESPEJO V2",
+      subtitle: "Consola táctica · códigos 1.1–1.10",
+      icon: Terminal,
+      route: "/espejo/v2",
+      color: "#00FFC3",
     },
   ];
 
