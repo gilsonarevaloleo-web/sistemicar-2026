@@ -5,11 +5,13 @@ import {
   ChevronUp,
   DoorClosed,
   DoorOpen,
+  ExternalLink,
   Layers,
   Plus,
   Trash2,
 } from "lucide-react";
 import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 import type { Proyecto } from "@/lib/proyectos";
 import type { PlantillaRutina, SegmentoV5 } from "@/lib/persistence";
 import {
@@ -30,6 +32,7 @@ const BLOOD_BRIGHT = "#FF2A2A";
 const EMERALD = "#00C851";
 const CYAN = "#00FFC3";
 const DIAS = ["D", "L", "M", "X", "J", "V", "S"] as const;
+const HUB_PROYECTOS_PATH = "/proyectos";
 
 type PlanillaApi = ReturnType<typeof useJornada4Planilla>;
 
@@ -263,6 +266,18 @@ export function Jornada4SegmentosPanel({
           >
             <div className="flex justify-between items-center pt-2 gap-2 flex-wrap">
               <div className="flex gap-1.5">
+                <NavTransitionLink
+                  href={HUB_PROYECTOS_PATH}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-sky-400/35 bg-sky-400/10 text-sky-400"
+                >
+                  <span
+                    className="inline-flex items-center gap-1"
+                    data-testid="jornada4-abrir-hub"
+                  >
+                    <ExternalLink size={10} />
+                    Hub Proyectos
+                  </span>
+                </NavTransitionLink>
                 <button
                   type="button"
                   onClick={() => setShowRutinas(v => !v)}

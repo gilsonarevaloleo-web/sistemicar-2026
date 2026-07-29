@@ -89,7 +89,7 @@ const STEPS_ESTUDIANTE_EXTRA: TutorialStep[] = [
     title: "Proyectos y peldaños",
     description:
       "En Hub Proyectos subes una escalera de peldaños. Puedes vincular un segmento al proyecto para claridad mental.",
-    action: "Abre Proyectos desde el menú y revisa tu escalera activa.",
+    action: "Desde Jornada → Plan → Hub Proyectos, revisa tu escalera activa.",
   },
 ];
 
@@ -164,7 +164,7 @@ export function getPrimerDiaItems(profile: PlanificacionPlanProfile): PrimerDiaI
     items.push({
       key: "proyecto",
       label: "Revisé o avancé un peldaño en Proyectos",
-      hint: "Menú → Proyectos → escalera activa.",
+      hint: "Jornada → Plan → Hub Proyectos → escalera activa.",
       requires: "proyecto",
     });
   }
