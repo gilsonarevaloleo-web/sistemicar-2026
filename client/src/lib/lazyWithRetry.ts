@@ -25,10 +25,9 @@ export function lazyWithRetry<T extends ComponentType<unknown>>(
   });
 }
 
-/** Precarga chunks de Jornada (menú → transición más rápida). */
+/** Precarga chunk de Jornada V4 (menú → transición más rápida). */
 export function prefetchJornadaChunk(): Promise<void> {
-  return Promise.all([
-    import("@/pages/planeacionV3").catch(() => null),
-    import("@/pages/planeacion").catch(() => null),
-  ]).then(() => undefined);
+  return import("@/pages/jornadaV4")
+    .catch(() => null)
+    .then(() => undefined);
 }

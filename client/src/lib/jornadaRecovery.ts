@@ -65,7 +65,7 @@ export function runJornadaRecovery(opts?: { archiveSituacion?: boolean }): void 
 
 export function reloadJornadaHard(): void {
   const url = new URL(window.location.href);
-  url.pathname = "/planeacion";
+  url.pathname = "/jornada-v4";
   url.searchParams.set("_jr", String(Date.now()));
   window.location.replace(url.toString());
 }

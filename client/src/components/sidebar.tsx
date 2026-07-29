@@ -30,17 +30,20 @@ import { useAuthContext } from "@/App";
 import { subscribeToProgression, UserProgression } from "@/lib/persistence";
 import { isOwner } from "@/lib/owner";
 import { getUserEmail } from "@/lib/firebase";
-import { JORNADA_MODULE, JORNADA_V3_PATH } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 
 type NavItem = { path: string; icon: React.ElementType; label: string };
 
 function isNavPathActive(location: string, itemPath: string): boolean {
-  if (itemPath === JORNADA_V3_PATH) {
-    return location === JORNADA_V3_PATH || location === "/planeacion-v3";
-  }
-  if (itemPath === "/planeacion") {
-    return location === "/planeacion";
+  if (itemPath === JORNADA_V4_PATH) {
+    return (
+      location === JORNADA_V4_PATH ||
+      location.startsWith(`${JORNADA_V4_PATH}?`) ||
+      location === "/planeacion" ||
+      location === "/jornada-v3" ||
+      location === "/planeacion-v3"
+    );
   }
   return location === itemPath;
 }
@@ -125,8 +128,7 @@ export function Sidebar() {
     { path: "/espejo", icon: Terminal, label: "Espejo" },
     { path: "/radar", icon: Radio, label: "Radar" },
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
-    { path: "/planeacion", icon: Compass, label: JORNADA_MODULE.title },
-    { path: JORNADA_V3_PATH, icon: Zap, label: "Jornada V3" },
+    { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
     { path: "/proyectos", icon: Layers, label: "Proyectos" },
     { path: "/esperanza", icon: Sparkles, label: "Esperanza" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
@@ -306,7 +308,7 @@ export function Sidebar() {
                 { path: "/menu", icon: Home, label: "Menú", color: "#A855F7" },
                 { path: "/espejo", icon: Terminal, label: "Espejo", color: "#3B82F6" },
                 { path: "/alquimia", icon: Flame, label: "Sabiduría", color: "#EF4444" },
-                { path: "/planeacion", icon: Compass, label: "Plan", color: "#7C3AED" },
+                { path: JORNADA_V4_PATH, icon: Compass, label: "Plan", color: "#7C3AED" },
               ]
             : [
                 { path: "/menu", icon: Home, label: "Menú", color: "#A855F7" },

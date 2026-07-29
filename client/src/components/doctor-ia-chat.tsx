@@ -43,7 +43,7 @@ interface ChatMessage {
 
 const MODULE_NAMES: Record<string, string> = {
   "/espejo": "Espejo",
-  "/planeacion": "Planificación",
+  "/jornada-v4": "Jornada",
   "/alquimia": "Alquimia",
   "/esperanza": "Depósito de Esperanza",
   "/historial": "Historial",
@@ -83,7 +83,7 @@ export function DoctorIAChat() {
 
   const isCreator = isOwner(user?.email);
   const currentModule = MODULE_NAMES[location] || null;
-  const isPlanificacionModule = location === "/planeacion";
+  const isPlanificacionModule = location === "/jornada-v4" || location.startsWith("/jornada-v4?");
   const [planificacionProfile, setPlanificacionProfile] =
     useState<PlanificacionPlanProfile>("base");
 

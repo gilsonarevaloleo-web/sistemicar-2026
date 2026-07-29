@@ -26,7 +26,7 @@ function postAttentionNotification(opts: {
     });
     n.onclick = () => {
       window.focus();
-      window.location.href = "/planeacion";
+      window.location.href = "/jornada-v4";
       n.close();
     };
   } catch {

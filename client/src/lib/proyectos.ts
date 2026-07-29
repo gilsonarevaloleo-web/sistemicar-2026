@@ -913,5 +913,5 @@ export function buildLaunchUrl(
   launch: "desglosador_tiempo" | "desglosador_situacion"
 ): string {
   const q = new URLSearchParams({ proyectoId, peldanoId, launch });
-  return `/planeacion?${q.toString()}`;
+  return `/jornada-v4?${q.toString()}`;
 }

@@ -1,10 +1,6 @@
 import { SISTEMICAR_CATEGORY } from "./sistemicarCategory";
 
-/** Identidad visible del módulo `/planeacion` (capa usuario). */
-/** Ruta del laboratorio modular (no sustituye `/planeacion` en producción). */
-export const JORNADA_V3_PATH = "/jornada-v3" as const;
-
-/** Dual Kernel — solo Conquista + Situacional + PS (anti-freeze). */
+/** Dual Kernel — flujo de producción de Jornada (anti-freeze). */
 export const JORNADA_V4_PATH = "/jornada-v4" as const;
 
 /** True en `/jornada-v4` (y query). Usado para pausar motores globales del App shell. */

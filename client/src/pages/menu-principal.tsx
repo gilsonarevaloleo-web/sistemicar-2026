@@ -66,7 +66,7 @@ import { useAuthContext } from "@/App";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
-import { JORNADA_MODULE, JORNADA_V3_PATH, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
+import { JORNADA_MODULE, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
 import { resetVoicePlaybackCache } from "@/lib/voicePlaybackCacheReset";
 
@@ -127,24 +127,8 @@ function buildMenuItems(
       title: JORNADA_MODULE.titleUpper,
       subtitle: JORNADA_MODULE.tagline,
       icon: Heart,
-      route: "/planeacion",
-      color: SPECTRUM.VERDE,
-    });
-    items.push({
-      id: "jornada-v4",
-      title: `${JORNADA_MODULE.titleUpper} V4`,
-      subtitle: "Dual Kernel · solo conquista + situacional",
-      icon: Zap,
       route: JORNADA_V4_PATH,
-      color: "#c4a35a",
-    });
-    items.push({
-      id: "jornada-v3",
-      title: `${JORNADA_MODULE.titleUpper} V3`,
-      subtitle: "Laboratorio modular (4 vehículos)",
-      icon: Zap,
-      route: JORNADA_V3_PATH,
-      color: "#D4AF37",
+      color: SPECTRUM.VERDE,
     });
   }
 
@@ -821,10 +805,6 @@ export default function MenuPrincipal() {
                     onPointerEnter={() => {
                       if (
                         item.id === "planificacion" ||
-                        item.id === "jornada-v3" ||
-                        item.id === "jornada-v4" ||
-                        item.route === "/planeacion" ||
-                        item.route === JORNADA_V3_PATH ||
                         item.route === JORNADA_V4_PATH
                       ) {
                         prefetchJornadaChunk();
@@ -1110,7 +1090,7 @@ export default function MenuPrincipal() {
             const navItems = [
               { icon: Eye, color: SPECTRUM.ROJO, route: "/espejo", label: "Espejo" },
               ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
-                ? [{ icon: Heart, color: SPECTRUM.VERDE, route: "/planeacion", label: JORNADA_MODULE.title }]
+                ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
               ...(previewUnlocked || hasSoberaniaDiaAccess(...accessArgs)
                 ? [{ icon: Layers, color: "#38BDF8", route: "/proyectos", label: "Proyectos" }]

@@ -265,7 +265,7 @@ function OracleSuggestions({
       return { route: "/esperanza", label: "Ir a Esperanza", icon: <Heart size={14} /> };
     }
     if (lower.includes("plan") || lower.includes("estructur")) {
-      return { route: "/planeacion", label: "Ir a Planeación", icon: <Target size={14} /> };
+      return { route: "/jornada-v4", label: "Ir a Jornada", icon: <Target size={14} /> };
     }
     if (lower.includes("oráculo") || lower.includes("consult")) {
       return { route: "/oraculo", label: "Consultar Oráculo", icon: <Brain size={14} /> };

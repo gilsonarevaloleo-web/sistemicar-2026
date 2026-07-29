@@ -76,8 +76,6 @@ export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location] = useLocation();
   const isPlanificacion =
-    location === "/planeacion" ||
-    location.startsWith("/planeacion?") ||
     location === "/jornada-v4" ||
     location.startsWith("/jornada-v4?");
   const [isOpen, setIsOpen] = useState(false);
@@ -95,7 +93,7 @@ export function CierreJornadaModal() {
   const [dailySovereigntyPoints, setDailySovereigntyPoints] = useState(0);
   const [dailyPointsLogs, setDailyPointsLogs] = useState<SovereigntyPointsLog[]>([]);
 
-  // Sin listeners en /planeacion ni Dual Kernel (la UI ya no monta el modal ahí).
+  // Sin listeners en Dual Kernel (la UI ya no monta el modal ahí).
   useEffect(() => {
     if (!user || isPlanificacion) return;
     
