@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, ListTodo, Plus, Rocket, Trash2, X } from "lucide-react";
+import { Clock, ListTodo, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
@@ -8,17 +8,24 @@ import {
   getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
-import type { DesglosadorSubFormRow } from "@/lib/executeFlotaLaunch";
+import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
 import {
   projectDesglosadorEndFromSubs,
   projectUnitEndLabel,
 } from "@/jornada4/desglosadorProjection";
 import {
+  desglosadorProfundidadLabel,
+  desglosadorProfundidadPotencialPs,
+} from "@/jornada4/desglosadorProfundidad";
+import {
   resolveDefaultObjetivoHoraParaRing,
   situacionMinutosHastaObjetivoHora,
 } from "@/lib/situacionGanancia";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
+import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
@@ -34,6 +41,10 @@ type Props = {
   segmentoHoraFin?: string | null;
   /** Nombre del segmento activo (chip en launcher). */
   segmentoActivoNombre?: string | null;
+  /** Hub de proyectos para dirección (segmento / vehículo / sub). */
+  proyectosHub?: Proyecto[];
+  /** Dirección por defecto del segmento activo. */
+  defaultProyectoId?: string | null;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -79,14 +90,22 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   disabled = false,
   segmentoHoraFin = null,
   segmentoActivoNombre = null,
+  proyectosHub = [],
+  defaultProyectoId = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tipo, setTipo] = useState<(typeof V4_TIPOS)[number] | null>(null);
+  const [modo, setModo] = useState<FlotaLaunchModo>("rapido");
   const [titulo, setTitulo] = useState("");
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
-  const [conquistaHoraFin, setConquistaHoraFin] = useState("");
+  const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
+  const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
+  /** Conquista multi: un desglosador en secuencia vs N tareas independientes. */
+  const [conquistaMultiModo, setConquistaMultiModo] = useState<
+    "secuencia" | "independientes"
+  >("secuencia");
   const [situacionHoraFin, setSituacionHoraFin] = useState(() =>
     resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
@@ -107,22 +126,37 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [open]);
 
   useEffect(() => {
-    if (tipo !== "tiempo" || titulo.trim().length < 3) {
+    const onOpen = () => {
+      setTipo(null);
+      setOpen(true);
+    };
+    window.addEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+    return () => window.removeEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
+  }, []);
+
+  useEffect(() => {
+    if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
       setHistorialSubs([]);
       return;
     }
     setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
-  }, [titulo, tipo]);
+  }, [titulo, tipo, modo]);
 
   const missionSuggestions =
-    tipo === "tiempo" && titulo.trim().length >= 2
+    tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
       ? getDesglosadorMisionData(titulo, 5)
       : [];
 
   const projection = useMemo(() => {
     void tick;
+    if (tipo !== "tiempo") return null;
     return projectDesglosadorEndFromSubs(subs);
-  }, [subs, tick]);
+  }, [subs, tick, tipo]);
+
+  const profundidadePs = useMemo(() => {
+    const n = subs.filter(s => s.titulo.trim()).length;
+    return desglosadorProfundidadPotencialPs(n);
+  }, [subs]);
 
   const situacionMinHasta = useMemo(() => {
     if (!situacionHoraFin.trim()) return null;
@@ -130,20 +164,23 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [situacionHoraFin, tick]);
 
   useEffect(() => {
-    if (tipo === "situacion") {
+    if (tipo === "situacion" && modo === "desglose") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
           defaultHoraPlus(30)
       );
     }
-  }, [segmentoHoraFin, tipo]);
+  }, [segmentoHoraFin, tipo, modo]);
 
   const reset = useCallback(() => {
     setTipo(null);
+    setModo("rapido");
     setTitulo("");
     setSubs([makeSub()]);
     setFilas([""]);
-    setConquistaHoraFin("");
+    setFilasProyectoIds([""]);
+    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
+    setConquistaMultiModo("secuencia");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
         defaultHoraPlus(30)
@@ -153,10 +190,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setHistorialSubs([]);
     setActiveSubSugIdx(null);
     setOpen(false);
-  }, [segmentoHoraFin]);
+  }, [segmentoHoraFin, defaultProyectoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     setTipo(t);
+    // Conquista = siempre desglosador (1 tarea → crece). Enfoque = lista libre primero.
+    setModo(t === "tiempo" ? "desglose" : "rapido");
+    setConquistaMultiModo("secuencia");
+    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -165,45 +206,98 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
-  }, [terminoDetalle, segmentoHoraFin]);
+  }, [terminoDetalle, segmentoHoraFin, defaultProyectoId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setVehiculoProyectoId(prev => prev || defaultProyectoId?.trim() || "");
+  }, [open, defaultProyectoId]);
 
   const canLaunch =
-    titulo.trim().length > 0 &&
     tipo != null &&
     (tipo === "tiempo"
-      ? subs.some(s => s.titulo.trim())
-      : filas.some(f => f.trim()) && situacionMinHasta != null);
+      ? (() => {
+          const validSubs = subs.filter(
+            s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
+          );
+          if (validSubs.length === 0) return false;
+          // Independientes: cada unidad es su propia misión.
+          if (validSubs.length > 1 && conquistaMultiModo === "independientes") {
+            return true;
+          }
+          // Desglosador (secuencia): requiere nombre de misión.
+          return titulo.trim().length > 0;
+        })()
+      : modo === "rapido"
+        ? filas.some(f => f.trim())
+        : titulo.trim().length > 0 &&
+          filas.some(f => f.trim()) &&
+          situacionMinHasta != null);
 
   const handleLaunch = useCallback(async () => {
     if (!tipo || saving || !canLaunch) return;
     setSaving(true);
     try {
-      const id = await onLaunch({
-        titulo,
-        tipoFlota: tipo,
-        desglosadorSubs: tipo === "tiempo" ? subs : undefined,
-        situacionFilas: tipo === "situacion" ? filas : undefined,
-        situacionObjetivoHora: tipo === "situacion" ? situacionHoraFin.trim() : undefined,
-        terminoDetalle:
-          tipo === "situacion"
-            ? terminoDetalle
-            : conquistaHoraFin.trim() || undefined,
-      });
+      const dirVehiculo = vehiculoProyectoId.trim() || undefined;
+      const validSubs = subs.filter(
+        s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
+      );
+
+      let id: string | null = null;
+      if (tipo === "tiempo") {
+        const asIndependientes =
+          validSubs.length > 1 && conquistaMultiModo === "independientes";
+        id = await onLaunch({
+          titulo: asIndependientes
+            ? ""
+            : titulo.trim() || validSubs[0]!.titulo.trim(),
+          tipoFlota: "tiempo",
+          modo: "desglose",
+          desglosadorSubs: asIndependientes ? undefined : validSubs,
+          tareasIndependientes: asIndependientes ? validSubs : undefined,
+          conquistaComoIndependientes: asIndependientes,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      } else if (modo === "rapido") {
+        id = await onLaunch({
+          titulo: "",
+          tipoFlota: "situacion",
+          modo: "rapido",
+          situacionFilas: filas,
+          situacionFilasProyectoIds: filasProyectoIds,
+          terminoDetalle,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      } else {
+        id = await onLaunch({
+          titulo,
+          tipoFlota: "situacion",
+          modo: "desglose",
+          situacionFilas: filas,
+          situacionFilasProyectoIds: filasProyectoIds,
+          situacionObjetivoHora: situacionHoraFin.trim(),
+          terminoDetalle,
+          ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+        });
+      }
       if (id) reset();
     } finally {
       setSaving(false);
     }
   }, [
     tipo,
+    modo,
     saving,
     canLaunch,
     onLaunch,
     titulo,
     subs,
     filas,
+    filasProyectoIds,
+    vehiculoProyectoId,
     situacionHoraFin,
     terminoDetalle,
-    conquistaHoraFin,
+    conquistaMultiModo,
     reset,
   ]);
 
@@ -225,26 +319,25 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   };
 
   return (
-    <div className="px-3 pb-3 space-y-2.5 sm:px-4" data-testid="jornada4-launch">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: INK }}>
+    <div className="px-4 pb-3 space-y-3" data-testid="jornada4-launch">
+      <div className="flex items-end justify-between gap-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
             La Flota
+          </p>
+          <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
+            {FLOTA_SELECTOR_DISCRIMINATOR}
           </p>
           {segmentoActivoNombre ? (
             <p
-              className="text-[9px] mt-0.5 font-bold truncate"
+              className="text-[9px] mt-1 font-bold"
               style={{ color: EMERALD }}
               data-testid="jornada4-launch-seg-chip"
             >
               Lanza en · {segmentoActivoNombre}
               {segmentoHoraFin ? ` · meta ${segmentoHoraFin}` : ""}
             </p>
-          ) : (
-            <p className="text-[9px] mt-0.5 leading-snug truncate" style={{ color: MUTED }}>
-              {FLOTA_SELECTOR_DISCRIMINATOR}
-            </p>
-          )}
+          ) : null}
         </div>
         <button
           type="button"
@@ -253,16 +346,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
             setTipo(null);
             setOpen(true);
           }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider touch-manipulation shrink-0"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider touch-manipulation shrink-0"
           style={{
-            border: `1px solid ${GOLD}`,
-            backgroundColor: GOLD,
-            color: "#0a0a0a",
-            boxShadow: `0 0 16px ${GOLD}35`,
+            borderColor: `${GOLD}40`,
+            backgroundColor: `${GOLD}12`,
+            color: GOLD,
           }}
           data-testid="jornada4-launch-open"
         >
-          <Rocket size={13} /> Lanzar
+          <Rocket size={12} /> Lanzar
         </button>
       </div>
 
@@ -276,28 +368,25 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               type="button"
               disabled={disabled}
               onClick={() => openTipo(t)}
-              className="p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all hover:scale-[1.01] touch-manipulation disabled:opacity-40"
-              style={{
-                border: "1px solid rgba(64,64,64,0.95)",
-                backgroundColor: "rgba(23,23,23,0.55)",
-              }}
+              className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40"
+              style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }}
               data-testid={`jornada4-flota-${t}`}
             >
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${cfg.color}18` }}
+                className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: `${cfg.color}20` }}
               >
-                <Icon size={18} style={{ color: cfg.color }} />
+                <Icon size={20} style={{ color: cfg.color }} />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: cfg.color }}>
+              <span className="text-xs font-black uppercase tracking-wider" style={{ color: cfg.color }}>
                 {cfg.label}
               </span>
-              <span className="text-[8px] text-center leading-tight px-0.5" style={{ color: MUTED }}>
+              <span className="text-[9px] text-center leading-tight" style={{ color: MUTED }}>
                 {cfg.sublabel}
               </span>
               <span
-                className="text-[7px] font-bold px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: `${cfg.color}12`, color: cfg.color }}
+                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
               >
                 {cfg.relojLabel}
               </span>
@@ -305,6 +394,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           );
         })}
       </div>
+
+      <p className="text-center text-[9px]" style={{ color: MUTED }}>
+        Dual Kernel · solo estos 2 vehículos (sin descanso ni verdad)
+      </p>
 
       {open ? (
         <div
@@ -362,7 +455,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setTipo(t)}
+                        onClick={() => openTipo(t)}
                         className="p-3 rounded-xl border flex flex-col items-center gap-1.5 touch-manipulation"
                         style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }}
                         data-testid={`jornada4-launch-tipo-${t === "tiempo" ? "conquista" : "situacion"}`}
@@ -403,6 +496,117 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </button>
                   </div>
 
+                  {tipo === "situacion" ? (
+                  <div
+                    className="grid grid-cols-2 gap-2"
+                    data-testid="jornada4-launch-modo"
+                  >
+                    {(
+                      [
+                        {
+                          id: "rapido" as const,
+                          label: "Lista libre",
+                          hint: "Filas directas · sin meta ni presión",
+                          icon: Zap,
+                        },
+                        {
+                          id: "desglose" as const,
+                          label: "Ring",
+                          hint: "Filas + meta sellada",
+                          icon: ListTodo,
+                        },
+                      ] as const
+                    ).map(opt => {
+                      const Icon = opt.icon;
+                      const active = modo === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setModo(opt.id)}
+                          className="p-3 rounded-xl border text-left touch-manipulation"
+                          style={{
+                            borderColor: active
+                              ? `${FLOTA_CONFIG[tipo].color}55`
+                              : "rgba(255,255,255,0.1)",
+                            backgroundColor: active
+                              ? `${FLOTA_CONFIG[tipo].color}12`
+                              : "rgba(255,255,255,0.02)",
+                          }}
+                          data-testid={`jornada4-launch-modo-${opt.id}`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Icon
+                              size={12}
+                              style={{
+                                color: active
+                                  ? FLOTA_CONFIG[tipo].color
+                                  : MUTED,
+                              }}
+                            />
+                            <span
+                              className="text-[10px] font-black uppercase"
+                              style={{
+                                color: active
+                                  ? FLOTA_CONFIG[tipo].color
+                                  : MUTED,
+                              }}
+                            >
+                              {opt.label}
+                            </span>
+                          </div>
+                          <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                            {opt.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  ) : (
+                  <div
+                    className="rounded-xl border px-3 py-2.5 space-y-1"
+                    style={{
+                      borderColor: `${ORANGE}35`,
+                      backgroundColor: "rgba(249,115,22,0.08)",
+                    }}
+                    data-testid="jornada4-conquista-modo-hint"
+                  >
+                    <p className="text-[10px] font-black uppercase" style={{ color: ORANGE }}>
+                      {subs.filter(s => s.titulo.trim()).length > 1 &&
+                      conquistaMultiModo === "independientes"
+                        ? "Independientes · sin secuencia"
+                        : "Desglosador · secuencia"}
+                    </p>
+                    <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                      Misión + unidades con cantidad y récord. Al añadir 2+ unidades puedes
+                      elegir secuencia (un desglosador) o independientes.
+                    </p>
+                  </div>
+                  )}
+
+                  {/* Dirección del vehículo (hereda segmento; se puede cambiar). */}
+                  <SegmentoProyectoSelect
+                    value={vehiculoProyectoId}
+                    onChange={setVehiculoProyectoId}
+                    proyectos={proyectosHub}
+                    compact
+                    label="Dirección del vehículo"
+                    emptyLabel={
+                      defaultProyectoId
+                        ? "Heredar del segmento"
+                        : "Sin dirección"
+                    }
+                    hint="Default = segmento. Cámbialo si esta misión es de otro proyecto."
+                    testId="jornada4-launch-dir-vehiculo"
+                  />
+
+                  {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
+                  {((tipo === "tiempo" &&
+                    !(
+                      subs.filter(s => s.titulo.trim()).length > 1 &&
+                      conquistaMultiModo === "independientes"
+                    )) ||
+                    (tipo === "situacion" && modo === "desglose")) ? (
                   <div>
                     <label
                       className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
@@ -420,13 +624,18 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           }
                         }}
                         onFocus={() => {
-                          if (tipo === "tiempo" && titulo.trim().length >= 2) {
+                          if (
+                            tipo === "tiempo" &&
+                            titulo.trim().length >= 2
+                          ) {
                             setShowMissionSugs(true);
                           }
                         }}
                         onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
                         placeholder={
-                          tipo === "tiempo" ? "Ej: Producción del día" : "Ej: Enfoque de la tarde"
+                          tipo === "tiempo"
+                            ? "Ej: Armado de bolsillo"
+                            : "Ej: Enfoque de la tarde"
                         }
                         className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
                         style={{
@@ -491,6 +700,100 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       ) : null}
                     </div>
                   </div>
+                  ) : null}
+
+                  {modo === "rapido" && tipo === "situacion" ? (
+                    <div className="space-y-3" data-testid="jornada4-launch-lista-libre">
+                      <p
+                        className="text-[9px] leading-snug rounded-xl border px-3 py-2.5"
+                        style={{
+                          color: MUTED,
+                          borderColor: "rgba(255,255,255,0.08)",
+                          backgroundColor: "rgba(255,255,255,0.03)",
+                        }}
+                      >
+                        Lista libre: vas directo a las tareas. Sin título de misión, sin meta
+                        de ring, sin presión de tiempo. Puedes añadir más filas.
+                      </p>
+                      <p
+                        className="text-[10px] font-black uppercase tracking-wider"
+                        style={{ color: FLOTA_CONFIG.situacion.color }}
+                      >
+                        Tareas
+                      </p>
+                      {filas.map((fila, idx) => (
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex gap-2 items-center">
+                            <span
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                              style={{
+                                backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
+                                color: FLOTA_CONFIG.situacion.color,
+                              }}
+                            >
+                              {idx + 1}
+                            </span>
+                            <input
+                              value={fila}
+                              onChange={e => {
+                                const next = [...filas];
+                                next[idx] = e.target.value;
+                                setFilas(next);
+                              }}
+                              placeholder={`Tarea ${idx + 1}`}
+                              className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
+                              autoFocus={idx === 0}
+                              data-testid={`jornada4-launch-libre-fila-${idx}`}
+                            />
+                            {filas.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilas(filas.filter((_, i) => i !== idx));
+                                  setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/5"
+                              >
+                                <Trash2 size={14} style={{ color: MUTED }} />
+                              </button>
+                            ) : null}
+                          </div>
+                          <SegmentoProyectoSelect
+                            value={filasProyectoIds[idx] ?? ""}
+                            onChange={id => {
+                              setFilasProyectoIds(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = id;
+                                return next;
+                              });
+                            }}
+                            proyectos={proyectosHub}
+                            compact
+                            label="Dirección de esta fila"
+                            emptyLabel="Heredar del vehículo"
+                            testId={`jornada4-launch-libre-dir-${idx}`}
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilas([...filas, ""]);
+                          setFilasProyectoIds([...filasProyectoIds, ""]);
+                        }}
+                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        style={{
+                          backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
+                          color: FLOTA_CONFIG.situacion.color,
+                          border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
+                        }}
+                      >
+                        <Plus size={12} /> Añadir tarea
+                      </button>
+                    </div>
+                  ) : null}
 
                   {tipo === "tiempo" && historialSubs.length > 0 ? (
                     <div
@@ -561,39 +864,71 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       </div>
 
-                      {/* Meta de ciclo en hora real (opcional) */}
-                      <div
-                        className="rounded-xl border-2 p-3 space-y-2"
-                        style={{
-                          borderColor: `${CYAN}35`,
-                          backgroundColor: "rgba(0,255,195,0.05)",
-                        }}
-                        data-testid="jornada4-conquista-hora-fin"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Clock size={12} style={{ color: CYAN }} />
-                          <label
-                            className="text-[10px] font-black uppercase tracking-wider"
-                            style={{ color: CYAN }}
-                          >
-                            Termina a las (meta del ciclo)
-                          </label>
+                      {subs.filter(s => s.titulo.trim()).length > 1 ? (
+                        <div
+                          className="grid grid-cols-2 gap-2"
+                          data-testid="jornada4-conquista-multi-modo"
+                        >
+                          {(
+                            [
+                              {
+                                id: "secuencia" as const,
+                                label: "Secuencia",
+                                hint: "Un desglosador · orden fijo",
+                              },
+                              {
+                                id: "independientes" as const,
+                                label: "Independientes",
+                                hint: "N misiones · sin secuencia",
+                              },
+                            ] as const
+                          ).map(opt => {
+                            const active = conquistaMultiModo === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setConquistaMultiModo(opt.id)}
+                                className="p-2.5 rounded-xl border text-left touch-manipulation"
+                                style={{
+                                  borderColor: active ? `${ORANGE}55` : "rgba(255,255,255,0.1)",
+                                  backgroundColor: active
+                                    ? "rgba(249,115,22,0.12)"
+                                    : "rgba(255,255,255,0.02)",
+                                }}
+                                data-testid={`jornada4-conquista-multi-${opt.id}`}
+                              >
+                                <span
+                                  className="text-[10px] font-black uppercase"
+                                  style={{ color: active ? ORANGE : MUTED }}
+                                >
+                                  {opt.label}
+                                </span>
+                                <p className="text-[8px] mt-0.5" style={{ color: MUTED }}>
+                                  {opt.hint}
+                                </p>
+                              </button>
+                            );
+                          })}
                         </div>
-                        <input
-                          type="time"
-                          value={conquistaHoraFin}
-                          onChange={e => setConquistaHoraFin(e.target.value)}
-                          className="w-full p-3 rounded-xl bg-black/60 border-2 text-lg font-mono font-black tabular-nums focus:outline-none"
-                          style={{
-                            color: INK,
-                            borderColor: conquistaHoraFin ? CYAN : "rgba(255,255,255,0.12)",
-                          }}
-                          data-testid="jornada4-launch-hora-fin-conquista"
-                        />
-                        <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                          Elige la hora de pared en que quieres cerrar el desglosador.
-                          La proyección abajo suma las unidades (cant × MIN/U).
-                        </p>
+                      ) : null}
+
+                      <div
+                        className="rounded-xl border px-3 py-2.5 flex items-center justify-between gap-2"
+                        style={{
+                          borderColor: `${GOLD}35`,
+                          backgroundColor: "rgba(212,175,55,0.08)",
+                        }}
+                        data-testid="jornada4-launch-profundidad"
+                      >
+                        <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: GOLD }}>
+                          {desglosadorProfundidadLabel(
+                            subs.filter(s => s.titulo.trim()).length
+                          )}
+                        </span>
+                        <span className="text-[11px] font-black font-mono" style={{ color: GOLD }}>
+                          {profundidadePs} PS
+                        </span>
                       </div>
 
                       {subs.map((sub, idx) => {
@@ -836,6 +1171,24 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
+                            <SegmentoProyectoSelect
+                              value={sub.proyectoId ?? ""}
+                              onChange={id => {
+                                setSubs(prev =>
+                                  prev.map((s, i) =>
+                                    i === idx
+                                      ? { ...s, proyectoId: id || undefined }
+                                      : s
+                                  )
+                                );
+                              }}
+                              proyectos={proyectosHub}
+                              compact
+                              label="Dirección de esta unidad"
+                              emptyLabel="Heredar del vehículo"
+                              hint="Sub ≠ proyecto del segmento → elige aquí."
+                              testId={`jornada4-launch-sub-dir-${idx}`}
+                            />
                           </div>
                         );
                       })}
@@ -865,23 +1218,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       )}
 
-                      {conquistaHoraFin && projection ? (
-                        <p
-                          className="text-[9px] text-center font-mono"
-                          style={{
-                                color:
-                              situacionMinutosHastaObjetivoHora(conquistaHoraFin) != null &&
-                              (situacionMinutosHastaObjetivoHora(conquistaHoraFin) ?? 0) <
-                                projection.totalMin
-                                ? "#FF3131"
-                                : EMERALD,
-                          }}
-                          data-testid="jornada4-launch-meta-vs-proy"
-                        >
-                          Meta {conquistaHoraFin} · proyección {projection.finLabel}
-                        </p>
-                      ) : null}
-
                       <button
                         type="button"
                         onClick={() => setSubs([...subs, makeSub()])}
@@ -895,7 +1231,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         <Plus size={12} /> Añadir unidad
                       </button>
                     </div>
-                  ) : (
+                  ) : tipo === "situacion" && modo === "desglose" ? (
                     <div className="space-y-3">
                       <div>
                         <label
@@ -954,41 +1290,65 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         Filas del ring
                       </p>
                       {filas.map((fila, idx) => (
-                        <div key={idx} className="flex gap-2 items-center">
-                          <span
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
-                            style={{
-                              backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
-                              color: FLOTA_CONFIG.situacion.color,
-                            }}
-                          >
-                            {idx + 1}
-                          </span>
-                          <input
-                            value={fila}
-                            onChange={e => {
-                              const next = [...filas];
-                              next[idx] = e.target.value;
-                              setFilas(next);
-                            }}
-                            placeholder={`Fila ${idx + 1}`}
-                            className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
-                            style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
-                          />
-                          {filas.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => setFilas(filas.filter((_, i) => i !== idx))}
-                              className="p-2 rounded-lg hover:bg-white/5"
+                        <div key={idx} className="space-y-1.5">
+                          <div className="flex gap-2 items-center">
+                            <span
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0"
+                              style={{
+                                backgroundColor: `${FLOTA_CONFIG.situacion.color}22`,
+                                color: FLOTA_CONFIG.situacion.color,
+                              }}
                             >
-                              <Trash2 size={14} style={{ color: MUTED }} />
-                            </button>
-                          ) : null}
+                              {idx + 1}
+                            </span>
+                            <input
+                              value={fila}
+                              onChange={e => {
+                                const next = [...filas];
+                                next[idx] = e.target.value;
+                                setFilas(next);
+                              }}
+                              placeholder={`Fila ${idx + 1}`}
+                              className="flex-1 p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
+                              style={{ color: INK, borderColor: "rgba(255,255,255,0.14)" }}
+                            />
+                            {filas.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilas(filas.filter((_, i) => i !== idx));
+                                  setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-lg hover:bg-white/5"
+                              >
+                                <Trash2 size={14} style={{ color: MUTED }} />
+                              </button>
+                            ) : null}
+                          </div>
+                          <SegmentoProyectoSelect
+                            value={filasProyectoIds[idx] ?? ""}
+                            onChange={id => {
+                              setFilasProyectoIds(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = id;
+                                return next;
+                              });
+                            }}
+                            proyectos={proyectosHub}
+                            compact
+                            label="Dirección de esta fila"
+                            emptyLabel="Heredar del vehículo"
+                            testId={`jornada4-launch-ring-dir-${idx}`}
+                          />
                         </div>
                       ))}
                       <button
                         type="button"
-                        onClick={() => setFilas([...filas, ""])}
+                        onClick={() => {
+                          setFilas([...filas, ""]);
+                          setFilasProyectoIds([...filasProyectoIds, ""]);
+                        }}
                         className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
                           backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
@@ -999,7 +1359,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         <Plus size={12} /> Añadir fila
                       </button>
                     </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>
@@ -1019,14 +1379,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     data-testid="jornada4-launch-cta-proy"
                   >
                     Fin proyectado ≈ {projection.finLabel}
-                    {conquistaHoraFin ? ` · meta ${conquistaHoraFin}` : ""}
+                    {profundidadePs > 0 ? ` · profundidad ${profundidadePs} PS` : ""}
+                  </p>
+                ) : null}
+                {tipo === "tiempo" && !projection && profundidadePs > 0 ? (
+                  <p
+                    className="mb-2 text-center text-[10px] font-mono font-black"
+                    style={{ color: GOLD }}
+                    data-testid="jornada4-launch-cta-profundidad"
+                  >
+                    Profundidad {profundidadePs} PS
                   </p>
                 ) : null}
                 {!canLaunch ? (
                   <p className="mb-2 text-center text-[9px]" style={{ color: MUTED }}>
                     {tipo === "tiempo"
-                      ? "Escribe nombre de misión + al menos una unidad"
-                      : "Escribe misión + filas + hora de término"}
+                      ? conquistaMultiModo === "independientes" &&
+                        subs.filter(s => s.titulo.trim()).length > 1
+                        ? "Cada unidad necesita nombre + cantidad"
+                        : "Misión + unidades (nombre y cantidad)"
+                      : modo === "rapido"
+                        ? "Escribe al menos una tarea de la lista"
+                        : "Escribe misión + filas + hora de término"}
                   </p>
                 ) : null}
                 <button
@@ -1043,7 +1417,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   }}
                   data-testid="jornada4-launch-submit"
                 >
-                  {saving ? "Lanzando…" : "Lanzar vehículo"}
+                  {saving
+                    ? "Lanzando…"
+                    : tipo === "tiempo"
+                      ? conquistaMultiModo === "independientes" &&
+                        subs.filter(s => s.titulo.trim()).length > 1
+                        ? "Lanzar independientes"
+                        : "Lanzar desglosador"
+                      : modo === "rapido"
+                        ? "Lanzar lista libre"
+                        : "Lanzar ring"}
                 </button>
               </div>
             ) : null}

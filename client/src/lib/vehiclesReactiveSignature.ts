@@ -2,8 +2,8 @@ import type { Vehicle } from "./persistence";
 
 /**
  * Firma estable para reconcile/disco.
- * Debe incluir ancla + resultado de filas del ring: si se omiten, Cumplido
- * puede saltarse el flush a disco y rehidratarse el reloj viejo (freeze percibido).
+ * Debe incluir ancla + resultado de filas del ring Y de lista libre: si se omiten,
+ * Cumplido puede no notificar a React (firma igual) y la UI parece "muerta".
  */
 export function vehiclesReactiveSignature(vehicles: Vehicle[]): string {
   return vehicles
@@ -15,6 +15,14 @@ export function vehiclesReactiveSignature(vehicles: Vehicle[]): string {
         .map(
           st =>
             `${st.id}.${st.resultadoSituacion ?? "p"}.${st.minutosCupo ?? 0}.${st.cerradaAt ?? 0}`
+        )
+        .join(",");
+      // Lista libre / filas sin ring — sin esto Cumplido/Fallado no dispara re-render.
+      const libreSig = (v.subTareas ?? [])
+        .filter(st => !st.enDesgloseCronometro)
+        .map(
+          st =>
+            `${st.id}.${st.resultadoSituacion ?? "p"}.${st.completada ? 1 : 0}`
         )
         .join(",");
       const desgSig = (v.subVehiculos ?? [])
@@ -34,6 +42,7 @@ export function vehiclesReactiveSignature(vehicles: Vehicle[]): string {
         anchor?.subTareaId ?? "",
         anchor?.startedAt ?? 0,
         cronSig,
+        libreSig,
         desgSig,
         v.subTareas?.length ?? 0,
       ].join(":");

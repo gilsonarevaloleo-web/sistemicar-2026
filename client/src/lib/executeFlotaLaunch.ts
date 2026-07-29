@@ -1,4 +1,4 @@
-import { startTransition, type MutableRefObject } from "react";
+import { type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
   type CriterioFin,
@@ -74,13 +74,28 @@ export type DesglosadorSubFormRow = {
   titulo: string;
   cantidadObjetivo: string;
   tiempoRecordMinPerUnit?: number;
+  /** Dirección de proyecto de esta unidad (opcional). */
+  proyectoId?: string;
 };
+
+/** `rapido` = independientes (conquista: unidades sin secuencia; enfoque: lista libre). `desglose` = desglosador/ring. */
+export type FlotaLaunchModo = "rapido" | "desglose";
 
 export type FlotaLaunchForm = {
   titulo: string;
   tipoFlota: "tiempo" | "situacion";
   terminoDetalle?: string;
+  /** Default: desglose si hay subs; si se pasa explícito, manda. */
+  modo?: FlotaLaunchModo;
   desglosadorSubs?: DesglosadorSubFormRow[];
+  /** Conquista rápido: unidades de la tarea independiente (el título ES la tarea). */
+  cantidadObjetivo?: number;
+  tiempoRecordMinPerUnit?: number;
+  /**
+   * Dirección del vehículo (desglosador/misión).
+   * Si se omite, hereda del segmento activo vía resolverProyectoId.
+   */
+  proyectoId?: string;
 };
 
 export type ExecuteFlotaLaunchParams = {
@@ -154,12 +169,20 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     let detalle = "";
     let criterio: CriterioFin = "circunstancia";
     let tipoTermino: TipoTerminoRapido = "situacion";
-    const relojTiempo = tipoFlota === "tiempo" ? ("desglosador" as const) : undefined;
+    const desglosadorSubs = (form.desglosadorSubs ?? []).filter(s => s.titulo.trim());
+    const modo: FlotaLaunchModo = form.modo ?? "desglose";
+    const esDesglose = modo === "desglose";
+    // Conquista rápido = producción por unidades (tarea = título, sin secuencia).
+    const relojTiempo =
+      tipoFlota === "tiempo"
+        ? esDesglose
+          ? ("desglosador" as const)
+          : ("produccion" as const)
+        : undefined;
 
     if (tipoFlota === "tiempo") {
       criterio = "tiempo";
       tipoTermino = "hora";
-      // Meta opcional HH:mm — misma semántica que el reloj proyectivo clásico
       detalle = form.terminoDetalle?.trim() || "";
     } else {
       criterio = "circunstancia";
@@ -167,10 +190,17 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       detalle = form.terminoDetalle?.trim() || "Al cerrar este bloque";
     }
 
-    const desglosadorSubs = (form.desglosadorSubs ?? []).filter(s => s.titulo.trim());
-    if (tipoFlota === "tiempo" && desglosadorSubs.length === 0) {
+    if (tipoFlota === "tiempo" && esDesglose && desglosadorSubs.length === 0) {
       toast.error("Añade al menos un sub al desglosador");
       return null;
+    }
+
+    if (tipoFlota === "tiempo" && !esDesglose) {
+      const cant = form.cantidadObjetivo;
+      if (!(cant != null && Number.isFinite(cant) && cant > 0)) {
+        toast.error("Indica las unidades de la tarea rápida");
+        return null;
+      }
     }
 
     const bonoTemple = isNearDescanso(planilla);
@@ -181,7 +211,11 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       : null;
     const segActualNombre = segResuelto?.nombre ?? segmentoActivo?.nombre ?? undefined;
     const segActualId = segResuelto?.id ?? segmentoActivo?.id;
-    const resolvedProyectoId = resolverProyectoId(null);
+    const resolvedProyectoId = resolverProyectoId(
+      form.proyectoId?.trim()
+        ? { proyectoId: form.proyectoId.trim() }
+        : null
+    );
 
     const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
 
@@ -200,6 +234,17 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
         relojTiempo === "desglosador"
           ? desglosadorSubs.map((s, idx) => buildDesglosadorSubFromForm(s, idx, Date.now()))
           : undefined,
+      ...(relojTiempo === "produccion" && form.cantidadObjetivo != null
+        ? {
+            cantidadObjetivo: form.cantidadObjetivo,
+            ...(form.tiempoRecordMinPerUnit != null && form.tiempoRecordMinPerUnit > 0
+              ? {
+                  recordSugerido: form.tiempoRecordMinPerUnit,
+                  tiempoElegido: form.tiempoRecordMinPerUnit,
+                }
+              : {}),
+          }
+        : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,
