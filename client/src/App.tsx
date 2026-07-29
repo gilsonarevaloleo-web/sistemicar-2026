@@ -50,6 +50,7 @@ import EmbudoSistemicar from "@/pages/embudo-sistemicar";
 import Acceso from "@/pages/acceso";
 import Documentos from "@/pages/documentos";
 import Espejo from "@/pages/espejo";
+import EspejoV2 from "@/pages/espejo-v2";
 import EspejoExpedientes from "@/pages/espejo-expedientes";
 import EspejoExpedienteDetalle from "@/pages/espejo-expediente-detalle";
 import GraciasCompra from "@/pages/gracias-compra";
@@ -417,6 +418,7 @@ function Router() {
         <Route path="/embudo" component={EmbudoSistemicar} />
         <Route path="/documentos" component={Documentos} />
         <Route path="/vendedores-planificacion" component={VendedoresPlanificacion} />
+        <Route path="/espejo/v2" component={EspejoV2} />
         <Route path="/espejo" component={Espejo} />
         <Route path="/espejo/expedientes/:id" component={EspejoExpedienteDetalle} />
         <Route path="/espejo/expedientes" component={EspejoExpedientes} />

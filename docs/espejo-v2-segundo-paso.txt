@@ -1,0 +1,55 @@
+¡Excelente trabajo con el setup del backend, la API y la estructura de datos en la PR #21!
+
+Ahora vamos a perfeccionar y pulir la interfaz visual (UI/UX) de la ruta `/espejo/v2` para que la Consola del Espejo V2 sea una experiencia inmersiva, quirúrgica y de alta densidad de procesamiento.
+
+Sigue estas directrices exactas para perfeccionar el componente en `/espejo/v2`:
+
+---
+
+### 1. ESTÉICA Y ESTILO DE INTERFAZ (SISTEMICAR TERMINAL)
+- **Tema Visual:** Oscuro, minimalista, de alto contraste (estilo consola táctica / terminal de operaciones).
+- **Header Superior:**
+  - Título fijo: `PROC-ESPEJO // SISTEMICAR V2` (Fuente monospace, badge de estado en verde/azul `SISTEMA ACTIVO`).
+  - Muestra en tiempo real el código detectado: `FRECUENCIA: CÓDIGO 1.X - [NOMBRE DEL CÓDIGO]`
+- **Paneles de Control e Indicadores:**
+  - **Barra de Densidad del Polo Negativo:** Una barra visual de progreso (0% a 100%) que se va llenando dinámicamente conforme el usuario responde las Fases 1, 2 y 3.
+  - **Indicator de Fricción:** Un badge dinámico que muestra `FRICCIÓN: ESTÁNDAR (NIVEL 1)` o cambia a alerta en rojo `FRICCIÓN: REFRACCIÓN DETECTADA (NIVEL 2)` si ocurre un salto por colapso.
+
+---
+
+### 2. DINÁMICA DE INTERACCIÓN PASO A PASO (STEP-BY-STEP FLOW)
+
+#### Entrada Inicial:
+- Mostrar el campo de volcado con el prompt oficial:
+  > *"Bienvenido a la Consola del Espejo (Sistemicar V2). Expresa con claridad la queja, el bloqueo o la interferencia que sientes hoy en tu realidad. ¿Dónde sientes que tu esfuerzo no está traccionando?"*
+- Al enviar, invoca `/api/espejo-v2/clasificar`, bloquea la frecuencia y transiciona a la Fase 1.
+
+#### Ciclo de Fases (Fases 1 a 5):
+1. **Fases 1, 2 y 3 (Polo Negativo / Densificación):**
+   - Presenta la pregunta con rigor visual.
+   - El usuario responde en un área de texto limpia.
+   - Con cada respuesta, la barra de densidad aumenta (Fase 1: 33%, Fase 2: 66%, Fase 3: 100%).
+
+2. **Manejo de Refracción (Detectado en Fase 4 o 5):**
+   - Si la respuesta del usuario en la Fase 4 o 5 contiene un patrón o intención de colapso (*"no tengo ganas"*, *"perdí la fe"*, *"no sé qué hacer"*, *"tengo miedo"*):
+     - Cambia el badge a `FRICCIÓN NIVEL 2`.
+     - Muestra un banner táctico de interrupción:
+       `[INTERRUPCIÓN DE PROTOCOLO: REFRACCIÓN DETECTADA]`
+       *"La resistencia no está en la tarea, está en tu reserva de energía vital. Se ha reencuadrado la frecuencia al CÓDIGO [Nuevo Código]."*
+     - Salta automáticamente al nuevo código maestro en Nivel 2 e impone la Ley:
+       *"EL SISTEMA NO REQUIERE FE NI GANAS PARA EJECUTAR. LA ACCIÓN MÍNIMA EXIGE PRESENCIA, NO ENTUSIASMO."*
+
+3. **Fase 4 y 5 (Polo Positivo / Expulsión Gravitacional):**
+   - Muestra las cajas de salida de alta prioridad:
+     - **Acción Mínima (Hoy):** La tarea atómica e inmediata.
+     - **Acción Máxima:** El movimiento estratégico.
+     - **Mandato del Gobernador (Fase 5):** Un panel de cierre destacado donde se fija la soberanía, dignidad y razón irrenunciable del usuario.
+
+---
+
+### 3. REQUERIMIENTOS DE CÓDIGO Y UX
+- Agrega transiciones suaves (fade-in / slide-up) entre fases.
+- Permite un botón de `REINICIAR CONSOLA` o `NUEVO PROCESO` al finalizar para limpiar el estado.
+- Asegúrate de que el historial de respuestas del flujo actual quede visible en un acordeón o bitácora colapsable tipo "Log de Consola".
+
+Revisa y ajusta el componente de la ruta `/espejo/v2` con estos elementos. Confírmame cuando esté implementado para probar la interfaz.

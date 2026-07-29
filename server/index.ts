@@ -75,6 +75,7 @@ import { deliverCorazonSabioIfNeeded, parseMpExternalRef } from "./mercadopagoEs
 import { activateModulesForEmail, activateModulesForUserById, adminLookupUserByEmail, isFirebaseAdminReady } from "./firebaseAdmin";
 import { modulesGrantedByPlan } from "../shared/moduleAccess";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
+import { registerEspejoV2Routes } from "./espejoV2Routes";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -2228,6 +2229,8 @@ app.get("/api/mercadopago/test-link/:planId", async (req, res) => {
     res.status(500).json({ error: "Error generando enlace de prueba" });
   }
 });
+
+registerEspejoV2Routes(app, { callGemini, parseGeminiJSON });
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
   try {

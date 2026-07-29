@@ -1,0 +1,27 @@
+¡La arquitectura de la V2 ya es estable! Ahora vamos a activar la capa de razonamiento en tiempo real utilizando la API de Gemini que ya tenemos configurada en la plataforma.
+
+Actualmente, las preguntas de las Fases 1 a 5 son textos estáticos. Queremos que el sistema ANALICE lo que el usuario responde en cada paso antes de lanzar la siguiente fase.
+
+Por favor, modifica el handler de la API `/api/espejo-v2/fase` para que funcione con el siguiente flujo dinámico:
+
+---
+
+### 1. INYECCIÓN DEL PROMPT DE RAZONAMIENTO A GEMINI
+Cuando el usuario responde una Fase (por ejemplo, la Fase 1) y solicita avanzar a la siguiente (Fase 2):
+1. Envía a la API de Gemini:
+   - El Código Activo (ej. Código 1.3 - Tiempo).
+   - El historial del volcado inicial y las respuestas anteriores.
+   - La respuesta que el usuario acaba de ingresar.
+   - El marco del Código de Sistemicar actual.
+
+2. Pídele a Gemini que actúe bajo la persona del "Gobernador de Sistemicar":
+   - "Analiza quirúrgicamente la respuesta del usuario. Detecta si hay evasión, victimismo o dispersión."
+   - "Genera una devolución de 1 o 2 oraciones que confronte o valide lo que el usuario acaba de decir, y LUEGO formula la pregunta de la siguiente fase (Fase X) adaptada al contexto ESPECÍFICO que el usuario acaba de revelar."
+
+---
+
+### 2. MANTENER LA REFRACCIÓN ACTIVA
+- Antes de llamar a Gemini para la Fase 4 o 5, mantén la verificación de patrones de colapso ("no tengo ganas", "perdí la fe", etc.).
+- Si hay refracción, activa el salto de código como ya lo hace. Si no hay refracción, Gemini analiza la respuesta y genera la pregunta personalizada para la siguiente fase.
+
+Ajusta la API para que Gemini procese la respuesta del usuario en cada paso y la Consola V2 sea verdaderamente analítica e inteligente.
