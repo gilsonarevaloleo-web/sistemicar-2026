@@ -25,11 +25,9 @@ type Props = {
 export function Jornada4MobileNav({ value, onChange }: Props) {
   return (
     <nav
-      className="sticky top-[52px] z-20 px-3 pt-2 pb-1 sm:px-4"
+      className="px-3 pt-2 pb-1 sm:px-4"
       style={{
-        background:
-          "linear-gradient(180deg, rgba(10,10,10,0.96) 0%, rgba(10,10,10,0.88) 100%)",
-        backdropFilter: "blur(8px)",
+        backgroundColor: "rgba(10,10,10,0.92)",
       }}
       data-testid="jornada4-mobile-nav"
     >
