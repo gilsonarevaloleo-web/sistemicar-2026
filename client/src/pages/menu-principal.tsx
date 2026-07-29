@@ -30,7 +30,6 @@ import {
   Map,
   Zap,
   Rocket,
-  Layers,
   Scale,
   FileText,
   LogIn,
@@ -44,7 +43,7 @@ import { StatusAlianza } from "@/components/status-alianza";
 import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
-import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
+import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess } from "@/lib/persistence";
 import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
@@ -138,17 +137,6 @@ function buildMenuItems(
       icon: Heart,
       route: JORNADA_V4_PATH,
       color: SPECTRUM.VERDE,
-    });
-  }
-
-  if (previewOps || hasSoberaniaDiaAccess(...accessArgs)) {
-    items.push({
-      id: "proyectos",
-      title: "PROYECTOS",
-      subtitle: "Escalera de peldaños",
-      icon: Layers,
-      route: "/proyectos",
-      color: "#38BDF8",
     });
   }
 
@@ -1101,9 +1089,6 @@ export default function MenuPrincipal() {
               ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
                 ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
-              ...(previewUnlocked || hasSoberaniaDiaAccess(...accessArgs)
-                ? [{ icon: Layers, color: "#38BDF8", route: "/proyectos", label: "Proyectos" }]
-                : []),
             ];
 
             return navItems.map((item) => (

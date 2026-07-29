@@ -293,7 +293,7 @@ export const MASTER_MANUALS: Record<ManualType, MasterManual> = {
       {
         title: "PROYECTOS Y CLARIDAD",
         instruction:
-          "Hub Proyectos (Soberanía del día): peldaños, oleada/claridad activa. Puedes vincular segmento ↔ proyecto. La rutina da horarios; la claridad viene del Hub.",
+          "Hub Proyectos (Soberanía del día): peldaños, oleada/claridad activa. Entrá desde Jornada → Plan → Hub Proyectos. Puedes vincular segmento ↔ proyecto. La rutina da horarios; la claridad viene del Hub.",
         checklist: [
           { key: "plan_proy_1", text: "Tengo un proyecto con peldaños visibles" },
           { key: "plan_proy_2", text: "Marqué un peldaño o avance hoy" },
