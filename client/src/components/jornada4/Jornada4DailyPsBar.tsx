@@ -3,7 +3,7 @@ import { Zap } from "lucide-react";
 import { computeDailyPsBarModel } from "@/lib/dailyPsBar";
 import { J4_COLORS } from "./Jornada4Shell";
 
-const { PIZARRA, MUTED, GOLD } = J4_COLORS;
+const { MUTED, GOLD } = J4_COLORS;
 const CYAN = "#00FFC3";
 
 type Props = {
@@ -27,11 +27,10 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3"
+      className="mx-3 mb-3 rounded-xl border p-3 sm:mx-4"
       style={{
-        backgroundColor: PIZARRA,
-        borderColor: `${CYAN}28`,
-        boxShadow: `0 0 14px rgba(0,255,195,0.08)`,
+        backgroundColor: "rgba(23,23,23,0.55)",
+        borderColor: `${CYAN}22`,
       }}
       data-testid="jornada4-daily-ps-bar"
     >
@@ -56,7 +55,7 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
       </p>
 
       <p
-        className="text-[8px] font-bold mb-1.5 leading-snug"
+        className="text-[8px] font-bold mb-2 leading-snug"
         style={{ color: model.atOrAbove100 ? GOLD : CYAN }}
         data-testid="jornada4-daily-ps-status"
       >
@@ -64,7 +63,7 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
       </p>
 
       <div
-        className="relative h-3 rounded-full overflow-visible mb-1"
+        className="relative h-1.5 rounded-full overflow-visible mb-1"
         style={{ backgroundColor: "rgba(0,255,195,0.12)" }}
       >
         <div
@@ -72,7 +71,6 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
           style={{
             left: `${model.marker100WidthPct}%`,
             backgroundColor: model.atOrAbove100 ? `${GOLD}90` : "rgba(255,255,255,0.45)",
-            boxShadow: model.atOrAbove100 ? `0 0 6px ${GOLD}80` : "none",
           }}
         />
         <div
@@ -80,9 +78,6 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
           style={{
             width: `${model.fillWidthPct}%`,
             background: fillGradient,
-            boxShadow: model.atOrAbove120
-              ? `0 0 12px rgba(212,175,55,0.35)`
-              : `0 0 8px rgba(0,255,195,0.2)`,
           }}
           data-testid="jornada4-daily-ps-fill"
         />

@@ -1,9 +1,14 @@
 /**
  * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota + Crisol.
+ * UI móvil en pestañas (Operar / Plan / Métricas) — sin cambiar hooks ni timers.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
+import {
+  Jornada4MobileNav,
+  type Jornada4MobileTab,
+} from "@/components/jornada4/Jornada4MobileNav";
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
 import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
@@ -27,6 +32,7 @@ export default function JornadaV4Session() {
   const { user } = useAuthContext();
   const core = useJornada4Core();
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
+  const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
   const [yesterdayPs, setYesterdayPs] = useState(0);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
@@ -129,48 +135,63 @@ export default function JornadaV4Session() {
         dailyPS={core.dailyPS}
         statusLine={statusLine}
       />
+      <Jornada4MobileNav value={mobileTab} onChange={setMobileTab} />
       <div className="max-w-lg mx-auto pt-2">
-        <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
-        <Jornada4SegmentosPanel
-          planilla={planillaApi.planilla}
-          plantillasRutina={planillaApi.plantillasRutina}
-          segmentoActivo={planillaApi.segmentoActivo}
-          busySegId={planillaApi.busySegId}
-          onAdd={planillaApi.addSegmento}
-          onAbrir={planillaApi.activarSegmento}
-          onCerrar={planillaApi.cerrarSegmento}
-          onGuardarRutina={planillaApi.guardarComoRutina}
-          onCargarRutina={planillaApi.cargarRutina}
-          onEliminarRutina={planillaApi.eliminarRutina}
-          proyectosHub={proyectosHub}
-          ventanaAbrirIds={puertaWindows.abrirIds}
-          ventanaCerrarIds={puertaWindows.cerrarIds}
-          notifPermission={notifPermission}
-          onRequestNotifPermission={() => {
-            void ensureJornada4NotificationPermission().then(ok => {
-              setNotifPermission(
-                typeof Notification === "undefined"
-                  ? "unsupported"
-                  : ok
-                    ? "granted"
-                    : Notification.permission
-              );
-            });
-          }}
-        />
-        <Jornada4LaunchPanel
-          onLaunch={handleLaunch}
-          segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
-          segmentoActivoNombre={
-            planillaApi.segmentoActivo
-              ? proyectoVinculadoActivo
-                ? `${planillaApi.segmentoActivo.nombre} · ${proyectoVinculadoActivo.titulo}`
-                : planillaApi.segmentoActivo.nombre
-              : null
-          }
-        />
-        <Jornada4Boveda />
-        <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />
+        {mobileTab === "operar" ? (
+          <div role="tabpanel" data-testid="jornada4-panel-operar">
+            <Jornada4LaunchPanel
+              onLaunch={handleLaunch}
+              segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
+              segmentoActivoNombre={
+                planillaApi.segmentoActivo
+                  ? proyectoVinculadoActivo
+                    ? `${planillaApi.segmentoActivo.nombre} · ${proyectoVinculadoActivo.titulo}`
+                    : planillaApi.segmentoActivo.nombre
+                  : null
+              }
+            />
+            <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />
+          </div>
+        ) : null}
+
+        {mobileTab === "plan" ? (
+          <div role="tabpanel" data-testid="jornada4-panel-plan">
+            <Jornada4SegmentosPanel
+              planilla={planillaApi.planilla}
+              plantillasRutina={planillaApi.plantillasRutina}
+              segmentoActivo={planillaApi.segmentoActivo}
+              busySegId={planillaApi.busySegId}
+              onAdd={planillaApi.addSegmento}
+              onAbrir={planillaApi.activarSegmento}
+              onCerrar={planillaApi.cerrarSegmento}
+              onGuardarRutina={planillaApi.guardarComoRutina}
+              onCargarRutina={planillaApi.cargarRutina}
+              onEliminarRutina={planillaApi.eliminarRutina}
+              proyectosHub={proyectosHub}
+              ventanaAbrirIds={puertaWindows.abrirIds}
+              ventanaCerrarIds={puertaWindows.cerrarIds}
+              notifPermission={notifPermission}
+              onRequestNotifPermission={() => {
+                void ensureJornada4NotificationPermission().then(ok => {
+                  setNotifPermission(
+                    typeof Notification === "undefined"
+                      ? "unsupported"
+                      : ok
+                        ? "granted"
+                        : Notification.permission
+                  );
+                });
+              }}
+            />
+          </div>
+        ) : null}
+
+        {mobileTab === "metricas" ? (
+          <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
+            <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
+            <Jornada4Boveda />
+          </div>
+        ) : null}
       </div>
 
       <PlaneacionCrisolDock
