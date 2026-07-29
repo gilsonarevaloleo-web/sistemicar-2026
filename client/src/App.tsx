@@ -2,10 +2,8 @@ import { Switch, Route, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout";
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode, Suspense } from "react";
-import { lazyWithRetry, prefetchJornadaChunk } from "@/lib/lazyWithRetry";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
-import { JornadaSuspenseFallback } from "@/components/jornada/JornadaSuspenseFallback";
 import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,8 +24,6 @@ interface AppUser {
 import MenuPrincipal from "@/pages/menu-principal";
 import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
-const Planeacion = lazyWithRetry(() => import("@/pages/planeacion"));
-const PlaneacionV3 = lazyWithRetry(() => import("@/pages/planeacionV3"));
 const JornadaV4 = lazyWithRetry(() => import("@/pages/jornadaV4"));
 import Esperanza from "@/pages/esperanza";
 import Rewards from "@/pages/rewards";
@@ -81,7 +77,7 @@ import { unlockSpeechSynthesis } from "@/lib/speechQueue";
 import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speechRecovery";
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
-import { isJornada4WindowPath } from "@/lib/jornadaBrand";
+import { isJornada4WindowPath, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -314,20 +310,6 @@ function ArquitectoRoute({ component: Component }: { component: React.ComponentT
   return <Component />;
 }
 
-function JornadaV3ModuleRoute() {
-  return (
-    <JornadaErrorBoundary>
-      <Suspense fallback={<JornadaV3SuspenseFallback />}>
-        <ModuleRoute
-          component={PlaneacionV3}
-          requiredModule="planificacion_base"
-          loadingFallback={<JornadaShell statusLine="Laboratorio V3 · verificando acceso…" />}
-        />
-      </Suspense>
-    </JornadaErrorBoundary>
-  );
-}
-
 function JornadaV4ModuleRoute() {
   return (
     <JornadaErrorBoundary>
@@ -358,21 +340,13 @@ function Router() {
           {() => { window.location.replace("/espejo"); return null; }}
         </Route>
         <Route path="/planeacion">
-          <ErrorBoundary>
-            <Suspense fallback={<JornadaSuspenseFallback />}>
-              <ModuleRoute
-                component={Planeacion}
-                requiredModule="planificacion_base"
-                loadingFallback={<JornadaShell statusLine="Verificando acceso…" />}
-              />
-            </Suspense>
-          </ErrorBoundary>
+          <Redirect to={JORNADA_V4_PATH} />
         </Route>
         <Route path="/jornada-v3">
-          <JornadaV3ModuleRoute />
+          <Redirect to={JORNADA_V4_PATH} />
         </Route>
         <Route path="/planeacion-v3">
-          <JornadaV3ModuleRoute />
+          <Redirect to={JORNADA_V4_PATH} />
         </Route>
         <Route path="/jornada-v4">
           <JornadaV4ModuleRoute />
@@ -543,7 +517,7 @@ function App() {
     // Deploy preview: ?preview_ops=1 desbloquea ANTES de que ModuleRoute mande a /pagos.
     if (consumePreviewOpsQueryUnlock()) {
       if (window.location.pathname === "/menu" || window.location.pathname === "/") {
-        window.location.replace("/planeacion");
+        window.location.replace(JORNADA_V4_PATH);
         return;
       }
     }

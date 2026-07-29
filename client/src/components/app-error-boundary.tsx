@@ -96,12 +96,12 @@ export class AppErrorBoundary extends Component<Props, State> {
   handleRecover = () => {
     const crashes = getPlaneacionCrashCount();
     this.runPlaneacionRecovery(crashes >= 2);
-    this.reloadTo("/planeacion");
+    this.reloadTo("/jornada-v4");
   };
 
   handleForceSituacion = () => {
     this.runPlaneacionRecovery(true);
-    this.reloadTo("/planeacion");
+    this.reloadTo("/jornada-v4");
   };
 
   handleGoMenu = () => {

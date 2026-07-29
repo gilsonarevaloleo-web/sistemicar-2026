@@ -73,7 +73,7 @@ function showScheduledNotification(opts: {
     });
     n.onclick = () => {
       window.focus();
-      window.location.href = "/planeacion";
+      window.location.href = "/jornada-v4";
       n.close();
     };
   } catch {
@@ -272,7 +272,7 @@ export function notifySituacionAlert(opts: {
     });
     n.onclick = () => {
       window.focus();
-      window.location.href = opts.vehicleId ? `/planeacion?vehicle=${opts.vehicleId}` : "/planeacion";
+      window.location.href = opts.vehicleId ? `/jornada-v4?vehicle=${opts.vehicleId}` : "/jornada-v4";
       n.close();
     };
   } catch {
@@ -293,7 +293,7 @@ export function scheduleEspejoFollowup(habitoTitulo: string): void {
       });
       n.onclick = () => {
         window.focus();
-        window.location.href = "/planeacion";
+        window.location.href = "/jornada-v4";
       };
     } catch { }
   }, VEINTICUATRO_HORAS);

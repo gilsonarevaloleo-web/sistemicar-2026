@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
 import { JornadaShell } from "./JornadaShell";
 import { BotonRepararJornada } from "./BotonRepararJornada";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
 import { setJornadaChunkLoadPhase } from "@/lib/jornadaChunkBoot";
 
 const SLOW_LOAD_MS = isMobilePerfMode() ? 4_000 : 3_000;
-/** Móvil: chunk V3 puede tardar >5s — no disparar watchdog agresivo del fallback clásico. */
 const WATCHDOG_MS = isMobilePerfMode() ? 18_000 : 10_000;
 
-/** Fallback Suspense para /jornada-v3 — watchdog largo y enlace a clásica. */
+/** Fallback Suspense para /jornada-v4 — watchdog largo. */
 export function JornadaV3SuspenseFallback() {
   const [slow, setSlow] = useState(false);
   const [stuck, setStuck] = useState(false);
@@ -29,31 +27,23 @@ export function JornadaV3SuspenseFallback() {
   }, []);
 
   return (
-    <div className="relative min-h-[60vh]" data-testid="jornada-v3-suspense-fallback">
+    <div className="relative min-h-[60vh]" data-testid="jornada-v4-suspense-fallback">
       <JornadaShell
         statusLine={
           stuck
-            ? "V3 no cargó a tiempo — prueba reparar o usa Jornada clásica"
+            ? "Jornada no cargó a tiempo — prueba reparar"
             : slow
-              ? "Laboratorio V3 · el módulo tarda en móvil…"
-              : "Laboratorio V3 · preparando…"
+              ? "Dual Kernel · el módulo tarda en móvil…"
+              : "Dual Kernel · preparando…"
         }
       />
       {(slow || stuck) && (
         <div className="fixed bottom-20 left-0 right-0 z-50 px-4 max-w-lg mx-auto space-y-2">
           <BotonRepararJornada
-            title="Reparar V3"
-            description="Recarga el chunk del laboratorio modular."
+            title="Reparar Jornada"
+            description="Recarga el chunk Dual Kernel."
             compact
           />
-          <Link
-            href="/planeacion"
-            className="block w-full py-3 rounded-xl text-center text-xs font-bold uppercase tracking-wider border touch-manipulation"
-            style={{ borderColor: "rgba(212,175,55,0.35)", color: "#D4AF37" }}
-            data-testid="jornada-v3-fallback-classic"
-          >
-            Ir a Jornada clásica
-          </Link>
         </div>
       )}
     </div>

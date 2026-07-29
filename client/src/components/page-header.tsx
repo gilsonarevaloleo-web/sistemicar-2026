@@ -17,7 +17,7 @@ import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 
 const pageInfo: Record<string, { title: string; subtitle: string; icon: any }> = {
   "/espejo": { title: "Espejo", subtitle: "Alquimia Clínica del Corazón", icon: Terminal },
-  "/planeacion": { title: JORNADA_MODULE.title, subtitle: JORNADA_MODULE.tagline, icon: Compass },
+  "/jornada-v4": { title: JORNADA_MODULE.title, subtitle: JORNADA_MODULE.tagline, icon: Compass },
   "/esperanza": { title: "Depósito", subtitle: "Batería de Certeza", icon: Sparkles },
   "/analytics": { title: "Analytics", subtitle: "Tus patrones de energía", icon: TrendingUp },
   "/rewards": { title: "Beneficios", subtitle: "Desbloquea recompensas", icon: Trophy },

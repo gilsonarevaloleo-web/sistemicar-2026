@@ -5,7 +5,7 @@ import { PageHeader } from "./page-header";
 import { PageContainer } from "./page-container";
 import { Link } from "wouter";
 
-const pagesWithHeader = ["/espejo", "/planeacion", "/esperanza", "/analytics", "/rewards", "/tutorial", "/historial"];
+const pagesWithHeader = ["/espejo", "/jornada-v4", "/esperanza", "/analytics", "/rewards", "/tutorial", "/historial"];
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();

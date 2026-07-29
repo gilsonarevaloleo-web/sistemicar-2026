@@ -102,10 +102,10 @@ export function hideNetlifyDrawerIfNeeded(): boolean {
 
 /**
  * Entrada a Jornada tras unlock — soft navigate (wouter), no location.assign.
- * Full reload remonta motores globales + parse del chunk planeacion y congela móvil.
+ * Full reload remonta motores globales + parse del chunk Dual Kernel y congela móvil.
  */
 export function previewPlaneacionHref(): string {
-  return "/planeacion";
+  return "/jornada-v4";
 }
 
 /** Entrada dura a Jornada (fallback si soft navigate falla). */
@@ -113,8 +113,8 @@ export function goPreviewJornada(hard = true): void {
   setPreviewOpsUnlocked(true);
   if (typeof window === "undefined") return;
   if (hard) {
-    window.location.assign("/planeacion");
+    window.location.assign("/jornada-v4");
     return;
   }
-  window.location.href = "/planeacion";
+  window.location.href = "/jornada-v4";
 }

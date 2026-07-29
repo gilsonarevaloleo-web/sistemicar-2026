@@ -111,6 +111,6 @@ describe("previewOps", () => {
   });
 
   it("previewPlaneacionHref es path limpio (sin query)", () => {
-    assert.equal(previewPlaneacionHref(), "/planeacion");
+    assert.equal(previewPlaneacionHref(), "/jornada-v4");
   });
 });
