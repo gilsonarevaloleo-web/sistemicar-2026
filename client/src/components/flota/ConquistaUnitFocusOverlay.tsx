@@ -22,12 +22,18 @@ type Props = {
   open: boolean;
   onClose: () => void;
   accentColor?: string;
+  /**
+   * Reserva inferior (px) para no tapar El Crisol / nav mientras el
+   * cronómetro de unidad está activo.
+   */
+  bottomInsetPx?: number;
 };
 
 export function ConquistaUnitFocusOverlay({
   open,
   onClose,
   accentColor = NARANJA,
+  bottomInsetPx = 0,
 }: Props) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => hardwareClockNow());
@@ -113,8 +119,11 @@ export function ConquistaUnitFocusOverlay({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[230] flex flex-col items-center justify-center"
-          style={{ backgroundColor: accentColor }}
+          className="fixed inset-x-0 top-0 z-[230] flex flex-col items-center justify-center"
+          style={{
+            backgroundColor: accentColor,
+            bottom: Math.max(0, bottomInsetPx),
+          }}
           onClick={() => handleClose()}
           data-testid="conquista-unit-focus-overlay"
           role="dialog"

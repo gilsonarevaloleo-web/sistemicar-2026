@@ -808,10 +808,12 @@ export function ConquistaCard({
         ) : null}
       </div>
 
+      {/* bottomInsetPx: nav (~80) + Crisol colapsado (~72) — no tapa El Crisol */}
       <ConquistaUnitFocusOverlay
         open={unitFocusOpen}
         onClose={() => setUnitFocusOpen(false)}
         accentColor={NARANJA}
+        bottomInsetPx={168}
       />
     </article>
   );

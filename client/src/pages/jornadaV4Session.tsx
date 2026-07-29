@@ -1,5 +1,5 @@
 /**
- * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota.
+ * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota + Crisol.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
@@ -9,7 +9,9 @@ import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosP
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
+import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
+import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
@@ -44,6 +46,15 @@ export default function JornadaV4Session() {
     vehiclesRef: core.vehiclesRef,
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
+  });
+  const crisol = useJornada4Crisol({
+    userId: user?.uid,
+    vehiclesRef: core.vehiclesRef,
+    setVehicles: core.setVehicles,
+    expandedId: core.expandedId,
+    setExpandedId: core.setExpandedId,
+    segmentoActivo: planillaApi.segmentoActivo,
+    proyectosHub,
   });
 
   useEffect(() => {
@@ -109,7 +120,7 @@ export default function JornadaV4Session() {
 
   return (
     <div
-      className="min-h-screen pb-28"
+      className="min-h-screen pb-40"
       style={{ backgroundColor: "#0a0a0a" }}
       data-testid="jornada4-session"
     >
@@ -161,6 +172,19 @@ export default function JornadaV4Session() {
         <Jornada4Boveda />
         <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />
       </div>
+
+      <PlaneacionCrisolDock
+        items={crisol.reservaActivas}
+        proyectos={crisol.imanProyectos}
+        defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? ""}
+        onQuickAdd={crisol.handleReservaTacticaQuickAdd}
+        onEnviarUnidad={crisol.handleEnviarReservaASituacion}
+        onEnviarSeleccion={crisol.handleEnviarReservasSeleccionadas}
+        onAbrirNido={crisol.handleAbrirNidoEnSituacion}
+        onDelete={crisol.handleReservaEliminar}
+        onRutaChange={crisol.handleReservaRutaChange}
+        elevateAboveUnitFocus
+      />
     </div>
   );
 }

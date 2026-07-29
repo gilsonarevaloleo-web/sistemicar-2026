@@ -22,9 +22,8 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | Persistencia flota + sombra | Escalera de conciencia |
 | Tick UI mínimo (islands) | Disciplina / puntualidad |
 | Resistencia en background | Reloj/scheduler de conciencia global |
-| | Voz (TTS / GPS clips) |
+| **Crisol MOS** (dock clásico → ring / lista libre) | Voz (TTS / GPS clips) |
 | | Termodinámica / segment attention acoplada |
-| | Crisol / reserva táctica (fase 2 opcional) |
 
 ---
 

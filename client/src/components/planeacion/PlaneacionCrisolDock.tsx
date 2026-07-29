@@ -19,6 +19,9 @@ export interface PlaneacionCrisolDockProps {
   onAbrirNido?: (nidoId: string) => void | Promise<void>;
   onDelete: (reservaId: string) => void | Promise<void>;
   onRutaChange: (reservaId: string, ruta: ReservaTacticaRuta) => void | Promise<void>;
+  /** Deja el dock usable sobre el Foco unidad de conquista. */
+  elevateAboveUnitFocus?: boolean;
+  dockBottomPx?: number;
 }
 
 function PlaneacionCrisolDockInner({
@@ -31,6 +34,8 @@ function PlaneacionCrisolDockInner({
   onAbrirNido,
   onDelete,
   onRutaChange,
+  elevateAboveUnitFocus = false,
+  dockBottomPx,
 }: PlaneacionCrisolDockProps) {
   const handleQuickAdd = useCallback(
     (texto: string, ruta: ReservaTacticaRuta, proyectoId?: string) =>
@@ -50,6 +55,8 @@ function PlaneacionCrisolDockInner({
       onDelete={onDelete}
       onRutaChange={onRutaChange}
       colors={CRISOL_COLORS}
+      elevateAboveUnitFocus={elevateAboveUnitFocus}
+      dockBottomPx={dockBottomPx}
     />
   );
 }

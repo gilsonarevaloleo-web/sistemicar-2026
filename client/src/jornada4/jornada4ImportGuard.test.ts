@@ -58,6 +58,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
       join(clientSrc, "jornada4"),
       join(clientSrc, "hooks/useJornada4Core.ts"),
       join(clientSrc, "hooks/useJornada4Ops.ts"),
+      join(clientSrc, "hooks/useJornada4Crisol.ts"),
       join(clientSrc, "hooks/useJornada4Tick.ts"),
       join(clientSrc, "hooks/useJornada4Planilla.ts"),
       join(clientSrc, "hooks/useJornada4PuertaAlerts.ts"),
@@ -79,5 +80,12 @@ describe("Jornada 4 Dual Kernel import guard", () => {
         );
       }
     }
+  });
+
+  it("sesión monta El Crisol (dock clásico)", () => {
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    assert.match(session, /PlaneacionCrisolDock/);
+    assert.match(session, /useJornada4Crisol/);
+    assert.match(session, /elevateAboveUnitFocus/);
   });
 });
