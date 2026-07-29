@@ -24,7 +24,7 @@ import {
 } from "@/hooks/useJornada4Planilla";
 import { J4_COLORS } from "./Jornada4Shell";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 const BLOOD = "#991b1b";
 const BLOOD_BRIGHT = "#FF2A2A";
 const EMERALD = "#00C851";
@@ -134,40 +134,111 @@ export function Jornada4SegmentosPanel({
   };
 
   return (
-    <div className="px-4 pb-3" data-testid="jornada4-segmentos">
+    <div className="px-3 pb-3 sm:px-4" data-testid="jornada4-segmentos">
       <style>{`
         @keyframes j4-puerta-pulse {
           0%, 100% { box-shadow: 0 0 10px rgba(0,200,81,0.12); }
           50% { box-shadow: 0 0 22px rgba(0,200,81,0.35); }
         }
       `}</style>
+
+      {segmentos.length > 0 ? (
+        <div
+          className="mb-3 rounded-xl border px-3 py-2.5"
+          style={{
+            backgroundColor: "rgba(23,23,23,0.55)",
+            borderColor: "rgba(64,64,64,0.95)",
+          }}
+          data-testid="jornada4-puertas-timeline"
+        >
+          <p
+            className="text-[8px] font-black uppercase tracking-widest mb-2"
+            style={{ color: MUTED }}
+          >
+            Puertas del día
+          </p>
+          <div className="relative flex items-start justify-between gap-1">
+            <div
+              className="absolute left-3 right-3 top-[11px] h-px"
+              style={{ backgroundColor: "rgba(163,163,163,0.25)" }}
+              aria-hidden
+            />
+            {segmentos.map((seg, idx) => {
+              const isActive = seg.estado === "activo";
+              const isClosed = seg.estado === "cerrado_manual";
+              const isEntropia = seg.estado === "entropia" || Boolean(seg.puertaSistema);
+              return (
+                <div
+                  key={seg.id}
+                  className="relative z-[1] flex flex-col items-center gap-1 min-w-0 flex-1"
+                  data-testid={`jornada4-puerta-node-${seg.id}`}
+                >
+                  <div
+                    className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-black tabular-nums border"
+                    style={{
+                      backgroundColor: isActive
+                        ? EMERALD
+                        : isEntropia
+                          ? BLOOD_BRIGHT
+                          : isClosed
+                            ? "rgba(64,64,64,0.9)"
+                            : "rgba(10,10,10,0.95)",
+                      borderColor: isActive
+                        ? EMERALD
+                        : isEntropia
+                          ? BLOOD_BRIGHT
+                          : "rgba(115,115,115,0.8)",
+                      color: isActive || isEntropia ? "#0a0a0a" : INK,
+                    }}
+                  >
+                    {idx + 1}
+                  </div>
+                  <span
+                    className="text-[8px] font-bold truncate max-w-full px-0.5 text-center leading-tight"
+                    style={{ color: isActive ? EMERALD : MUTED }}
+                  >
+                    {seg.nombre}
+                  </span>
+                  <span className="text-[7px] font-mono tabular-nums" style={{ color: MUTED }}>
+                    {seg.horaInicio}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       <div
         className="rounded-xl border overflow-hidden"
-        style={{ backgroundColor: PIZARRA, borderColor: `${BLOOD}40` }}
+        style={{
+          backgroundColor: "rgba(23,23,23,0.45)",
+          borderColor: "rgba(64,64,64,0.95)",
+        }}
       >
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="w-full p-4 flex items-center justify-between"
+          className="w-full p-3 flex items-center justify-between"
           data-testid="jornada4-segmentos-toggle"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Layers size={14} style={{ color: BLOOD_BRIGHT }} />
             <span
-              className="text-xs font-bold uppercase tracking-widest"
+              className="text-[11px] font-bold uppercase tracking-widest"
               style={{ color: BLOOD_BRIGHT }}
             >
-              Segmentos del Día
+              Segmentos
             </span>
             <span
-              className="text-[9px] px-2 py-0.5 rounded-full"
+              className="text-[9px] px-1.5 py-0.5 rounded"
               style={{ backgroundColor: `${BLOOD}30`, color: BLOOD_BRIGHT }}
             >
               {count}
             </span>
             {segmentoActivo ? (
               <span
-                className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded"
+                className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded truncate max-w-[7rem]"
                 style={{
                   backgroundColor: "rgba(0,200,81,0.15)",
                   color: EMERALD,
@@ -187,7 +258,7 @@ export function Jornada4SegmentosPanel({
 
         {open ? (
           <div
-            className="px-4 pb-4 space-y-3 border-t"
+            className="px-3 pb-3 space-y-3 border-t"
             style={{ borderColor: "rgba(255,255,255,0.06)" }}
           >
             <div className="flex justify-between items-center pt-2 gap-2 flex-wrap">
@@ -580,19 +651,17 @@ export function Jornada4SegmentosPanel({
                   return (
                     <div
                       key={seg.id}
-                      className="rounded-2xl border p-3.5"
+                      className="rounded-xl border p-3"
                       style={{
-                        backgroundColor: "rgba(0,0,0,0.4)",
+                        backgroundColor: "rgba(23,23,23,0.55)",
                         borderColor: inAlertWindow
                           ? "rgba(0,200,81,0.55)"
                           : isActive
                             ? "rgba(0,200,81,0.35)"
-                            : "rgba(255,255,255,0.08)",
+                            : "rgba(64,64,64,0.95)",
                         boxShadow: inAlertWindow
                           ? "0 0 18px rgba(0,200,81,0.22)"
-                          : isActive
-                            ? "0 0 12px rgba(0,200,81,0.08)"
-                            : undefined,
+                          : undefined,
                         animation: inAlertWindow
                           ? "j4-puerta-pulse 1.6s ease-in-out infinite"
                           : undefined,

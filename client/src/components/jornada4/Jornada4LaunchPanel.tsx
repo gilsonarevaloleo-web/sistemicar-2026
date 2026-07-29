@@ -225,25 +225,26 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   };
 
   return (
-    <div className="px-4 pb-3 space-y-3" data-testid="jornada4-launch">
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
+    <div className="px-3 pb-3 space-y-2.5 sm:px-4" data-testid="jornada4-launch">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: INK }}>
             La Flota
-          </p>
-          <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
-            {FLOTA_SELECTOR_DISCRIMINATOR}
           </p>
           {segmentoActivoNombre ? (
             <p
-              className="text-[9px] mt-1 font-bold"
+              className="text-[9px] mt-0.5 font-bold truncate"
               style={{ color: EMERALD }}
               data-testid="jornada4-launch-seg-chip"
             >
               Lanza en · {segmentoActivoNombre}
               {segmentoHoraFin ? ` · meta ${segmentoHoraFin}` : ""}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-[9px] mt-0.5 leading-snug truncate" style={{ color: MUTED }}>
+              {FLOTA_SELECTOR_DISCRIMINATOR}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -252,15 +253,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
             setTipo(null);
             setOpen(true);
           }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider touch-manipulation shrink-0"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider touch-manipulation shrink-0"
           style={{
-            borderColor: `${GOLD}40`,
-            backgroundColor: `${GOLD}12`,
-            color: GOLD,
+            border: `1px solid ${GOLD}`,
+            backgroundColor: GOLD,
+            color: "#0a0a0a",
+            boxShadow: `0 0 16px ${GOLD}35`,
           }}
           data-testid="jornada4-launch-open"
         >
-          <Rocket size={12} /> Lanzar
+          <Rocket size={13} /> Lanzar
         </button>
       </div>
 
@@ -274,25 +276,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               type="button"
               disabled={disabled}
               onClick={() => openTipo(t)}
-              className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40"
-              style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }}
+              className="p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all hover:scale-[1.01] touch-manipulation disabled:opacity-40"
+              style={{
+                border: "1px solid rgba(64,64,64,0.95)",
+                backgroundColor: "rgba(23,23,23,0.55)",
+              }}
               data-testid={`jornada4-flota-${t}`}
             >
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${cfg.color}20` }}
+                className="w-9 h-9 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: `${cfg.color}18` }}
               >
-                <Icon size={20} style={{ color: cfg.color }} />
+                <Icon size={18} style={{ color: cfg.color }} />
               </div>
-              <span className="text-xs font-black uppercase tracking-wider" style={{ color: cfg.color }}>
+              <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: cfg.color }}>
                 {cfg.label}
               </span>
-              <span className="text-[9px] text-center leading-tight" style={{ color: MUTED }}>
+              <span className="text-[8px] text-center leading-tight px-0.5" style={{ color: MUTED }}>
                 {cfg.sublabel}
               </span>
               <span
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                className="text-[7px] font-bold px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: `${cfg.color}12`, color: cfg.color }}
               >
                 {cfg.relojLabel}
               </span>
@@ -300,10 +305,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           );
         })}
       </div>
-
-      <p className="text-center text-[9px]" style={{ color: MUTED }}>
-        Dual Kernel · solo estos 2 vehículos (sin descanso ni verdad)
-      </p>
 
       {open ? (
         <div

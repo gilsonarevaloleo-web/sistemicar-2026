@@ -45,15 +45,18 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
   if (vehicles.length === 0) {
     return (
       <div
-        className="mx-4 p-4 rounded-xl border text-center space-y-1"
-        style={{ backgroundColor: "#0a0a0a", borderColor: "rgba(255,255,255,0.06)" }}
+        className="mx-3 p-3 rounded-xl border text-center space-y-1 sm:mx-4"
+        style={{
+          backgroundColor: "rgba(23,23,23,0.45)",
+          borderColor: "rgba(64,64,64,0.95)",
+        }}
         data-testid="jornada4-empty"
       >
         <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
           Sin vehículos activos
         </p>
         <p className="text-[9px]" style={{ color: MUTED }}>
-          Lanza uno desde <strong style={{ color: INK }}>La Flota</strong> arriba —
+          Lanza uno desde <strong style={{ color: INK }}>La Flota</strong> —
           Conquista o Enfoque.
         </p>
       </div>
@@ -61,24 +64,27 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
   }
 
   return (
-    <div className="px-4 pb-24" data-testid="jornada4-list">
+    <div className="px-3 pb-24 sm:px-4" data-testid="jornada4-list">
       <div
         className="rounded-xl border overflow-hidden"
-        style={{ backgroundColor: "#0a0a0a", borderColor: `${BLOOD}20` }}
+        style={{
+          backgroundColor: "rgba(23,23,23,0.45)",
+          borderColor: "rgba(64,64,64,0.95)",
+        }}
       >
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="w-full p-4 flex items-center justify-between"
+          className="w-full p-3 flex items-center justify-between"
           data-testid="jornada4-activos-toggle"
         >
           <div className="flex items-center gap-2">
             <Zap size={14} style={{ color: BLOOD }} />
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: BLOOD }}>
+            <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: BLOOD }}>
               Vehículos activos
             </span>
             <span
-              className="text-[9px] px-2 py-0.5 rounded-full"
+              className="text-[9px] px-1.5 py-0.5 rounded"
               style={{ backgroundColor: `${BLOOD}20`, color: BLOOD }}
             >
               {vehicles.length} activo{vehicles.length !== 1 ? "s" : ""}

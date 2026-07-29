@@ -1,0 +1,32 @@
+Actúa como un Diseñador Senior de UX/UI y Frontend Engineer experto en Tailwind CSS/UI y dashboards tácticos de alta densidad.
+
+La lógica interna y el motor de la "Jornada V4" están funcionando perfectos y sin congelamientos. Ahora necesitamos hacer un REFACTORIZACIÓN EXCLUSIVA DE INTERFAZ Y EXPERIENCIA DE USUARIO (UI/UX) para que la vista móvil sea limpia, elegante, intuitiva y visualmente jerarquizada, recuperando el refinamiento de las versiones anteriores sin alterar la lógica de estado.
+
+Aplica los siguientes cambios de maquetación y diseño:
+
+1. HEADER Y ENCABEZADO MÓVIL (Compactación extrema)
+- Convierte la cabecera superior en un header compacto de una sola línea limpia o estilo "Compact App Bar".
+- Reduce el tamaño de los títulos "La Flota Dual Kernel" y oculta la frase explicativa ("Conquista y Enfoque operables...") dentro de un tooltip o sección plegable.
+- El header debe liberar espacio vertical para que las tarjetas de acción principal queden visibles en el primer pantallazo (Above the fold).
+
+2. TARJETAS PRINCIPALES Y ACCIONES ("Conquista" y "Enfoque")
+- Aplica un layout de grid de 2 columnas más limpio y estilizado.
+- Remueve los bordes dobles encajonados. Usa fondos oscuros sutiles (ej. bg-neutral-900/50) con bordes ultra finos (1px border-neutral-800).
+- Destaca el botón "LANZAR" con un acento cromático claro pero elegante para que sea la acción primaria sin distorsionar la paleta.
+
+3. NAVEGACIÓN Y SECCIONES (Pestañas o Accordions Limpios)
+- La pantalla actual es un "scroll interminable". Agrupa los módulos en PESTAÑAS (Tabs) superiores o en un sistema de ACCORDIONS (secciones colapsables) bien definidos:
+* Tab 1: [OPERAR] -> Vehículos activos, Conquista, Enfoque y Lanzador.
+* Tab 2: [PLAN & COBERTURA] -> Cobertura del día, Huecos, Segmentos y Puertas del día.
+* Tab 3: [MÉTRICAS & RÉCORDS] -> Disciplina, PS del Día, Bóveda.
+- Si prefieres mantener vista única, usa acordeones donde solo [OPERAR] esté abierto por defecto y el resto pueda colapsarse limpiamente.
+
+4. DENSIDAD Y ESPACIADO (Spacing System)
+- Revisa el padding interno de los contenedores: usa máximo p-4 en móvil.
+- Simplifica el mapa de las "4 PUERTAS": los indicadores numéricos (1, 2, 3, 4) deben verse como un timeline horizontal continuo y minimalista en vez de cajas grandes estáticas.
+- Ajusta el contraste de texto: el texto secundario usa 'text-neutral-400' para no competir con los datos numéricos principales (como el 99% de disciplina o los 131 PS).
+
+5. INDICADORES Y BARRAS DE PROGRESO
+- La barra de "INYECCIÓN DE FE / PS DEL DÍA" y la de "PULSO / COBERTURA" deben ser más delgadas (4px a 6px de alto, rounded-full) con un degradado sutil en vez de bloques masivos.
+
+REGLA DE ORO: NO alteres los hooks, ni las funciones de estado, ni los timers que garantizan el rendimiento de V4. Solo refactoriza el JSX/CSS y la estructura visual de los componentes.

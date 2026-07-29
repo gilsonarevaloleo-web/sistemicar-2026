@@ -313,7 +313,7 @@ export function Jornada4Boveda() {
   );
 
   return (
-    <div className="px-4 pb-2" data-testid="jornada4-boveda">
+    <div className="px-3 pb-2 sm:px-4" data-testid="jornada4-boveda">
       <button
         type="button"
         onClick={() => {
@@ -321,11 +321,10 @@ export function Jornada4Boveda() {
           setSelected(null);
           setOpen(true);
         }}
-        className="w-full p-3 rounded-xl border flex items-center justify-between touch-manipulation"
+        className="w-full p-3 rounded-xl flex items-center justify-between touch-manipulation"
         style={{
-          backgroundColor: `${GOLD}08`,
-          borderColor: `${GOLD}35`,
-          boxShadow: `0 0 14px ${GOLD}12`,
+          backgroundColor: "rgba(23,23,23,0.55)",
+          border: `1px solid ${GOLD}40`,
         }}
         data-testid="jornada4-boveda-open"
       >
