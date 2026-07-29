@@ -15,6 +15,7 @@ import { recordConsciousVehicleLaunch } from "@/lib/entropyMonotonicStore";
 import { scheduleVehicleRemotePersist, type Vehicle, type VehicleStatus } from "@/lib/persistence";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
 import { suggestedSec } from "@/lib/desglosadorClock";
+import { isJornada4WindowPath } from "@/lib/jornadaBrand";
 import type { MutableRefObject } from "react";
 
 /** Expand situacional / conquista grande en móvil: deja respirar toast + primer paint. */
@@ -108,12 +109,14 @@ export function paintFlotaLaunchOptimistic(params: FlotaLaunchOptimisticParams):
   scheduleSaveLocalVehiclesAfterLaunch(() => vehiclesRef.current, newVehicleId);
   suppressGhostReconcileAfterLaunch();
 
-  // Burst de reloj fuera del frame del gesto (móvil: evita cascada de anillo/métricas).
-  enqueueConcienciaWork({
-    key: `launch-clock-burst:${newVehicleId}`,
-    priority: "low",
-    run: () => burstConcienciaClockTick(1),
-  });
+  // Burst de conciencia: NO en Dual Kernel (scheduler pausado; no despertarlo).
+  if (!isJornada4WindowPath()) {
+    enqueueConcienciaWork({
+      key: `launch-clock-burst:${newVehicleId}`,
+      priority: "low",
+      run: () => burstConcienciaClockTick(1),
+    });
+  }
 
   const deferHeavyUi = (fn: () => void) => {
     if (typeof requestAnimationFrame !== "undefined") {

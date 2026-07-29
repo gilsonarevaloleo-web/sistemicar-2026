@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useAuthContext } from "@/App";
 import {
   getLocalVehicles,
@@ -25,12 +26,15 @@ import {
   maybeReleaseStaleSuppression,
   resetCentinelaTimerState,
 } from "@/lib/centinelaEngine";
+import { isJornada4Path } from "@/lib/jornadaBrand";
 
 const CENTINELA_MAX_AGE_MS = 8 * 3600 * 1000;
 
-/** Motor global del Centinela ÔÇö corre en toda la app, no solo en Planificaci├│n. */
+/** Motor global del Centinela — pausado en Dual Kernel (`/jornada-v4`). */
 export function CentinelaEngine() {
   const { user } = useAuthContext();
+  const [location] = useLocation();
+  const dualKernelQuiet = isJornada4Path(location);
   const [planillaFecha, setPlanillaFecha] = useState(() => getJournalDateString());
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaRef = useRef<Planilla | null>(null);
@@ -41,6 +45,7 @@ export function CentinelaEngine() {
   const lastRetroMaterializeAt = useRef(0);
 
   useEffect(() => {
+    if (dualKernelQuiet) return;
     const tick = () => {
       const f = getJournalDateString();
       setPlanillaFecha(prev => (prev !== f ? f : prev));
@@ -48,10 +53,10 @@ export function CentinelaEngine() {
     const interval = setInterval(tick, 60_000);
     tick();
     return () => clearInterval(interval);
-  }, []);
+  }, [dualKernelQuiet]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || dualKernelQuiet) return;
 
     const fecha = planillaFecha;
     const unsubPlanilla = subscribeToPlanilla(
@@ -274,7 +279,7 @@ export function CentinelaEngine() {
       window.removeEventListener("vehicles-status-changed", onVehiclesLocalSync);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user, planillaFecha]);
+  }, [user, planillaFecha, dualKernelQuiet]);
 
   return null;
 }

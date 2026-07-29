@@ -159,7 +159,8 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     if (tipoFlota === "tiempo") {
       criterio = "tiempo";
       tipoTermino = "hora";
-      detalle = "";
+      // Meta opcional HH:mm — misma semántica que el reloj proyectivo clásico
+      detalle = form.terminoDetalle?.trim() || "";
     } else {
       criterio = "circunstancia";
       tipoTermino = "situacion";

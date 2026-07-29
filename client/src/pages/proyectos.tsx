@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -82,6 +82,94 @@ function ProyectoIcono({
   return <Layers size={size} style={{ color: tint }} />;
 }
 
+/** Formulario aislado: el tipado no pelea con re-renders del listado/sync del Hub. */
+function NuevoProyectoForm({
+  creating,
+  onCancel,
+  onCreate,
+}: {
+  creating: boolean;
+  onCancel: () => void;
+  onCreate: (data: { titulo: string; etiqueta: ProyectoEtiqueta; nota: string }) => void | Promise<void>;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [etiqueta, setEtiqueta] = useState<ProyectoEtiqueta>("proyecto");
+  const [nota, setNota] = useState("");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="p-4 rounded-xl border border-white/10 mb-4 space-y-3"
+      style={{ backgroundColor: PIZARRA }}
+    >
+      <input
+        value={titulo}
+        onChange={e => setTitulo(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void onCreate({ titulo, etiqueta, nota });
+          }
+        }}
+        placeholder="Nombre (ej: Costura, Salud…)"
+        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white text-sm focus:outline-none"
+        autoFocus
+        autoComplete="off"
+        data-testid="input-nuevo-proyecto-titulo"
+      />
+      <div className="flex gap-2">
+        {(["proyecto", "centro"] as const).map(e => (
+          <button
+            key={e}
+            type="button"
+            onClick={() => setEtiqueta(e)}
+            className={cn(
+              "flex-1 py-2 rounded-lg text-[9px] font-bold uppercase",
+              etiqueta === e ? "text-white" : "text-slate-500"
+            )}
+            style={
+              etiqueta === e
+                ? { backgroundColor: `${CYAN}25`, border: `1px solid ${CYAN}50` }
+                : { border: "1px solid rgba(255,255,255,0.08)" }
+            }
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={nota}
+        onChange={e => setNota(e.target.value)}
+        placeholder="Opcional: qué tiempo te libera esto…"
+        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-slate-300 text-[11px] resize-none min-h-[50px] focus:outline-none"
+        data-testid="input-nuevo-proyecto-nota"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={creating}
+          className="flex-1 py-2 text-[10px] font-bold text-slate-500 disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={() => void onCreate({ titulo, etiqueta, nota })}
+          disabled={creating || !titulo.trim()}
+          className="flex-1 py-2 rounded-lg text-[10px] font-bold uppercase disabled:opacity-50"
+          style={{ backgroundColor: CYAN, color: "#000" }}
+          data-testid="btn-crear-proyecto"
+        >
+          {creating ? "Creando…" : "Crear"}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function ProyectosPage() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
@@ -94,9 +182,6 @@ export default function ProyectosPage() {
   const [peldanos, setPeldanos] = useState<ProyectoPeldano[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [newTitulo, setNewTitulo] = useState("");
-  const [newEtiqueta, setNewEtiqueta] = useState<ProyectoEtiqueta>("proyecto");
-  const [newNota, setNewNota] = useState("");
   const [newIdeaTitulo, setNewIdeaTitulo] = useState("");
   const [expandedConq, setExpandedConq] = useState<string | null>(null);
   const [notaEdit, setNotaEdit] = useState("");
@@ -107,6 +192,8 @@ export default function ProyectosPage() {
   const [creatingProyecto, setCreatingProyecto] = useState(false);
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
+  const proyectosLenRef = useRef(0);
+  proyectosLenRef.current = proyectos.length;
 
   const applyDetailState = useCallback((p: Proyecto | null, pel: ProyectoPeldano[]) => {
     setProyecto(p);
@@ -160,9 +247,11 @@ export default function ProyectosPage() {
     setProyectos(getProyectosLocal(user.uid));
     setLoading(true);
     void syncListFromRemote().finally(() => setLoading(false));
+    // Solo leer local en el evento: re-fetch remoto aquí martillaba Firestore y el hilo principal.
     const unsub = subscribeToProyectos(user.uid, () => {
-      setProyectos(getProyectosLocal(user.uid));
-      void syncListFromRemote();
+      startTransition(() => {
+        setProyectos(getProyectosLocal(user.uid));
+      });
       if (detailIdRef.current) void reloadDetail();
     });
     return () => {
@@ -212,47 +301,47 @@ export default function ProyectosPage() {
     await reloadDetail();
   };
 
-  const handleCreateProyecto = async () => {
-    if (!user || creatingProyecto) return;
-    const titulo = newTitulo.trim();
-    if (!titulo) {
-      toast.error("Escribe un nombre para el proyecto o centro");
-      return;
-    }
-    setCreatingProyecto(true);
-    try {
-      const color = PROYECTO_COLORS[proyectos.length % PROYECTO_COLORS.length];
-      const p = await addProyecto(user.uid, {
-        titulo,
-        etiqueta: newEtiqueta,
-        nota: newNota.trim() || undefined,
-        color,
-      });
-      const claridad =
-        p.claridadActiva ??
-        buildDefaultClaridadDireccion({
-          tituloProyecto: p.titulo,
-          etiqueta: p.etiqueta,
-          focoTitulo: p.oleadaTitulo ?? p.titulo,
+  const handleCreateProyecto = useCallback(
+    async (data: { titulo: string; etiqueta: ProyectoEtiqueta; nota: string }) => {
+      if (!user || creatingProyecto) return;
+      const titulo = data.titulo.trim();
+      if (!titulo) {
+        toast.error("Escribe un nombre para el proyecto o centro");
+        return;
+      }
+      setCreatingProyecto(true);
+      try {
+        const color = PROYECTO_COLORS[proyectosLenRef.current % PROYECTO_COLORS.length];
+        const p = await addProyecto(user.uid, {
+          titulo,
+          etiqueta: data.etiqueta,
+          nota: data.nota.trim() || undefined,
+          color,
         });
-      setProyectos(prev => [p, ...prev.filter(x => x.id !== p.id)]);
-      setProyecto(p);
-      setPeldanos([]);
-      setClaridadEdit(claridad);
-      setNotaEdit(p.nota ?? "");
-      setOleadaTituloEdit(p.oleadaTitulo ?? "");
-      setShowNew(false);
-      setNewTitulo("");
-      setNewNota("");
-      setNewEtiqueta("proyecto");
-      navigate(`/proyectos?id=${p.id}`);
-      toast.success(`"${p.titulo}" creado`);
-    } catch {
-      toast.error("No se pudo crear el proyecto. Intenta de nuevo.");
-    } finally {
-      setCreatingProyecto(false);
-    }
-  };
+        const claridad =
+          p.claridadActiva ??
+          buildDefaultClaridadDireccion({
+            tituloProyecto: p.titulo,
+            etiqueta: p.etiqueta,
+            focoTitulo: p.oleadaTitulo ?? p.titulo,
+          });
+        setProyectos(prev => [p, ...prev.filter(x => x.id !== p.id)]);
+        setProyecto(p);
+        setPeldanos([]);
+        setClaridadEdit(claridad);
+        setNotaEdit(p.nota ?? "");
+        setOleadaTituloEdit(p.oleadaTitulo ?? "");
+        setShowNew(false);
+        navigate(`/proyectos?id=${p.id}`);
+        toast.success(`"${p.titulo}" creado`);
+      } catch {
+        toast.error("No se pudo crear el proyecto. Intenta de nuevo.");
+      } finally {
+        setCreatingProyecto(false);
+      }
+    },
+    [user, creatingProyecto, navigate]
+  );
 
   const handleAddIdea = async () => {
     if (!user || !detailId || !newIdeaTitulo.trim()) return;
@@ -655,67 +744,11 @@ export default function ProyectosPage() {
 
       <AnimatePresence>
         {showNew && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="p-4 rounded-xl border border-white/10 mb-4 space-y-3"
-            style={{ backgroundColor: PIZARRA }}
-          >
-            <input
-              value={newTitulo}
-              onChange={e => setNewTitulo(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && void handleCreateProyecto()}
-              placeholder="Nombre (ej: Costura, Salud…)"
-              className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white text-sm focus:outline-none"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              {(["proyecto", "centro"] as const).map(e => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setNewEtiqueta(e)}
-                  className={cn(
-                    "flex-1 py-2 rounded-lg text-[9px] font-bold uppercase",
-                    newEtiqueta === e ? "text-white" : "text-slate-500"
-                  )}
-                  style={
-                    newEtiqueta === e
-                      ? { backgroundColor: `${CYAN}25`, border: `1px solid ${CYAN}50` }
-                      : { border: "1px solid rgba(255,255,255,0.08)" }
-                  }
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={newNota}
-              onChange={e => setNewNota(e.target.value)}
-              placeholder="Opcional: qué tiempo te libera esto…"
-              className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-slate-300 text-[11px] resize-none min-h-[50px] focus:outline-none"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowNew(false)}
-                disabled={creatingProyecto}
-                className="flex-1 py-2 text-[10px] font-bold text-slate-500 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreateProyecto()}
-                disabled={creatingProyecto || !newTitulo.trim()}
-                className="flex-1 py-2 rounded-lg text-[10px] font-bold uppercase disabled:opacity-50"
-                style={{ backgroundColor: CYAN, color: "#000" }}
-              >
-                {creatingProyecto ? "Creando…" : "Crear"}
-              </button>
-            </div>
-          </motion.div>
+          <NuevoProyectoForm
+            creating={creatingProyecto}
+            onCancel={() => setShowNew(false)}
+            onCreate={handleCreateProyecto}
+          />
         )}
       </AnimatePresence>
 

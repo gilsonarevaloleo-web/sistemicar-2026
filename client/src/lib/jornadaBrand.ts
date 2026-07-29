@@ -4,6 +4,21 @@ import { SISTEMICAR_CATEGORY } from "./sistemicarCategory";
 /** Ruta del laboratorio modular (no sustituye `/planeacion` en producción). */
 export const JORNADA_V3_PATH = "/jornada-v3" as const;
 
+/** Dual Kernel — solo Conquista + Situacional + PS (anti-freeze). */
+export const JORNADA_V4_PATH = "/jornada-v4" as const;
+
+/** True en `/jornada-v4` (y query). Usado para pausar motores globales del App shell. */
+export function isJornada4Path(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return pathname === JORNADA_V4_PATH || pathname.startsWith(`${JORNADA_V4_PATH}?`);
+}
+
+/** Pathname actual (SSR-safe). Para hot paths sin hooks (launch ms0). */
+export function isJornada4WindowPath(): boolean {
+  if (typeof window === "undefined") return false;
+  return isJornada4Path(window.location.pathname);
+}
+
 export const JORNADA_MODULE = {
   title: "Jornada",
   titleUpper: "JORNADA",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Vehicle } from "@/lib/persistence";
-import { computeSituacionTimerUi } from "./situacionRelojIsland";
+import { computeSituacionTimerUi } from "@/lib/situacionTimerUi";
 
 function vehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {

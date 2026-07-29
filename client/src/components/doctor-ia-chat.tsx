@@ -436,8 +436,19 @@ export function DoctorIAChat() {
       ? "GUÍA PLANIFICACIÓN"
       : "DOCTOR IA - SISTEMICAR";
 
-  const hiddenPages = ["/bienvenida", "/acceso", "/pagos", "/terminos-condiciones", "/libro-reclamaciones", "/embudo", "/gracias-compra", "/umbral-leads", "/ventas-espejo"];
-  if (!user || hiddenPages.includes(location)) return null;
+  const hiddenPages = [
+    "/bienvenida",
+    "/acceso",
+    "/pagos",
+    "/terminos-condiciones",
+    "/libro-reclamaciones",
+    "/embudo",
+    "/gracias-compra",
+    "/umbral-leads",
+    "/ventas-espejo",
+    "/jornada-v4", // Dual Kernel: sin FAB ni ~10 listeners Firebase
+  ];
+  if (!user || hiddenPages.includes(location) || location.startsWith("/jornada-v4?")) return null;
 
   return (
     <>

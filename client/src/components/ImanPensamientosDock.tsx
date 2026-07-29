@@ -42,6 +42,11 @@ type Props = {
     gold: string;
   };
   dockBottomPx?: number;
+  /**
+   * Por encima del Foco unidad (z-[230]) para capturar pensamientos
+   * mientras el cronómetro de conquista está abierto.
+   */
+  elevateAboveUnitFocus?: boolean;
 };
 
 function ImanPensamientosDock({
@@ -56,6 +61,7 @@ function ImanPensamientosDock({
   onRutaChange,
   colors,
   dockBottomPx = 84,
+  elevateAboveUnitFocus = false,
 }: Props) {
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState("");
@@ -167,7 +173,9 @@ function ImanPensamientosDock({
 
   return (
     <div
-      className="fixed left-0 right-0 z-40 pointer-events-none"
+      className={`fixed left-0 right-0 pointer-events-none ${
+        elevateAboveUnitFocus ? "z-[240]" : "z-40"
+      }`}
       style={{ bottom: dockBottomPx }}
       data-testid="iman-pensamientos-dock"
     >

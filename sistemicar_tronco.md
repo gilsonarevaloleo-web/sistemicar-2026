@@ -237,6 +237,8 @@ flowchart TB
 
 **V3 paso 2 (completado):** `/jornada-v3` entra por `planeacionV3.tsx` + `useJornadaFlotaCore` (sin manager). La sesión V3 (`planeacionV3Session.tsx`) usa `useJornadaFlotaCore` para flota y `useJornadaV3Ops` para ring/reserva/desglosador — `useDesglosadorManager` ha sido eliminado de la sesión V3. Test en `useJornadaFlotaCore.test.ts` garantiza que ni el entry ni la sesión importan el manager. Siguiente: partir conquista fuera del manager en la ruta `/planeacion` monolítica.
 
+**Jornada 4 — Dual Kernel (propuesta / estudio):** nueva ruta `/jornada-v4` que **no** monta anillo, escalera, disciplina ni voz. Base = lógica pura de desglosador Conquista + Situacional + PS, con wall-clock en background. Cantera de libs del tronco; runtime recortado para no congelar. Ver `docs/JORNADA4_DUAL_KERNEL.md` y `public/docs/BRIEF_JORNADA4_DUAL_KERNEL.md`.
+
 **Foco unidad (conquista):** overlay naranja (`ConquistaUnitFocusOverlay`) — mide por unidad con Tik al segundo y vueltas (sin persistir); Reiniciar limpia. **1 unidad completa** = Σ (duración/cantidad) de cada sub del desglosador (producción por producto).
 
 ---
