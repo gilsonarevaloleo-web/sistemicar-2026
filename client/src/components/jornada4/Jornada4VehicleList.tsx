@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
-import { isConquistaDesglosador, isSituacionDesglosador } from "@/jornada4/filters";
+import {
+  isConquistaDesglosador,
+  isConquistaRapido,
+  isExpressSituacion,
+  isSituacionListaLibre,
+  isSituacionRing,
+} from "@/jornada4/filters";
+import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
+import { SituacionLibreCard } from "./SituacionLibreCard";
+import { RapidoCard } from "./RapidoCard";
+import { InterruptCard } from "./InterruptCard";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { MUTED, INK, GOLD } = J4_COLORS;
@@ -22,6 +32,18 @@ type Ops = {
     status: "cumplido" | "fallado"
   ) => Promise<void>;
   closeSituacionBlock: (vehicleId: string) => Promise<void>;
+  closeRapidoVehicle: (
+    vehicleId: string,
+    status: "cumplido" | "archivado",
+    cantidad?: number
+  ) => Promise<void>;
+  closeSituacionLibreFila: (
+    vehicleId: string,
+    subTareaId: string,
+    status: "cumplido" | "fallado"
+  ) => Promise<void>;
+  closeSituacionLibreBloque: (vehicleId: string) => Promise<void>;
+  addSituacionLibreFila: (vehicleId: string, texto: string) => Promise<void>;
   addConquistaSub: (
     vehicleId: string,
     form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
@@ -31,6 +53,22 @@ type Ops = {
     vehicleId: string,
     subTareaId: string,
     minutos: number | undefined
+  ) => Promise<void>;
+  reorderConquistaSubs: (
+    vehicleId: string,
+    movedId: string,
+    direction: ReorderDirection
+  ) => void;
+  reorderSituacionFilas: (
+    vehicleId: string,
+    movedId: string,
+    direction: ReorderDirection
+  ) => void;
+  pausaInterrupcion: (vehicleId: string, titulo: string) => Promise<void>;
+  resumeDesglosador: (parentId: string) => Promise<void>;
+  closeExpressVehicle: (
+    vehicleId: string,
+    status: "cumplido" | "archivado"
   ) => Promise<void>;
 };
 
@@ -45,46 +83,40 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
   if (vehicles.length === 0) {
     return (
       <div
-        className="mx-3 p-3 rounded-xl border text-center space-y-1 sm:mx-4"
-        style={{
-          backgroundColor: "rgba(23,23,23,0.45)",
-          borderColor: "rgba(64,64,64,0.95)",
-        }}
+        className="mx-4 p-4 rounded-xl border text-center space-y-1"
+        style={{ backgroundColor: "#0a0a0a", borderColor: "rgba(255,255,255,0.06)" }}
         data-testid="jornada4-empty"
       >
         <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
           Sin vehículos activos
         </p>
         <p className="text-[9px]" style={{ color: MUTED }}>
-          Lanza uno desde <strong style={{ color: INK }}>La Flota</strong> —
-          Conquista o Enfoque.
+          Lanza desde <strong style={{ color: INK }}>La Flota</strong> —
+          conquista, lista libre o ring.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="px-3 pb-24 sm:px-4" data-testid="jornada4-list">
+    <div className="px-4 pb-24" data-testid="jornada4-list">
       <div
         className="rounded-xl border overflow-hidden"
-        style={{
-          backgroundColor: "rgba(23,23,23,0.45)",
-          borderColor: "rgba(64,64,64,0.95)",
-        }}
+        style={{ backgroundColor: "#0a0a0a", borderColor: `${BLOOD}20` }}
       >
         <button
           type="button"
           onClick={() => setOpen(o => !o)}
-          className="w-full p-3 flex items-center justify-between"
+          className="w-full p-4 flex items-center justify-between"
           data-testid="jornada4-activos-toggle"
         >
           <div className="flex items-center gap-2">
             <Zap size={14} style={{ color: BLOOD }} />
-            <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: BLOOD }}>
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: BLOOD }}>
               Vehículos activos
             </span>
             <span
-              className="text-[9px] px-1.5 py-0.5 rounded"
+              className="text-[9px] px-2 py-0.5 rounded-full"
               style={{ backgroundColor: `${BLOOD}20`, color: BLOOD }}
             >
               {vehicles.length} activo{vehicles.length !== 1 ? "s" : ""}
@@ -105,19 +137,34 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
             {vehicles.map(v => {
               if (isConquistaDesglosador(v)) {
                 return (
-                <ConquistaCard
-                  key={v.id}
-                  vehicle={v}
-                  onCumplido={cantidad =>
-                    void ops.closeConquistaSub(v.id, "cumplido", cantidad)
-                  }
-                  onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
-                  onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
-                  onAddSub={form => void ops.addConquistaSub(v.id, form)}
-                />
+                  <ConquistaCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={cantidad =>
+                      void ops.closeConquistaSub(v.id, "cumplido", cantidad)
+                    }
+                    onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
+                    onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+                    onAddSub={form => void ops.addConquistaSub(v.id, form)}
+                    onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+                    onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
+                    onReorderSubs={(movedId, direction) =>
+                      ops.reorderConquistaSubs(v.id, movedId, direction)
+                    }
+                  />
                 );
               }
-              if (isSituacionDesglosador(v)) {
+              if (isExpressSituacion(v)) {
+                return (
+                  <InterruptCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={() => void ops.closeExpressVehicle(v.id, "cumplido")}
+                    onIncumplido={() => void ops.closeExpressVehicle(v.id, "archivado")}
+                  />
+                );
+              }
+              if (isSituacionRing(v)) {
                 return (
                   <SituacionCard
                     key={v.id}
@@ -127,13 +174,38 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
                     onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
                     onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
+                    onReorderFilas={(movedId, direction) =>
+                      ops.reorderSituacionFilas(v.id, movedId, direction)
+                    }
+                  />
+                );
+              }
+              if (isSituacionListaLibre(v)) {
+                return (
+                  <SituacionLibreCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplido={id => void ops.closeSituacionLibreFila(v.id, id, "cumplido")}
+                    onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
+                    onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
+                    onAddFila={texto => void ops.addSituacionLibreFila(v.id, texto)}
+                  />
+                );
+              }
+              if (isConquistaRapido(v)) {
+                return (
+                  <RapidoCard
+                    key={v.id}
+                    vehicle={v}
+                    onCumplir={cant => void ops.closeRapidoVehicle(v.id, "cumplido", cant)}
+                    onArchivar={() => void ops.closeRapidoVehicle(v.id, "archivado")}
                   />
                 );
               }
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · sin anillo · sin voz
+              Dual Kernel · pausa · reorden · conquista · ring
             </p>
           </div>
         ) : null}

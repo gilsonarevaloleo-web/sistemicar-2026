@@ -49,8 +49,13 @@ export function pickSituacionVehicleTarget(
   vehicles: Vehicle[],
   expandedId: string | null
 ): { vehicle?: Vehicle; ambiguous: boolean } {
+  // Incluye ring activo, lista libre y situación vacía (ring por abrir).
   const activos = vehicles.filter(
-    v => v.status === "activo" && isSituacionDesglosador(v)
+    v =>
+      v.status === "activo" &&
+      !v.autoVerdad &&
+      v.tipoFlota === "situacion" &&
+      !v.vehiculoPadreDesglosadorId
   );
   if (activos.length === 0) return { ambiguous: false };
   if (expandedId) {
@@ -83,7 +88,9 @@ export function injectCrisolToListaLibre(
   vehicle: Vehicle,
   item: SituacionReservaItem
 ): CrisolInjectResult {
-  if (!isSituacionDesglosador(vehicle)) return { ok: false, reason: "no_vehicle" };
+  if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
+    return { ok: false, reason: "no_vehicle" };
+  }
   const newSub = subTareaFromImanItem(item);
   return {
     ok: true,
@@ -162,7 +169,9 @@ export function injectCrisolOpeningRing(
   item: SituacionReservaItem,
   opts?: { segmentoHoraFin?: string | null; segmentoProyectoId?: string }
 ): CrisolInjectResult {
-  if (!isSituacionDesglosador(vehicle)) return { ok: false, reason: "no_vehicle" };
+  if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
+    return { ok: false, reason: "no_vehicle" };
+  }
 
   const enfoqueHeredado =
     item.proyectoId?.trim() ||

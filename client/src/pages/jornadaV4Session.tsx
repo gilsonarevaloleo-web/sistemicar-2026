@@ -2,7 +2,7 @@
  * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota + Crisol.
  * UI móvil en pestañas (Operar / Plan / Métricas) — sin cambiar hooks ni timers.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import {
@@ -10,22 +10,30 @@ import {
   type Jornada4MobileTab,
 } from "@/components/jornada4/Jornada4MobileNav";
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
+import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
+import { CoberturaHuecosPanel } from "@/components/jornada4/CoberturaHuecosPanel";
+import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
+import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
   type Jornada4LaunchForm,
 } from "@/jornada4/executeJornada4Launch";
+import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
+import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
+import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
 
 export default function JornadaV4Session() {
@@ -34,6 +42,7 @@ export default function JornadaV4Session() {
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
   const [yesterdayPs, setYesterdayPs] = useState(0);
+  const [huecosRefresh, setHuecosRefresh] = useState(0);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
@@ -52,6 +61,7 @@ export default function JornadaV4Session() {
     vehiclesRef: core.vehiclesRef,
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
+    segmentoActivo: planillaApi.segmentoActivo,
   });
   const crisol = useJornada4Crisol({
     userId: user?.uid,
@@ -62,6 +72,69 @@ export default function JornadaV4Session() {
     segmentoActivo: planillaApi.segmentoActivo,
     proyectosHub,
   });
+
+  // Un gesto desbloquea AudioContext (móvil) para que el timbre de puerta suene.
+  useEffect(() => {
+    const unlock = () => {
+      void unlockPuertaAudio();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true, passive: true });
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
+
+  const pulsoModel = usePulsoCobertura({
+    segmentos: planillaApi.planilla?.segmentos ?? [],
+    vehicles: core.vehicles,
+    segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
+    enabled: Boolean(user && planillaApi.planilla),
+  });
+
+  const disciplinaTick = useJornada4Tick(Boolean(user && planillaApi.planilla));
+  const disciplinaModel = useMemo(() => {
+    void disciplinaTick;
+    return computeDisciplinaPlanDia({
+      segmentos: planillaApi.planilla?.segmentos ?? [],
+    });
+  }, [planillaApi.planilla, disciplinaTick]);
+
+  const bumpHuecos = useCallback(() => {
+    setHuecosRefresh(n => n + 1);
+  }, []);
+
+  // Una sola reconciliación al montar (idle): abre hueco si ya estás sin cobertura.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      try {
+        reconcileCoberturaHuecos({ vehicles: core.vehiclesRef.current });
+        bumpHuecos();
+      } catch {
+        /* non-fatal */
+      }
+    };
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(run, { timeout: 2000 });
+      return () => {
+        cancelled = true;
+        cancelIdleCallback(id);
+      };
+    }
+    const t = window.setTimeout(run, 500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+    // solo boot
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -91,7 +164,7 @@ export default function JornadaV4Session() {
   const handleLaunch = useCallback(
     async (form: Jornada4LaunchForm) => {
       if (!user) return null;
-      return executeJornada4Launch({
+      const id = await executeJornada4Launch({
         userId: user.uid,
         form,
         vehiclesRef: core.vehiclesRef,
@@ -108,9 +181,30 @@ export default function JornadaV4Session() {
         ghostReconcileRef: core.ghostReconcileRef,
         lastLaunchRef,
       });
+      if (id) bumpHuecos();
+      return id;
     },
-    [user, core, planillaApi.planilla, planillaApi.segmentoActivo, resolverProyectoId]
+    [user, core, planillaApi.planilla, planillaApi.segmentoActivo, resolverProyectoId, bumpHuecos]
   );
+
+  const wrapClose = useCallback(
+    <A extends unknown[]>(fn: (...args: A) => Promise<void>) =>
+      async (...args: A) => {
+        await fn(...args);
+        bumpHuecos();
+      },
+    [bumpHuecos]
+  );
+
+  const opsWithHuecos = {
+    ...ops,
+    closeConquistaCycle: wrapClose(ops.closeConquistaCycle),
+    closeSituacionBlock: wrapClose(ops.closeSituacionBlock),
+    closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
+    closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
+    closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
+    closeExpressVehicle: wrapClose(ops.closeExpressVehicle),
+  };
 
   const statusLine = planillaApi.segmentoActivo
     ? [
@@ -149,13 +243,21 @@ export default function JornadaV4Session() {
                     : planillaApi.segmentoActivo.nombre
                   : null
               }
+              proyectosHub={proyectosHub}
+              defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? null}
             />
-            <Jornada4VehicleList vehicles={core.dualVehicles} ops={ops} />
+            <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
           </div>
         ) : null}
 
         {mobileTab === "plan" ? (
           <div role="tabpanel" data-testid="jornada4-panel-plan">
+            <PulsoCobertura
+              model={pulsoModel}
+              showCta={Boolean(planillaApi.segmentoActivo)}
+              sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
+            />
+            <CoberturaHuecosPanel refreshKey={huecosRefresh} />
             <Jornada4SegmentosPanel
               planilla={planillaApi.planilla}
               plantillasRutina={planillaApi.plantillasRutina}
@@ -172,6 +274,7 @@ export default function JornadaV4Session() {
               ventanaCerrarIds={puertaWindows.cerrarIds}
               notifPermission={notifPermission}
               onRequestNotifPermission={() => {
+                void unlockPuertaAudio();
                 void ensureJornada4NotificationPermission().then(ok => {
                   setNotifPermission(
                     typeof Notification === "undefined"
@@ -188,6 +291,7 @@ export default function JornadaV4Session() {
 
         {mobileTab === "metricas" ? (
           <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
+            <Jornada4DisciplinaCard model={disciplinaModel} />
             <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
             <Jornada4Boveda />
           </div>
