@@ -47,6 +47,7 @@ import { RutasMentalesGrafo } from "@/components/RutasMentalesGrafo";
 import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
+import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 
 const PIZARRA = "#0a0a0a";
@@ -501,6 +502,16 @@ export default function ProyectosPage() {
             />
           </div>
         )}
+
+        <div className="mb-4 p-3 rounded-xl border border-white/10" style={{ backgroundColor: PIZARRA }}>
+          <p className="text-[9px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5" style={{ color: CYAN }}>
+            <TrendingUp size={12} /> Calendario de pasos dados
+          </p>
+          <p className="text-[8px] mb-3 leading-relaxed" style={{ color: NARANJA }}>
+            Historial de ejecución — pasos ya realizados. No es un planificador.
+          </p>
+          <PasosDadosCalendar pasos={proyecto.pasosEjecutadosLog ?? []} />
+        </div>
 
         {enCursoPlan.length > 0 && (
           <div className="mb-4">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Plus, X as XIcon } from "lucide-react";
+import { Check, Plus, TrendingUp, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
 
@@ -7,11 +7,13 @@ const OK = "#00C851";
 const BAD = "#FF2A2A";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
+const AMBER = "#F59E0B";
 const flotaColor = FLOTA_CONFIG.situacion.color;
 
 type Props = {
   vehicle: Vehicle;
   onCumplido: (subTareaId: string) => void;
+  onAvance: (subTareaId: string) => void;
   onFallado: (subTareaId: string) => void;
   onCerrar: () => void;
   onAddFila: (texto: string) => void;
@@ -24,6 +26,7 @@ type Props = {
 export function SituacionLibreCard({
   vehicle,
   onCumplido,
+  onAvance,
   onFallado,
   onCerrar,
   onAddFila,
@@ -82,6 +85,7 @@ export function SituacionLibreCard({
               row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
             const isDone = resultado === "cumplido";
             const isFail = resultado === "fallado";
+            const isAvance = resultado === "avance";
             const isPending = resultado === "pendiente";
             return (
               <div
@@ -100,11 +104,13 @@ export function SituacionLibreCard({
                         ? `${OK}25`
                         : isFail
                           ? `${BAD}25`
-                          : `${flotaColor}20`,
-                      color: isDone ? OK : isFail ? BAD : flotaColor,
+                          : isAvance
+                            ? `${AMBER}25`
+                            : `${flotaColor}20`,
+                      color: isDone ? OK : isFail ? BAD : isAvance ? AMBER : flotaColor,
                     }}
                   >
-                    {isDone ? <Check size={10} /> : isFail ? <XIcon size={10} /> : idx + 1}
+                    {isDone ? <Check size={10} /> : isFail ? <XIcon size={10} /> : isAvance ? <TrendingUp size={9} /> : idx + 1}
                   </span>
                   <p
                     className="text-xs font-semibold flex-1 truncate"
@@ -114,7 +120,7 @@ export function SituacionLibreCard({
                   </p>
                 </div>
                 {isPending ? (
-                  <div className="flex gap-2 pl-7">
+                  <div className="flex gap-1.5 pl-7">
                     <button
                       type="button"
                       className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase"
@@ -123,6 +129,16 @@ export function SituacionLibreCard({
                       data-testid={`j4-libre-cumplido-${row.id}`}
                     >
                       Cumplido
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 py-2 rounded-lg text-[9px] font-black uppercase flex items-center justify-center gap-0.5"
+                      style={{ backgroundColor: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}45` }}
+                      onClick={() => onAvance(row.id)}
+                      data-testid={`j4-libre-avance-${row.id}`}
+                    >
+                      <TrendingUp size={9} />
+                      Avance
                     </button>
                     <button
                       type="button"

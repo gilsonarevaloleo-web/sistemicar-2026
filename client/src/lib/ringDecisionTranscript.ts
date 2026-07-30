@@ -8,7 +8,7 @@ import { isInvisibleCentinelaVehicle } from "./centinelaEngine";
 import type { ProyectoDecisionEnumerada } from "./proyectos";
 import type { SubTarea, SubVehiculo, Vehicle } from "./persistence";
 
-export type DecisionStatus = "cumplido" | "fallado";
+export type DecisionStatus = "cumplido" | "fallado" | "avance";
 
 export interface RawRingDecision {
   key: string;
@@ -26,14 +26,20 @@ export interface RawRingDecision {
 
 function situacionSubEjecutada(st: SubTarea): boolean {
   if (st.enDesgloseCronometro) {
-    return st.resultadoSituacion === "cumplido" || st.resultadoSituacion === "fallado";
+    return (
+      st.resultadoSituacion === "cumplido" ||
+      st.resultadoSituacion === "fallado" ||
+      st.resultadoSituacion === "avance"
+    );
   }
   return st.completada === true;
 }
 
 function situacionSubStatus(st: SubTarea): DecisionStatus {
   if (st.enDesgloseCronometro) {
-    return st.resultadoSituacion === "fallado" ? "fallado" : "cumplido";
+    if (st.resultadoSituacion === "fallado") return "fallado";
+    if (st.resultadoSituacion === "avance") return "avance";
+    return "cumplido";
   }
   return "cumplido";
 }

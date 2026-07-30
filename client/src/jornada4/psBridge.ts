@@ -17,6 +17,9 @@ export type AwardPsFn = (amount: number, source: string) => Promise<boolean>;
 /** PS por fila situacional cumplida (misma magnitud que V3 ops). */
 export const J4_SITUACION_FILA_PS = 4;
 
+/** PS por fila situacional con avance (iniciado pero no terminado). */
+export const J4_SITUACION_AVANCE_PS = 2;
+
 export async function awardConquistaSubPs(
   vehicleTitulo: string,
   closedSub: SubVehiculo,
@@ -56,6 +59,19 @@ export async function awardSituacionFilaPs(
     `J4 situacional · ${texto}${idSuffix}`
   );
   return ok ? J4_SITUACION_FILA_PS : 0;
+}
+
+export async function awardSituacionFilaAvancePs(
+  texto: string,
+  award: AwardPsFn,
+  subTareaId?: string
+): Promise<number> {
+  const idSuffix = subTareaId ? ` [${subTareaId}]` : "";
+  const ok = await award(
+    J4_SITUACION_AVANCE_PS,
+    `J4 avance · ${texto}${idSuffix}`
+  );
+  return ok ? J4_SITUACION_AVANCE_PS : 0;
 }
 
 export async function awardSituacionBlockPs(

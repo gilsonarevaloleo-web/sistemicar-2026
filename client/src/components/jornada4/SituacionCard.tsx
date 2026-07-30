@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Flag, Lock, X as XIcon, Zap } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Flag, Lock, TrendingUp, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
 import { computeSituacionTimerUi } from "@/lib/situacionTimerUi";
@@ -23,12 +23,14 @@ const BAD = "#FF2A2A";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
 const GOLD = "#D4AF37";
+const AMBER = "#F59E0B";
 const VIOLET = "#8B5CF6";
 const flotaColor = FLOTA_CONFIG.situacion.color;
 
 type Props = {
   vehicle: Vehicle;
   onCumplido: (subTareaId: string) => void;
+  onAvance: (subTareaId: string) => void;
   onFallado: (subTareaId: string) => void;
   onCerrarBloque: () => void;
   onAddFila: (texto: string) => void;
@@ -39,6 +41,7 @@ type Props = {
 export function SituacionCard({
   vehicle,
   onCumplido,
+  onAvance,
   onFallado,
   onCerrarBloque,
   onAddFila,
@@ -208,6 +211,16 @@ export function SituacionCard({
               </button>
               <button
                 type="button"
+                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation flex items-center justify-center gap-1"
+                style={{ backgroundColor: `${AMBER}18`, color: AMBER, border: `1px solid ${AMBER}55` }}
+                onClick={() => onAvance(focus.id)}
+                data-testid="j4-situacion-avance"
+              >
+                <TrendingUp size={10} />
+                Avance
+              </button>
+              <button
+                type="button"
                 className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
                 style={{ backgroundColor: "transparent", color: BAD, border: `1px solid ${BAD}60` }}
                 onClick={() => onFallado(focus.id)}
@@ -287,6 +300,7 @@ export function SituacionCard({
                 row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
               const done = resultado === "cumplido";
               const fail = resultado === "fallado";
+              const avance = resultado === "avance";
               const horario = horarioById.get(row.id);
               const cupoBase = row.minutosCupo ?? 0;
               const cupoEfectivo = horario?.minutosCupo ?? cupoBase;
@@ -345,18 +359,20 @@ export function SituacionCard({
                           ? `${OK}25`
                           : fail
                             ? `${BAD}25`
-                            : isFocus
-                              ? `${flotaColor}25`
-                              : "rgba(255,255,255,0.06)",
-                        color: done ? OK : fail ? BAD : isFocus ? flotaColor : MUTED,
+                            : avance
+                              ? `${AMBER}25`
+                              : isFocus
+                                ? `${flotaColor}25`
+                                : "rgba(255,255,255,0.06)",
+                        color: done ? OK : fail ? BAD : avance ? AMBER : isFocus ? flotaColor : MUTED,
                       }}
                     >
-                      {done ? <Check size={10} /> : fail ? <XIcon size={10} /> : idx + 1}
+                      {done ? <Check size={10} /> : fail ? <XIcon size={10} /> : avance ? <TrendingUp size={9} /> : idx + 1}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-xs font-semibold truncate"
-                        style={{ color: isFocus || isPending ? INK : MUTED }}
+                        style={{ color: isFocus || isPending ? INK : avance ? AMBER : MUTED }}
                       >
                         {row.texto || `Fila ${idx + 1}`}
                       </p>

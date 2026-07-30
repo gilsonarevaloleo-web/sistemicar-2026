@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
   awardConquistaSubPs,
   awardSituacionFilaPs,
+  awardSituacionFilaAvancePs,
   DESGLOSADOR_SUB_CUMPLIDO_PS,
   J4_SITUACION_FILA_PS,
+  J4_SITUACION_AVANCE_PS,
 } from "./psBridge.ts";
 import type { SubVehiculo } from "../lib/persistence.ts";
 
@@ -56,5 +58,23 @@ describe("psBridge Dual Kernel", () => {
 
     assert.equal(awarded, J4_SITUACION_FILA_PS);
     assert.equal(calls[0]!.source, "J4 situacional · Decisión A [st_99]");
+  });
+
+  it("otorga 2 PS por avance y registra fuente J4 avance", async () => {
+    const calls: Array<{ amount: number; source: string }> = [];
+    const awarded = await awardSituacionFilaAvancePs("Tarea iniciada", async (amount, source) => {
+      calls.push({ amount, source });
+      return true;
+    }, "st_av1");
+
+    assert.equal(awarded, J4_SITUACION_AVANCE_PS);
+    assert.equal(awarded, 2);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]!.source, "J4 avance · Tarea iniciada [st_av1]");
+  });
+
+  it("J4_SITUACION_AVANCE_PS es 2 y menor que J4_SITUACION_FILA_PS (4)", () => {
+    assert.equal(J4_SITUACION_AVANCE_PS, 2);
+    assert.ok(J4_SITUACION_AVANCE_PS < J4_SITUACION_FILA_PS);
   });
 });
