@@ -1,11 +1,15 @@
 import {
+  CODIGO_HIERARCHY,
   ESPEJO_V2_CODIGOS,
   ESPEJO_V2_ENTRY_PROMPT,
   ESPEJO_V2_PHASES,
+  buildHierarchyPromptBlock,
   classifyQueja,
   detectRefraction,
   densityPercent,
+  getCodigoHierarchy,
   getPhasePrompt,
+  isCodigoSuperior,
   isValidCodigo,
   isValidPhase,
   type EspejoV2CodigoId,
@@ -65,25 +69,39 @@ function buildReasoningPrompt(args: {
           })
           .join("\n");
 
+  const hierarchy = getCodigoHierarchy(args.codigo);
+  const superiorQuestionRule = isCodigoSuperior(args.codigo)
+    ? `
+REGLA DE PREGUNTA (Código Mayor ${args.codigo}): la "pregunta" debe hablar de soberanía, presencia, dignidad, honor o gobernancia del territorio/familia — NUNCA de gestión del tiempo, agenda ni lista de tareas.`
+    : "";
+
   const nextInstr = args.completed
     ? `El protocolo cierra en Fase 5 (Gobernador). Devuelve:
 - "devolucion": 1-2 oraciones que sellen dignidad/soberanía según lo dicho.
 - "pregunta": reformula el Mandato del Gobernador anclado al contexto (una sola pregunta o mandato corto).
-- "senales": array corto de señales detectadas (evasión, victimismo, dispersión, claridad, acción).`
+- "senales": array corto de señales detectadas (evasión, victimismo, dispersión, claridad, acción).${superiorQuestionRule}`
     : `La siguiente fase es Fase ${args.nextPhase!.index} — ${args.nextPhase!.label} (${args.nextPhase!.codigoFase}, polo ${args.nextPhase!.polo}).
 Marco base de esa fase (adáptalo, no lo copies literal si el contexto permite precisión):
 "${marcoFaseBase}"
+${superiorQuestionRule}
 
 Devuelve:
 - "devolucion": 1-2 oraciones que confronten o validen quirúrgicamente lo que el usuario acaba de decir.
 - "pregunta": la pregunta de la Fase ${args.nextPhase!.index} adaptada al contexto ESPECÍFICO revelado.
 - "senales": array corto de señales (evasión, victimismo, dispersión, claridad, acción, etc.).`;
 
+  const hierarchyBlock = buildHierarchyPromptBlock(args.codigo);
+  const superiorGuard = isCodigoSuperior(args.codigo)
+    ? `\nVALIDACIÓN FINAL ANTES DE RESPONDER: Si tu "pregunta" habla de agenda, tareas, horas o gestión del tiempo, DESCÁRTALA y reformúlala desde soberanía/dignidad/territorio.`
+    : "";
+
   return `Eres el Gobernador de Sistemicar. Lenguaje técnico, directo, sin consuelo motivacional genérico.
 Analiza quirúrgicamente la respuesta del usuario. Detecta si hay evasión, victimismo o dispersión.
 Genera una devolución breve que confronte o valide, y LUEGO formula la siguiente intervención adaptada al contexto.
 
-CÓDIGO ACTIVO: ${args.codigo} — ${def.frecuencia}
+${hierarchyBlock}
+
+CÓDIGO ACTIVO: ${args.codigo} — ${def.frecuencia} [${hierarchy.level}]
 PUNTO CORPORAL / DIAGNÓSTICO: ${def.puntoCorporal}
 QUEJA TÍPICA DEL CÓDIGO: ${def.quejaTipica}
 FRICCIÓN ACTUAL: NIVEL ${args.friction}${args.friction === 2 ? " (REFRACCIÓN REENCUADRADA)" : ""}
@@ -99,6 +117,7 @@ RESPUESTA RECIÉN INGRESADA:
 """${args.respuesta}"""
 
 ${nextInstr}
+${superiorGuard}
 
 Responde SOLO JSON válido:
 {
@@ -117,18 +136,33 @@ export function registerEspejoV2Routes(app: Express, deps: EspejoV2RouteDeps = {
 
   app.get("/api/espejo-v2/meta", (_req: Request, res: Response) => {
     res.json({
-      version: "2.0.0-paso-3",
+      version: "2.1.0-jerarquia",
       header: "PROC-ESPEJO // SISTEMICAR V2",
       entryPrompt: ESPEJO_V2_ENTRY_PROMPT,
       phases: ESPEJO_V2_PHASES,
       reasoning: Boolean(callGemini),
-      codigos: Object.values(ESPEJO_V2_CODIGOS).map((c) => ({
-        id: c.id,
-        secuencia: c.secuencia,
-        frecuencia: c.frecuencia,
-        puntoCorporal: c.puntoCorporal,
-        quejaTipica: c.quejaTipica,
-      })),
+      jerarquia: {
+        regla:
+          "Cuando el volcado active múltiples códigos, el de mayor jerarquía anula a los de menor. Códigos 1.8–1.10 nunca se responden con preguntas tácticas de 1.3.",
+        niveles: {
+          superior: ["1.10", "1.9", "1.8"],
+          medio: ["1.4", "1.5", "1.6", "1.7"],
+          base: ["1.1", "1.2", "1.3"],
+        },
+      },
+      codigos: Object.values(ESPEJO_V2_CODIGOS).map((c) => {
+        const h = CODIGO_HIERARCHY[c.id];
+        return {
+          id: c.id,
+          secuencia: c.secuencia,
+          frecuencia: c.frecuencia,
+          puntoCorporal: c.puntoCorporal,
+          quejaTipica: c.quejaTipica,
+          hierarchyLevel: h.level,
+          hierarchyRank: h.rank,
+          hierarchyLabel: h.label,
+        };
+      }),
     });
   });
 
@@ -143,15 +177,24 @@ export function registerEspejoV2Routes(app: Express, deps: EspejoV2RouteDeps = {
 
       const classification = classifyQueja(texto);
       const codigo = ESPEJO_V2_CODIGOS[classification.codigo];
+      const hierarchy = getCodigoHierarchy(classification.codigo);
       const firstPhase = ESPEJO_V2_PHASES[0];
 
       res.json({
         ok: true,
         classification,
+        hierarchy: {
+          level: hierarchy.level,
+          rank: hierarchy.rank,
+          label: hierarchy.label,
+          applied: classification.hierarchyApplied,
+          dominatedCodes: classification.dominatedCodes,
+        },
         sessionSeed: {
           codigo: classification.codigo,
           frecuencia: classification.frecuencia,
           puntoCorporal: classification.puntoCorporal,
+          hierarchyLevel: hierarchy.level,
           friction: 1 as FrictionLevel,
           phaseId: firstPhase.id,
           phaseIndex: firstPhase.index,

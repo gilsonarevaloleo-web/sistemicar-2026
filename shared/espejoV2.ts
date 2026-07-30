@@ -258,7 +258,59 @@ export const ESPEJO_V2_CODIGOS: Record<EspejoV2CodigoId, EspejoV2CodigoDef> = {
   },
 };
 
-/** Keyword rules for classifier (spec §5.2). Order = priority when scoring ties. */
+/**
+ * Ley de Jerarquía de Códigos (dominancia multi-código).
+ * Nivel Superior anula Medio; Medio anula Base.
+ * Dentro del mismo nivel: más hits de keyword, luego tieBreak interno.
+ */
+export type CodigoHierarchyLevel = "superior" | "medio" | "base";
+
+export interface CodigoHierarchyMeta {
+  level: CodigoHierarchyLevel;
+  /** 3 = superior, 2 = medio, 1 = base. Mayor = más autoridad. */
+  rank: number;
+  /** Desempate dentro del mismo nivel (mayor gana). */
+  tieBreak: number;
+  label: string;
+}
+
+export const CODIGO_HIERARCHY: Record<EspejoV2CodigoId, CodigoHierarchyMeta> = {
+  "1.10": {
+    level: "superior",
+    rank: 3,
+    tieBreak: 3,
+    label: "Suelo / Familia / Territorio",
+  },
+  "1.9": {
+    level: "superior",
+    rank: 3,
+    tieBreak: 2,
+    label: "Vitalidad / Fuego / Reserva Energética",
+  },
+  "1.8": {
+    level: "superior",
+    rank: 3,
+    tieBreak: 1,
+    label: "Honor / Estándar / Dignidad / Juicio Personal",
+  },
+  "1.7": { level: "medio", rank: 2, tieBreak: 4, label: "Mando / Liderazgo" },
+  "1.6": { level: "medio", rank: 2, tieBreak: 3, label: "Caza / Herramientas de mercado" },
+  "1.5": { level: "medio", rank: 2, tieBreak: 2, label: "Caudal / Estructura de proceso" },
+  "1.4": { level: "medio", rank: 2, tieBreak: 1, label: "Marco / Ley / Enfoque normativo" },
+  "1.3": { level: "base", rank: 1, tieBreak: 3, label: "Tiempo / Tracción (táctico)" },
+  "1.2": { level: "base", rank: 1, tieBreak: 2, label: "Ruta / Contención (táctico)" },
+  "1.1": { level: "base", rank: 1, tieBreak: 1, label: "Sentido / Juego (táctico)" },
+};
+
+export function getCodigoHierarchy(codigo: EspejoV2CodigoId): CodigoHierarchyMeta {
+  return CODIGO_HIERARCHY[codigo];
+}
+
+export function isCodigoSuperior(codigo: EspejoV2CodigoId): boolean {
+  return CODIGO_HIERARCHY[codigo].level === "superior";
+}
+
+/** Keyword rules for classifier (spec §5.2). Selection uses hierarchy, not list order. */
 const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> = [
   {
     codigo: "1.3",
@@ -272,6 +324,10 @@ const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> 
       "no avanzo",
       "sin avanzar",
       "fuga de tiempo",
+      "retraso",
+      "entregas",
+      "atrasado",
+      "agenda",
     ],
   },
   {
@@ -280,12 +336,21 @@ const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> 
       "pareja",
       "casa",
       "hogar",
+      "familia",
+      "territorio",
+      "suelo",
       "desprecio",
       "desequilibrio",
       "dar sin recibir",
       "no me valoran",
       "balanza",
       "reciprocidad",
+      "proveer",
+      "proveedor",
+      "mi familia",
+      "a mi familia",
+      "mis hijos",
+      "mi casa",
     ],
   },
   {
@@ -327,8 +392,9 @@ const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> 
       "respeto",
       "violaron",
       "acuerdos",
-      "juicio",
       "desprotegido",
+      "me juzgan",
+      "me faltan al respeto",
     ],
   },
   {
@@ -381,6 +447,19 @@ const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> 
       "perfeccionismo",
       "fallé",
       "falle",
+      "inútil",
+      "inutil",
+      "soy un fracaso",
+      "me juzgo",
+      "juicio de valor",
+      "juicio personal",
+      "dignidad",
+      "honor",
+      "mi estándar",
+      "no valgo",
+      "no sirvo",
+      "fracasé",
+      "fracase",
     ],
   },
   {
@@ -395,6 +474,11 @@ const CLASSIFIER_RULES: Array<{ codigo: EspejoV2CodigoId; keywords: string[] }> 
       "sin ganas",
       "no disfruto",
       "obligación",
+      "sin energía",
+      "sin fuego",
+      "apagado",
+      "reserva energética",
+      "vitalidad",
     ],
   },
 ];
@@ -406,6 +490,43 @@ export interface ClassificationResult {
   matchedKeywords: string[];
   scores: Partial<Record<EspejoV2CodigoId, number>>;
   method: "keyword";
+  hierarchyLevel: CodigoHierarchyLevel;
+  /** Códigos que también activaron keywords pero fueron anulados por jerarquía. */
+  dominatedCodes: EspejoV2CodigoId[];
+  hierarchyApplied: boolean;
+}
+
+/**
+ * Elige el código dominante: mayor rank jerárquico anula menores;
+ * dentro del mismo nivel, más hits; luego tieBreak.
+ */
+export function selectDominantCodigo(
+  scores: Partial<Record<EspejoV2CodigoId, number>>,
+): EspejoV2CodigoId {
+  const activated = (Object.keys(ESPEJO_V2_CODIGOS) as EspejoV2CodigoId[]).filter(
+    (id) => (scores[id] ?? 0) > 0,
+  );
+  if (activated.length === 0) return "1.3";
+
+  let best = activated[0];
+  for (const id of activated.slice(1)) {
+    const a = CODIGO_HIERARCHY[id];
+    const b = CODIGO_HIERARCHY[best];
+    const scoreA = scores[id] ?? 0;
+    const scoreB = scores[best] ?? 0;
+    if (a.rank > b.rank) {
+      best = id;
+      continue;
+    }
+    if (a.rank < b.rank) continue;
+    if (scoreA > scoreB) {
+      best = id;
+      continue;
+    }
+    if (scoreA < scoreB) continue;
+    if (a.tieBreak > b.tieBreak) best = id;
+  }
+  return best;
 }
 
 export function classifyQueja(texto: string): ClassificationResult {
@@ -432,19 +553,14 @@ export function classifyQueja(texto: string): ClassificationResult {
     }
   }
 
-  let best: EspejoV2CodigoId = "1.3";
-  let bestScore = -1;
-  for (const rule of CLASSIFIER_RULES) {
-    const s = scores[rule.codigo] ?? 0;
-    if (s > bestScore) {
-      bestScore = s;
-      best = rule.codigo;
-    }
-  }
-
-  if (bestScore <= 0) {
-    best = "1.3";
-  }
+  const activated = (Object.keys(scores) as EspejoV2CodigoId[]).filter(
+    (id) => (scores[id] ?? 0) > 0,
+  );
+  const best = selectDominantCodigo(scores);
+  const hierarchy = CODIGO_HIERARCHY[best];
+  const dominatedCodes = activated
+    .filter((id) => id !== best)
+    .sort((a, b) => CODIGO_HIERARCHY[b].rank - CODIGO_HIERARCHY[a].rank);
 
   const def = ESPEJO_V2_CODIGOS[best];
   return {
@@ -454,7 +570,46 @@ export function classifyQueja(texto: string): ClassificationResult {
     matchedKeywords: matchedByCode[best] ?? [],
     scores,
     method: "keyword",
+    hierarchyLevel: hierarchy.level,
+    dominatedCodes,
+    hierarchyApplied: dominatedCodes.some(
+      (id) => CODIGO_HIERARCHY[id].rank < hierarchy.rank,
+    ),
   };
+}
+
+/**
+ * Instrucciones de encuadre para Gemini según nivel jerárquico del código activo.
+ * Prohíbe responder códigos superiores con preguntas tácticas de Nivel Base (1.3).
+ */
+export function buildHierarchyPromptBlock(codigo: EspejoV2CodigoId): string {
+  const h = CODIGO_HIERARCHY[codigo];
+  const base = `LEY DE JERARQUÍA DE CÓDIGOS (OBLIGATORIA — CIRUGÍA DE AUTORIDAD):
+- Nivel Superior (máxima autoridad): 1.10 Suelo/Familia/Territorio, 1.9 Vitalidad/Fuego, 1.8 Honor/Dignidad/Juicio personal.
+- Nivel Medio: 1.4–1.7 (Estructura, Mando, Enfoque, Herramientas).
+- Nivel Base (táctico): 1.1–1.3 (Sentido, Ruta, Tiempo/Tracción).
+Cuando el volcado active múltiples códigos, el de MAYOR jerarquía ANULA a los de menor. Nunca trates un síntoma táctico (tiempo, agenda, tareas) como el diagnóstico si hay señal de Familia, Honor o Vitalidad.
+
+CÓDIGO ACTIVO: ${codigo} — Nivel ${h.level.toUpperCase()} (rank ${h.rank}) — ${h.label}.`;
+
+  if (h.level === "superior") {
+    return `${base}
+
+PROHIBICIÓN RÍGIDA PARA CÓDIGOS MAYORES (1.8–1.10):
+- JAMÁS respondas con preguntas operativas, de agenda, productividad, "qué tareas", "cómo organizas el tiempo" o gestión del Código 1.3.
+- Formula devolución y pregunta desde SOBERANÍA, PRESENCIA, ROL DE GOBERNADOR DE SU TERRITORIO y DIGNIDAD.
+- Si el usuario menciona retrasos o tiempo, reencuadra: el tiempo es síntoma; el núcleo es dignidad, fuego o territorio/familia.`;
+  }
+
+  if (h.level === "medio") {
+    return `${base}
+
+Encuadre Nivel Medio: estructura, mando, flujo u oferta. No bajes a micro-gestión de agenda (1.3) ni ignores señales superiores si reaparecen en la respuesta.`;
+  }
+
+  return `${base}
+
+Encuadre Nivel Base (táctico): sentido, ruta o tracción/tiempo. Si en la respuesta emergen Familia, Honor/juicio personal o colapso vital, NO insistas en agenda: señalalo como posible reencuadre hacia 1.8–1.10.`;
 }
 
 export interface RefractionRule {
