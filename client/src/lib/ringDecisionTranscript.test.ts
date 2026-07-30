@@ -103,4 +103,38 @@ describe("ringDecisionTranscript", () => {
     assert.equal(filtered[0].n, 1);
     assert.equal(filtered[0].texto, "A");
   });
+
+  it("collectExecutedDecisions incluye sub con resultadoSituacion avance", () => {
+    const vehicle: Vehicle = {
+      id: "v3",
+      titulo: "Ring con avance",
+      tipoFlota: "situacion",
+      status: "activo",
+      proyectoId: "proy_c",
+      subTareas: [
+        {
+          id: "st_a",
+          texto: "Tarea avanzada",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "avance",
+          cerradaAt: 3000,
+        },
+        {
+          id: "st_b",
+          texto: "Tarea pendiente",
+          completada: false,
+          creadaAt: 2,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    } as Vehicle;
+
+    const raw = collectExecutedDecisionsFromVehicle(vehicle);
+    assert.equal(raw.length, 1);
+    assert.equal(raw[0]!.status, "avance");
+    assert.equal(raw[0]!.texto, "Tarea avanzada");
+  });
 });

@@ -27,7 +27,7 @@ export type SituacionRowCloseResult = {
 export function applySituacionRowClose(
   vehicle: Vehicle,
   subTareaId: string,
-  status: "cumplido" | "fallado",
+  status: "cumplido" | "fallado" | "avance",
   now = Date.now()
 ): SituacionRowCloseResult | null {
   if (!isSituacionDesglosador(vehicle) || vehicle.status !== "activo") return null;
@@ -65,7 +65,7 @@ export function applySituacionRowClose(
     subTareas = gained.subTareas;
     minutosGanados = gained.minutosGanados;
     saldoAdelantoMin = gained.saldoAdelantoMin;
-  } else {
+  } else if (status === "fallado") {
     const failed = registrarCierreFalladoCronometro(
       subTareas,
       subTareaId,
@@ -75,6 +75,26 @@ export function applySituacionRowClose(
     );
     subTareas = failed.subTareas;
     minutosPerdidos = failed.minutosPerdidos;
+  } else {
+    // avance: cierre neutro — libera el ring, sin ganancia ni pérdida de tiempo
+    const anchor = vehicle.situacionCupoAnchor;
+    let duracionRealSec = 0;
+    if (anchor?.subTareaId === subTareaId) {
+      duracionRealSec = Math.max(0, Math.floor((now - anchor.startedAt) / 1000));
+    } else if (target.minutosCupo) {
+      duracionRealSec = target.minutosCupo * 60;
+    }
+    subTareas = subTareas.map(st =>
+      st.id === subTareaId
+        ? {
+            ...st,
+            completada: false,
+            resultadoSituacion: "avance" as const,
+            duracionRealSec,
+            cerradaAt: now,
+          }
+        : st
+    );
   }
 
   const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);
@@ -137,7 +157,9 @@ export function applySituacionBlockClose(
   if (pending) return null;
 
   const cronRows = subs.filter(st => st.enDesgloseCronometro);
-  const anyCumplido = cronRows.some(st => st.resultadoSituacion === "cumplido");
+  const anyCumplido = cronRows.some(
+    st => st.resultadoSituacion === "cumplido" || st.resultadoSituacion === "avance"
+  );
   const sc = vehicle.situacionCronometro;
 
   return {
@@ -158,4 +180,15 @@ export function situacionProgressLabel(vehicle: Vehicle): string {
   const cron = (vehicle.subTareas ?? []).filter(st => st.enDesgloseCronometro);
   const done = cron.filter(st => (st.resultadoSituacion ?? "pendiente") !== "pendiente").length;
   return `${done}/${cron.length}`;
+}
+
+/** Returns the row status for display purposes (cumplido | avance | fallado | pendiente). */
+export function situacionFilaResultado(
+  row: { resultadoSituacion?: string; completada?: boolean }
+): "cumplido" | "avance" | "fallado" | "pendiente" {
+  const r = row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
+  if (r === "cumplido") return "cumplido";
+  if (r === "avance") return "avance";
+  if (r === "fallado") return "fallado";
+  return "pendiente";
 }

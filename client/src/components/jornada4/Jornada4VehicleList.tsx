@@ -29,7 +29,7 @@ type Ops = {
   closeSituacionRow: (
     vehicleId: string,
     subTareaId: string,
-    status: "cumplido" | "fallado"
+    status: "cumplido" | "fallado" | "avance"
   ) => Promise<void>;
   closeSituacionBlock: (vehicleId: string) => Promise<void>;
   closeRapidoVehicle: (
@@ -40,7 +40,7 @@ type Ops = {
   closeSituacionLibreFila: (
     vehicleId: string,
     subTareaId: string,
-    status: "cumplido" | "fallado"
+    status: "cumplido" | "fallado" | "avance"
   ) => Promise<void>;
   closeSituacionLibreBloque: (vehicleId: string) => Promise<void>;
   addSituacionLibreFila: (vehicleId: string, texto: string) => Promise<void>;
@@ -170,6 +170,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     key={v.id}
                     vehicle={v}
                     onCumplido={id => void ops.closeSituacionRow(v.id, id, "cumplido")}
+                    onAvance={id => void ops.closeSituacionRow(v.id, id, "avance")}
                     onFallado={id => void ops.closeSituacionRow(v.id, id, "fallado")}
                     onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
                     onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
@@ -186,6 +187,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     key={v.id}
                     vehicle={v}
                     onCumplido={id => void ops.closeSituacionLibreFila(v.id, id, "cumplido")}
+                    onAvance={id => void ops.closeSituacionLibreFila(v.id, id, "avance")}
                     onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
                     onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
                     onAddFila={texto => void ops.addSituacionLibreFila(v.id, texto)}

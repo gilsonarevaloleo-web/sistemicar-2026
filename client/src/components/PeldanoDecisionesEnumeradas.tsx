@@ -4,10 +4,12 @@ const EMERALD = "#10b981";
 const BLOOD = "#f87171";
 const CYAN = "#00FFC3";
 const SLATE = "#64748b";
+const AMBER = "#F59E0B";
 
 function statusColor(status: ProyectoDecisionEnumerada["status"]): string {
   if (status === "cumplido") return EMERALD;
   if (status === "fallado") return BLOOD;
+  if (status === "avance") return AMBER;
   return SLATE;
 }
 

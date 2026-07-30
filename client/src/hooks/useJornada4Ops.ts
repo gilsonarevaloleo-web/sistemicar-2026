@@ -27,6 +27,7 @@ import {
   awardConquistaSubPs,
   awardConquistaCyclePs,
   awardSituacionFilaPs,
+  awardSituacionFilaAvancePs,
   awardSituacionBlockPs,
 } from "@/jornada4/psBridge";
 import { burstJornada4Tick } from "@/jornada4/jornada4Tick";
@@ -88,6 +89,7 @@ const BLOOD = "#FF2A2A";
 const PLATA = "#C0C0C0";
 const CYAN = "#00FFC3";
 const VIOLET = "#8B5CF6";
+const AMBER = "#F59E0B";
 
 const STUB_EJES = {
   enfoque: { text: "", trifecta: "omitir" as const },
@@ -327,7 +329,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const closeSituacionRow = useCallback(
-    async (vehicleId: string, subTareaId: string, status: "cumplido" | "fallado") => {
+    async (vehicleId: string, subTareaId: string, status: "cumplido" | "fallado" | "avance") => {
       if (!userId) return;
       const key = `s:${vehicleId}:${subTareaId}`;
       if (inFlightRef.current.has(key)) return;
@@ -368,6 +370,25 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                   backgroundColor: PIZARRA,
                   border: `1px solid ${EMERALD}`,
                   color: EMERALD,
+                },
+                duration: 2200,
+              }
+            );
+          } else if (status === "avance") {
+            const awarded = await awardSituacionFilaAvancePs(
+              patch.closedSubTexto,
+              safeAwardPS,
+              subTareaId
+            );
+            toast.success(
+              awarded > 0
+                ? `+${awarded} PS · avance (retomar)`
+                : "Avance registrado · retomar",
+              {
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${AMBER}`,
+                  color: AMBER,
                 },
                 duration: 2200,
               }
@@ -669,7 +690,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const closeSituacionLibreFila = useCallback(
-    async (vehicleId: string, subTareaId: string, status: "cumplido" | "fallado") => {
+    async (vehicleId: string, subTareaId: string, status: "cumplido" | "fallado" | "avance") => {
       if (!userId) return;
       const key = `sl:${vehicleId}:${subTareaId}`;
       if (inFlightRef.current.has(key)) return;
@@ -702,6 +723,20 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 backgroundColor: PIZARRA,
                 border: `1px solid ${EMERALD}`,
                 color: EMERALD,
+              },
+              duration: 2000,
+            });
+          } else if (status === "avance") {
+            const awarded = await awardSituacionFilaAvancePs(
+              subTareas.find(s => s.id === subTareaId)?.texto ?? "fila",
+              safeAwardPS,
+              subTareaId
+            );
+            toast.success(awarded > 0 ? `+${awarded} PS · avance` : "Avance registrado", {
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${AMBER}`,
+                color: AMBER,
               },
               duration: 2000,
             });

@@ -48,7 +48,7 @@ export interface ProyectoDecisionEnumerada {
   key: string;
   texto: string;
   kind: DecisionKind;
-  status: "cumplido" | "fallado";
+  status: "cumplido" | "fallado" | "avance";
   ts?: number;
   pasoEjecutadoNumero?: number;
   proyectoId?: string;
@@ -70,7 +70,7 @@ export interface ProyectoPeldanoResumen {
   psGanados?: number;
   subResumen?: {
     titulo: string;
-    status: "cumplido" | "fallado" | "pendiente";
+    status: "cumplido" | "fallado" | "avance" | "pendiente";
     duracionMin?: number;
   }[];
   subTareasResumen?: ProyectoSubTareaResumen[];
