@@ -96,6 +96,15 @@ export type FlotaLaunchForm = {
    * Si se omite, hereda del segmento activo vía resolverProyectoId.
    */
   proyectoId?: string;
+  /**
+   * Semilla situacional (ring o lista libre) incluida en el paint + remote del launch.
+   * Evita persistir un shell sin cronómetro/filas si el usuario sale al instante.
+   */
+  situacionLaunchSeed?: {
+    subTareas: NonNullable<Vehicle["subTareas"]>;
+    situacionCronometro: Vehicle["situacionCronometro"] | null;
+    situacionCupoAnchor: Vehicle["situacionCupoAnchor"] | null;
+  };
 };
 
 export type ExecuteFlotaLaunchParams = {
@@ -219,6 +228,11 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
 
     const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
 
+    const situacionSeed =
+      tipoFlota === "situacion" && form.situacionLaunchSeed
+        ? form.situacionLaunchSeed
+        : null;
+
     const vehiclePayload = {
       titulo,
       criterioFin: criterio,
@@ -243,6 +257,13 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
                   tiempoElegido: form.tiempoRecordMinPerUnit,
                 }
               : {}),
+          }
+        : {}),
+      ...(situacionSeed
+        ? {
+            subTareas: situacionSeed.subTareas,
+            situacionCronometro: situacionSeed.situacionCronometro,
+            situacionCupoAnchor: situacionSeed.situacionCupoAnchor,
           }
         : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),

@@ -108,4 +108,26 @@ describe("jornada4 filters", () => {
     assert.equal(isSituacionListaLibre(libre), true);
     assert.equal(isExpressSituacion(libre), false);
   });
+
+  it("ring pausado con filas pendientes sigue siendo ring (no lista libre)", () => {
+    const paused = v({
+      id: "paused",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: false, bloqueInicioAt: 1 },
+      subTareas: [
+        {
+          id: "f1",
+          texto: "Fila",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    assert.equal(isSituacionRing(paused), true);
+    assert.equal(isSituacionDesglosador(paused), true);
+    assert.equal(isSituacionListaLibre(paused), false);
+    assert.equal(isExpressSituacion(paused), false);
+  });
 });

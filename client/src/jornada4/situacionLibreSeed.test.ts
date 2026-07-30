@@ -52,5 +52,22 @@ describe("situacionLibreSeed", () => {
       }),
       false
     );
+    assert.equal(
+      isSituacionListaLibre({
+        ...libre,
+        situacionCronometro: { activo: false, bloqueInicioAt: 1 },
+        subTareas: [
+          {
+            id: "a",
+            texto: "x",
+            completada: false,
+            creadaAt: 1,
+            enDesgloseCronometro: true,
+            resultadoSituacion: "pendiente",
+          },
+        ],
+      }),
+      false
+    );
   });
 });

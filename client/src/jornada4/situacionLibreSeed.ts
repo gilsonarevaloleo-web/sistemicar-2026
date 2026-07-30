@@ -2,7 +2,8 @@
  * Semilla de lista libre situacional (sin ring / sin meta / sin presión).
  * Filas directas: se cumplen en cualquier orden, sin cupos ni contrato.
  */
-import type { SubTarea, Vehicle } from "@/lib/persistence";
+import type { SubTarea, Vehicle } from "../lib/persistence";
+import { ringSessionOperable } from "../lib/ringEnfoqueReal";
 
 export type SituacionLibreSeed = {
   subTareas: SubTarea[];
@@ -46,6 +47,7 @@ export function buildSituacionLibreSeed(opts: {
 
 export function isSituacionListaLibre(v: Vehicle): boolean {
   if (v.tipoFlota !== "situacion" || v.status !== "activo") return false;
-  if (v.situacionCronometro?.activo === true) return false;
+  // Ring pausado/operable no es lista libre (evita “pérdida” visual del ring al volver).
+  if (ringSessionOperable(v.situacionCronometro, v.subTareas ?? [])) return false;
   return (v.subTareas?.length ?? 0) > 0;
 }

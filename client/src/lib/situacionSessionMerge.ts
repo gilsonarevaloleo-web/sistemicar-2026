@@ -74,6 +74,19 @@ export function mergeSubTareasById(
   return order.map(id => byId.get(id)!);
 }
 
+function situacionCronometroSeedScore(
+  sc: NonNullable<Vehicle["situacionCronometro"]>
+): number {
+  let score = 0;
+  if (sc.activo === true) score += 40;
+  if (sc.bloqueInicioAt != null) score += 10;
+  if ((sc.horaFinContratoMs ?? sc.horaFinMs ?? 0) > 0) score += 10;
+  if ((sc.retosCompletados ?? 0) > 0) score += sc.retosCompletados! * 5;
+  if ((sc.depthBlockPsGranted ?? 0) > 0) score += sc.depthBlockPsGranted!;
+  if (sc.proyectoEnfoqueId?.trim()) score += 2;
+  return score;
+}
+
 function pickSituacionCronometro(
   fb: Vehicle["situacionCronometro"],
   local: Vehicle["situacionCronometro"]
@@ -95,6 +108,10 @@ function pickSituacionCronometro(
       return local;
     }
   }
+  // Shell remoto (sin bloque/meta) no debe pisar un ring local ya sellado.
+  const localScore = situacionCronometroSeedScore(local);
+  const fbScore = situacionCronometroSeedScore(fb);
+  if (localScore > fbScore + 8) return local;
   const fbFin = fb.horaFinContratoMs ?? fb.horaFinMs ?? 0;
   const localFin = local.horaFinContratoMs ?? local.horaFinMs ?? 0;
   const picked = localFin >= fbFin ? local : fb;
