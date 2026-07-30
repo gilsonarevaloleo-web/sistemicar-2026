@@ -741,7 +741,7 @@ export default function ProyectosPage() {
           Proyectos y Centros
         </h1>
         <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-          Construye tu futuro peldaño a peldaño. Sin calendario. Sin semana que traiciona.
+          Construye tu futuro peldaño a peldaño. Calendario de pasos dados — no de promesas.
         </p>
       </header>
 
