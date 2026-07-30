@@ -1,4 +1,5 @@
 import type { Proyecto } from "@/lib/proyectos";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 
 type Props = {
   value: string;
@@ -13,6 +14,8 @@ type Props = {
   emptyLabel?: string;
   /** Hint opcional bajo el select. */
   hint?: string;
+  /** Ruta al Hub (default /proyectos). Null oculta el enlace. */
+  hubHref?: string | null;
 };
 
 /** Selector tech-noir: vincular segmento / vehículo / sub a Proyecto o Centro del Hub. */
@@ -26,7 +29,17 @@ export function SegmentoProyectoSelect({
   label = "Proyecto o Centro de Atención",
   emptyLabel = "Sin vincular",
   hint,
+  hubHref = "/proyectos",
 }: Props) {
+  const hubLink = hubHref ? (
+    <NavTransitionLink
+      href={hubHref}
+      className="text-cyan-500/90 underline underline-offset-2"
+    >
+      {proyectos.length === 0 ? "Abrir Hub" : "Abrir Hub de Proyectos"}
+    </NavTransitionLink>
+  ) : null;
+
   return (
     <div className={className}>
       <label
@@ -57,9 +70,17 @@ export function SegmentoProyectoSelect({
       </select>
       {hint ? (
         <p className="text-[8px] text-gray-600 mt-1">{hint}</p>
+      ) : proyectos.length === 0 && hubLink ? (
+        <p className="text-[8px] text-gray-600 mt-1" data-testid={`${testId}-abrir-hub`}>
+          Sin proyectos. {hubLink} para crear y vincular.
+        </p>
       ) : proyectos.length === 0 ? (
         <p className="text-[8px] text-gray-600 mt-1">
           Crea proyectos en el Hub para vincular este bloque.
+        </p>
+      ) : hubLink ? (
+        <p className="text-[8px] text-gray-600 mt-1" data-testid={`${testId}-abrir-hub`}>
+          {hubLink}
         </p>
       ) : null}
     </div>
