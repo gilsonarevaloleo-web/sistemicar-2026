@@ -1,22 +1,17 @@
 /**
  * Sesión Dual Kernel — segmentos + proyectos + alertas puerta + PS + flota + Crisol.
- * UI móvil en pestañas (Operar / Plan / Métricas) — sin cambiar hooks ni timers.
+ * UI móvil en pestañas (Operar / Plan / Métricas).
+ * Plan y Métricas van en chunks lazy; Operar queda liviano (sin Pulso/recharts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "@/App";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import {
   Jornada4MobileNav,
   type Jornada4MobileTab,
 } from "@/components/jornada4/Jornada4MobileNav";
-import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
-import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
-import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
-import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
-import { CoberturaHuecosPanel } from "@/components/jornada4/CoberturaHuecosPanel";
-import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
@@ -24,26 +19,42 @@ import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
 import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
-import { useJornada4Tick } from "@/hooks/useJornada4Tick";
-import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
   type Jornada4LaunchForm,
 } from "@/jornada4/executeJornada4Launch";
-import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
-import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
+
+const Jornada4PlanTab = lazy(() => import("@/components/jornada4/Jornada4PlanTab"));
+const Jornada4MetricasTab = lazy(
+  () => import("@/components/jornada4/Jornada4MetricasTab")
+);
+
+function TabChunkFallback({ label }: { label: string }) {
+  return (
+    <div
+      className="mx-4 my-6 rounded-xl border px-3 py-4 text-center text-[11px] uppercase tracking-widest"
+      style={{
+        borderColor: "rgba(255,255,255,0.08)",
+        color: "#64748b",
+        backgroundColor: "rgba(0,0,0,0.25)",
+      }}
+      data-testid="jornada4-tab-fallback"
+    >
+      {label}
+    </div>
+  );
+}
 
 export default function JornadaV4Session() {
   const { user } = useAuthContext();
   const core = useJornada4Core();
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
-  const [yesterdayPs, setYesterdayPs] = useState(0);
   const [huecosRefresh, setHuecosRefresh] = useState(0);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
@@ -57,12 +68,9 @@ export default function JornadaV4Session() {
   });
   const { proyectosHub, proyectoVinculadoActivo, resolverProyectoId } =
     useSegmentoProyectoVinculo(user?.uid, planillaApi.segmentoActivo);
-  // Badges de puerta solo tickean UI en pestaña Plan; toasts van por subscribe.
-  const puertaWindows = useJornada4PuertaAlerts(
-    planillaApi.planilla,
-    Boolean(user),
-    mobileTab === "plan"
-  );
+  // Toasts de puerta en sombra (sin tick UI en el root). Badges viven en PlanTab.
+  useJornada4PuertaAlerts(planillaApi.planilla, Boolean(user), false);
+  // Atención siempre activa: auto-apertura/entropía deben correr también en Operar.
   useJornada4SegmentAttention({
     userId: user?.uid,
     planilla: planillaApi.planilla,
@@ -101,28 +109,27 @@ export default function JornadaV4Session() {
     };
   }, []);
 
-  const pulsoModel = usePulsoCobertura({
-    segmentos: planillaApi.planilla?.segmentos ?? [],
-    vehicles: core.vehicles,
-    segmentoActivoId: planillaApi.segmentoActivo?.id ?? null,
-    enabled: Boolean(user && planillaApi.planilla),
-  });
-
-  // Disciplina solo en Métricas — evita re-render del root cada 1s en Operar/Plan/Crisol.
-  const disciplinaTick = useJornada4Tick(
-    Boolean(user && planillaApi.planilla && mobileTab === "metricas")
-  );
-  const disciplinaModel = useMemo(() => {
-    void disciplinaTick;
-    return computeDisciplinaPlanDia({
-      segmentos: planillaApi.planilla?.segmentos ?? [],
-    });
-  }, [planillaApi.planilla, disciplinaTick]);
-
-  const puertaPanorama = useMemo(
-    () => computePuertaPanorama(planillaApi.planilla?.segmentos ?? []),
-    [planillaApi.planilla]
-  );
+  // Prefetch Plan/Métricas en idle — primer cambio de pestaña sin cold parse.
+  useEffect(() => {
+    let cancelled = false;
+    const prefetch = () => {
+      if (cancelled) return;
+      void import("@/components/jornada4/Jornada4PlanTab");
+      void import("@/components/jornada4/Jornada4MetricasTab");
+    };
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(prefetch, { timeout: 2500 });
+      return () => {
+        cancelled = true;
+        cancelIdleCallback(id);
+      };
+    }
+    const t = window.setTimeout(prefetch, 800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, []);
 
   const bumpHuecos = useCallback(() => {
     setHuecosRefresh(n => n + 1);
@@ -155,31 +162,6 @@ export default function JornadaV4Session() {
     };
     // solo boot
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user?.uid) {
-      setYesterdayPs(0);
-      return;
-    }
-    let cancelled = false;
-    const load = () => {
-      void getYesterdayDailyPointsTotal(user.uid).then(n => {
-        if (!cancelled) setYesterdayPs(n);
-      });
-    };
-    if (typeof requestIdleCallback === "function") {
-      const id = requestIdleCallback(load, { timeout: 2500 });
-      return () => {
-        cancelled = true;
-        cancelIdleCallback(id);
-      };
-    }
-    const t = window.setTimeout(load, 400);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
   }, [user?.uid]);
 
   const handleLaunch = useCallback(
@@ -230,6 +212,11 @@ export default function JornadaV4Session() {
     [ops, wrapClose]
   );
 
+  const puertaPanorama = useMemo(
+    () => computePuertaPanorama(planillaApi.planilla?.segmentos ?? []),
+    [planillaApi.planilla]
+  );
+
   const statusLine = planillaApi.segmentoActivo
     ? [
         `Segmento · ${planillaApi.segmentoActivo.nombre}`,
@@ -275,14 +262,8 @@ export default function JornadaV4Session() {
         ) : null}
 
         {mobileTab === "plan" ? (
-          <div role="tabpanel" data-testid="jornada4-panel-plan">
-            <PulsoCobertura
-              model={pulsoModel}
-              showCta={Boolean(planillaApi.segmentoActivo)}
-              sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
-            />
-            <CoberturaHuecosPanel refreshKey={huecosRefresh} />
-            <Jornada4SegmentosPanel
+          <Suspense fallback={<TabChunkFallback label="Cargando plan…" />}>
+            <Jornada4PlanTab
               planilla={planillaApi.planilla}
               plantillasRutina={planillaApi.plantillasRutina}
               segmentoActivo={planillaApi.segmentoActivo}
@@ -294,8 +275,8 @@ export default function JornadaV4Session() {
               onCargarRutina={planillaApi.cargarRutina}
               onEliminarRutina={planillaApi.eliminarRutina}
               proyectosHub={proyectosHub}
-              ventanaAbrirIds={puertaWindows.abrirIds}
-              ventanaCerrarIds={puertaWindows.cerrarIds}
+              vehicles={core.vehicles}
+              huecosRefresh={huecosRefresh}
               notifPermission={notifPermission}
               onRequestNotifPermission={() => {
                 void unlockPuertaAudio();
@@ -310,15 +291,17 @@ export default function JornadaV4Session() {
                 });
               }}
             />
-          </div>
+          </Suspense>
         ) : null}
 
         {mobileTab === "metricas" ? (
-          <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
-            <Jornada4DisciplinaCard model={disciplinaModel} />
-            <Jornada4DailyPsBar todayPs={core.dailyPS} yesterdayPs={yesterdayPs} />
-            <Jornada4Boveda />
-          </div>
+          <Suspense fallback={<TabChunkFallback label="Cargando métricas…" />}>
+            <Jornada4MetricasTab
+              userId={user?.uid}
+              segmentos={planillaApi.planilla?.segmentos ?? []}
+              todayPs={core.dailyPS}
+            />
+          </Suspense>
         ) : null}
       </div>
 
