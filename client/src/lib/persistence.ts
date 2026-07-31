@@ -7132,12 +7132,21 @@ export async function deletePlantillaRutina(userId: string, plantillaId: string)
 
 export async function applyPlantillaToday(userId: string, plantilla: PlantillaRutina): Promise<Planilla> {
   const fecha = getTodayDateString();
-  const { resolveClaridadParaSegmentoVinculado, ensurePeldanoFromSegmento } = await import(
-    "./segmentoPeldanoBridge"
-  );
+  const templates = Array.isArray(plantilla.segmentos) ? plantilla.segmentos : [];
+  if (templates.length === 0) {
+    throw new Error("La rutina no tiene segmentos para cargar");
+  }
+
+  const needsBridge = templates.some(t => Boolean(t.proyectoVinculadoId));
+  const bridge = needsBridge
+    ? await import("./segmentoPeldanoBridge").catch(error => {
+        console.error("[applyPlantillaToday] Bridge Hub no disponible:", error);
+        return null;
+      })
+    : null;
 
   const segmentos: SegmentoV5[] = [];
-  for (const t of plantilla.segmentos) {
+  for (const t of templates) {
     const id = `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     let seg: SegmentoV5 = {
       id,
@@ -7151,21 +7160,26 @@ export async function applyPlantillaToday(userId: string, plantilla: PlantillaRu
       psGanados: 0,
       ...(t.proyectoVinculadoId ? { proyectoVinculadoId: t.proyectoVinculadoId } : {}),
     };
-    if (t.proyectoVinculadoId) {
-      const claridad = await resolveClaridadParaSegmentoVinculado(
-        userId,
-        t.proyectoVinculadoId,
-        t.nombre
-      );
-      if (claridad) {
-        seg = { ...seg, rutasMentales: claridad };
-        const { peldanoId } = await ensurePeldanoFromSegmento(userId, {
-          proyectoId: t.proyectoVinculadoId,
-          segmento: seg,
-          planillaFecha: fecha,
-          rutasMentales: claridad,
-        });
-        seg = { ...seg, proyectoPeldanoId: peldanoId };
+    if (t.proyectoVinculadoId && bridge) {
+      try {
+        const claridad = await bridge.resolveClaridadParaSegmentoVinculado(
+          userId,
+          t.proyectoVinculadoId,
+          t.nombre
+        );
+        if (claridad) {
+          seg = { ...seg, rutasMentales: claridad };
+          const { peldanoId } = await bridge.ensurePeldanoFromSegmento(userId, {
+            proyectoId: t.proyectoVinculadoId,
+            segmento: seg,
+            planillaFecha: fecha,
+            rutasMentales: claridad,
+          });
+          seg = { ...seg, proyectoPeldanoId: peldanoId };
+        }
+      } catch (error) {
+        // La rutina debe cargar igual; el vínculo Hub se puede reconstruir después.
+        console.error("[applyPlantillaToday] Vínculo Hub falló para segmento:", t.nombre, error);
       }
     }
     segmentos.push(seg);
