@@ -24,6 +24,10 @@ import {
   J4_SEGMENT_COLORS,
   type useJornada4Planilla,
 } from "@/hooks/useJornada4Planilla";
+import {
+  canCerrarPuertaJ4,
+  J4_PUERTA_MANTRA,
+} from "@/jornada4/segmentAttentionJ4";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { INK, MUTED, GOLD } = J4_COLORS;
@@ -57,7 +61,8 @@ type Props = {
 };
 
 function estadoLabel(seg: SegmentoV5): string | null {
-  if (seg.estado === "entropia" || seg.puertaSistema) return "ENTROPÍA";
+  if (seg.estado === "entropia") return "ENTROPÍA";
+  if (seg.puertaSistema && seg.estado === "activo") return "SISTEMA";
   if (seg.estado === "cerrado_manual") return "CERRADO";
   if (seg.estado === "activo") return "ACTIVO";
   if (seg.estado === "pendiente") return "PENDIENTE";
@@ -167,9 +172,10 @@ export function Jornada4SegmentosPanel({
               aria-hidden
             />
             {segmentos.map((seg, idx) => {
-              const isActive = seg.estado === "activo";
+              const isActive = seg.estado === "activo" && !seg.puertaSistema;
               const isClosed = seg.estado === "cerrado_manual";
-              const isEntropia = seg.estado === "entropia" || Boolean(seg.puertaSistema);
+              const isSistema = seg.estado === "activo" && Boolean(seg.puertaSistema);
+              const isEntropia = seg.estado === "entropia";
               return (
                 <div
                   key={seg.id}
@@ -181,24 +187,26 @@ export function Jornada4SegmentosPanel({
                     style={{
                       backgroundColor: isActive
                         ? EMERALD
-                        : isEntropia
+                        : isSistema || isEntropia
                           ? BLOOD_BRIGHT
                           : isClosed
                             ? "rgba(64,64,64,0.9)"
                             : "rgba(10,10,10,0.95)",
                       borderColor: isActive
                         ? EMERALD
-                        : isEntropia
+                        : isSistema || isEntropia
                           ? BLOOD_BRIGHT
                           : "rgba(115,115,115,0.8)",
-                      color: isActive || isEntropia ? "#0a0a0a" : INK,
+                      color: isActive || isSistema || isEntropia ? "#0a0a0a" : INK,
                     }}
                   >
                     {idx + 1}
                   </div>
                   <span
                     className="text-[8px] font-bold truncate max-w-full px-0.5 text-center leading-tight"
-                    style={{ color: isActive ? EMERALD : MUTED }}
+                    style={{
+                      color: isActive ? EMERALD : isSistema || isEntropia ? BLOOD_BRIGHT : MUTED,
+                    }}
                   >
                     {seg.nombre}
                   </span>
@@ -644,11 +652,13 @@ export function Jornada4SegmentosPanel({
                   const isActive = seg.estado === "activo";
                   const isPendiente = seg.estado === "pendiente";
                   const isClosed = seg.estado === "cerrado_manual";
+                  const isSistema = isActive && Boolean(seg.puertaSistema);
+                  const isEntropia = seg.estado === "entropia";
                   const badge = estadoLabel(seg);
                   const puertaOpen =
                     ventanaAbrirIds?.has(seg.id) ??
                     isWithinPuertaWindow(nowMs, seg.horaInicio, dayStart);
-                  const cierreOpen =
+                  const withinFin =
                     ventanaCerrarIds?.has(seg.id) ??
                     (seg.horaFin
                       ? isWithinSegmentTimeMargin(
@@ -660,6 +670,7 @@ export function Jornada4SegmentosPanel({
                           dayStart
                         )
                       : true);
+                  const cierreOpen = canCerrarPuertaJ4(seg, nowMs, Boolean(withinFin));
                   const inAlertWindow =
                     (isPendiente && puertaOpen) || (isActive && Boolean(cierreOpen));
                   const busy = busySegId === seg.id;
@@ -669,14 +680,20 @@ export function Jornada4SegmentosPanel({
                       className="rounded-xl border p-3"
                       style={{
                         backgroundColor: "rgba(23,23,23,0.55)",
-                        borderColor: inAlertWindow
-                          ? "rgba(0,200,81,0.55)"
-                          : isActive
-                            ? "rgba(0,200,81,0.35)"
-                            : "rgba(64,64,64,0.95)",
+                        borderColor: isSistema
+                          ? "rgba(255,42,42,0.45)"
+                          : inAlertWindow
+                            ? "rgba(0,200,81,0.55)"
+                            : isActive
+                              ? "rgba(0,200,81,0.35)"
+                              : isEntropia
+                                ? "rgba(153,27,27,0.45)"
+                                : "rgba(64,64,64,0.95)",
                         boxShadow: inAlertWindow
                           ? "0 0 18px rgba(0,200,81,0.22)"
-                          : undefined,
+                          : isSistema
+                            ? "0 0 14px rgba(255,42,42,0.18)"
+                            : undefined,
                         animation: inAlertWindow
                           ? "j4-puerta-pulse 1.6s ease-in-out infinite"
                           : undefined,
@@ -687,7 +704,13 @@ export function Jornada4SegmentosPanel({
                         <div
                           className="w-3 h-3 rounded-full ring-2 ring-white/10 shrink-0"
                           style={{
-                            backgroundColor: isActive ? EMERALD : isClosed ? MUTED : seg.color,
+                            backgroundColor: isSistema
+                              ? BLOOD_BRIGHT
+                              : isActive
+                                ? EMERALD
+                                : isEntropia || isClosed
+                                  ? MUTED
+                                  : seg.color,
                           }}
                         />
                         <div className="flex flex-col text-[10px] font-mono tabular-nums shrink-0" style={{ color: MUTED }}>
@@ -718,8 +741,14 @@ export function Jornada4SegmentosPanel({
                           <span
                             className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0"
                             style={{
-                              color: isActive ? EMERALD : MUTED,
-                              borderColor: "rgba(255,255,255,0.1)",
+                              color: isSistema || isEntropia
+                                ? BLOOD_BRIGHT
+                                : isActive
+                                  ? EMERALD
+                                  : MUTED,
+                              borderColor: isSistema || isEntropia
+                                ? "rgba(255,42,42,0.35)"
+                                : "rgba(255,255,255,0.1)",
                               backgroundColor: "rgba(0,0,0,0.35)",
                             }}
                           >
@@ -727,6 +756,17 @@ export function Jornada4SegmentosPanel({
                           </span>
                         ) : null}
                       </div>
+
+                      {isSistema ? (
+                        <p
+                          className="mt-2 text-[9px] leading-snug"
+                          style={{ color: BLOOD_BRIGHT }}
+                          data-testid={`jornada4-seg-sistema-msg-${seg.id}`}
+                        >
+                          Abierto por el sistema · −2 (entropía / desatención). Cierra para +2.{" "}
+                          {J4_PUERTA_MANTRA}.
+                        </p>
+                      ) : null}
 
                       {(isPendiente || isActive) && (
                         <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap gap-2">
@@ -762,20 +802,34 @@ export function Jornada4SegmentosPanel({
                               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider disabled:opacity-35"
                               style={{
                                 backgroundColor: cierreOpen
-                                  ? "rgba(0,200,81,0.15)"
+                                  ? isSistema
+                                    ? "rgba(255,42,42,0.12)"
+                                    : "rgba(0,200,81,0.15)"
                                   : "rgba(255,255,255,0.04)",
-                                color: cierreOpen ? EMERALD : MUTED,
-                                border: `1px solid ${cierreOpen ? "rgba(0,200,81,0.4)" : "rgba(255,255,255,0.08)"}`,
+                                color: cierreOpen ? (isSistema ? BLOOD_BRIGHT : EMERALD) : MUTED,
+                                border: `1px solid ${
+                                  cierreOpen
+                                    ? isSistema
+                                      ? "rgba(255,42,42,0.4)"
+                                      : "rgba(0,200,81,0.4)"
+                                    : "rgba(255,255,255,0.08)"
+                                }`,
                               }}
                               data-testid={`jornada4-seg-cerrar-${seg.id}`}
                               title={
-                                cierreOpen
-                                  ? "Cerrar con intención (±5 min del fin)"
-                                  : `Cierre ±5 min de ${seg.horaFin}`
+                                isSistema
+                                  ? "Cerrar y recuperar +2 PS"
+                                  : cierreOpen
+                                    ? "Cerrar con intención (±5 min del fin)"
+                                    : `Cierre ±5 min de ${seg.horaFin}`
                               }
                             >
                               <DoorClosed size={12} />
-                              {cierreOpen ? "Cerrar puerta" : `Cierre a las ${seg.horaFin}`}
+                              {isSistema
+                                ? "Cerrar · recuperar +2"
+                                : cierreOpen
+                                  ? "Cerrar puerta"
+                                  : `Cierre a las ${seg.horaFin}`}
                             </button>
                           ) : null}
                         </div>

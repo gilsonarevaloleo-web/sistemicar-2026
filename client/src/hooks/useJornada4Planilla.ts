@@ -28,6 +28,10 @@ import {
   isWithinPuertaWindow,
 } from "@/lib/segmentAttentionEngine";
 import { setActiveSegmento, registrarEvento, COMPONENTES } from "@/lib/evento-universal";
+import {
+  canCerrarPuertaJ4,
+  J4_PUERTA_MANTRA,
+} from "@/jornada4/segmentAttentionJ4";
 
 const PIZARRA = "#0a0a0a";
 const BLOOD = "#FF2A2A";
@@ -219,8 +223,8 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         }
         setPlanilla(saved);
         setActiveSegmento(userId, segId);
-        toast.success("+2 PS · puerta abierta", {
-          description: seg.nombre,
+        toast.success(`+2 PS · ${J4_PUERTA_MANTRA}`, {
+          description: `${seg.nombre} · puerta abierta con intención`,
           style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
         });
         void safeAwardPS(2, "Puerta de atención: " + seg.nombre);
@@ -242,9 +246,10 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
       const seg = planilla.segmentos.find(s => s.id === segId);
       if (!seg || seg.estado !== "activo") return;
       const nowMs = Date.now();
+      let withinFin = true;
       if (seg.horaFin) {
         const dayStart = getSegmentCalendarDayStartMs(nowMs);
-        const dentro = isWithinSegmentTimeMargin(
+        withinFin = isWithinSegmentTimeMargin(
           nowMs,
           seg.horaInicio,
           seg.horaFin,
@@ -252,14 +257,14 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
           5,
           dayStart
         );
-        if (!dentro) {
-          toast.warning("La puerta está sellada", {
-            description: `Cierre con intención (+2 PS) solo ±5 min de ${seg.horaFin}.`,
-            style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}40`, color: BLOOD },
-            duration: 5600,
-          });
-          return;
-        }
+      }
+      if (!canCerrarPuertaJ4(seg, nowMs, withinFin)) {
+        toast.warning("La puerta está sellada", {
+          description: `Cierre con intención (+2 PS) solo ±5 min de ${seg.horaFin}.`,
+          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}40`, color: BLOOD },
+          duration: 5600,
+        });
+        return;
       }
       const patch = {
         estado: "cerrado_manual" as const,
@@ -286,8 +291,11 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         }
         setPlanilla(saved);
         if (segmentoActivo?.id === segId) setActiveSegmento(userId, null);
-        toast.success("+2 PS · cierre consciente", {
-          description: seg.nombre,
+        const recuperacion = seg.puertaSistema
+          ? " · recuperaste la puerta del sistema"
+          : " · cierre consciente";
+        toast.success(`+2 PS · ${J4_PUERTA_MANTRA}`, {
+          description: `${seg.nombre}${recuperacion}`,
           style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
         });
         void safeAwardPS(2, "Cierre consciente: " + seg.nombre);

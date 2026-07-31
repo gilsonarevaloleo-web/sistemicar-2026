@@ -62,6 +62,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
       join(clientSrc, "hooks/useJornada4Tick.ts"),
       join(clientSrc, "hooks/useJornada4Planilla.ts"),
       join(clientSrc, "hooks/useJornada4PuertaAlerts.ts"),
+      join(clientSrc, "hooks/useJornada4SegmentAttention.ts"),
       join(clientSrc, "components/jornada4"),
     ];
     const files: string[] = [];
@@ -87,5 +88,11 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /PlaneacionCrisolDock/);
     assert.match(session, /useJornada4Crisol/);
     assert.match(session, /elevateAboveUnitFocus/);
+  });
+
+  it("sesión monta atención de puertas Dual Kernel", () => {
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    assert.match(session, /useJornada4SegmentAttention/);
+    assert.match(session, /computePuertaPanorama/);
   });
 });
