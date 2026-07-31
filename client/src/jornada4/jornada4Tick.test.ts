@@ -16,10 +16,36 @@ describe("jornada4Tick burst coalesce", () => {
 });
 
 describe("anti-freeze Dual Kernel session", () => {
-  it("sesión no tickea disciplina fuera de métricas", () => {
+  it("sesión no importa useJornada4Tick ni Pulso en el root", () => {
     const session = readFileSync(join(dir, "../pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /mobileTab === "metricas"/);
     assert.match(session, /mobileTab === "plan"/);
+    assert.equal(session.includes("useJornada4Tick"), false);
+    assert.equal(session.includes("usePulsoCobertura"), false);
+    assert.equal(session.includes("Jornada4Boveda"), false);
+    assert.match(session, /lazy\(\(\) => import\("@\/components\/jornada4\/Jornada4PlanTab"\)\)/);
+    assert.match(
+      session,
+      /lazy\(\s*\(\) => import\("@\/components\/jornada4\/Jornada4MetricasTab"\)\s*\)/
+    );
+  });
+
+  it("disciplina tickea solo dentro de MetricasTab (isla)", () => {
+    const metricas = readFileSync(
+      join(dir, "../components/jornada4/Jornada4MetricasTab.tsx"),
+      "utf8"
+    );
+    assert.match(metricas, /useJornada4Tick\(Boolean\(userId\)\)/);
+    assert.match(metricas, /Jornada4Boveda/);
+  });
+
+  it("Pulso solo monta en PlanTab", () => {
+    const plan = readFileSync(
+      join(dir, "../components/jornada4/Jornada4PlanTab.tsx"),
+      "utf8"
+    );
+    assert.match(plan, /usePulsoCobertura/);
+    assert.match(plan, /useJornada4Tick/);
   });
 
   it("SituacionCard solo tickea con cron activo", () => {
