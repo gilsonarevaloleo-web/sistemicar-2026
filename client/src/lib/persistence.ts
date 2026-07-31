@@ -727,36 +727,64 @@ function initLocalVehiclesFlushListeners(): void {
   initVehicleDebounceFlushListeners(() => flushLocalVehicles());
 }
 const PARKED_ACTIVES_KEY = "sistemicar_parked_actives";
+/** Espejo durable: sessionStorage muere si el SO descarta la pestaña. */
+const PARKED_ACTIVES_DURABLE_KEY = "sistemicar_parked_actives_durable";
 
-/** Guarda activos en sessionStorage al ir a segundo plano (recuperación tras suspender la pestaña). */
-export function parkActiveVehiclesForResume(vehicles: Vehicle[]): void {
+function writeParkedActives(actives: Vehicle[]): void {
+  const payload = JSON.stringify(actives);
   try {
-    const actives = vehicles.filter(
-      v => v.status === "activo" && !v.autoVerdad && !wasVehicleRecentlyClosed(v.id)
-    );
     if (actives.length === 0) {
       sessionStorage.removeItem(PARKED_ACTIVES_KEY);
-      return;
+    } else {
+      sessionStorage.setItem(PARKED_ACTIVES_KEY, payload);
     }
-    sessionStorage.setItem(PARKED_ACTIVES_KEY, JSON.stringify(actives));
   } catch {
     // sessionStorage no disponible
   }
+  try {
+    if (typeof localStorage === "undefined") return;
+    if (actives.length === 0) {
+      localStorage.removeItem(PARKED_ACTIVES_DURABLE_KEY);
+    } else {
+      localStorage.setItem(PARKED_ACTIVES_DURABLE_KEY, payload);
+    }
+  } catch {
+    // quota / private mode
+  }
+}
+
+function readParkedActivesRaw(): string | null {
+  try {
+    const fromSession = sessionStorage.getItem(PARKED_ACTIVES_KEY);
+    if (fromSession) return fromSession;
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage.getItem(PARKED_ACTIVES_DURABLE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Guarda activos al ir a segundo plano (session + localStorage durable). */
+export function parkActiveVehiclesForResume(vehicles: Vehicle[]): void {
+  const actives = vehicles.filter(
+    v => v.status === "activo" && !v.autoVerdad && !wasVehicleRecentlyClosed(v.id)
+  );
+  writeParkedActives(actives);
 }
 
 function unparkVehicleOnClose(vehicleId: string): void {
   try {
-    const raw = sessionStorage.getItem(PARKED_ACTIVES_KEY);
+    const raw = readParkedActivesRaw();
     if (!raw) return;
     const parked = parseParkedVehicles(raw);
     const filtered = parked.filter(v => v.id !== vehicleId);
-    if (filtered.length === 0) {
-      sessionStorage.removeItem(PARKED_ACTIVES_KEY);
-    } else if (filtered.length !== parked.length) {
-      sessionStorage.setItem(PARKED_ACTIVES_KEY, JSON.stringify(filtered));
-    }
+    writeParkedActives(filtered);
   } catch {
-    // sessionStorage no disponible
+    // storage no disponible
   }
 }
 
@@ -793,7 +821,7 @@ function parseParkedVehicles(raw: string): Vehicle[] {
 /** Activo(s) aparcados al ocultar la app; útil si localStorage fue pisado por un snapshot vacío. */
 export function getParkedActiveVehicles(): Vehicle[] {
   try {
-    const raw = sessionStorage.getItem(PARKED_ACTIVES_KEY);
+    const raw = readParkedActivesRaw();
     return raw ? parseParkedVehicles(raw) : [];
   } catch {
     return [];
@@ -801,11 +829,7 @@ export function getParkedActiveVehicles(): Vehicle[] {
 }
 
 export function clearParkedActiveVehicles(): void {
-  try {
-    sessionStorage.removeItem(PARKED_ACTIVES_KEY);
-  } catch {
-    // ignore
-  }
+  writeParkedActives([]);
 }
 
 export function getLocalVehicles(): Vehicle[] {

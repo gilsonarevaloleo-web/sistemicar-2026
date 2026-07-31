@@ -1,4 +1,5 @@
-import type { Vehicle } from "@/lib/persistence";
+import type { Vehicle } from "../lib/persistence";
+import { ringSessionOperable } from "../lib/ringEnfoqueReal";
 import { isSituacionListaLibre } from "./situacionLibreSeed";
 
 /** Vehículos que Dual Kernel opera en v1. */
@@ -22,9 +23,13 @@ export function isConquistaDesglosador(v: Vehicle): boolean {
   return v.tipoFlota === "tiempo" && v.tipoReloj === "desglosador";
 }
 
-/** Situacional con ring activo (presión + meta). */
+/**
+ * Situacional con ring operable (activo o pausado con filas pendientes).
+ * No exigir solo `activo === true`: tras resume/pausa el ring sigue siendo ring.
+ */
 export function isSituacionDesglosador(v: Vehicle): boolean {
-  return v.tipoFlota === "situacion" && v.situacionCronometro?.activo === true;
+  if (v.tipoFlota !== "situacion") return false;
+  return ringSessionOperable(v.situacionCronometro, v.subTareas ?? []);
 }
 
 /** Ring situacional operable — excluye interrupciones express. */

@@ -5,7 +5,12 @@ import {
   type ExecuteFlotaLaunchParams,
   type FlotaLaunchForm,
 } from "@/lib/executeFlotaLaunch";
-import { updateVehicle, type Vehicle } from "@/lib/persistence";
+import {
+  flushLocalVehicles,
+  parkActiveVehiclesForResume,
+  updateVehicle,
+  type Vehicle,
+} from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { runShadowTaskAsync } from "@/lib/desglosadorShadow";
 import {
@@ -43,7 +48,7 @@ export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form">
  * Lanza Conquista/Situacional en modo rápido o desglose.
  * - Conquista rápido: tarea = título + unidades (sin secuencia).
  * - Situacional libre: filas sin ring/meta.
- * - Situacional ring: filas + meta sellada.
+ * - Situacional ring: filas + meta sellada (atómico en el paint/remote del launch).
  */
 export async function executeJornada4Launch(
   params: ExecuteJornada4LaunchParams
@@ -187,12 +192,68 @@ export async function executeJornada4Launch(
         "Lista libre"
       : baseForm.titulo;
 
+  // Ring / lista libre: semilla ANTES del launch para paint + remote atómicos.
+  let situacionLaunchSeed: FlotaLaunchForm["situacionLaunchSeed"];
+  if (baseForm.tipoFlota === "situacion" && modo === "desglose") {
+    const now = Date.now();
+    const hora = situacionObjetivoHora?.trim();
+    const fromHora = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;
+    const contratoMs = hora ? situacionObjetivoHoraToContratoMs(hora, now) : null;
+    const minutosBloque =
+      fromHora ??
+      (situacionMinutosBloque != null && situacionMinutosBloque > 0
+        ? Math.round(situacionMinutosBloque)
+        : 30);
+    const proyectoEnfoqueId =
+      baseForm.proyectoId?.trim() ||
+      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
+      undefined;
+    const seed = buildSituacionRingSeed({
+      filas: situacionFilas ?? [],
+      filasProyectoIds: situacionFilasProyectoIds,
+      minutosBloque,
+      now,
+      horaFinMs: contratoMs ?? undefined,
+      proyectoEnfoqueId,
+    });
+    if (seed) {
+      situacionLaunchSeed = {
+        subTareas: seed.subTareas,
+        situacionCronometro: seed.situacionCronometro,
+        situacionCupoAnchor: seed.situacionCupoAnchor,
+      };
+    }
+  }
+
+  if (baseForm.tipoFlota === "situacion" && modo === "rapido") {
+    const proyectoEnfoqueId =
+      baseForm.proyectoId?.trim() ||
+      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
+      undefined;
+    const seed = buildSituacionLibreSeed({
+      filas: situacionFilas ?? [],
+      filasProyectoIds: situacionFilasProyectoIds,
+      proyectoEnfoqueId,
+    });
+    if (seed) {
+      situacionLaunchSeed = {
+        subTareas: seed.subTareas,
+        situacionCronometro: null,
+        situacionCupoAnchor: null,
+      };
+    }
+  }
+
   const id = await executeFlotaLaunch({
     ...rest,
     userId,
     vehiclesRef,
     setVehicles,
-    form: { ...baseForm, titulo: situacionTitulo },
+    form: {
+      ...baseForm,
+      titulo: situacionTitulo,
+      ...(situacionLaunchSeed ? { situacionLaunchSeed } : {}),
+    },
   });
   if (!id) return null;
 
@@ -205,81 +266,64 @@ export async function executeJornada4Launch(
     /* non-fatal */
   }
 
-  if (baseForm.tipoFlota === "situacion" && modo === "desglose") {
-    const now = Date.now();
-    const hora = situacionObjetivoHora?.trim();
-    const fromHora = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;
-    const contratoMs = hora ? situacionObjetivoHoraToContratoMs(hora, now) : null;
-    const minutosBloque =
-      fromHora ??
-      (situacionMinutosBloque != null && situacionMinutosBloque > 0
-        ? Math.round(situacionMinutosBloque)
-        : 30);
+  // Defensa: si el launch pintó sin seed (legado / race), aplicar + flush sync.
+  if (baseForm.tipoFlota === "situacion" && situacionLaunchSeed) {
     const launched = vehiclesRef.current.find(v => v.id === id);
-    const proyectoEnfoqueId =
-      baseForm.proyectoId?.trim() ||
-      launched?.proyectoId?.trim() ||
-      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
-      undefined;
-    const seed = buildSituacionRingSeed({
-      filas: situacionFilas ?? [],
-      filasProyectoIds: situacionFilasProyectoIds,
-      minutosBloque,
-      now,
-      horaFinMs: contratoMs ?? undefined,
-      proyectoEnfoqueId,
-    });
-    if (seed) {
-      paintSituacionSeed(id, seed, vehiclesRef, setVehicles);
+    const needsSeed =
+      (!launched?.situacionCronometro && situacionLaunchSeed.situacionCronometro != null) ||
+      ((launched?.subTareas?.length ?? 0) === 0 &&
+        (situacionLaunchSeed.subTareas?.length ?? 0) > 0);
+    if (needsSeed && situacionLaunchSeed.situacionCronometro) {
+      paintSituacionSeed(
+        id,
+        {
+          subTareas: situacionLaunchSeed.subTareas,
+          situacionCronometro: situacionLaunchSeed.situacionCronometro,
+          situacionCupoAnchor: situacionLaunchSeed.situacionCupoAnchor!,
+        },
+        vehiclesRef,
+        setVehicles
+      );
       void runShadowTaskAsync(async () => {
         try {
           await updateVehicle(
             userId,
             id,
             {
-              subTareas: seed.subTareas,
-              situacionCronometro: seed.situacionCronometro,
-              situacionCupoAnchor: seed.situacionCupoAnchor,
+              subTareas: situacionLaunchSeed!.subTareas,
+              situacionCronometro: situacionLaunchSeed!.situacionCronometro,
+              situacionCupoAnchor: situacionLaunchSeed!.situacionCupoAnchor,
             },
             { skipLocalSync: true }
           );
         } catch (e) {
-          console.error("[executeJornada4Launch] seed situacion ring", e);
+          console.error("[executeJornada4Launch] seed situacion fallback", e);
         }
       });
-    }
-  }
-
-  if (baseForm.tipoFlota === "situacion" && modo === "rapido") {
-    const launched = vehiclesRef.current.find(v => v.id === id);
-    const proyectoEnfoqueId =
-      baseForm.proyectoId?.trim() ||
-      launched?.proyectoId?.trim() ||
-      rest.segmentoActivo?.proyectoVinculadoId?.trim() ||
-      undefined;
-    const seed = buildSituacionLibreSeed({
-      filas: situacionFilas ?? [],
-      filasProyectoIds: situacionFilasProyectoIds,
-      proyectoEnfoqueId,
-    });
-    if (seed) {
-      paintSituacionLibre(id, seed.subTareas, vehiclesRef, setVehicles);
+    } else if (needsSeed) {
+      // Lista libre: solo filas, sin cronómetro.
+      paintSituacionLibre(id, situacionLaunchSeed.subTareas, vehiclesRef, setVehicles);
       void runShadowTaskAsync(async () => {
         try {
           await updateVehicle(
             userId,
             id,
             {
-              subTareas: seed.subTareas,
+              subTareas: situacionLaunchSeed!.subTareas,
               situacionCronometro: null,
               situacionCupoAnchor: null,
             },
             { skipLocalSync: true }
           );
         } catch (e) {
-          console.error("[executeJornada4Launch] seed situacion libre", e);
+          console.error("[executeJornada4Launch] seed situacion libre fallback", e);
         }
       });
+    } else {
+      // Seed ya en paint: asegurar disco síncrono (no solo debounce/idle).
+      flushLocalVehicles(vehiclesRef.current);
+      parkActiveVehiclesForResume(vehiclesRef.current);
+      burstJornada4Tick();
     }
   }
 
@@ -288,7 +332,11 @@ export async function executeJornada4Launch(
 
 function paintSituacionSeed(
   vehicleId: string,
-  seed: NonNullable<ReturnType<typeof buildSituacionRingSeed>>,
+  seed: {
+    subTareas: NonNullable<Vehicle["subTareas"]>;
+    situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
+    situacionCupoAnchor: NonNullable<Vehicle["situacionCupoAnchor"]>;
+  },
   vehiclesRef: MutableRefObject<Vehicle[]>,
   setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void
 ): void {
@@ -305,6 +353,8 @@ function paintSituacionSeed(
     );
   vehiclesRef.current = map(vehiclesRef.current);
   setVehicles(map);
+  flushLocalVehicles(vehiclesRef.current);
+  parkActiveVehiclesForResume(vehiclesRef.current);
   scheduleSaveLocalVehicles(vehiclesRef.current);
   burstJornada4Tick();
 }
@@ -328,6 +378,8 @@ function paintSituacionLibre(
     );
   vehiclesRef.current = map(vehiclesRef.current);
   setVehicles(map);
+  flushLocalVehicles(vehiclesRef.current);
+  parkActiveVehiclesForResume(vehiclesRef.current);
   scheduleSaveLocalVehicles(vehiclesRef.current);
   burstJornada4Tick();
 }

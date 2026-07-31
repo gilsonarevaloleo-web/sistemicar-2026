@@ -37,4 +37,16 @@ describe("useJornadaFlotaCore (Dual Kernel)", () => {
       "useJornada4Ops.ts no debe importar useDesglosadorManager"
     );
   });
+
+  it("useJornadaFlotaCore hace flush síncrono y rehydrate al volver", () => {
+    const core = readFileSync(join(dir, "./useJornadaFlotaCore.ts"), "utf8");
+    assert.match(core, /flushLocalVehicles/);
+    assert.match(core, /onJornadaVisibilityReturn/);
+    assert.match(core, /rehydrateFlotaFromDiskSources/);
+    assert.equal(
+      core.includes("saveLocalVehicles(vehiclesRef.current)"),
+      false,
+      "hide/pagehide no debe usar saveLocalVehicles debounced"
+    );
+  });
 });

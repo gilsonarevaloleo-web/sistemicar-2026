@@ -1,17 +1,17 @@
 /**
- * Núcleo liviano de flota para Jornada V3 (paso 2 migración).
+ * Núcleo liviano de flota para Jornada V4 (Dual Kernel).
  * Sin useDesglosadorManager: solo store, expand, rehydrate, launch deps.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import {
   awardSovereigntyPoints,
+  flushLocalVehicles,
   getDailyPointsLocalSync,
   getLocalVehicles,
   getParkedActiveVehicles,
   parkActiveVehiclesForResume,
-  saveLocalVehicles,
   wasVehicleRecentlyClosed,
   type Vehicle,
 } from "@/lib/persistence";
@@ -19,17 +19,16 @@ import {
   buildCentinelaArchiveFields,
   listActiveCentinelas,
 } from "@/lib/centinelaEngine";
-import { shouldPreserveLocalActivo } from "@/lib/ghostVehicleEngine";
 import { getJournalDayStartMs } from "@/lib/segmentTime";
 import { readLocalFlota } from "@/services/jornadaFlotaCache";
-import { cancelFlotaFetch } from "@/services/jornadaFlotaFetch";
+import { cancelFlotaFetch, onJornadaVisibilityReturn } from "@/services/jornadaFlotaFetch";
 import { refreshFlotaSession } from "@/flota/flotaStore";
 import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStoreSelectors";
 import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
 import { recordFocusBandEvent } from "@/lib/focusBandLedger";
 import { BLOOD, PIZARRA } from "@/components/flota/vehicleCardShared";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
-import { startTransition } from "react";
+import { rehydrateFlotaFromDiskSources } from "@/lib/flotaResume";
 
 export type JornadaFlotaCore = {
   vehicles: Vehicle[];
@@ -93,39 +92,27 @@ export function useJornadaFlotaCore(options?: {
 
   useEffect(() => {
     if (!user) return;
+    /** Hide/kill: escritura síncrona — el debounce de 500ms pierde el ring si el OS mata la pestaña. */
     const flushToLocal = () => {
-      saveLocalVehicles(vehiclesRef.current);
+      flushLocalVehicles(vehiclesRef.current);
       parkActiveVehiclesForResume(vehiclesRef.current);
     };
     const rehydrateFromLocal = () => {
       const nowMs = Date.now();
       const dayStart = getJournalDayStartMs(nowMs);
-      const localRaw = getLocalVehicles();
-      const localById = new Map(localRaw.map(v => [v.id, v]));
-      const parked = getParkedActiveVehicles().filter(p => {
-        const local = localById.get(p.id);
-        if (local && local.status !== "activo") return false;
-        return !wasVehicleRecentlyClosed(p.id, p.clientRequestId);
+      const result = rehydrateFlotaFromDiskSources({
+        memory: vehiclesRef.current,
+        local: getLocalVehicles(),
+        parked: getParkedActiveVehicles(),
+        nowMs,
+        dayStartMs: dayStart,
+        wasRecentlyClosed: wasVehicleRecentlyClosed,
       });
-      const byId = new Map(vehiclesRef.current.map(v => [v.id, v]));
-      const toAdd = [...localRaw, ...parked].filter(
-        v =>
-          v.status === "activo" &&
-          !v.autoVerdad &&
-          !byId.has(v.id) &&
-          !wasVehicleRecentlyClosed(v.id, v.clientRequestId) &&
-          shouldPreserveLocalActivo(v, nowMs, dayStart)
-      );
-      if (toAdd.length === 0) return;
-      const deduped = toAdd.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
-      setVehicles(prev => {
-        const ids = new Set(prev.map(v => v.id));
-        const add = deduped.filter(v => !ids.has(v.id));
-        if (add.length === 0) return prev;
-        const next = [...add, ...prev];
-        saveLocalVehicles(next);
-        return next;
-      });
+      if (!result.changed) return;
+      vehiclesRef.current = result.next;
+      setVehicles(result.next);
+      flushLocalVehicles(result.next);
+      parkActiveVehiclesForResume(result.next);
     };
     rehydrateFlotaFromLocalRef.current = rehydrateFromLocal;
     const onVisibility = () => {
@@ -133,10 +120,15 @@ export function useJornadaFlotaCore(options?: {
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flushToLocal);
+    // Bus de retorno (debounce 800ms): recupera ring/conquista tras app-switch.
+    const unsubReturn = onJornadaVisibilityReturn(() => {
+      rehydrateFlotaFromLocalRef.current?.();
+    });
     return () => {
       rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushToLocal);
+      unsubReturn();
     };
   }, [user, setVehicles]);
 
