@@ -1,13 +1,41 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { before, describe, it } from "node:test";
 import {
   buildDefaultClaridadDireccion,
   countSegmentosListosParaSellar,
   refreshClaridadPaso1,
+  resolveClaridadParaSegmentoVinculado,
 } from "./segmentoPeldanoBridge.ts";
 import type { SegmentoV5 } from "./persistence.ts";
 
 describe("segmentoPeldanoBridge", () => {
+  before(() => {
+    if (typeof globalThis.localStorage !== "undefined") return;
+    const store = new Map<string, string>();
+    globalThis.localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+      clear: () => store.clear(),
+      key: (i: number) => [...store.keys()][i] ?? null,
+      get length() {
+        return store.size;
+      },
+    } as Storage;
+  });
+
+  it("resolveClaridadParaSegmentoVinculado no lanza ReferenceError (import getPeldanosByProyecto)", async () => {
+    // Regresión: tras el refactor a claridadDireccion faltaba el import y
+    // cargar rutinas con proyectoVinculadoId fallaba con "No se pudo cargar la rutina".
+    await assert.doesNotReject(() =>
+      resolveClaridadParaSegmentoVinculado("user_test", "proy_inexistente", "Bloque AM")
+    );
+  });
+
   it("buildDefaultClaridadDireccion crea A/B/C con 3 pasos de claridad", () => {
     const r = buildDefaultClaridadDireccion({
       tituloProyecto: "Costura",
