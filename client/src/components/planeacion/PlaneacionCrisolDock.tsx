@@ -22,6 +22,9 @@ export interface PlaneacionCrisolDockProps {
   /** Deja el dock usable sobre el Foco unidad de conquista. */
   elevateAboveUnitFocus?: boolean;
   dockBottomPx?: number;
+  panoramaHeadline?: string;
+  panoramaSubline?: string;
+  panoramaMantra?: string;
 }
 
 function PlaneacionCrisolDockInner({
@@ -36,6 +39,9 @@ function PlaneacionCrisolDockInner({
   onRutaChange,
   elevateAboveUnitFocus = false,
   dockBottomPx,
+  panoramaHeadline,
+  panoramaSubline,
+  panoramaMantra,
 }: PlaneacionCrisolDockProps) {
   const handleQuickAdd = useCallback(
     (texto: string, ruta: ReservaTacticaRuta, proyectoId?: string) =>
@@ -57,6 +63,9 @@ function PlaneacionCrisolDockInner({
       colors={CRISOL_COLORS}
       elevateAboveUnitFocus={elevateAboveUnitFocus}
       dockBottomPx={dockBottomPx}
+      panoramaHeadline={panoramaHeadline}
+      panoramaSubline={panoramaSubline}
+      panoramaMantra={panoramaMantra}
     />
   );
 }

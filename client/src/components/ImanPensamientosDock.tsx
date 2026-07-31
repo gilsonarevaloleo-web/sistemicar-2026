@@ -47,6 +47,10 @@ type Props = {
    * mientras el cronómetro de conquista está abierto.
    */
   elevateAboveUnitFocus?: boolean;
+  /** Espejo panorámico de puertas del día (Dual Kernel). */
+  panoramaHeadline?: string;
+  panoramaSubline?: string;
+  panoramaMantra?: string;
 };
 
 function ImanPensamientosDock({
@@ -62,6 +66,9 @@ function ImanPensamientosDock({
   colors,
   dockBottomPx = 84,
   elevateAboveUnitFocus = false,
+  panoramaHeadline,
+  panoramaSubline,
+  panoramaMantra,
 }: Props) {
   const [open, setOpen] = useState(true);
   const [draft, setDraft] = useState("");
@@ -201,7 +208,16 @@ function ImanPensamientosDock({
             >
               {items.length}
             </span>
-            {preview && !open && (
+            {panoramaHeadline && !open ? (
+              <span
+                className="ml-1 text-[8px] font-bold truncate min-w-0"
+                style={{ color: colors.gold }}
+                data-testid="iman-panorama-collapsed"
+              >
+                {panoramaHeadline}
+              </span>
+            ) : null}
+            {preview && !open && !panoramaHeadline && (
               <span className="ml-1 text-[8px] text-slate-500 truncate min-w-0">
                 Nido · {preview.nido} · [{preview.short}] {preview.texto}
               </span>
@@ -213,6 +229,35 @@ function ImanPensamientosDock({
 
           {open && (
             <div className="border-t px-3 pb-3 pt-2 space-y-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+              {panoramaHeadline ? (
+                <div
+                  className="rounded-xl border px-2.5 py-2 space-y-0.5"
+                  style={{
+                    borderColor: "rgba(212,175,55,0.28)",
+                    backgroundColor: "rgba(212,175,55,0.06)",
+                  }}
+                  data-testid="iman-panorama-mirror"
+                >
+                  <p
+                    className="text-[9px] font-black uppercase tracking-wider"
+                    style={{ color: colors.gold }}
+                  >
+                    {panoramaHeadline}
+                  </p>
+                  {panoramaSubline ? (
+                    <p className="text-[8px] leading-snug text-slate-400">{panoramaSubline}</p>
+                  ) : null}
+                  {panoramaMantra ? (
+                    <p
+                      className="text-[8px] font-bold italic"
+                      style={{ color: colors.cyan }}
+                      data-testid="iman-panorama-mantra"
+                    >
+                      {panoramaMantra}.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <p className="text-[7px] text-slate-500 leading-relaxed">{CRISOL_TAGLINE}</p>
               <p className="text-[7px] text-slate-600 leading-relaxed">
                 {CRISOL_MOS_HINT} Marca las filas y envíalas al vehículo de enfoque una a una.

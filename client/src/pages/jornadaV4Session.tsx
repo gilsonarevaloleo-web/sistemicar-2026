@@ -23,6 +23,7 @@ import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
+import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
@@ -34,6 +35,7 @@ import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
 import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
+import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
 
 export default function JornadaV4Session() {
@@ -56,6 +58,12 @@ export default function JornadaV4Session() {
   const { proyectosHub, proyectoVinculadoActivo, resolverProyectoId } =
     useSegmentoProyectoVinculo(user?.uid, planillaApi.segmentoActivo);
   const puertaWindows = useJornada4PuertaAlerts(planillaApi.planilla, Boolean(user));
+  useJornada4SegmentAttention({
+    userId: user?.uid,
+    planilla: planillaApi.planilla,
+    busySegId: planillaApi.busySegId,
+    enabled: Boolean(user),
+  });
   const ops = useJornada4Ops({
     userId: user?.uid,
     vehiclesRef: core.vehiclesRef,
@@ -102,6 +110,11 @@ export default function JornadaV4Session() {
       segmentos: planillaApi.planilla?.segmentos ?? [],
     });
   }, [planillaApi.planilla, disciplinaTick]);
+
+  const puertaPanorama = useMemo(
+    () => computePuertaPanorama(planillaApi.planilla?.segmentos ?? []),
+    [planillaApi.planilla]
+  );
 
   const bumpHuecos = useCallback(() => {
     setHuecosRefresh(n => n + 1);
@@ -309,6 +322,15 @@ export default function JornadaV4Session() {
         onDelete={crisol.handleReservaEliminar}
         onRutaChange={crisol.handleReservaRutaChange}
         elevateAboveUnitFocus
+        panoramaHeadline={
+          puertaPanorama.total > 0 ? puertaPanorama.headline : undefined
+        }
+        panoramaSubline={
+          puertaPanorama.total > 0 ? puertaPanorama.subline : undefined
+        }
+        panoramaMantra={
+          puertaPanorama.total > 0 ? puertaPanorama.mantra : undefined
+        }
       />
     </div>
   );
