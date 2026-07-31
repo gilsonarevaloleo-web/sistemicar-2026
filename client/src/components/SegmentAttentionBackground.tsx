@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useLocation } from "wouter";
 import { useAuthContext } from "@/App";
 import {
   getPlanillaHoy,
@@ -40,7 +39,7 @@ import {
 import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival } from "@/lib/mobilePerf";
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
-import { isJornada4Path } from "@/lib/jornadaBrand";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -61,8 +60,8 @@ const SEGMENT_WORK_KEY = "segment-attention-cycle";
  */
 export function SegmentAttentionBackground() {
   const { user } = useAuthContext();
-  const [location] = useLocation();
-  const dualKernelQuiet = isJornada4Path(location);
+  // Quiet en Dual Kernel + soft-start al salir (evita freeze Jornada→Espejo).
+  const dualKernelQuiet = useDualKernelMotorsQuiet();
   const planillaRef = useRef<Planilla | null>(null);
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaFechaRef = useRef(getJournalDateString());

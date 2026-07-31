@@ -57,7 +57,12 @@ export default function JornadaV4Session() {
   });
   const { proyectosHub, proyectoVinculadoActivo, resolverProyectoId } =
     useSegmentoProyectoVinculo(user?.uid, planillaApi.segmentoActivo);
-  const puertaWindows = useJornada4PuertaAlerts(planillaApi.planilla, Boolean(user));
+  // Badges de puerta solo tickean UI en pestaña Plan; toasts van por subscribe.
+  const puertaWindows = useJornada4PuertaAlerts(
+    planillaApi.planilla,
+    Boolean(user),
+    mobileTab === "plan"
+  );
   useJornada4SegmentAttention({
     userId: user?.uid,
     planilla: planillaApi.planilla,
@@ -103,7 +108,10 @@ export default function JornadaV4Session() {
     enabled: Boolean(user && planillaApi.planilla),
   });
 
-  const disciplinaTick = useJornada4Tick(Boolean(user && planillaApi.planilla));
+  // Disciplina solo en Métricas — evita re-render del root cada 1s en Operar/Plan/Crisol.
+  const disciplinaTick = useJornada4Tick(
+    Boolean(user && planillaApi.planilla && mobileTab === "metricas")
+  );
   const disciplinaModel = useMemo(() => {
     void disciplinaTick;
     return computeDisciplinaPlanDia({
@@ -209,15 +217,18 @@ export default function JornadaV4Session() {
     [bumpHuecos]
   );
 
-  const opsWithHuecos = {
-    ...ops,
-    closeConquistaCycle: wrapClose(ops.closeConquistaCycle),
-    closeSituacionBlock: wrapClose(ops.closeSituacionBlock),
-    closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
-    closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
-    closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
-    closeExpressVehicle: wrapClose(ops.closeExpressVehicle),
-  };
+  const opsWithHuecos = useMemo(
+    () => ({
+      ...ops,
+      closeConquistaCycle: wrapClose(ops.closeConquistaCycle),
+      closeSituacionBlock: wrapClose(ops.closeSituacionBlock),
+      closeRapidoVehicle: wrapClose(ops.closeRapidoVehicle),
+      closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
+      closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
+      closeExpressVehicle: wrapClose(ops.closeExpressVehicle),
+    }),
+    [ops, wrapClose]
+  );
 
   const statusLine = planillaApi.segmentoActivo
     ? [

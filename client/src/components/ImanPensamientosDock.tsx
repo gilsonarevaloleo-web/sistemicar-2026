@@ -70,7 +70,11 @@ function ImanPensamientosDock({
   panoramaSubline,
   panoramaMantra,
 }: Props) {
-  const [open, setOpen] = useState(true);
+  // Móvil: colapsado por defecto — menos DOM mientras tickean ring/flota.
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.innerWidth >= 768;
+  });
   const [draft, setDraft] = useState("");
   const [rutaDraft, setRutaDraft] = useState<ReservaTacticaRuta>(() => getDefaultReservaRuta());
   const [proyectoDraft, setProyectoDraft] = useState(defaultProyectoId);

@@ -56,7 +56,8 @@ export function SituacionCard({
   const sc = vehicle.situacionCronometro;
   const cronActivo = sc?.activo === true;
 
-  const tick = useJornada4Tick(true);
+  // Solo tickear con ring activo (como Conquista). Idle = sin setState/s.
+  const tick = useJornada4Tick(cronActivo);
   const nowMs = useMemo(() => Date.now(), [tick]);
   const timer = useMemo(
     () => computeSituacionTimerUi(vehicle, nowMs),

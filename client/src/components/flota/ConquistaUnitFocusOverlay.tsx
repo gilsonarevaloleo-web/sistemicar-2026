@@ -54,7 +54,8 @@ export function ConquistaUnitFocusOverlay({
     lastTickSecRef.current = 0;
     // Unlock audio en el gesto de apertura.
     if (isTikSoundEnabled()) playTikTapTone();
-    const id = window.setInterval(() => setNowMs(hardwareClockNow()), 250);
+    // 1s basta para el cronómetro visible; 250ms peleaba con Crisol/ticks J4 en móvil.
+    const id = window.setInterval(() => setNowMs(hardwareClockNow()), 1000);
     return () => window.clearInterval(id);
   }, [open]);
 
