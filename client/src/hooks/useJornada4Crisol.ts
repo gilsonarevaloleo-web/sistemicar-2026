@@ -238,16 +238,18 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
   );
 
   const handleEnviarReservaASituacion = useCallback(
-    async (reservaId: string) => {
+    async (reservaId: string, opts?: { skipYield?: boolean; quietToast?: boolean }) => {
       if (!userId) return;
       const item = reservaActivas.find(r => r.id === reservaId);
       if (!item) return;
       if (!reservaEsEnviabeASituacion(item)) {
-        toast.info("Ruta M — tener en cuenta", {
-          description: "Cambia a S o E para enviarla al vehículo de enfoque.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}40`, color: PLATA },
-          duration: 4000,
-        });
+        if (!opts?.quietToast) {
+          toast.info("Ruta M — tener en cuenta", {
+            description: "Cambia a S o E para enviarla al vehículo de enfoque.",
+            style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}40`, color: PLATA },
+            duration: 4000,
+          });
+        }
         return;
       }
 
@@ -314,7 +316,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
 
       paintVehicle(result.vehicleId, patch);
       setExpandedId(result.vehicleId);
-      await yieldAfterPaint();
+      if (!opts?.skipYield) await yieldAfterPaint();
 
       const estado =
         result.mode === "lista_libre" ? "retomada_libre" : "retomada_cron";
@@ -331,6 +333,8 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
           console.error("[j4.handleEnviarReservaASituacion]", e);
         }
       });
+
+      if (opts?.quietToast) return;
 
       if (result.mode === "lista_libre") {
         toast.success("Retomada en lista libre", {
@@ -366,8 +370,22 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
 
   const handleEnviarReservasSeleccionadas = useCallback(
     async (reservaIds: string[]) => {
-      for (const id of reservaIds) {
-        await handleEnviarReservaASituacion(id);
+      const ids = reservaIds.filter(Boolean);
+      if (ids.length === 0) return;
+      const batch = ids.length > 1;
+      for (let i = 0; i < ids.length; i++) {
+        const last = i === ids.length - 1;
+        await handleEnviarReservaASituacion(ids[i], {
+          // Un solo yield al final; en lote un toast resumen.
+          skipYield: !last,
+          quietToast: batch,
+        });
+      }
+      if (batch) {
+        toast.success(`${ids.length} pensamientos enviados al enfoque`, {
+          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
+          duration: 2800,
+        });
       }
     },
     [handleEnviarReservaASituacion]
@@ -383,11 +401,9 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
         });
         return;
       }
-      for (const item of ejecutables) {
-        await handleEnviarReservaASituacion(item.id);
-      }
+      await handleEnviarReservasSeleccionadas(ejecutables.map(i => i.id));
     },
-    [reservaActivas, handleEnviarReservaASituacion]
+    [reservaActivas, handleEnviarReservasSeleccionadas]
   );
 
   return {

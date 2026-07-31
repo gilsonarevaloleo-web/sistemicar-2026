@@ -1,5 +1,4 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
 import { useAuthContext } from "@/App";
 import {
   getLocalVehicles,
@@ -26,15 +25,15 @@ import {
   maybeReleaseStaleSuppression,
   resetCentinelaTimerState,
 } from "@/lib/centinelaEngine";
-import { isJornada4Path } from "@/lib/jornadaBrand";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const CENTINELA_MAX_AGE_MS = 8 * 3600 * 1000;
 
 /** Motor global del Centinela — pausado en Dual Kernel (`/jornada-v4`). */
 export function CentinelaEngine() {
   const { user } = useAuthContext();
-  const [location] = useLocation();
-  const dualKernelQuiet = isJornada4Path(location);
+  // Quiet en Dual Kernel + soft-start al salir (evita freeze Jornada→Espejo).
+  const dualKernelQuiet = useDualKernelMotorsQuiet();
   const [planillaFecha, setPlanillaFecha] = useState(() => getJournalDateString());
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaRef = useRef<Planilla | null>(null);
