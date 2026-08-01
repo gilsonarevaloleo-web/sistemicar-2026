@@ -36,6 +36,7 @@ describe("anti-freeze Dual Kernel session", () => {
       "utf8"
     );
     assert.match(metricas, /useJornada4Tick\(Boolean\(userId\)\)/);
+    assert.match(metricas, /Jornada4DailyDisciplinaBar/);
     assert.match(metricas, /Jornada4Boveda/);
   });
 
