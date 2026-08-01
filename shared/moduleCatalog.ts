@@ -10,7 +10,7 @@ export interface ModuleCatalogEntry {
   color?: string;
 }
 
-/** Módulos del ecosistema — solo Planificación y Espejo tienen precio hoy. */
+/** Módulos del ecosistema — Jornada (Base/Ritmo/Norte) y Espejo tienen precio hoy. */
 export const MODULOS_EN_CAMINO: ModuleCatalogEntry[] = [
   { id: "alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", route: "/alquimia", enCamino: true, color: "#A855F7" },
   { id: "umbral", nombre: "Umbral", desc: "Expansión de límites", route: "/umbral", enCamino: true, color: "#3B82F6" },

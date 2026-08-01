@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, ListTodo, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
+import { Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
@@ -45,6 +46,10 @@ type Props = {
   proyectosHub?: Proyecto[];
   /** Dirección por defecto del segmento activo. */
   defaultProyectoId?: string | null;
+  /** Ritmo: Situacional / Enfoque. Base solo Conquista. */
+  canSituacion?: boolean;
+  /** Norte: vincular a Hub Proyectos. */
+  canProyectos?: boolean;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -92,6 +97,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   segmentoActivoNombre = null,
   proyectosHub = [],
   defaultProyectoId = null,
+  canSituacion = true,
+  canProyectos = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -193,11 +200,23 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [segmentoHoraFin, defaultProyectoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
+    if (t === "situacion" && !canSituacion) {
+      toast.message("Situacional es parte de Ritmo del día", {
+        description: "Base incluye Conquista (unidades). Activa Ritmo para imprevistos y ring.",
+        action: {
+          label: "Ver Ritmo",
+          onClick: () => {
+            window.location.href = "/pagos?plan=operativo";
+          },
+        },
+      });
+      return;
+    }
     setTipo(t);
     // Conquista = siempre desglosador (1 tarea → crece). Enfoque = lista libre primero.
     setModo(t === "tiempo" ? "desglose" : "rapido");
     setConquistaMultiModo("secuencia");
-    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
+    setVehiculoProyectoId(canProyectos ? defaultProyectoId?.trim() || "" : "");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -206,7 +225,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
-  }, [terminoDetalle, segmentoHoraFin, defaultProyectoId]);
+  }, [terminoDetalle, segmentoHoraFin, defaultProyectoId, canSituacion, canProyectos]);
 
   useEffect(() => {
     if (!open) return;
@@ -362,16 +381,29 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         {V4_TIPOS.map(t => {
           const cfg = FLOTA_CONFIG[t];
           const Icon = cfg.icon;
+          const locked = t === "situacion" && !canSituacion;
           return (
             <button
               key={t}
               type="button"
               disabled={disabled}
               onClick={() => openTipo(t)}
-              className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40"
-              style={{ borderColor: `${cfg.color}30`, backgroundColor: `${cfg.color}08` }}
+              className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40 relative"
+              style={{
+                borderColor: locked ? `${cfg.color}18` : `${cfg.color}30`,
+                backgroundColor: `${cfg.color}08`,
+                opacity: locked ? 0.72 : 1,
+              }}
               data-testid={`jornada4-flota-${t}`}
             >
+              {locked ? (
+                <span
+                  className="absolute top-2 right-2 flex items-center gap-0.5 text-[7px] font-black uppercase tracking-wider"
+                  style={{ color: GOLD }}
+                >
+                  <Lock size={9} /> Ritmo
+                </span>
+              ) : null}
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: `${cfg.color}20` }}
@@ -382,7 +414,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 {cfg.label}
               </span>
               <span className="text-[9px] text-center leading-tight" style={{ color: MUTED }}>
-                {cfg.sublabel}
+                {locked ? "Requiere Ritmo del día" : cfg.sublabel}
               </span>
               <span
                 className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"

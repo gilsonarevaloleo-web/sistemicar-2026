@@ -37,9 +37,11 @@ import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAle
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
+import { usePlanificacionEntitlements } from "@/hooks/usePlanificacionEntitlements";
 
 export default function JornadaV4Session() {
   const { user } = useAuthContext();
+  const entitlements = usePlanificacionEntitlements();
   const core = useJornada4Core();
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
@@ -177,6 +179,10 @@ export default function JornadaV4Session() {
   const handleLaunch = useCallback(
     async (form: Jornada4LaunchForm) => {
       if (!user) return null;
+      if (form.tipoFlota === "situacion" && !entitlements.hasRitmo) {
+        window.location.href = "/pagos?plan=operativo";
+        return null;
+      }
       const id = await executeJornada4Launch({
         userId: user.uid,
         form,
@@ -185,7 +191,9 @@ export default function JornadaV4Session() {
         setExpandedId: core.setExpandedId,
         planilla: planillaApi.planilla,
         segmentoActivo: planillaApi.segmentoActivo,
-        resolverProyectoId,
+        resolverProyectoId: entitlements.hasNorte
+          ? resolverProyectoId
+          : () => undefined,
         applyCentinelaArchiveLocally: core.applyCentinelaArchiveLocally,
         safeAwardPS: core.safeAwardPS,
         recordVehiculoInicio: core.recordVehiculoInicio,
@@ -197,7 +205,16 @@ export default function JornadaV4Session() {
       if (id) bumpHuecos();
       return id;
     },
-    [user, core, planillaApi.planilla, planillaApi.segmentoActivo, resolverProyectoId, bumpHuecos]
+    [
+      user,
+      core,
+      planillaApi.planilla,
+      planillaApi.segmentoActivo,
+      resolverProyectoId,
+      bumpHuecos,
+      entitlements.hasRitmo,
+      entitlements.hasNorte,
+    ]
   );
 
   const wrapClose = useCallback(
@@ -251,13 +268,19 @@ export default function JornadaV4Session() {
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
               segmentoActivoNombre={
                 planillaApi.segmentoActivo
-                  ? proyectoVinculadoActivo
+                  ? proyectoVinculadoActivo && entitlements.hasNorte
                     ? `${planillaApi.segmentoActivo.nombre} · ${proyectoVinculadoActivo.titulo}`
                     : planillaApi.segmentoActivo.nombre
                   : null
               }
-              proyectosHub={proyectosHub}
-              defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? null}
+              proyectosHub={entitlements.hasNorte ? proyectosHub : []}
+              defaultProyectoId={
+                entitlements.hasNorte
+                  ? planillaApi.segmentoActivo?.proyectoVinculadoId ?? null
+                  : null
+              }
+              canSituacion={entitlements.hasRitmo}
+              canProyectos={entitlements.hasNorte}
             />
             <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
           </div>
@@ -265,40 +288,81 @@ export default function JornadaV4Session() {
 
         {mobileTab === "plan" ? (
           <div role="tabpanel" data-testid="jornada4-panel-plan">
-            <PulsoCobertura
-              model={pulsoModel}
-              showCta={Boolean(planillaApi.segmentoActivo)}
-              sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
-            />
-            <CoberturaHuecosPanel refreshKey={huecosRefresh} />
-            <Jornada4SegmentosPanel
-              planilla={planillaApi.planilla}
-              plantillasRutina={planillaApi.plantillasRutina}
-              segmentoActivo={planillaApi.segmentoActivo}
-              busySegId={planillaApi.busySegId}
-              onAdd={planillaApi.addSegmento}
-              onAbrir={planillaApi.activarSegmento}
-              onCerrar={planillaApi.cerrarSegmento}
-              onGuardarRutina={planillaApi.guardarComoRutina}
-              onCargarRutina={planillaApi.cargarRutina}
-              onEliminarRutina={planillaApi.eliminarRutina}
-              proyectosHub={proyectosHub}
-              ventanaAbrirIds={puertaWindows.abrirIds}
-              ventanaCerrarIds={puertaWindows.cerrarIds}
-              notifPermission={notifPermission}
-              onRequestNotifPermission={() => {
-                void unlockPuertaAudio();
-                void ensureJornada4NotificationPermission().then(ok => {
-                  setNotifPermission(
-                    typeof Notification === "undefined"
-                      ? "unsupported"
-                      : ok
-                        ? "granted"
-                        : Notification.permission
-                  );
-                });
-              }}
-            />
+            {!entitlements.hasRitmo ? (
+              <div
+                className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10"
+                data-testid="jornada4-ritmo-upsell"
+              >
+                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                  Ritmo del día
+                </p>
+                <p className="text-sm text-slate-200 mt-1 leading-snug">
+                  Segmentos y Situacional ordenan el día. Base ya te da Conquista (unidades).
+                </p>
+                <a
+                  href="/pagos?plan=operativo"
+                  className="inline-flex mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-300 underline"
+                >
+                  Activar Ritmo →
+                </a>
+              </div>
+            ) : (
+              <>
+                <PulsoCobertura
+                  model={pulsoModel}
+                  showCta={Boolean(planillaApi.segmentoActivo)}
+                  sinSegmentos={(planillaApi.planilla?.segmentos.length ?? 0) === 0}
+                />
+                <CoberturaHuecosPanel refreshKey={huecosRefresh} />
+                <Jornada4SegmentosPanel
+                  planilla={planillaApi.planilla}
+                  plantillasRutina={planillaApi.plantillasRutina}
+                  segmentoActivo={planillaApi.segmentoActivo}
+                  busySegId={planillaApi.busySegId}
+                  onAdd={planillaApi.addSegmento}
+                  onAbrir={planillaApi.activarSegmento}
+                  onCerrar={planillaApi.cerrarSegmento}
+                  onGuardarRutina={planillaApi.guardarComoRutina}
+                  onCargarRutina={planillaApi.cargarRutina}
+                  onEliminarRutina={planillaApi.eliminarRutina}
+                  proyectosHub={entitlements.hasNorte ? proyectosHub : []}
+                  ventanaAbrirIds={puertaWindows.abrirIds}
+                  ventanaCerrarIds={puertaWindows.cerrarIds}
+                  notifPermission={notifPermission}
+                  onRequestNotifPermission={() => {
+                    void unlockPuertaAudio();
+                    void ensureJornada4NotificationPermission().then(ok => {
+                      setNotifPermission(
+                        typeof Notification === "undefined"
+                          ? "unsupported"
+                          : ok
+                            ? "granted"
+                            : Notification.permission
+                      );
+                    });
+                  }}
+                />
+              </>
+            )}
+            {!entitlements.hasNorte ? (
+              <div
+                className="mx-3 mt-2 sm:mx-4 p-4 rounded-xl border border-sky-500/30 bg-sky-500/10"
+                data-testid="jornada4-norte-upsell"
+              >
+                <p className="text-[11px] font-black uppercase tracking-wider text-sky-400">
+                  Norte
+                </p>
+                <p className="text-sm text-slate-200 mt-1 leading-snug">
+                  Crisol + Hub Proyectos: el peldaño de alto valor para quien ya cierra el día.
+                </p>
+                <a
+                  href="/pagos?plan=soberania_dia"
+                  className="inline-flex mt-3 text-[10px] font-black uppercase tracking-wider text-sky-300 underline"
+                >
+                  Activar Norte →
+                </a>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -311,27 +375,29 @@ export default function JornadaV4Session() {
         ) : null}
       </div>
 
-      <PlaneacionCrisolDock
-        items={crisol.reservaActivas}
-        proyectos={crisol.imanProyectos}
-        defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? ""}
-        onQuickAdd={crisol.handleReservaTacticaQuickAdd}
-        onEnviarUnidad={crisol.handleEnviarReservaASituacion}
-        onEnviarSeleccion={crisol.handleEnviarReservasSeleccionadas}
-        onAbrirNido={crisol.handleAbrirNidoEnSituacion}
-        onDelete={crisol.handleReservaEliminar}
-        onRutaChange={crisol.handleReservaRutaChange}
-        elevateAboveUnitFocus
-        panoramaHeadline={
-          puertaPanorama.total > 0 ? puertaPanorama.headline : undefined
-        }
-        panoramaSubline={
-          puertaPanorama.total > 0 ? puertaPanorama.subline : undefined
-        }
-        panoramaMantra={
-          puertaPanorama.total > 0 ? puertaPanorama.mantra : undefined
-        }
-      />
+      {entitlements.hasNorte ? (
+        <PlaneacionCrisolDock
+          items={crisol.reservaActivas}
+          proyectos={crisol.imanProyectos}
+          defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? ""}
+          onQuickAdd={crisol.handleReservaTacticaQuickAdd}
+          onEnviarUnidad={crisol.handleEnviarReservaASituacion}
+          onEnviarSeleccion={crisol.handleEnviarReservasSeleccionadas}
+          onAbrirNido={crisol.handleAbrirNidoEnSituacion}
+          onDelete={crisol.handleReservaEliminar}
+          onRutaChange={crisol.handleReservaRutaChange}
+          elevateAboveUnitFocus
+          panoramaHeadline={
+            puertaPanorama.total > 0 ? puertaPanorama.headline : undefined
+          }
+          panoramaSubline={
+            puertaPanorama.total > 0 ? puertaPanorama.subline : undefined
+          }
+          panoramaMantra={
+            puertaPanorama.total > 0 ? puertaPanorama.mantra : undefined
+          }
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,13 +1,20 @@
-/** IDs de módulos vendibles (Planificación + futuros). */
+/** IDs de módulos vendibles (Planificación + futuros).
+ * Display comercial (v2): Base · Ritmo · Norte — ver planificacionPricing.ts
+ */
 export type ModuleId =
   | "planificacion_base"
   | "soberania_dia"
   | "operativo";
 
 export const MODULE_IDS = {
+  /** Jornada Base — Conquista + PS */
   PLANIFICACION_BASE: "planificacion_base" as const,
+  /** Norte — Crisol + Hub Proyectos */
   SOBERANIA_DIA: "soberania_dia" as const,
+  NORTE: "soberania_dia" as const,
+  /** Ritmo del día — segmentos + Situacional */
   OPERATIVO: "operativo" as const,
+  RITMO: "operativo" as const,
 };
 
 /** Planes de checkout activos (Planificación mensual + Espejo aparte). */
@@ -93,11 +100,21 @@ export function hasSoberaniaDiaAccess(input: ModuleAccessInput): boolean {
   return hasModule(input, "soberania_dia");
 }
 
+/** Alias comercial: Norte (Crisol + Hub). */
+export function hasNorteAccess(input: ModuleAccessInput): boolean {
+  return hasSoberaniaDiaAccess(input);
+}
+
 export function hasOperativoAccess(input: ModuleAccessInput): boolean {
   return hasModule(input, "operativo");
 }
 
-/** @deprecated Usar hasOperativoAccess */
+/** Alias comercial: Ritmo del día (segmentos + Situacional). */
+export function hasRitmoAccess(input: ModuleAccessInput): boolean {
+  return hasOperativoAccess(input);
+}
+
+/** @deprecated Usar hasOperativoAccess / hasRitmoAccess */
 export function hasDesglosadorAccessFromModules(input: ModuleAccessInput): boolean {
   return hasOperativoAccess(input);
 }

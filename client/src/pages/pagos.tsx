@@ -8,6 +8,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PLANIFICACION_CHECKOUT_PLANS } from "@shared/mercadopagoPlans";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { modulesGrantedByPlan } from "@shared/moduleAccess";
+import {
+  EMBUDO_PREGUNTAS_V2,
+  PLANIFICACION_FULL_MONTHLY_USD,
+  PLANIFICACION_STACKS,
+  SKU_BASE,
+  SKU_NORTE,
+  SKU_RITMO,
+} from "@shared/planificacionPricing";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
@@ -44,26 +52,12 @@ interface Plan {
   funnelHint?: string;
 }
 
-const EMBUDO_PREGUNTAS = [
-  {
-    id: "base",
-    pregunta: "¿Tu día cierra con estructura?",
-    si: "Planificación Base — Escalera de Conciencia (3 capas) + anillo, segmentos y flota.",
-    peldaño: 1,
-  },
-  {
-    id: "operativo",
-    pregunta: "¿Necesitas saber cuánto produces de verdad (unidades, ritmo, récord)?",
-    si: "Añade Operativo — primer upsell: conquista medible.",
-    peldaño: 2,
-  },
-  {
-    id: "soberania",
-    pregunta: "¿Ideas sueltas, imprevistos y poco avance en proyectos grandes?",
-    si: "Añade Soberanía del día — orden mental avanzado (Crisol MOS, situación, pasos de fe).",
-    peldaño: 3,
-  },
-];
+const EMBUDO_PREGUNTAS = EMBUDO_PREGUNTAS_V2.map((q) => ({
+  id: q.id,
+  pregunta: q.pregunta,
+  si: q.si,
+  peldaño: q.peldaño,
+}));
 
 const espejoPlan: Plan = {
   id: "corazon-sabio",
@@ -87,101 +81,79 @@ const espejoPlan: Plan = {
 
 const planificacionPlans: Plan[] = [
   {
-    id: "planificacion_base",
-    name: "Planificación Base",
-    price: 19.99,
-    pricePEN: 74,
-    peldaño: "Peldaño 1 · Fundamento",
-    forWho: "Todos — obligatorio",
-    anchorCopy: SISTEMICAR_CATEGORY.nameShort + ": anillo + Escalera (presencia, entrada, producción).",
-    roiCopy: "Cierra el día con datos por capas — no con culpa ni listas infinitas.",
-    features: [
-      { name: "Escalera de Conciencia — 3 capas en Métricas", locked: false, highlight: true },
-      { name: "Anillo de conciencia + segmentos", locked: false, highlight: true },
-      { name: "La Flota — Conquista · Enfoque · Descanso · Verdad", locked: false },
-      { name: "Disciplina, PS y cierre de jornada con sello", locked: false },
-      { name: "Combustible de conciencia (decisiones)", locked: false },
-    ],
+    id: SKU_BASE.id,
+    name: SKU_BASE.name,
+    price: SKU_BASE.priceUsd,
+    pricePEN: SKU_BASE.pricePen,
+    peldaño: "Peldaño 1 · Entrada urgente",
+    forWho: SKU_BASE.forWho,
+    anchorCopy: SKU_BASE.identity + " — vehículos Conquista + PS.",
+    roiCopy: "Si no mides unidades, el día se va sin veredicto. Empieza aquí.",
+    features: SKU_BASE.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
     icon: Compass,
     color: GOLD,
     popular: true,
+    funnelHint: SKU_BASE.funnelHint,
   },
   {
-    id: "operativo",
-    name: "Operativo",
-    price: 39.99,
-    pricePEN: 148,
-    peldaño: "Peldaño 2 · Conquista medible",
-    funnelHint: "Primer upsell recomendado",
-    forWho: "Unidades · ritmo · récord",
-    anchorCopy: "Desglosador conquista: unidades, ritmo y récord.",
-    roiCopy: "Si pierdes un día de producción al mes por mal ritmo, esto se paga solo.",
-    features: [
-      { name: "Desglosador Conquista (unidades y ritmo)", locked: false, highlight: true },
-      { name: "Récord, bóveda y tiempo heredado", locked: false, highlight: true },
-      { name: "Ruta fluido → concentrado → límite + voz", locked: false },
-      { name: "Producción de decisiones medibles", locked: false },
-      { name: "Requiere Planificación Base", locked: false },
-    ],
+    id: SKU_RITMO.id,
+    name: SKU_RITMO.name,
+    price: SKU_RITMO.priceUsd,
+    pricePEN: SKU_RITMO.pricePen,
+    peldaño: "Peldaño 2 · Compromiso del día",
+    funnelHint: SKU_RITMO.funnelHint,
+    forWho: SKU_RITMO.forWho,
+    anchorCopy: SKU_RITMO.identity,
+    roiCopy: "Segmentos + Situacional: estructura e imprevistos sin perder el hilo.",
+    features: SKU_RITMO.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
     icon: Clock,
     color: "#00C851",
-    badge: "PRIMER PASO",
+    badge: "RITMO",
   },
   {
-    id: "soberania_dia",
-    name: "Soberanía del día",
-    price: 29.99,
-    pricePEN: 111,
-    peldaño: "Peldaño 3 · Orden mental",
-    funnelHint: "Nivel avanzado — ideal tras habituar cierre medible",
-    forWho: "Ideas sueltas · imprevistos · proyectos",
-    anchorCopy: "Crisol MOS + Ring de enfoque + pasos en proyectos.",
-    roiCopy: "Ordena pensamientos hacia fe incremental — no solo listas.",
-    features: [
-      { name: "El Crisol de Pensamientos · MOS (nidos y ruta S)", locked: false, highlight: true },
-      { name: "Desglosador Enfoque (bloques 3+3)", locked: false, highlight: true },
-      { name: "Hub Proyectos y peldaños / pasos de fe", locked: false },
-      { name: "Bolsa de ganancia de tiempo", locked: false },
-      { name: "Requiere Planificación Base", locked: false },
-    ],
+    id: SKU_NORTE.id,
+    name: SKU_NORTE.name,
+    price: SKU_NORTE.priceUsd,
+    pricePEN: SKU_NORTE.pricePen,
+    peldaño: "Peldaño 3 · Alto valor",
+    funnelHint: SKU_NORTE.funnelHint,
+    forWho: SKU_NORTE.forWho,
+    anchorCopy: SKU_NORTE.identity,
+    roiCopy: "Crisol + Hub: solo cuando ya cierras unidades y quieres horizonte.",
+    features: SKU_NORTE.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
     icon: Layers,
     color: "#38BDF8",
-    badge: "AVANZADO",
+    badge: "NORTE",
   },
 ];
 
-const STACKS = [
-  {
-    id: "conquista",
-    title: "Conquista medible",
-    subtitle: "Peldaño 2 — empieza aquí si quieres resultados medibles",
-    modules: "Base + Operativo",
-    totalUsd: 59.98,
-    addOnId: "operativo" as const,
-    color: "#00C851",
-    desc: "Unidades, ritmo, récord. Familiariza con cerrar y medir.",
-  },
-  {
-    id: "orden",
-    title: "Orden mental",
-    subtitle: "Peldaño 3 — imprevistos e ideas hacia proyectos",
-    modules: "Base + Soberanía del día",
-    totalUsd: 49.98,
-    addOnId: "soberania_dia" as const,
-    color: "#38BDF8",
-    desc: "Crisol MOS, Ring de enfoque, pasos de fe.",
-  },
-  {
-    id: "completo",
-    title: "Sistema completo",
-    subtitle: "Peldaños 2 + 3",
-    modules: "Base + Operativo + Soberanía",
-    totalUsd: 89.96,
-    addOnId: null,
-    color: GOLD,
-    desc: "Mides producción y ordenas pensamientos.",
-  },
-];
+const STACK_COLORS: Record<string, string> = {
+  ritmo: "#00C851",
+  norte: GOLD,
+};
+
+const STACKS = PLANIFICACION_STACKS.map((stack) => ({
+  id: stack.id,
+  title: stack.title,
+  subtitle: stack.subtitle,
+  modules: stack.modulesLabel,
+  totalUsd: stack.totalUsd,
+  addOnId: stack.highlightAddOnId,
+  color: STACK_COLORS[stack.id] ?? GOLD,
+  desc: stack.desc,
+}));
 
 type PaymentMethod = "mercadopago" | "paypal" | "yape" | null;
 
@@ -634,7 +606,9 @@ export default function Pagos() {
                   <p className="text-[10px] text-slate-400 leading-relaxed">{stack.desc}</p>
                   {stack.addOnId ? (
                     <>
-                      <p className="text-[9px] text-slate-600">Incluye Base ($19.99) + add-on.</p>
+                      <p className="text-[9px] text-slate-600">
+                        Incluye Base (${SKU_BASE.priceUsd}) + add-on. Apilado mensual.
+                      </p>
                       <button
                         type="button"
                         onClick={() => selectStack(stack.addOnId!)}
@@ -646,7 +620,8 @@ export default function Pagos() {
                     </>
                   ) : (
                     <p className="text-[9px] text-slate-500 italic">
-                      Activa Base + Operativo + Soberanía (tres suscripciones).
+                      Usuario comprometido: Base + Ritmo + Norte ≈ ${PLANIFICACION_FULL_MONTHLY_USD}/mes
+                      (tres capas apiladas).
                     </p>
                   )}
                 </div>

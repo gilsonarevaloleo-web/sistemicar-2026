@@ -60,6 +60,8 @@ import {
   hasPlanificacionBaseAccess as _hasPlanificacionBaseAccess,
   hasSoberaniaDiaAccess as _hasSoberaniaDiaAccess,
   hasOperativoAccess as _hasOperativoAccess,
+  hasRitmoAccess as _hasRitmoAccess,
+  hasNorteAccess as _hasNorteAccess,
   resolveActiveModules,
   mergeModuleIds,
   modulesGrantedByPlan,
@@ -2489,6 +2491,28 @@ export function hasOperativoAccess(
 ): boolean {
   if (isPreviewOpsUnlocked()) return true;
   return _hasOperativoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Ritmo del día — segmentos + Situacional (alias comercial de operativo). */
+export function hasRitmoAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasRitmoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Norte — Crisol + Hub (alias comercial de soberania_dia). */
+export function hasNorteAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasNorteAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
 export function hasDesglosadorAccess(

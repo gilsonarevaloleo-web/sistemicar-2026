@@ -1,7 +1,8 @@
 import {
-  hasOperativoAccess,
-  hasSoberaniaDiaAccess,
+  hasNorteAccess,
+  hasRitmoAccess,
   type UserProgression,
+  type UserRank,
 } from "./persistence";
 import type { PlanificacionPlanProfile } from "./planificacionOnboarding";
 
@@ -10,14 +11,15 @@ export type { PlanificacionPlanProfile };
 export function resolvePlanificacionProfile(
   subscriptionPlan?: string | null,
   email?: string | null,
-  rank?: string | null,
+  rank?: UserRank | null,
   activeModules?: string[] | null
 ): PlanificacionPlanProfile {
-  if (hasOperativoAccess(subscriptionPlan, email, rank, activeModules)) {
-    return "produccion";
+  // Norte (Crisol + Hub) es el perfil más alto.
+  if (hasNorteAccess(subscriptionPlan, email, rank, activeModules)) {
+    return "norte";
   }
-  if (hasSoberaniaDiaAccess(subscriptionPlan, email, rank, activeModules)) {
-    return "estudiante";
+  if (hasRitmoAccess(subscriptionPlan, email, rank, activeModules)) {
+    return "ritmo";
   }
   return "base";
 }

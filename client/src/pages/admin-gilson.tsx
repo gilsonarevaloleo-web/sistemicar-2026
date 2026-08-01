@@ -1457,9 +1457,9 @@ export default function AdminGilson() {
                 className="w-full mb-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
                 data-testid="select-module-plan"
               >
-                <option value="planificacion_base">Planificación base</option>
-                <option value="soberania_dia">Soberanía del día</option>
-                <option value="operativo">Operativo</option>
+                <option value="planificacion_base">Jornada Base</option>
+                <option value="operativo">Ritmo del día</option>
+                <option value="soberania_dia">Norte</option>
               </select>
               <input
                 type="text"

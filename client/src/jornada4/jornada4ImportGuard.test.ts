@@ -83,11 +83,12 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     }
   });
 
-  it("sesión monta El Crisol (dock clásico)", () => {
+  it("sesión cablea El Crisol (dock clásico; gated por Norte)", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /PlaneacionCrisolDock/);
     assert.match(session, /useJornada4Crisol/);
     assert.match(session, /elevateAboveUnitFocus/);
+    assert.match(session, /entitlements\.hasNorte/);
   });
 
   it("sesión monta atención de puertas Dual Kernel", () => {
