@@ -16,6 +16,7 @@ import {
   situacionPendingCronRows,
   situacionProgressLabel,
 } from "@/jornada4/situacionKernel";
+import { desglosadorProfundidadPotencialPs } from "@/jornada4/desglosadorProfundidad";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 
 const OK = "#00C851";
@@ -131,7 +132,7 @@ export function SituacionCard({
           <div className="flex items-center gap-1 shrink-0">
             <Zap size={10} style={{ color: flotaColor }} />
             <span className="text-xs font-black" style={{ color: flotaColor }}>
-              3-7 PS
+              {desglosadorProfundidadPotencialPs(cronRows.length)} PS
             </span>
           </div>
         </div>

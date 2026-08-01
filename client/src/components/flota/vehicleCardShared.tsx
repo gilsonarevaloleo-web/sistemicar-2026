@@ -23,6 +23,8 @@ import {
 import { countCasaHechas, groupCasaByTexto, type CasaTextoCount } from "@/lib/situacionCasa";
 import { formatCombustibleCelebracionBloque } from "@/lib/combustibleConciencia";
 import {
+  DESGLOSADOR_CYCLE_CLOSE_BASE_PS,
+  DESGLOSADOR_SUB_CUMPLIDO_PS,
   VEHICLE_ARCHIVADO_BASE_PS,
   VEHICLE_CUMPLIDO_BASE_PS,
 } from "@/lib/sovereigntyPointsConfig";
@@ -358,7 +360,7 @@ export function computeSituacionDesgloseSummary(vehicle: Vehicle): SituacionDesg
   const subs = (vehicle.subTareas || []).filter(s => s.enDesgloseCronometro);
   const cumplidos = subs.filter(s => s.resultadoSituacion === "cumplido").length;
   const fallados = subs.filter(s => s.resultadoSituacion === "fallado").length;
-  const psFilas = cumplidos * 4;
+  const psFilas = cumplidos * DESGLOSADOR_SUB_CUMPLIDO_PS;
   const psProfundidad = vehicle.situacionCronometro?.depthBlockPsGranted ?? 0;
   const psDetalles = subs.reduce(
     (acc, st) => acc + (st.detalles?.filter(d => d.entregado && !d.casa).length ?? 0),
@@ -529,7 +531,28 @@ export function calculateVehicleScore(vehicle: Vehicle): {
     };
   }
   if (vehicle.tipoFlota === "situacion") {
-    return { difficulty: "facil", potentialCPCumplido: 5, potentialCPArchivado: 0, scorePercent: 50, retoCount: 0, blandoCount: 0 };
+    const filas = vehicle.subTareas ?? [];
+    // Desglose/ring/lista: 2 PS × cada subtarea + cierre ciclo (no express +5).
+    if (filas.length > 0) {
+      return {
+        difficulty: "facil",
+        potentialCPCumplido:
+          filas.length * DESGLOSADOR_SUB_CUMPLIDO_PS + DESGLOSADOR_CYCLE_CLOSE_BASE_PS,
+        potentialCPArchivado: VEHICLE_ARCHIVADO_BASE_PS,
+        scorePercent: 50,
+        retoCount: 0,
+        blandoCount: 0,
+      };
+    }
+    // Rápido / express sin filas: +5 / +2.
+    return {
+      difficulty: "facil",
+      potentialCPCumplido: EXPRESS_PS.situacion.cumple,
+      potentialCPArchivado: EXPRESS_PS.situacion.arch,
+      scorePercent: 50,
+      retoCount: 0,
+      blandoCount: 0,
+    };
   }
   if (vehicle.tipoTerminoRapido) {
     const ps = EXPRESS_PS[vehicle.tipoTerminoRapido] ?? {
