@@ -17,6 +17,10 @@ import {
   situacionProgressLabel,
 } from "@/jornada4/situacionKernel";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
+import {
+  ENTRENAMIENTO_COPY,
+  isRingModoEntrenamiento,
+} from "@/jornada4/entrenamientoRestricciones";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -25,6 +29,7 @@ const INK = "#f1f5f9";
 const GOLD = "#D4AF37";
 const AMBER = "#F59E0B";
 const VIOLET = "#8B5CF6";
+const CYAN = "#00FFC3";
 const flotaColor = FLOTA_CONFIG.situacion.color;
 
 type Props = {
@@ -36,6 +41,7 @@ type Props = {
   onAddFila: (texto: string) => void;
   onSetCupo: (subTareaId: string, minutos: number | undefined) => void;
   onReorderFilas?: (movedId: string, direction: ReorderDirection) => void;
+  onSustituirFoco?: (subTareaId: string) => void;
 };
 
 export function SituacionCard({
@@ -47,6 +53,7 @@ export function SituacionCard({
   onAddFila,
   onSetCupo,
   onReorderFilas,
+  onSustituirFoco,
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
@@ -55,6 +62,7 @@ export function SituacionCard({
   const focus = pending.find(st => st.id === focusId) ?? pending[0] ?? null;
   const sc = vehicle.situacionCronometro;
   const cronActivo = sc?.activo === true;
+  const entrenamiento = isRingModoEntrenamiento(vehicle);
 
   // Solo tickear con ring activo (como Conquista). Idle = sin setState/s.
   const tick = useJornada4Tick(cronActivo);
@@ -121,12 +129,26 @@ export function SituacionCard({
               >
                 {FLOTA_CONFIG.situacion.label}
               </span>
+              {entrenamiento ? (
+                <span
+                  className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase"
+                  style={{ backgroundColor: `${CYAN}18`, color: CYAN }}
+                  data-testid="j4-situacion-entrenamiento-badge"
+                >
+                  {ENTRENAMIENTO_COPY.ringBadge}
+                </span>
+              ) : null}
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
               Ring · {situacionProgressLabel(vehicle)}
               {remBudget != null ? ` · cupo ${remBudget} min` : ""}
               {vehicle.criterioDetalle ? ` · ${vehicle.criterioDetalle}` : ""}
             </p>
+            {entrenamiento ? (
+              <p className="text-[9px] mt-1 leading-snug" style={{ color: CYAN }}>
+                {ENTRENAMIENTO_COPY.ringHint}
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Zap size={10} style={{ color: flotaColor }} />
@@ -210,16 +232,18 @@ export function SituacionCard({
               >
                 Cumplido
               </button>
-              <button
-                type="button"
-                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation flex items-center justify-center gap-1"
-                style={{ backgroundColor: `${AMBER}18`, color: AMBER, border: `1px solid ${AMBER}55` }}
-                onClick={() => onAvance(focus.id)}
-                data-testid="j4-situacion-avance"
-              >
-                <TrendingUp size={10} />
-                Avance
-              </button>
+              {!entrenamiento ? (
+                <button
+                  type="button"
+                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation flex items-center justify-center gap-1"
+                  style={{ backgroundColor: `${AMBER}18`, color: AMBER, border: `1px solid ${AMBER}55` }}
+                  onClick={() => onAvance(focus.id)}
+                  data-testid="j4-situacion-avance"
+                >
+                  <TrendingUp size={10} />
+                  Avance
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
@@ -377,6 +401,11 @@ export function SituacionCard({
                       >
                         {row.texto || `Fila ${idx + 1}`}
                       </p>
+                      {fail && row.motivoCierre === "distraccion" ? (
+                        <p className="text-[9px] font-bold mt-0.5" style={{ color: BAD }}>
+                          {ENTRENAMIENTO_COPY.perdidaDistraccion}
+                        </p>
+                      ) : null}
                       {finLabel ? (
                         <p
                           className="text-[9px] font-mono font-bold mt-0.5"
@@ -392,6 +421,25 @@ export function SituacionCard({
                         </p>
                       ) : null}
                     </div>
+                    {entrenamiento &&
+                    isPending &&
+                    !isFocus &&
+                    onSustituirFoco &&
+                    cronActivo ? (
+                      <button
+                        type="button"
+                        onClick={() => onSustituirFoco(row.id)}
+                        className="text-[7px] font-black uppercase tracking-wider px-1.5 py-1 rounded shrink-0"
+                        style={{
+                          backgroundColor: `${CYAN}14`,
+                          color: CYAN,
+                          border: `1px solid ${CYAN}40`,
+                        }}
+                        data-testid={`j4-situacion-sustituir-${row.id}`}
+                      >
+                        {ENTRENAMIENTO_COPY.sustituirFoco}
+                      </button>
+                    ) : null}
                   </div>
 
                   {isPending && cronActivo ? (

@@ -27,6 +27,8 @@ export function isDesglosadorEnFoco(vehicle: Vehicle): boolean {
 }
 
 export function isDesglosadorCrossSegmentExempt(vehicle: Vehicle): boolean {
+  // Contrato opt-in: anclado al segmento pierde la exención de cruce.
+  if (vehicle.ancladoAlSegmento === true) return false;
   return isDesglosadorEnFoco(vehicle);
 }
 

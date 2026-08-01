@@ -27,6 +27,7 @@ import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
+import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
 const ORANGE = "#f97316";
@@ -45,6 +46,10 @@ type Props = {
   proyectosHub?: Proyecto[];
   /** Dirección por defecto del segmento activo. */
   defaultProyectoId?: string | null;
+  /** Plan Soberanía: toggle ring entrenamiento. */
+  canModoEntrenamientoRing?: boolean;
+  /** Plan Operativo: toggle anclar desglosador al segmento. */
+  canAnclarDesglosadorSegmento?: boolean;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -92,6 +97,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   segmentoActivoNombre = null,
   proyectosHub = [],
   defaultProyectoId = null,
+  canModoEntrenamientoRing = false,
+  canAnclarDesglosadorSegmento = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -113,6 +120,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [showMissionSugs, setShowMissionSugs] = useState(false);
   const [historialSubs, setHistorialSubs] = useState<string[]>([]);
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
+  const [modoEntrenamientoRing, setModoEntrenamientoRing] = useState(false);
+  const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
   const keyboardInset = useKeyboardInset();
   const tick = useJornada4Tick(open && tipo === "tiempo");
 
@@ -189,6 +198,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setShowMissionSugs(false);
     setHistorialSubs([]);
     setActiveSubSugIdx(null);
+    setModoEntrenamientoRing(false);
+    setAncladoAlSegmento(false);
     setOpen(false);
   }, [segmentoHoraFin, defaultProyectoId]);
 
@@ -257,6 +268,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           tareasIndependientes: asIndependientes ? validSubs : undefined,
           conquistaComoIndependientes: asIndependientes,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+          ...(canAnclarDesglosadorSegmento && ancladoAlSegmento
+            ? { ancladoAlSegmento: true }
+            : {}),
         });
       } else if (modo === "rapido") {
         id = await onLaunch({
@@ -278,6 +292,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           situacionObjetivoHora: situacionHoraFin.trim(),
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+          ...(canModoEntrenamientoRing && modoEntrenamientoRing
+            ? { modoEntrenamientoRing: true }
+            : {}),
         });
       }
       if (id) reset();
@@ -298,6 +315,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     situacionHoraFin,
     terminoDetalle,
     conquistaMultiModo,
+    canAnclarDesglosadorSegmento,
+    ancladoAlSegmento,
+    canModoEntrenamientoRing,
+    modoEntrenamientoRing,
     reset,
   ]);
 
@@ -583,6 +604,62 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </p>
                   </div>
                   )}
+
+                  {tipo === "situacion" && modo === "desglose" && canModoEntrenamientoRing ? (
+                    <button
+                      type="button"
+                      onClick={() => setModoEntrenamientoRing(v => !v)}
+                      className="w-full rounded-xl border px-3 py-2.5 text-left touch-manipulation"
+                      style={{
+                        borderColor: modoEntrenamientoRing
+                          ? `${CYAN}55`
+                          : "rgba(255,255,255,0.1)",
+                        backgroundColor: modoEntrenamientoRing
+                          ? "rgba(0,255,195,0.08)"
+                          : "rgba(255,255,255,0.02)",
+                      }}
+                      data-testid="jornada4-launch-entrenamiento-ring"
+                    >
+                      <p
+                        className="text-[10px] font-black uppercase"
+                        style={{ color: modoEntrenamientoRing ? CYAN : MUTED }}
+                      >
+                        {ENTRENAMIENTO_COPY.ringToggle}
+                        {modoEntrenamientoRing ? " · ON" : ""}
+                      </p>
+                      <p className="text-[8px] leading-snug mt-0.5" style={{ color: MUTED }}>
+                        {ENTRENAMIENTO_COPY.ringHint}
+                      </p>
+                    </button>
+                  ) : null}
+
+                  {tipo === "tiempo" && canAnclarDesglosadorSegmento ? (
+                    <button
+                      type="button"
+                      onClick={() => setAncladoAlSegmento(v => !v)}
+                      className="w-full rounded-xl border px-3 py-2.5 text-left touch-manipulation"
+                      style={{
+                        borderColor: ancladoAlSegmento
+                          ? `${ORANGE}55`
+                          : "rgba(255,255,255,0.1)",
+                        backgroundColor: ancladoAlSegmento
+                          ? "rgba(249,115,22,0.1)"
+                          : "rgba(255,255,255,0.02)",
+                      }}
+                      data-testid="jornada4-launch-anclar-segmento"
+                    >
+                      <p
+                        className="text-[10px] font-black uppercase"
+                        style={{ color: ancladoAlSegmento ? ORANGE : MUTED }}
+                      >
+                        {ENTRENAMIENTO_COPY.ancladoToggle}
+                        {ancladoAlSegmento ? " · ON" : ""}
+                      </p>
+                      <p className="text-[8px] leading-snug mt-0.5" style={{ color: MUTED }}>
+                        {ENTRENAMIENTO_COPY.ancladoHint}
+                      </p>
+                    </button>
+                  ) : null}
 
                   {/* Dirección del vehículo (hereda segmento; se puede cambiar). */}
                   <SegmentoProyectoSelect

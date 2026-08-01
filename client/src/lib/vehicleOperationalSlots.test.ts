@@ -38,6 +38,10 @@ describe("vehicleOperationalSlots", () => {
     assert.equal(isDesglosadorEnFoco(desg), true);
     assert.equal(isDesglosadorCrossSegmentExempt(desg), true);
 
+    const anclado = v({ ...desg, id: "d1b", ancladoAlSegmento: true });
+    assert.equal(isDesglosadorEnFoco(anclado), true);
+    assert.equal(isDesglosadorCrossSegmentExempt(anclado), false);
+
     const paused = v({ ...desg, id: "d2", interrupcionActiva: true, subVehiculos: [] });
     assert.equal(isDesglosadorEnFoco(paused), true);
 

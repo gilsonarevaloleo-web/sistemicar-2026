@@ -19,6 +19,7 @@ import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
 import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
+import { useJornada4EntrenamientoGuard } from "@/hooks/useJornada4EntrenamientoGuard";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
@@ -28,6 +29,14 @@ import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
+import {
+  hasOperativoAccess,
+  hasSoberaniaDiaAccess,
+  subscribeToProgression,
+  type UserProgression,
+} from "@/lib/persistence";
+import { isOwnerEmail } from "@shared/moduleAccess";
+import { isPreviewOpsUnlocked } from "@/lib/previewOps";
 
 const Jornada4PlanTab = lazy(() => import("@/components/jornada4/Jornada4PlanTab"));
 const Jornada4MetricasTab = lazy(
@@ -56,6 +65,7 @@ export default function JornadaV4Session() {
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
   const [huecosRefresh, setHuecosRefresh] = useState(0);
+  const [progression, setProgression] = useState<UserProgression | null>(null);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
@@ -84,6 +94,13 @@ export default function JornadaV4Session() {
     safeAwardPS: core.safeAwardPS,
     segmentoActivo: planillaApi.segmentoActivo,
   });
+  useJornada4EntrenamientoGuard({
+    enabled: Boolean(user),
+    vehiclesRef: core.vehiclesRef,
+    planilla: planillaApi.planilla,
+    failSituacionDistraccion: ops.failSituacionDistraccion,
+    archiveAncladoPorSegmento: ops.archiveAncladoPorSegmento,
+  });
   const crisol = useJornada4Crisol({
     userId: user?.uid,
     vehiclesRef: core.vehiclesRef,
@@ -93,6 +110,33 @@ export default function JornadaV4Session() {
     segmentoActivo: planillaApi.segmentoActivo,
     proyectosHub,
   });
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setProgression(null);
+      return;
+    }
+    return subscribeToProgression(user.uid, prog => setProgression(prog));
+  }, [user?.uid]);
+
+  const planBypass =
+    isOwnerEmail(user?.email) || isPreviewOpsUnlocked();
+  const canModoEntrenamientoRing =
+    planBypass ||
+    hasSoberaniaDiaAccess(
+      progression?.subscriptionPlan,
+      user?.email,
+      progression?.rank,
+      progression?.activeModules
+    );
+  const canAnclarDesglosadorSegmento =
+    planBypass ||
+    hasOperativoAccess(
+      progression?.subscriptionPlan,
+      user?.email,
+      progression?.rank,
+      progression?.activeModules
+    );
 
   // Un gesto desbloquea AudioContext (móvil) para que el timbre de puerta suene.
   useEffect(() => {
@@ -256,6 +300,8 @@ export default function JornadaV4Session() {
               }
               proyectosHub={proyectosHub}
               defaultProyectoId={planillaApi.segmentoActivo?.proyectoVinculadoId ?? null}
+              canModoEntrenamientoRing={canModoEntrenamientoRing}
+              canAnclarDesglosadorSegmento={canAnclarDesglosadorSegmento}
             />
             <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
           </div>

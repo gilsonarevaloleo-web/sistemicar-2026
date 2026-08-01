@@ -64,6 +64,9 @@ type Ops = {
     movedId: string,
     direction: ReorderDirection
   ) => void;
+  sustituirSituacionFoco?: (vehicleId: string, newFocusId: string) => void;
+  failSituacionDistraccion?: (vehicleId: string) => Promise<void>;
+  archiveAncladoPorSegmento?: (vehicleId: string) => Promise<void>;
   pausaInterrupcion: (vehicleId: string, titulo: string) => Promise<void>;
   resumeDesglosador: (parentId: string) => Promise<void>;
   closeExpressVehicle: (
@@ -177,6 +180,11 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
                     onReorderFilas={(movedId, direction) =>
                       ops.reorderSituacionFilas(v.id, movedId, direction)
+                    }
+                    onSustituirFoco={
+                      ops.sustituirSituacionFoco
+                        ? id => ops.sustituirSituacionFoco!(v.id, id)
+                        : undefined
                     }
                   />
                 );

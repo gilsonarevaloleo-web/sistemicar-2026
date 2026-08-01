@@ -506,6 +506,8 @@ export interface SubTarea {
   enDesgloseCronometro?: boolean;
   /** Resultado en lista cronometrada; en lista libre suele omitirse (solo `completada`). */
   resultadoSituacion?: "pendiente" | "cumplido" | "fallado" | "avance";
+  /** Motivo de cierre automático (entrenamiento / sistema). */
+  motivoCierre?: "distraccion";
   /** Tiempo real usado al cerrar fila del cronómetro situacional (segundos). */
   duracionRealSec?: number;
   /** Timestamp de cierre cumplido/fallado en cronómetro situacional. */
@@ -678,7 +680,17 @@ export interface Vehicle {
     bolsaSegundoRetoMin?: number;
     /** Proyecto/nido con el que se abrió el bloque de enfoque (herencia para subs inline y reservas). */
     proyectoEnfoqueId?: string;
+    /**
+     * Contrato opt-in de entrenamiento serio:
+     * distracción (pestaña oculta) falla la fila en foco; se puede sustituir el foco; sin avance.
+     */
+    modoEntrenamiento?: boolean;
   } | null;
+  /**
+   * Contrato opt-in: desglosador no puede cruzar su segmento
+   * (pierde la exención cross-segment; el sistema archiva al expirar gracia).
+   */
+  ancladoAlSegmento?: boolean;
   /** PS de profundidad por duración real del desglosador de tiempo (sesión); curva progresiva 5→6→8→12… sin tope. */
   desglosadorBloqueDepthPsGranted?: number;
   /** Bandas de ruta de enfoque declaradas al cierre (desglosador u otros con ruta activa). */
@@ -1646,7 +1658,7 @@ export type UpdateVehicleOptions = {
 export async function updateVehicle(
   userId: string,
   vehicleId: string,
-  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId">>,
+  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId" | "ancladoAlSegmento">>,
   opts?: UpdateVehicleOptions
 ): Promise<void> {
   const updateLocally = () => {

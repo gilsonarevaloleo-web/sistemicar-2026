@@ -63,6 +63,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
       join(clientSrc, "hooks/useJornada4Planilla.ts"),
       join(clientSrc, "hooks/useJornada4PuertaAlerts.ts"),
       join(clientSrc, "hooks/useJornada4SegmentAttention.ts"),
+      join(clientSrc, "hooks/useJornada4EntrenamientoGuard.ts"),
       join(clientSrc, "components/jornada4"),
     ];
     const files: string[] = [];

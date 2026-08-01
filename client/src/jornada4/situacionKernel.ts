@@ -11,6 +11,7 @@ import {
 } from "@/lib/situacionCupoDistrib";
 import { ringSessionOperable, reanudarSituacionCronometroRing } from "@/lib/ringEnfoqueReal";
 import { isSituacionDesglosador } from "./filters";
+import { isRingModoEntrenamiento } from "./entrenamientoRestricciones";
 
 export type SituacionRowCloseResult = {
   vehicleId: string;
@@ -39,6 +40,11 @@ export function applySituacionRowClose(
     !target?.enDesgloseCronometro ||
     (target.resultadoSituacion ?? "pendiente") !== "pendiente"
   ) {
+    return null;
+  }
+
+  // Entrenamiento serio: sin avance fácil — cumplido, fallado o sustituir foco.
+  if (status === "avance" && isRingModoEntrenamiento(vehicle)) {
     return null;
   }
 
