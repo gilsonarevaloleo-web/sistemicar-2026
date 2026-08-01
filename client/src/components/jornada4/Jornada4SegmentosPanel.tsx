@@ -28,6 +28,8 @@ import {
   canCerrarPuertaJ4,
   J4_PUERTA_MANTRA,
 } from "@/jornada4/segmentAttentionJ4";
+import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
+import { resolvePuertaTimelineVisual } from "@/jornada4/puertaTimelineVisual";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { INK, MUTED, GOLD } = J4_COLORS;
@@ -98,10 +100,10 @@ export function Jornada4SegmentosPanel({
   const [saving, setSaving] = useState(false);
   const [rutinaNombre, setRutinaNombre] = useState("");
   const [rutinaDias, setRutinaDias] = useState<number[]>([1, 2, 3, 4, 5]);
-  const tick = useJornada4Tick(open);
-
   const count = planilla?.segmentos.length ?? 0;
   const segmentos = planilla?.segmentos ?? [];
+  /** Tick mientras hay puertas (timeline) o el listado está abierto. */
+  const tick = useJornada4Tick(open || segmentos.length > 0);
 
   const proyectoTituloById = useMemo(() => {
     const map = new Map<string, string>();
@@ -114,6 +116,21 @@ export function Jornada4SegmentosPanel({
     return Date.now();
   }, [tick]);
   const dayStart = useMemo(() => getSegmentCalendarDayStartMs(nowMs), [nowMs]);
+
+  const disciplinaTimeline = useMemo(
+    () =>
+      computeDisciplinaPlanDia({
+        segmentos,
+        nowMs,
+        dayStartMs: dayStart,
+      }),
+    [segmentos, nowMs, dayStart]
+  );
+  const entradaBySegId = useMemo(() => {
+    const map = new Map<string, (typeof disciplinaTimeline.entradas)[number]>();
+    for (const e of disciplinaTimeline.entradas) map.set(e.segmentoId, e);
+    return map;
+  }, [disciplinaTimeline]);
 
   const resetForm = () => {
     setNombre("");
@@ -144,9 +161,9 @@ export function Jornada4SegmentosPanel({
   return (
     <div className="px-3 pb-3 sm:px-4" data-testid="jornada4-segmentos">
       <style>{`
-        @keyframes j4-puerta-pulse {
-          0%, 100% { box-shadow: 0 0 10px rgba(0,200,81,0.12); }
-          50% { box-shadow: 0 0 22px rgba(0,200,81,0.35); }
+        @keyframes j4-puerta-foco-pulse {
+          0%, 100% { box-shadow: 0 0 0 1px rgba(212,175,55,0.35), 0 0 8px rgba(212,175,55,0.12); }
+          50% { box-shadow: 0 0 0 2px rgba(212,175,55,0.55), 0 0 16px rgba(212,175,55,0.32); }
         }
       `}</style>
 
@@ -172,41 +189,33 @@ export function Jornada4SegmentosPanel({
               aria-hidden
             />
             {segmentos.map((seg, idx) => {
-              const isActive = seg.estado === "activo" && !seg.puertaSistema;
-              const isClosed = seg.estado === "cerrado_manual";
-              const isSistema = seg.estado === "activo" && Boolean(seg.puertaSistema);
-              const isEntropia = seg.estado === "entropia";
+              const visual = resolvePuertaTimelineVisual({
+                seg,
+                entrada: entradaBySegId.get(seg.id),
+              });
               return (
                 <div
                   key={seg.id}
                   className="relative z-[1] flex flex-col items-center gap-1 min-w-0 flex-1"
                   data-testid={`jornada4-puerta-node-${seg.id}`}
+                  data-puerta-kind={visual.kind}
                 >
                   <div
                     className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-black tabular-nums border"
                     style={{
-                      backgroundColor: isActive
-                        ? EMERALD
-                        : isSistema || isEntropia
-                          ? BLOOD_BRIGHT
-                          : isClosed
-                            ? "rgba(64,64,64,0.9)"
-                            : "rgba(10,10,10,0.95)",
-                      borderColor: isActive
-                        ? EMERALD
-                        : isSistema || isEntropia
-                          ? BLOOD_BRIGHT
-                          : "rgba(115,115,115,0.8)",
-                      color: isActive || isSistema || isEntropia ? "#0a0a0a" : INK,
+                      backgroundColor: visual.backgroundColor,
+                      borderColor: visual.borderColor,
+                      color: visual.numberColor,
+                      animation: visual.pulse
+                        ? "j4-puerta-foco-pulse 1.8s ease-in-out infinite"
+                        : undefined,
                     }}
                   >
                     {idx + 1}
                   </div>
                   <span
                     className="text-[8px] font-bold truncate max-w-full px-0.5 text-center leading-tight"
-                    style={{
-                      color: isActive ? EMERALD : isSistema || isEntropia ? BLOOD_BRIGHT : MUTED,
-                    }}
+                    style={{ color: visual.labelColor }}
                   >
                     {seg.nombre}
                   </span>

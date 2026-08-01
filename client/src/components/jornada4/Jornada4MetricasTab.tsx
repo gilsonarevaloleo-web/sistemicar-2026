@@ -3,11 +3,13 @@
  * El tick 1s de disciplina vive aquí (isla), no en el root de sesión.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Jornada4DailyDisciplinaBar } from "@/components/jornada4/Jornada4DailyDisciplinaBar";
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
 import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
+import { getYesterdayDisciplinaPct } from "@/jornada4/yesterdayDisciplina";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
 import type { SegmentoV5 } from "@/lib/persistence";
 
@@ -23,6 +25,7 @@ export default function Jornada4MetricasTab({
   todayPs,
 }: Jornada4MetricasTabProps) {
   const [yesterdayPs, setYesterdayPs] = useState(0);
+  const [yesterdayDisciplinaPct, setYesterdayDisciplinaPct] = useState(0);
   const disciplinaTick = useJornada4Tick(Boolean(userId));
   const disciplinaModel = useMemo(() => {
     void disciplinaTick;
@@ -32,12 +35,16 @@ export default function Jornada4MetricasTab({
   useEffect(() => {
     if (!userId) {
       setYesterdayPs(0);
+      setYesterdayDisciplinaPct(0);
       return;
     }
     let cancelled = false;
     const load = () => {
       void getYesterdayDailyPointsTotal(userId).then(n => {
         if (!cancelled) setYesterdayPs(n);
+      });
+      void getYesterdayDisciplinaPct(userId).then(n => {
+        if (!cancelled) setYesterdayDisciplinaPct(n);
       });
     };
     if (typeof requestIdleCallback === "function") {
@@ -57,6 +64,10 @@ export default function Jornada4MetricasTab({
   return (
     <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
       <Jornada4DisciplinaCard model={disciplinaModel} />
+      <Jornada4DailyDisciplinaBar
+        todayPct={disciplinaModel.porcentajeDia}
+        yesterdayPct={yesterdayDisciplinaPct}
+      />
       <Jornada4DailyPsBar todayPs={todayPs} yesterdayPs={yesterdayPs} />
       <Jornada4Boveda />
     </div>
