@@ -8,6 +8,7 @@ import { useAuthContext } from "@/App";
 import { isOwner } from "@/lib/owner";
 import { auth, getUserEmail } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -65,6 +66,8 @@ type AdminUserLookup = {
 export default function AdminGilson() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
+  // Si venimos de Dual Kernel, diferir lab Firebase hasta el soft-start.
+  const motorsQuiet = useDualKernelMotorsQuiet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -404,7 +407,7 @@ export default function AdminGilson() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (!isAuthenticated || !user || motorsQuiet) return;
     const unsubs: (() => void)[] = [];
     unsubs.push(subscribeToPrincipiosMaestros(
       (items) => setPrincipios(items),
@@ -423,7 +426,7 @@ export default function AdminGilson() {
       (err) => console.error("Genome error:", err)
     ));
     return () => unsubs.forEach(u => { try { u(); } catch {} });
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, motorsQuiet]);
 
   const runMineria = async () => {
     setMineriaLoading(true);

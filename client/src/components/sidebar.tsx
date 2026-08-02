@@ -99,6 +99,12 @@ export function Sidebar() {
   const [progression, setProgression] = useState<UserProgression | null>(null);
   const userEmail = getUserEmail();
 
+  // Al cambiar de ruta (Ring→Admin, etc.), cerrar overlay al instante
+  // para que spring/blur no deje la UI “bloqueada”.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location]);
+
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = subscribeToProgression(
@@ -231,21 +237,22 @@ export function Sidebar() {
         </div>
       </nav>
 
-      {/* MOBILE MENU OVERLAY */}
+      {/* MOBILE MENU OVERLAY — z por encima de Foco/Crisol (230/240) */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40"
+            transition={{ duration: 0.15 }}
+            className="md:hidden fixed inset-0 bg-black/85 z-[300]"
             onClick={closeMobileMenu}
           >
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25 }}
+              transition={{ type: "tween", duration: 0.18, ease: "easeOut" }}
               className="absolute bottom-20 left-0 right-0 bg-[#0a0c14] border-t border-white/10 rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
@@ -296,8 +303,8 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* MOBILE BOTTOM NAV */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-black/95 backdrop-blur-2xl z-50 border-t border-white/5 flex items-center justify-around px-2">
+      {/* MOBILE BOTTOM NAV — por encima del overlay del menú */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full h-20 bg-black/95 backdrop-blur-2xl z-[310] border-t border-white/5 flex items-center justify-around px-2">
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#A855F7] via-[#3B82F6] via-[#EF4444] to-[#7C3AED]" />
 
         {(() => {
