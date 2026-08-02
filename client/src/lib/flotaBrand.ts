@@ -28,7 +28,7 @@ export const FLOTA_BRAND: Record<TipoFlota, FlotaBrandEntry> = {
     labelUpper: "ENFOQUE",
     sublabel: "Lista libre o ring con meta",
     relojLabel: "Meta y cupos",
-    psCierre: "3-7 PS por esfuerzo activo",
+    psCierre: "2 PS por subtarea (+ cierre ciclo)",
     vehiclePhrase: "enfoque",
   },
   descanso: {

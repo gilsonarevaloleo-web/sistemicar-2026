@@ -504,7 +504,7 @@ export interface SubTarea {
   minutosCupo?: number;
   /** Si true, el usuario fijó minutosCupo manualmente; no se sobrescribe al redistribuir. */
   cupoFijo?: boolean;
-  /** Si true, la fila está en el desglose con tiempo madre (4 PS al cumplir, cupo/+5′). */
+  /** Si true, la fila está en el desglose con tiempo madre (2 PS al cumplir, cupo/+5′). */
   enDesgloseCronometro?: boolean;
   /** Resultado en lista cronometrada; en lista libre suele omitirse (solo `completada`). */
   resultadoSituacion?: "pendiente" | "cumplido" | "fallado" | "avance";
