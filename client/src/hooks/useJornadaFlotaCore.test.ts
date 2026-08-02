@@ -41,8 +41,10 @@ describe("useJornadaFlotaCore (Dual Kernel)", () => {
   it("useJornadaFlotaCore hace flush síncrono y rehydrate al volver", () => {
     const core = readFileSync(join(dir, "./useJornadaFlotaCore.ts"), "utf8");
     assert.match(core, /flushLocalVehicles/);
+    assert.match(core, /flushPendingSaveLocalVehicles/);
     assert.match(core, /onJornadaVisibilityReturn/);
     assert.match(core, /rehydrateFlotaFromDiskSources/);
+    assert.match(core, /pageshow/);
     assert.equal(
       core.includes("saveLocalVehicles(vehiclesRef.current)"),
       false,
@@ -50,3 +52,4 @@ describe("useJornadaFlotaCore (Dual Kernel)", () => {
     );
   });
 });
+

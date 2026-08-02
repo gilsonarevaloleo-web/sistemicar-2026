@@ -3,9 +3,11 @@
  */
 import {
   getLocalVehicles,
+  parkActiveVehiclesForResume,
   subscribeToVehicles,
   type Vehicle,
 } from "@/lib/persistence";
+import { registerFlotaMemoryGetter } from "@/lib/flotaMemoryBridge";
 import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
 import { preferLocalSubTareasInVehicleList, preferLocalSubVehiculosInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
@@ -50,6 +52,9 @@ let pendingRemoteAfterMerge: (() => void) | null = null;
 let vehiclesUpdatedHandler: (() => void) | null = null;
 
 const listeners = new Set<StoreListener>();
+
+// Persistencia consulta esta memoria al escribir disco (anti shell-lean).
+registerFlotaMemoryGetter(() => vehicles);
 
 function notify(): void {
   scheduleCoalescedNotify(() => {
@@ -229,6 +234,12 @@ function applyIncomingSnapshot(
   }
 
   if (uid && merged.length > 0) {
+    // Park sync: sobrevivir kill antes del idle write de writeLocalFlota.
+    try {
+      parkActiveVehiclesForResume(merged);
+    } catch {
+      /* quota */
+    }
     runShadowTask(() => {
       writeLocalFlota(uid, merged);
     });
@@ -354,4 +365,5 @@ export function resetFlotaStoreForTests(): void {
   refCount = 0;
   mergeContext = null;
   fetchGeneration = 0;
+  registerFlotaMemoryGetter(() => vehicles);
 }
