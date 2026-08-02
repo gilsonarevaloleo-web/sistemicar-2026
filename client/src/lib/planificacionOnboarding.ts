@@ -2,7 +2,13 @@ import { JORNADA_MODULE } from "./jornadaBrand";
 import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR } from "./flotaBrand";
 import { SISTEMICAR_CATEGORY } from "./sistemicarCategory";
 
-export type PlanificacionPlanProfile = "base" | "estudiante" | "produccion";
+/** base | ritmo | norte — aliases legacy: produccion→ritmo, estudiante→norte */
+export type PlanificacionPlanProfile =
+  | "base"
+  | "ritmo"
+  | "norte"
+  | "estudiante"
+  | "produccion";
 
 export type PrimerDiaCheckKey =
   | "segmento"
@@ -31,89 +37,79 @@ export function checklistStorageKey(uid: string): string {
 
 export function profileLabel(profile: PlanificacionPlanProfile): string {
   switch (profile) {
+    case "ritmo":
     case "produccion":
-      return "Producción (Operativo)";
+      return "Ritmo del día";
+    case "norte":
     case "estudiante":
-      return "Estudiante (Soberanía del día)";
+      return "Norte";
     default:
-      return "Planificación Base";
+      return "Jornada Base";
   }
 }
 
 const STEPS_BASE: TutorialStep[] = [
   {
     title: `Bienvenido a ${JORNADA_MODULE.title}`,
-    description: `${SISTEMICAR_CATEGORY.oneLiner} Estructuras el día en segmentos, operas en La Flota y cierras la jornada con sello (cumplido o archivado).`,
-    action: "Siguiente: la Escalera de Conciencia.",
+    description: `${SISTEMICAR_CATEGORY.oneLiner} Empiezas midiendo: lanzas Conquista, cierras unidades y ganas PS.`,
+    action: "Siguiente: lanzar tu primera Conquista.",
   },
   {
-    title: "Escalera de Conciencia — 3 capas",
+    title: "Conquista = unidades con veredicto",
     description:
-      "Presencia (anillo): ¿en qué se me va el tiempo? Entrada (disciplina): ¿aparezco al trabajo consciente? Producción (combustible): ¿convierto el tiempo en decisiones? Ninguna capa sustituye a la otra.",
-    action: "Ve a «Métricas» y revisa las tres capas de hoy.",
-  },
-  {
-    title: "Segmentos = tu día en tramos",
-    description:
-      "Mañana, tarde, noche… Cada segmento tiene hora de inicio y fin. Si ninguno está activo, el monitor muestra OMISIÓN (tiempo sin registro).",
-    action: "Ve a «Segmentos del día» y revisa o crea tu tramo actual.",
-  },
-  {
-    title: "La Flota: cuatro tipos de misión",
-    description:
-      `${FLOTA_SELECTOR_DISCRIMINATOR} **${FLOTA_BRAND.tiempo.label}** = unidades y ritmo. **${FLOTA_BRAND.situacion.label}** = decisiones selladas (ring y cupos). **${FLOTA_BRAND.descanso.label}** = recarga consciente. **${FLOTA_BRAND.verdad.label}** = sinceridad ante el vacío. Título + criterio de cierre; sin cumplido/archivado no hay PS.`,
-    action: `Lanza un vehículo de ${FLOTA_BRAND.tiempo.label} o ${FLOTA_BRAND.situacion.label} con algo concreto de hoy.`,
+      `${FLOTA_SELECTOR_DISCRIMINATOR} **${FLOTA_BRAND.tiempo.label}** mide cantidad y ritmo. Cada sub se cierra cumplido o fallado. Sin cierre no hay PS.`,
+    action: `Lanza un vehículo de ${FLOTA_BRAND.tiempo.label} con algo concreto de hoy.`,
   },
   {
     title: "Cierra para ganar PS",
     description:
-      "Una misión solo cuenta cuando la marcas CUMPLIDO o ARCHIVADO. El coraje de intentar también suma puntos.",
+      "Una misión solo cuenta cuando la marcas CUMPLIDO o FALLADO. El coraje de intentar también suma puntos.",
     action: "Cierra tu primer vehículo antes de salir.",
   },
   {
     title: "Tu guía: Doctor IA",
     description:
-      `En ${JORNADA_MODULE.title} el Doctor responde en modo guía: «¿qué es un segmento?», «¿por dónde empiezo?». Pregunta con tu duda concreta.`,
+      `En ${JORNADA_MODULE.title} el Doctor responde en modo guía: «¿cómo lanzo Conquista?», «¿qué es PS?». Pregunta con tu duda concreta.`,
     action: "Abre el chat flotante y escribe: «¿Por dónde empiezo hoy?»",
   },
 ];
 
-const STEPS_ESTUDIANTE_EXTRA: TutorialStep[] = [
+const STEPS_RITMO_EXTRA: TutorialStep[] = [
   {
-    title: "Ring de enfoque (desglosador)",
+    title: "Segmentos = tu día en tramos",
     description:
-      "Para ideas sueltas e imprevistos: bloques 3+3, cupos por subtarea, meta sellada. Ideal cuando nadie te marca la agenda.",
-    action: "Crea un vehículo de enfoque y cierra al menos un bloque del ring.",
+      "Mañana, tarde, noche… Cada segmento tiene hora de inicio y fin. Ritmo del día estructura la ventana.",
+    action: "Ve a «Plan» y crea o abre tu segmento actual.",
   },
   {
-    title: "Proyectos y peldaños",
+    title: "Situacional / Enfoque",
     description:
-      "En Hub Proyectos subes una escalera de peldaños. Puedes vincular un segmento al proyecto para claridad mental.",
+      `**${FLOTA_BRAND.situacion.label}** = ring, cupos e imprevistos. Ideal cuando nadie te marca la agenda.`,
+    action: "Crea un vehículo Situacional y cierra al menos un bloque.",
+  },
+];
+
+const STEPS_NORTE_EXTRA: TutorialStep[] = [
+  {
+    title: "Crisol de pensamientos",
+    description:
+      "Captura ideas con nido (proyecto/inbox) antes de ejecutar. Ordena la mente sin perder el hilo.",
+    action: "Abre el Crisol y captura una idea con destino.",
+  },
+  {
+    title: "Hub Proyectos (último peldaño)",
+    description:
+      "En Hub Proyectos subes peldaños con pasos de fe. Es el nivel de alto compromiso — horizonte, no urgencia.",
     action: "Desde Jornada → Plan → Hub Proyectos, revisa tu escalera activa.",
   },
 ];
 
-const STEPS_PRODUCCION_EXTRA: TutorialStep[] = [
-  {
-    title: "Desglosador conquista (unidades)",
-    description:
-      "Para producción repetitiva: defines unidades, el contador baja con pitido, cada sub es un bloque medido.",
-    action: "Abre un vehículo de conquista con desglosador en La Flota.",
-  },
-  {
-    title: "Ruta fluido → concentrado → límite",
-    description:
-      "La voz marca tramos del contador. Al cerrar subs, la termodinámica compara dominio fluido y fricción vs ayer.",
-    action: "Cierra 2 subs y revisa la comparativa del día.",
-  },
-];
-
 export function getTutorialSteps(profile: PlanificacionPlanProfile): TutorialStep[] {
-  if (profile === "produccion") {
-    return [...STEPS_BASE, ...STEPS_PRODUCCION_EXTRA];
+  if (profile === "norte" || profile === "estudiante") {
+    return [...STEPS_BASE, ...STEPS_RITMO_EXTRA, ...STEPS_NORTE_EXTRA];
   }
-  if (profile === "estudiante") {
-    return [...STEPS_BASE, ...STEPS_ESTUDIANTE_EXTRA];
+  if (profile === "ritmo" || profile === "produccion") {
+    return [...STEPS_BASE, ...STEPS_RITMO_EXTRA];
   }
   return STEPS_BASE;
 }
@@ -127,43 +123,38 @@ export type PrimerDiaItem = {
 };
 
 export function getPrimerDiaItems(profile: PlanificacionPlanProfile): PrimerDiaItem[] {
+  const hasRitmo = profile === "ritmo" || profile === "produccion" || profile === "norte" || profile === "estudiante";
+  const hasNorte = profile === "norte" || profile === "estudiante";
+
   const items: PrimerDiaItem[] = [
     {
-      key: "segmento",
-      label: "Tengo un segmento del día definido (o activo)",
-      hint: "Segmentos del día → crea mañana/tarde o usa plantilla.",
-    },
-    {
       key: "vehiculo",
-      label: "Lancé al menos un vehículo en La Flota",
-      hint: `${FLOTA_BRAND.tiempo.label} para medir unidades; ${FLOTA_BRAND.situacion.label} para sellar decisiones; elige tipo al crear.`,
+      label: "Lancé al menos una Conquista en La Flota",
+      hint: `${FLOTA_BRAND.tiempo.label}: unidades y ritmo. Base empieza aquí.`,
     },
     {
       key: "cierre",
-      label: "Cerré un vehículo (cumplido o archivado)",
-      hint: "Sin cierre no hay PS ni datos en termodinámica.",
+      label: "Cerré un vehículo (cumplido o fallado)",
+      hint: "Sin cierre no hay PS ni veredicto del día.",
     },
     {
-      key: "escalera",
-      label: "Revisé la Escalera de Conciencia en Métricas",
-      hint: "Métricas → Presencia · Entrada · Producción — tu espejo por capas.",
+      key: "desglosador",
+      label: "Cerré al menos un sub de Conquista",
+      hint: "Desglosador conquista → subs por unidades.",
+      requires: "desglosador",
     },
   ];
-  if (profile === "estudiante" || profile === "produccion") {
-    items.push({
-      key: "desglosador",
-      label: "Usé un desglosador y cerré al menos un sub",
-      hint:
-        profile === "produccion"
-          ? "Desglosador conquista → subs por unidades."
-          : "Ring de enfoque → bloques 3+3.",
-      requires: "desglosador",
+  if (hasRitmo) {
+    items.unshift({
+      key: "segmento",
+      label: "Tengo un segmento del día definido (o activo)",
+      hint: "Plan → Segmentos: crea mañana/tarde o usa plantilla.",
     });
   }
-  if (profile === "estudiante") {
+  if (hasNorte) {
     items.push({
       key: "proyecto",
-      label: "Revisé o avancé un peldaño en Proyectos",
+      label: "Revisé o avancé un peldaño en Hub Proyectos",
       hint: "Jornada → Plan → Hub Proyectos → escalera activa.",
       requires: "proyecto",
     });

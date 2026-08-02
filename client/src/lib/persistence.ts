@@ -60,6 +60,8 @@ import {
   hasPlanificacionBaseAccess as _hasPlanificacionBaseAccess,
   hasSoberaniaDiaAccess as _hasSoberaniaDiaAccess,
   hasOperativoAccess as _hasOperativoAccess,
+  hasRitmoAccess as _hasRitmoAccess,
+  hasNorteAccess as _hasNorteAccess,
   resolveActiveModules,
   mergeModuleIds,
   modulesGrantedByPlan,
@@ -2501,6 +2503,28 @@ export function hasOperativoAccess(
 ): boolean {
   if (isPreviewOpsUnlocked()) return true;
   return _hasOperativoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Ritmo del día — segmentos + Situacional (alias comercial de operativo). */
+export function hasRitmoAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasRitmoAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Norte — Crisol + Hub (alias comercial de soberania_dia). */
+export function hasNorteAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasNorteAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
 export function hasDesglosadorAccess(
@@ -7142,6 +7166,80 @@ export async function deletePlantillaRutina(userId: string, plantillaId: string)
   }
 }
 
+/** Materializa templates → segmentos del día (sin red). IDs estables por índice. */
+export function buildSegmentosFromPlantillaTemplates(
+  templates: SegmentoTemplate[],
+  nowMs = Date.now()
+): SegmentoV5[] {
+  return templates.map((t, index) => ({
+    id: `seg_${nowMs}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+    nombre: t.nombre,
+    horaInicio: t.horaInicio,
+    horaFin: t.horaFin,
+    color: t.color,
+    icono: t.icono,
+    estado: "pendiente" as const,
+    eventos: [],
+    psGanados: 0,
+    ...(t.proyectoVinculadoId ? { proyectoVinculadoId: t.proyectoVinculadoId } : {}),
+  }));
+}
+
+/**
+ * Enriquece segmentos con claridad/peldaño del Hub en segundo plano.
+ * No bloquea la carga de la rutina (móvil / red lenta).
+ */
+async function enrichPlanillaHubLinks(userId: string, planilla: Planilla): Promise<void> {
+  const linked = planilla.segmentos.filter(s => s.proyectoVinculadoId);
+  if (linked.length === 0) return;
+
+  const bridge = await import("./segmentoPeldanoBridge").catch(error => {
+    console.error("[applyPlantillaToday] Bridge Hub no disponible:", error);
+    return null;
+  });
+  if (!bridge) return;
+
+  const enrichById = new Map<string, Pick<SegmentoV5, "rutasMentales" | "proyectoPeldanoId">>();
+  for (const seg of linked) {
+    const proyectoId = seg.proyectoVinculadoId;
+    if (!proyectoId) continue;
+    try {
+      const claridad = await bridge.resolveClaridadParaSegmentoVinculado(
+        userId,
+        proyectoId,
+        seg.nombre
+      );
+      if (!claridad) continue;
+      const { peldanoId } = await bridge.ensurePeldanoFromSegmento(userId, {
+        proyectoId,
+        segmento: seg,
+        planillaFecha: planilla.fecha,
+        rutasMentales: claridad,
+      });
+      enrichById.set(seg.id, { rutasMentales: claridad, proyectoPeldanoId: peldanoId });
+    } catch (error) {
+      console.error("[applyPlantillaToday] Vínculo Hub falló para segmento:", seg.nombre, error);
+    }
+  }
+  if (enrichById.size === 0) return;
+
+  // Si el usuario ya cargó otra rutina, no pisar.
+  const local = getLocalPlanilla(planilla.fecha);
+  if (!local?.segmentos?.length) return;
+  const stillSame = planilla.segmentos.every(s => local.segmentos.some(l => l.id === s.id));
+  if (!stillSame) return;
+
+  const segmentos = local.segmentos.map(s => {
+    const e = enrichById.get(s.id);
+    return e ? { ...s, ...e } : s;
+  });
+  await savePlanilla(userId, { ...local, segmentos });
+}
+
+/**
+ * Carga la rutina al plan del día de forma inmediata (local-first).
+ * El vínculo Hub (claridad/peldaños) corre en sombra para no clavar el botón Cargar.
+ */
 export async function applyPlantillaToday(userId: string, plantilla: PlantillaRutina): Promise<Planilla> {
   const fecha = getTodayDateString();
   const templates = Array.isArray(plantilla.segmentos) ? plantilla.segmentos : [];
@@ -7149,54 +7247,7 @@ export async function applyPlantillaToday(userId: string, plantilla: PlantillaRu
     throw new Error("La rutina no tiene segmentos para cargar");
   }
 
-  const needsBridge = templates.some(t => Boolean(t.proyectoVinculadoId));
-  const bridge = needsBridge
-    ? await import("./segmentoPeldanoBridge").catch(error => {
-        console.error("[applyPlantillaToday] Bridge Hub no disponible:", error);
-        return null;
-      })
-    : null;
-
-  const segmentos: SegmentoV5[] = [];
-  for (const t of templates) {
-    const id = `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    let seg: SegmentoV5 = {
-      id,
-      nombre: t.nombre,
-      horaInicio: t.horaInicio,
-      horaFin: t.horaFin,
-      color: t.color,
-      icono: t.icono,
-      estado: "pendiente",
-      eventos: [],
-      psGanados: 0,
-      ...(t.proyectoVinculadoId ? { proyectoVinculadoId: t.proyectoVinculadoId } : {}),
-    };
-    if (t.proyectoVinculadoId && bridge) {
-      try {
-        const claridad = await bridge.resolveClaridadParaSegmentoVinculado(
-          userId,
-          t.proyectoVinculadoId,
-          t.nombre
-        );
-        if (claridad) {
-          seg = { ...seg, rutasMentales: claridad };
-          const { peldanoId } = await bridge.ensurePeldanoFromSegmento(userId, {
-            proyectoId: t.proyectoVinculadoId,
-            segmento: seg,
-            planillaFecha: fecha,
-            rutasMentales: claridad,
-          });
-          seg = { ...seg, proyectoPeldanoId: peldanoId };
-        }
-      } catch (error) {
-        // La rutina debe cargar igual; el vínculo Hub se puede reconstruir después.
-        console.error("[applyPlantillaToday] Vínculo Hub falló para segmento:", t.nombre, error);
-      }
-    }
-    segmentos.push(seg);
-  }
-
+  const segmentos = buildSegmentosFromPlantillaTemplates(templates);
   const planilla: Planilla = {
     id: `planilla_${fecha}_${Date.now()}`,
     fecha,
@@ -7205,6 +7256,13 @@ export async function applyPlantillaToday(userId: string, plantilla: PlantillaRu
     updatedAt: new Date().toISOString(),
   };
   await savePlanilla(userId, planilla);
+
+  if (templates.some(t => Boolean(t.proyectoVinculadoId))) {
+    void enrichPlanillaHubLinks(userId, planilla).catch(error => {
+      console.error("[applyPlantillaToday] enrich Hub:", error);
+    });
+  }
+
   return planilla;
 }
 

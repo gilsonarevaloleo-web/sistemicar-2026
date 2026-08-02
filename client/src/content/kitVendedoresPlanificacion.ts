@@ -1,16 +1,25 @@
 /** Contenido del kit vendedores — fuente compartida con `/vendedores-planificacion`. */
 import { SISTEMICAR_CATEGORY, CATEGORY_FOOTER } from "@/lib/sistemicarCategory";
+import {
+  PLANIFICACION_FULL_MONTHLY_USD,
+  PLANIFICACION_STACKS,
+  PLANIFICACION_SKU_BY_ID,
+  SKU_BASE,
+  SKU_NORTE,
+  SKU_RITMO,
+  EMBUDO_PREGUNTAS_V2,
+} from "@shared/planificacionPricing";
 
-export const KIT_VERSION = "1.6";
+export const KIT_VERSION = "2.0";
 
 export const KIT_ELEVATOR_PITCH = SISTEMICAR_CATEGORY.elevator;
 
 export const KIT_RESUMEN_30S = [
   SISTEMICAR_CATEGORY.name + " — no calendario ni lista de tareas.",
-  "Peldaño 1 Base — Escalera de Conciencia, anillo, segmentos, PS.",
-  "Peldaño 2 Operativo — conquista medible (unidades, ritmo, récord) — primer upsell.",
-  "Peldaño 3 Soberanía — orden mental avanzado (Imán, enfoque, proyectos).",
-  "Espejo es otro producto. Comisión 30% recurrente mientras el cliente pague.",
+  `Peldaño 1 ${SKU_BASE.name} ($${SKU_BASE.priceUsd}) — vehículos Conquista + PS (urgente).`,
+  `Peldaño 2 ${SKU_RITMO.name} (+$${SKU_RITMO.priceUsd}) — segmentos + Situacional.`,
+  `Peldaño 3 ${SKU_NORTE.name} (+$${SKU_NORTE.priceUsd}) — Crisol + Hub Proyectos (último, alto valor).`,
+  `Comprometido paga ~$${PLANIFICACION_FULL_MONTHLY_USD}/mes (tres capas apiladas). Comisión 30% recurrente.`,
 ];
 
 export const ESCALERA_CAPAS = [
@@ -19,33 +28,33 @@ export const ESCALERA_CAPAS = [
     id: "presencia",
     titulo: "Presencia",
     pregunta: "¿En qué se me va el tiempo?",
-    metrica: "Anillo de conciencia (conquista vs entropía)",
+    metrica: "Cierre medible (Conquista + PS)",
     color: "#8B5CF6",
     copyVenta:
-      "Primera capa: dejar de ser víctima del reloj. El anillo muestra dónde fluye el día sin culpa — inconsciencia del tiempo.",
-    demo: "Abrir Métricas → Capa 1 · ver conquista/entropía en vivo.",
+      "Primera capa: dejar de inventar el día. Conquista muestra unidades cerradas — veredicto, no culpa.",
+    demo: "Lanzar Conquista → cerrar 2 subs → ver PS.",
   },
   {
     capa: 2,
     id: "entrada",
     titulo: "Entrada",
-    pregunta: "¿Aparezco al trabajo consciente?",
-    metrica: "Disciplina — vehículos en segmento",
+    pregunta: "¿Aparezco en la ventana del día?",
+    metrica: "Segmentos + Situacional (Ritmo)",
     color: "#D4AF37",
     copyVenta:
-      "Segunda capa: no basta ver el tiempo — hay que entrar. Disciplina mide cuándo montas vehículo consciente en cada segmento.",
-    demo: "Capa 2 · índice disciplina + Δ al primer vehículo.",
+      "Segunda capa: estructura e imprevistos. Ritmo del día para quien ya mide unidades.",
+    demo: "Crear segmento → lanzar Situacional → cerrar bloque.",
   },
   {
     capa: 3,
     id: "produccion",
-    titulo: "Producción",
-    pregunta: "¿Convierto el tiempo en decisiones?",
-    metrica: "Combustible de conciencia + pulso de decisiones",
+    titulo: "Norte",
+    pregunta: "¿Mis ideas van a un proyecto?",
+    metrica: "Crisol + Hub Proyectos",
     color: "#A855F7",
     copyVenta:
-      "Tercera capa: la parálisis también quema tiempo. Decisiones cerradas = antientropía profunda. Conquista sin combustible = ilusión de progreso.",
-    demo: "Capa 3 · pulso intradía + badge Puente si hay presencia sin decisiones.",
+      "Tercera capa (última): horizonte. Solo el comprometido apunta ideas a largo plazo.",
+    demo: "Crisol → nido → paso #N en Hub.",
   },
 ] as const;
 
@@ -53,159 +62,111 @@ export const ESCALERA_INTEGRACION = CATEGORY_FOOTER;
 
 export const PRODUCTOS = [
   {
-    id: "planificacion_base",
-    name: "Planificación Base",
-    price: 19.99,
+    id: SKU_BASE.id,
+    name: SKU_BASE.name,
+    price: SKU_BASE.priceUsd,
     stack: "Peldaño 1 · obligatorio",
-    comision: 6.0,
+    comision: SKU_BASE.commissionUsd,
     color: "#D4AF37",
   },
   {
-    id: "operativo",
-    name: "Operativo",
-    price: 39.99,
-    stack: "Peldaño 2 · Conquista medible",
-    comision: 12.0,
+    id: SKU_RITMO.id,
+    name: SKU_RITMO.name,
+    price: SKU_RITMO.priceUsd,
+    stack: "Peldaño 2 · Ritmo del día",
+    comision: SKU_RITMO.commissionUsd,
     color: "#00C851",
   },
   {
-    id: "soberania_dia",
-    name: "Soberanía del día",
-    price: 29.99,
-    stack: "Peldaño 3 · Orden mental",
-    comision: 9.0,
+    id: SKU_NORTE.id,
+    name: SKU_NORTE.name,
+    price: SKU_NORTE.priceUsd,
+    stack: "Peldaño 3 · Norte (alto valor)",
+    comision: SKU_NORTE.commissionUsd,
     color: "#38BDF8",
   },
 ] as const;
 
-export const STACKS = [
-  {
-    title: "Conquista medible",
-    peldao: "Peldaño 2 · primer upsell",
-    modules: "Base + Operativo",
-    total: 59.98,
-    comisionEjemplo: 18.0,
-    desc: "Unidades, ritmo, récord. Familiariza con cerrar y medir.",
-  },
-  {
-    title: "Orden mental",
-    peldao: "Peldaño 3 · avanzado",
-    modules: "Base + Soberanía del día",
-    total: 49.98,
-    comisionEjemplo: 15.0,
-    desc: "Imán, desglosador enfoque, proyectos y pasos de fe.",
-  },
-  {
-    title: "Sistema completo",
-    peldao: "Peldaños 2 + 3",
-    modules: "Base + Operativo + Soberanía",
-    total: 89.96,
-    comisionEjemplo: 27.0,
-    desc: "Mide producción y ordena pensamientos.",
-  },
-] as const;
+export const STACKS = PLANIFICACION_STACKS.map((s) => ({
+  title: s.title,
+  peldao: s.subtitle,
+  modules: s.modulesLabel,
+  total: s.totalUsd,
+  comisionEjemplo: s.commissionUsd,
+  desc: s.desc,
+}));
 
-export const EMBUDO_PREGUNTAS = [
-  { peldao: 1, pregunta: "¿Tu día cierra con estructura?", respuesta: "Planificación Base." },
-  {
-    peldao: 2,
-    pregunta: "¿Necesitas unidades, ritmo y récord reales?",
-    respuesta: "Añade Operativo — primer upsell.",
-  },
-  {
-    peldao: 3,
-    pregunta: "¿Ideas sueltas, imprevistos y proyectos grandes?",
-    respuesta: "Añade Soberanía — Imán + enfoque + pasos de fe.",
-  },
-] as const;
+export const EMBUDO_PREGUNTAS = EMBUDO_PREGUNTAS_V2.map((q) => ({
+  peldao: q.peldaño,
+  pregunta: q.pregunta,
+  respuesta: q.si,
+}));
 
 export const CATALOGO_PELDAO = [
   {
     peldao: 1,
-    titulo: "Planificación Base",
-    frase: "Organiza el día y cierra segmentos con datos, no con culpa.",
-    incluye: [
-      "Anillo de conciencia — reloj del día (conquista vs entropía)",
-      "Escalera de Conciencia — presencia · entrada · producción (Métricas)",
-      "Segmentos del día y monitor de omisión/entropía",
-      "La Flota — Conquista · Enfoque · Descanso · Verdad",
-      "Puntos de Soberanía (PS) + economía de cierre",
-      "Disciplina — vehículos conscientes en segmento",
-      "Visión panorámica — entrenamiento amplitud/foco",
-      "Termodinámica atencional y combustible de conciencia (lectura)",
-      "Resumen Escalera de Conciencia al sellar jornada",
-      "Vehículos conquista, enfoque, descanso y verdad",
-    ],
-    noIncluye: "Desglosador premium, hub proyectos, Imán completo.",
+    titulo: SKU_BASE.name,
+    frase: SKU_BASE.identity,
+    incluye: [...SKU_BASE.unlocks],
+    noIncluye: "Segmentos, Situacional, Crisol, Hub — van en Ritmo/Norte.",
   },
   {
     peldao: 2,
-    titulo: "Operativo",
-    frase: "Si pierdes un día de producción al mes por mal ritmo, esto se paga solo.",
-    incluye: [
-      "Desglosador conquista (unidades, pitido, ritmo en vivo)",
-      "Récord / bóveda + tiempo heredado",
-      "Ruta fluido → concentrado → límite (voz guía)",
-      "Producción de decisiones medibles a escala",
-      "Termodinámica v2 al máximo con subs de tiempo",
-    ],
-    noIncluye: "Requiere Planificación Base.",
-    demo: "Desglosador conquista → 2–3 subs → Escalera capa 3 + termo vs ayer.",
+    titulo: SKU_RITMO.name,
+    frase: SKU_RITMO.identity,
+    incluye: [...SKU_RITMO.unlocks],
+    noIncluye: `Requiere ${SKU_BASE.name}.`,
+    demo: "Segmento → Situacional → cerrar bloque.",
   },
   {
     peldao: 3,
-    titulo: "Soberanía del día",
-    frase: "Tres ideas, un bloque cerrado. Pasos numerados hacia sueños más grandes.",
-    incluye: [
-      "Imán de pensamientos (captura, nidos, ruta S)",
-      "Desglosador enfoque (bloques 3+3, cupos, ring)",
-      "Hub Proyectos y peldaños (pasos de fe)",
-      "Bolsa de ganancia de tiempo",
-    ],
-    noIncluye: "Requiere Planificación Base. Ideal tras habituar cierre medible.",
-    demo: "Imán → ring de enfoque → paso #N en proyecto.",
+    titulo: SKU_NORTE.name,
+    frase: SKU_NORTE.identity,
+    incluye: [...SKU_NORTE.unlocks],
+    noIncluye: `Requiere ${SKU_BASE.name}. Ideal tras Ritmo.`,
+    demo: "Crisol → ring → paso #N en proyecto.",
   },
 ] as const;
 
 export const MATRIZ_BENEFICIOS = [
   {
-    persona: "Día sin estructura",
-    dolor: "Se me va el día",
-    peldao: "1 Base",
-    demo: "Segmento → flota → Escalera capa 1",
+    persona: "Producción urgente",
+    dolor: "No sé cuánto hice",
+    peldao: `1 ${SKU_BASE.shortName}`,
+    demo: "Conquista → PS",
   },
   {
-    persona: "Producción / unidades",
-    dolor: "Autoengaño al cerrar",
-    peldao: "2 Operativo",
-    demo: "Desglosador conquista → Escalera capa 3",
+    persona: "Día sin estructura",
+    dolor: "Se me va el día / imprevistos",
+    peldao: `2 ${SKU_RITMO.shortName}`,
+    demo: "Segmentos + Situacional",
   },
   {
     persona: "Mente acelerada",
     dolor: "Ideas que se pierden",
-    peldao: "3 Soberanía",
-    demo: "Imán → nido → cronómetro",
+    peldao: `3 ${SKU_NORTE.shortName}`,
+    demo: "Crisol → nido",
   },
   {
     persona: "Proyectos largos",
     dolor: "Poco avance visible",
-    peldao: "3 Soberanía",
-    demo: "Hub → paso #N al cumplir",
+    peldao: `3 ${SKU_NORTE.shortName}`,
+    demo: "Hub → paso #N",
   },
 ] as const;
 
 export const OBJECIONES = [
   {
     q: "¿Por qué no uso Notion / Google Calendar?",
-    a: "Porque aquí pagas por cierre medido y ritmo, no por almacenar notas.",
+    a: "Porque aquí pagas por cierre medido (unidades y bloques), no por almacenar notas.",
   },
   {
     q: "¿Es muy complicado?",
-    a: "Empieza con Conquista (unidades) o Enfoque (decisiones). Los desglosadores son para quien ya cierra bloques (add-ons Operativo o Soberanía).",
+    a: "Empieza con Base: solo Conquista. Ritmo y Norte se activan cuando el usuario ya cierra.",
   },
   {
-    q: "¿Por qué capturar en el Imán si luego escribo en el desglosador?",
-    a: "Con nido + proyecto + paso al cumplir, la captura ordena antes de ejecutar. El cronómetro sostiene el foco (~60%).",
+    q: "¿Por qué el Hub es el más caro?",
+    a: "Porque el poco comprometido no valora proyectos a largo plazo. Primero mide unidades; el Norte es para quien ya confía en el método.",
   },
   {
     q: "¿Y si no renuevo?",
@@ -213,7 +174,7 @@ export const OBJECIONES = [
   },
   {
     q: "¿Incluye todo SISTEMICAR?",
-    a: "No. Solo Planificación según catálogo de /pagos.",
+    a: "No. Solo Jornada/Planificación según catálogo de /pagos.",
   },
 ] as const;
 
@@ -223,31 +184,32 @@ export const LISTA_ROJA = [
   "Que la app planifica sola sin que el usuario cierre vehículos/subs",
   "Resultados garantizados — vende medición y método",
   "Comisión infinita si el cliente cancela",
+  "Vender Hub/Proyectos a quien aún no cierra unidades",
 ] as const;
 
 export const GUION_VENTA = [
-  "¿Tu día cierra con estructura? → Base.",
-  "¿Necesitas unidades y ritmo reales? → Operativo (primer upsell). Demo desglosador conquista.",
-  "¿Ideas sueltas e imprevistos? → Soberanía (avanzado). Demo Imán → ring de enfoque.",
+  `¿Necesitas medir unidades hoy? → ${SKU_BASE.name} ($${SKU_BASE.priceUsd}).`,
+  `¿Quieres estructura e imprevistos? → + ${SKU_RITMO.name} ($${SKU_RITMO.priceUsd}).`,
+  `¿Ideas a proyectos con pasos? → + ${SKU_NORTE.name} ($${SKU_NORTE.priceUsd}) — último peldaño.`,
   "¿Comparas con Notion? → Ritmo, cierre y decisiones medidas — no listas.",
-  'Cierre: "Empieza con Base; si produces por unidades, el peldaño 2 se paga solo. Cuando domines el cierre medible, el peldaño 3 ordena tus pensamientos hacia proyectos."',
+  `Cierre: "Base mide; Ritmo ordena el día; Norte apunta al proyecto. Comprometido ≈ $${PLANIFICACION_FULL_MONTHLY_USD}/mes."`,
 ] as const;
 
 export const IMAN_FLUJO = [
-  "Mente → Imán (captura + nido/proyecto)",
-  "Desglosador enfoque (ring ~60% con cronómetro)",
-  "[no alcanza el bloque] → Imán otra vez (ruta S)",
-  "Cumplido → paso ejecutado en proyecto",
+  "Mente → Crisol (captura + nido/proyecto)",
+  "Desglosador Situacional (ring ~60% con cronómetro)",
+  "[no alcanza el bloque] → Crisol otra vez (ruta S)",
+  "Cumplido → paso ejecutado en Hub Proyectos",
 ] as const;
 
 export const IMAN_OBJECIONES = [
   {
     q: "¿Por qué escribo dos veces: aquí y donde resuelvo?",
-    a: "Con Imán + proyecto, la primera escritura es aterrizaje con destino; la segunda es ejecución medida en tiempo.",
+    a: "Con Crisol + proyecto, la primera escritura es aterrizaje con destino; la segunda es ejecución medida en tiempo.",
   },
   {
     q: "Prefiero anotar directo donde trabajo",
-    a: "Directo = foco bajo si no acotas tiempo. Desglosador + cronómetro sube el foco ~60%.",
+    a: "Directo = foco bajo si no acotas tiempo. Situacional + cronómetro sube el foco ~60%.",
   },
   {
     q: "Es otra bandeja de notas",
@@ -257,16 +219,26 @@ export const IMAN_OBJECIONES = [
 
 export const IMAN_FRASES = [
   "No es escribir dos veces al vacío: es capturar con nido y cerrar con paso en tu proyecto.",
-  "El Imán ordena; el desglosador enfoca; el proyecto te da fe para soñar más grande.",
+  "El Crisol ordena; el Situacional enfoca; el Hub te da fe para soñar más grande.",
   "Prácticamente el primer sistema que ordena pensamientos hacia acción medida.",
 ] as const;
 
 export const INVENTARIO_PRODUCTO = [
-  { area: "Segmentos + La Flota (4 tipos)", estado: "Producción", nota: "Core — peldaño 1" },
-  { area: "Escalera de Conciencia (Métricas)", estado: "Producción", nota: "Capas presencia/entrada/producción" },
-  { area: "Desglosador conquista + récord", estado: "Producción", nota: "Peldaño 2 — vender primero" },
-  { area: "Desglosador enfoque + Imán + proyectos", estado: "Producción", nota: "Peldaño 3 — avanzado" },
-  { area: "Termodinámica v2 + combustible", estado: "Producción", nota: "Ledger de decisiones + pulso" },
+  {
+    area: "Conquista + PS (Jornada V4)",
+    estado: "Producción",
+    nota: `Peldaño 1 — ${PLANIFICACION_SKU_BY_ID.planificacion_base.name}`,
+  },
+  {
+    area: "Segmentos + Situacional",
+    estado: "Producción",
+    nota: `Peldaño 2 — ${PLANIFICACION_SKU_BY_ID.operativo.name}`,
+  },
+  {
+    area: "Crisol + Hub Proyectos",
+    estado: "Producción",
+    nota: `Peldaño 3 — ${PLANIFICACION_SKU_BY_ID.soberania_dia.name}`,
+  },
   { area: "Pagos recurrentes MP + ref vendedor", estado: "Producción", nota: "Verificar dominio producción" },
 ] as const;
 
