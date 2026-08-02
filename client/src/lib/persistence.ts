@@ -5708,6 +5708,46 @@ export async function getPlanillaHoy(userId: string): Promise<Planilla> {
   return newPlanilla;
 }
 
+/**
+ * Planilla de una fecha concreta (día-jornada YYYY-MM-DD).
+ * No crea planilla vacía si no existe — útil para historial / ayer vs hoy.
+ */
+export async function getPlanillaByFecha(
+  userId: string,
+  fecha: string
+): Promise<Planilla | null> {
+  const local = getLocalPlanilla(fecha);
+
+  if (isFirebaseConfigured() && db) {
+    try {
+      const path = getPrivatePath(userId, "planillas");
+      const q = query(collection(db, path), where("fecha", "==", fecha));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        const fbSegmentos = (data.segmentos || []) as SegmentoV5[];
+        const segmentos =
+          local?.segmentos?.length
+            ? mergePlanillaSegmentosWithLocal(fbSegmentos, local.segmentos)
+            : fbSegmentos;
+        const planilla: Planilla = {
+          id: snapshot.docs[0].id,
+          fecha: data.fecha,
+          segmentos,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+        saveLocalPlanilla(planilla);
+        return planilla;
+      }
+    } catch (error) {
+      console.error("Error getting planilla by fecha from Firebase:", error);
+    }
+  }
+
+  return local;
+}
+
 /** Guarda primero en el dispositivo; la nube se sincroniza en segundo plano. */
 export async function savePlanilla(userId: string, planilla: Planilla): Promise<boolean> {
   planilla.updatedAt = new Date().toISOString();
