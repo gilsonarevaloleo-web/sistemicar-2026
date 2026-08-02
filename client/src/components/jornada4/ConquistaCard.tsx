@@ -182,11 +182,26 @@ export function ConquistaCard({
               >
                 Desglosador
               </span>
+              {vehicle.ancladoAlSegmento === true ? (
+                <span
+                  className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase"
+                  style={{
+                    backgroundColor: "rgba(249,115,22,0.18)",
+                    color: NARANJA,
+                  }}
+                  data-testid="j4-conquista-anclado-badge"
+                >
+                  Anclado
+                </span>
+              ) : null}
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
               {`Desglosador · secuencia · ${conquistaProgressLabel(vehicle)}`}
               {profundidadPotencial > 0
                 ? ` · profundidad ${profundidadGanada}/${profundidadPotencial} PS`
+                : ""}
+              {vehicle.ancladoAlSegmento === true
+                ? " · no cruza su segmento"
                 : ""}
             </p>
           </div>

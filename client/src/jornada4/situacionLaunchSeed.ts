@@ -21,6 +21,8 @@ export function buildSituacionRingSeed(opts: {
   horaFinMs?: number;
   /** Proyecto / centro vinculado (enfoque del ring / default). */
   proyectoEnfoqueId?: string;
+  /** Contrato opt-in: entrenamiento de enfoque serio. */
+  modoEntrenamiento?: boolean;
 }): SituacionRingSeed | null {
   const now = opts.now ?? Date.now();
   const filas = opts.filas.map(f => f.trim()).filter(Boolean);
@@ -65,6 +67,7 @@ export function buildSituacionRingSeed(opts: {
       saldoAdelantoMin: 0,
       depthBlockPsGranted: 0,
       ...(proyectoEnfoqueId ? { proyectoEnfoqueId } : {}),
+      ...(opts.modoEntrenamiento === true ? { modoEntrenamiento: true } : {}),
     },
     situacionCupoAnchor: { subTareaId: firstId, startedAt: now },
   };

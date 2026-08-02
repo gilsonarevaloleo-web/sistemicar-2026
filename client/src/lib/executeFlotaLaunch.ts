@@ -105,6 +105,8 @@ export type FlotaLaunchForm = {
     situacionCronometro: Vehicle["situacionCronometro"] | null;
     situacionCupoAnchor: Vehicle["situacionCupoAnchor"] | null;
   };
+  /** Opt-in: desglosador anclado a su segmento (planes superiores). */
+  ancladoAlSegmento?: boolean;
 };
 
 export type ExecuteFlotaLaunchParams = {
@@ -270,6 +272,9 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,
       segmentosCruzados: 0,
+      ...(tipoFlota === "tiempo" && form.ancladoAlSegmento === true
+        ? { ancladoAlSegmento: true }
+        : {}),
     };
 
     const optimisticVehicle = buildOptimisticVehicleShell(

@@ -24,6 +24,12 @@ import {
   applySituacionBlockClose,
 } from "@/jornada4/situacionKernel";
 import {
+  applySituacionDistraccionFail,
+  applySituacionSustituirFoco,
+  ENTRENAMIENTO_COPY,
+  isRingModoEntrenamiento,
+} from "@/jornada4/entrenamientoRestricciones";
+import {
   awardConquistaSubPs,
   awardConquistaCyclePs,
   awardSituacionFilaPs,
@@ -337,6 +343,13 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
+        if (status === "avance" && isRingModoEntrenamiento(vehicle)) {
+          toast.info(ENTRENAMIENTO_COPY.avanceBloqueado, {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
+            duration: 2800,
+          });
+          return;
+        }
         const patch = applySituacionRowClose(vehicle, subTareaId, status);
         if (!patch) return;
 
@@ -983,6 +996,158 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle]
   );
 
+  /** Sustituye la fila en foco (solo modo entrenamiento). Paint ms0 + sombra. */
+  const sustituirSituacionFoco = useCallback(
+    (vehicleId: string, newFocusId: string) => {
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle) return;
+      const patch = applySituacionSustituirFoco(vehicle, newFocusId);
+      if (!patch) return;
+      paintVehicle(vehicleId, {
+        subTareas: patch.subTareas,
+        situacionCupoAnchor: patch.situacionCupoAnchor,
+      });
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      toast.info(ENTRENAMIENTO_COPY.sustituirFoco, {
+        description: `Ahora: ${patch.nuevoFocoTexto}`,
+        style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
+        duration: 2200,
+      });
+      if (!userId) return;
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            vehicleId,
+            {
+              subTareas: patch.subTareas,
+              situacionCupoAnchor: patch.situacionCupoAnchor,
+            },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[jornada4.sustituirSituacionFoco]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  /** Auto-fallado por distracción (pestaña oculta). Reusa paint ms0 del ring. */
+  const failSituacionDistraccion = useCallback(
+    async (vehicleId: string) => {
+      if (!userId) return;
+      const key = `dist:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle) return;
+        const patch = applySituacionDistraccionFail(vehicle);
+        if (!patch) return;
+
+        paintVehicle(vehicleId, {
+          subTareas: patch.subTareas,
+          situacionCupoAnchor: patch.situacionCupoAnchor,
+          situacionCronometro: patch.situacionCronometro,
+        });
+        flushLaunchPersistOnSubClose(vehicleId);
+        await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        toast.error(ENTRENAMIENTO_COPY.perdidaDistraccion, {
+          description:
+            patch.minutosPerdidos > 0
+              ? `${patch.closedSubTexto} · −${patch.minutosPerdidos} min`
+              : patch.closedSubTexto,
+          duration: 3200,
+          style: {
+            backgroundColor: PIZARRA,
+            border: `1px solid ${BLOOD}`,
+            color: BLOOD,
+          },
+        });
+        if (patch.bloqueListo) {
+          toast.message("Ring listo — cierra el bloque", { duration: 3200 });
+        }
+
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              {
+                subTareas: patch.subTareas,
+                situacionCupoAnchor: patch.situacionCupoAnchor,
+                situacionCronometro: patch.situacionCronometro,
+              },
+              { skipLocalSync: true }
+            );
+          } catch (e) {
+            console.error("[jornada4.failSituacionDistraccion]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  /** Archiva desglosador anclado que cruzó su segmento (sin cascada de celebración). */
+  const archiveAncladoPorSegmento = useCallback(
+    async (vehicleId: string) => {
+      if (!userId) return;
+      const key = `anc:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || vehicle.status !== "activo") return;
+        if (vehicle.ancladoAlSegmento !== true) return;
+
+        const cierreAt = Date.now();
+        const aperturaAt = vehicle.aperturaAt || vehicle.createdAt?.getTime() || cierreAt;
+        const duracionFinal = Math.max(1, Math.round((cierreAt - aperturaAt) / 60000));
+        const patch = {
+          status: "archivado" as const,
+          cierreAt,
+          duracionFinal,
+          cierreManual: false,
+          interrupcionActiva: false,
+          desglosadorPausa: undefined,
+        };
+
+        notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+        paintVehicle(vehicleId, patch);
+        await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current);
+
+        toast.error(ENTRENAMIENTO_COPY.cierreAnclado, {
+          description: `${vehicle.titulo} · no puede pasar su segmento`,
+          duration: 4500,
+          style: {
+            backgroundColor: PIZARRA,
+            border: `1px solid ${BLOOD}`,
+            color: BLOOD,
+          },
+        });
+
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+          } catch (e) {
+            console.error("[jornada4.archiveAncladoPorSegmento]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
   const pausaInterrupcion = useCallback(
     async (vehicleId: string, tituloInterrupcion: string) => {
       if (!userId || !tituloInterrupcion.trim()) return;
@@ -1279,6 +1444,9 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     setSituacionCupo,
     reorderConquistaSubs,
     reorderSituacionFilas,
+    sustituirSituacionFoco,
+    failSituacionDistraccion,
+    archiveAncladoPorSegmento,
     pausaInterrupcion,
     resumeDesglosador,
     closeExpressVehicle,

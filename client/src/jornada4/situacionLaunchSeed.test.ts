@@ -21,4 +21,14 @@ describe("situacionLaunchSeed", () => {
   it("rechaza sin filas", () => {
     assert.equal(buildSituacionRingSeed({ filas: ["  "], minutosBloque: 20 }), null);
   });
+
+  it("sella modoEntrenamiento cuando se pide", () => {
+    const seed = buildSituacionRingSeed({
+      filas: ["A"],
+      minutosBloque: 15,
+      modoEntrenamiento: true,
+    });
+    assert.ok(seed);
+    assert.equal(seed!.situacionCronometro.modoEntrenamiento, true);
+  });
 });

@@ -63,6 +63,7 @@ export function buildSituacionCronometroPausaInactividad(
         ? { horaFinMs: sc.horaFinMs, horaFinContratoMs: sc.horaFinMs }
         : {}),
     ...(sc.proyectoEnfoqueId ? { proyectoEnfoqueId: sc.proyectoEnfoqueId } : {}),
+    ...(sc.modoEntrenamiento === true ? { modoEntrenamiento: true } : {}),
   };
 }
 

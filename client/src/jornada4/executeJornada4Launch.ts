@@ -38,6 +38,10 @@ export type Jornada4LaunchForm = FlotaLaunchForm & {
   tareasIndependientes?: DesglosadorSubFormRow[];
   /** Si true con tareasIndependientes: lanzar N desglosadores 1-sub. */
   conquistaComoIndependientes?: boolean;
+  /** Opt-in ring: entrenamiento de enfoque serio (Soberanía). */
+  modoEntrenamientoRing?: boolean;
+  /** Opt-in conquista: desglosador anclado al segmento (Operativo). */
+  ancladoAlSegmento?: boolean;
 };
 
 export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form"> & {
@@ -61,6 +65,8 @@ export async function executeJornada4Launch(
     situacionObjetivoHora,
     tareasIndependientes,
     conquistaComoIndependientes,
+    modoEntrenamientoRing,
+    ancladoAlSegmento,
     ...baseForm
   } = form;
 
@@ -99,6 +105,7 @@ export async function executeJornada4Launch(
             : baseForm.proyectoId?.trim()
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
+          ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
       if (!id) break;
@@ -169,6 +176,7 @@ export async function executeJornada4Launch(
             : baseForm.proyectoId?.trim()
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
+          ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
       if (!id) break;
@@ -215,6 +223,7 @@ export async function executeJornada4Launch(
       now,
       horaFinMs: contratoMs ?? undefined,
       proyectoEnfoqueId,
+      modoEntrenamiento: modoEntrenamientoRing === true,
     });
     if (seed) {
       situacionLaunchSeed = {
@@ -253,6 +262,9 @@ export async function executeJornada4Launch(
       ...baseForm,
       titulo: situacionTitulo,
       ...(situacionLaunchSeed ? { situacionLaunchSeed } : {}),
+      ...(baseForm.tipoFlota === "tiempo" && ancladoAlSegmento === true
+        ? { ancladoAlSegmento: true }
+        : {}),
     },
   });
   if (!id) return null;

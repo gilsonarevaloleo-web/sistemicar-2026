@@ -19,6 +19,7 @@ import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
 import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
+import { useJornada4EntrenamientoGuard } from "@/hooks/useJornada4EntrenamientoGuard";
 import { useSegmentoProyectoVinculo } from "@/hooks/useSegmentoProyectoVinculo";
 import {
   executeJornada4Launch,
@@ -86,6 +87,13 @@ export default function JornadaV4Session() {
     safeAwardPS: core.safeAwardPS,
     segmentoActivo: planillaApi.segmentoActivo,
   });
+  useJornada4EntrenamientoGuard({
+    enabled: Boolean(user),
+    vehiclesRef: core.vehiclesRef,
+    planilla: planillaApi.planilla,
+    failSituacionDistraccion: ops.failSituacionDistraccion,
+    archiveAncladoPorSegmento: ops.archiveAncladoPorSegmento,
+  });
   const crisol = useJornada4Crisol({
     userId: user?.uid,
     vehiclesRef: core.vehiclesRef,
@@ -95,6 +103,10 @@ export default function JornadaV4Session() {
     segmentoActivo: planillaApi.segmentoActivo,
     proyectosHub,
   });
+
+  // Ring entrenamiento → Norte; anclar desglosador → Ritmo (mismo stack comercial).
+  const canModoEntrenamientoRing = entitlements.hasNorte;
+  const canAnclarDesglosadorSegmento = entitlements.hasRitmo;
 
   // Un gesto desbloquea AudioContext (móvil) para que el timbre de puerta suene.
   useEffect(() => {
@@ -279,6 +291,8 @@ export default function JornadaV4Session() {
               }
               canSituacion={entitlements.hasRitmo}
               canProyectos={entitlements.hasNorte}
+              canModoEntrenamientoRing={canModoEntrenamientoRing}
+              canAnclarDesglosadorSegmento={canAnclarDesglosadorSegmento}
             />
             <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
           </div>
