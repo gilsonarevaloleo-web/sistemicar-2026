@@ -96,4 +96,15 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /useJornada4SegmentAttention/);
     assert.match(session, /computePuertaPanorama/);
   });
+
+  it("sesión difería Plan/Métricas (sin Pulso/recharts en el chunk Operar)", () => {
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    assert.match(session, /Jornada4PlanTab/);
+    assert.match(session, /Jornada4MetricasTab/);
+    assert.equal(session.includes('from "@/hooks/usePulsoCobertura"'), false);
+    assert.equal(session.includes('from "@/components/jornada4/Jornada4Boveda"'), false);
+    assert.equal(session.includes('from "recharts"'), false);
+    // Toasts sí; tick UI de badges no (false = sin setState root cada 1s).
+    assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
+  });
 });

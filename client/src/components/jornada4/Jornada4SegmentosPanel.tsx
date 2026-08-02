@@ -87,6 +87,7 @@ export function Jornada4SegmentosPanel({
   notifPermission = "default",
 }: Props) {
   const [open, setOpen] = useState(true);
+  const [loadingRutinaId, setLoadingRutinaId] = useState<string | null>(null);
   const [showCrear, setShowCrear] = useState(false);
   const [showRutinas, setShowRutinas] = useState(false);
   const [showGuardar, setShowGuardar] = useState(false);
@@ -496,8 +497,21 @@ export function Jornada4SegmentosPanel({
                         </div>
                         <button
                           type="button"
-                          onClick={() => void onCargarRutina(r)}
-                          className="px-2 py-1.5 rounded-lg text-[8px] font-black uppercase"
+                          disabled={loadingRutinaId === r.id}
+                          onClick={() => {
+                            if (loadingRutinaId) return;
+                            setLoadingRutinaId(r.id);
+                            void Promise.resolve(onCargarRutina(r))
+                              .then(ok => {
+                                if (ok) setShowRutinas(false);
+                              })
+                              .finally(() => {
+                                setLoadingRutinaId(current =>
+                                  current === r.id ? null : current
+                                );
+                              });
+                          }}
+                          className="px-2 py-1.5 rounded-lg text-[8px] font-black uppercase disabled:opacity-60"
                           style={{
                             color: GOLD,
                             border: `1px solid ${GOLD}40`,
@@ -505,7 +519,7 @@ export function Jornada4SegmentosPanel({
                           }}
                           data-testid={`jornada4-cargar-rutina-${r.id}`}
                         >
-                          Cargar
+                          {loadingRutinaId === r.id ? "Cargando…" : "Cargar"}
                         </button>
                         <button
                           type="button"

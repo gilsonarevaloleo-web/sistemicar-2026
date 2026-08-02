@@ -355,7 +355,10 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
 
   const cargarRutina = useCallback(
     async (plantilla: PlantillaRutina) => {
-      if (!userId) return false;
+      if (!userId) {
+        toast.error("Inicia sesión para cargar la rutina");
+        return false;
+      }
       try {
         const next = await applyPlantillaToday(userId, plantilla);
         setPlanilla(next);

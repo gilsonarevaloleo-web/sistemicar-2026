@@ -1,6 +1,8 @@
 import type { SegmentoV5, SubTarea, Vehicle } from "./persistence";
 import {
+  getPeldanosByProyecto,
   getPeldanosByProyectoLocal,
+  getProyectoById,
   updatePeldano,
   upsertPeldanoDesdeSegmento,
   refreshProyectoStatsPublic,
@@ -14,7 +16,6 @@ import {
   refreshClaridadPaso1,
   resolveClaridadParaProyecto,
 } from "./claridadDireccion";
-import { getProyectoById } from "./proyectos";
 import { inferFaseAtencional, computeResistenciaDia } from "./termodinamicaAtencional";
 import type { FocusBandEvent } from "./focusBandLedger";
 

@@ -64,8 +64,10 @@ export function subscribeJornada4Tick(listener: Listener): () => void {
   };
 }
 
-/** Forzar un tick (p. ej. tras paint ms0 de cierre). */
-export function burstJornada4Tick(): void {
+let burstRaf: number | null = null;
+
+function flushBurst(): void {
+  burstRaf = null;
   listeners.forEach(fn => {
     try {
       fn();
@@ -73,4 +75,17 @@ export function burstJornada4Tick(): void {
       /* ignore */
     }
   });
+}
+
+/**
+ * Forzar un tick (p. ej. tras paint ms0 de cierre / inyección Crisol).
+ * Coalescido en rAF: varios paints en el mismo frame → un solo fan-out.
+ */
+export function burstJornada4Tick(): void {
+  if (typeof requestAnimationFrame !== "function") {
+    flushBurst();
+    return;
+  }
+  if (burstRaf != null) return;
+  burstRaf = requestAnimationFrame(flushBurst);
 }

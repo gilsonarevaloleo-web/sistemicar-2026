@@ -249,11 +249,17 @@ function isLocalOnlyReservaId(reservaId: string): boolean {
   return reservaId.startsWith("reserva_");
 }
 
-function saveAllLocalReserva(items: SituacionReservaItem[]): boolean {
+function saveAllLocalReserva(
+  items: SituacionReservaItem[],
+  opts?: { silent?: boolean }
+): boolean {
   items = dedupeReservasItems(items);
   const persist = (list: SituacionReservaItem[]) => {
     const ok = safeSetItem(STORAGE_KEY, JSON.stringify(list));
-    if (ok) window.dispatchEvent(new CustomEvent(SITUACION_RESERVA_EVENT));
+    // silent: el caller ya notifica (p. ej. onSnapshot → onData) — evita doble setState.
+    if (ok && !opts?.silent) {
+      window.dispatchEvent(new CustomEvent(SITUACION_RESERVA_EVENT));
+    }
     return ok;
   };
 
@@ -383,7 +389,8 @@ export function subscribeToSituacionReserva(
         const merged = mergeReservaRemoteWithLocalPending(userId, data);
         deactivateSovereignModeGlobal();
         const others = getAllLocalReserva().filter(i => i.userId !== userId);
-        saveAllLocalReserva([...others, ...merged]);
+        // silent: onData abajo ya actualiza React; el event provocaba doble paint en Crisol.
+        saveAllLocalReserva([...others, ...merged], { silent: true });
         backupToLocal("situacionReserva", merged);
         onData(merged);
       },
