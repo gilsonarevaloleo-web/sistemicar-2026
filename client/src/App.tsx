@@ -7,7 +7,7 @@ import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
-import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess } from "@/lib/persistence";
+import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess } from "@/lib/persistence";
 import {
   consumePreviewOpsQueryUnlock,
   isPreviewOpsUnlocked,
@@ -172,6 +172,7 @@ function ModuleRoute({
     if (ownerBypass || previewBypass || isPreviewOpsUnlocked()) return true;
     const args = [prog?.subscriptionPlan, user?.email, prog?.rank, prog?.activeModules] as const;
     if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
+    if (requiredModule === "operativo") return hasOperativoAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
     return false;
   };

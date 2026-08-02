@@ -26,8 +26,8 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     color: GOLD,
     rutas: [
       { path: "/menu", nombre: "Menú Principal", desc: "Panel central de navegación", icon: Home, color: GOLD, acceso: "usuario" },
-      { path: "/jornada-v4", nombre: JORNADA_MODULE.title, desc: `${JORNADA_MODULE.tagline} — requiere Planificación Base`, icon: Zap, color: ORANGE, acceso: "planificacion_base" },
-      { path: "/proyectos", nombre: "Proyectos y Peldaños", desc: "Hub anti-planificación — requiere Soberanía del día", icon: Layers, color: "#38BDF8", acceso: "soberania_dia" },
+      { path: "/jornada-v4", nombre: JORNADA_MODULE.title, desc: `${JORNADA_MODULE.tagline} — Jornada Base (Conquista + PS)`, icon: Zap, color: ORANGE, acceso: "planificacion_base" },
+      { path: "/proyectos", nombre: "Proyectos y Peldaños", desc: "Hub — requiere Norte (peldaño alto valor)", icon: Layers, color: "#38BDF8", acceso: "soberania_dia" },
       { path: "/espejo", nombre: "Espejo Soberano", desc: "El Corazón Sabio™ — $17 pago único", icon: Heart, color: "#ef4444", acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
@@ -96,9 +96,9 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
 const ACCESO_LABELS: Record<string, { label: string; color: string }> = {
   libre: { label: "LIBRE", color: EMERALD },
   usuario: { label: "USUARIO", color: BLUE },
-  planificacion_base: { label: "PLAN BASE", color: GOLD },
-  soberania_dia: { label: "SOBERANÍA DÍA", color: "#38BDF8" },
-  operativo: { label: "OPERATIVO", color: "#00C851" },
+  planificacion_base: { label: "JORNADA BASE", color: GOLD },
+  soberania_dia: { label: "NORTE", color: "#38BDF8" },
+  operativo: { label: "RITMO", color: "#00C851" },
   en_camino: { label: "EN CAMINO", color: "#64748b" },
 };
 

@@ -1,4 +1,9 @@
 /** Planes de suscripción y API usados por Mercado Pago (servidor Node y función Vercel). */
+import {
+  PLANIFICACION_CHECKOUT_ORDER,
+  PLANIFICACION_SKU_BY_ID,
+} from "./planificacionPricing";
+
 export const SUBSCRIPTION_PLANS = {
   "corazon-sabio": {
     id: "corazon-sabio",
@@ -8,23 +13,23 @@ export const SUBSCRIPTION_PLANS = {
     espejoCredits: 10,
   },
   "soberania-mental": { id: "soberania-mental", name: "Soberanía Mental", price: 9.99 },
-  /** Planificación — suscripción base mensual */
+  /** Jornada Base — vehículos + PS + Conquista */
   planificacion_base: {
     id: "planificacion_base",
-    name: "Planificación Base",
-    price: 19.99,
+    name: PLANIFICACION_SKU_BY_ID.planificacion_base.name,
+    price: PLANIFICACION_SKU_BY_ID.planificacion_base.priceUsd,
   },
-  /** Desglosador Enfoque + Hub Proyectos */
+  /** Norte — Crisol + Hub (id legacy soberania_dia) */
   soberania_dia: {
     id: "soberania_dia",
-    name: "Soberanía del día",
-    price: 29.99,
+    name: PLANIFICACION_SKU_BY_ID.soberania_dia.name,
+    price: PLANIFICACION_SKU_BY_ID.soberania_dia.priceUsd,
   },
-  /** Desglosador Conquista (producción) */
+  /** Ritmo del día — segmentos + Situacional (id legacy operativo) */
   operativo: {
     id: "operativo",
-    name: "Operativo",
-    price: 39.99,
+    name: PLANIFICACION_SKU_BY_ID.operativo.name,
+    price: PLANIFICACION_SKU_BY_ID.operativo.priceUsd,
   },
   /** Legacy — grandfather / webhooks antiguos (no checkout UI) */
   arquitecto: { id: "arquitecto", name: "Arquitecto", price: 24.99, legacy: true },
@@ -48,11 +53,7 @@ export const SUBSCRIPTION_PLANS = {
 
 export type SubscriptionPlanId = keyof typeof SUBSCRIPTION_PLANS;
 
-/** Planes visibles en checkout de Planificación (mensual). */
-export const PLANIFICACION_CHECKOUT_PLANS = [
-  "planificacion_base",
-  "soberania_dia",
-  "operativo",
-] as const;
+/** Planes visibles en checkout de Planificación (mensual) — orden psicológico. */
+export const PLANIFICACION_CHECKOUT_PLANS = PLANIFICACION_CHECKOUT_ORDER;
 
 export type PlanificacionCheckoutPlanId = (typeof PLANIFICACION_CHECKOUT_PLANS)[number];

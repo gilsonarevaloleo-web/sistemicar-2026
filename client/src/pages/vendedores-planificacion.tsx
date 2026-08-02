@@ -208,7 +208,7 @@ export default function VendedoresPlanificacion() {
             {ESCALERA_INTEGRACION}
           </p>
           <p className="text-[9px] text-purple-400/80 mt-2">
-            Badge <strong>Puente</strong> en app = presencia alta pero pocas decisiones (parálisis con tiempo cubierto). Momento ideal para hablar del peldaño 2 Operativo.
+            Badge <strong>Puente</strong> en app = presencia alta pero pocas decisiones. Momento ideal para hablar del peldaño 2 Ritmo (segmentos + Situacional).
           </p>
         </section>
 
@@ -234,7 +234,7 @@ export default function VendedoresPlanificacion() {
             ))}
           </div>
           <p className="text-[9px] text-slate-600 mt-3 italic">
-            Operativo (peldaño 2) antes que Soberanía (peldaño 3): primero medir, después ordenar pensamientos.
+            Ritmo (peldaño 2) antes que Norte (peldaño 3): primero medir unidades, después horizonte/proyectos.
           </p>
         </section>
 
@@ -252,7 +252,7 @@ export default function VendedoresPlanificacion() {
             {Math.round(SELLER_COMMISSION_RATE * 100)}% cada mes que el cliente pague
           </p>
           <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-            Recurrente en suscripciones Base, Operativo y Soberanía. Si cancela, deja de generarse comisión. Espejo ($17 único) ~$5.10 una vez — no recurrente.
+            Recurrente en suscripciones Base, Ritmo y Norte. Si cancela, deja de generarse comisión. Espejo ($17 único) ~$5.10 una vez — no recurrente.
           </p>
         </section>
 
