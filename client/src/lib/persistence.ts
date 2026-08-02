@@ -43,6 +43,8 @@ import {
   isOrphanDesglosadorInterrupt,
   archiveOrphanDesglosadorInterrupts,
 } from "./situacionSessionMerge";
+import { upgradeActiveSessionsFromSources } from "./flotaResume";
+import { getFlotaMemoryVehicles } from "./flotaMemoryBridge";
 import { getJournalDateString, getJournalDayStartMs, getNextJournalDayStartMs } from "./segmentTime";
 import {
   isGhostActiveVehicle,
@@ -782,12 +784,43 @@ function readParkedActivesRaw(): string | null {
   }
 }
 
-/** Guarda activos al ir a segundo plano (session + localStorage durable). */
+/**
+ * Guarda activos al ir a segundo plano (session + localStorage durable).
+ * Lista vacía NO borra el park durable: un remount/race no debe borrar
+ * ring/conquista aparcados. El clear explícito es clearParkedActiveVehicles /
+ * unpark por cierre.
+ */
 export function parkActiveVehiclesForResume(vehicles: Vehicle[]): void {
   const actives = vehicles.filter(
-    v => v.status === "activo" && !v.autoVerdad && !wasVehicleRecentlyClosed(v.id)
+    v =>
+      v.status === "activo" &&
+      !v.autoVerdad &&
+      !wasVehicleRecentlyClosed(v.id, v.clientRequestId)
   );
-  writeParkedActives(actives);
+  if (actives.length === 0) return;
+
+  // Conservar parked más rico si el incoming es shell lean del mismo id.
+  let toPark = actives;
+  try {
+    const prevRaw = readParkedActivesRaw();
+    if (prevRaw) {
+      const prev = parseParkedVehicles(prevRaw);
+      if (prev.length > 0) {
+        toPark = upgradeActiveSessionsFromSources(actives, prev);
+        // Mantener parked de otros ids aún activos que no vienen en este snapshot.
+        const incomingIds = new Set(actives.map(v => v.id));
+        for (const p of prev) {
+          if (incomingIds.has(p.id)) continue;
+          if (p.status !== "activo" || p.autoVerdad) continue;
+          if (wasVehicleRecentlyClosed(p.id, p.clientRequestId)) continue;
+          toPark.push(p);
+        }
+      }
+    }
+  } catch {
+    toPark = actives;
+  }
+  writeParkedActives(toPark);
 }
 
 function unparkVehicleOnClose(vehicleId: string): void {
@@ -1039,6 +1072,9 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
   // Per-ID tracking (not a global time window): only skip preservation for vehicle IDs
   // that were explicitly closed recently. A NEW vehicle created immediately after closing
   // another has a different ID and is always protected.
+  //
+  // También: nunca degradar ring/conquista rico → shell lean del mismo id
+  // (el preserve-by-missing-ID no cubría ese caso).
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const current = getLocalVehicles();
   vehicles = enforceLocalClosedOverrides(vehicles, current);
@@ -1061,6 +1097,14 @@ function flushLocalVehiclesNow(vehicles: Vehicle[]): boolean {
     console.warn(`[saveLocalVehicles] Preservando ${preserved.length} activo(s) no presentes en datos nuevos:`, preserved.map(v => `${v.id}:${v.titulo}`));
     vehicles = [...preserved, ...vehicles];
   }
+
+  // Upgrade in-place: disco + memoria + park pueden ser más ricos que el incoming.
+  const richnessSources = [
+    ...current,
+    ...getFlotaMemoryVehicles(),
+    ...getParkedActiveVehicles(),
+  ];
+  vehicles = upgradeActiveSessionsFromSources(vehicles, richnessSources);
 
   const nextSig = vehiclesReactiveSignature(vehicles);
   if (nextSig === lastWrittenVehiclesSig) {
@@ -1511,14 +1555,23 @@ export function subscribeToVehicles(
       });
 
       sortedWithSubs = mergeMissingLocalActives(sortedWithSubs);
+      const parkedActives = getParkedActiveVehicles().filter(
+        p => !wasVehicleRecentlyClosed(p.id, p.clientRequestId)
+      );
       sortedWithSubs = reconcileVehicleListView({
         incoming: sortedWithSubs,
         localSources: existingLocal,
-        parkedActives: getParkedActiveVehicles().filter(
-          p => !wasVehicleRecentlyClosed(p.id, p.clientRequestId)
-        ),
+        parkedActives,
         isCloseInFlight: options?.isCloseInFlight,
       });
+
+      // Memoria/park pueden tener ring/conquista que el merge FB↔disco aún no vio
+      // (launch gated, idle save pendiente, celular lento).
+      sortedWithSubs = upgradeActiveSessionsFromSources(sortedWithSubs, [
+        ...existingLocal,
+        ...parkedActives,
+        ...getFlotaMemoryVehicles(),
+      ]);
 
       // Persist the merged result locally (always save the fullest result)
       if (sortedWithSubs.length > 0) {

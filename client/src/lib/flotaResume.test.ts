@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import type { Vehicle } from "./persistence.ts";
 import {
   diskSessionRicherThanMemory,
+  pickRicherActiveVehicle,
   rehydrateFlotaFromDiskSources,
+  upgradeActiveSessionsFromSources,
 } from "./flotaResume.ts";
 
 function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
@@ -46,6 +48,85 @@ describe("flotaResume", () => {
     });
     assert.equal(diskSessionRicherThanMemory(memory, disk), true);
     assert.equal(diskSessionRicherThanMemory(disk, memory), false);
+  });
+
+  it("detecta shell conquista vs desglosador con unidades", () => {
+    const memory = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+    });
+    const disk = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        {
+          id: "u1",
+          titulo: "Unidad 1",
+          status: "activo",
+          aperturaAt: 100,
+        },
+        {
+          id: "u2",
+          titulo: "Unidad 2",
+          status: "pendiente",
+        },
+      ] as Vehicle["subVehiculos"],
+    });
+    assert.equal(diskSessionRicherThanMemory(memory, disk), true);
+  });
+
+  it("upgradeActiveSessionsFromSources no deja shell lean pisar ring", () => {
+    const lean = [v({ id: "r1", titulo: "Ring shell" })];
+    const rich = [
+      v({
+        id: "r1",
+        titulo: "Ring shell",
+        situacionCronometro: {
+          activo: true,
+          bloqueInicioAt: 50,
+          horaFinMs: 50 + 20 * 60_000,
+        },
+        subTareas: [
+          {
+            id: "st1",
+            texto: "A",
+            completada: false,
+            creadaAt: 50,
+            enDesgloseCronometro: true,
+            minutosCupo: 10,
+          },
+        ],
+      }),
+    ];
+    const upgraded = upgradeActiveSessionsFromSources(lean, rich);
+    assert.equal(upgraded[0]!.situacionCronometro?.activo, true);
+    assert.equal(upgraded[0]!.subTareas?.length, 1);
+  });
+
+  it("pickRicherActiveVehicle prefiere memoria con progreso conquista", () => {
+    const lean = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        { id: "u1", titulo: "A", status: "pendiente" },
+        { id: "u2", titulo: "B", status: "pendiente" },
+      ] as Vehicle["subVehiculos"],
+    });
+    const progress = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        { id: "u1", titulo: "A", status: "cumplido", cierreAt: 200 },
+        { id: "u2", titulo: "B", status: "activo", aperturaAt: 200 },
+      ] as Vehicle["subVehiculos"],
+    });
+    const picked = pickRicherActiveVehicle(lean, progress);
+    assert.equal(picked.subVehiculos?.[0]?.status, "cumplido");
+    assert.equal(picked.subVehiculos?.[1]?.status, "activo");
   });
 
   it("rehydrate actualiza shell en memoria con ring de disco", () => {
@@ -125,6 +206,48 @@ describe("flotaResume", () => {
     assert.equal(result.changed, true);
     assert.deepEqual(result.addedIds, ["r2"]);
     assert.equal(result.next.length, 1);
+  });
+
+  it("rehydrate recupera conquista desde parked cuando local es shell", () => {
+    const now = Date.now();
+    const memory = [
+      v({
+        id: "c1",
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        titulo: "Conquista shell",
+      }),
+    ];
+    const parked = [
+      v({
+        id: "c1",
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        titulo: "Conquista",
+        aperturaAt: now - 30_000,
+        createdAt: new Date(now - 30_000),
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "U1",
+            status: "activo",
+            aperturaAt: now - 30_000,
+          },
+          { id: "u2", titulo: "U2", status: "pendiente" },
+        ] as Vehicle["subVehiculos"],
+      }),
+    ];
+    const result = rehydrateFlotaFromDiskSources({
+      memory,
+      local: memory,
+      parked,
+      nowMs: now,
+      dayStartMs: now - 8 * 3600_000,
+      wasRecentlyClosed: () => false,
+    });
+    assert.equal(result.changed, true);
+    assert.equal(result.next[0]!.subVehiculos?.length, 2);
+    assert.equal(result.next[0]!.subVehiculos?.[0]?.status, "activo");
   });
 
   it("no toca memoria si disco no es más rico", () => {

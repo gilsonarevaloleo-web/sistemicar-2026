@@ -17,7 +17,16 @@ function situacionSessionRichness(v: Vehicle): number {
   let score = 0;
   if (sc?.activo === true) score += 100;
   if (ringSessionOperable(sc, subs)) score += 50;
+  if (sc?.bloqueInicioAt != null) score += 20;
+  if ((sc?.horaFinContratoMs ?? sc?.horaFinMs ?? 0) > 0) score += 15;
+  if ((sc?.retosCompletados ?? 0) > 0) score += sc!.retosCompletados! * 8;
   score += subs.filter(st => st.enDesgloseCronometro).length * 10;
+  score += subs.filter(
+    st =>
+      st.completada ||
+      st.resultadoSituacion === "cumplido" ||
+      st.resultadoSituacion === "fallado"
+  ).length * 6;
   score += subs.length;
   if (v.situacionCupoAnchor?.subTareaId) score += 5;
   return score;
@@ -29,10 +38,20 @@ function conquistaSessionRichness(v: Vehicle): number {
   let score = subs.length * 10;
   score += subs.filter(s => s.status === "cumplido" || s.status === "fallado").length * 5;
   score += subs.filter(s => s.status === "activo").length * 3;
+  // Timestamps / pausa: mismo conteo de filas no implica misma sesión.
+  for (const s of subs) {
+    if (s.aperturaAt != null) score += 2;
+    if (s.cierreAt != null) score += 2;
+  }
+  if (v.interrupcionActiva) score += 8;
+  if (v.desglosadorPausa?.subActivoId) score += 8;
+  if ((v.desglosadorBloqueDepthPsGranted ?? 0) > 0) {
+    score += v.desglosadorBloqueDepthPsGranted!;
+  }
   return score;
 }
 
-/** Disco/parked más rico que memoria (shell sin ring, etc.). */
+/** Disco/parked/memoria más rico que el candidato (shell sin ring, etc.). */
 export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boolean {
   if (memory.id !== disk.id) return false;
   if (disk.status !== "activo" || memory.status !== "activo") return false;
@@ -40,6 +59,56 @@ export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boo
     situacionSessionRichness(disk) > situacionSessionRichness(memory) ||
     conquistaSessionRichness(disk) > conquistaSessionRichness(memory)
   );
+}
+
+/**
+ * Elige la sesión activa más rica entre candidatos del mismo id.
+ * Usado al escribir disco: un snapshot lean no debe pisar ring/conquista.
+ */
+export function pickRicherActiveVehicle(
+  base: Vehicle,
+  ...sources: Array<Vehicle | undefined | null>
+): Vehicle {
+  if (base.status !== "activo" || base.autoVerdad) return base;
+  let best = base;
+  for (const src of sources) {
+    if (!src || src.id !== best.id) continue;
+    if (src.status !== "activo" || src.autoVerdad) continue;
+    if (diskSessionRicherThanMemory(best, src)) {
+      best = mergeActiveVehicleSessionState(best, src);
+    }
+  }
+  return best;
+}
+
+/**
+ * Enriquece una lista entrante con sesiones más ricas de disco/memoria/park.
+ * No añade IDs nuevos — solo upgrade in-place de activos.
+ */
+export function upgradeActiveSessionsFromSources(
+  incoming: Vehicle[],
+  sources: Vehicle[]
+): Vehicle[] {
+  if (incoming.length === 0 || sources.length === 0) return incoming;
+  const byId = new Map<string, Vehicle>();
+  for (const s of sources) {
+    if (s.status !== "activo" || s.autoVerdad) continue;
+    const prev = byId.get(s.id);
+    if (!prev || diskSessionRicherThanMemory(prev, s)) {
+      byId.set(s.id, s);
+    }
+  }
+  if (byId.size === 0) return incoming;
+
+  let changed = false;
+  const next = incoming.map(v => {
+    if (v.status !== "activo" || v.autoVerdad) return v;
+    const richer = byId.get(v.id);
+    if (!richer || !diskSessionRicherThanMemory(v, richer)) return v;
+    changed = true;
+    return mergeActiveVehicleSessionState(v, richer);
+  });
+  return changed ? next : incoming;
 }
 
 export type RehydrateFlotaInput = {

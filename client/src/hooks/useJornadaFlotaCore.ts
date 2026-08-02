@@ -27,7 +27,10 @@ import { useFlotaMutator, useFlotaVehiclesShallow } from "@/hooks/useModularStor
 import { requestGhostReconcileAfterVehicleAction } from "@/lib/ghostReconcileScheduler";
 import { recordFocusBandEvent } from "@/lib/focusBandLedger";
 import { BLOOD, PIZARRA } from "@/components/flota/vehicleCardShared";
-import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
+import {
+  flushPendingSaveLocalVehicles,
+  scheduleSaveLocalVehicles,
+} from "@/lib/deferredVehicleSave";
 import { rehydrateFlotaFromDiskSources } from "@/lib/flotaResume";
 
 export type JornadaFlotaCore = {
@@ -92,8 +95,13 @@ export function useJornadaFlotaCore(options?: {
 
   useEffect(() => {
     if (!user) return;
-    /** Hide/kill: escritura síncrona — el debounce de 500ms pierde el ring si el OS mata la pestaña. */
+    /**
+     * Hide/kill: escritura síncrona.
+     * Orden: (1) vaciar idle pending, (2) flush flota, (3) park durable.
+     * El debounce 500ms + idle 8s pierden ring/conquista si el OS mata la pestaña.
+     */
     const flushToLocal = () => {
+      flushPendingSaveLocalVehicles();
       flushLocalVehicles(vehiclesRef.current);
       parkActiveVehiclesForResume(vehiclesRef.current);
     };
@@ -118,8 +126,15 @@ export function useJornadaFlotaCore(options?: {
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flushToLocal();
     };
+    /** bfcache (Safari/iOS): pagehide + pageshow persisted — sin esto el ring no vuelve. */
+    const onPageShow = (ev: PageTransitionEvent) => {
+      if (ev.persisted) {
+        rehydrateFlotaFromLocalRef.current?.();
+      }
+    };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flushToLocal);
+    window.addEventListener("pageshow", onPageShow);
     // Bus de retorno (debounce 800ms): recupera ring/conquista tras app-switch.
     const unsubReturn = onJornadaVisibilityReturn(() => {
       rehydrateFlotaFromLocalRef.current?.();
@@ -128,6 +143,7 @@ export function useJornadaFlotaCore(options?: {
       rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushToLocal);
+      window.removeEventListener("pageshow", onPageShow);
       unsubReturn();
     };
   }, [user, setVehicles]);
