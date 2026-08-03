@@ -1,6 +1,8 @@
 import { Link } from "wouter";
 import type { ReactNode } from "react";
 import { beginViewTransition } from "@/lib/viewTransitionShield";
+import { armDualKernelExitSoftStart } from "@/lib/dualKernelQuiet";
+import { isJornada4Path, isJornada4WindowPath } from "@/lib/jornadaBrand";
 
 type Props = {
   href: string;
@@ -16,6 +18,11 @@ export function NavTransitionLink({ href, children, className, onClick }: Props)
       href={href}
       className={className}
       onClick={() => {
+        // Soft-start ANTES del cambio de ruta: el latch compartido debe
+        // estar armado cuando Admin/Espejo montan en el mismo commit.
+        if (isJornada4WindowPath() && !isJornada4Path(href)) {
+          armDualKernelExitSoftStart();
+        }
         beginViewTransition();
         onClick?.();
       }}

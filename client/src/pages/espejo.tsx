@@ -70,6 +70,7 @@ import { enqueueJornadaVehicleIntent } from "@/lib/jornadaVehicleIntent";
 import { beginViewTransition } from "@/lib/viewTransitionShield";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useJornadaActiveVehicleIds } from "@/hooks/useModularStoreSelectors";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { getUserEmail } from "@/lib/firebase";
 import { isOwner } from "@/lib/owner";
 import { registrarEvento, COMPONENTES } from "@/lib/evento-universal";
@@ -365,6 +366,8 @@ export default function Espejo() {
   const { user, login } = useAuthContext();
   const [, navigate] = useLocation();
   useViewTransitionShield();
+  // Soft-start al venir de Dual Kernel (Ring→menú→Espejo): diferir Firebase.
+  const motorsQuiet = useDualKernelMotorsQuiet();
   useJornadaActiveVehicleIds(user?.uid);
   const [phase, setPhase] = useState<"landing" | "preparacion" | "arquitecto" | "historial" | "mapa">("landing");
   const [showPaywall, setShowPaywall] = useState(false);
@@ -483,56 +486,57 @@ export default function Espejo() {
     const accepted = localStorage.getItem(SOVEREIGNTY_ACCEPTED_KEY);
     if (accepted === "true") setSovereigntyAccepted(true);
     
-    if (user) {
-      const isOwnerAccess = user.email?.toLowerCase() === "gilsonarevalo.leo@gmail.com";
-      getMuroFirmado(user.uid).then((firmado) => {
-        if (firmado) setShowMuro(false);
-      }).catch(() => {});
-      if (isOwnerAccess) {
-        setProspectoVerificado(true);
-      } else {
-        const email = getUserEmail();
-        if (email) {
-          setVerificandoProspecto(true);
-          getProspectoByEmail(email).then((p) => {
-            setProspectoVerificado(!!p);
-            setVerificandoProspecto(false);
-          }).catch(() => {
-            setVerificandoProspecto(false);
-          });
-        }
-      }
+    // Diferir Firebase/red mientras dura soft-start Dual Kernel → Espejo.
+    if (!user || motorsQuiet) return;
 
-      const unsubProg = subscribeToProgression(
-        user.uid,
-        (prog: UserProgression) => {
-          setIsPremium(prog.rank === "arquitecto" || isOwnerAccess);
-          setUserSovereigntyPoints(prog.sovereigntyPoints || 0);
-          setPtsEspejo(prog.ptsEspejo || 0);
-        },
-        () => {}
-      );
-      const unsubSessions = subscribeToEspejoSessions(
-        user.uid,
-        (sessions) => setSesiones(sessions as any),
-        () => {}
-      );
-      const unsubCredits = subscribeToEspejoCredits(
-        user.uid,
-        (c) => setCredits(c),
-        () => {}
-      );
-      const unsubConviccion = subscribeToConviccion(
-        user.uid,
-        (level) => setConviccionCheck(level),
-        () => {}
-      );
-      return () => { unsubProg(); unsubSessions(); unsubCredits(); unsubConviccion(); };
+    const isOwnerAccess = user.email?.toLowerCase() === "gilsonarevalo.leo@gmail.com";
+    getMuroFirmado(user.uid).then((firmado) => {
+      if (firmado) setShowMuro(false);
+    }).catch(() => {});
+    if (isOwnerAccess) {
+      setProspectoVerificado(true);
+    } else {
+      const email = getUserEmail();
+      if (email) {
+        setVerificandoProspecto(true);
+        getProspectoByEmail(email).then((p) => {
+          setProspectoVerificado(!!p);
+          setVerificandoProspecto(false);
+        }).catch(() => {
+          setVerificandoProspecto(false);
+        });
+      }
     }
-  }, [user]);
+
+    const unsubProg = subscribeToProgression(
+      user.uid,
+      (prog: UserProgression) => {
+        setIsPremium(prog.rank === "arquitecto" || isOwnerAccess);
+        setUserSovereigntyPoints(prog.sovereigntyPoints || 0);
+        setPtsEspejo(prog.ptsEspejo || 0);
+      },
+      () => {}
+    );
+    const unsubSessions = subscribeToEspejoSessions(
+      user.uid,
+      (sessions) => setSesiones(sessions as any),
+      () => {}
+    );
+    const unsubCredits = subscribeToEspejoCredits(
+      user.uid,
+      (c) => setCredits(c),
+      () => {}
+    );
+    const unsubConviccion = subscribeToConviccion(
+      user.uid,
+      (level) => setConviccionCheck(level),
+      () => {}
+    );
+    return () => { unsubProg(); unsubSessions(); unsubCredits(); unsubConviccion(); };
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || motorsQuiet) return;
     let cancelled = false;
     (async () => {
       try {
@@ -551,13 +555,13 @@ export default function Espejo() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.uid]);
+  }, [user?.uid, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || user.email?.toLowerCase() !== "gilsonarevalo.leo@gmail.com") return;
+    if (!user || motorsQuiet || user.email?.toLowerCase() !== "gilsonarevalo.leo@gmail.com") return;
     const unsub = subscribeToPacientes(user.uid, setPacientesLista, () => {});
     return unsub;
-  }, [user]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
     if (!bloqueoEje3) return;
