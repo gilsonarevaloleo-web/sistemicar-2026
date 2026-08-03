@@ -1,6 +1,7 @@
 /**
  * Quiet Dual Kernel: pausa motores globales del App shell en `/jornada-v4`
- * y, al salir, aplica un soft-start para no colapsar el hilo al montar Espejo/etc.
+ * y, al salir, aplica un soft-start para no colapsar el hilo al montar
+ * Espejo, Admin u otros módulos (Menú hamburguesa incluido).
  */
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";

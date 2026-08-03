@@ -28,4 +28,16 @@ describe("dualKernelQuiet soft-start", () => {
     assert.equal(seg.includes("isJornada4Path(location)"), false);
     assert.equal(cen.includes("isJornada4Path(location)"), false);
   });
+
+  it("CierreJornada y AdminGilson usan soft-start (Ring→Menú→Admin)", () => {
+    const cierre = readFileSync(
+      join(dir, "../components/cierre-jornada-modal.tsx"),
+      "utf8"
+    );
+    const admin = readFileSync(join(dir, "../pages/admin-gilson.tsx"), "utf8");
+    assert.match(cierre, /useDualKernelMotorsQuiet/);
+    assert.match(admin, /useDualKernelMotorsQuiet/);
+    assert.equal(cierre.includes("isPlanificacion"), false);
+    assert.match(admin, /motorsQuiet/);
+  });
 });

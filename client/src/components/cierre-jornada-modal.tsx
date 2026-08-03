@@ -36,6 +36,7 @@ import BalanceConquistaPanel from "@/components/BalanceConquistaPanel";
 import { calcularBalanceConquistaJornada } from "@/engines/ConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
 import { shouldMountAutoCierreJornada } from "@/lib/jornadaConsciousGuard";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const GOLD = "#D4AF37";
 const PURPLE = "#A855F7";
@@ -75,9 +76,8 @@ interface CierreData {
 export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location] = useLocation();
-  const isPlanificacion =
-    location === "/jornada-v4" ||
-    location.startsWith("/jornada-v4?");
+  // Quiet en Dual Kernel + soft-start al salir (evita freeze Ring→Menú→Admin).
+  const motorsQuiet = useDualKernelMotorsQuiet();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cierreData, setCierreData] = useState<CierreData | null>(null);
@@ -93,9 +93,9 @@ export function CierreJornadaModal() {
   const [dailySovereigntyPoints, setDailySovereigntyPoints] = useState(0);
   const [dailyPointsLogs, setDailyPointsLogs] = useState<SovereigntyPointsLog[]>([]);
 
-  // Sin listeners en Dual Kernel (la UI ya no monta el modal ahí).
+  // Sin listeners en Dual Kernel ni durante soft-start al salir.
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     
     const unsubscribe = subscribeToDailyPoints(
       user.uid,
@@ -109,60 +109,60 @@ export function CierreJornadaModal() {
     );
     
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToEnergyLogs(
       user.uid,
       (data) => setEnergyLogs(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToAliados(
       user.uid,
       (data) => setAliados(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToAlquimiaEntries(
       user.uid,
       (data) => setAlquimias(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToProgression(
       user.uid,
       (data) => setProgression(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToVehicles(
       user.uid,
       (data) => setVehicles(data),
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   useEffect(() => {
-    if (!user || isPlanificacion) return;
+    if (!user || motorsQuiet) return;
     const unsubscribe = subscribeToPlanilla(
       user.uid,
       getLimaDateString(),
@@ -170,7 +170,7 @@ export function CierreJornadaModal() {
       (error) => console.error(error)
     );
     return unsubscribe;
-  }, [user, isPlanificacion]);
+  }, [user, motorsQuiet]);
 
   const todayVehicles = useMemo(
     () => filterVehiclesForAnilloCoverage(vehicles, Date.now()),
@@ -188,7 +188,7 @@ export function CierreJornadaModal() {
   );
 
   useEffect(() => {
-    if (isPlanificacion) return;
+    if (motorsQuiet) return;
     const checkTime = () => {
       const now = new Date();
       const hours = now.getHours();
@@ -205,7 +205,7 @@ export function CierreJornadaModal() {
     checkTime();
     const interval = setInterval(checkTime, 60000);
     return () => clearInterval(interval);
-  }, [hasClosed, user, isPlanificacion, vehicles, location]);
+  }, [hasClosed, user, motorsQuiet, vehicles, location]);
 
   const fetchCierreData = async () => {
     if (!user) return;
@@ -261,7 +261,7 @@ export function CierreJornadaModal() {
   const EjeIcon = cierreData?.ejeDebil ? AXIS_ICONS[cierreData.ejeDebil] || Target : Target;
   const ejeColor = cierreData?.ejeDebil ? AXIS_COLORS[cierreData.ejeDebil] || GOLD : GOLD;
 
-  if (isPlanificacion) return null;
+  if (motorsQuiet) return null;
 
   return (
     <AnimatePresence>
