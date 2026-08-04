@@ -5,7 +5,6 @@ import {
   bumpPlaneacionCrashCount,
   clearPlaneacionCrashCount,
   forceArchiveSituacionActivos,
-  getPlaneacionCrashCount,
   repairStuckSituacionVehicles,
 } from "@/lib/situacionRepair";
 import { flushLocalVehicles } from "@/lib/persistence";
@@ -68,7 +67,24 @@ export class AppErrorBoundary extends Component<Props, State> {
     window.location.href = path;
   }
 
-  private runPlaneacionRecovery(archiveSituacion: boolean) {
+  handleRecover = () => {
+    // Remount suave: nunca archivar por conteo de crashes.
+    try {
+      hardResetSpeechSystems(true);
+      teardownAllSituacionSessions();
+      repairStuckSituacionVehicles();
+      emergencyPruneStorage({ aggressive: false });
+      resetAnilloViewModeStorage();
+      flushLocalVehicles();
+      clearPlaneacionCrashCount();
+    } catch {
+      // ignore
+    }
+    this.reloadTo("/jornada-v4");
+  };
+
+  handleForceSituacion = () => {
+    // Emergencia explícita: archivar rings situacionales (no conquista ni su pausa).
     try {
       hardResetSpeechSystems(true);
       teardownAllSituacionSessions();
@@ -76,31 +92,11 @@ export class AppErrorBoundary extends Component<Props, State> {
       emergencyPruneStorage({ aggressive: true });
       resetAnilloViewModeStorage();
       flushLocalVehicles();
-    } catch {
-      // ignore
-    }
-    if (archiveSituacion) {
-      try {
-        forceArchiveSituacionActivos();
-      } catch {
-        // ignore
-      }
-    }
-    try {
+      forceArchiveSituacionActivos();
       clearPlaneacionCrashCount();
     } catch {
       // ignore
     }
-  }
-
-  handleRecover = () => {
-    const crashes = getPlaneacionCrashCount();
-    this.runPlaneacionRecovery(crashes >= 2);
-    this.reloadTo("/jornada-v4");
-  };
-
-  handleForceSituacion = () => {
-    this.runPlaneacionRecovery(true);
     this.reloadTo("/jornada-v4");
   };
 
@@ -126,17 +122,15 @@ export class AppErrorBoundary extends Component<Props, State> {
           <p className="text-xs uppercase tracking-widest text-slate-500">SISTEMICAR</p>
           <h1 className="text-lg font-bold text-white">Algo bloqueó la interfaz</h1>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Un vehículo de enfoque atascado puede provocar este bucle. Prueba la reparación
-            automática o cierra el desglosador en emergencia.
+            Suele pasar al volver de segundo plano. «Reparar» recarga la vista y conserva conquista
+            y rings abiertos. Solo usa emergencia si el ring situacional quedó irrecuperable.
           </p>
           {this.state.message && (
             <p className="text-[10px] text-slate-600 font-mono break-all px-2">{this.state.message}</p>
           )}
-          {this.state.crashCount >= 2 && (
-            <p className="text-[10px] text-amber-400/90 leading-snug">
-              Falló {this.state.crashCount} veces — al reparar se archivarán vehículos situación activos.
-            </p>
-          )}
+          <p className="text-[10px] text-emerald-400/90 leading-snug">
+            Reparar no archiva ni borra desglosadores activos.
+          </p>
           <button
             type="button"
             id="app-error-recover"
@@ -144,7 +138,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider"
             style={{ backgroundColor: "#D4AF37", color: "#000" }}
           >
-            Reparar y abrir Planificación
+            Reparar y abrir Jornada
           </button>
           <button
             type="button"
@@ -153,7 +147,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wider"
             style={{ backgroundColor: "rgba(239,68,68,0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.45)" }}
           >
-            Cerrar ring de enfoque (emergencia)
+            Cerrar ring situacional (emergencia)
           </button>
           <button
             type="button"

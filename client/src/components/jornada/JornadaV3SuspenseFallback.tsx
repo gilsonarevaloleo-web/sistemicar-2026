@@ -41,7 +41,7 @@ export function JornadaV3SuspenseFallback() {
         <div className="fixed bottom-20 left-0 right-0 z-50 px-4 max-w-lg mx-auto space-y-2">
           <BotonRepararJornada
             title="Reparar Jornada"
-            description="Recarga el chunk Dual Kernel."
+            description="Recarga el módulo Dual Kernel. Conquista y rings abiertos se conservan."
             compact
           />
         </div>

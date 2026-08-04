@@ -57,4 +57,34 @@ describe("situacionRepair", () => {
     assert.equal(v.status, "archivado");
     assert.equal(v.situacionCronometro, null);
   });
+
+  it("forceArchive no corta interrupción de conquista aún activa", () => {
+    localStorage.setItem(KEY, JSON.stringify([
+      {
+        id: "conq",
+        status: "activo",
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        aperturaAt: Date.now() - 120000,
+      },
+      {
+        id: "pause",
+        status: "activo",
+        tipoFlota: "situacion",
+        vehiculoPadreDesglosadorId: "conq",
+        aperturaAt: Date.now() - 60000,
+      },
+      {
+        id: "ring",
+        status: "activo",
+        tipoFlota: "situacion",
+        aperturaAt: Date.now() - 60000,
+      },
+    ]));
+    assert.equal(forceArchiveSituacionActivos(), 1);
+    const list = JSON.parse(localStorage.getItem(KEY)!);
+    assert.equal(list.find((x: { id: string }) => x.id === "pause").status, "activo");
+    assert.equal(list.find((x: { id: string }) => x.id === "ring").status, "archivado");
+    assert.equal(list.find((x: { id: string }) => x.id === "conq").status, "activo");
+  });
 });

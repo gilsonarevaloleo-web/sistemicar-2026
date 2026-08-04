@@ -37,6 +37,39 @@ export function isJournalStaleActiveVehicle(
 }
 
 /**
+ * Desglosador con trabajo real aún abierto (conquista o ring).
+ * Debe resistir ausencias largas: no es «fantasma» solo por edad.
+ */
+export function hasLiveDesglosadorWork(v: Vehicle): boolean {
+  if (v.status !== "activo" || v.autoVerdad) return false;
+
+  if (v.tipoFlota === "tiempo" && v.tipoReloj === "desglosador") {
+    const subs = v.subVehiculos ?? [];
+    if (subs.length === 0) return false;
+    if (v.interrupcionActiva || v.desglosadorPausa?.subActivoId) return true;
+    return subs.some(
+      s =>
+        s.status === "activo" ||
+        s.status === "pendiente" ||
+        s.status === "nested_paused"
+    );
+  }
+
+  if (v.tipoFlota === "situacion") {
+    const sc = v.situacionCronometro;
+    if (sc?.activo === true) return true;
+    const subs = v.subTareas ?? [];
+    return subs.some(
+      st =>
+        !!st.enDesgloseCronometro &&
+        (st.resultadoSituacion ?? "pendiente") === "pendiente"
+    );
+  }
+
+  return false;
+}
+
+/**
  * Vehículo consciente `activo` que no representa trabajo real en curso.
  * Bloquea entropía del anillo y al Centinela si no se filtra.
  */
@@ -50,15 +83,20 @@ export function isGhostActiveVehicle(
 
   const apertura = v.aperturaAt || (v.createdAt instanceof Date ? v.createdAt.getTime() : 0);
   if (apertura === 0) return true;
-  if (nowMs - apertura > GHOST_MAX_SESSION_MS) return true;
-  if (isJournalStaleActiveVehicle(apertura, nowMs, dayStartMs)) return true;
 
+  // Interrupción huérfana / padre cerrado — siempre fantasma.
   if (v.vehiculoPadreDesglosadorId) {
     const parent = vehiclesById?.get(v.vehiculoPadreDesglosadorId);
     if (!parent || parent.status !== "activo") return true;
   }
 
   if (vehiclesById && isOrphanDesglosadorInterrupt(v, vehiclesById)) return true;
+
+  // Conquista/ring con trabajo vivo: no cortar por 12h ni por cruce 05:00.
+  if (hasLiveDesglosadorWork(v)) return false;
+
+  if (nowMs - apertura > GHOST_MAX_SESSION_MS) return true;
+  if (isJournalStaleActiveVehicle(apertura, nowMs, dayStartMs)) return true;
 
   if (v.tipoFlota === "descanso") {
     const match = v.criterioDetalle?.match(/([\d.]+)\s*min/i);
@@ -127,6 +165,9 @@ export function shouldPreserveLocalActivo(v: Vehicle, nowMs: number, dayStartMs?
   if (v.status !== "activo" || v.autoVerdad) return false;
   const dayStart = dayStartMs ?? getJournalDayStartMs(nowMs);
   if (isGhostActiveVehicle(v, nowMs, dayStart)) return false;
+
+  // Desglosador con trabajo vivo: preservar tras ausencias largas / borde de jornada.
+  if (hasLiveDesglosadorWork(v)) return true;
 
   const apertura = v.aperturaAt || (v.createdAt instanceof Date ? v.createdAt.getTime() : 0);
   if (apertura >= dayStart) return true;
