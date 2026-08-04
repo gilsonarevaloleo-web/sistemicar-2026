@@ -27,7 +27,9 @@ import {
   desglosadorSubTimerUiFromClocks,
   formatHHMM,
   formatMMSS,
+  subSecPerUnit,
   suggestedSec,
+  sumDesglosadorUnitCycle,
 } from "@/lib/desglosadorClock";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import {
@@ -38,6 +40,7 @@ import {
   desglosadorProfundidadGanadaPs,
   desglosadorProfundidadPotencialPs,
 } from "@/jornada4/desglosadorProfundidad";
+import { projectProductsUntilMeta } from "@/jornada4/desglosadorProjection";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 
 const OK = "#00C851";
@@ -93,6 +96,18 @@ export function ConquistaCard({
   );
 
   const subs = vehicle.subVehiculos ?? [];
+  // 1 unidad completa = Σ seg/unidad de cada sub (medido sella al cerrar; si no, récord).
+  const unitCycle = useMemo(() => sumDesglosadorUnitCycle(subs), [subs]);
+  const metaHora =
+    /^\d{1,2}:\d{2}$/.test((vehicle.criterioDetalle ?? "").trim())
+      ? vehicle.criterioDetalle!.trim()
+      : null;
+  const reachUntilMeta = useMemo(() => {
+    if (!metaHora || unitCycle.stepsCounted <= 0) return null;
+    void tick; // refrescar alcance con el wall-clock
+    return projectProductsUntilMeta(subs, metaHora, Date.now());
+  }, [metaHora, subs, unitCycle.stepsCounted, unitCycle.totalSec, tick]);
+
   const pendientes = subs.filter(s => s.status === "pendiente");
   const cycleReady = subs.every(s => s.status === "cumplido" || s.status === "fallado");
   const doneCount = subs.filter(s => s.status === "cumplido" || s.status === "fallado").length;
@@ -147,9 +162,9 @@ export function ConquistaCard({
   const refLabel = objSecs != null ? formatMMSS(objSecs) : null;
   const futuroSub = clocks.subEndAt != null ? formatHHMM(clocks.subEndAt) : "—";
   const futuroCiclo = clocks.cycleEndAt != null ? formatHHMM(clocks.cycleEndAt) : "—";
-  const metaHora =
-    /^\d{1,2}:\d{2}$/.test((vehicle.criterioDetalle ?? "").trim())
-      ? vehicle.criterioDetalle!.trim()
+  const unitCycleLabel =
+    unitCycle.stepsCounted > 0
+      ? formatMMSS(Math.round(unitCycle.totalSec))
       : null;
 
   return (
@@ -385,7 +400,7 @@ export function ConquistaCard({
                   </div>
                 ) : null}
 
-                <div className="flex justify-between items-center px-1 pt-0.5">
+                <div className="flex justify-between items-center px-1 pt-0.5 gap-2">
                   <div>
                     <p
                       className="text-[7px] font-black uppercase tracking-widest"
@@ -402,6 +417,33 @@ export function ConquistaCard({
                       data-testid="j4-conquista-termina"
                     >
                       {futuroSub}
+                    </p>
+                  </div>
+                  <div className="text-center min-w-0">
+                    <p
+                      className="text-[7px] font-black uppercase tracking-widest"
+                      style={{ color: NARANJA }}
+                      title="Suma de seg/unidad de cada sub = 1 producto"
+                    >
+                      1 und
+                    </p>
+                    <p
+                      className="text-[11px] font-black tabular-nums"
+                      style={{
+                        color: unitCycleLabel ? NARANJA : "rgba(255,255,255,0.45)",
+                        fontFamily: "ui-monospace, monospace",
+                      }}
+                      data-testid="j4-conquista-unit-cycle"
+                    >
+                      {unitCycleLabel ?? "—"}
+                      {unitCycleLabel && unitCycle.allRef ? (
+                        <span
+                          className="text-[7px] font-bold ml-0.5"
+                          style={{ color: "rgba(255,255,255,0.45)" }}
+                        >
+                          ·ref
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   <div className="text-right">
@@ -425,14 +467,48 @@ export function ConquistaCard({
                   </div>
                 </div>
                 {metaHora ? (
-                  <p
-                    className="text-center text-[9px] font-mono font-bold"
-                    style={{ color: GOLD }}
+                  <div
+                    className="rounded-lg px-2.5 py-2 space-y-0.5"
+                    style={{
+                      backgroundColor: "rgba(212,175,55,0.08)",
+                      border: "1px solid rgba(212,175,55,0.28)",
+                    }}
                     data-testid="j4-conquista-meta-hora"
                   >
-                    Meta del ciclo · {metaHora}
-                    {futuroCiclo !== "—" ? ` · proyección ${futuroCiclo}` : ""}
-                  </p>
+                    <p
+                      className="text-center text-[9px] font-mono font-bold"
+                      style={{ color: GOLD }}
+                    >
+                      Meta · {metaHora}
+                      {futuroCiclo !== "—" ? ` · proyección ${futuroCiclo}` : ""}
+                    </p>
+                    {reachUntilMeta ? (
+                      <p
+                        className="text-center text-[11px] font-black tabular-nums"
+                        style={{ color: NARANJA, fontFamily: "ui-monospace, monospace" }}
+                        data-testid="j4-conquista-alcance"
+                      >
+                        ≈{reachUntilMeta.products} producto
+                        {reachUntilMeta.products === 1 ? "" : "s"} hasta {metaHora}
+                        <span
+                          className="text-[8px] font-bold ml-1"
+                          style={{ color: "rgba(255,255,255,0.55)" }}
+                        >
+                          ({unitCycleLabel}/und
+                          {reachUntilMeta.allRef ? " ·ref" : reachUntilMeta.hasMeasured ? " ·medido" : ""}
+                          )
+                        </span>
+                      </p>
+                    ) : unitCycleLabel ? (
+                      <p
+                        className="text-center text-[9px] font-mono"
+                        style={{ color: "rgba(255,255,255,0.55)" }}
+                        data-testid="j4-conquista-alcance-empty"
+                      >
+                        Meta alcanzada o sin margen para otra unidad
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
@@ -691,6 +767,45 @@ export function ConquistaCard({
             <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: "#D4AF37" }}>
               Ciclo completado
             </p>
+            {unitCycle.stepsCounted > 0 ? (
+              <div
+                className="flex items-center justify-between px-2.5 py-2 rounded-lg"
+                style={{
+                  backgroundColor: "rgba(249,115,22,0.1)",
+                  border: "1px solid rgba(249,115,22,0.35)",
+                }}
+                data-testid="j4-conquista-unit-cycle-done"
+              >
+                <div>
+                  <p
+                    className="text-[8px] font-black uppercase tracking-widest"
+                    style={{ color: NARANJA }}
+                  >
+                    1 unidad completa
+                  </p>
+                  <p className="text-[7px] font-bold" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    Suma seg/unidad de {unitCycle.stepsCounted}/{unitCycle.stepsTotal} pasos
+                    {unitCycle.allRef ? " · ref" : unitCycle.hasMeasured ? " · medido" : ""}
+                  </p>
+                </div>
+                <p
+                  className="text-lg font-black font-mono tabular-nums"
+                  style={{ color: NARANJA }}
+                >
+                  {formatMMSS(Math.round(unitCycle.totalSec))}
+                </p>
+              </div>
+            ) : null}
+            {metaHora && reachUntilMeta ? (
+              <p
+                className="text-[10px] font-mono font-bold text-center"
+                style={{ color: GOLD }}
+                data-testid="j4-conquista-alcance-done"
+              >
+                Con este ritmo ≈{reachUntilMeta.products} producto
+                {reachUntilMeta.products === 1 ? "" : "s"} hasta {metaHora}
+              </p>
+            ) : null}
             <p className="text-sm" style={{ color: MUTED }}>
               Todas las unidades cerradas. Sella el ciclo para liquidar PS.
             </p>
@@ -747,6 +862,8 @@ export function ConquistaCard({
               const fail = sv.status === "fallado";
               const isPending = sv.status === "pendiente";
               const pIdx = isPending ? pendientes.findIndex(p => p.id === sv.id) : -1;
+              const taktSec = subSecPerUnit(sv, "best");
+              const measuredTakt = subSecPerUnit(sv, "measured");
               const recordLine =
                 sv.cantidadObjetivo && sv.tiempoRecordMinPerUnit
                   ? `${sv.cantidadObjetivo}×${sv.tiempoRecordMinPerUnit.toFixed(1)}m/u · ≈${Math.round(
@@ -755,6 +872,10 @@ export function ConquistaCard({
                   : sv.cantidadObjetivo
                     ? `${sv.cantidadObjetivo} u`
                     : null;
+              const taktLine =
+                taktSec != null && Number.isFinite(taktSec) && taktSec > 0
+                  ? `${formatMMSS(Math.round(taktSec))}/u${measuredTakt != null ? " ·sellado" : " ·ref"}`
+                  : null;
               return (
                 <div
                   key={sv.id}
@@ -818,6 +939,15 @@ export function ConquistaCard({
                         {sv.cantidadLograda != null
                           ? `${sv.cantidadLograda}/${sv.cantidadObjetivo}`
                           : recordLine}
+                      </p>
+                    ) : null}
+                    {taktLine ? (
+                      <p
+                        className="text-[8px] font-mono font-bold"
+                        style={{ color: measuredTakt != null ? NARANJA : "rgba(255,255,255,0.45)" }}
+                        data-testid={`j4-conquista-sub-takt-${sv.id}`}
+                      >
+                        {taktLine}
                       </p>
                     ) : null}
                   </div>
