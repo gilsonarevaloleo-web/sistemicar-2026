@@ -73,6 +73,7 @@ export function usePulsoCobertura({
             segmentoActivoId: src.segmentoActivoId,
           });
           setModel(prev =>
+            prev.hasPlanificacion === next.hasPlanificacion &&
             prev.conquistaMin === next.conquistaMin &&
             prev.entropiaMin === next.entropiaMin &&
             prev.coberturaPct === next.coberturaPct &&

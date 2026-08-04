@@ -37,6 +37,21 @@ function baseVehicle(partial: Partial<Vehicle> & { id: string }): Vehicle {
 }
 
 describe("pulsoCoberturaCompute", () => {
+  it("sin planificación no hay pulso (ruido, no información)", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 6, 26, 10, 30);
+    const model = computePulsoCobertura({
+      segmentos: [],
+      vehicles: [],
+      now,
+      applyMonotonic: false,
+    });
+    assert.equal(model.hasPlanificacion, false);
+    assert.equal(model.entropiaMin, 0);
+    assert.equal(model.conquistaMin, 0);
+    assert.equal(model.needsLaunch, false);
+  });
+
   it("sin vehículos marca needsLaunch si hay segmento activo", () => {
     resetLiveEntropyMonotonic();
     const now = limaAt(2026, 6, 26, 10, 30);
@@ -55,10 +70,39 @@ describe("pulsoCoberturaCompute", () => {
       now,
       applyMonotonic: false,
     });
+    assert.equal(model.hasPlanificacion, true);
     assert.equal(model.needsLaunch, true);
     assert.equal(model.consciousNow, false);
     assert.ok(model.entropiaMin > 0, "debe acumular inconsciente en ventana vivida");
     assert.equal(model.segmentoActivoNombre, "Bloque mañana");
+  });
+
+  it("inconsciente no supera el plan no conquistado (techo de planificación)", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 6, 26, 20, 0);
+    // Tres bloques solapados 05:30–21:00 — sin merge el reloj inventaba ~47h.
+    const segs = [
+      { id: "a", horaInicio: "05:30", horaFin: "21:00", estado: "activo" },
+      { id: "b", horaInicio: "05:30", horaFin: "21:00", estado: "cerrado" },
+      { id: "c", horaInicio: "05:30", horaFin: "21:00", estado: "cerrado" },
+    ];
+    const model = computePulsoCobertura({
+      segmentos: segs,
+      vehicles: [],
+      segmentoActivoId: "a",
+      now,
+      applyMonotonic: false,
+    });
+    const plannedUniqueMin = 15.5 * 60; // 05:30–21:00
+    assert.ok(model.hasPlanificacion);
+    assert.ok(
+      model.entropiaMin <= plannedUniqueMin + 0.5,
+      `entropía ${model.entropiaMin} no debe superar plan único ~${plannedUniqueMin}`
+    );
+    assert.ok(
+      model.conquistaMin + model.entropiaMin <= plannedUniqueMin + 0.5,
+      "consciente+inconsciente acotados al plan"
+    );
   });
 
   it("vehículo consciente activo apaga needsLaunch", () => {

@@ -669,6 +669,26 @@ describe("computeAnilloEstado", () => {
     }
   });
 
+  it("entropiaMin en vivo no supera el plan no conquistado (anti-47h)", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 4, 18, 20, 0);
+    const segmentos = [
+      { horaInicio: "05:30", horaFin: "21:00" },
+      { horaInicio: "05:30", horaFin: "21:00" },
+      { horaInicio: "05:30", horaFin: "21:00" },
+    ];
+    const stats = computeLiveEntropy({
+      segmentos,
+      vehiculos: [],
+      now,
+    }).dayStats;
+    // Plan único 05:30–21:00 = 930 min; sin conquista el techo es ese terreno.
+    assert.ok(
+      stats.entropiaMin <= 930 + 0.5,
+      `entropía ${stats.entropiaMin} no debe superar plan (~930); solapes no multiplican`
+    );
+  });
+
   it("vehículo fantasma stale no reduce entropiaMin en computeLiveEntropy", () => {
     resetLiveEntropyMonotonic();
     const now = limaAt(2026, 4, 18, 8, 10);
