@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -131,15 +131,43 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
   const keyboardInset = useKeyboardInset();
   const tick = useJornada4Tick(open && tipo === "tiempo");
+  /** Overflow previo del body — liberar al abrir <select> nativo (evita bloqueo móvil). */
+  const bodyOverflowPrevRef = useRef<string | null>(null);
+  const nativePickerOpenRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
+    bodyOverflowPrevRef.current = prev;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = bodyOverflowPrevRef.current ?? prev;
+      bodyOverflowPrevRef.current = null;
+      nativePickerOpenRef.current = false;
     };
   }, [open]);
+
+  const releaseBodyForNativePicker = useCallback(() => {
+    if (!open || nativePickerOpenRef.current) return;
+    nativePickerOpenRef.current = true;
+    document.body.style.overflow = bodyOverflowPrevRef.current ?? "";
+  }, [open]);
+
+  const restoreBodyAfterNativePicker = useCallback(() => {
+    if (!nativePickerOpenRef.current) return;
+    nativePickerOpenRef.current = false;
+    if (open) document.body.style.overflow = "hidden";
+  }, [open]);
+
+  /** Cierra el sheet ANTES de salir a /proyectos (overflow + Dual Kernel). */
+  const closeBeforeHubNavigate = useCallback(() => {
+    nativePickerOpenRef.current = false;
+    if (bodyOverflowPrevRef.current != null) {
+      document.body.style.overflow = bodyOverflowPrevRef.current;
+      bodyOverflowPrevRef.current = null;
+    }
+    setOpen(false);
+  }, []);
 
   useEffect(() => {
     const onOpen = () => {
@@ -707,6 +735,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     }
                     hint="Default = segmento. Cámbialo si esta misión es de otro proyecto."
                     testId="jornada4-launch-dir-vehiculo"
+                    locked={!canProyectos}
+                    onBeforeHubNavigate={closeBeforeHubNavigate}
+                    onNativePickerOpen={releaseBodyForNativePicker}
+                    onNativePickerClose={restoreBodyAfterNativePicker}
                   />
 
                   {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
@@ -883,6 +915,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             label="Dirección de esta fila"
                             emptyLabel="Heredar del vehículo"
                             testId={`jornada4-launch-libre-dir-${idx}`}
+                            locked={!canProyectos}
+                            onBeforeHubNavigate={closeBeforeHubNavigate}
+                            onNativePickerOpen={releaseBodyForNativePicker}
+                            onNativePickerClose={restoreBodyAfterNativePicker}
                           />
                         </div>
                       ))}
@@ -1297,6 +1333,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               emptyLabel="Heredar del vehículo"
                               hint="Sub ≠ proyecto del segmento → elige aquí."
                               testId={`jornada4-launch-sub-dir-${idx}`}
+                              locked={!canProyectos}
+                              onBeforeHubNavigate={closeBeforeHubNavigate}
+                              onNativePickerOpen={releaseBodyForNativePicker}
+                              onNativePickerClose={restoreBodyAfterNativePicker}
                             />
                           </div>
                         );
@@ -1449,6 +1489,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             label="Dirección de esta fila"
                             emptyLabel="Heredar del vehículo"
                             testId={`jornada4-launch-ring-dir-${idx}`}
+                            locked={!canProyectos}
+                            onBeforeHubNavigate={closeBeforeHubNavigate}
+                            onNativePickerOpen={releaseBodyForNativePicker}
+                            onNativePickerClose={restoreBodyAfterNativePicker}
                           />
                         </div>
                       ))}
