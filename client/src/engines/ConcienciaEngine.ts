@@ -219,6 +219,36 @@ function sumMinutosPlaneados(segmentos: SegmentoAnilloLite[]): number {
   }, 0);
 }
 
+/** Minutos de plan únicos (ventanas fusionadas). Techo real del pulso/inconsciente. */
+function sumMinutosPlaneadosMerged(segmentos: SegmentoAnilloLite[]): number {
+  if (segmentos.length === 0) return 0;
+  const windows: { start: number; end: number }[] = [];
+  for (const s of segmentos) {
+    if (!s) continue;
+    const ini = parseSegMinutes(s.horaInicio || "");
+    const fin = parseSegMinutes(s.horaFin || "");
+    const end = fin >= ini ? fin : fin + 1440;
+    if (end > ini) windows.push({ start: ini, end });
+  }
+  if (windows.length === 0) return 0;
+  windows.sort((a, b) => a.start - b.start);
+  let total = 0;
+  let curStart = windows[0].start;
+  let curEnd = windows[0].end;
+  for (let i = 1; i < windows.length; i++) {
+    const w = windows[i];
+    if (w.start <= curEnd) {
+      curEnd = Math.max(curEnd, w.end);
+    } else {
+      total += curEnd - curStart;
+      curStart = w.start;
+      curEnd = w.end;
+    }
+  }
+  total += curEnd - curStart;
+  return total;
+}
+
 
 function overlapMinutes(
   sessionStart: number,
@@ -1520,12 +1550,6 @@ export function resetLiveEntropyMonotonic(): void {
   resetEntropyMonotonicState();
 }
 
-function readNoVehicleSinceMs(): number | null {
-  if (typeof localStorage === "undefined") return null;
-  const raw = parseInt(localStorage.getItem(NO_VEHICLE_SINCE_KEY) || "0", 10);
-  return raw > 0 ? raw : null;
-}
-
 function patchTimelineEntropy(timeline: ConcienciaTimeline, entropiaMin: number): ConcienciaTimeline {
   const { jornadaMin, conquistaMin } = timeline.metricas;
   const modoBatallaAnillo = timeline.metricas.terrenoRestanteMin !== undefined;
@@ -1601,21 +1625,31 @@ export function computeLiveEntropy(params: {
 
   let raw = timeline.dayStats.entropiaMin;
 
+  // Con planificación: inconsciente ≤ plan único no conquistado (y ≥ timeline, p.ej. centinela).
+  // Corrige pisos monótonos / relojes inflados (p. ej. 47h) sin inventar techo sin plan.
+  const plannedCap =
+    params.segmentos.length > 0
+      ? Math.max(
+          timeline.dayStats.entropiaMin,
+          Math.max(
+            0,
+            sumMinutosPlaneadosMerged(params.segmentos) - timeline.dayStats.conquistaMin
+          )
+        )
+      : null;
+
   if (!consciousNow && params.applyMonotonic !== false) {
     let gapState = getLiveGapClockState(now);
     if (!gapState) {
       const mono = getEntropyMonotonicDebugState(now);
-      const noVehicleSince = readNoVehicleSinceMs();
-      const gapAnchorMs = mono?.gapAnchorMs ?? noVehicleSince ?? now;
-      const floor = mono?.floorMin ?? 0;
-      const baselineEntropyMin = Math.max(
-        floor,
-        gapAnchorMs < now - 1000 ? floor : raw,
-        raw
-      );
+      let floor = mono?.floorMin ?? 0;
+      if (plannedCap != null) floor = Math.min(floor, plannedCap);
+      // La timeline ya incluye el hueco abierto hasta `now`. Sellar aquí:
+      // el reloj solo suma minutos planificados futuros (evita doble conteo
+      // con NO_VEHICLE_SINCE / gapAnchor stale → cifras tipo 47h).
       gapState = armLiveGapClock({
-        gapAnchorMs,
-        baselineEntropyMin,
+        gapAnchorMs: now,
+        baselineEntropyMin: Math.max(floor, raw),
         nowMs: now,
       });
     }
@@ -1626,12 +1660,14 @@ export function computeLiveEntropy(params: {
     });
   }
 
+  if (plannedCap != null) raw = Math.min(raw, plannedCap);
+
   if (params.applyMonotonic === false) {
     if (Math.abs(raw - timeline.dayStats.entropiaMin) < 0.05) return timeline;
     return patchTimelineEntropy(timeline, raw);
   }
 
-  const entropiaMin = clampLiveEntropyDisplay(
+  let entropiaMin = clampLiveEntropyDisplay(
     applyMonotonicLiveEntropy({
       rawMin: raw,
       nowMs: now,
@@ -1641,6 +1677,7 @@ export function computeLiveEntropy(params: {
     now,
     consciousNow
   );
+  if (plannedCap != null) entropiaMin = Math.min(entropiaMin, plannedCap);
 
   if (Math.abs(entropiaMin - timeline.dayStats.entropiaMin) < 0.05) return timeline;
 

@@ -1,6 +1,6 @@
 /**
  * Pulso de cobertura — UI espejo (sin SVG 24h, sin Framer Motion).
- * Evidencia minutos conscientes vs inconscientes e insiste en lanzar.
+ * Solo se muestra con planificación: sin orden no hay cobertura que medir.
  */
 import { memo } from "react";
 import { Rocket } from "lucide-react";
@@ -20,8 +20,6 @@ export type PulsoCoberturaProps = {
   model: PulsoCoberturaModel;
   /** Si false, oculta el CTA de lanzar. */
   showCta?: boolean;
-  /** True cuando aún no hay segmentos del día. */
-  sinSegmentos?: boolean;
   onInsistirLanzar?: () => void;
   className?: string;
 };
@@ -29,10 +27,12 @@ export type PulsoCoberturaProps = {
 export const PulsoCobertura = memo(function PulsoCobertura({
   model,
   showCta = true,
-  sinSegmentos = false,
   onInsistirLanzar,
   className = "",
 }: PulsoCoberturaProps) {
+  // Sin planificación el pulso no existe: es ruido, no información.
+  if (!model.hasPlanificacion) return null;
+
   const handleCta = () => {
     if (onInsistirLanzar) {
       onInsistirLanzar();
@@ -44,13 +44,11 @@ export const PulsoCobertura = memo(function PulsoCobertura({
   const conquistaW = Math.max(0, Math.min(100, model.coberturaPct));
   const entropiaW = Math.max(0, 100 - conquistaW);
 
-  const hint = sinSegmentos
-    ? "Crea un segmento del día y ábrelo: aquí verás consciente vs inconsciente."
-    : model.consciousNow
-      ? "Hay vehículo cubriendo conciencia ahora."
-      : model.needsLaunch
-        ? "Segmento activo sin vehículo — el tiempo planificado se vuelve inconsciente."
-        : "Sin cobertura consciente en este instante.";
+  const hint = model.consciousNow
+    ? "Hay vehículo cubriendo conciencia ahora."
+    : model.needsLaunch
+      ? "Segmento activo sin vehículo — el tiempo planificado se vuelve inconsciente."
+      : "Sin cobertura consciente en este instante.";
 
   return (
     <section

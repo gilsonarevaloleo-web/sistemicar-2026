@@ -52,11 +52,12 @@ export default function Jornada4PlanTab({
   onRequestNotifPermission,
 }: Jornada4PlanTabProps) {
   // Solo vive mientras la pestaña Plan está montada — sin intervalo en Operar/Métricas.
+  const hasPlan = Boolean(planilla?.segmentos?.length);
   const pulsoModel = usePulsoCobertura({
     segmentos: planilla?.segmentos ?? [],
     vehicles,
     segmentoActivoId: segmentoActivo?.id ?? null,
-    enabled: true,
+    enabled: hasPlan,
   });
 
   const badgeTick = useJornada4Tick(Boolean(planilla?.segmentos?.length));
@@ -73,7 +74,6 @@ export default function Jornada4PlanTab({
       <PulsoCobertura
         model={pulsoModel}
         showCta={Boolean(segmentoActivo)}
-        sinSegmentos={(planilla?.segmentos.length ?? 0) === 0}
       />
       <CoberturaHuecosPanel refreshKey={huecosRefresh} />
       <Jornada4SegmentosPanel

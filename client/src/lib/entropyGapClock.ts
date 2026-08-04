@@ -83,12 +83,6 @@ export function armLiveGapClock(params: {
   return state;
 }
 
-function overlapMs(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
-  const start = Math.max(aStart, bStart);
-  const end = Math.min(aEnd, bEnd);
-  return Math.max(0, end - start);
-}
-
 /** Minutos planificados entre dos instantes (segmentos HH:mm). */
 export function plannedMinutesBetween(
   segmentos: SegmentoAnilloLite[],
@@ -98,13 +92,37 @@ export function plannedMinutesBetween(
 ): number {
   if (toMs <= fromMs) return 0;
   if (segmentos.length === 0) {
+    // Contingencia del anillo (sin plan). El Pulso no usa este camino.
     return (toMs - fromMs) / 60000;
   }
-  let totalMs = 0;
+  // Fusionar solapes: sumar ventanas crudas inflaba (p. ej. 3×15h ≈ 47h).
+  const windows: { start: number; end: number }[] = [];
   for (const seg of segmentos) {
-    const { start, end } = segmentWindowMs(seg.horaInicio || "00:00", seg.horaFin || "00:00", limaDayStartMs);
-    totalMs += overlapMs(fromMs, toMs, start, end);
+    const { start, end } = segmentWindowMs(
+      seg.horaInicio || "00:00",
+      seg.horaFin || "00:00",
+      limaDayStartMs
+    );
+    const oStart = Math.max(fromMs, start);
+    const oEnd = Math.min(toMs, end);
+    if (oEnd > oStart) windows.push({ start: oStart, end: oEnd });
   }
+  if (windows.length === 0) return 0;
+  windows.sort((a, b) => a.start - b.start);
+  let totalMs = 0;
+  let curStart = windows[0].start;
+  let curEnd = windows[0].end;
+  for (let i = 1; i < windows.length; i++) {
+    const w = windows[i];
+    if (w.start <= curEnd) {
+      curEnd = Math.max(curEnd, w.end);
+    } else {
+      totalMs += curEnd - curStart;
+      curStart = w.start;
+      curEnd = w.end;
+    }
+  }
+  totalMs += curEnd - curStart;
   return totalMs / 60000;
 }
 

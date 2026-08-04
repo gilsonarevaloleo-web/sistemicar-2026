@@ -1,5 +1,6 @@
 /**
  * Pulso de cobertura — métrica lite de conciencia (conquista vs inconsciente).
+ * Solo existe dentro de la planificación del día: sin segmentos = sin pulso (ruido).
  * Usa computeLiveEntropy (sin arcos SVG / horizonte). Prohibido en ms0 de gestos.
  */
 import {
@@ -9,6 +10,7 @@ import {
   type SegmentoAnilloLite,
 } from "@/engines/ConcienciaEngine";
 import { resolveCoverageVehicles } from "@/lib/entropyTimePolicy";
+import { segmentTimeToMinutes } from "@/lib/segmentTime";
 import type { Vehicle } from "@/lib/persistence";
 
 export type PulsoSegmentoLite = SegmentoAnilloLite & {
@@ -18,6 +20,8 @@ export type PulsoSegmentoLite = SegmentoAnilloLite & {
 };
 
 export type PulsoCoberturaModel = {
+  /** False cuando no hay planificación: el pulso no debe mostrarse ni acumular. */
+  hasPlanificacion: boolean;
   conquistaMin: number;
   entropiaMin: number;
   /** conquista / (conquista + entropía) — 0–100 */
@@ -66,8 +70,40 @@ function resolveActiveSegment(
   return segmentos.find(s => s.estado === "activo") ?? null;
 }
 
+/** Minutos únicos planificados (ventanas fusionadas por solape). */
+export function sumMinutosPlanificadosPulso(segmentos: PulsoSegmentoLite[]): number {
+  if (segmentos.length === 0) return 0;
+  const windows: { start: number; end: number }[] = [];
+  for (const s of segmentos) {
+    if (!s) continue;
+    const ini = segmentTimeToMinutes(s.horaInicio || "");
+    const fin = segmentTimeToMinutes(s.horaFin || "");
+    if (!Number.isFinite(ini) || !Number.isFinite(fin)) continue;
+    const end = fin >= ini ? fin : fin + 1440;
+    if (end > ini) windows.push({ start: ini, end });
+  }
+  if (windows.length === 0) return 0;
+  windows.sort((a, b) => a.start - b.start);
+  let total = 0;
+  let curStart = windows[0].start;
+  let curEnd = windows[0].end;
+  for (let i = 1; i < windows.length; i++) {
+    const w = windows[i];
+    if (w.start <= curEnd) {
+      curEnd = Math.max(curEnd, w.end);
+    } else {
+      total += curEnd - curStart;
+      curStart = w.start;
+      curEnd = w.end;
+    }
+  }
+  total += curEnd - curStart;
+  return total;
+}
+
 /**
  * Cálculo puro del pulso. Llamar solo desde idle / cola sombra — nunca en handlers ms0.
+ * Sin planificación → modelo vacío (no hay cobertura que medir).
  */
 export function computePulsoCobertura(params: {
   segmentos: PulsoSegmentoLite[];
@@ -81,6 +117,11 @@ export function computePulsoCobertura(params: {
   const segmentos = Array.isArray(params.segmentos) ? params.segmentos : [];
   const vehicles = Array.isArray(params.vehicles) ? params.vehicles : [];
   const segmentoActivoId = params.segmentoActivoId ?? null;
+  const plannedMin = sumMinutosPlanificadosPulso(segmentos);
+
+  if (segmentos.length === 0 || plannedMin <= 0) {
+    return { ...EMPTY_PULSO_MODEL, computedAt: now };
+  }
 
   const timeline = computeLiveEntropy({
     segmentos,
@@ -90,7 +131,9 @@ export function computePulsoCobertura(params: {
   });
 
   const conquistaMin = timeline.dayStats.conquistaMin;
-  const entropiaMin = timeline.dayStats.entropiaMin;
+  // Techo duro: solo el terreno planificado no conquistado puede ser inconsciente.
+  const entropiaCap = Math.max(0, plannedMin - conquistaMin);
+  const entropiaMin = Math.min(timeline.dayStats.entropiaMin, entropiaCap);
   const fought = conquistaMin + entropiaMin;
   const coberturaPct =
     fought > 0 ? Math.min(100, Math.round((conquistaMin / fought) * 100)) : 0;
@@ -102,6 +145,7 @@ export function computePulsoCobertura(params: {
   const needsLaunch = Boolean(active && !consciousNow);
 
   return {
+    hasPlanificacion: true,
     conquistaMin,
     entropiaMin,
     coberturaPct,
@@ -116,6 +160,7 @@ export function computePulsoCobertura(params: {
 }
 
 export const EMPTY_PULSO_MODEL: PulsoCoberturaModel = {
+  hasPlanificacion: false,
   conquistaMin: 0,
   entropiaMin: 0,
   coberturaPct: 0,

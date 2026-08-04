@@ -28,6 +28,23 @@ describe("entropyGapClock", () => {
     assert.equal(mins, 10);
   });
 
+  it("plannedMinutesBetween fusiona segmentos solapados (no multiplica horas)", () => {
+    const start = limaAt(2026, 4, 18, 5, 30);
+    const end = limaAt(2026, 4, 18, 21, 0);
+    const limaDayStart = getLimaDayStartMs(start);
+    const mins = plannedMinutesBetween(
+      [
+        { horaInicio: "05:30", horaFin: "21:00" },
+        { horaInicio: "05:30", horaFin: "21:00" },
+        { horaInicio: "05:30", horaFin: "21:00" },
+      ],
+      limaDayStart,
+      start,
+      end
+    );
+    assert.equal(mins, 15.5 * 60, "3 ventanas idénticas → 15.5h únicas, no 46.5h");
+  });
+
   it("computeTimestampGapEntropyMin suma baseline + minutos desde gapAnchor", () => {
     resetLiveGapClockForTests();
     const gapAnchor = limaAt(2026, 4, 18, 8, 0);
