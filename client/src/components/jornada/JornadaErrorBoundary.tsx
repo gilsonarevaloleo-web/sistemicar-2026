@@ -33,7 +33,8 @@ export class JornadaErrorBoundary extends Component<Props, State> {
             <div className="rounded-xl border p-4 text-center" style={{ borderColor: "rgba(239,68,68,0.35)", backgroundColor: "rgba(10,10,10,0.95)" }}>
               <p className="text-sm font-bold text-white">Algo bloqueó Jornada</p>
               <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                Un vehículo de conquista o datos corruptos pueden provocar este fallo.
+                La vista se colgó (a menudo al volver de segundo plano). Reparar recarga el módulo
+                sin borrar conquista ni ring abiertos.
               </p>
               {this.state.message && (
                 <p className="text-[9px] text-slate-600 font-mono mt-2 break-all">{this.state.message}</p>

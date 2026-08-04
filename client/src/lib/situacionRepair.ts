@@ -37,17 +37,33 @@ export function repairStuckSituacionVehicles(): number {
   }
 }
 
-/** Archiva todos los vehículos situación activos (salida de emergencia). */
+/**
+ * Archiva rings situacionales activos (salida de emergencia).
+ * No toca interrupciones anidadas de una conquista aún activa — eso dejaría
+ * el desglosador padre colgado en pausa sin el vehículo de interrupción.
+ */
 export function forceArchiveSituacionActivos(): number {
   try {
     const raw = localStorage.getItem(VEHICLES_KEY);
     if (!raw) return 0;
     const parsed = JSON.parse(raw) as Vehicle[];
     if (!Array.isArray(parsed)) return 0;
+    const byId = new Map(parsed.map(v => [v.id, v]));
     const now = Date.now();
     let archived = 0;
     const fixed = parsed.map(v => {
       if (v.status !== "activo" || v.tipoFlota !== "situacion") return v;
+      const parentId = v.vehiculoPadreDesglosadorId;
+      if (parentId) {
+        const parent = byId.get(parentId);
+        if (
+          parent?.status === "activo" &&
+          parent.tipoFlota === "tiempo" &&
+          parent.tipoReloj === "desglosador"
+        ) {
+          return v;
+        }
+      }
       archived++;
       const aperturaAt = v.aperturaAt || now;
       return {

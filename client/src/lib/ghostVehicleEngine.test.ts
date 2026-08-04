@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import type { Vehicle } from "./persistence";
 import {
   filterVehiclesForAnilloCoverage,
@@ -9,11 +9,14 @@ import {
   isGhostActiveVehicle,
   isJournalStaleActiveVehicle,
   recoverMissingJournalDayActives,
+  resetGhostSessionCache,
   shouldPreserveLocalActivo,
 } from "./ghostVehicleEngine.ts";
+import { getJournalDayStartMs } from "./segmentTime.ts";
 
-const DAY_START = new Date("2026-05-31T05:00:00").getTime();
-const NOW = DAY_START + 3 * 3600_000;
+/** 08:00 Lima del 31-may-2026 (journal 05:00 Lima). */
+const NOW = Date.UTC(2026, 4, 31, 13, 0, 0);
+const DAY_START = getJournalDayStartMs(NOW);
 
 function v(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
   return {
@@ -29,6 +32,10 @@ function v(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
 }
 
 describe("ghostVehicleEngine", () => {
+  beforeEach(() => {
+    resetGhostSessionCache();
+  });
+
   it("activo que empezó ~04:00 y sigue a las 08:00 no es fantasma", () => {
     const cross = v({ id: "g1", aperturaAt: DAY_START - 3600_000 });
     assert.equal(isGhostActiveVehicle(cross, NOW, DAY_START), false);
@@ -52,6 +59,40 @@ describe("ghostVehicleEngine", () => {
   it("sesión obsoleta (>12h) sí es fantasma", () => {
     const stale = v({ id: "s1", aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000 });
     assert.equal(isGhostActiveVehicle(stale, NOW, DAY_START), true);
+  });
+
+  it("conquista con subs abiertos resiste >12h (no fantasma)", () => {
+    const longConquista = v({
+      id: "long-conq",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000,
+      subVehiculos: [
+        { id: "s1", titulo: "Pegar", status: "cumplido" },
+        { id: "s2", titulo: "Cortar", status: "activo" },
+      ],
+    });
+    assert.equal(isGhostActiveVehicle(longConquista, NOW, DAY_START), false);
+    assert.equal(shouldPreserveLocalActivo(longConquista, NOW, DAY_START), true);
+  });
+
+  it("ring situacional con cron activo resiste >12h", () => {
+    const longRing = v({
+      id: "long-ring",
+      tipoFlota: "situacion",
+      aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000,
+      situacionCronometro: { activo: true },
+      subTareas: [
+        {
+          id: "st1",
+          texto: "A",
+          completada: false,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    assert.equal(isGhostActiveVehicle(longRing, NOW, DAY_START), false);
   });
 
   it("activo real del día no es fantasma", () => {
