@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { beginViewTransition } from "@/lib/viewTransitionShield";
+import { armDualKernelExitSoftStart, isDualKernelExitSoftActive } from "@/lib/dualKernelQuiet";
+import { isJornada4Path } from "@/lib/jornadaBrand";
 
 /** Arma el escudo en cada cambio de ruta (navegación programática o por Link). */
 export function ViewTransitionBootstrap() {
@@ -15,6 +17,10 @@ export function ViewTransitionBootstrap() {
       return;
     }
     if (prevRef.current !== location) {
+      // Respaldo si la nav no pasó por NavTransitionLink.
+      if (isJornada4Path(prevRef.current) && !isJornada4Path(location) && !isDualKernelExitSoftActive()) {
+        armDualKernelExitSoftStart();
+      }
       beginViewTransition();
       prevRef.current = location;
     }

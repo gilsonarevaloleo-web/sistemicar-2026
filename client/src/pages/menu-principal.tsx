@@ -44,6 +44,7 @@ import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
 import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess } from "@/lib/persistence";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
@@ -170,6 +171,8 @@ const OWNER_EMAIL = "gilsonarevalo.leo@gmail.com";
 export default function MenuPrincipal() {
   const [, navigate] = useLocation();
   const { user } = useAuthContext();
+  // Soft-start al venir de Dual Kernel (Ring→hamburguesa→Menú).
+  const motorsQuiet = useDualKernelMotorsQuiet();
   const [resetting, setResetting] = useState(false);
   const [showDataStatus, setShowDataStatus] = useState(false);
   const [showResumenDiario, setShowResumenDiario] = useState(false);
@@ -238,7 +241,7 @@ export default function MenuPrincipal() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || motorsQuiet) return;
     const unsub = subscribeToProgression(
       user.uid,
       (prog) => {
@@ -252,7 +255,7 @@ export default function MenuPrincipal() {
       (err) => console.error("Progression error:", err)
     );
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, motorsQuiet]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -280,7 +283,7 @@ export default function MenuPrincipal() {
   }, [previewUnlocked]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || motorsQuiet) return;
     const unsub = subscribeToCodices(
       user.uid,
       (data) => {
@@ -290,17 +293,17 @@ export default function MenuPrincipal() {
       (err) => console.error("Codices error:", err)
     );
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, motorsQuiet]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || motorsQuiet) return;
     const unsub = subscribeToManualProgress(
       user.uid,
       (data: UserCertification) => setCertification(data),
       (err: Error) => console.error("Manual progress error:", err)
     );
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, motorsQuiet]);
 
   const handleOnboardingComplete = () => {
     if (user?.uid) {
