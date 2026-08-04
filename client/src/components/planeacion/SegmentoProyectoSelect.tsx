@@ -16,6 +16,25 @@ type Props = {
   hint?: string;
   /** Ruta al Hub (default /proyectos). Null oculta el enlace. */
   hubHref?: string | null;
+  /**
+   * Cerrar sheet/modales ANTES de navegar al Hub.
+   * Evita body overflow:hidden + salida Dual Kernel a la vez (bloqueo en móvil).
+   */
+  onBeforeHubNavigate?: () => void;
+  /**
+   * Liberar scroll del body al abrir el picker nativo (iOS/Android).
+   * El sheet de lanzamiento pone overflow:hidden; sin esto el select se clava.
+   */
+  onNativePickerOpen?: () => void;
+  onNativePickerClose?: () => void;
+  /**
+   * Sin Norte: no mostrar select vacío (parece “bloqueo”).
+   * Muestra copy + enlace de upgrade.
+   */
+  locked?: boolean;
+  lockedHint?: string;
+  lockedHref?: string;
+  lockedCta?: string;
 };
 
 /** Selector tech-noir: vincular segmento / vehículo / sub a Proyecto o Centro del Hub. */
@@ -30,11 +49,49 @@ export function SegmentoProyectoSelect({
   emptyLabel = "Sin vincular",
   hint,
   hubHref = "/proyectos",
+  onBeforeHubNavigate,
+  onNativePickerOpen,
+  onNativePickerClose,
+  locked = false,
+  lockedHint = "Dirección de proyecto requiere Norte (Hub Proyectos).",
+  lockedHref = "/pagos?plan=soberania_dia",
+  lockedCta = "Activar Norte →",
 }: Props) {
+  const labelCls = compact
+    ? "text-[8px] text-gray-500 uppercase tracking-wider mb-1 block"
+    : "text-[9px] text-gray-500 uppercase tracking-wider mb-1 block";
+
+  if (locked) {
+    return (
+      <div className={className} data-testid={`${testId}-locked`}>
+        <label className={labelCls}>{label}</label>
+        <div
+          className={
+            compact
+              ? "w-full p-2 rounded-lg border border-sky-500/25 bg-sky-500/8"
+              : "w-full p-2.5 rounded-xl border border-sky-500/25 bg-sky-500/8"
+          }
+        >
+          <p className="text-[10px] text-slate-300 leading-snug">{lockedHint}</p>
+          <a
+            href={lockedHref}
+            className="inline-flex mt-1.5 text-[9px] font-black uppercase tracking-wider text-sky-400 underline"
+            data-testid={`${testId}-locked-cta`}
+          >
+            {lockedCta}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   const hubLink = hubHref ? (
     <NavTransitionLink
       href={hubHref}
       className="text-cyan-500/90 underline underline-offset-2"
+      onClick={() => {
+        onBeforeHubNavigate?.();
+      }}
     >
       {proyectos.length === 0 ? "Abrir Hub" : "Abrir Hub de Proyectos"}
     </NavTransitionLink>
@@ -42,18 +99,12 @@ export function SegmentoProyectoSelect({
 
   return (
     <div className={className}>
-      <label
-        className={
-          compact
-            ? "text-[8px] text-gray-500 uppercase tracking-wider mb-1 block"
-            : "text-[9px] text-gray-500 uppercase tracking-wider mb-1 block"
-        }
-      >
-        {label}
-      </label>
+      <label className={labelCls}>{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={() => onNativePickerOpen?.()}
+        onBlur={() => onNativePickerClose?.()}
         className={
           compact
             ? "w-full p-2 rounded-lg bg-gray-900/60 border border-gray-800 text-gray-300 text-xs focus:outline-none focus:border-cyan-500/40"
