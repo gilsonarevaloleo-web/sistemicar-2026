@@ -1987,6 +1987,13 @@ app.post("/api/mercadopago/create-preference", async (req, res) => {
       return res.status(400).json({ error: "Plan no válido" });
     }
 
+    // Espejo $17 y otros planes legacy: fuera de lista de venta (solo Jornada V4 + API).
+    if ("legacy" in plan && plan.legacy) {
+      return res.status(400).json({
+        error: "Este plan ya no está a la venta. Usa Jornada Base, Ritmo del día o Norte.",
+      });
+    }
+
     const preference = new Preference(mpClient);
     // Siempre usar URL pública para Mercado Pago (requiere URLs accesibles)
     const baseUrl = "https://sistemicar.app";

@@ -74,7 +74,6 @@ import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { getUserEmail } from "@/lib/firebase";
 import { isOwner } from "@/lib/owner";
 import { registrarEvento, COMPONENTES } from "@/lib/evento-universal";
-import yapeQrImage from "@assets/yape_qr_2026-02-17T22-11-48_1771384383841.png";
 import HumanSilhouette from "@/components/espejo/HumanSilhouette";
 import VUMeterBars from "@/components/espejo/VUMeterBars";
 import TerminalConsole from "@/components/espejo/TerminalConsole";
@@ -217,7 +216,6 @@ const EJE_BG_STYLES: Record<string, React.CSSProperties> = {
   }
 };
 
-const MERCADOPAGO_URL = "https://mpago.la/1coKcGZ";
 const CREDITS_KEY = "sistemicar_espejo_creditos";
 const SOVEREIGNTY_ACCEPTED_KEY = "sistemicar_espejo_soberania";
 const STORAGE_KEY = "sistemicar_espejo_sesiones";
@@ -1905,8 +1903,8 @@ export default function Espejo() {
                         <span style={{ color: RED_ALERT, fontWeight: "bold" }}>BLOQUEADO</span>
                       </p>
                     </div>
-                    <button
-                      onClick={() => setShowPaywall(true)}
+                    <Link
+                      href="/pagos"
                       className="w-full py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02]"
                       style={{
                         background: `linear-gradient(135deg, ${RED_ALERT} 0%, ${GOLD} 100%)`,
@@ -1914,8 +1912,8 @@ export default function Espejo() {
                       }}
                     >
                       <Lock size={12} />
-                      Activar acceso — $17 (10 créditos)
-                    </button>
+                      Ver planes de Jornada
+                    </Link>
                   </motion.div>
                 );
               })()}
@@ -1948,12 +1946,6 @@ export default function Espejo() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-lg font-bold text-white" style={{ fontFamily: "monospace" }}>ALQUIMIA CLÍNICA™</h3>
-                        <span 
-                          className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                          style={{ backgroundColor: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30`, fontFamily: "monospace" }}
-                        >
-                          $17
-                        </span>
                       </div>
                       <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
                         Doctor IA ejecuta diagnóstico clínico en 3 ejes.
@@ -2771,9 +2763,9 @@ export default function Espejo() {
                                   >
                                     <p className="text-[10px] text-center" style={{ color: GOLD, fontFamily: "monospace" }}>
                                       CRÉDITOS INSUFICIENTES.{" "}
-                                      <a href={MERCADOPAGO_URL} target="_blank" rel="noopener noreferrer" className="underline font-bold">
-                                        ADQUIRIR CRÉDITOS
-                                      </a>
+                                      <Link href="/pagos" className="underline font-bold">
+                                        VER PLANES DE JORNADA
+                                      </Link>
                                     </p>
                                   </motion.div>
                                 )}
@@ -3823,60 +3815,23 @@ export default function Espejo() {
                 </div>
                 
                 <h3 className="text-xl font-bold text-white mb-2">
-                  EL CORAZÓN SABIO™
+                  Acceso a Jornada
                 </h3>
                 
                 <p className="text-sm text-slate-400 mb-6">
-                  Incluye 10 Créditos de Claridad para validación del Doctor IA,
-                  guía por los 4 Pasos del Corazón y Mapa de Voltaje personalizado.
+                  El pack Espejo de $17 ya no está a la venta. El catálogo actual es Jornada V4:
+                  Base, Ritmo del día y Norte.
                 </p>
-                
-                <div className="p-4 rounded-xl mb-6" style={{ backgroundColor: `${WARM_ROSE}10`, border: `1px solid ${WARM_ROSE}30` }}>
-                  <div className="text-3xl font-black mb-1" style={{ color: WARM_ROSE }}>$17</div>
-                  <p className="text-[10px] text-slate-500">Pago único · 10 créditos · ~2 diagnósticos completos</p>
-                </div>
-
-                <div className="space-y-2 text-left mb-6">
-                  {[
-                    "EJE I — Ducha Mental (gratis, sin créditos)",
-                    "EJE II — Código diagnóstico + interfaz M01–M10 (1 crédito)",
-                    "EJE III — Protocolo de calibración de 24h (4 créditos)",
-                    "Detección automática de bucles saboteadores",
-                    "10 créditos incluidos · ~2 diagnósticos completos",
-                    `+${FIXED_POINTS} PS por sesión completa`
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-slate-300">
-                      <CheckCircle size={14} style={{ color: WARM_ROSE }} />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <a
-                  href={MERCADOPAGO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full py-4 rounded-xl font-bold text-center"
-                  style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
-                >
-                  Obtener Acceso
-                </a>
 
                 <Link
-                  href="/pagos?plan=corazon-sabio"
+                  href="/pagos"
                   data-testid="btn-actualizar-datos-pago"
-                  className="block w-full py-3 mt-3 rounded-xl font-semibold text-sm border text-center transition-all hover:bg-white/5"
-                  style={{ borderColor: `${WARM_ROSE}50`, color: WARM_ROSE }}
+                  className="block w-full py-4 rounded-xl font-bold text-center"
+                  style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
+                  onClick={() => setShowPaywall(false)}
                 >
-                  Actualizar datos de pago · El Corazón Sabio™ ($17)
+                  Ver planes de Jornada
                 </Link>
-
-                <div className="mt-4 p-3 rounded-xl text-center" style={{ backgroundColor: "rgba(96, 40, 143, 0.1)", border: "1px solid rgba(96, 40, 143, 0.3)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#60288F" }}>O paga con Yape</p>
-                  <img src={yapeQrImage} alt="QR Yape" className="w-40 h-40 mx-auto rounded-lg mb-2" />
-                  <p className="text-xs text-slate-400">N° 918260514</p>
-                  <p className="text-[10px] text-slate-500">Gilson Arevalo Pezo</p>
-                </div>
                 
                 <button
                   onClick={() => setShowPaywall(false)}

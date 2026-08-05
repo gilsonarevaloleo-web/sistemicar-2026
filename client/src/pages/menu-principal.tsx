@@ -115,7 +115,7 @@ function buildMenuItems(
     {
       id: "espejo",
       title: "ESPEJO",
-      subtitle: "Vaciado mental · $17 pago único",
+      subtitle: "Vaciado mental · Doctor IA",
       icon: Eye,
       route: "/espejo",
       color: SPECTRUM.ROJO,

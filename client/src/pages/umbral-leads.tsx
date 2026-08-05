@@ -101,7 +101,7 @@ export default function UmbralLeads() {
       if (trackingParams.retorno === "espejo") {
         navigate("/espejo");
       } else {
-        navigate("/ventas-espejo");
+        navigate("/pagos");
       }
     } catch (error) {
       console.error("Error registrando prospecto:", error);

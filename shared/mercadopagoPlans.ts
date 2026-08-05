@@ -5,14 +5,19 @@ import {
 } from "./planificacionPricing";
 
 export const SUBSCRIPTION_PLANS = {
+  /**
+   * Legacy — Espejo v1 ($17). Ya no se vende en checkout.
+   * Se conserva para webhooks / créditos de compras antiguas.
+   */
   "corazon-sabio": {
     id: "corazon-sabio",
     name: "El Corazón Sabio™",
     price: 17,
     isOneTime: true,
     espejoCredits: 10,
+    legacy: true,
   },
-  "soberania-mental": { id: "soberania-mental", name: "Soberanía Mental", price: 9.99 },
+  "soberania-mental": { id: "soberania-mental", name: "Soberanía Mental", price: 9.99, legacy: true },
   /** Jornada Base — vehículos + PS + Conquista */
   planificacion_base: {
     id: "planificacion_base",
