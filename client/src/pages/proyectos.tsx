@@ -315,11 +315,20 @@ export default function ProyectosPage() {
 
   const openProyectoDetalle = useCallback(
     (id: string) => {
-      startTransition(() => {
-        navigate(`/proyectos?id=${id}`);
-      });
+      if (!user) return;
+      // Sembrar detalle ANTES del navigate: el primer paint ya es interactivo.
+      // Sin startTransition: con hilo saturado la transición diferida nunca pintaba.
+      const fromList = proyectos.find(p => p.id === id) ?? null;
+      const localP =
+        fromList ?? getProyectosLocal(user.uid).find(p => p.id === id) ?? null;
+      const localPel = getPeldanosByProyectoLocal(user.uid, id);
+      if (localP) {
+        applyDetailState(localP, localPel);
+        setDetailHeavyReady(false);
+      }
+      navigate(`/proyectos?id=${encodeURIComponent(id)}`);
     },
-    [navigate]
+    [user, proyectos, applyDetailState, navigate]
   );
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);

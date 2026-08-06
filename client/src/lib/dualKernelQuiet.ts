@@ -146,3 +146,17 @@ export function useDualKernelMotorsQuiet(): boolean {
 
   return onJ4 || soft || isDualKernelExitSoftActive();
 }
+
+/**
+ * True en Dual Kernel, soft-start de salida, O mientras estamos en Hub Proyectos.
+ * Usar SOLO en motores del App shell (Centinela / SegmentAttention / Cierre).
+ * No usar en la página Hub: ahí el soft-start corto basta para diferir Firestore propio.
+ *
+ * Motivo: con ring activo, al soltar soft-start el reloj/Centinela saturan el hilo
+ * y los toques del Hub (abrir detalle) no llegan a pintar — #50/#51 no bastaban.
+ */
+export function useAppShellMotorsQuiet(): boolean {
+  const [location] = useLocation();
+  const dualQuiet = useDualKernelMotorsQuiet();
+  return dualQuiet || isProyectosHubPath(location);
+}

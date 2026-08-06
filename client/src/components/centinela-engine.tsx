@@ -25,22 +25,15 @@ import {
   maybeReleaseStaleSuppression,
   resetCentinelaTimerState,
 } from "@/lib/centinelaEngine";
-import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
-import { isProyectosHubPath } from "@/lib/jornadaBrand";
-import { useLocation } from "wouter";
+import { useAppShellMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const CENTINELA_MAX_AGE_MS = 8 * 3600 * 1000;
-/** En Hub Proyectos el tick UI 1 s pelea con abrir detalles — bajar a 5 s. */
-const CENTINELA_UI_MS_DEFAULT = 1_000;
-const CENTINELA_UI_MS_HUB = 5_000;
 
-/** Motor global del Centinela — pausado en Dual Kernel (`/jornada-v4`). */
+/** Motor global del Centinela — pausado en Dual Kernel y Hub Proyectos. */
 export function CentinelaEngine() {
   const { user } = useAuthContext();
-  const [location] = useLocation();
-  // Quiet en Dual Kernel + soft-start al salir (evita freeze Jornada→Espejo).
-  const dualKernelQuiet = useDualKernelMotorsQuiet();
-  const onHubProyectos = isProyectosHubPath(location);
+  // Quiet en Dual Kernel, soft-start Y Hub (abrir detalle no pelea con Firebase/tick 1s).
+  const dualKernelQuiet = useAppShellMotorsQuiet();
   const [planillaFecha, setPlanillaFecha] = useState(() => getJournalDateString());
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaRef = useRef<Planilla | null>(null);
@@ -248,8 +241,7 @@ export function CentinelaEngine() {
     void tickUi();
     setTimeout(() => { void runRetroMaterialize(); }, 12_000);
 
-    const uiMs = onHubProyectos ? CENTINELA_UI_MS_HUB : CENTINELA_UI_MS_DEFAULT;
-    const uiInterval = setInterval(() => { void tickUi(); }, uiMs);
+    const uiInterval = setInterval(() => { void tickUi(); }, 1000);
     const activateInterval = setInterval(() => {
       void checkActivate();
     }, 5000);
@@ -286,7 +278,7 @@ export function CentinelaEngine() {
       window.removeEventListener("vehicles-status-changed", onVehiclesLocalSync);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user, planillaFecha, dualKernelQuiet, onHubProyectos]);
+  }, [user, planillaFecha, dualKernelQuiet]);
 
   return null;
 }
