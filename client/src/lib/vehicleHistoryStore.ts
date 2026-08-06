@@ -7,6 +7,14 @@ import {
   saveVehicleHistoryFirebase,
   type VehicleHistoryEntry,
 } from "./persistence";
+import { HISTORY_MEASURE_ARROW } from "./vehicleHistoryMeasure";
+
+export {
+  HISTORY_MEASURE_ARROW,
+  cleanHistorySubTitulo,
+  measureKeyFromHistoryTitulo,
+  measureTituloFromHistoryTitulo,
+} from "./vehicleHistoryMeasure";
 
 const VEHICLE_HISTORY_KEY = "sistemicar_vehicle_history";
 const MAX_ENTRIES = 200;
@@ -128,7 +136,7 @@ export function recordDesglosadorSubHistory(
   const minPerUnit = durSec / 60 / logradas;
   const totalMin = durSec / 60;
   saveVehicleHistoryEntry(
-    `${missionTitulo} → ${sub.titulo}`,
+    `${missionTitulo}${HISTORY_MEASURE_ARROW}${sub.titulo}`,
     minPerUnit,
     totalMin,
     "desglosador",
