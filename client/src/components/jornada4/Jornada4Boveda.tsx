@@ -21,10 +21,9 @@ import {
   computeJornadaVoltaje,
   type BovedaRecordView,
   type BovedaVoltaje,
-} from "@/components/jornada/MetricasJornadaModule";
-import {
-  readVehicleHistoryLocal,
-} from "@/lib/vehicleHistoryStore";
+} from "@/lib/bovedaRecords";
+import { measureKeyFromHistoryTitulo } from "@/lib/vehicleHistoryMeasure";
+import { readVehicleHistoryLocal } from "@/lib/vehicleHistoryStore";
 import type { VehicleHistoryEntry } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
 
@@ -42,15 +41,18 @@ const VOLTAJE: Record<
   Bajo: { color: MUTED, glow: "rgba(100,116,139,0.18)", label: "VOLTAJE BAJO" },
 };
 
+/** Serie del gráfico: todas las ejecuciones de la misma medida (unidad). */
 function historyForTitulo(
   all: VehicleHistoryEntry[],
   titulo: string
 ): VehicleHistoryEntry[] {
-  const key = titulo.toLowerCase().trim();
+  const key = measureKeyFromHistoryTitulo(titulo);
+  if (!key) return [];
   return all
     .filter(
       h =>
-        h?.titulo?.toLowerCase().trim() === key &&
+        h?.titulo &&
+        measureKeyFromHistoryTitulo(h.titulo) === key &&
         Number.isFinite(h.minPerUnit) &&
         h.minPerUnit > 0
     )

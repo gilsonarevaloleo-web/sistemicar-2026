@@ -28,6 +28,11 @@ import {
   VEHICLE_ARCHIVADO_BASE_PS,
   VEHICLE_CUMPLIDO_BASE_PS,
 } from "@/lib/sovereigntyPointsConfig";
+import {
+  cleanHistorySubTitulo,
+  measureKeyFromHistoryTitulo,
+  measureTituloFromHistoryTitulo,
+} from "@/lib/vehicleHistoryMeasure";
 
 export const GOLD = "#D4AF37";
 export const AZURE = "#1E90FF";
@@ -55,7 +60,12 @@ export const getHistoricalVehicleData = (missionTitle: string): { lastMinPerUnit
     const data = localStorage.getItem("sistemicar_vehicle_history");
     if (!data) return { count: 0 };
     const history: Array<{ titulo: string; minPerUnit: number; totalMin: number; tipoReloj: string; fecha: number }> = JSON.parse(data);
-    const matching = history.filter(h => h.titulo.toLowerCase() === missionTitle.toLowerCase());
+    const key = missionTitle.toLowerCase().trim();
+    // Coincide título completo o medida (unidad tras " → "), p.ej. sugerencia "Veis".
+    const matching = history.filter(h => {
+      const full = h.titulo.toLowerCase().trim();
+      return full === key || measureKeyFromHistoryTitulo(h.titulo) === key;
+    });
     if (matching.length === 0) return { count: 0 };
     const sorted = matching.sort((a, b) => b.fecha - a.fecha);
     const best = matching.reduce((min, h) => h.minPerUnit < min ? h.minPerUnit : min, Infinity);
@@ -205,8 +215,7 @@ export type CierreEnergiaModalPayload =
   | { kind: "desglosador"; vehicleId: string; subs: SubVehiculo[] }
   | { kind: "descanso"; vehicleId: string; status: "cumplido" | "archivado"; etiqueta: "recuperado" | "parcial" | "fragmentado"; nota: string };
 
-export const cleanSubTitulo = (t: string): string =>
-  t.replace(/^Día\s+\d+\s*\[[^\]]+\]:\s*/i, "").trim();
+export const cleanSubTitulo = (t: string): string => cleanHistorySubTitulo(t);
 
 export type DesglosadorSubFormRow = {
   titulo: string;
@@ -451,12 +460,10 @@ export const getSubVehicleRecordSuggestions = (query: string, limit = 5): Array<
     const map = new Map<string, { titulo: string; sum: number; count: number }>();
     for (const h of history) {
       if (h.minPerUnit <= 0 || !isFinite(h.minPerUnit)) continue;
-      const rawClean = h.titulo.includes(" → ")
-        ? h.titulo.split(" → ").slice(1).join(" → ").trim()
-        : h.titulo;
-      const cleanTitle = cleanSubTitulo(rawClean);
+      const cleanTitle = measureTituloFromHistoryTitulo(h.titulo);
       if (!cleanTitle.toLowerCase().includes(q)) continue;
-      const key = cleanTitle.toLowerCase().trim();
+      const key = measureKeyFromHistoryTitulo(h.titulo);
+      if (!key) continue;
       const ex = map.get(key);
       if (ex) { ex.sum += h.minPerUnit; ex.count++; }
       else map.set(key, { titulo: cleanTitle, sum: h.minPerUnit, count: 1 });
