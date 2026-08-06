@@ -3,8 +3,8 @@ import { SUBSCRIPTION_PLANS } from "./mercadopagoPlans";
 /** Comisión del vendedor: 30% de cada pago mientras la suscripción siga activa (corte al cancelar). */
 export const SELLER_COMMISSION_RATE = 0.3;
 
+/** Solo Jornada V4 (catálogo actual de /pagos). Espejo $17 ya no se vende. */
 export const SELLER_PLAN_IDS = [
-  "corazon-sabio",
   "planificacion_base",
   "soberania_dia",
   "operativo",

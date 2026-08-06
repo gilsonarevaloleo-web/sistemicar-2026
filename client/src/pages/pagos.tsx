@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { auth } from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
-import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Heart, Eye, Brain, Compass, Map, Layers, Clock, Zap, TrendingUp } from "lucide-react";
+import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,11 +19,8 @@ import {
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
-import yapeQrImage from "@assets/yape_qr_2026-02-17T22-11-48_1771384383841.png";
 
 const GOLD = "#D4AF37";
-const PURPLE = "#9333ea";
-const BLUE = "#3b82f6";
 
 const PAYPAL_LINK = "https://paypal.me/ElimanAte";
 const WHATSAPP_NUMBER = "51918260514";
@@ -58,26 +55,6 @@ const EMBUDO_PREGUNTAS = EMBUDO_PREGUNTAS_V2.map((q) => ({
   si: q.si,
   peldaño: q.peldaño,
 }));
-
-const espejoPlan: Plan = {
-  id: "corazon-sabio",
-  name: "El Corazón Sabio™",
-  price: 17,
-  pricePEN: 58.08,
-  isOneTime: true,
-  forWho: "Entrada al sistema",
-  roiCopy: "Diagnóstico antes de invertir en módulos mensuales.",
-  features: [
-    { name: "Doctor IA que lee tu historial de conducta", locked: false },
-    { name: "Detección de tu Interfaz de Dolor activa (M01–M10)", locked: false },
-    { name: "Patrón de boicot identificado con datos reales", locked: false },
-    { name: "Radiografía de tu brecha percepción/realidad", locked: false },
-    { name: "10 créditos · ~2 diagnósticos completos", locked: false },
-    { name: "7 días gratis — sin tarjeta", locked: false },
-  ],
-  icon: Heart,
-  color: "#E8567F",
-};
 
 const planificacionPlans: Plan[] = [
   {
@@ -157,24 +134,12 @@ const STACKS = PLANIFICACION_STACKS.map((stack) => ({
 
 type PaymentMethod = "mercadopago" | "paypal" | "yape" | null;
 
-const WARM_ROSE = "#E8567F";
-
-const ESPEJO_BENEFITS = [
-  { icon: Brain, text: "Doctor IA que lee tu historial de conducta", color: "#00FFC3" },
-  { icon: Eye, text: "Detección de tu Interfaz de Dolor activa (M01–M10)", color: "#FF3131" },
-  { icon: Heart, text: "Patrón de boicot identificado con datos reales", color: WARM_ROSE },
-  { icon: Zap, text: "Radiografía de tu brecha percepción/realidad", color: GOLD },
-  { icon: Shield, text: "10 créditos · ~2 diagnósticos completos", color: "#3b82f6" },
-  { icon: Sparkles, text: "7 días gratis — sin tarjeta", color: "#F97316" },
-];
-
 export default function Pagos() {
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
   const [selectedPlan, setSelectedPlan] = useState<Plan>(planificacionPlans[0]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [loading, setLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const [isEspejoProduct, setIsEspejoProduct] = useState(false);
   const [activeSellerRef, setActiveSellerRef] = useState<string | null>(null);
   const paymentSectionRef = useRef<HTMLDivElement>(null);
 
@@ -234,20 +199,22 @@ export default function Pagos() {
     const params = new URLSearchParams(window.location.search);
     const captured = captureSellerRefFromUrl(window.location.search);
     setActiveSellerRef(captured ?? getSellerRef());
-    const producto = params.get("producto");
-    if (producto === "espejo") {
-      setIsEspejoProduct(true);
-    }
 
     const status = params.get("status");
     const planParam = params.get("plan");
+    const producto = params.get("producto");
 
-    if (planParam === "corazon-sabio") {
-      setSelectedPlan(espejoPlan);
-      setTimeout(() => {
-        paymentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 300);
-    } else if (planParam && PLANIFICACION_CHECKOUT_PLANS.includes(planParam as typeof PLANIFICACION_CHECKOUT_PLANS[number])) {
+    // Espejo $17 retirado de venta — deep links de compra caen en Jornada V4.
+    // No tocar URL en status=success (compras legacy aún acreditan créditos).
+    if ((producto === "espejo" || planParam === "corazon-sabio") && status !== "success") {
+      toast.info("El pack Espejo ($17) ya no está a la venta. Elige un plan de Jornada.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("producto");
+      if (planParam === "corazon-sabio") url.searchParams.delete("plan");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+
+    if (planParam && PLANIFICACION_CHECKOUT_PLANS.includes(planParam as typeof PLANIFICACION_CHECKOUT_PLANS[number])) {
       const p = planificacionPlans.find(x => x.id === planParam);
       if (p) {
         setSelectedPlan(p);
@@ -258,6 +225,7 @@ export default function Pagos() {
     }
 
     if (status === "success") {
+      // Respaldo para compras legacy de Espejo que aún regresan del checkout MP.
       if (planParam === "corazon-sabio") {
         toast.success("¡Pago confirmado! Activando tus 10 créditos de Espejo…");
         void claimEspejoCredits();
@@ -348,213 +316,30 @@ export default function Pagos() {
             <Shield size={12} />
             Pago Seguro
           </div>
-          {isEspejoProduct ? (
-            <>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-white mb-2">
-                EL CORAZÓN <span style={{ color: WARM_ROSE }}>SABIO™</span>
-              </h1>
-              <p className="text-slate-400 text-sm">
-                Pago único · Sin suscripción · Acceso inmediato
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-white mb-2">
-                {SISTEMICAR_CATEGORY.name.toUpperCase()}
-              </h1>
-              <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
-                {SISTEMICAR_CATEGORY.oneLiner}
-              </p>
-              <p className="text-[10px] text-slate-600 mt-2 italic max-w-md mx-auto">
-                {SISTEMICAR_CATEGORY.notA}
-              </p>
-            </>
-          )}
+          <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-white mb-2">
+            {SISTEMICAR_CATEGORY.name.toUpperCase()}
+          </h1>
+          <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+            {SISTEMICAR_CATEGORY.oneLiner}
+          </p>
+          <p className="text-[10px] text-slate-600 mt-2 italic max-w-md mx-auto">
+            {SISTEMICAR_CATEGORY.notA}
+          </p>
         </header>
 
-        {activeSellerRef && !isEspejoProduct && (
+        {activeSellerRef && (
           <div className="mb-6 p-3 rounded-xl border text-center text-[10px]" style={{ borderColor: `${GOLD}30`, backgroundColor: `${GOLD}08`, color: GOLD }}>
             Referido por vendedor: <span className="font-black">{activeSellerRef}</span>
           </div>
         )}
 
-        {isEspejoProduct && (
-          <div className="mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl p-6 border-2 mb-6"
-              style={{ backgroundColor: `${WARM_ROSE}08`, borderColor: `${WARM_ROSE}30` }}
-            >
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)` }}>
-                  <Heart size={32} className="text-white" />
-                </div>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-slate-500 line-through text-lg">S/ 97.00</span>
-                  <span className="text-4xl font-black" style={{ color: GOLD }}>$17</span>
-                </div>
-                <p className="text-xs text-slate-500">Equivalente a S/ 58.08 · Pago único</p>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                {ESPEJO_BENEFITS.map((benefit, i) => {
-                  const Icon = benefit.icon;
-                  return (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${benefit.color}15` }}>
-                        <Icon size={16} style={{ color: benefit.color }} />
-                      </div>
-                      <span className="text-slate-300">{benefit.text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="space-y-4 mb-6"
-            >
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Elige tu método de pago</p>
-
-              <div className="rounded-2xl p-5 border-2 text-center" style={{ backgroundColor: "rgba(96, 40, 143, 0.08)", borderColor: "rgba(96, 40, 143, 0.4)" }}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(96, 40, 143, 0.2)" }}>
-                    <Smartphone size={20} style={{ color: "#60288F" }} />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-white text-sm">Yape</p>
-                    <p className="text-[10px] text-slate-500">Perú · Pago instantáneo</p>
-                  </div>
-                </div>
-                <img src={yapeQrImage} alt="QR Yape" className="w-44 h-44 mx-auto rounded-lg mb-3" />
-                <p className="text-sm font-bold text-white">N° 918260514</p>
-                <p className="text-xs text-slate-400 mb-3">Gilson Arevalo Pezo</p>
-                <a
-                  href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hola Gilson, acabo de pagar El Corazón Sabio ($17) por Yape. Mi correo es: ")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-white text-xs transition-all hover:scale-[1.02]"
-                  style={{ backgroundColor: "#25D366" }}
-                >
-                  <MessageCircle size={14} />
-                  Confirmar pago por WhatsApp
-                </a>
-              </div>
-
-              <a
-                href={`${PAYPAL_LINK}/17USD`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block rounded-2xl p-5 border-2 transition-all hover:scale-[1.01]"
-                style={{ backgroundColor: "rgba(59, 130, 246, 0.05)", borderColor: "rgba(59, 130, 246, 0.3)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(59, 130, 246, 0.2)" }}>
-                    <CreditCard size={20} className="text-blue-400" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <p className="font-bold text-white text-sm">PayPal</p>
-                    <p className="text-[10px] text-slate-500">Internacional · $17 USD</p>
-                  </div>
-                  <ExternalLink size={16} className="text-slate-500" />
-                </div>
-              </a>
-
-              <button
-                onClick={async () => {
-                  try {
-                    const response = await fetch("/api/mercadopago/create-preference", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ planId: "corazon-sabio", email: localStorage.getItem("userEmail") || undefined, sellerRef: getSellerRef() || undefined })
-                    });
-                    const data = await response.json();
-                    if (data.initPoint) {
-                      window.location.href = data.initPoint;
-                    } else {
-                      toast.error("Error al conectar con MercadoPago");
-                    }
-                  } catch {
-                    toast.error("Error al procesar. Intenta otro método.");
-                  }
-                }}
-                className="w-full rounded-2xl p-5 border-2 transition-all hover:scale-[1.01] text-left"
-                style={{ backgroundColor: "rgba(59, 130, 246, 0.05)", borderColor: "rgba(59, 130, 246, 0.3)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(59, 130, 246, 0.2)" }}>
-                    <CreditCard size={20} className="text-blue-300" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-white text-sm">MercadoPago</p>
-                    <p className="text-[10px] text-slate-500">Tarjetas, débito · S/ 58.08</p>
-                  </div>
-                  <ExternalLink size={16} className="text-slate-500" />
-                </div>
-              </button>
-
-              <p className="text-[10px] text-slate-500 text-center">Después de pagar con Yape o PayPal, envía tu comprobante por WhatsApp para activar tu acceso</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-center"
-            >
-              <Link href="/ventas-espejo" className="text-sm text-slate-500 hover:text-white transition-colors">
-                ← Volver a la página del Espejo
-              </Link>
-            </motion.div>
-          </div>
-        )}
-
-        {!isEspejoProduct && (<>
-        {/* Espejo — pago único */}
-        <section className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart size={16} style={{ color: WARM_ROSE }} />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Espejo</h2>
-          </div>
-          <motion.button
-            onClick={() => navigate("/pagos?producto=espejo")}
-            whileHover={{ scale: 1.01 }}
-            className="w-full p-5 rounded-2xl border-2 text-left transition-all"
-            style={{ borderColor: `${WARM_ROSE}40`, backgroundColor: `${WARM_ROSE}08` }}
-            data-testid="section-espejo"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl" style={{ background: `${WARM_ROSE}20` }}>
-                  <Heart size={22} style={{ color: WARM_ROSE }} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white">El Corazón Sabio™</h3>
-                  <p className="text-[11px] text-slate-400">Doctor IA · 10 créditos · Pago único</p>
-                  {espejoPlan.roiCopy && (
-                    <p className="text-[10px] text-slate-500 mt-1 italic">{espejoPlan.roiCopy}</p>
-                  )}
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <span className="text-2xl font-black text-white">$17</span>
-                <p className="text-[10px] text-slate-500">S/ 58.08</p>
-              </div>
-            </div>
-          </motion.button>
-        </section>
-
-        {/* Planificación mensual */}
+        {/* Jornada V4 — única lista de venta */}
         <section className="mb-10">
           <CategoriaSistemicarBanner />
 
           <div className="flex items-center gap-2 mb-4">
             <Compass size={16} style={{ color: GOLD }} />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Planificación · Mensual</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Jornada · Mensual</h2>
           </div>
 
           {/* Embudo — autodiagnóstico */}
@@ -1093,7 +878,6 @@ export default function Pagos() {
             © 2025 SISTEMICAR. Todos los derechos reservados.
           </p>
         </footer>
-        </>)}
       </motion.div>
     </TooltipProvider>
   );

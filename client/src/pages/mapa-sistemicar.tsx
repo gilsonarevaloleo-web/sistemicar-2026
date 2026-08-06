@@ -28,7 +28,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/menu", nombre: "Menú Principal", desc: "Panel central de navegación", icon: Home, color: GOLD, acceso: "usuario" },
       { path: "/jornada-v4", nombre: JORNADA_MODULE.title, desc: `${JORNADA_MODULE.tagline} — Jornada Base (Conquista + PS)`, icon: Zap, color: ORANGE, acceso: "planificacion_base" },
       { path: "/proyectos", nombre: "Proyectos y Peldaños", desc: "Hub — requiere Norte (peldaño alto valor)", icon: Layers, color: "#38BDF8", acceso: "soberania_dia" },
-      { path: "/espejo", nombre: "Espejo Soberano", desc: "El Corazón Sabio™ — $17 pago único", icon: Heart, color: "#ef4444", acceso: "libre" },
+      { path: "/espejo", nombre: "Espejo Soberano", desc: "Vaciado mental · Doctor IA", icon: Heart, color: "#ef4444", acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
       { path: "/esperanza", nombre: "Depósito (Esperanza)", desc: "Registro de esperanzas y deseos futuros", icon: Star, color: EMERALD, acceso: "en_camino" },
@@ -70,11 +70,10 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     titulo: "Comercio y Acceso",
     color: ORANGE,
     rutas: [
-      { path: "/ventas-espejo", nombre: "Ventas Espejo", desc: "El Corazón Sabio™ — producto de $17 con Doctor IA", icon: ShoppingCart, color: ORANGE, acceso: "libre" },
       { path: "/embudo", nombre: "Embudo SISTEMICAR", desc: "Funnel de ventas principal", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/umbral", nombre: "Umbral", desc: "Página de entrada y conversión", icon: Lock, color: GOLD, acceso: "en_camino" },
       { path: "/umbral-leads", nombre: "Umbral Leads", desc: "Captura de prospectos interesados", icon: Users, color: BLUE, acceso: "libre" },
-      { path: "/pagos", nombre: "Pagos", desc: "Espejo + Planificación modular (Base, Soberanía del día, Operativo)", icon: ShoppingCart, color: EMERALD, acceso: "libre" },
+      { path: "/pagos", nombre: "Pagos", desc: "Jornada V4 — Base, Ritmo del día, Norte", icon: ShoppingCart, color: EMERALD, acceso: "libre" },
       { path: "/gracias-compra", nombre: "Gracias por tu Compra", desc: "Página post-compra con siguiente paso", icon: Star, color: GOLD, acceso: "libre" },
     ]
   },
@@ -121,8 +120,7 @@ export default function MapaSistemicar() {
 
         <div className="p-3 rounded-xl border mb-4 flex items-center gap-3" style={{ backgroundColor: `${GOLD}05`, borderColor: `${GOLD}15` }}>
           <Map size={16} style={{ color: GOLD }} />
-          <p className="text-[10px] text-slate-400">Precios hoy: Espejo $17 · Planificación Base $19.99/mes · Soberanía del día $29.99/mes · Operativo $39.99/mes</p>
-          <p className="text-[9px] text-slate-500 mt-1">Stacks: Estudiante ~$50/mes · Producción ~$60/mes</p>
+          <p className="text-[10px] text-slate-400">Precios hoy: Jornada Base $24.99/mes · Ritmo del día $29.99/mes · Norte $34.99/mes</p>
         </div>
 
         <div className="flex gap-2 mb-4 flex-wrap">

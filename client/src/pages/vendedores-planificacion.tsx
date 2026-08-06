@@ -252,7 +252,7 @@ export default function VendedoresPlanificacion() {
             {Math.round(SELLER_COMMISSION_RATE * 100)}% cada mes que el cliente pague
           </p>
           <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-            Recurrente en suscripciones Base, Ritmo y Norte. Si cancela, deja de generarse comisión. Espejo ($17 único) ~$5.10 una vez — no recurrente.
+            Recurrente en suscripciones Base, Ritmo y Norte. Si cancela, deja de generarse comisión.
           </p>
         </section>
 
