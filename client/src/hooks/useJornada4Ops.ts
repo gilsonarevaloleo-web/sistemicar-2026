@@ -63,6 +63,7 @@ import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 import type { SubTarea } from "@/lib/persistence";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
 import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
+import { recordProgresoHubAlCerrarVehiculo } from "@/lib/proyectos";
 import {
   buildDesglosadorNestedPausePatch,
   resumeDesglosadorFromNestedPause,
@@ -323,6 +324,18 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               },
               { skipLocalSync: true }
             );
+            const closed: Vehicle = {
+              ...vehicle,
+              status: patch.status,
+              cierreAt: patch.cierreAt,
+              subVehiculos: patch.subVehiculos,
+              desglosadorBloqueDepthPsGranted: depthPs,
+            };
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: "tiempo",
+              psGanados: cyclePs + depthPs,
+              subs: patch.subVehiculos,
+            });
           } catch (e) {
             console.error("[jornada4.closeConquistaCycle] remote", e);
           }
@@ -493,8 +506,9 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
 
+        let awarded = 0;
         try {
-          const awarded = await awardSituacionBlockPs(
+          awarded = await awardSituacionBlockPs(
             vehicle.titulo,
             patch.status,
             safeAwardPS
@@ -529,6 +543,22 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               },
               { skipLocalSync: true }
             );
+            const closed: Vehicle = {
+              ...vehicle,
+              status: patch.status,
+              cierreAt: patch.cierreAt,
+              subTareas: patch.subTareas,
+              situacionCronometro: patch.situacionCronometro,
+              situacionCupoAnchor: patch.situacionCupoAnchor,
+            };
+            const apertura = vehicle.aperturaAt ?? patch.cierreAt;
+            const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: "situacion",
+              psGanados: awarded,
+              duracionMin,
+              subTareas: patch.subTareas,
+            });
           } catch (e) {
             console.error("[jornada4.closeSituacionBlock] remote", e);
           }
@@ -792,9 +822,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
 
+        let awarded = 0;
         try {
           noteHuecoAfterClose(vehiclesRef.current);
-          const awarded = await awardSituacionBlockPs(
+          awarded = await awardSituacionBlockPs(
             vehicle.titulo,
             status,
             safeAwardPS
@@ -822,6 +853,17 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               { status, cierreAt },
               { skipLocalSync: true }
             );
+            if (status === "cumplido") {
+              const closed: Vehicle = { ...vehicle, status, cierreAt };
+              const apertura = vehicle.aperturaAt ?? cierreAt;
+              const duracionMin = Math.max(0, (cierreAt - apertura) / 60_000);
+              await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+                tipoOrigen: "situacion",
+                psGanados: awarded,
+                duracionMin,
+                subTareas: vehicle.subTareas ?? [],
+              });
+            }
           } catch (e) {
             console.error("[jornada4.closeSituacionLibreBloque] remote", e);
           }

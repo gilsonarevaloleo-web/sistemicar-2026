@@ -4,7 +4,9 @@
  * Plan y Métricas van en chunks lazy; Operar queda liviano (sin Pulso/recharts).
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearch, useLocation } from "wouter";
 import { useAuthContext } from "@/App";
+import { requestJornada4OpenLaunch } from "@/lib/pulsoCoberturaEvents";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import {
   Jornada4MobileNav,
@@ -57,13 +59,45 @@ export default function JornadaV4Session() {
   const entitlements = usePlanificacionEntitlements();
   const core = useJornada4Core();
   const lastLaunchRef = useRef<{ key: string; at: number } | null>(null);
+  const search = useSearch();
+  const [, setLocation] = useLocation();
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
   const [huecosRefresh, setHuecosRefresh] = useState(0);
+  const [hubLaunchPeldanoId, setHubLaunchPeldanoId] = useState<string | null>(null);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
+
+  // Deep link desde Hub: /jornada-v4?proyectoId&peldanoId&launch=desglosador_*
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const proyectoId = params.get("proyectoId")?.trim();
+    const peldanoId = params.get("peldanoId")?.trim();
+    const launch = params.get("launch");
+    if (!proyectoId && !peldanoId && !launch) return;
+
+    const tipoFlota =
+      launch === "desglosador_situacion"
+        ? ("situacion" as const)
+        : launch === "desglosador_tiempo"
+          ? ("tiempo" as const)
+          : undefined;
+
+    if (peldanoId) setHubLaunchPeldanoId(peldanoId);
+    setMobileTab("operar");
+    const t = window.setTimeout(() => {
+      requestJornada4OpenLaunch({
+        ...(tipoFlota ? { tipoFlota } : {}),
+        ...(proyectoId ? { proyectoId } : {}),
+        ...(peldanoId ? { peldanoId } : {}),
+        modo: "desglose",
+      });
+      setLocation("/jornada-v4", { replace: true });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [search, setLocation]);
 
   const planillaApi = useJornada4Planilla({
     userId: user?.uid,
@@ -289,6 +323,7 @@ export default function JornadaV4Session() {
                   ? planillaApi.segmentoActivo?.proyectoVinculadoId ?? null
                   : null
               }
+              hubPeldanoId={entitlements.hasNorte ? hubLaunchPeldanoId : null}
               canSituacion={entitlements.hasRitmo}
               canProyectos={entitlements.hasNorte}
               canModoEntrenamientoRing={canModoEntrenamientoRing}

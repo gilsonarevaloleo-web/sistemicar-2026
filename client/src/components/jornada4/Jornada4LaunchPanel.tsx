@@ -55,6 +55,8 @@ type Props = {
   canModoEntrenamientoRing?: boolean;
   /** Ritmo (Operativo): toggle anclar desglosador al segmento. */
   canAnclarDesglosadorSegmento?: boolean;
+  /** Peldaño Hub (idea/oleada) al que se amarran los vehículos lanzados. */
+  hubPeldanoId?: string | null;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -106,6 +108,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   canProyectos = true,
   canModoEntrenamientoRing = false,
   canAnclarDesglosadorSegmento = false,
+  hubPeldanoId = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -116,6 +119,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filas, setFilas] = useState<string[]>([""]);
   const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
   const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
+  const [peldanoIdLaunch, setPeldanoIdLaunch] = useState(hubPeldanoId?.trim() || "");
   /** Conquista multi: un desglosador en secuencia vs N tareas independientes. */
   const [conquistaMultiModo, setConquistaMultiModo] = useState<
     "secuencia" | "independientes"
@@ -170,13 +174,26 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, []);
 
   useEffect(() => {
-    const onOpen = () => {
-      setTipo(null);
+    const onOpen = (ev: Event) => {
+      const detail = (ev as CustomEvent<{
+        tipoFlota?: "tiempo" | "situacion";
+        proyectoId?: string;
+        peldanoId?: string;
+        modo?: FlotaLaunchModo;
+      }>).detail;
+      if (detail?.proyectoId?.trim()) setVehiculoProyectoId(detail.proyectoId.trim());
+      if (detail?.peldanoId?.trim()) setPeldanoIdLaunch(detail.peldanoId.trim());
+      if (detail?.modo) setModo(detail.modo);
+      setTipo(detail?.tipoFlota ?? null);
       setOpen(true);
     };
     window.addEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
     return () => window.removeEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
   }, []);
+
+  useEffect(() => {
+    if (hubPeldanoId?.trim()) setPeldanoIdLaunch(hubPeldanoId.trim());
+  }, [hubPeldanoId]);
 
   useEffect(() => {
     if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
@@ -224,6 +241,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setFilas([""]);
     setFilasProyectoIds([""]);
     setVehiculoProyectoId(defaultProyectoId?.trim() || "");
+    setPeldanoIdLaunch(hubPeldanoId?.trim() || "");
     setConquistaMultiModo("secuencia");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -236,7 +254,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
     setOpen(false);
-  }, [segmentoHoraFin, defaultProyectoId]);
+  }, [segmentoHoraFin, defaultProyectoId, hubPeldanoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     if (t === "situacion" && !canSituacion) {
@@ -297,6 +315,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setSaving(true);
     try {
       const dirVehiculo = vehiculoProyectoId.trim() || undefined;
+      const dirPeldano = peldanoIdLaunch.trim() || undefined;
       const validSubs = subs.filter(
         s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
       );
@@ -315,6 +334,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           tareasIndependientes: asIndependientes ? validSubs : undefined,
           conquistaComoIndependientes: asIndependientes,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+          ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
           ...(canAnclarDesglosadorSegmento && ancladoAlSegmento
             ? { ancladoAlSegmento: true }
             : {}),
@@ -328,6 +348,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           situacionFilasProyectoIds: filasProyectoIds,
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+          ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
         });
       } else {
         id = await onLaunch({
@@ -339,6 +360,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           situacionObjetivoHora: situacionHoraFin.trim(),
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
+          ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
           ...(canModoEntrenamientoRing && modoEntrenamientoRing
             ? { modoEntrenamientoRing: true }
             : {}),
@@ -359,6 +381,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     filas,
     filasProyectoIds,
     vehiculoProyectoId,
+    peldanoIdLaunch,
     situacionHoraFin,
     terminoDetalle,
     conquistaMultiModo,

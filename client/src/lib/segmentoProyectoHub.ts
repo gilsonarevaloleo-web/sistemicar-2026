@@ -43,10 +43,23 @@ export function ordenFlotaParaSegmento(seg: SegmentoV5 | null): TipoFlota[] {
 
 export function resolverProyectoIdVehiculo(
   segmentoActivo: SegmentoV5 | null,
-  launchCtx: { proyectoId: string } | null
+  launchCtx: { proyectoId: string; peldanoId?: string } | null
 ): string | undefined {
   if (launchCtx?.proyectoId) return launchCtx.proyectoId;
   return segmentoActivo?.proyectoVinculadoId || undefined;
+}
+
+/**
+ * Peldaño al que se amarra el vehículo.
+ * Hub (idea/oleada) gana; si no, la sombra del segmento del día (para sellar puerta).
+ */
+export function resolverPeldanoIdVehiculo(
+  segmentoActivo: SegmentoV5 | null,
+  launchCtx: { proyectoId?: string; peldanoId?: string } | null
+): string | undefined {
+  const fromHub = launchCtx?.peldanoId?.trim();
+  if (fromHub) return fromHub;
+  return segmentoActivo?.proyectoPeldanoId || undefined;
 }
 
 /** Registra cronómetros, PS y cierres en el Hub del proyecto vinculado al segmento. */

@@ -34,6 +34,8 @@ import {
   GOLD,
 } from "@/components/flota/vehicleCardShared";
 import { COMPONENTES, registrarEvento } from "@/lib/evento-universal";
+import { resolverPeldanoIdVehiculo } from "@/lib/segmentoProyectoHub";
+import { getPeldanosByProyectoLocal, markPeldanoEnCurso } from "@/lib/proyectos";
 
 const STUB_EJES = {
   enfoque: { text: "", trifecta: "omitir" as const },
@@ -96,6 +98,11 @@ export type FlotaLaunchForm = {
    * Si se omite, hereda del segmento activo vía resolverProyectoId.
    */
   proyectoId?: string;
+  /**
+   * Peldaño del Hub (idea/oleada) al que camina este vehículo.
+   * Si se omite, hereda la sombra del segmento (para sellar puerta).
+   */
+  peldanoId?: string;
   /**
    * Semilla situacional (ring o lista libre) incluida en el paint + remote del launch.
    * Evita persistir un shell sin cronómetro/filas si el usuario sale al instante.
@@ -224,9 +231,16 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
     const segActualId = segResuelto?.id ?? segmentoActivo?.id;
     const resolvedProyectoId = resolverProyectoId(
       form.proyectoId?.trim()
-        ? { proyectoId: form.proyectoId.trim() }
+        ? {
+            proyectoId: form.proyectoId.trim(),
+            ...(form.peldanoId?.trim() ? { peldanoId: form.peldanoId.trim() } : {}),
+          }
         : null
     );
+    const resolvedPeldanoId = resolverPeldanoIdVehiculo(segResuelto ?? segmentoActivo, {
+      proyectoId: resolvedProyectoId,
+      peldanoId: form.peldanoId?.trim(),
+    });
 
     const { provisionalId: newVehicleId, clientRequestId: newClientRequestId } = newFlotaLaunchIds();
 
@@ -269,6 +283,7 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
           }
         : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
+      ...(resolvedPeldanoId ? { proyectoPeldanoId: resolvedPeldanoId } : {}),
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,
       segmentosCruzados: 0,
@@ -327,6 +342,21 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       vehicleId: newVehicleId,
       safeAwardPS,
     });
+
+    // Idea/oleada del Hub: pasa a en_curso al lanzar el vehículo sobre ella.
+    if (resolvedProyectoId && resolvedPeldanoId) {
+      const pel = getPeldanosByProyectoLocal(userId, resolvedProyectoId).find(
+        p => p.id === resolvedPeldanoId
+      );
+      if (pel && !pel.origenSegmento && pel.estado === "idea") {
+        void markPeldanoEnCurso(
+          userId,
+          resolvedPeldanoId,
+          newVehicleId,
+          tipoFlota === "situacion" ? "situacion" : "tiempo"
+        );
+      }
+    }
 
     return newVehicleId;
   } catch (err) {
