@@ -195,6 +195,8 @@ export default function ProyectosPage() {
   const [guardandoClaridad, setGuardandoClaridad] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [creatingProyecto, setCreatingProyecto] = useState(false);
+  /** Diferir editor/calendario: abrir detalle no debe montar todo el árbol de golpe. */
+  const [detailHeavyReady, setDetailHeavyReady] = useState(false);
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
@@ -282,16 +284,43 @@ export default function ProyectosPage() {
       setProyecto(null);
       setPeldanos([]);
       setDetailLoading(false);
+      setDetailHeavyReady(false);
       return;
     }
-    // Detalle: local al momento; remoto solo fuera del soft-start Dual Kernel.
+    // Detalle: pintar local al instante (el gesto de abrir no espera red).
     if (user) {
       const localP = getProyectosLocal(user.uid).find(p => p.id === detailId) ?? null;
       const localPel = getPeldanosByProyectoLocal(user.uid, detailId);
       if (localP) applyDetailState(localP, localPel);
     }
-    if (!motorsQuiet) void reloadDetail();
-  }, [detailId, reloadDetail, motorsQuiet, user, applyDetailState]);
+  }, [detailId, user, applyDetailState]);
+
+  useEffect(() => {
+    if (!detailId) {
+      setDetailHeavyReady(false);
+      return;
+    }
+    setDetailHeavyReady(false);
+    const heavyId = window.setTimeout(() => setDetailHeavyReady(true), 120);
+    return () => window.clearTimeout(heavyId);
+  }, [detailId]);
+
+  useEffect(() => {
+    if (!detailId || motorsQuiet) return;
+    const remoteId = window.setTimeout(() => {
+      void reloadDetail();
+    }, 280);
+    return () => window.clearTimeout(remoteId);
+  }, [detailId, motorsQuiet, reloadDetail]);
+
+  const openProyectoDetalle = useCallback(
+    (id: string) => {
+      startTransition(() => {
+        navigate(`/proyectos?id=${id}`);
+      });
+    },
+    [navigate]
+  );
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
   // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
@@ -511,15 +540,19 @@ export default function ProyectosPage() {
                 </button>
               </div>
             )}
-            <RutasMentalesEditor
-              rutas={claridadEdit}
-              onChange={setClaridadEdit}
-              etiqueta={proyecto.etiqueta}
-              desdeProyecto
-            />
+            {detailHeavyReady ? (
+              <RutasMentalesEditor
+                rutas={claridadEdit}
+                onChange={setClaridadEdit}
+                etiqueta={proyecto.etiqueta}
+                desdeProyecto
+              />
+            ) : (
+              <p className="text-[9px] text-slate-600 py-2">Cargando dirección…</p>
+            )}
             <button
               type="button"
-              disabled={guardandoClaridad}
+              disabled={guardandoClaridad || !detailHeavyReady}
               onClick={() => void handleGuardarClaridad()}
               className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
               style={{
@@ -579,7 +612,11 @@ export default function ProyectosPage() {
           <p className="text-[8px] mb-3 leading-relaxed" style={{ color: NARANJA }}>
             Historial de ejecución — pasos ya realizados. No es un planificador.
           </p>
-          <PasosDadosCalendar pasos={proyecto.pasosEjecutadosLog ?? []} />
+          {detailHeavyReady ? (
+            <PasosDadosCalendar pasos={proyecto.pasosEjecutadosLog ?? []} />
+          ) : (
+            <p className="text-[9px] text-slate-600 py-2">Cargando calendario…</p>
+          )}
         </div>
 
         {enCursoPlan.length > 0 && (
@@ -848,9 +885,11 @@ export default function ProyectosPage() {
           {proyectos.map(p => (
             <button
               key={p.id}
-              onClick={() => navigate(`/proyectos?id=${p.id}`)}
+              type="button"
+              onClick={() => openProyectoDetalle(p.id)}
               className="w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.01]"
               style={{ backgroundColor: PIZARRA, borderColor: `${p.color ?? CYAN}30` }}
+              data-testid={`proyecto-card-${p.id}`}
             >
               <div className="flex items-start justify-between">
                 <div>

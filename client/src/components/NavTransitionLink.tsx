@@ -19,9 +19,9 @@ export function NavTransitionLink({ href, children, className, onClick }: Props)
       className={className}
       onClick={() => {
         // Soft-start ANTES del cambio de ruta: el latch compartido debe
-        // estar armado cuando Admin/Espejo montan en el mismo commit.
+        // estar armado cuando Admin/Espejo/Hub montan en el mismo commit.
         if (isJornada4WindowPath() && !isJornada4Path(href)) {
-          armDualKernelExitSoftStart();
+          armDualKernelExitSoftStart({ href });
         }
         beginViewTransition();
         onClick?.();
