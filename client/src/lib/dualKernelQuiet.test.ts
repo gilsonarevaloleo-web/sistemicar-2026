@@ -25,6 +25,7 @@ describe("dualKernelQuiet soft-start", () => {
   it("exporta helper de quiet + soft-start compartido", () => {
     const src = readFileSync(join(dir, "dualKernelQuiet.ts"), "utf8");
     assert.match(src, /useDualKernelMotorsQuiet/);
+    assert.match(src, /useAppShellMotorsQuiet/);
     assert.match(src, /DUAL_KERNEL_EXIT_SOFT_MS/);
     assert.match(src, /DUAL_KERNEL_HUB_EXIT_SOFT_MS/);
     assert.match(src, /armDualKernelExitSoftStart/);
@@ -54,7 +55,7 @@ describe("dualKernelQuiet soft-start", () => {
     assert.ok(Date.now() - before < DUAL_KERNEL_HUB_EXIT_SOFT_MS);
   });
 
-  it("SegmentAttention y Centinela usan soft-start al salir de Dual Kernel", () => {
+  it("SegmentAttention, Centinela y Cierre callan en Hub vía useAppShellMotorsQuiet", () => {
     const seg = readFileSync(
       join(dir, "../components/SegmentAttentionBackground.tsx"),
       "utf8"
@@ -63,23 +64,19 @@ describe("dualKernelQuiet soft-start", () => {
       join(dir, "../components/centinela-engine.tsx"),
       "utf8"
     );
-    assert.match(seg, /useDualKernelMotorsQuiet/);
-    assert.match(cen, /useDualKernelMotorsQuiet/);
-    assert.match(seg, /isProyectosHubPath/);
-    assert.match(cen, /isProyectosHubPath/);
-    assert.match(seg, /CLOCK_MS_IDLE/);
-    assert.match(cen, /CENTINELA_UI_MS_HUB/);
-    assert.equal(seg.includes("isJornada4Path(location)"), false);
-    assert.equal(cen.includes("isJornada4Path(location)"), false);
-  });
-
-  it("CierreJornada y AdminGilson usan soft-start (Ring→Menú→Admin)", () => {
     const cierre = readFileSync(
       join(dir, "../components/cierre-jornada-modal.tsx"),
       "utf8"
     );
+    assert.match(seg, /useAppShellMotorsQuiet/);
+    assert.match(cen, /useAppShellMotorsQuiet/);
+    assert.match(cierre, /useAppShellMotorsQuiet/);
+    assert.equal(seg.includes("useDualKernelMotorsQuiet"), false);
+    assert.equal(cen.includes("useDualKernelMotorsQuiet"), false);
+  });
+
+  it("AdminGilson usa soft-start (Ring→Menú→Admin)", () => {
     const admin = readFileSync(join(dir, "../pages/admin-gilson.tsx"), "utf8");
-    assert.match(cierre, /useDualKernelMotorsQuiet/);
     assert.match(admin, /useDualKernelMotorsQuiet/);
     assert.match(admin, /motorsQuiet/);
   });
@@ -109,7 +106,7 @@ describe("dualKernelQuiet soft-start", () => {
     assert.match(menu, /motorsQuiet/);
   });
 
-  it("Hub Proyectos difiere Firestore y aligera apertura de detalle", () => {
+  it("Hub Proyectos abre detalle síncrono y siembra estado local", () => {
     const hub = readFileSync(join(dir, "../pages/proyectos.tsx"), "utf8");
     assert.match(hub, /useDualKernelMotorsQuiet/);
     assert.match(hub, /motorsQuiet/);
@@ -117,6 +114,11 @@ describe("dualKernelQuiet soft-start", () => {
     assert.match(hub, /getProyectosLocal/);
     assert.match(hub, /detailHeavyReady/);
     assert.match(hub, /openProyectoDetalle/);
-    assert.match(hub, /startTransition/);
+    assert.match(hub, /applyDetailState\(localP/);
+    // Crítico: no diferir el navigate con startTransition (nunca pintaba con hilo saturado).
+    const openBlock = hub.slice(hub.indexOf("const openProyectoDetalle"));
+    const openFn = openBlock.slice(0, openBlock.indexOf("const stats"));
+    assert.equal(openFn.includes("startTransition(()"), false);
+    assert.match(openFn, /navigate\(`\/proyectos\?id=/);
   });
 });

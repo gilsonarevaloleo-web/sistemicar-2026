@@ -36,7 +36,7 @@ import BalanceConquistaPanel from "@/components/BalanceConquistaPanel";
 import { calcularBalanceConquistaJornada } from "@/engines/ConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
 import { shouldMountAutoCierreJornada } from "@/lib/jornadaConsciousGuard";
-import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import { useAppShellMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const GOLD = "#D4AF37";
 const PURPLE = "#A855F7";
@@ -76,8 +76,8 @@ interface CierreData {
 export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location] = useLocation();
-  // Quiet en Dual Kernel + soft-start al salir (evita freeze Ring→Menú→Admin).
-  const motorsQuiet = useDualKernelMotorsQuiet();
+  // Quiet en Dual Kernel, soft-start y Hub Proyectos.
+  const motorsQuiet = useAppShellMotorsQuiet();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cierreData, setCierreData] = useState<CierreData | null>(null);
