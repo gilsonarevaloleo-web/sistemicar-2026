@@ -1,7 +1,7 @@
 /**
  * Quiet Dual Kernel: pausa motores globales del App shell en `/jornada-v4`
  * y, al salir, aplica un soft-start compartido para no colapsar el hilo al
- * montar Espejo, Admin u otros módulos (Menú hamburguesa incluido).
+ * montar Espejo, Admin, Hub Proyectos u otros módulos (Menú hamburguesa incluido).
  *
  * Latch a nivel de módulo (no por instancia de hook):
  * - El #41 dejaba un hueco de 1 frame: `exitQuiet` solo se armaba en useEffect,
@@ -9,14 +9,23 @@
  *   que el unmount de Jornada + mount del destino.
  * - Destinos nuevos (Admin/Espejo) inicializaban su propio `exitQuiet=false`
  *   y nunca veían el soft-start.
+ * - Hub Proyectos (#50) difería Firestore, pero el soft-start corto no bastaba:
+ *   al soltar, el reloj 1 s del ring + Centinela clavaban el detalle.
  */
 import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useLocation } from "wouter";
-import { isJornada4Path } from "@/lib/jornadaBrand";
+import { isJornada4Path, isProyectosHubPath } from "@/lib/jornadaBrand";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
 
 /** Tras salir de Dual Kernel, diferir Centinela / SegmentAttention / Cierre / destinos pesados. */
 export const DUAL_KERNEL_EXIT_SOFT_MS = isMobilePerfMode() ? 2_500 : 1_200;
+
+/**
+ * Ring → Hub Proyectos: soft-start más largo.
+ * El Hub necesita toques (abrir detalle) mientras el ring sigue “vivo” en flotaStore;
+ * 1–2.5 s no alcanza antes de que el reloj 1 s y Centinela saturen el hilo.
+ */
+export const DUAL_KERNEL_HUB_EXIT_SOFT_MS = isMobilePerfMode() ? 5_500 : 3_000;
 
 let softUntilMs = 0;
 let softTimer: ReturnType<typeof setTimeout> | null = null;
@@ -58,12 +67,33 @@ export function isDualKernelExitSoftActive(): boolean {
   return Date.now() < softUntilMs;
 }
 
+export type ArmDualKernelExitSoftOpts = {
+  /** Destino de la navegación (p. ej. `/proyectos`) — alarga soft-start al Hub. */
+  href?: string;
+  /** Override explícito de duración. */
+  durationMs?: number;
+};
+
+function resolveSoftDuration(opts?: ArmDualKernelExitSoftOpts): number {
+  if (opts?.durationMs != null && opts.durationMs > 0) return opts.durationMs;
+  if (opts?.href && isProyectosHubPath(opts.href)) return DUAL_KERNEL_HUB_EXIT_SOFT_MS;
+  return DUAL_KERNEL_EXIT_SOFT_MS;
+}
+
 /**
  * Arma el soft-start de forma síncrona — llamar en el click de nav
  * ANTES de cambiar la ruta (NavTransitionLink).
  */
-export function armDualKernelExitSoftStart(): void {
-  softUntilMs = Date.now() + DUAL_KERNEL_EXIT_SOFT_MS;
+export function armDualKernelExitSoftStart(opts?: ArmDualKernelExitSoftOpts | number): void {
+  const normalized: ArmDualKernelExitSoftOpts |
+    undefined =
+    typeof opts === "number" ? { durationMs: opts } : opts;
+  const ms = resolveSoftDuration(normalized);
+  // No acortar un soft-start Hub ya armado (p. ej. ViewTransitionBootstrap backup).
+  const nextUntil = Date.now() + ms;
+  if (nextUntil > softUntilMs) {
+    softUntilMs = nextUntil;
+  }
   scheduleSoftRelease();
   notifySoftListeners();
 }
@@ -94,7 +124,10 @@ export function useDualKernelMotorsQuiet(): boolean {
   } else if (moduleSeenOnJ4) {
     moduleSeenOnJ4 = false;
     if (!isDualKernelExitSoftActive()) {
-      softUntilMs = Date.now() + DUAL_KERNEL_EXIT_SOFT_MS;
+      const ms = isProyectosHubPath(location)
+        ? DUAL_KERNEL_HUB_EXIT_SOFT_MS
+        : DUAL_KERNEL_EXIT_SOFT_MS;
+      softUntilMs = Date.now() + ms;
     }
   }
 
@@ -107,9 +140,9 @@ export function useDualKernelMotorsQuiet(): boolean {
     if (isDualKernelExitSoftActive()) {
       scheduleSoftRelease();
     } else if (wasOnJ4) {
-      armDualKernelExitSoftStart();
+      armDualKernelExitSoftStart({ href: location });
     }
-  }, [onJ4]);
+  }, [onJ4, location]);
 
   return onJ4 || soft || isDualKernelExitSoftActive();
 }

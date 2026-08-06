@@ -40,6 +40,8 @@ import { isMobilePerfMode, MOBILE_PERF, shouldRunMobileSurvival } from "@/lib/mo
 import { registerVoiceVisibleHandler } from "@/lib/voiceLifecycle";
 import { isInterModuleSyncBlocked } from "@/lib/viewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import { isProyectosHubPath } from "@/lib/jornadaBrand";
+import { useLocation } from "wouter";
 
 const TICK_MS_FOREGROUND = 10_000;
 const TICK_MS_BACKGROUND = 15_000;
@@ -60,8 +62,12 @@ const SEGMENT_WORK_KEY = "segment-attention-cycle";
  */
 export function SegmentAttentionBackground() {
   const { user } = useAuthContext();
+  const [location] = useLocation();
   // Quiet en Dual Kernel + soft-start al salir (evita freeze Jornada→Espejo).
   const dualKernelQuiet = useDualKernelMotorsQuiet();
+  const onHubProyectos = isProyectosHubPath(location);
+  const onHubProyectosRef = useRef(onHubProyectos);
+  onHubProyectosRef.current = onHubProyectos;
   const planillaRef = useRef<Planilla | null>(null);
   const vehiclesRef = useRef<Vehicle[]>([]);
   const planillaFechaRef = useRef(getJournalDateString());
@@ -211,8 +217,11 @@ export function SegmentAttentionBackground() {
     // sesión activa). En reposo (sin vehículos activos) baja a cadencia lenta,
     // recortando re-renders globales sin afectar puertas/entropía, que van por
     // el ciclo de runTick (intervalId), independiente de este reloj visual.
+    // En Hub Proyectos tampoco hace falta el latido 1 s: el ring sigue en
+    // flotaStore pero no hay segunderos visibles — el 1 s clavaba el detalle.
     const computeClockMs = () => {
       if (isAppInBackground()) return CLOCK_MS_BACKGROUND;
+      if (onHubProyectosRef.current) return CLOCK_MS_IDLE;
       const hasLiveWork = vehiclesRef.current.some(v => v.status === "activo");
       return hasLiveWork ? CLOCK_MS_FOREGROUND : CLOCK_MS_IDLE;
     };
@@ -259,7 +268,7 @@ export function SegmentAttentionBackground() {
       stopConcienciaScheduler();
       cancelAllNotifications();
     };
-  }, [user, dualKernelQuiet]);
+  }, [user, dualKernelQuiet, onHubProyectos]);
 
   return null;
 }
