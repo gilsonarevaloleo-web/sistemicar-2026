@@ -18,8 +18,14 @@ export function ViewTransitionBootstrap() {
     }
     if (prevRef.current !== location) {
       // Respaldo si la nav no pasó por NavTransitionLink.
-      if (isJornada4Path(prevRef.current) && !isJornada4Path(location) && !isDualKernelExitSoftActive()) {
-        armDualKernelExitSoftStart();
+      if (isJornada4Path(prevRef.current) && !isJornada4Path(location)) {
+        if (!isDualKernelExitSoftActive()) {
+          armDualKernelExitSoftStart();
+        }
+        // Sheet de lanzamiento / overlays pueden dejar body overflow:hidden al desmontar.
+        if (typeof document !== "undefined" && document.body.style.overflow === "hidden") {
+          document.body.style.overflow = "";
+        }
       }
       beginViewTransition();
       prevRef.current = location;
