@@ -5,6 +5,7 @@ import { maxBanda, inferBandaBloque } from "./termodinamicaAtencional";
 import type { RutaCruzadaSnapshot } from "./rutaEnfoque";
 import {
   buildDefaultClaridadDireccion,
+  getOleadaEnCurso,
   normalizeRutasMentales,
   type ClaridadProfundidad,
   type ProyectoEtiqueta,
@@ -371,10 +372,18 @@ export async function setOleadaComoDireccion(
       etiqueta: proyecto.etiqueta,
       focoTitulo: pel.titulo,
     });
-  for (const p of peldanos.filter(x => x.estado === "en_curso" && x.id !== peldanoId)) {
+  // Solo demota otras oleadas/ideas en curso — nunca sombras de segmento del día
+  // (esas inundaban "Desglosar ideas" con el nombre del bloque repetido).
+  for (const p of peldanos.filter(
+    x => x.estado === "en_curso" && x.id !== peldanoId && !x.origenSegmento
+  )) {
     await updatePeldano(userId, p.id, { estado: "idea" });
   }
-  await updatePeldano(userId, peldanoId, { estado: "en_curso", rutasMentales: claridad });
+  await updatePeldano(userId, peldanoId, {
+    estado: "en_curso",
+    rutasMentales: claridad,
+    origenSegmento: false,
+  });
   return updateProyecto(userId, proyectoId, {
     oleadaTitulo: pel.titulo,
     claridadActiva: claridad,
@@ -469,11 +478,15 @@ export async function upsertPeldanoDesdeSegmento(
   }
 ): Promise<ProyectoPeldano> {
   const peldanos = await getPeldanosByProyecto(userId, params.proyectoId);
+  const tituloKey = params.titulo.trim().toLowerCase();
+  // Deduplicar por día+título: al recargar rutina los segmentoId cambian y
+  // antes se creaba otro "Desarrollo personal" en_curso cada vez.
   const existing = peldanos.find(
     p =>
       p.origenSegmento &&
-      p.segmentoId === params.segmentoId &&
-      p.planillaFecha === params.planillaFecha
+      p.planillaFecha === params.planillaFecha &&
+      (p.segmentoId === params.segmentoId ||
+        p.titulo.trim().toLowerCase() === tituloKey)
   );
   if (existing) {
     const updated = await updatePeldano(userId, existing.id, {
@@ -481,6 +494,8 @@ export async function upsertPeldanoDesdeSegmento(
       horaInicio: params.horaInicio,
       horaFin: params.horaFin,
       rutasMentales: params.rutasMentales,
+      segmentoId: params.segmentoId,
+      estado: existing.estado === "conquistado" ? "conquistado" : "en_curso",
     });
     return updated!;
   }
@@ -765,6 +780,144 @@ export async function markPeldanoConquistadoSituacion(
     opts.subTareas
   );
   return { ideasCreadas };
+}
+
+/**
+ * Cierra un vehículo → peldaño en el Hub (sensación de caminar lejos).
+ * - Idea puntual (no es la oleada activa) → conquista ese peldaño.
+ * - Oleada activa / solo proyectoId / sombra de segmento → crea peldaño conquistado nuevo
+ *   (se camina SOBRE la oleada; no se apaga con un solo cierre).
+ * - La sombra de segmento la sella además el cierre de puerta.
+ */
+export async function recordProgresoHubAlCerrarVehiculo(
+  userId: string,
+  vehicle: Vehicle,
+  opts: {
+    tipoOrigen: "tiempo" | "situacion";
+    psGanados: number;
+    duracionMin?: number;
+    subs?: SubVehiculo[];
+    subTareas?: SubTarea[];
+  }
+): Promise<void> {
+  const proyectoId = vehicle.proyectoId;
+  if (!proyectoId) return;
+
+  if (vehicle.proyectoPeldanoId) {
+    const peldanos = getPeldanosByProyectoLocal(userId, proyectoId);
+    const pel = peldanos.find(p => p.id === vehicle.proyectoPeldanoId);
+    const oleada = getOleadaEnCurso(peldanos);
+    const esOleadaActiva = Boolean(
+      pel && !pel.origenSegmento && oleada?.id && pel.id === oleada.id
+    );
+    // Idea puntual (no oleada, no segmento): el desglose cierra ese bloque de ideas.
+    if (pel && !pel.origenSegmento && !esOleadaActiva) {
+      if (opts.tipoOrigen === "tiempo") {
+        await markPeldanoConquistadoTiempo(
+          userId,
+          vehicle,
+          opts.subs ?? vehicle.subVehiculos ?? [],
+          opts.psGanados
+        );
+      } else {
+        await markPeldanoConquistadoSituacion(userId, vehicle, {
+          duracionMin: opts.duracionMin ?? vehicle.duracionFinal ?? 0,
+          psGanados: opts.psGanados,
+          subTareas: opts.subTareas ?? vehicle.subTareas ?? [],
+        });
+      }
+      return;
+    }
+  }
+
+  await spawnConquistadoDesdeVehiculo(userId, vehicle, opts);
+}
+
+/** Peldaño conquistado nuevo = un paso caminado sobre la oleada/proyecto. */
+async function spawnConquistadoDesdeVehiculo(
+  userId: string,
+  vehicle: Vehicle,
+  opts: {
+    tipoOrigen: "tiempo" | "situacion";
+    psGanados: number;
+    duracionMin?: number;
+    subs?: SubVehiculo[];
+    subTareas?: SubTarea[];
+  }
+): Promise<void> {
+  const proyectoId = vehicle.proyectoId;
+  if (!proyectoId) return;
+
+  const existing = getPeldanosByProyectoLocal(userId, proyectoId);
+  if (existing.some(p => p.vehicleId === vehicle.id && p.estado === "conquistado")) {
+    return;
+  }
+
+  const proyecto = await getProyectoById(userId, proyectoId);
+  const oleadaLabel = proyecto?.oleadaTitulo?.trim();
+  const tituloBase = vehicle.titulo.trim() || "Paso ejecutado";
+  const titulo = oleadaLabel ? `${tituloBase}` : tituloBase;
+
+  const subs = opts.subs ?? vehicle.subVehiculos ?? [];
+  const subTareas = opts.subTareas ?? vehicle.subTareas ?? [];
+  const duracionMin = opts.duracionMin ?? vehicle.duracionFinal ?? 0;
+  const ahora = Date.now();
+  const maxOrden = existing.reduce((m, p) => Math.max(m, p.orden), -1);
+
+  let resumen: ProyectoPeldanoResumen;
+  if (opts.tipoOrigen === "tiempo") {
+    const cumplidos = subs.filter(s => s.status === "cumplido").length;
+    resumen = {
+      subsCumplidos: cumplidos,
+      subsTotal: subs.length,
+      duracionMin,
+      profundidadMaxima: profundidadFromSubs(subs, vehicle.rutaCruzada),
+      psGanados: opts.psGanados,
+      subResumen: subs
+        .filter(s => s.status === "cumplido" || s.status === "fallado")
+        .map(sv => ({
+          titulo: sv.titulo,
+          status: sv.status as "cumplido" | "fallado",
+          duracionMin: sv.duracionFinal != null ? Math.round(sv.duracionFinal / 60) : undefined,
+        })),
+      segmentoResumen: oleadaLabel
+        ? { rutaMentalLabel: `Oleada · ${oleadaLabel}`, vehiculosCerrados: 1 }
+        : { vehiculosCerrados: 1 },
+    };
+  } else {
+    const cronometradas = subTareas.filter(st => st.enDesgloseCronometro);
+    const cumplidas = cronometradas.filter(st => st.resultadoSituacion === "cumplido").length;
+    resumen = {
+      subsCumplidos: cumplidas,
+      subsTotal: cronometradas.length,
+      duracionMin,
+      profundidadMaxima: profundidadFromSituacionSubTareas(subTareas),
+      psGanados: opts.psGanados,
+      subTareasResumen: buildSubTareasResumenFromVehicle(subTareas),
+      segmentoResumen: oleadaLabel
+        ? { rutaMentalLabel: `Oleada · ${oleadaLabel}`, vehiculosCerrados: 1 }
+        : { vehiculosCerrados: 1 },
+    };
+  }
+
+  const peldano: ProyectoPeldano = {
+    id: `pel_walk_${ahora}_${Math.random().toString(36).slice(2, 6)}`,
+    proyectoId,
+    orden: maxOrden + 1,
+    titulo,
+    estado: "conquistado",
+    tipoOrigen: opts.tipoOrigen,
+    vehicleId: vehicle.id,
+    cerradoAt: ahora,
+    resumen,
+    createdAt: ahora,
+    updatedAt: ahora,
+  };
+  const all = getLocalPeldanos(userId);
+  all.push(peldano);
+  saveLocalPeldanos(userId, all);
+  void syncFirestorePeldano(userId, peldano);
+  await refreshProyectoStats(userId, proyectoId);
 }
 
 export function computeProyectoStats(peldanos: ProyectoPeldano[]) {

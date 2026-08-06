@@ -27,10 +27,12 @@ export type ClaridadProyectoRef = {
 };
 
 export type ClaridadPeldanoRef = {
+  id?: string;
   titulo: string;
   estado: "idea" | "en_curso" | "conquistado";
   origenSegmento?: boolean;
   rutasMentales?: RutasMentalesSet;
+  orden?: number;
 };
 
 const PROFUNDIDAD_LABEL: Record<ClaridadProfundidad, string> = {
@@ -87,24 +89,25 @@ function pasosClaridad(
       { numero: 3, titulo: `${f} — handoff: qué queda resuelto` },
     ];
   }
+  // Ideas/oleada: horizontes que pueden abarcar varios días — no un segmento suelto.
   if (profundidad === "ligera") {
     return [
       { numero: 1, titulo: `${f} — qué quiero tener claro al entrar` },
-      { numero: 2, titulo: `${f} — qué avance dejo en este bloque` },
-      { numero: 3, titulo: `${f} — cómo cierro mentalmente el bloque` },
+      { numero: 2, titulo: `${f} — qué avance dejo sobre esta oleada` },
+      { numero: 3, titulo: `${f} — cómo cierro mentalmente este paso` },
     ];
   }
   if (profundidad === "media") {
     return [
-      { numero: 1, titulo: `${f} — intención del bloque (por qué ahora)` },
-      { numero: 2, titulo: `${f} — entrega visible de este tramo` },
+      { numero: 1, titulo: `${f} — intención del tramo (por qué ahora)` },
+      { numero: 2, titulo: `${f} — entrega visible que mueve la oleada` },
       { numero: 3, titulo: `${f} — siguiente paso de la oleada` },
     ];
   }
   return [
-    { numero: 1, titulo: `${f} — visión del tramo (qué construyo)` },
+    { numero: 1, titulo: `${f} — visión del horizonte (qué construyo)` },
     { numero: 2, titulo: `${f} — entrega que mueve la oleada` },
-    { numero: 3, titulo: `${f} — cierre: qué queda conquistado` },
+    { numero: 3, titulo: `${f} — cierre: qué queda conquistado en el camino` },
   ];
 }
 
@@ -157,8 +160,8 @@ export function getOleadaEnCurso(peldanos: ClaridadPeldanoRef[]): ClaridadPeldan
 /** Próxima idea en cola si no hay oleada en curso. */
 export function getProximaIdea(peldanos: ClaridadPeldanoRef[]): ClaridadPeldanoRef | null {
   const ideas = peldanos
-    .filter(p => p.estado === "idea")
-    .sort((a, b) => a.orden - b.orden);
+    .filter(p => p.estado === "idea" && !p.origenSegmento)
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   return ideas[0] ?? null;
 }
 
@@ -200,25 +203,37 @@ export function resolveClaridadParaProyecto(
   });
 }
 
-/** Actualiza paso 1 con el bloque del día; conserva pasos 2–3 definidos en el proyecto. */
+/**
+ * Paso 1 = puerta del segmento de hoy.
+ * Pasos 2–3 = oleada/horizonte del proyecto (no se pisan con el nombre del bloque).
+ */
 export function refreshClaridadPaso1(
   rutas: RutasMentalesSet,
   segmentoNombre: string,
   focoTitulo: string | undefined,
   etiqueta: ProyectoEtiqueta
 ): RutasMentalesSet {
-  const foco = focoTitulo?.trim() || segmentoNombre.trim() || "Bloque";
+  const puerta = segmentoNombre.trim() || "Bloque de hoy";
+  const oleada = focoTitulo?.trim() || puerta;
   const rutasOut = { ...rutas.rutas };
   for (const id of ["a", "b", "c"] as const) {
     const r = rutasOut[id];
     if (!r) continue;
-    const fresh = pasosClaridad(etiqueta, foco, migrateProfundidad(r.perfil as string));
+    const profundidad = migrateProfundidad(r.perfil as string);
+    const pasoPuerta: RutaMentalPaso = {
+      numero: 1,
+      titulo:
+        etiqueta === "centro"
+          ? `${puerta} — qué debo cumplir en este hueco de hoy`
+          : `${puerta} — qué abro hoy sobre la oleada`,
+    };
+    const freshOleada = pasosClaridad(etiqueta, oleada, profundidad);
     rutasOut[id] = {
       ...r,
       pasos: [
-        fresh[0],
-        r.pasos[1] ?? fresh[1],
-        r.pasos[2] ?? fresh[2],
+        pasoPuerta,
+        r.pasos[1] ?? freshOleada[1],
+        r.pasos[2] ?? freshOleada[2],
       ],
     };
   }

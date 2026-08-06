@@ -8,6 +8,7 @@ import {
   applyPlantillaToday,
   addPlantillaRutina,
   deletePlantillaRutina,
+  getLocalVehicles,
   savePlanilla,
   subscribePlantillasRutina,
   subscribeToPlanilla,
@@ -19,10 +20,12 @@ import {
 } from "@/lib/persistence";
 import {
   getJournalDateString,
+  getLimaDayStartMs,
   getSegmentCalendarDayStartMs,
   isWithinSegmentTimeMargin,
   validateSegmentTimes,
 } from "@/lib/segmentTime";
+import { sealPeldanosFromSegmentos } from "@/lib/segmentoPeldanoBridge";
 import {
   classifyPuertaTiming,
   isWithinPuertaWindow,
@@ -300,6 +303,13 @@ export function useJornada4Planilla({ userId, safeAwardPS }: UseJornada4Planilla
         });
         void safeAwardPS(2, "Cierre consciente: " + seg.nombre);
         void registrarEvento(COMPONENTES.PLANIFICACION);
+        // Sella el peldaño-sombra del Hub → la escalera sube al cerrar la puerta.
+        void sealPeldanosFromSegmentos(userId, {
+          fecha: saved.fecha,
+          segmentos: saved.segmentos,
+          vehicles: getLocalVehicles(),
+          dayStartMs: getLimaDayStartMs(nowMs),
+        }).catch(err => console.error("[j4.cerrarSegmento] seal hub", err));
       } catch (e) {
         console.error("[j4.cerrarSegmento]", e);
         setPlanilla(planilla);

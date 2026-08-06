@@ -105,6 +105,7 @@ export async function executeJornada4Launch(
             : baseForm.proyectoId?.trim()
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
+          ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
@@ -176,6 +177,7 @@ export async function executeJornada4Launch(
             : baseForm.proyectoId?.trim()
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
+          ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });

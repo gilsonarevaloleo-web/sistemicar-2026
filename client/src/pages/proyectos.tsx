@@ -48,6 +48,7 @@ import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
 import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
+import { getJournalDateString } from "@/lib/segmentTime";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 
 const PIZARRA = "#0a0a0a";
@@ -271,7 +272,11 @@ export default function ProyectosPage() {
   }, [detailId, reloadDetail]);
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
-  const ideas = useMemo(() => peldanos.filter(p => p.estado === "idea"), [peldanos]);
+  // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
+  const ideas = useMemo(
+    () => peldanos.filter(p => p.estado === "idea" && !p.origenSegmento),
+    [peldanos]
+  );
   const conquistados = useMemo(
     () =>
       peldanos
@@ -279,11 +284,28 @@ export default function ProyectosPage() {
         .sort((a, b) => (b.cerradoAt ?? 0) - (a.cerradoAt ?? 0)),
     [peldanos]
   );
+  const hoyFecha = useMemo(() => getJournalDateString(), []);
   const enCursoPlan = useMemo(
-    () => peldanos.filter(p => p.estado === "en_curso" && p.origenSegmento),
-    [peldanos]
+    () =>
+      peldanos.filter(
+        p =>
+          p.estado === "en_curso" &&
+          p.origenSegmento &&
+          p.planillaFecha === hoyFecha
+      ),
+    [peldanos, hoyFecha]
   );
   const oleadaActiva = useMemo(() => getOleadaEnCurso(peldanos), [peldanos]);
+  const oleadaPeldano = useMemo(
+    () =>
+      peldanos.find(
+        p =>
+          p.estado === "en_curso" &&
+          !p.origenSegmento &&
+          (oleadaActiva?.id ? p.id === oleadaActiva.id : p.titulo === oleadaActiva?.titulo)
+      ) ?? null,
+    [peldanos, oleadaActiva]
+  );
 
   const handleGuardarClaridad = async () => {
     if (!user || !detailId || !claridadEdit) return;
@@ -440,7 +462,32 @@ export default function ProyectosPage() {
             {oleadaActiva && !oleadaActiva.origenSegmento && (
               <p className="text-[8px] text-slate-500">
                 Oleada en curso: <span className="text-slate-300">{oleadaActiva.titulo}</span>
+                {" — "}aquí van los vehículos; al cerrarlos sube la escalera.
               </p>
+            )}
+            {oleadaPeldano && (
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(buildLaunchUrl(proyecto.id, oleadaPeldano.id, "desglosador_tiempo"))
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
+                >
+                  <Clock size={12} /> Tiempo sobre oleada
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(buildLaunchUrl(proyecto.id, oleadaPeldano.id, "desglosador_situacion"))
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
+                >
+                  <Flag size={12} /> Situación sobre oleada
+                </button>
+              </div>
             )}
             <RutasMentalesEditor
               rutas={claridadEdit}
@@ -544,11 +591,15 @@ export default function ProyectosPage() {
           <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: CYAN }}>
             Desglosar ideas
           </p>
+          <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
+            Horizontes amplios (más allá de un día o segmento). Actívalos como oleada para
+            lanzar vehículos sobre ellos — A/B/C orientan la oleada, no el hueco de hoy.
+          </p>
           <div className="flex gap-2 mb-3">
             <input
               value={newIdeaTitulo}
               onChange={e => setNewIdeaTitulo(e.target.value)}
-              placeholder="Nueva idea / bloque…"
+              placeholder="Nueva idea / oleada…"
               className="flex-1 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none"
               onKeyDown={e => e.key === "Enter" && void handleAddIdea()}
             />
@@ -564,7 +615,7 @@ export default function ProyectosPage() {
           <div className="space-y-2">
             {ideas.length === 0 && (
               <p className="text-[10px] text-slate-600 text-center py-4">
-                Añade ideas opcionales — no son deuda, son peldaños posibles.
+                Añade ideas de oleada — no son el bloque del día; son el camino a caminar.
               </p>
             )}
             {ideas.map(pel => (

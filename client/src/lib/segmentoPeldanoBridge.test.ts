@@ -49,14 +49,15 @@ describe("segmentoPeldanoBridge", () => {
     assert.equal(r.rutas.c.perfil, "profunda");
   });
 
-  it("refreshClaridadPaso1 actualiza paso 1", () => {
+  it("refreshClaridadPaso1 actualiza paso 1 con la puerta del día", () => {
     const base = buildDefaultClaridadDireccion({
       tituloProyecto: "P",
       etiqueta: "proyecto",
       segmentoNombre: "A",
     });
     const next = refreshClaridadPaso1(base, "Bloque PM", "Oleada", "proyecto");
-    assert.match(next.rutas.a.pasos[0].titulo, /Bloque PM|Oleada/i);
+    assert.match(next.rutas.a.pasos[0].titulo, /Bloque PM/i);
+    assert.match(next.rutas.a.pasos[0].titulo, /hoy|oleada/i);
     assert.equal(next.rutas.a.pasos[1].titulo, base.rutas.a.pasos[1].titulo);
   });
 
