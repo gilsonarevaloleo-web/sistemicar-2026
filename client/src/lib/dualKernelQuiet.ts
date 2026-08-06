@@ -79,7 +79,7 @@ export function resetDualKernelExitSoftForTests(): void {
 
 /**
  * True mientras estamos en `/jornada-v4` o en la ventana soft-start tras salir.
- * Usar en motores del App shell y en destinos pesados (Admin, Espejo…).
+ * Usar en motores del App shell y en destinos pesados (Admin, Espejo, Hub Proyectos…).
  */
 export function useDualKernelMotorsQuiet(): boolean {
   const [location] = useLocation();

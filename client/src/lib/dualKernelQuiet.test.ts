@@ -89,4 +89,13 @@ describe("dualKernelQuiet soft-start", () => {
     assert.match(menu, /useDualKernelMotorsQuiet/);
     assert.match(menu, /motorsQuiet/);
   });
+
+  it("Hub Proyectos difiere Firestore con motorsQuiet (Ring→/proyectos)", () => {
+    const hub = readFileSync(join(dir, "../pages/proyectos.tsx"), "utf8");
+    assert.match(hub, /useDualKernelMotorsQuiet/);
+    assert.match(hub, /motorsQuiet/);
+    assert.match(hub, /if \(!user \|\| motorsQuiet\) return/);
+    // Listado local primero: no bloquear la UI esperando remoto en soft-start.
+    assert.match(hub, /getProyectosLocal/);
+  });
 });

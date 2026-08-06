@@ -50,6 +50,7 @@ import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnume
 import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -178,6 +179,8 @@ export default function ProyectosPage() {
   const search = useSearch();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const detailId = params.get("id");
+  // Ring→Hub: diferir Firestore hasta soft-start (mismo patrón que Admin/Espejo/Menú).
+  const motorsQuiet = useDualKernelMotorsQuiet();
 
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
@@ -196,6 +199,8 @@ export default function ProyectosPage() {
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
   proyectosLenRef.current = proyectos.length;
+  const motorsQuietRef = useRef(motorsQuiet);
+  motorsQuietRef.current = motorsQuiet;
 
   const applyDetailState = useCallback((p: Proyecto | null, pel: ProyectoPeldano[]) => {
     setProyecto(p);
@@ -246,20 +251,31 @@ export default function ProyectosPage() {
 
   useEffect(() => {
     if (!user) return;
-    setProyectos(getProyectosLocal(user.uid));
-    setLoading(true);
-    void syncListFromRemote().finally(() => setLoading(false));
+    // Liberar overflow residual del sheet de lanzamiento (bloqueo táctil en móvil).
+    if (document.body.style.overflow === "hidden") {
+      document.body.style.overflow = "";
+    }
+    const local = getProyectosLocal(user.uid);
+    setProyectos(local);
+    // Listado local al instante: la UI debe responder aunque el soft-start aún corra.
+    setLoading(false);
     // Solo leer local en el evento: re-fetch remoto aquí martillaba Firestore y el hilo principal.
     const unsub = subscribeToProyectos(user.uid, () => {
       startTransition(() => {
         setProyectos(getProyectosLocal(user.uid));
       });
-      if (detailIdRef.current) void reloadDetail();
+      if (detailIdRef.current && !motorsQuietRef.current) void reloadDetail();
     });
     return () => {
       unsub();
     };
-  }, [user, syncListFromRemote, reloadDetail]);
+  }, [user, reloadDetail]);
+
+  useEffect(() => {
+    if (!user || motorsQuiet) return;
+    setLoading(proyectosLenRef.current === 0);
+    void syncListFromRemote().finally(() => setLoading(false));
+  }, [user, motorsQuiet, syncListFromRemote]);
 
   useEffect(() => {
     if (!detailId) {
@@ -268,8 +284,14 @@ export default function ProyectosPage() {
       setDetailLoading(false);
       return;
     }
-    void reloadDetail();
-  }, [detailId, reloadDetail]);
+    // Detalle: local al momento; remoto solo fuera del soft-start Dual Kernel.
+    if (user) {
+      const localP = getProyectosLocal(user.uid).find(p => p.id === detailId) ?? null;
+      const localPel = getPeldanosByProyectoLocal(user.uid, detailId);
+      if (localP) applyDetailState(localP, localPel);
+    }
+    if (!motorsQuiet) void reloadDetail();
+  }, [detailId, reloadDetail, motorsQuiet, user, applyDetailState]);
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
   // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
