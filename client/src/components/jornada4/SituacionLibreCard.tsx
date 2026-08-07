@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Check, Plus, TrendingUp, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
+import type { DestinoCierre } from "@/lib/destinoCierre";
+import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -16,6 +18,7 @@ type Props = {
   onAvance: (subTareaId: string) => void;
   onFallado: (subTareaId: string) => void;
   onCerrar: () => void;
+  onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
   onAddFila: (texto: string) => void;
 };
 
@@ -29,6 +32,7 @@ export function SituacionLibreCard({
   onAvance,
   onFallado,
   onCerrar,
+  onDestinoChange,
   onAddFila,
 }: Props) {
   const [draft, setDraft] = useState("");
@@ -188,19 +192,28 @@ export function SituacionLibreCard({
         </div>
 
         {allDone || rows.length > 0 ? (
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
-            style={{
-              color: allDone ? OK : MUTED,
-              border: `1px solid ${allDone ? `${OK}40` : "rgba(255,255,255,0.1)"}`,
-              backgroundColor: allDone ? `${OK}12` : "transparent",
-            }}
-            data-testid="j4-libre-cerrar"
-          >
-            {allDone ? "Cerrar lista" : "Cerrar lista (con pendientes)"}
-          </button>
+          <div className="space-y-2">
+            {onDestinoChange ? (
+              <DestinoCierreToggle
+                value={vehicle.destinoCierre}
+                proyectoId={vehicle.proyectoId}
+                onChange={onDestinoChange}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
+              style={{
+                color: allDone ? OK : MUTED,
+                border: `1px solid ${allDone ? `${OK}40` : "rgba(255,255,255,0.1)"}`,
+                backgroundColor: allDone ? `${OK}12` : "transparent",
+              }}
+              data-testid="j4-libre-cerrar"
+            >
+              {allDone ? "Cerrar lista" : "Cerrar lista (con pendientes)"}
+            </button>
+          </div>
         ) : null}
       </div>
     </article>

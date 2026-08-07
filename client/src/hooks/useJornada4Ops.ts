@@ -65,6 +65,11 @@ import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoH
 import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
 import { recordProgresoHubAlCerrarVehiculo } from "@/lib/proyectos";
 import {
+  feedsProyectoHub,
+  resolveDestinoCierre,
+  type DestinoCierre,
+} from "@/lib/destinoCierre";
+import {
   buildDesglosadorNestedPausePatch,
   resumeDesglosadorFromNestedPause,
 } from "@/lib/nestedContextStack";
@@ -97,6 +102,7 @@ const PLATA = "#C0C0C0";
 const CYAN = "#00FFC3";
 const VIOLET = "#8B5CF6";
 const AMBER = "#F59E0B";
+const GOLD = "#D4AF37";
 
 const STUB_EJES = {
   enfoque: { text: "", trifecta: "omitir" as const },
@@ -246,6 +252,26 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle, safeAwardPS]
   );
 
+  const setDestinoCierre = useCallback(
+    (vehicleId: string, destino: DestinoCierre, proyectoId?: string) => {
+      if (!userId) return;
+      const patch: Partial<Vehicle> = { destinoCierre: destino };
+      if (destino === "peldano" && proyectoId) {
+        patch.proyectoId = proyectoId;
+      }
+      paintVehicle(vehicleId, patch);
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+        } catch (e) {
+          console.error("[jornada4.setDestinoCierre]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
   const closeConquistaCycle = useCallback(
     async (vehicleId: string) => {
       if (!userId) return;
@@ -255,6 +281,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
+        const destino = resolveDestinoCierre(vehicle.destinoCierre);
+        if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
+          toast.error("Elige un proyecto para subir el peldaño", {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+            duration: 2800,
+          });
+          return;
+        }
         const patch = applyConquistaCycleClose(vehicle);
         if (!patch) {
           toast.error("Aún hay unidades pendientes", {
@@ -269,6 +303,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           cierreAt: patch.cierreAt,
           subVehiculos: patch.subVehiculos,
           desglosadorBloqueDepthPsGranted: depthPs,
+          destinoCierre: destino,
         });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -292,17 +327,20 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           );
           cyclePs = settled.cyclePs;
           noteHuecoAfterClose(vehiclesRef.current);
+          const hubNote = feedsProyectoHub(destino)
+            ? " · peldaño al Hub"
+            : " · presencia";
           toast.success(
             cyclePs > 0
-              ? `Ciclo cerrado · +${cyclePs} PS · profundidad ${depthPs} PS`
+              ? `Ciclo cerrado · +${cyclePs} PS · profundidad ${depthPs} PS${hubNote}`
               : depthPs > 0
-                ? `Ciclo cerrado · profundidad ${depthPs} PS`
-                : "Ciclo cerrado",
+                ? `Ciclo cerrado · profundidad ${depthPs} PS${hubNote}`
+                : `Ciclo cerrado${hubNote}`,
             {
               style: {
                 backgroundColor: PIZARRA,
-                border: `1px solid ${EMERALD}`,
-                color: EMERALD,
+                border: `1px solid ${feedsProyectoHub(destino) ? GOLD : EMERALD}`,
+                color: feedsProyectoHub(destino) ? GOLD : EMERALD,
               },
               duration: 2800,
             }
@@ -321,6 +359,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 cierreAt: patch.cierreAt,
                 subVehiculos: patch.subVehiculos,
                 desglosadorBloqueDepthPsGranted: depthPs,
+                destinoCierre: destino,
+                proyectoId: vehicle.proyectoId,
               },
               { skipLocalSync: true }
             );
@@ -330,11 +370,13 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               cierreAt: patch.cierreAt,
               subVehiculos: patch.subVehiculos,
               desglosadorBloqueDepthPsGranted: depthPs,
+              destinoCierre: destino,
             };
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "tiempo",
               psGanados: cyclePs + depthPs,
               subs: patch.subVehiculos,
+              destinoCierre: destino,
             });
           } catch (e) {
             console.error("[jornada4.closeConquistaCycle] remote", e);
@@ -488,6 +530,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
+        const destino = resolveDestinoCierre(vehicle.destinoCierre);
+        if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
+          toast.error("Elige un proyecto para subir el peldaño", {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+            duration: 2800,
+          });
+          return;
+        }
         const patch = applySituacionBlockClose(vehicle);
         if (!patch) {
           toast.error("Aún hay filas pendientes en el ring", {
@@ -502,6 +552,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           subTareas: patch.subTareas,
           situacionCronometro: patch.situacionCronometro,
           situacionCupoAnchor: patch.situacionCupoAnchor,
+          destinoCierre: destino,
         });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -514,13 +565,18 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             safeAwardPS
           );
           noteHuecoAfterClose(vehiclesRef.current);
+          const hubNote = feedsProyectoHub(destino)
+            ? " · peldaño al Hub"
+            : " · presencia";
           toast.success(
-            awarded > 0 ? `Ring cerrado · +${awarded} PS` : "Ring cerrado",
+            awarded > 0
+              ? `Ring cerrado · +${awarded} PS${hubNote}`
+              : `Ring cerrado${hubNote}`,
             {
               style: {
                 backgroundColor: PIZARRA,
-                border: `1px solid ${EMERALD}`,
-                color: EMERALD,
+                border: `1px solid ${feedsProyectoHub(destino) ? GOLD : EMERALD}`,
+                color: feedsProyectoHub(destino) ? GOLD : EMERALD,
               },
               duration: 2800,
             }
@@ -540,6 +596,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 subTareas: patch.subTareas,
                 situacionCronometro: patch.situacionCronometro,
                 situacionCupoAnchor: patch.situacionCupoAnchor,
+                destinoCierre: destino,
+                proyectoId: vehicle.proyectoId,
               },
               { skipLocalSync: true }
             );
@@ -550,6 +608,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               subTareas: patch.subTareas,
               situacionCronometro: patch.situacionCronometro,
               situacionCupoAnchor: patch.situacionCupoAnchor,
+              destinoCierre: destino,
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
             const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
@@ -558,6 +617,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               psGanados: awarded,
               duracionMin,
               subTareas: patch.subTareas,
+              destinoCierre: destino,
             });
           } catch (e) {
             console.error("[jornada4.closeSituacionBlock] remote", e);
@@ -811,6 +871,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle)) return;
+        const destino = resolveDestinoCierre(vehicle.destinoCierre);
+        if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
+          toast.error("Elige un proyecto para subir el peldaño", {
+            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+            duration: 2800,
+          });
+          return;
+        }
         const cierreAt = Date.now();
         const anyOk = (vehicle.subTareas ?? []).some(
           s =>
@@ -818,7 +886,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             (s.completada && s.resultadoSituacion !== "fallado")
         );
         const status = anyOk ? ("cumplido" as const) : ("archivado" as const);
-        paintVehicle(vehicleId, { status, cierreAt });
+        paintVehicle(vehicleId, { status, cierreAt, destinoCierre: destino });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
 
@@ -830,13 +898,18 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             status,
             safeAwardPS
           );
+          const hubNote = feedsProyectoHub(destino)
+            ? " · peldaño al Hub"
+            : " · presencia";
           toast.success(
-            awarded > 0 ? `Lista cerrada · +${awarded} PS` : "Lista cerrada",
+            awarded > 0
+              ? `Lista cerrada · +${awarded} PS${hubNote}`
+              : `Lista cerrada${hubNote}`,
             {
               style: {
                 backgroundColor: PIZARRA,
-                border: `1px solid ${EMERALD}`,
-                color: EMERALD,
+                border: `1px solid ${feedsProyectoHub(destino) ? GOLD : EMERALD}`,
+                color: feedsProyectoHub(destino) ? GOLD : EMERALD,
               },
               duration: 2400,
             }
@@ -850,11 +923,21 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             await updateVehicle(
               userId,
               vehicleId,
-              { status, cierreAt },
+              {
+                status,
+                cierreAt,
+                destinoCierre: destino,
+                proyectoId: vehicle.proyectoId,
+              },
               { skipLocalSync: true }
             );
             if (status === "cumplido") {
-              const closed: Vehicle = { ...vehicle, status, cierreAt };
+              const closed: Vehicle = {
+                ...vehicle,
+                status,
+                cierreAt,
+                destinoCierre: destino,
+              };
               const apertura = vehicle.aperturaAt ?? cierreAt;
               const duracionMin = Math.max(0, (cierreAt - apertura) / 60_000);
               await recordProgresoHubAlCerrarVehiculo(userId, closed, {
@@ -862,6 +945,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 psGanados: awarded,
                 duracionMin,
                 subTareas: vehicle.subTareas ?? [],
+                destinoCierre: destino,
               });
             }
           } catch (e) {
@@ -1484,6 +1568,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     addConquistaSub,
     addSituacionFila,
     setSituacionCupo,
+    setDestinoCierre,
     reorderConquistaSubs,
     reorderSituacionFilas,
     sustituirSituacionFoco,

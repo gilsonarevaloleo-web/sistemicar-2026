@@ -9,6 +9,7 @@ import {
   isSituacionRing,
 } from "@/jornada4/filters";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
+import type { DestinoCierre } from "@/lib/destinoCierre";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
 import { SituacionLibreCard } from "./SituacionLibreCard";
@@ -54,6 +55,11 @@ type Ops = {
     subTareaId: string,
     minutos: number | undefined
   ) => Promise<void>;
+  setDestinoCierre: (
+    vehicleId: string,
+    destino: DestinoCierre,
+    proyectoId?: string
+  ) => void;
   reorderConquistaSubs: (
     vehicleId: string,
     movedId: string,
@@ -148,6 +154,9 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     }
                     onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
                     onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+                    onDestinoChange={(destino, proyectoId) =>
+                      ops.setDestinoCierre(v.id, destino, proyectoId)
+                    }
                     onAddSub={form => void ops.addConquistaSub(v.id, form)}
                     onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
                     onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
@@ -176,6 +185,9 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onAvance={id => void ops.closeSituacionRow(v.id, id, "avance")}
                     onFallado={id => void ops.closeSituacionRow(v.id, id, "fallado")}
                     onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
+                    onDestinoChange={(destino, proyectoId) =>
+                      ops.setDestinoCierre(v.id, destino, proyectoId)
+                    }
                     onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
                     onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
                     onReorderFilas={(movedId, direction) =>
@@ -198,6 +210,9 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onAvance={id => void ops.closeSituacionLibreFila(v.id, id, "avance")}
                     onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
                     onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
+                    onDestinoChange={(destino, proyectoId) =>
+                      ops.setDestinoCierre(v.id, destino, proyectoId)
+                    }
                     onAddFila={texto => void ops.addSituacionLibreFila(v.id, texto)}
                   />
                 );

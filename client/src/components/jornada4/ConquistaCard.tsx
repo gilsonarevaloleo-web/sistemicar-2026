@@ -42,6 +42,8 @@ import {
 } from "@/jornada4/desglosadorProfundidad";
 import { projectProductsUntilMeta } from "@/jornada4/desglosadorProjection";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
+import type { DestinoCierre } from "@/lib/destinoCierre";
+import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -62,6 +64,7 @@ type Props = {
   onCumplido: (cantidad?: number) => void;
   onFallado: () => void;
   onCerrarCiclo: () => void;
+  onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
   onAddSub?: (form: AddSubForm) => void;
   onPausaInterrupcion?: (titulo: string) => void;
   onResumeDesglosador?: () => void;
@@ -73,6 +76,7 @@ export function ConquistaCard({
   onCumplido,
   onFallado,
   onCerrarCiclo,
+  onDestinoChange,
   onAddSub,
   onPausaInterrupcion,
   onResumeDesglosador,
@@ -697,36 +701,46 @@ export function ConquistaCard({
                   ) : null}
                 </div>
               ) : (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                    style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
-                    onClick={() => {
-                      const n = cantidad.trim() ? Number(cantidad) : undefined;
-                      onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
-                      setCantidad("");
-                    }}
-                    data-testid="j4-conquista-cumplido"
-                  >
-                    Cumplido
-                  </button>
-                  <button
-                    type="button"
-                    className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                    style={{
-                      backgroundColor: "transparent",
-                      color: BAD,
-                      border: `1px solid ${BAD}60`,
-                    }}
-                    onClick={() => {
-                      onFallado();
-                      setCantidad("");
-                    }}
-                    data-testid="j4-conquista-fallado"
-                  >
-                    Fallado
-                  </button>
+                <div className="space-y-2">
+                  {onDestinoChange ? (
+                    <DestinoCierreToggle
+                      compact
+                      value={vehicle.destinoCierre}
+                      proyectoId={vehicle.proyectoId}
+                      onChange={onDestinoChange}
+                    />
+                  ) : null}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                      style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
+                      onClick={() => {
+                        const n = cantidad.trim() ? Number(cantidad) : undefined;
+                        onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
+                        setCantidad("");
+                      }}
+                      data-testid="j4-conquista-cumplido"
+                    >
+                      Cumplido
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                      style={{
+                        backgroundColor: "transparent",
+                        color: BAD,
+                        border: `1px solid ${BAD}60`,
+                      }}
+                      onClick={() => {
+                        onFallado();
+                        setCantidad("");
+                      }}
+                      data-testid="j4-conquista-fallado"
+                    >
+                      Fallado
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -809,6 +823,13 @@ export function ConquistaCard({
             <p className="text-sm" style={{ color: MUTED }}>
               Todas las unidades cerradas. Sella el ciclo para liquidar PS.
             </p>
+            {onDestinoChange ? (
+              <DestinoCierreToggle
+                value={vehicle.destinoCierre}
+                proyectoId={vehicle.proyectoId}
+                onChange={onDestinoChange}
+              />
+            ) : null}
             <button
               type="button"
               className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
