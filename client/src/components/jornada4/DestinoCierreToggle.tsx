@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Footprints } from "lucide-react";
 import { useAuthContext } from "@/App";
 import {
@@ -22,8 +22,9 @@ type Props = {
 };
 
 /**
- * Clasificador atractivo: Presencia (valor de estar) vs Peldaño (valor de avanzar).
- * Default visual = Presencia; Peldaño insiste al valor sin humillar lo demás.
+ * Clasificador: Presencia (día) vs Peldaño (Hub).
+ * Peldaño nunca se ve “apagado/disabled” — solo menos intenso cuando no está elegido.
+ * Estado local optimista: el toque pinta al instante aunque el padre tarde un frame.
  */
 export function DestinoCierreToggle({
   value,
@@ -32,8 +33,15 @@ export function DestinoCierreToggle({
   compact = false,
 }: Props) {
   const { user } = useAuthContext();
-  const destino = resolveDestinoCierre(value);
+  const propDestino = resolveDestinoCierre(value);
+  const [optimistic, setOptimistic] = useState<DestinoCierre | null>(null);
+  const destino = optimistic ?? propDestino;
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    // Padre confirmó (o revirtió): soltar optimismo.
+    setOptimistic(null);
+  }, [value]);
 
   const proyectos = useMemo(() => {
     if (!user) return [] as Proyecto[];
@@ -43,11 +51,13 @@ export function DestinoCierreToggle({
   const selected = proyectos.find(p => p.id === proyectoId) ?? null;
 
   const pick = (next: DestinoCierre) => {
+    setOptimistic(next);
     if (next === "presencia") {
       setPickerOpen(false);
       onChange("presencia", proyectoId ?? undefined);
       return;
     }
+    // Peldaño siempre seleccionable — no está condicionado al sello final.
     if (!proyectoId && proyectos.length > 0) {
       setPickerOpen(true);
       onChange("peldano", proyectos[0]!.id);
@@ -56,6 +66,9 @@ export function DestinoCierreToggle({
     onChange("peldano", proyectoId ?? undefined);
     if (!proyectoId) setPickerOpen(true);
   };
+
+  const presenciaOn = destino === "presencia";
+  const peldanoOn = destino === "peldano";
 
   return (
     <div
@@ -69,30 +82,33 @@ export function DestinoCierreToggle({
         >
           ¿Adónde cuenta este cierre?
         </p>
-      ) : null}
+      ) : (
+        <p className="text-[8px] font-bold" style={{ color: MUTED }}>
+          Tocá para elegir destino · default Presencia
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={() => pick("presencia")}
-          className="rounded-xl px-2.5 py-2.5 text-left touch-manipulation transition-all"
+          className="rounded-xl px-2.5 py-2.5 text-left touch-manipulation transition-transform active:scale-[0.98]"
           style={{
-            backgroundColor:
-              destino === "presencia" ? "rgba(0,255,195,0.12)" : "rgba(255,255,255,0.03)",
-            border:
-              destino === "presencia"
-                ? `1px solid ${CYAN}70`
-                : "1px solid rgba(255,255,255,0.08)",
-            boxShadow:
-              destino === "presencia" ? `0 0 16px ${CYAN}22` : "none",
+            backgroundColor: presenciaOn
+              ? "rgba(0,255,195,0.14)"
+              : "rgba(0,255,195,0.04)",
+            border: presenciaOn
+              ? `1.5px solid ${CYAN}`
+              : `1px solid rgba(0,255,195,0.28)`,
+            boxShadow: presenciaOn ? `0 0 16px ${CYAN}28` : "none",
           }}
           data-testid="destino-presencia"
-          aria-pressed={destino === "presencia"}
+          aria-pressed={presenciaOn}
         >
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Eye size={12} style={{ color: destino === "presencia" ? CYAN : MUTED }} />
+            <Eye size={12} style={{ color: presenciaOn ? CYAN : "rgba(0,255,195,0.7)" }} />
             <span
               className="text-[10px] font-black uppercase tracking-wider"
-              style={{ color: destino === "presencia" ? CYAN : MUTED }}
+              style={{ color: presenciaOn ? CYAN : "rgba(0,255,195,0.75)" }}
             >
               {DESTINO_CIERRE_COPY.presencia.label}
             </span>
@@ -107,30 +123,30 @@ export function DestinoCierreToggle({
         <button
           type="button"
           onClick={() => pick("peldano")}
-          className="rounded-xl px-2.5 py-2.5 text-left touch-manipulation transition-all"
+          className="rounded-xl px-2.5 py-2.5 text-left touch-manipulation transition-transform active:scale-[0.98]"
           style={{
-            backgroundColor:
-              destino === "peldano" ? "rgba(212,175,55,0.16)" : "rgba(255,255,255,0.03)",
-            border:
-              destino === "peldano"
-                ? `1px solid ${GOLD}`
-                : "1px solid rgba(255,255,255,0.08)",
-            boxShadow:
-              destino === "peldano"
-                ? `0 0 22px rgba(212,175,55,0.28)`
-                : "none",
+            // Idle ya lleva oro: no debe leerse como disabled.
+            backgroundColor: peldanoOn
+              ? "rgba(212,175,55,0.2)"
+              : "rgba(212,175,55,0.08)",
+            border: peldanoOn
+              ? `1.5px solid ${GOLD}`
+              : `1px solid rgba(212,175,55,0.45)`,
+            boxShadow: peldanoOn
+              ? `0 0 22px rgba(212,175,55,0.35)`
+              : `0 0 10px rgba(212,175,55,0.12)`,
           }}
           data-testid="destino-peldano"
-          aria-pressed={destino === "peldano"}
+          aria-pressed={peldanoOn}
         >
           <div className="flex items-center gap-1.5 mb-0.5">
             <Footprints
               size={12}
-              style={{ color: destino === "peldano" ? GOLD : MUTED }}
+              style={{ color: peldanoOn ? GOLD : "rgba(212,175,55,0.85)" }}
             />
             <span
               className="text-[10px] font-black uppercase tracking-wider"
-              style={{ color: destino === "peldano" ? GOLD : MUTED }}
+              style={{ color: peldanoOn ? GOLD : "rgba(212,175,55,0.9)" }}
             >
               {DESTINO_CIERRE_COPY.peldano.label}
             </span>
@@ -139,11 +155,15 @@ export function DestinoCierreToggle({
             <p className="text-[9px] leading-snug" style={{ color: MUTED }}>
               {DESTINO_CIERRE_COPY.peldano.hint}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-[8px] leading-snug mt-0.5" style={{ color: "rgba(212,175,55,0.7)" }}>
+              Sube la escalera
+            </p>
+          )}
         </button>
       </div>
 
-      {destino === "peldano" ? (
+      {peldanoOn ? (
         <div className="space-y-1.5">
           {selected ? (
             <p className="text-[9px] font-bold" style={{ color: GOLD }}>
@@ -159,9 +179,10 @@ export function DestinoCierreToggle({
               </button>
             </p>
           ) : (
-            <p className="text-[9px]" style={{ color: MUTED }}>
-              Elige un proyecto para subir la escalera.
-              {proyectos.length === 0 ? " (crea uno en el Hub)" : ""}
+            <p className="text-[9px]" style={{ color: GOLD }}>
+              {proyectos.length === 0
+                ? "Sin proyectos aún — créalo en el Hub para sellar como peldaño."
+                : "Elige un proyecto para subir la escalera."}
             </p>
           )}
           {(pickerOpen || !proyectoId) && proyectos.length > 0 ? (
@@ -177,10 +198,11 @@ export function DestinoCierreToggle({
                     key={p.id}
                     type="button"
                     onClick={() => {
+                      setOptimistic("peldano");
                       onChange("peldano", p.id);
                       setPickerOpen(false);
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded-md text-[10px] font-bold truncate"
+                    className="w-full text-left px-2 py-1.5 rounded-md text-[10px] font-bold truncate touch-manipulation active:scale-[0.99]"
                     style={{
                       color: active ? GOLD : INK,
                       backgroundColor: active ? "rgba(212,175,55,0.12)" : "transparent",

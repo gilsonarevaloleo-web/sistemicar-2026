@@ -254,13 +254,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
   const setDestinoCierre = useCallback(
     (vehicleId: string, destino: DestinoCierre, proyectoId?: string) => {
-      if (!userId) return;
+      // Pintar siempre (ms0): el toque no puede depender de auth/red.
       const patch: Partial<Vehicle> = { destinoCierre: destino };
       if (destino === "peldano" && proyectoId) {
         patch.proyectoId = proyectoId;
       }
       paintVehicle(vehicleId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
+      if (!userId) return;
       void runShadowTaskAsync(async () => {
         try {
           await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
