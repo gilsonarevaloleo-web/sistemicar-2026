@@ -22,6 +22,8 @@ import {
   ENTRENAMIENTO_COPY,
   isRingModoEntrenamiento,
 } from "@/jornada4/entrenamientoRestricciones";
+import type { DestinoCierre } from "@/lib/destinoCierre";
+import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -39,6 +41,7 @@ type Props = {
   onAvance: (subTareaId: string) => void;
   onFallado: (subTareaId: string) => void;
   onCerrarBloque: () => void;
+  onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
   onAddFila: (texto: string) => void;
   onSetCupo: (subTareaId: string, minutos: number | undefined) => void;
   onReorderFilas?: (movedId: string, direction: ReorderDirection) => void;
@@ -51,6 +54,7 @@ export function SituacionCard({
   onAvance,
   onFallado,
   onCerrarBloque,
+  onDestinoChange,
   onAddFila,
   onSetCupo,
   onReorderFilas,
@@ -223,6 +227,14 @@ export function SituacionCard({
                   : ""}
               </p>
             ) : null}
+            {onDestinoChange ? (
+              <DestinoCierreToggle
+                compact
+                value={vehicle.destinoCierre}
+                proyectoId={vehicle.proyectoId}
+                onChange={onDestinoChange}
+              />
+            ) : null}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -268,6 +280,13 @@ export function SituacionCard({
             <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
               Ring sin filas pendientes
             </p>
+            {onDestinoChange ? (
+              <DestinoCierreToggle
+                value={vehicle.destinoCierre}
+                proyectoId={vehicle.proyectoId}
+                onChange={onDestinoChange}
+              />
+            ) : null}
             <button
               type="button"
               className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"

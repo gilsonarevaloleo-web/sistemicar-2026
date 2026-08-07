@@ -727,6 +727,11 @@ export interface Vehicle {
   /** Hub Proyectos: enlace al proyecto y peldaño en ejecución. */
   proyectoId?: string;
   proyectoPeldanoId?: string;
+  /**
+   * Destino del cierre: presencia (día) vs peldaño (Hub).
+   * Default efectivo = presencia — el peldaño es gesto consciente.
+   */
+  destinoCierre?: "presencia" | "peldano";
   /** Respaldo termodinámico al cerrar — subs/decisiones si Firebase pierde el array. */
   termoDecisionSnapshot?: {
     journalDayStartMs: number;
@@ -1713,7 +1718,7 @@ export type UpdateVehicleOptions = {
 export async function updateVehicle(
   userId: string,
   vehicleId: string,
-  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId" | "ancladoAlSegmento">>,
+  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId" | "ancladoAlSegmento" | "proyectoId" | "proyectoPeldanoId" | "destinoCierre">>,
   opts?: UpdateVehicleOptions
 ): Promise<void> {
   const updateLocally = () => {

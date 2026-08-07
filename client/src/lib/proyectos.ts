@@ -14,6 +14,7 @@ import {
   type RutaMentalPaso,
   type RutasMentalesSet,
 } from "./claridadDireccion";
+import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import { safeSetItem } from "./storageHygiene";
 import {
   buildTranscriptFromVehicles,
@@ -130,6 +131,11 @@ export interface Proyecto {
   nota?: string;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Orden manual en el Hub (menor = más arriba).
+   * Si falta, se ordena por updatedAt al final del bloque ordenado.
+   */
+  orden?: number;
   peldanosConquistados: number;
   profundidadMaxima?: FocusBandId;
   minutosTotales?: number;
@@ -292,9 +298,19 @@ async function loadProyectoFromFirestoreById(userId: string, id: string): Promis
   }
 }
 
+/** Orden estable del Hub: orden manual, luego updatedAt desc. */
+export function sortProyectos(list: Proyecto[]): Proyecto[] {
+  return [...list].sort((a, b) => {
+    const ao = a.orden ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.orden ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return b.updatedAt - a.updatedAt;
+  });
+}
+
 /** Listado instantáneo desde localStorage (sin red). */
 export function getProyectosLocal(userId: string): Proyecto[] {
-  return [...getLocalProyectos(userId)].sort((a, b) => b.updatedAt - a.updatedAt);
+  return sortProyectos(getLocalProyectos(userId));
 }
 
 export async function getProyectos(userId: string): Promise<Proyecto[]> {
@@ -303,7 +319,7 @@ export async function getProyectos(userId: string): Promise<Proyecto[]> {
   for (const p of await loadProyectosFromFirestore(userId)) {
     if (!byId.has(p.id)) byId.set(p.id, p);
   }
-  return Array.from(byId.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  return sortProyectos(Array.from(byId.values()));
 }
 
 export async function getProyectoById(userId: string, id: string): Promise<Proyecto | null> {
@@ -324,20 +340,54 @@ export async function addProyecto(
       etiqueta: data.etiqueta,
       focoTitulo: data.oleadaTitulo ?? data.titulo,
     });
+  const existing = getLocalProyectos(userId);
+  const minOrden = existing.reduce(
+    (min, p) => Math.min(min, p.orden ?? 0),
+    0
+  );
   const proyecto: Proyecto = {
     id: `proy_${now}_${Math.random().toString(36).slice(2, 6)}`,
     ...data,
     claridadActiva,
+    orden: minOrden - 1,
     peldanosConquistados: 0,
     minutosTotales: 0,
     createdAt: now,
     updatedAt: now,
   };
-  const list = getLocalProyectos(userId);
+  const list = [...existing];
   list.unshift(proyecto);
   saveLocalProyectos(userId, list);
   void syncFirestoreProyecto(userId, proyecto);
   return proyecto;
+}
+
+/** Reordena proyectos en el Hub (swap con vecino). */
+export async function reorderProyecto(
+  userId: string,
+  proyectoId: string,
+  direction: "up" | "down"
+): Promise<void> {
+  const sorted = sortProyectos(getLocalProyectos(userId));
+  if (sorted.length < 2) return;
+  // Normaliza orden 0..n-1 para que el swap sea fiable aunque falten valores.
+  const normalized = sorted.map((p, i) => ({ ...p, orden: i }));
+  const idx = normalized.findIndex(p => p.id === proyectoId);
+  if (idx === -1) return;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= normalized.length) return;
+  const a = normalized[idx]!;
+  const b = normalized[swapIdx]!;
+  const ordenA = a.orden;
+  a.orden = b.orden;
+  b.orden = ordenA;
+  a.updatedAt = Date.now();
+  b.updatedAt = Date.now();
+  const byId = new Map(normalized.map(p => [p.id, p]));
+  const merged = getLocalProyectos(userId).map(p => byId.get(p.id) ?? p);
+  saveLocalProyectos(userId, merged);
+  void syncFirestoreProyecto(userId, a);
+  void syncFirestoreProyecto(userId, b);
 }
 
 /** Guarda dirección de claridad en el Hub (sincroniza a segmentos al aplicar rutina o crear bloque). */
@@ -798,8 +848,13 @@ export async function recordProgresoHubAlCerrarVehiculo(
     duracionMin?: number;
     subs?: SubVehiculo[];
     subTareas?: SubTarea[];
+    /** Override del clasificador; default = vehicle.destinoCierre ?? presencia. */
+    destinoCierre?: "presencia" | "peldano";
   }
 ): Promise<void> {
+  const destino = resolveDestinoCierre(vehicle.destinoCierre, opts.destinoCierre);
+  if (!feedsProyectoHub(destino)) return;
+
   const proyectoId = vehicle.proyectoId;
   if (!proyectoId) return;
 

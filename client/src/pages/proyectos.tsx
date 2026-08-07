@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  startTransition,
+  type ReactNode,
+} from "react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,6 +35,7 @@ import {
   addPeldanoIdea,
   deletePeldanoIdea,
   reorderPeldano,
+  reorderProyecto,
   computeProyectoStats,
   subscribeToProyectos,
   buildLaunchUrl,
@@ -83,6 +92,73 @@ function ProyectoIcono({
   const tint = color ?? (etiqueta === "centro" ? GOLD : CYAN);
   if (etiqueta === "centro") return <Sparkles size={size} style={{ color: tint }} />;
   return <Layers size={size} style={{ color: tint }} />;
+}
+
+/** Sección colapsable del detalle Hub — acorta el scroll largo. */
+function HubCollapsible({
+  title,
+  tint,
+  icon,
+  count,
+  defaultOpen = false,
+  children,
+  testId,
+}: {
+  title: string;
+  tint: string;
+  icon?: ReactNode;
+  count?: number;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  testId?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div
+      className="mb-4 rounded-xl border overflow-hidden"
+      style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.1)" }}
+      data-testid={testId}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full p-3 flex items-center justify-between gap-2 text-left"
+      >
+        <span
+          className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+          style={{ color: tint }}
+        >
+          {icon}
+          {title}
+          {count != null ? (
+            <span
+              className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black"
+              style={{ backgroundColor: `${tint}18`, color: tint }}
+            >
+              {count}
+            </span>
+          ) : null}
+        </span>
+        {open ? (
+          <ChevronUp size={14} className="text-slate-500 shrink-0" />
+        ) : (
+          <ChevronDown size={14} className="text-slate-500 shrink-0" />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-t border-white/5"
+          >
+            <div className="p-3">{children}</div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 /** Formulario aislado: el tipado no pelea con re-renders del listado/sync del Hub. */
@@ -197,6 +273,8 @@ export default function ProyectosPage() {
   const [creatingProyecto, setCreatingProyecto] = useState(false);
   /** Diferir editor/calendario: abrir detalle no debe montar todo el árbol de golpe. */
   const [detailHeavyReady, setDetailHeavyReady] = useState(false);
+  /** Escalera: mostrar solo los N más recientes; el resto bajo “mostrar más”. */
+  const [conquistadosVisible, setConquistadosVisible] = useState(5);
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
@@ -301,6 +379,8 @@ export default function ProyectosPage() {
       return;
     }
     setDetailHeavyReady(false);
+    setConquistadosVisible(5);
+    setExpandedConq(null);
     const heavyId = window.setTimeout(() => setDetailHeavyReady(true), 120);
     return () => window.clearTimeout(heavyId);
   }, [detailId]);
@@ -606,18 +686,30 @@ export default function ProyectosPage() {
         </div>
 
         {(proyecto.pasosEjecutadosLog?.length ?? 0) > 0 && (
-          <div className="mb-4 p-3 rounded-xl border border-white/10" style={{ backgroundColor: PIZARRA }}>
-            <PeldanoDecisionesEnumeradas
-              decisiones={proyecto.pasosEjecutadosLog!}
-              titulo="Pasos desde el Crisol"
-            />
-          </div>
+          <HubCollapsible
+            title="Pasos desde el Crisol"
+            tint={GOLD}
+            icon={<Sparkles size={12} />}
+            count={proyecto.pasosEjecutadosLog!.length}
+            defaultOpen={false}
+            testId="hub-pasos-crisol"
+          >
+            <div className="max-h-56 overflow-y-auto pr-1">
+              <PeldanoDecisionesEnumeradas
+                decisiones={proyecto.pasosEjecutadosLog!}
+                titulo="Pasos desde el Crisol"
+              />
+            </div>
+          </HubCollapsible>
         )}
 
-        <div className="mb-4 p-3 rounded-xl border border-white/10" style={{ backgroundColor: PIZARRA }}>
-          <p className="text-[9px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5" style={{ color: CYAN }}>
-            <TrendingUp size={12} /> Calendario de pasos dados
-          </p>
+        <HubCollapsible
+          title="Calendario de pasos dados"
+          tint={CYAN}
+          icon={<TrendingUp size={12} />}
+          defaultOpen={false}
+          testId="hub-calendario-pasos"
+        >
           <p className="text-[8px] mb-3 leading-relaxed" style={{ color: NARANJA }}>
             Historial de ejecución — pasos ya realizados. No es un planificador.
           </p>
@@ -626,7 +718,7 @@ export default function ProyectosPage() {
           ) : (
             <p className="text-[9px] text-slate-600 py-2">Cargando calendario…</p>
           )}
-        </div>
+        </HubCollapsible>
 
         {enCursoPlan.length > 0 && (
           <div className="mb-4">
@@ -655,10 +747,14 @@ export default function ProyectosPage() {
           </div>
         )}
 
-        <div className="mb-4">
-          <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: CYAN }}>
-            Desglosar ideas
-          </p>
+        <HubCollapsible
+          title="Desglosar ideas"
+          tint={CYAN}
+          icon={<Layers size={12} />}
+          count={ideas.length}
+          defaultOpen={ideas.length > 0 && ideas.length <= 4}
+          testId="hub-ideas"
+        >
           <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
             Horizontes amplios (más allá de un día o segmento). Actívalos como oleada para
             lanzar vehículos sobre ellos — A/B/C orientan la oleada, no el hueco de hoy.
@@ -680,7 +776,7 @@ export default function ProyectosPage() {
             </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
             {ideas.length === 0 && (
               <p className="text-[10px] text-slate-600 text-center py-4">
                 Añade ideas de oleada — no son el bloque del día; son el camino a caminar.
@@ -696,13 +792,13 @@ export default function ProyectosPage() {
                   <span className="text-sm font-bold text-white">{pel.titulo}</span>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => void reorderPeldano(user!.uid, detailId, pel.id, "up")}
+                      onClick={() => void reorderPeldano(user!.uid, proyecto.id, pel.id, "up")}
                       className="p-1 text-slate-500 hover:text-white"
                     >
                       <ChevronUp size={14} />
                     </button>
                     <button
-                      onClick={() => void reorderPeldano(user!.uid, detailId, pel.id, "down")}
+                      onClick={() => void reorderPeldano(user!.uid, proyecto.id, pel.id, "down")}
                       className="p-1 text-slate-500 hover:text-white"
                     >
                       <ChevronDown size={14} />
@@ -731,14 +827,14 @@ export default function ProyectosPage() {
                 </button>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => navigate(buildLaunchUrl(detailId, pel.id, "desglosador_tiempo"))}
+                    onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_tiempo"))}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
                     style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
                   >
                     <Clock size={12} /> Tiempo
                   </button>
                   <button
-                    onClick={() => navigate(buildLaunchUrl(detailId, pel.id, "desglosador_situacion"))}
+                    onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_situacion"))}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
                     style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
                   >
@@ -748,23 +844,27 @@ export default function ProyectosPage() {
               </div>
             ))}
           </div>
-        </div>
+        </HubCollapsible>
 
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: GOLD }}>
-            <TrendingUp size={12} /> Tu escalera — conquistados
-          </p>
+        <HubCollapsible
+          title="Tu escalera — conquistados"
+          tint={GOLD}
+          icon={<TrendingUp size={12} />}
+          count={conquistados.length}
+          defaultOpen={conquistados.length > 0}
+          testId="hub-escalera"
+        >
           {conquistados.length === 0 ? (
             <p className="text-[10px] text-slate-600 text-center py-6 border border-dashed border-white/10 rounded-xl">
-              Lanza un desglosador y ciérralo — aquí aparecerá tu progreso real.
+              Cierra un vehículo como Peldaño — aquí aparece el avance serio.
             </p>
           ) : (
             <div className="space-y-2">
-              {conquistados.map((pel, i) => (
+              {conquistados.slice(0, conquistadosVisible).map((pel, i) => (
                 <div
                   key={pel.id}
                   className="rounded-xl border overflow-hidden"
-                  style={{ borderColor: `${GOLD}25`, backgroundColor: PIZARRA }}
+                  style={{ borderColor: `${GOLD}25`, backgroundColor: "rgba(0,0,0,0.35)" }}
                 >
                   <button
                     className="w-full p-3 flex items-center justify-between text-left"
@@ -844,9 +944,20 @@ export default function ProyectosPage() {
                   </AnimatePresence>
                 </div>
               ))}
+              {conquistados.length > conquistadosVisible ? (
+                <button
+                  type="button"
+                  onClick={() => setConquistadosVisible(n => n + 8)}
+                  className="w-full py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider"
+                  style={{ color: GOLD, border: `1px solid ${GOLD}35` }}
+                  data-testid="hub-escalera-mas"
+                >
+                  Mostrar más ({conquistados.length - conquistadosVisible})
+                </button>
+              ) : null}
             </div>
           )}
-        </div>
+        </HubCollapsible>
       </div>
     );
   }
@@ -891,31 +1002,69 @@ export default function ProyectosPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {proyectos.map(p => (
-            <button
+          {proyectos.map((p, idx) => (
+            <div
               key={p.id}
-              type="button"
-              onClick={() => openProyectoDetalle(p.id)}
-              className="w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.01]"
+              className="rounded-xl border overflow-hidden"
               style={{ backgroundColor: PIZARRA, borderColor: `${p.color ?? CYAN}30` }}
               data-testid={`proyecto-card-${p.id}`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[8px] font-bold uppercase text-slate-500">{p.etiqueta}</span>
-                  <p className="text-base font-black text-white">{p.titulo}</p>
+              <div className="flex">
+                <div className="flex flex-col border-r border-white/5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={idx === 0}
+                    onClick={e => {
+                      e.stopPropagation();
+                      void reorderProyecto(user.uid, p.id, "up").then(() =>
+                        setProyectos(getProyectosLocal(user.uid))
+                      );
+                    }}
+                    className="p-2 text-slate-500 hover:text-white disabled:opacity-20"
+                    aria-label="Subir proyecto"
+                    data-testid={`proyecto-up-${p.id}`}
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={idx === proyectos.length - 1}
+                    onClick={e => {
+                      e.stopPropagation();
+                      void reorderProyecto(user.uid, p.id, "down").then(() =>
+                        setProyectos(getProyectosLocal(user.uid))
+                      );
+                    }}
+                    className="p-2 text-slate-500 hover:text-white disabled:opacity-20"
+                    aria-label="Bajar proyecto"
+                    data-testid={`proyecto-down-${p.id}`}
+                  >
+                    <ChevronDown size={14} />
+                  </button>
                 </div>
-                <ProyectoIcono etiqueta={p.etiqueta} color={p.color} />
+                <button
+                  type="button"
+                  onClick={() => openProyectoDetalle(p.id)}
+                  className="flex-1 p-4 text-left transition-all hover:bg-white/[0.02]"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[8px] font-bold uppercase text-slate-500">{p.etiqueta}</span>
+                      <p className="text-base font-black text-white">{p.titulo}</p>
+                    </div>
+                    <ProyectoIcono etiqueta={p.etiqueta} color={p.color} />
+                  </div>
+                  <div className="flex gap-4 mt-3 text-[9px] font-bold uppercase tracking-wider">
+                    <span style={{ color: GOLD }}>{p.peldanosConquistados} peldaños</span>
+                    {p.profundidadMaxima && (
+                      <span style={{ color: RUTA_BANDA_META[p.profundidadMaxima].color }}>
+                        {RUTA_BANDA_META[p.profundidadMaxima].label}
+                      </span>
+                    )}
+                  </div>
+                </button>
               </div>
-              <div className="flex gap-4 mt-3 text-[9px] font-bold uppercase tracking-wider">
-                <span style={{ color: GOLD }}>{p.peldanosConquistados} peldaños</span>
-                {p.profundidadMaxima && (
-                  <span style={{ color: RUTA_BANDA_META[p.profundidadMaxima].color }}>
-                    {RUTA_BANDA_META[p.profundidadMaxima].label}
-                  </span>
-                )}
-              </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

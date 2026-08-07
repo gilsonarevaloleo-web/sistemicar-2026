@@ -4,16 +4,21 @@
  * Solo sombra / async — no en el gesto ms0.
  */
 import type { SegmentoV5, SubVehiculo, Vehicle } from "./persistence";
+import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import { registrarPasoEjecutadoEnProyecto } from "./proyectos";
 import { resolveDireccionDesdeEntidades } from "./resolveDireccionProyecto";
 
 export async function syncDesglosadorSubToProyectoHub(
   userId: string,
-  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId">,
+  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId" | "destinoCierre">,
   sub: SubVehiculo,
   status: "cumplido" | "fallado",
   segmento?: Pick<SegmentoV5, "proyectoVinculadoId"> | null
 ): Promise<{ pasoNumero: number | null; proyectoId: string | undefined }> {
+  if (!feedsProyectoHub(resolveDestinoCierre(vehicle.destinoCierre))) {
+    return { pasoNumero: null, proyectoId: vehicle.proyectoId };
+  }
+
   const proyectoId = resolveDireccionDesdeEntidades({
     sub,
     vehicle,

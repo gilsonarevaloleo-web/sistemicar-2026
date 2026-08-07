@@ -1,4 +1,5 @@
 import type { SubTarea, Vehicle } from "./persistence";
+import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import {
   appendDecisionToPeldanoTranscript,
   registrarPasoEjecutadoEnProyecto,
@@ -10,11 +11,15 @@ import { markImanReservaEjecutada } from "./situacionReserva";
 /** Volca una decisión del ring/taller al proyecto y al peldaño vinculado. */
 export async function syncRingDecisionToProyectoHub(
   userId: string,
-  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId">,
+  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId" | "destinoCierre">,
   sub: SubTarea,
   status: DecisionStatus,
   ts: number
 ): Promise<{ pasoNumero: number | null }> {
+  if (!feedsProyectoHub(resolveDestinoCierre(vehicle.destinoCierre))) {
+    return { pasoNumero: null };
+  }
+
   const raw = rawDecisionFromSubTarea(vehicle, sub, status, ts);
   const [enumerated] = enumerateRingDecisions([raw]);
   if (!enumerated) return { pasoNumero: null };

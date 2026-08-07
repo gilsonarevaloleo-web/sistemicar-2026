@@ -137,6 +137,7 @@ describe("hub progreso oleada", () => {
         titulo: "Desglose pagos UI",
         proyectoId: p.id,
         proyectoPeldanoId: idea.id,
+        destinoCierre: "peldano",
         duracionFinal: 25,
         subVehiculos: [
           {
@@ -148,7 +149,7 @@ describe("hub progreso oleada", () => {
           } as never,
         ],
       }),
-      { tipoOrigen: "tiempo", psGanados: 5, duracionMin: 25 }
+      { tipoOrigen: "tiempo", psGanados: 5, duracionMin: 25, destinoCierre: "peldano" }
     );
 
     const all = getPeldanosByProyectoLocal(USER, p.id);
@@ -170,13 +171,38 @@ describe("hub progreso oleada", () => {
         titulo: "Trabajo idea",
         proyectoId: p.id,
         proyectoPeldanoId: idea.id,
+        destinoCierre: "peldano",
         duracionFinal: 10,
         subVehiculos: [],
       }),
-      { tipoOrigen: "tiempo", psGanados: 2, duracionMin: 10, subs: [] }
+      { tipoOrigen: "tiempo", psGanados: 2, duracionMin: 10, subs: [], destinoCierre: "peldano" }
     );
 
     const pel = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id);
     assert.equal(pel?.estado, "conquistado");
+  });
+
+  it("cierre con destino presencia no ensucia la escalera del Hub", async () => {
+    const p = await addProyecto(USER, { titulo: "Sistemicar", etiqueta: "proyecto" });
+    const idea = await addPeldanoIdea(USER, p.id, "Oleada limpia");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v3",
+        titulo: "Ruido del día",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        destinoCierre: "presencia",
+        duracionFinal: 15,
+        subVehiculos: [],
+      }),
+      { tipoOrigen: "tiempo", psGanados: 3, duracionMin: 15, destinoCierre: "presencia" }
+    );
+
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(all.filter(x => x.estado === "conquistado").length, 0);
+    assert.equal(all.find(x => x.id === idea.id)?.estado, "en_curso");
   });
 });
