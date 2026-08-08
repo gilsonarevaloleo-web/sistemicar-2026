@@ -35,10 +35,17 @@ export interface ConfiguracionCodigo {
   modoExterno: ModoExternoConfig;
 }
 
+export interface HistorialUmbralItem {
+  rol: "user" | "system";
+  texto: string;
+}
+
 export interface PromptEvaluacionInput {
   codigo: CodigoNumero;
   modo: ModoUmbral;
   respuestaUsuario: string;
+  /** Contexto opcional de turnos previos (Umbral v2 parte 2). */
+  historialPrevio?: HistorialUmbralItem[];
 }
 
 export interface EvaluacionGeminiJson {
@@ -353,6 +360,33 @@ export function siguienteCodigo(
   return (codigo + 1) as CodigoNumero;
 }
 
+export function isCodigoNumero(value: unknown): value is CodigoNumero {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 10
+  );
+}
+
+export function isModoUmbral(value: unknown): value is ModoUmbral {
+  return value === "INTERNO_HABILIDAD" || value === "EXTERNO_VENTAS";
+}
+
+/**
+ * Regla de avance del Umbral v2 (parte 2):
+ * - aprobado + código < 10 → codigoActual + 1
+ * - aprobado + código 10 → null (módulo completado)
+ * - no aprobado → permanece en codigoActual
+ */
+export function resolverCodigoSiguiente(
+  aprobado: boolean,
+  codigoActual: CodigoNumero,
+): CodigoNumero | null {
+  if (!aprobado) return codigoActual;
+  return siguienteCodigo(codigoActual);
+}
+
 /**
  * Arma el prompt de evaluación para Gemini.
  * La respuesta del modelo DEBE ser JSON estricto:
@@ -361,7 +395,7 @@ export function siguienteCodigo(
 export function obtenerPromptEvaluacion(
   input: PromptEvaluacionInput,
 ): PromptEvaluacion {
-  const { codigo, modo, respuestaUsuario } = input;
+  const { codigo, modo, respuestaUsuario, historialPrevio = [] } = input;
   const cfg = obtenerCodigo(codigo);
   const modoMeta = MODOS_UMBRAL[modo];
   const next = siguienteCodigo(codigo);
@@ -383,6 +417,18 @@ export function obtenerPromptEvaluacion(
           `Instrucción de evaluación: ${cfg.modoExterno.instruccionEvaluadorGemini}`,
         ].join("\n");
 
+  const historialTxt =
+    historialPrevio.length === 0
+      ? "(sin historial previo)"
+      : historialPrevio
+          .slice(-16)
+          .map((h, i) => {
+            const rol = h.rol === "system" ? "system" : "user";
+            const texto = String(h.texto ?? "").trim();
+            return `${i + 1}. [${rol}] ${texto || "(vacío)"}`;
+          })
+          .join("\n");
+
   const system = [
     "Eres el Evaluador Confrontativo del Umbral v2 (Sistemicar).",
     "Tu trabajo es aprobar o rechazar con criterio clínico-técnico, sin New Age y sin floritura.",
@@ -391,9 +437,9 @@ export function obtenerPromptEvaluacion(
     '{"aprobado": boolean, "feedbackConfrontativo": string, "codigoSiguiente": number | null}',
     "",
     "Reglas de codigoSiguiente:",
-    `- Si aprobado === true y existe siguiente: usa ${next === null ? "null" : next}.`,
-    "- Si aprobado === false: codigoSiguiente = null (el operador permanece en el código actual).",
-    "- Si es Código 10 y aprobado === true: codigoSiguiente = null (dominio total alcanzado).",
+    `- Si aprobado === true y codigo < 10: codigoSiguiente = ${next ?? "null"}.`,
+    `- Si aprobado === true y codigo === 10: codigoSiguiente = null (módulo completado).`,
+    `- Si aprobado === false: codigoSiguiente = ${codigo} (el operador no avanza).`,
     "",
     "feedbackConfrontativo: 2–5 frases. Directo, densificado, sin consuelo vacío. Si rechazas, nombra el fallo exacto y qué faltó.",
     "",
@@ -403,7 +449,10 @@ export function obtenerPromptEvaluacion(
   ].join("\n");
 
   const user = [
-    `Respuesta del operador a evaluar:`,
+    "HISTORIAL PREVIO:",
+    historialTxt,
+    "",
+    "Respuesta del operador a evaluar:",
     "---",
     respuestaUsuario.trim() || "(vacío)",
     "---",
@@ -416,10 +465,15 @@ export function obtenerPromptEvaluacion(
     responseSchema: {
       aprobado: false,
       feedbackConfrontativo: "",
-      codigoSiguiente: null,
+      codigoSiguiente: codigo,
     },
     codigo,
     modo,
     nombreCodigo: cfg.nombre,
   };
+}
+
+/** Prompt único (system + user) listo para callGemini. */
+export function serializarPromptEvaluacion(prompt: PromptEvaluacion): string {
+  return `${prompt.system}\n\n${prompt.user}`;
 }

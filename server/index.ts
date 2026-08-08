@@ -76,6 +76,7 @@ import { activateModulesForEmail, activateModulesForUserById, adminLookupUserByE
 import { modulesGrantedByPlan } from "../shared/moduleAccess";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
 import { registerEspejoV2Routes } from "./espejoV2Routes";
+import { registerUmbralV2Routes } from "./umbralV2Routes";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -2238,6 +2239,7 @@ app.get("/api/mercadopago/test-link/:planId", async (req, res) => {
 });
 
 registerEspejoV2Routes(app, { callGemini, parseGeminiJSON });
+registerUmbralV2Routes(app, { callGemini, parseGeminiJSON });
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
   try {

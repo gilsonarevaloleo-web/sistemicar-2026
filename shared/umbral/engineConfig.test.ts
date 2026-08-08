@@ -5,6 +5,7 @@ import {
   DICCIONARIO_CODIGOS,
   obtenerCodigo,
   obtenerPromptEvaluacion,
+  resolverCodigoSiguiente,
   siguienteCodigo,
   type CodigoNumero,
   type ModoUmbral,
@@ -41,11 +42,18 @@ describe("Umbral v2 — engineConfig", () => {
     assert.equal(siguienteCodigo(10), null);
   });
 
+  it("resolverCodigoSiguiente aplica regla de avance parte 2", () => {
+    assert.equal(resolverCodigoSiguiente(false, 4), 4);
+    assert.equal(resolverCodigoSiguiente(true, 4), 5);
+    assert.equal(resolverCodigoSiguiente(true, 10), null);
+  });
+
   it("obtenerPromptEvaluacion (interno) incluye criterio y schema JSON", () => {
     const prompt = obtenerPromptEvaluacion({
       codigo: 4,
       modo: "INTERNO_HABILIDAD",
       respuestaUsuario: "Hoy corto la flor y hago la acción mínima: una llamada.",
+      historialPrevio: [{ rol: "user", texto: "intento previo vago" }],
     });
     assert.equal(prompt.codigo, 4);
     assert.equal(prompt.modo, "INTERNO_HABILIDAD");
@@ -53,7 +61,8 @@ describe("Umbral v2 — engineConfig", () => {
     assert.match(prompt.system, /feedbackConfrontativo/);
     assert.match(prompt.system, /accion mínima|acción mínima|Seriedad/i);
     assert.match(prompt.user, /acción mínima: una llamada/i);
-    assert.equal(prompt.responseSchema.codigoSiguiente, null);
+    assert.match(prompt.user, /intento previo vago/);
+    assert.equal(prompt.responseSchema.codigoSiguiente, 4);
   });
 
   it("obtenerPromptEvaluacion (externo) usa objecionCliente", () => {
@@ -74,5 +83,6 @@ describe("Umbral v2 — engineConfig", () => {
       respuestaUsuario: "Asumo el rol. Yo marco el estándar.",
     });
     assert.match(prompt.system, /codigoSiguiente = null/);
+    assert.match(prompt.system, /codigoSiguiente = 10/);
   });
 });
