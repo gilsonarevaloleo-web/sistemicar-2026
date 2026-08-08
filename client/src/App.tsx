@@ -42,6 +42,7 @@ import Escaner from "@/pages/escaner";
 import CamaraInmunidad from "@/pages/camara-inmunidad";
 import ComoFunciona from "@/pages/como-funciona";
 import Umbral from "@/pages/umbral";
+import UmbralV2 from "@/pages/umbral-v2";
 import Proyector from "@/pages/proyector";
 import Proyectos from "@/pages/proyectos";
 import TerminosCondiciones from "@/pages/terminos-condiciones";
@@ -408,6 +409,9 @@ function Router() {
         </Route>
         <Route path="/umbral">
           <ProtectedRoute component={Umbral} />
+        </Route>
+        <Route path="/umbral/v2">
+          <ProtectedRoute component={UmbralV2} />
         </Route>
         <Route path="/proyector">
           <ProtectedRoute component={Proyector} />
