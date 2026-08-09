@@ -14,16 +14,17 @@
  */
 import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { useLocation } from "wouter";
-import { isJornada4Path, isProyectosHubPath } from "@/lib/jornadaBrand";
+import { isAppShellQuietPath, isJornada4Path } from "@/lib/jornadaBrand";
 import { isMobilePerfMode } from "@/lib/mobilePerf";
 
 /** Tras salir de Dual Kernel, diferir Centinela / SegmentAttention / Cierre / destinos pesados. */
 export const DUAL_KERNEL_EXIT_SOFT_MS = isMobilePerfMode() ? 2_500 : 1_200;
 
 /**
- * Ring → Hub Proyectos: soft-start más largo.
- * El Hub necesita toques (abrir detalle) mientras el ring sigue “vivo” en flotaStore;
- * 1–2.5 s no alcanza antes de que el reloj 1 s y Centinela saturen el hilo.
+ * Ring → Hub Proyectos o Centro de Comando (`/menu`): soft-start más largo.
+ * Esas pantallas necesitan toques (abrir detalle / tarjetas) mientras el ring
+ * sigue “vivo” en flotaStore; 1–2.5 s no alcanza antes de que el reloj 1 s y
+ * Centinela saturen el hilo.
  */
 export const DUAL_KERNEL_HUB_EXIT_SOFT_MS = isMobilePerfMode() ? 5_500 : 3_000;
 
@@ -76,7 +77,9 @@ export type ArmDualKernelExitSoftOpts = {
 
 function resolveSoftDuration(opts?: ArmDualKernelExitSoftOpts): number {
   if (opts?.durationMs != null && opts.durationMs > 0) return opts.durationMs;
-  if (opts?.href && isProyectosHubPath(opts.href)) return DUAL_KERNEL_HUB_EXIT_SOFT_MS;
+  if (opts?.href && isAppShellQuietPath(opts.href)) {
+    return DUAL_KERNEL_HUB_EXIT_SOFT_MS;
+  }
   return DUAL_KERNEL_EXIT_SOFT_MS;
 }
 
@@ -124,7 +127,7 @@ export function useDualKernelMotorsQuiet(): boolean {
   } else if (moduleSeenOnJ4) {
     moduleSeenOnJ4 = false;
     if (!isDualKernelExitSoftActive()) {
-      const ms = isProyectosHubPath(location)
+      const ms = isAppShellQuietPath(location)
         ? DUAL_KERNEL_HUB_EXIT_SOFT_MS
         : DUAL_KERNEL_EXIT_SOFT_MS;
       softUntilMs = Date.now() + ms;
@@ -148,15 +151,17 @@ export function useDualKernelMotorsQuiet(): boolean {
 }
 
 /**
- * True en Dual Kernel, soft-start de salida, O mientras estamos en Hub Proyectos.
+ * True en Dual Kernel, soft-start de salida, O mientras estamos en Hub Proyectos
+ * o Centro de Comando (`/menu`).
  * Usar SOLO en motores del App shell (Centinela / SegmentAttention / Cierre).
- * No usar en la página Hub: ahí el soft-start corto basta para diferir Firestore propio.
+ * No usar en la página Hub/Menú: ahí el soft-start corto basta para diferir Firestore propio.
  *
  * Motivo: con ring activo, al soltar soft-start el reloj/Centinela saturan el hilo
- * y los toques del Hub (abrir detalle) no llegan a pintar — #50/#51 no bastaban.
+ * y los toques (abrir detalle / tarjetas del menú) no llegan a pintar —
+ * #50/#51/#52 callaron Hub Proyectos; `/menu` tenía el mismo hueco.
  */
 export function useAppShellMotorsQuiet(): boolean {
   const [location] = useLocation();
   const dualQuiet = useDualKernelMotorsQuiet();
-  return dualQuiet || isProyectosHubPath(location);
+  return dualQuiet || isAppShellQuietPath(location);
 }

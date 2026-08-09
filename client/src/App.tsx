@@ -476,11 +476,17 @@ function VoiceBootstrap() {
     const isVoiceQuietPath = (): boolean => {
       if (isJornada4WindowPath()) return true;
       const p = window.location.pathname;
-      // Hub de proyectos: crear/editar no necesita TTS/GPS; el unlock en cada gesto congelaba el input.
-      return p === "/proyectos" || p.startsWith("/proyectos/");
+      // Hub de proyectos + Centro de Comando: sin TTS/GPS en el primer toque
+      // (el unlock + prefetch robaban el hilo y las tarjetas no abrían).
+      return (
+        p === "/proyectos" ||
+        p.startsWith("/proyectos/") ||
+        p === "/menu" ||
+        p.startsWith("/menu/")
+      );
     };
     const unlock = (e: Event) => {
-      // Dual Kernel + Hub /proyectos: sin voz/prefetch GPS.
+      // Dual Kernel + Hub /proyectos + /menu: sin voz/prefetch GPS.
       if (isVoiceQuietPath()) return;
       // Otros forms: no despertar voz al tipar.
       if (isTypingTarget(e.target)) return;
