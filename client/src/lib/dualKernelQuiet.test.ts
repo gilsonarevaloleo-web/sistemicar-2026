@@ -31,10 +31,21 @@ describe("dualKernelQuiet soft-start", () => {
     assert.match(src, /armDualKernelExitSoftStart/);
     assert.match(src, /isDualKernelExitSoftActive/);
     assert.match(src, /isJornada4Path/);
-    assert.match(src, /isProyectosHubPath/);
+    assert.match(src, /isAppShellQuietPath/);
     // Latch compartido: no depender solo de useState local por instancia.
     assert.match(src, /useSyncExternalStore/);
     assert.match(src, /isDualKernelExitSoftActive\(\)/);
+  });
+
+  it("Centro de Comando (/menu) calla motores del shell como Hub Proyectos", () => {
+    const src = readFileSync(join(dir, "dualKernelQuiet.ts"), "utf8");
+    const brand = readFileSync(join(dir, "jornadaBrand.ts"), "utf8");
+    const app = readFileSync(join(dir, "../App.tsx"), "utf8");
+    assert.match(brand, /isMenuPrincipalPath/);
+    assert.match(brand, /isAppShellQuietPath/);
+    assert.match(src, /isAppShellQuietPath\(location\)/);
+    // VoiceBootstrap: primer toque en /menu no debe despertar TTS/GPS.
+    assert.match(app, /p === "\/menu"/);
   });
 
   it("armDualKernelExitSoftStart activa el latch síncronamente", () => {
@@ -44,7 +55,7 @@ describe("dualKernelQuiet soft-start", () => {
     assert.ok(DUAL_KERNEL_EXIT_SOFT_MS >= 1_000);
   });
 
-  it("Hub Proyectos usa soft-start más largo que el default", () => {
+  it("Hub Proyectos y /menu usan soft-start más largo que el default", () => {
     assert.ok(DUAL_KERNEL_HUB_EXIT_SOFT_MS > DUAL_KERNEL_EXIT_SOFT_MS);
     armDualKernelExitSoftStart({ href: "/proyectos" });
     assert.equal(isDualKernelExitSoftActive(), true);
@@ -53,6 +64,10 @@ describe("dualKernelQuiet soft-start", () => {
     armDualKernelExitSoftStart();
     assert.ok(isDualKernelExitSoftActive());
     assert.ok(Date.now() - before < DUAL_KERNEL_HUB_EXIT_SOFT_MS);
+
+    resetDualKernelExitSoftForTests();
+    armDualKernelExitSoftStart({ href: "/menu" });
+    assert.equal(isDualKernelExitSoftActive(), true);
   });
 
   it("SegmentAttention, Centinela y Cierre callan en Hub vía useAppShellMotorsQuiet", () => {

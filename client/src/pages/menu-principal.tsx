@@ -44,7 +44,10 @@ import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
 import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess } from "@/lib/persistence";
-import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import {
+  armDualKernelExitSoftStart,
+  useDualKernelMotorsQuiet,
+} from "@/lib/dualKernelQuiet";
 import {
   isDeployPreviewHost,
   isPreviewOpsUnlocked,
@@ -801,7 +804,13 @@ export default function MenuPrincipal() {
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
-                    onClick={() => item.id !== "proximo" && navigate(item.route)}
+                    onClick={() => {
+                      if (item.id === "proximo" || !item.route) return;
+                      // Soft-start: al salir del menú los motores del shell no
+                      // deben despertar en el mismo gesto que monta el destino.
+                      armDualKernelExitSoftStart({ href: item.route });
+                      navigate(item.route);
+                    }}
                     onPointerEnter={() => {
                       if (
                         item.id === "planificacion" ||
