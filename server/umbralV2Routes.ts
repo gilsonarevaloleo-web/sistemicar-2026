@@ -6,10 +6,11 @@
 import type { Express, Request, Response } from "express";
 import {
   DICCIONARIO_CODIGOS,
+  evaluarUmbralLocal,
   isCodigoNumero,
   isModoUmbral,
   obtenerPromptEvaluacion,
-  resolverCodigoSiguiente,
+  parseEvaluacionGemini,
   serializarPromptEvaluacion,
   type CodigoNumero,
   type EvaluacionGeminiJson,
@@ -40,6 +41,7 @@ export interface UmbralEvaluarSuccess {
   moduloCompletado: boolean;
   nombreCodigo: string;
   userId: string;
+  source: "gemini" | "local_fallback";
 }
 
 export interface UmbralEvaluarErrorBody {
@@ -50,13 +52,6 @@ export interface UmbralEvaluarErrorBody {
   feedbackConfrontativo: string;
   codigoSiguiente: number | null;
   error: string;
-}
-
-function safeParseJson(raw: string): any {
-  const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-  const match = cleaned.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("No JSON in Gemini response");
-  return JSON.parse(match[0]);
 }
 
 function normalizeHistorial(raw: unknown): HistorialUmbralItem[] {
@@ -73,35 +68,15 @@ function normalizeHistorial(raw: unknown): HistorialUmbralItem[] {
     .filter((h) => h.texto.length > 0);
 }
 
-function normalizeEvaluacion(
-  parsed: any,
-  codigoActual: CodigoNumero,
-): EvaluacionGeminiJson {
-  const aprobado = Boolean(parsed?.aprobado);
-  const feedbackConfrontativo = String(
-    parsed?.feedbackConfrontativo ?? "",
-  ).trim();
-  if (!feedbackConfrontativo) {
-    throw new Error("Gemini omitió feedbackConfrontativo");
-  }
-  return {
-    aprobado,
-    feedbackConfrontativo: feedbackConfrontativo.slice(0, 1200),
-    // La fuente de verdad del avance es la regla de servidor, no Gemini.
-    codigoSiguiente: resolverCodigoSiguiente(aprobado, codigoActual),
-  };
-}
-
 /**
  * Umbral v2 — POST /api/umbral/evaluar
  */
 export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {}) {
   const callGemini = deps.callGemini;
-  const parseJson = deps.parseGeminiJSON ?? safeParseJson;
 
   app.get("/api/umbral/meta", (_req: Request, res: Response) => {
     res.json({
-      version: "2.0.0-parte2",
+      version: "2.0.1-parte2-fix",
       endpoint: "POST /api/umbral/evaluar",
       modos: ["INTERNO_HABILIDAD", "EXTERNO_VENTAS"],
       codigos: Object.values(DICCIONARIO_CODIGOS).map((c) => ({
@@ -110,6 +85,7 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
         conceptoClave: c.conceptoClave,
       })),
       gemini: Boolean(callGemini),
+      fallbackLocal: true,
     });
   });
 
@@ -161,45 +137,55 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
       if (respuestaUsuario.length < 2) {
         return fallback(400, "respuestaUsuario es requerida");
       }
-      if (!callGemini) {
-        return fallback(500, "Gemini no configurado en el servidor");
-      }
 
-      const prompt = obtenerPromptEvaluacion({
+      const promptInput = {
         codigo: codigoActual,
         modo,
         respuestaUsuario,
         historialPrevio,
-      });
+      };
+      const prompt = obtenerPromptEvaluacion(promptInput);
 
-      let raw: string;
-      try {
-        raw = await callGemini(serializarPromptEvaluacion(prompt), 700, true);
-      } catch (err: any) {
-        console.error("[umbral/evaluar] Gemini error:", err);
-        return fallback(
-          500,
-          err?.message?.includes("timeout")
-            ? "Timeout al consultar Gemini"
-            : "Error al consultar Gemini",
-          {
-            feedbackConfrontativo:
-              "El evaluador no respondió a tiempo. Mantente en el código actual y vuelve a enviar tu respuesta.",
-            codigoSiguiente: codigoActual,
-          },
-        );
+      let evaluacion: EvaluacionGeminiJson | null = null;
+      let source: "gemini" | "local_fallback" = "local_fallback";
+
+      if (callGemini) {
+        try {
+          // 2.5 Flash usa tokens de pensamiento: 700 suele truncar el JSON.
+          const raw = await callGemini(
+            serializarPromptEvaluacion(prompt),
+            2048,
+            true,
+          );
+          try {
+            evaluacion = parseEvaluacionGemini(raw, codigoActual);
+            source = "gemini";
+          } catch (parseErr) {
+            // Reintento sin jsonMode estricto (a veces el MIME JSON llega vacío/truncado).
+            console.warn(
+              "[umbral/evaluar] parse JSON-mode falló, reintentando texto libre:",
+              parseErr,
+              "raw:",
+              String(raw).slice(0, 240),
+            );
+            const raw2 = await callGemini(
+              serializarPromptEvaluacion(prompt) +
+                "\n\nIMPORTANTE: responde SOLO un objeto JSON con claves aprobado, feedbackConfrontativo, codigoSiguiente.",
+              2048,
+              false,
+            );
+            evaluacion = parseEvaluacionGemini(raw2, codigoActual);
+            source = "gemini";
+          }
+        } catch (err: any) {
+          console.error("[umbral/evaluar] Gemini error → fallback local:", err);
+          evaluacion = null;
+        }
       }
 
-      let evaluacion: EvaluacionGeminiJson;
-      try {
-        evaluacion = normalizeEvaluacion(parseJson(raw), codigoActual);
-      } catch (err: any) {
-        console.error("[umbral/evaluar] parse error:", err, "raw:", String(raw).slice(0, 300));
-        return fallback(500, "Error al parsear respuesta de Gemini", {
-          feedbackConfrontativo:
-            "La evaluación llegó corrupta. Permaneces en el mismo código; reintenta con una respuesta más clara.",
-          codigoSiguiente: codigoActual,
-        });
+      if (!evaluacion) {
+        evaluacion = evaluarUmbralLocal(promptInput);
+        source = "local_fallback";
       }
 
       const moduloCompletado =
@@ -215,6 +201,7 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
         moduloCompletado,
         nombreCodigo: prompt.nombreCodigo,
         userId,
+        source,
       };
 
       return res.status(200).json(body);

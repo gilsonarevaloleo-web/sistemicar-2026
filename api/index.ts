@@ -5,6 +5,8 @@ import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import { getPublicAppBaseUrl } from "../shared/publicBaseUrl";
 import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
 import { deliverCorazonSabioIfNeeded, parseMpExternalRef } from "../server/mercadopagoEspejo";
+import { registerUmbralV2Routes } from "../server/umbralV2Routes";
+import { GEMINI_MODELS } from "../shared/geminiConfig";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -13,6 +15,38 @@ const gemini = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY || process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "",
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
+
+async function callGeminiUmbral(
+  prompt: string,
+  maxTokens: number = 2048,
+  jsonMode: boolean = false,
+): Promise<string> {
+  if (!gemini.apiKey) {
+    throw new Error("Gemini no disponible: configura GEMINI_API_KEY");
+  }
+  const errors: string[] = [];
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await gemini.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: maxTokens,
+        ...(jsonMode
+          ? { response_format: { type: "json_object" as const } }
+          : {}),
+      });
+      const content = response.choices?.[0]?.message?.content || "";
+      if (!content.trim()) throw new Error(`respuesta vacía (${model})`);
+      return content;
+    } catch (err: any) {
+      errors.push(`${model}:${err?.message || err}`);
+      continue;
+    }
+  }
+  throw new Error(`Gemini no disponible: ${errors.join(" | ")}`);
+}
+
+registerUmbralV2Routes(app, { callGemini: callGeminiUmbral });
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {
   try {

@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
   CODIGOS_NUMERO,
   DICCIONARIO_CODIGOS,
+  evaluarUmbralLocal,
   obtenerCodigo,
   obtenerPromptEvaluacion,
+  parseEvaluacionGemini,
   resolverCodigoSiguiente,
   siguienteCodigo,
   type CodigoNumero,
@@ -84,5 +86,34 @@ describe("Umbral v2 — engineConfig", () => {
     });
     assert.match(prompt.system, /codigoSiguiente = null/);
     assert.match(prompt.system, /codigoSiguiente = 10/);
+  });
+
+  it("parseEvaluacionGemini acepta alias feedback", () => {
+    const ev = parseEvaluacionGemini(
+      '```json\n{"aprobado":true,"feedback":"Listo.","codigoSiguiente":2}\n```',
+      1,
+    );
+    assert.equal(ev.aprobado, true);
+    assert.equal(ev.feedbackConfrontativo, "Listo.");
+    assert.equal(ev.codigoSiguiente, 2);
+  });
+
+  it("evaluarUmbralLocal rechaza respuestas vacías y aprueba densas", () => {
+    const ko = evaluarUmbralLocal({
+      codigo: 1,
+      modo: "INTERNO_HABILIDAD",
+      respuestaUsuario: "ok",
+    });
+    assert.equal(ko.aprobado, false);
+    assert.equal(ko.codigoSiguiente, 1);
+
+    const ok = evaluarUmbralLocal({
+      codigo: 1,
+      modo: "INTERNO_HABILIDAD",
+      respuestaUsuario:
+        "La excusa puntual de hoy es abrir el celular cada vez que voy a vender, y mi acción mínima es una llamada sin pantalla.",
+    });
+    assert.equal(ok.aprobado, true);
+    assert.equal(ok.codigoSiguiente, 2);
   });
 });
