@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Check,
   Crown,
+  Flame,
   Loader2,
   Lock,
   RefreshCw,
   Swords,
-  Eye,
 } from "lucide-react";
 import {
   CODIGOS_NUMERO,
@@ -18,10 +18,12 @@ import {
   type CodigoNumero,
   type ModoUmbral,
 } from "@shared/umbral/engineConfig";
+import type { UmbralPsAward } from "@shared/umbral/pointsConfig";
 import {
   evaluarUmbral,
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
+import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -35,8 +37,19 @@ interface ConsolaUmbralProps {
 }
 
 type Veredicto =
-  | { kind: "aprobado"; feedback: string; siguiente: CodigoNumero | null }
-  | { kind: "rechazado"; feedback: string }
+  | {
+      kind: "aprobado";
+      feedback: string;
+      siguiente: CodigoNumero | null;
+      psAwards: UmbralPsAward[];
+      psTotal: number;
+    }
+  | {
+      kind: "rechazado";
+      feedback: string;
+      psAwards: UmbralPsAward[];
+      psTotal: number;
+    }
   | null;
 
 const fade = {
@@ -61,6 +74,7 @@ export function ConsolaUmbral({
   const [historial, setHistorial] = useState<UmbralHistorialItem[]>([]);
   const [moduloCompletado, setModuloCompletado] = useState(false);
   const [resumenSesion, setResumenSesion] = useState<string[]>([]);
+  const [psSesion, setPsSesion] = useState(0);
 
   const cfg = useMemo(() => obtenerCodigo(codigoActual), [codigoActual]);
   const modoMeta = MODOS_UMBRAL[modo];
@@ -93,6 +107,7 @@ export function ConsolaUmbral({
     setHistorial([]);
     setModuloCompletado(false);
     setResumenSesion([]);
+    setPsSesion(0);
   }
 
   function reiniciar(mismoModo = true) {
@@ -104,6 +119,7 @@ export function ConsolaUmbral({
     setHistorial([]);
     setModuloCompletado(false);
     setResumenSesion([]);
+    setPsSesion(0);
     if (!mismoModo) {
       setModo((m) =>
         m === "INTERNO_HABILIDAD" ? "EXTERNO_VENTAS" : "INTERNO_HABILIDAD",
@@ -133,6 +149,24 @@ export function ConsolaUmbral({
       ].slice(-16);
       setHistorial(nextHistorial);
 
+      let psAwards: UmbralPsAward[] = [];
+      let psTotal = 0;
+      try {
+        const ps = await awardUmbralV2PsForEvaluation(userId, {
+          modo,
+          codigo: codigoActual,
+          respuestaUsuario: texto,
+          aprobado: data.aprobado,
+        });
+        psAwards = ps.awarded;
+        psTotal = ps.total;
+        if (psTotal > 0) {
+          setPsSesion((n) => n + psTotal);
+        }
+      } catch (psErr) {
+        console.error("[ConsolaUmbral] PS no otorgados:", psErr);
+      }
+
       if (data.aprobado) {
         setAprobados((prev) => {
           const n = new Set(prev);
@@ -146,6 +180,8 @@ export function ConsolaUmbral({
           kind: "aprobado",
           feedback: data.feedbackConfrontativo,
           siguiente: data.codigoSiguiente,
+          psAwards,
+          psTotal,
         });
         setRespuesta("");
         if (data.moduloCompletado || data.codigoSiguiente == null) {
@@ -161,6 +197,8 @@ export function ConsolaUmbral({
         setVeredicto({
           kind: "rechazado",
           feedback: data.feedbackConfrontativo,
+          psAwards,
+          psTotal,
         });
       }
     } catch (e: any) {
@@ -191,6 +229,15 @@ export function ConsolaUmbral({
             Completaste los 10 Códigos en modo {modoMeta.label}. La secuencia
             cerró con autoría — no con pose.
           </p>
+          {psSesion > 0 && (
+            <p
+              className="mt-4 text-sm font-bold tracking-wide"
+              style={{ color: GOLD }}
+              data-testid="umbral-v2-ps-modulo"
+            >
+              +{psSesion} PS en esta secuencia
+            </p>
+          )}
         </motion.section>
 
         <div className="border border-white/10 bg-black/40 p-4">
@@ -231,8 +278,8 @@ export function ConsolaUmbral({
             data-testid="umbral-v2-cambiar-modo"
           >
             {modo === "INTERNO_HABILIDAD"
-              ? "DEL ESPEJO A LA ARENA"
-              : "DE LA ARENA AL ESPEJO"}
+              ? "DE LA FORJA A LA ARENA"
+              : "DE LA ARENA A LA FORJA"}
           </button>
         </div>
       </div>
@@ -276,15 +323,15 @@ export function ConsolaUmbral({
             [
               {
                 id: "INTERNO_HABILIDAD" as const,
-                icon: Eye,
-                title: "El Espejo",
-                sub: "Desarrollo de Habilidad",
+                icon: Flame,
+                title: MODOS_UMBRAL.INTERNO_HABILIDAD.label,
+                sub: MODOS_UMBRAL.INTERNO_HABILIDAD.alias,
               },
               {
                 id: "EXTERNO_VENTAS" as const,
                 icon: Swords,
-                title: "La Arena",
-                sub: "Entrenador de Ventas",
+                title: MODOS_UMBRAL.EXTERNO_VENTAS.label,
+                sub: MODOS_UMBRAL.EXTERNO_VENTAS.alias,
               },
             ] as const
           ).map((tab) => {
@@ -329,8 +376,13 @@ export function ConsolaUmbral({
         <div data-testid="umbral-v2-progreso">
           <div className="mb-2 flex items-center justify-between text-[10px] tracking-widest text-white/40">
             <span>PROGRESO DE CÓDIGOS</span>
-            <span style={{ color: GOLD }}>
-              {aprobados.size}/10
+            <span className="flex items-center gap-3">
+              {psSesion > 0 && (
+                <span style={{ color: CYAN }} data-testid="umbral-v2-ps-sesion">
+                  +{psSesion} PS
+                </span>
+              )}
+              <span style={{ color: GOLD }}>{aprobados.size}/10</span>
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -504,10 +556,23 @@ export function ConsolaUmbral({
               {veredicto.siguiente
                 ? ` · AVANZA A CÓDIGO ${veredicto.siguiente}`
                 : " · MÓDULO CERRADO"}
+              {veredicto.psTotal > 0 ? ` · +${veredicto.psTotal} PS` : ""}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-white/85">
               {veredicto.feedback}
             </p>
+            {veredicto.psAwards.length > 0 && (
+              <ul
+                className="mt-3 space-y-1 text-[11px] text-white/55"
+                data-testid="umbral-v2-ps-detalle"
+              >
+                {veredicto.psAwards.map((a) => (
+                  <li key={`${a.kind}-${a.source}`}>
+                    +{a.amount} PS · {a.source.replace(/^Umbral v2:\s*/, "")}
+                  </li>
+                ))}
+              </ul>
+            )}
           </motion.div>
         )}
 
@@ -524,12 +589,26 @@ export function ConsolaUmbral({
               style={{ color: WARN }}
             >
               RECHAZADO · PERMANECES EN CÓDIGO {codigoActual}
+              {veredicto.psTotal > 0 ? ` · +${veredicto.psTotal} PS` : ""}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-white/90">
               {veredicto.feedback}
             </p>
+            {veredicto.psAwards.length > 0 && (
+              <ul
+                className="mt-3 space-y-1 text-[11px] text-white/55"
+                data-testid="umbral-v2-ps-detalle"
+              >
+                {veredicto.psAwards.map((a) => (
+                  <li key={`${a.kind}-${a.source}`}>
+                    +{a.amount} PS · {a.source.replace(/^Umbral v2:\s*/, "")}
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="mt-3 text-[11px] text-white/45">
-              Reescribe con más densidad y vuelve a someter.
+              Reescribe con más densidad y vuelve a someter. El intento
+              consciente del día ya está contado; el pase se paga al aprobar.
             </p>
           </motion.div>
         )}
