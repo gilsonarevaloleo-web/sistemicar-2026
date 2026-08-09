@@ -1,6 +1,8 @@
 import type { SubVehiculo } from "./persistence";
 import { computeRutaPrivilegioPS } from "./rutaSeguimiento";
 
+/** Umbral v2 PS (intento / pase / módulo): ver `@shared/umbral/pointsConfig`. */
+
 /** PS base al cerrar un vehículo consciente cumplido (antes 10). */
 export const VEHICLE_CUMPLIDO_BASE_PS = 2;
 

@@ -3,8 +3,10 @@
  * Núcleo de datos, lenguaje y validación (sin UI).
  *
  * Modos:
- * - INTERNO_HABILIDAD → "El Espejo" (desarrollo de habilidad)
+ * - INTERNO_HABILIDAD → "La Forja" (desarrollo de habilidad)
  * - EXTERNO_VENTAS → "La Arena" (entrenador de ventas)
+ *
+ * Nota: no usar "Espejo" aquí — ese nombre es el módulo clínico `/espejo`.
  *
  * Spec: umbral v2. primera parte (WPS)
  */
@@ -69,7 +71,7 @@ export const MODOS_UMBRAL: Record<
 > = {
   INTERNO_HABILIDAD: {
     id: "INTERNO_HABILIDAD",
-    label: "El Espejo",
+    label: "La Forja",
     alias: "Desarrollo de Habilidad",
   },
   EXTERNO_VENTAS: {

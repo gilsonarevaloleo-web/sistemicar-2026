@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   CODIGOS_NUMERO,
   DICCIONARIO_CODIGOS,
+  MODOS_UMBRAL,
   evaluarUmbralLocal,
   obtenerCodigo,
   obtenerPromptEvaluacion,
@@ -14,6 +15,12 @@ import {
 } from "./engineConfig.ts";
 
 describe("Umbral v2 — engineConfig", () => {
+  it("modo interno se llama La Forja (no Espejo)", () => {
+    assert.equal(MODOS_UMBRAL.INTERNO_HABILIDAD.label, "La Forja");
+    assert.equal(MODOS_UMBRAL.EXTERNO_VENTAS.label, "La Arena");
+    assert.doesNotMatch(MODOS_UMBRAL.INTERNO_HABILIDAD.label, /Espejo/i);
+  });
+
   it("DICCIONARIO_CODIGOS cubre 1–10 sin huecos", () => {
     assert.equal(CODIGOS_NUMERO.length, 10);
     for (const n of CODIGOS_NUMERO) {
