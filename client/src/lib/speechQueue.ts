@@ -1,6 +1,7 @@
 /**
- * Motor TTS unificado — un solo speechSynthesis, tres canales (conquista, situación, Punto Cero).
+ * Motor TTS unificado — un solo speechSynthesis (canales conquista / situación / puerta).
  * Todas las utterances pasan por voiceEngine; prohibido cancel global entre canales.
+ * La voz clásica de desglosador GPS + Punto Cero UI fue retirada; Dual Kernel no usa TTS.
  */
 
 import {
@@ -16,7 +17,6 @@ import {
 import {
   getIsRemountingJornada,
 } from "./jornadaRemount";
-import { runShadowTask } from "./desglosadorShadow";
 import { shouldAllowJornadaVoice } from "./mobilePerf";
 import {
   isPostCallAudioShieldActive,
@@ -999,30 +999,6 @@ export function speakUbicacionSingle(
   source: UbicacionVoiceSource = "situacion"
 ): void {
   speakUbicacionQueue([text], false, source);
-}
-
-/**
- * Cola pasiva desglosador — despacho instantáneo, síntesis en sombra (no bloquea render).
- */
-export function enqueueDesglosadorVoicePassive(
-  key: string,
-  phrases: string[],
-  opts?: { cancelPrevious?: boolean; onPhraseStarted?: () => void; rutaBandUmbral?: boolean }
-): void {
-  const voiceOk =
-    shouldAllowJornadaVoice() || (opts?.rutaBandUmbral === true && isDesglosadorVoiceEnabled());
-  if (!voiceOk) return;
-  const filtered = phrases.map(p => p.trim()).filter(Boolean);
-  if (filtered.length === 0) return;
-  runShadowTask(() => {
-    speakUbicacionQueue(
-      filtered,
-      opts?.cancelPrevious ?? false,
-      "desglosador",
-      opts?.onPhraseStarted,
-      key
-    );
-  });
 }
 
 /** API directa del motor — texto, canal, key opcional. */

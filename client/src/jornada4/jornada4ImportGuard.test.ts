@@ -15,7 +15,10 @@ const BANNED = [
   'from "@/lib/escaleraConcienciaEngine"',
   'from "@/lib/disciplinaEngine"',
   'from "@/lib/desglosadorVoice"',
+  'from "@/lib/desglosadorVoiceDispatch"',
   'from "@/lib/situacionAlerts"',
+  'from "@/lib/gpsVoice"',
+  'from "@/lib/puntoCeroVoice"',
   'from "@/lib/speechQueue"',
   'useIslandConcienciaClock',
 ];

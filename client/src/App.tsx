@@ -460,7 +460,7 @@ function VoiceBootstrap() {
     const stopLifecycle = installVoiceLifecycleHub();
     ensureUbicacionVoiceRetryHub();
     const stopWatchdog = installSpeechStuckWatchdog();
-    /** Una sola vez: antes, cada keydown en /proyectos reimportaba GPS + prefetch y congelaba el input. */
+    /** Una sola vez: unlock TTS en gesto; Dual Kernel / Hub no lo necesitan. */
     let unlocked = false;
     const detachUnlockListeners = () => {
       window.removeEventListener("pointerdown", unlock, { capture: true });
@@ -476,8 +476,8 @@ function VoiceBootstrap() {
     const isVoiceQuietPath = (): boolean => {
       if (isJornada4WindowPath()) return true;
       const p = window.location.pathname;
-      // Hub de proyectos + Centro de Comando: sin TTS/GPS en el primer toque
-      // (el unlock + prefetch robaban el hilo y las tarjetas no abrían).
+      // Hub de proyectos + Centro de Comando: sin TTS en el primer toque
+      // (el unlock robaba el hilo y las tarjetas no abrían).
       return (
         p === "/proyectos" ||
         p.startsWith("/proyectos/") ||
@@ -486,7 +486,7 @@ function VoiceBootstrap() {
       );
     };
     const unlock = (e: Event) => {
-      // Dual Kernel + Hub /proyectos + /menu: sin voz/prefetch GPS.
+      // Dual Kernel + Hub /proyectos + /menu: sin unlock TTS en el gesto.
       if (isVoiceQuietPath()) return;
       // Otros forms: no despertar voz al tipar.
       if (isTypingTarget(e.target)) return;
@@ -494,15 +494,8 @@ function VoiceBootstrap() {
       unlocked = true;
       detachUnlockListeners();
       unlockSpeechSynthesis(true);
-      // Prefetch fuera del gesto crítico para no robar el hilo al teclado móvil.
+      // Reintentos de puerta fuera del gesto crítico.
       window.setTimeout(() => {
-        void import("@/lib/gpsVoice").then(m => {
-          m.unlockGpsVoice();
-          m.prefetchGpsClips([
-            ...m.GPS_CLIP_PACKS.ringBienvenidaPrimera,
-            ...m.GPS_CLIP_PACKS.conquistaIntro,
-          ]);
-        });
         retryAllPendingUbicacionVoice();
       }, 0);
     };

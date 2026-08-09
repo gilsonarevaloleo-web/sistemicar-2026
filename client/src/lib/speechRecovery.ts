@@ -5,22 +5,10 @@ import {
   recoverSpeechQueue,
   unlockSpeechSynthesis,
 } from "./speechQueue";
-import { stopPleasantVoice } from "./puntoCeroVoice";
-import { stopGpsVoice, unlockGpsVoice } from "./gpsVoice";
 
-/** Reset fulminante de TTS + cola Punto Cero + GPS — usar solo en gesto del usuario o watchdog. */
+/** Reset fulminante de TTS — usar solo en gesto del usuario o watchdog. */
 export function hardResetSpeechSystems(fromUserGesture = false): void {
   const wasUnlocked = isSpeechSynthesisUnlocked();
-  try {
-    stopPleasantVoice();
-  } catch {
-    /* noop */
-  }
-  try {
-    stopGpsVoice();
-  } catch {
-    /* noop */
-  }
   try {
     cancelSpeechSynthesisHard(false);
   } catch {
@@ -29,11 +17,6 @@ export function hardResetSpeechSystems(fromUserGesture = false): void {
   if (fromUserGesture || wasUnlocked) {
     try {
       unlockSpeechSynthesis(fromUserGesture);
-    } catch {
-      /* noop */
-    }
-    try {
-      unlockGpsVoice();
     } catch {
       /* noop */
     }

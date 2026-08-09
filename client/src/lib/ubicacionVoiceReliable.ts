@@ -1,12 +1,14 @@
 /**
- * Voz de ubicación (desglosador conquista + ring situacional).
+ * Voz de ubicación (puertas de atención y reintentos fiables).
  * Reintenta si el navegador bloquea TTS sin gesto o si speechSynthesis queda colgado.
+ *
+ * Nota: la voz clásica de desglosador/situación (pre–Dual Kernel) fue retirada;
+ * este módulo solo sostiene la cola de puerta / ubicación genérica.
  */
 
 import {
   recoverSpeechQueue,
   speakUbicacionQueue,
-  enqueueDesglosadorVoicePassive,
   unlockSpeechSynthesis,
   warmupSpeechSynthesis,
   isUbicacionPhraseQueued,
@@ -182,41 +184,6 @@ export function speakUbicacionVoiceReliable(
   return cleanup;
 }
 
-export function speakDesglosadorVoiceReliable(
-  key: string,
-  phrases: string[],
-  cancelPrevious: boolean,
-  onSpoken?: () => void
-): () => void {
-  if (!isDesglosadorVoiceEnabled()) {
-    return () => {};
-  }
-  enqueueDesglosadorVoicePassive(key, phrases, {
-    cancelPrevious,
-    onPhraseStarted: onSpoken,
-  });
-  return () => cancelUbicacionVoice(key);
-}
-
-/** @deprecated Usar dispatchDesglosadorVoice — misma cola pasiva en sombra. */
-export function speakDesglosadorVoiceReliableDeferred(
-  key: string,
-  phrases: string[],
-  cancelPrevious: boolean,
-  onSpoken?: () => void
-): () => void {
-  return speakDesglosadorVoiceReliable(key, phrases, cancelPrevious, onSpoken);
-}
-
-export function speakSituacionVoiceReliable(
-  key: string,
-  phrases: string[],
-  cancelPrevious: boolean,
-  onSpoken?: () => void
-): () => void {
-  return speakUbicacionVoiceReliable(key, phrases, cancelPrevious, "situacion", onSpoken);
-}
-
 export function cancelUbicacionVoice(key: string): void {
   cleanupByKey.get(key)?.();
 }
@@ -237,9 +204,4 @@ export function cancelAllUbicacionVoice(): void {
   }
   cleanupByKey.clear();
   pending.clear();
-}
-
-/** @deprecated usar cancelUbicacionVoice */
-export function cancelDesglosadorVoice(key: string): void {
-  cancelUbicacionVoice(key);
 }

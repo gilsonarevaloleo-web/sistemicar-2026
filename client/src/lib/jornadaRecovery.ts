@@ -17,7 +17,6 @@ import {
 import { flushLocalVehicles } from "@/lib/persistence";
 import { teardownAllSituacionSessions } from "@/lib/situacionSessionTeardown";
 import { hardResetSpeechSystems } from "@/lib/speechRecovery";
-import { cancelPuntoCeroStepVoice } from "@/lib/puntoCeroStepVoice";
 import { cancelJornadaRemountGuard } from "@/lib/jornadaRemount";
 import { clearJornadaFatalError } from "@/lib/jornadaFatalError";
 import { jornadaBackupStorageKey } from "@/services/jornadaBackup";
@@ -46,7 +45,6 @@ export function runJornadaSoftRemount(): void {
     resetAnilloViewModeStorage();
     flushLocalVehicles();
     clearPlaneacionCache();
-    cancelPuntoCeroStepVoice();
     cancelJornadaRemountGuard();
     try {
       localStorage.removeItem("planeacion_cache_v2");
@@ -84,7 +82,6 @@ export function runJornadaRecovery(opts?: JornadaRecoveryOpts): void {
     resetAnilloViewModeStorage();
     flushLocalVehicles();
     clearPlaneacionCache();
-    cancelPuntoCeroStepVoice();
     cancelJornadaRemountGuard();
     try {
       localStorage.removeItem("planeacion_cache_v2");

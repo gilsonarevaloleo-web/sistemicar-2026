@@ -14,7 +14,6 @@ import {
   RUTA_BANDA_META,
 } from "@/lib/rutaEnfoque";
 import { situacionFilaCronometroPendiente } from "@/lib/situacionCupoDistrib";
-import { playSituacionCumplidoChimes } from "@/lib/situacionAlertSounds";
 import {
   computeEficienciaSituacionPct,
   computeSituacionBolsaGanancia,
@@ -443,11 +442,6 @@ export function situacionDesgloseBloqueTerminado(subTareas: SubTarea[]): boolean
 export function situacionDesgloseBloqueListo(subTareas: SubTarea[], sc: Vehicle["situacionCronometro"]): boolean {
   if (sc?.activo !== true) return false;
   return situacionDesgloseBloqueTerminado(subTareas);
-}
-
-/** Timbres decrecientes al marcar cumplido — delegado a situacionAlertSounds. */
-export async function playSituacionChimes(count: number) {
-  return playSituacionCumplidoChimes(count);
 }
 
 export const getSubVehicleRecordSuggestions = (query: string, limit = 5): Array<{ titulo: string; minPerUnit: number }> => {
