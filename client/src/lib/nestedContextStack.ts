@@ -120,23 +120,3 @@ export function resumeSituacionFromNestedPause(parent: Vehicle): Partial<Vehicle
   };
 }
 
-/** Padre en pausa por Punto Cero anidado — candidato a reanudación al cerrar descanso. */
-export function findNestedParentAwaitingPuntoCeroResume(vehicles: Vehicle[]): Vehicle | null {
-  return (
-    vehicles.find(
-      v =>
-        v.status === "activo" &&
-        (v.desglosadorPausa?.nestedKind === "punto_cero" || v.situacionNestedPause?.kind === "punto_cero")
-    ) ?? null
-  );
-}
-
-export function buildNestedParentResumePatch(parent: Vehicle): Partial<Vehicle> | null {
-  if (parent.desglosadorPausa?.nestedKind === "punto_cero") {
-    return resumeDesglosadorFromNestedPause(parent);
-  }
-  if (parent.situacionNestedPause?.kind === "punto_cero") {
-    return resumeSituacionFromNestedPause(parent);
-  }
-  return null;
-}

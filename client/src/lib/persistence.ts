@@ -2604,16 +2604,6 @@ export function hasArquitectoAccess(
   return hasPlanificacionBaseAccess(subscriptionPlan, email, rank, activeModules);
 }
 
-export function hasPuntoCeroAccess(
-  subscriptionPlan?: string | null,
-  email?: string | null,
-  rank?: UserRank | null,
-  activeModules?: string[] | null
-): boolean {
-  if (_isOwnerEmail(email)) return true;
-  return hasOperativoAccess(subscriptionPlan, email, rank, activeModules);
-}
-
 export async function activateModulesForUser(
   userId: string,
   moduleIds: ModuleId[],

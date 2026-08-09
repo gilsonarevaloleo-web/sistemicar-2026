@@ -42,7 +42,7 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `client/src/lib/desglosadorShadow.ts` | Primitiva `runShadowTask` / `yieldAfterPaint` |
 | `client/src/components/planeacion/desglosadorSubLiveIsland.tsx` | Island 1s (UI espejo) |
 
-**No arrastrar:** `desglosadorVoice*`, overlay de foco unidad acoplado a conciencia, handlers del manager monolítico (~4.2k líneas).
+**No arrastrar:** `desglosadorVoice*` (retirado del repo), overlay de foco unidad acoplado a conciencia, handlers del manager monolítico (~4.2k líneas).
 
 ### 2.2 Situacional — núcleo puro reutilizable
 
@@ -56,7 +56,7 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `client/src/lib/situacionSessionTeardown.ts` | Teardown limpio |
 | `client/src/components/planeacion/situacionRelojIsland.tsx` | Island cupo |
 
-**No arrastrar (v1):** `situacionAlerts` / voz, Crisol MOS, reserva táctica completa, sync a Proyecto Hub.
+**No arrastrar (v1):** `situacionAlerts` / voz (retirado del repo), Crisol MOS, reserva táctica completa, sync a Proyecto Hub.
 
 ### 2.3 Puntos — núcleo
 
