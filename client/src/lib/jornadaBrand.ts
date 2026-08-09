@@ -6,6 +6,9 @@ export const JORNADA_V4_PATH = "/jornada-v4" as const;
 /** Hub de Proyectos / Centros (Norte). */
 export const PROYECTOS_HUB_PATH = "/proyectos" as const;
 
+/** Centro de Comando (menú principal). */
+export const MENU_PRINCIPAL_PATH = "/menu" as const;
+
 /** True en `/jornada-v4` (y query). Usado para pausar motores globales del App shell. */
 export function isJornada4Path(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
@@ -19,6 +22,21 @@ export function isProyectosHubPath(pathname: string | null | undefined): boolean
   return path === PROYECTOS_HUB_PATH || path.startsWith(`${PROYECTOS_HUB_PATH}/`);
 }
 
+/** True en `/menu` (Centro de Comando). */
+export function isMenuPrincipalPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return path === MENU_PRINCIPAL_PATH || path.startsWith(`${MENU_PRINCIPAL_PATH}/`);
+}
+
+/**
+ * Rutas donde el App shell debe callar motores (Centinela / SegmentAttention / Cierre)
+ * durante toda la visita — no solo en soft-start.
+ */
+export function isAppShellQuietPath(pathname: string | null | undefined): boolean {
+  return isProyectosHubPath(pathname) || isMenuPrincipalPath(pathname);
+}
+
 /** Pathname actual (SSR-safe). Para hot paths sin hooks (launch ms0). */
 export function isJornada4WindowPath(): boolean {
   if (typeof window === "undefined") return false;
@@ -28,6 +46,11 @@ export function isJornada4WindowPath(): boolean {
 export function isProyectosHubWindowPath(): boolean {
   if (typeof window === "undefined") return false;
   return isProyectosHubPath(window.location.pathname);
+}
+
+export function isMenuPrincipalWindowPath(): boolean {
+  if (typeof window === "undefined") return false;
+  return isMenuPrincipalPath(window.location.pathname);
 }
 
 export const JORNADA_MODULE = {
