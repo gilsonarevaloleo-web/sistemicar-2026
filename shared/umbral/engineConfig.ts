@@ -477,3 +477,116 @@ export function obtenerPromptEvaluacion(
 export function serializarPromptEvaluacion(prompt: PromptEvaluacion): string {
   return `${prompt.system}\n\n${prompt.user}`;
 }
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function pickBool(obj: Record<string, unknown>, keys: string[]): boolean | null {
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === "boolean") return v;
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      if (s === "true" || s === "sí" || s === "si" || s === "aprobado") return true;
+      if (s === "false" || s === "no" || s === "rechazado") return false;
+    }
+    if (typeof v === "number") return v !== 0;
+  }
+  return null;
+}
+
+/**
+ * Parsea la respuesta cruda de Gemini a EvaluacionGeminiJson.
+ * Tolera aliases de campos y JSON envuelto en markdown.
+ */
+export function parseEvaluacionGemini(
+  raw: string,
+  codigoActual: CodigoNumero,
+): EvaluacionGeminiJson {
+  const text = String(raw ?? "").trim();
+  if (!text) throw new Error("Respuesta vacía de Gemini");
+
+  const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON en respuesta de Gemini");
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(match[0]);
+  } catch {
+    // Segundo intento: quitar control chars frecuentes.
+    const repaired = match[0]
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
+      .replace(/,\s*([}\]])/g, "$1");
+    parsed = JSON.parse(repaired);
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("JSON de evaluación inválido");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const aprobado =
+    pickBool(obj, ["aprobado", "approved", "pass", "ok"]) ?? false;
+  const feedbackConfrontativo = pickString(obj, [
+    "feedbackConfrontativo",
+    "feedback_confrontativo",
+    "feedback",
+    "devolucion",
+    "mensaje",
+    "razon",
+    "motivo",
+  ]);
+
+  if (!feedbackConfrontativo) {
+    throw new Error("Gemini omitió feedbackConfrontativo");
+  }
+
+  return {
+    aprobado,
+    feedbackConfrontativo: feedbackConfrontativo.slice(0, 1200),
+    codigoSiguiente: resolverCodigoSiguiente(aprobado, codigoActual),
+  };
+}
+
+/**
+ * Evaluador local de respaldo cuando Gemini falla/timeout/parsea mal.
+ * Criterio mínimo: densidad + señales del código activo.
+ */
+export function evaluarUmbralLocal(
+  input: PromptEvaluacionInput,
+): EvaluacionGeminiJson {
+  const cfg = obtenerCodigo(input.codigo);
+  const texto = input.respuestaUsuario.trim();
+  const words = texto.split(/\s+/).filter(Boolean);
+  const denseEnough = texto.length >= 40 && words.length >= 8;
+
+  const signalsInterno = [
+    /excusa|puntual|hoy|acción|accion|mínima|minima|número|numero|métrica|metrica|ruta|estándar|estandar|fricción|friccion|cobrar|rechazo|rutina|identidad|rol/i,
+  ];
+  const signalsExterno = [
+    /beneficio|utilidad|cliente|roi|precio|valor|cierre|prueba|minutos|fácil|facil|evidencia|retorno|escala|autoridad/i,
+  ];
+  const signals =
+    input.modo === "INTERNO_HABILIDAD" ? signalsInterno : signalsExterno;
+  const hasSignal = signals.some((re) => re.test(texto));
+  const aprobado = denseEnough && hasSignal;
+
+  const feedbackConfrontativo = aprobado
+    ? `APROBADO (evaluador local de respaldo). Cumples densidad mínima y señales del ${cfg.nombre}. El criterio clave: ${cfg.conceptoClave}`
+    : `RECHAZADO (evaluador local de respaldo). Tu respuesta es demasiado vaga o no toca el criterio del ${cfg.nombre}. ` +
+      (input.modo === "INTERNO_HABILIDAD"
+        ? `Reescribe nombrando el hecho puntual y la acción concreta. Criterio: ${cfg.modoInterno.criterioAprobacion}`
+        : `Reescribe con utilidad/evidencia concreta ante la objeción. Criterio: ${cfg.modoExterno.criterioAprobacionVendedor}`);
+
+  return {
+    aprobado,
+    feedbackConfrontativo,
+    codigoSiguiente: resolverCodigoSiguiente(aprobado, input.codigo),
+  };
+}

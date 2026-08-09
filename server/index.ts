@@ -462,7 +462,23 @@ async function callGemini(prompt: string, maxTokens: number = 500, jsonMode: boo
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig,
         });
-        return result.response.text();
+        let text = "";
+        try {
+          text = result.response.text();
+        } catch (textErr: any) {
+          // Bloqueos / candidatos vacíos (p. ej. MAX_TOKENS por thinking en 2.5).
+          const finish =
+            result?.response?.candidates?.[0]?.finishReason || "unknown";
+          throw new Error(
+            `Gemini text() vacío (finish=${finish}): ${textErr?.message || textErr}`,
+          );
+        }
+        if (!text || !String(text).trim()) {
+          const finish =
+            result?.response?.candidates?.[0]?.finishReason || "unknown";
+          throw new Error(`Gemini devolvió texto vacío (finish=${finish})`);
+        }
+        return text;
       } catch (error: any) {
         const status = error?.status;
         const errMsg = error?.message || error?.errorDetails?.[0]?.message || String(error);

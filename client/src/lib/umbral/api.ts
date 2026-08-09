@@ -23,6 +23,7 @@ export interface UmbralEvaluarSuccess {
   moduloCompletado: boolean;
   nombreCodigo: string;
   userId: string;
+  source?: "gemini" | "local_fallback";
 }
 
 export interface UmbralEvaluarError {
@@ -40,17 +41,37 @@ export type UmbralEvaluarResponse = UmbralEvaluarSuccess | UmbralEvaluarError;
 export async function evaluarUmbral(
   body: UmbralEvaluarRequest,
 ): Promise<UmbralEvaluarResponse> {
-  const res = await fetch("/api/umbral/evaluar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json()) as UmbralEvaluarResponse;
+  let res: Response;
+  try {
+    res = await fetch("/api/umbral/evaluar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(
+      "No hay conexión con el evaluador. Revisa tu red e inténtalo de nuevo.",
+    );
+  }
+
+  const rawText = await res.text();
+  let data: UmbralEvaluarResponse | null = null;
+  try {
+    data = JSON.parse(rawText) as UmbralEvaluarResponse;
+  } catch {
+    throw new Error(
+      res.ok
+        ? "El evaluador devolvió una respuesta ilegible."
+        : `Error HTTP ${res.status} al evaluar Umbral`,
+    );
+  }
+
   if (!res.ok || data.success === false) {
     const err = data as UmbralEvaluarError;
+    // Preferir el feedback confrontativo (útil) sobre el código técnico.
     throw new Error(
-      err.error ||
-        err.feedbackConfrontativo ||
+      err.feedbackConfrontativo ||
+        err.error ||
         `Error HTTP ${res.status} al evaluar Umbral`,
     );
   }
