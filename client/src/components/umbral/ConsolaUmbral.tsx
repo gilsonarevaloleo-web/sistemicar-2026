@@ -24,6 +24,7 @@ import {
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
+import { CardPerfilCliente } from "./CardPerfilCliente";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -448,6 +449,13 @@ export function ConsolaUmbral({
           className="space-y-4"
           data-testid="umbral-v2-desafio"
         >
+          {modo === "EXTERNO_VENTAS" && (
+            <CardPerfilCliente
+              codigoNumero={cfg.numero}
+              perfil={cfg.modoExterno}
+            />
+          )}
+
           <div className="border border-white/12 bg-black/45 p-5">
             <p className="text-[10px] tracking-[0.2em] text-white/40">
               CÓDIGO ACTIVO · {modoMeta.label.toUpperCase()}
