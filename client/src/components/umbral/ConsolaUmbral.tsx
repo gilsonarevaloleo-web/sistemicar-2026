@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BarChart3,
   Check,
   Crown,
   Flame,
@@ -24,6 +25,7 @@ import {
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
+import { CardPerfilCliente } from "./CardPerfilCliente";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -75,6 +77,7 @@ export function ConsolaUmbral({
   const [moduloCompletado, setModuloCompletado] = useState(false);
   const [resumenSesion, setResumenSesion] = useState<string[]>([]);
   const [psSesion, setPsSesion] = useState(0);
+  const [sesionId, setSesionId] = useState<string | null>(null);
 
   const cfg = useMemo(() => obtenerCodigo(codigoActual), [codigoActual]);
   const modoMeta = MODOS_UMBRAL[modo];
@@ -108,6 +111,7 @@ export function ConsolaUmbral({
     setModuloCompletado(false);
     setResumenSesion([]);
     setPsSesion(0);
+    setSesionId(null);
   }
 
   function reiniciar(mismoModo = true) {
@@ -120,6 +124,7 @@ export function ConsolaUmbral({
     setModuloCompletado(false);
     setResumenSesion([]);
     setPsSesion(0);
+    setSesionId(null);
     if (!mismoModo) {
       setModo((m) =>
         m === "INTERNO_HABILIDAD" ? "EXTERNO_VENTAS" : "INTERNO_HABILIDAD",
@@ -140,7 +145,12 @@ export function ConsolaUmbral({
         codigoActual,
         respuestaUsuario: texto,
         historialPrevio: historial,
+        sesionId: sesionId ?? undefined,
       });
+
+      if (data.sesionId) {
+        setSesionId(data.sesionId);
+      }
 
       const nextHistorial: UmbralHistorialItem[] = [
         ...historial,
@@ -282,6 +292,14 @@ export function ConsolaUmbral({
               : "DE LA ARENA A LA FORJA"}
           </button>
         </div>
+        <Link
+          href="/umbral/metricas"
+          className="flex items-center justify-center gap-2 border border-white/15 px-4 py-3 text-[11px] tracking-widest text-white/55 hover:border-[#00FFC3]/40 hover:text-[#00FFC3]"
+          data-testid="link-umbral-metricas-completado"
+        >
+          <BarChart3 size={14} />
+          VER MÉTRICAS DIAGNÓSTICAS
+        </Link>
       </div>
     );
   }
@@ -303,13 +321,23 @@ export function ConsolaUmbral({
               Consola de evaluación · secuencia rígida de 10 Códigos
             </p>
           </div>
-          <Link
-            href={backHref}
-            className="shrink-0 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-            data-testid="link-umbral-v1"
-          >
-            {backLabel}
-          </Link>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <Link
+              href="/umbral/metricas"
+              className="flex items-center gap-1.5 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
+              data-testid="link-umbral-metricas"
+            >
+              <BarChart3 size={12} />
+              MÉTRICAS
+            </Link>
+            <Link
+              href={backHref}
+              className="text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
+              data-testid="link-umbral-v1"
+            >
+              {backLabel}
+            </Link>
+          </div>
         </div>
 
         {/* Selector de modo */}
@@ -448,6 +476,13 @@ export function ConsolaUmbral({
           className="space-y-4"
           data-testid="umbral-v2-desafio"
         >
+          {modo === "EXTERNO_VENTAS" && (
+            <CardPerfilCliente
+              codigoNumero={cfg.numero}
+              perfil={cfg.modoExterno}
+            />
+          )}
+
           <div className="border border-white/12 bg-black/45 p-5">
             <p className="text-[10px] tracking-[0.2em] text-white/40">
               CÓDIGO ACTIVO · {modoMeta.label.toUpperCase()}

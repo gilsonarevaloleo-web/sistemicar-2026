@@ -6,6 +6,10 @@ import { getPublicAppBaseUrl } from "../shared/publicBaseUrl";
 import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
 import { deliverCorazonSabioIfNeeded, parseMpExternalRef } from "../server/mercadopagoEspejo";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
+import {
+  createDefaultUmbralSessionStore,
+  initUmbralSessionsTable,
+} from "../server/umbralSessionStore";
 import { GEMINI_MODELS } from "../shared/geminiConfig";
 
 const app = express();
@@ -46,7 +50,13 @@ async function callGeminiUmbral(
   throw new Error(`Gemini no disponible: ${errors.join(" | ")}`);
 }
 
-registerUmbralV2Routes(app, { callGemini: callGeminiUmbral });
+initUmbralSessionsTable().catch((err) =>
+  console.warn("[umbralSessions] Table init failed (non-fatal):", err?.message),
+);
+registerUmbralV2Routes(app, {
+  callGemini: callGeminiUmbral,
+  sessionStore: createDefaultUmbralSessionStore(),
+});
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {
   try {

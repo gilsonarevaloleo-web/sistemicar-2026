@@ -27,6 +27,14 @@ export interface ModoExternoConfig {
   estadoMentalCliente: string;
   criterioAprobacionVendedor: string;
   instruccionEvaluadorGemini: string;
+  /** Nombre del arquetipo de cliente (La Arena). */
+  arquetipoNombre: string;
+  /** Resumen breve del comportamiento psicológico del cliente. */
+  actitudCliente: string;
+  /** Objeción / barrera de entrada en primera persona. */
+  fraseTipica: string;
+  /** Instrucción táctica: qué debe desactivar el vendedor. */
+  misionVendedor: string;
 }
 
 export interface ConfiguracionCodigo {
@@ -111,6 +119,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor enuncia un beneficio concreto ligado al dolor del cliente en una frase útil, sin jerga ni promesa mágica.",
       instruccionEvaluadorGemini:
         "Evalúa si el vendedor demostró utilidad directa y específica al cliente. Rechaza pitch genérico, features sin beneficio o lenguaje de «flor». Aprueba solo si el cliente podría repetir en una frase para qué le sirve.",
+      arquetipoNombre: "El Apático / Distraído",
+      actitudCliente:
+        "Atención fragmentada: escucha a medias y solo se engancha si percibe utilidad inmediata. Cualquier abstracción lo hace desconectar.",
+      fraseTipica:
+        "Suena interesante… pero no veo para qué me sirve esto. No es para mí.",
+      misionVendedor:
+        "Desactivar la apatía con un beneficio concreto, ligado a su dolor, en una sola frase útil — cero jerga, cero flor.",
     },
   },
   2: {
@@ -137,6 +152,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor suma un beneficio adicional claro y reduce fricción percibida (facilidad de adopción) sin atacar lo que el cliente ya usa.",
       instruccionEvaluadorGemini:
         "Evalúa si el vendedor agregó valor incremental (suma) y facilidad. Rechaza descalificar al competidor o al status quo sin aportar. Aprueba si el cliente gana un plus concreto con menor esfuerzo aparente.",
+      arquetipoNombre: "El Abrumado / Incapaz",
+      actitudCliente:
+        "Se siente saturado: compara, resta y teme sumar otra carga. Protege lo que ya tiene porque cree que no da para más.",
+      fraseTipica:
+        "Ya tengo algo parecido. No necesito más — mi entorno no lo va a entender.",
+      misionVendedor:
+        "Desactivar la sensación de sobrecarga mostrando suma incremental y facilidad de adopción, sin atacar su status quo.",
     },
   },
   3: {
@@ -163,6 +185,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor demuestra practicidad: un primer paso factible en minutos/horas, con costo temporal explícito y bajo.",
       instruccionEvaluadorGemini:
         "Evalúa si se venció la objeción de tiempo con factibilidad real. Rechaza minimizar el esfuerzo con frases vacías. Aprueba si hay un camino práctico, acotado y creíble para empezar.",
+      arquetipoNombre: "El Postergador / Perezoso",
+      actitudCliente:
+        "Aplaza con la agenda como escudo. No rechaza de frente: diluye el momento de decisión hasta que se enfríe.",
+      fraseTipica:
+        "No tengo tiempo. Suena trabajoso… después lo veo.",
+      misionVendedor:
+        "Desactivar la postergación con un primer paso factible, acotado en minutos/horas y con costo temporal explícito.",
     },
   },
   4: {
@@ -189,6 +218,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor valida el trauma sin dramatizar y responde con evidencia, límites claros y cero floritura.",
       instruccionEvaluadorGemini:
         "Evalúa validación del trauma + prueba de seriedad (hechos, condiciones, evidencia). Rechaza seducción emocional o promesas absolutas. Aprueba si hay tono de ingeniería, no de marketing.",
+      arquetipoNombre: "El Cínico / Curado de Espantos",
+      actitudCliente:
+        "Trauma comercial activo: asume humo hasta prueba contraria. Cualquier floritura confirma que «otra vez es lo mismo».",
+      fraseTipica:
+        "Ya me han engañado antes. Suena demasiado bonito — no confío.",
+      misionVendedor:
+        "Desactivar el cinismo validando el trauma y respondiendo con evidencia, límites claros y cero floritura.",
     },
   },
   5: {
@@ -215,6 +251,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor formula números claros (costo, retorno esperado, tasa o rango) sin inventar precisión falsa.",
       instruccionEvaluadorGemini:
         "Evalúa formulación numérica (ROI, conversión, rangos). Rechaza estadísticas inventadas o vaguedad cuantitativa. Aprueba si los números son coherentes y honestos sobre incertidumbre.",
+      arquetipoNombre: "El Escéptico Frío",
+      actitudCliente:
+        "Modo auditor: descuenta el storytelling y solo se mueve con ROI, tasas y rangos creíbles. La anécdota no le alcanza.",
+      fraseTipica:
+        "¿Y los números? Muéstreme datos y retorno — no historias.",
+      misionVendedor:
+        "Desactivar el escepticismo con números claros (costo, retorno, tasa o rango) sin inventar precisión falsa.",
     },
   },
   6: {
@@ -241,6 +284,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor transfiere sensación de alivio/tranquilidad con una experiencia concreta (demo, prueba, ritual de uso) sin anestesia falsa.",
       instruccionEvaluadorGemini:
         "Evalúa transferencia sensorial de alivio. Rechaza promesas abstractas de «tranquilidad». Aprueba si el cliente puede imaginar/vivir un roce concreto que reduce miedo.",
+      arquetipoNombre: "El Temeroso / Tímido",
+      actitudCliente:
+        "Compra paz, no solo producto. Anticipa fricción y rechazo; necesita alivio sensorial y un camino de bajo riesgo.",
+      fraseTipica:
+        "No quiero complicarme. Me genera ansiedad — necesito sentirme seguro.",
+      misionVendedor:
+        "Desactivar el miedo con una experiencia concreta (demo, prueba, ritual) que transfiera alivio real, sin anestesia falsa.",
     },
   },
   7: {
@@ -267,6 +317,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor equilibra valor e intercambio: explica qué sostiene el precio y qué se pierde al elegir lo barato, sin humillar.",
       instruccionEvaluadorGemini:
         "Evalúa equilibrio de valor/intercambio. Rechaza bajar precio por pánico o moralizar al cliente. Aprueba si la justicia del intercambio queda clara y firme.",
+      arquetipoNombre: "El Moralista / Justiciero",
+      actitudCliente:
+        "Juzga el intercambio desde equidad percibida. «Caro» es una sentencia moral: necesita ver la balanza valor/precio, no un descuento emocional.",
+      fraseTipica:
+        "Está caro. No es justo — otro cobra menos por lo mismo.",
+      misionVendedor:
+        "Desactivar el juicio moral equilibrando valor e intercambio: qué sostiene el precio y qué se pierde al elegir lo barato, sin humillar.",
     },
   },
   8: {
@@ -293,6 +350,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor maneja la negociación compleja: sostiene marco, aclara siguientes pasos y no regala el proceso por ansiedad.",
       instruccionEvaluadorGemini:
         "Evalúa manejo estratégico de negociación compleja. Rechaza chase desesperado o cierre agresivo vacío. Aprueba si hay persistencia con marco y movimiento claro.",
+      arquetipoNombre: "El Negociador Duro",
+      actitudCliente:
+        "Estira el proceso: multiplica stakeholders y diluye la decisión. Prueba si el vendedor sostiene el marco o se desgasta.",
+      fraseTipica:
+        "Lo tengo que pensar. Hablemos con más personas — vuelva en dos semanas.",
+      misionVendedor:
+        "Desactivar la dilación sosteniendo el marco, aclarando siguientes pasos y sin regalar el proceso por ansiedad.",
     },
   },
   9: {
@@ -319,6 +383,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor muestra cierre natural + vía de escalabilidad/continuidad sin presión teatral.",
       instruccionEvaluadorGemini:
         "Evalúa cierre natural y escalabilidad del sistema ofrecido. Rechaza cierres forzados o promesas de escala sin mecanismo. Aprueba si el siguiente estado post-compra es claro y sostenible.",
+      arquetipoNombre: "El Perfeccionista / Exigente",
+      actitudCliente:
+        "Exige continuidad y estándar: teme soluciones puntuales que se caen al mes. No compra el pico; compra el sistema que sostiene.",
+      fraseTipica:
+        "¿Y después del cierre? ¿Escala conmigo? No quiero algo que se caiga al mes.",
+      misionVendedor:
+        "Desactivar la exigencia mostrando cierre natural y una vía creíble de escalabilidad/continuidad, sin presión teatral.",
     },
   },
   10: {
@@ -345,6 +416,13 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
         "El vendedor sostiene autoridad limpia y propone continuidad/fidelización sin subordinarse ni endiosarse.",
       instruccionEvaluadorGemini:
         "Evalúa autoridad + fidelización. Rechaza arrogancia vacía o servilismo. Aprueba si el vendedor se posiciona como referente creíble con relación post-venta clara.",
+      arquetipoNombre: "El Soberano / Aliado",
+      actitudCliente:
+        "Busca un referente con autoridad real y relación continua — no solo un producto. Decide con quien se alía, no con quien ruega.",
+      fraseTipica:
+        "¿Por qué usted? ¿Me van a acompañar después, o desaparecen al cobrar?",
+      misionVendedor:
+        "Desactivar la prueba de autoridad posicionándote como referente creíble y proponiendo fidelización sin subordinarte ni endiosarte.",
     },
   },
 };

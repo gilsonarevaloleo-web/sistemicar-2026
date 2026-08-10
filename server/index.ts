@@ -77,6 +77,10 @@ import { modulesGrantedByPlan } from "../shared/moduleAccess";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
 import { registerEspejoV2Routes } from "./espejoV2Routes";
 import { registerUmbralV2Routes } from "./umbralV2Routes";
+import {
+  createDefaultUmbralSessionStore,
+  initUmbralSessionsTable,
+} from "./umbralSessionStore";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -102,6 +106,9 @@ if (isServerless) {
 initPublicApiTables().catch(err => console.warn("[publicApiDb] Table init failed (non-fatal):", err?.message));
 initSubVehicleRecordsTable().catch(err => console.warn("[vehicleHistory] Table init failed (non-fatal):", err?.message));
 initEspejoCreditDeliveriesTable().catch(err => console.warn("[espejoCredits] Table init failed (non-fatal):", err?.message));
+initUmbralSessionsTable().catch(err => console.warn("[umbralSessions] Table init failed (non-fatal):", err?.message));
+
+const umbralSessionStore = createDefaultUmbralSessionStore();
 
 const RENDERED_VIDEOS_DIR = isServerless
   ? path.join("/tmp", "rendered-videos")
@@ -2255,7 +2262,11 @@ app.get("/api/mercadopago/test-link/:planId", async (req, res) => {
 });
 
 registerEspejoV2Routes(app, { callGemini, parseGeminiJSON });
-registerUmbralV2Routes(app, { callGemini, parseGeminiJSON });
+registerUmbralV2Routes(app, {
+  callGemini,
+  parseGeminiJSON,
+  sessionStore: umbralSessionStore,
+});
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
   try {
