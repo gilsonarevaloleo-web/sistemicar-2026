@@ -284,7 +284,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     // Conquista = siempre desglosador (1 tarea → crece). Enfoque = lista libre primero.
     setModo(t === "tiempo" ? "desglose" : "rapido");
     setConquistaMultiModo("secuencia");
-    setVehiculoProyectoId(canProyectos ? defaultProyectoId?.trim() || "" : "");
+    setVehiculoProyectoId("");
     if (t === "situacion") {
       setSituacionHoraFin(
         resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -772,7 +772,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         ? "Heredar del segmento"
                         : "Sin dirección"
                     }
-                    hint="Default = segmento. Cámbialo si esta misión es de otro proyecto."
+                    hint="Vacío = hereda del segmento. Elige otro proyecto para cambiar el rumbo. En Enfoque, el nido del Crisol también dirige."
                     testId="jornada4-launch-dir-vehiculo"
                     locked={!canProyectos}
                     onBeforeHubNavigate={closeBeforeHubNavigate}

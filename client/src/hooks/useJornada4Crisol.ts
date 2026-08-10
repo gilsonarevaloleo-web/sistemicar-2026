@@ -313,6 +313,10 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       if (result.situacionCupoAnchor !== undefined) {
         patch.situacionCupoAnchor = result.situacionCupoAnchor;
       }
+      // Nido del Crisol = rumbo del vehículo de enfoque.
+      if (result.proyectoId?.trim()) {
+        patch.proyectoId = result.proyectoId.trim();
+      }
 
       paintVehicle(result.vehicleId, patch);
       setExpandedId(result.vehicleId);

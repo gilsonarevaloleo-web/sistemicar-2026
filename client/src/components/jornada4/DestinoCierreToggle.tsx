@@ -170,12 +170,16 @@ export function DestinoCierreToggle({
               → {selected.titulo}
               <button
                 type="button"
-                className="ml-2 underline font-semibold"
-                style={{ color: MUTED }}
+                className="ml-2 inline-flex items-center px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider touch-manipulation"
+                style={{
+                  color: GOLD,
+                  backgroundColor: "rgba(212,175,55,0.12)",
+                  border: `1px solid ${GOLD}40`,
+                }}
                 onClick={() => setPickerOpen(o => !o)}
                 data-testid="destino-cambiar-proyecto"
               >
-                {pickerOpen ? "cerrar" : "cambiar"}
+                {pickerOpen ? "Cerrar" : "Cambiar dirección"}
               </button>
             </p>
           ) : (

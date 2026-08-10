@@ -95,6 +95,63 @@ describe("crisolKernel", () => {
     assert.equal(r.subTareas.filter(s => s.enDesgloseCronometro).length, 2);
   });
 
+  it("enqueue con nido del Crisol actualiza rumbo del ring", () => {
+    const now = Date.now();
+    const vehicle = baseVehicle({
+      proyectoId: "seg-proy",
+      subTareas: [
+        {
+          id: "st0",
+          texto: "A",
+          completada: false,
+          creadaAt: now,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 20,
+          proyectoId: "seg-proy",
+        },
+      ],
+      situacionCronometro: {
+        activo: true,
+        bloqueInicioAt: now,
+        horaFinMs: now + 20 * 60_000,
+        horaFinContratoMs: now + 20 * 60_000,
+        retoNumero: 1,
+        retosCompletados: 0,
+        minutosGanadosReto: 0,
+        minutosGanadosSesion: 0,
+        saldoAdelantoMin: 0,
+        depthBlockPsGranted: 0,
+        proyectoEnfoqueId: "seg-proy",
+      },
+      situacionCupoAnchor: { subTareaId: "st0", startedAt: now },
+    });
+    const r = injectCrisolToActiveRing(vehicle, {
+      ...item,
+      proyectoId: "crisol-proy",
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.proyectoId, "crisol-proy");
+    assert.equal(r.situacionCronometro?.proyectoEnfoqueId, "crisol-proy");
+    const last = r.subTareas[r.subTareas.length - 1];
+    assert.equal(last?.proyectoId, "crisol-proy");
+  });
+
+  it("pickSituacionVehicleTarget ignora postergados", () => {
+    const paused = baseVehicle({
+      id: "paused",
+      situacionNestedPause: {
+        pausedAt: Date.now(),
+        kind: "postergacion",
+        situacionCronometro: { activo: true },
+      },
+    });
+    const { vehicle, ambiguous } = pickSituacionVehicleTarget([paused], null);
+    assert.equal(ambiguous, false);
+    assert.equal(vehicle, undefined);
+  });
+
   it("abrir ring sin activo usa meta de segmento", () => {
     const hora = new Date(Date.now() + 45 * 60_000);
     const hh = String(hora.getHours()).padStart(2, "0");

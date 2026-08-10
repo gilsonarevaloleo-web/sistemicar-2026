@@ -9,6 +9,7 @@ import {
   type SituacionReservaItem,
 } from "@/lib/situacionReserva";
 import {
+  CRISOL_DIRECCION_HINT,
   CRISOL_MOS_HINT,
   CRISOL_TAGLINE,
   CRISOL_TITLE,
@@ -266,6 +267,13 @@ function ImanPensamientosDock({
               <p className="text-[7px] text-slate-600 leading-relaxed">
                 {CRISOL_MOS_HINT} Marca las filas y envíalas al vehículo de enfoque una a una.
               </p>
+              <p
+                className="text-[7px] leading-relaxed"
+                style={{ color: "rgba(212,175,55,0.75)" }}
+                data-testid="iman-direccion-hint"
+              >
+                {CRISOL_DIRECCION_HINT}
+              </p>
 
               {selectedCount > 0 && (
                 <button
@@ -290,11 +298,12 @@ function ImanPensamientosDock({
                 onChange={e => setProyectoDraft(e.target.value)}
                 className="w-full px-2 py-1.5 rounded-lg bg-black/40 border border-white/10 text-[9px] text-slate-300 focus:outline-none focus:border-white/25"
                 data-testid="iman-proyecto-pick"
+                aria-label="Dirección (nido) del pensamiento"
               >
-                <option value="">Aterrizaje pendiente (sin nido)</option>
+                <option value="">Aterrizaje pendiente (sin dirección)</option>
                 {proyectos.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
+                    Dirección · {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
                   </option>
                 ))}
               </select>

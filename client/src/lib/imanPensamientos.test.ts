@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  CRISOL_DIRECCION_HINT,
   CRISOL_MOS_LABEL,
   CRISOL_TAGLINE,
   CRISOL_TITLE,
@@ -31,6 +32,7 @@ describe("imanPensamientos", () => {
     assert.equal(CRISOL_TITLE, "El Crisol");
     assert.ok(CRISOL_TAGLINE.includes("Ordena pensamientos"));
     assert.equal(CRISOL_MOS_LABEL, "Matriz de Ordenamiento Situacional");
+    assert.ok(CRISOL_DIRECCION_HINT.includes("dirección"));
     assert.equal(IMAN_PENSAMIENTOS_TITLE, CRISOL_TITLE);
   });
 

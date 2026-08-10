@@ -36,6 +36,28 @@ describe("Umbral v2 — engineConfig", () => {
       assert.ok(c.modoExterno.estadoMentalCliente.length > 0);
       assert.ok(c.modoExterno.criterioAprobacionVendedor.length > 0);
       assert.ok(c.modoExterno.instruccionEvaluadorGemini.length > 0);
+      assert.ok(c.modoExterno.arquetipoNombre.length > 0);
+      assert.ok(c.modoExterno.actitudCliente.length > 0);
+      assert.ok(c.modoExterno.fraseTipica.length > 0);
+      assert.ok(c.modoExterno.misionVendedor.length > 0);
+    }
+  });
+
+  it("arquetipos de La Arena mapean 1–10", () => {
+    const esperados: Record<CodigoNumero, RegExp> = {
+      1: /Apático/i,
+      2: /Abrumado/i,
+      3: /Postergador/i,
+      4: /Cínico/i,
+      5: /Escéptico/i,
+      6: /Temeroso/i,
+      7: /Moralista/i,
+      8: /Negociador/i,
+      9: /Perfeccionista/i,
+      10: /Soberano/i,
+    };
+    for (const n of CODIGOS_NUMERO) {
+      assert.match(obtenerCodigo(n).modoExterno.arquetipoNombre, esperados[n]);
     }
   });
 
