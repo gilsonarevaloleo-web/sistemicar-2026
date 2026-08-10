@@ -641,11 +641,11 @@ export default function Umbral() {
             <h1 className="text-2xl font-black text-white">UMBRAL</h1>
             <p className="text-xs text-slate-500">Galería de Avatares</p>
             <Link
-              href="/umbral/v2"
+              href="/umbral/entrada"
               className="mt-2 inline-block text-[10px] tracking-widest text-[#D4AF37]/80 hover:text-[#D4AF37]"
               data-testid="link-umbral-v2"
             >
-              ABRIR CONSOLA V2 →
+              ENTRADA + CONSOLA V2 →
             </Link>
           </div>
           <div className="flex items-center gap-2">

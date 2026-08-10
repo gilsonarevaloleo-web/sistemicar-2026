@@ -64,6 +64,7 @@ import {
   hasOperativoAccess as _hasOperativoAccess,
   hasRitmoAccess as _hasRitmoAccess,
   hasNorteAccess as _hasNorteAccess,
+  hasUmbralAccess as _hasUmbralAccess,
   resolveActiveModules,
   mergeModuleIds,
   modulesGrantedByPlan,
@@ -2585,6 +2586,17 @@ export function hasNorteAccess(
 ): boolean {
   if (isPreviewOpsUnlocked()) return true;
   return _hasNorteAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Umbral v2 — Códigos 2–10 + métricas (Código 1 es trial gratis). */
+export function hasUmbralAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasUmbralAccess(accessInput(subscriptionPlan, email, rank, activeModules));
 }
 
 export function hasDesglosadorAccess(

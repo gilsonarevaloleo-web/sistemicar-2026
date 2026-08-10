@@ -1,10 +1,12 @@
-/** IDs de módulos vendibles (Planificación + futuros).
+/** IDs de módulos vendibles (Planificación + Umbral + futuros).
  * Display comercial (v2): Base · Ritmo · Norte — ver planificacionPricing.ts
+ * Umbral — ver umbralPricing.ts
  */
 export type ModuleId =
   | "planificacion_base"
   | "soberania_dia"
-  | "operativo";
+  | "operativo"
+  | "umbral";
 
 export const MODULE_IDS = {
   /** Jornada Base — Conquista + PS */
@@ -15,14 +17,28 @@ export const MODULE_IDS = {
   /** Ritmo del día — segmentos + Situacional */
   OPERATIVO: "operativo" as const,
   RITMO: "operativo" as const,
+  /** Umbral v2 — Forja + Arena (trial C1 gratis) */
+  UMBRAL: "umbral" as const,
 };
 
-/** Planes de checkout activos (Planificación mensual + Espejo aparte). */
+const VALID_MODULE_IDS = new Set<ModuleId>([
+  "planificacion_base",
+  "soberania_dia",
+  "operativo",
+  "umbral",
+]);
+
+function isModuleId(value: string): value is ModuleId {
+  return VALID_MODULE_IDS.has(value as ModuleId);
+}
+
+/** Planes de checkout activos (Planificación mensual + Umbral + Espejo aparte). */
 export type ActivePlanId =
   | "corazon-sabio"
   | "planificacion_base"
   | "soberania_dia"
-  | "operativo";
+  | "operativo"
+  | "umbral";
 
 /** Planes legacy — solo grandfather / webhooks antiguos. */
 export type LegacyPlanId = "arquitecto" | "soberano_operativo" | "soberano" | "soberania-mental";
@@ -50,6 +66,7 @@ export const PLAN_MODULE_GRANTS: Record<string, ModuleId[]> = {
   planificacion_base: ["planificacion_base"],
   soberania_dia: ["soberania_dia"],
   operativo: ["operativo"],
+  umbral: ["umbral"],
 };
 
 const LEGACY_RANK_MODULES: Record<string, ModuleId[]> = {
@@ -66,12 +83,15 @@ export function isOwnerEmail(email?: string | null): boolean {
 export function resolveActiveModules(input: ModuleAccessInput): Set<ModuleId> {
   const set = new Set<ModuleId>();
   if (isOwnerEmail(input.email)) {
-    return new Set<ModuleId>(["planificacion_base", "soberania_dia", "operativo"]);
+    return new Set<ModuleId>([
+      "planificacion_base",
+      "soberania_dia",
+      "operativo",
+      "umbral",
+    ]);
   }
   for (const m of input.activeModules ?? []) {
-    if (m === "planificacion_base" || m === "soberania_dia" || m === "operativo") {
-      set.add(m);
-    }
+    if (isModuleId(m)) set.add(m);
   }
   const plan = input.subscriptionPlan;
   if (plan) {
@@ -114,6 +134,11 @@ export function hasRitmoAccess(input: ModuleAccessInput): boolean {
   return hasOperativoAccess(input);
 }
 
+/** Umbral v2 — Forja + Arena (Códigos 2–10 + métricas). */
+export function hasUmbralAccess(input: ModuleAccessInput): boolean {
+  return hasModule(input, "umbral");
+}
+
 /** @deprecated Usar hasOperativoAccess / hasRitmoAccess */
 export function hasDesglosadorAccessFromModules(input: ModuleAccessInput): boolean {
   return hasOperativoAccess(input);
@@ -126,7 +151,7 @@ export function modulesGrantedByPlan(planId: string): ModuleId[] {
 export function mergeModuleIds(existing: string[] | null | undefined, toAdd: ModuleId[]): ModuleId[] {
   const set = new Set<ModuleId>();
   for (const m of existing ?? []) {
-    if (m === "planificacion_base" || m === "soberania_dia" || m === "operativo") set.add(m);
+    if (isModuleId(m)) set.add(m);
   }
   for (const m of toAdd) set.add(m);
   return Array.from(set);

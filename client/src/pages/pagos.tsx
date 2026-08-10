@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { auth } from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
-import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp } from "lucide-react";
+import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PLANIFICACION_CHECKOUT_PLANS } from "@shared/mercadopagoPlans";
+import { PLANIFICACION_CHECKOUT_PLANS, UMBRAL_CHECKOUT_PLANS } from "@shared/mercadopagoPlans";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { modulesGrantedByPlan } from "@shared/moduleAccess";
 import {
@@ -16,11 +16,13 @@ import {
   SKU_NORTE,
   SKU_RITMO,
 } from "@shared/planificacionPricing";
+import { UMBRAL_SKU } from "@shared/umbralPricing";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
 
 const GOLD = "#D4AF37";
+const UMBRAL_ACCENT = "#FF6B35";
 
 const PAYPAL_LINK = "https://paypal.me/ElimanAte";
 const WHATSAPP_NUMBER = "51918260514";
@@ -115,6 +117,29 @@ const planificacionPlans: Plan[] = [
     badge: "NORTE",
   },
 ];
+
+const umbralPlan: Plan = {
+  id: UMBRAL_SKU.id,
+  name: UMBRAL_SKU.name,
+  price: UMBRAL_SKU.priceUsd,
+  pricePEN: UMBRAL_SKU.pricePen,
+  peldaño: "Módulo · Entrenador de umbrales",
+  forWho: UMBRAL_SKU.forWho,
+  anchorCopy: UMBRAL_SKU.identity,
+  roiCopy: "Código 1 gratis con evaluador real. Pagas para Códigos 2–10, Arena/Forja y métricas.",
+  features: UMBRAL_SKU.unlocks.map((name, i) => ({
+    name,
+    locked: false,
+    highlight: i < 2,
+  })),
+  icon: Swords,
+  color: UMBRAL_ACCENT,
+  badge: "UMBRAL",
+  funnelHint: UMBRAL_SKU.funnelHint,
+  popular: false,
+};
+
+const allCheckoutPlans: Plan[] = [...planificacionPlans, umbralPlan];
 
 const STACK_COLORS: Record<string, string> = {
   ritmo: "#00C851",
@@ -214,8 +239,14 @@ export default function Pagos() {
       window.history.replaceState({}, "", url.pathname + url.search);
     }
 
-    if (planParam && PLANIFICACION_CHECKOUT_PLANS.includes(planParam as typeof PLANIFICACION_CHECKOUT_PLANS[number])) {
-      const p = planificacionPlans.find(x => x.id === planParam);
+    const isPlanificacion = PLANIFICACION_CHECKOUT_PLANS.includes(
+      planParam as (typeof PLANIFICACION_CHECKOUT_PLANS)[number],
+    );
+    const isUmbral = UMBRAL_CHECKOUT_PLANS.includes(
+      planParam as (typeof UMBRAL_CHECKOUT_PLANS)[number],
+    );
+    if (planParam && (isPlanificacion || isUmbral)) {
+      const p = allCheckoutPlans.find((x) => x.id === planParam);
       if (p) {
         setSelectedPlan(p);
         setTimeout(() => {
@@ -532,6 +563,76 @@ export default function Pagos() {
         <p className="text-[10px] text-slate-600 text-center mb-8 leading-relaxed px-2">
           Comparado con apps de notas (~$10/mes): aquí pagas por unidades, ritmo y cierre de bloque — no por listas.
         </p>
+
+        {/* Umbral — módulo aparte */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Swords size={14} style={{ color: UMBRAL_ACCENT }} />
+            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: UMBRAL_ACCENT }}>
+              Umbral · Forja + Arena
+            </h2>
+          </div>
+          <motion.button
+            type="button"
+            onClick={() => setSelectedPlan(umbralPlan)}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            data-testid="select-plan-umbral"
+            className="relative w-full p-6 rounded-2xl border-2 text-left transition-all"
+            style={{
+              borderColor: selectedPlan.id === umbralPlan.id ? umbralPlan.color : "rgba(255,255,255,0.12)",
+              background:
+                selectedPlan.id === umbralPlan.id
+                  ? `${umbralPlan.color}15`
+                  : "rgba(0,0,0,0.35)",
+            }}
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="p-2 rounded-xl"
+                    style={{ background: `${umbralPlan.color}20` }}
+                  >
+                    <Swords size={22} style={{ color: umbralPlan.color }} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg">{umbralPlan.name}</h3>
+                    <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: umbralPlan.color }}>
+                      {umbralPlan.peldaño}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 italic mb-2">{umbralPlan.anchorCopy}</p>
+                <p className="text-[10px] mb-3" style={{ color: umbralPlan.color }}>
+                  {umbralPlan.roiCopy}
+                </p>
+                <ul className="space-y-1.5">
+                  {umbralPlan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm text-slate-300">
+                      <Check size={14} style={{ color: umbralPlan.color }} />
+                      {feature.name}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/umbral/entrada"
+                  className="inline-block mt-3 text-[10px] tracking-widest uppercase text-[#00FFC3]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Probar entrada / Código 1 gratis →
+                </Link>
+              </div>
+              <div className="shrink-0 text-left sm:text-right">
+                <span className="text-3xl font-black text-white">${umbralPlan.price}</span>
+                <span className="text-slate-500 text-sm">/mes</span>
+                <p className="text-[10px] text-slate-600 mt-0.5">
+                  S/ {umbralPlan.pricePEN.toFixed(0)} soles
+                </p>
+              </div>
+            </div>
+          </motion.button>
+        </div>
         </section>
 
         {/* Ecosistema — en camino */}
