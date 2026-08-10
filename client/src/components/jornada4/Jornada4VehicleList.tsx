@@ -75,6 +75,8 @@ type Ops = {
   archiveAncladoPorSegmento?: (vehicleId: string) => Promise<void>;
   pausaInterrupcion: (vehicleId: string, titulo: string) => Promise<void>;
   resumeDesglosador: (parentId: string) => Promise<void>;
+  postergarEnfoque: (vehicleId: string) => Promise<void>;
+  reanudarEnfoque: (vehicleId: string) => Promise<void>;
   closeExpressVehicle: (
     vehicleId: string,
     status: "cumplido" | "archivado"
@@ -198,6 +200,8 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                         ? id => ops.sustituirSituacionFoco!(v.id, id)
                         : undefined
                     }
+                    onPostergar={() => void ops.postergarEnfoque(v.id)}
+                    onReanudar={() => void ops.reanudarEnfoque(v.id)}
                   />
                 );
               }
@@ -230,7 +234,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · pausa · reorden · conquista · ring
+              Dual Kernel · pausa · postergar · reorden · conquista · ring
             </p>
           </div>
         ) : null}

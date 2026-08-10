@@ -30,6 +30,8 @@ export type CrisolInjectOk = {
   subTareas: SubTarea[];
   situacionCronometro?: Vehicle["situacionCronometro"];
   situacionCupoAnchor?: Vehicle["situacionCupoAnchor"];
+  /** Dirección del vehículo: el nido del Crisol dirige el rumbo. */
+  proyectoId?: string;
   mode: "lista_libre" | "enqueue_ring" | "open_ring";
 };
 
@@ -50,12 +52,14 @@ export function pickSituacionVehicleTarget(
   expandedId: string | null
 ): { vehicle?: Vehicle; ambiguous: boolean } {
   // Incluye ring activo, lista libre y situación vacía (ring por abrir).
+  // Excluye postergados: el cupo está congelado hasta reanudar.
   const activos = vehicles.filter(
     v =>
       v.status === "activo" &&
       !v.autoVerdad &&
       v.tipoFlota === "situacion" &&
-      !v.vehiculoPadreDesglosadorId
+      !v.vehiculoPadreDesglosadorId &&
+      !v.situacionNestedPause
   );
   if (activos.length === 0) return { ambiguous: false };
   if (expandedId) {
@@ -91,11 +95,16 @@ export function injectCrisolToListaLibre(
   if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
     return { ok: false, reason: "no_vehicle" };
   }
-  const newSub = subTareaFromImanItem(item);
+  const nido = item.proyectoId?.trim();
+  const newSub = aplicarProyectoHeredadoASub(
+    subTareaFromImanItem(item),
+    nido || vehicle.proyectoId
+  );
   return {
     ok: true,
     vehicleId: vehicle.id,
     subTareas: [...(vehicle.subTareas || []), newSub],
+    ...(nido ? { proyectoId: nido } : {}),
     mode: "lista_libre",
   };
 }
@@ -112,8 +121,10 @@ export function injectCrisolToActiveRing(
   const sc = vehicle.situacionCronometro;
   if (sc?.activo !== true) return { ok: false, reason: "ring_inactive_enqueue" };
 
+  const nidoCrisol = item.proyectoId?.trim();
+  // Crisol manda: nido del pensamiento define el rumbo del ring.
   const enfoqueHeredado =
-    item.proyectoId?.trim() ||
+    nidoCrisol ||
     sc.proyectoEnfoqueId?.trim() ||
     resolveProyectoIdEnfoqueSituacion(vehicle, opts?.segmentoProyectoId);
 
@@ -125,6 +136,7 @@ export function injectCrisolToActiveRing(
   subTareas = redistribuirMinutosSituacionCronometro(subTareas, budgetMin);
 
   const proyectoEnfoqueId =
+    nidoCrisol ||
     sc.proyectoEnfoqueId?.trim() ||
     dominanteProyectoIdEnSubs(subTareas.filter(st => st.enDesgloseCronometro)) ||
     vehicle.proyectoId?.trim() ||
@@ -132,8 +144,11 @@ export function injectCrisolToActiveRing(
 
   const situacionCronometro = {
     ...sc,
-    ...(proyectoEnfoqueId && !sc.proyectoEnfoqueId?.trim()
-      ? { proyectoEnfoqueId }
+    ...(proyectoEnfoqueId
+      ? {
+          // Si el Crisol trae nido, actualiza el rumbo aunque el ring ya tuviera otro.
+          proyectoEnfoqueId,
+        }
       : {}),
   };
 
@@ -159,6 +174,7 @@ export function injectCrisolToActiveRing(
     subTareas,
     situacionCronometro,
     situacionCupoAnchor,
+    ...(nidoCrisol ? { proyectoId: nidoCrisol } : {}),
     mode: "enqueue_ring",
   };
 }
@@ -173,8 +189,9 @@ export function injectCrisolOpeningRing(
     return { ok: false, reason: "no_vehicle" };
   }
 
+  const nidoCrisol = item.proyectoId?.trim();
   const enfoqueHeredado =
-    item.proyectoId?.trim() ||
+    nidoCrisol ||
     resolveProyectoIdEnfoqueSituacion(vehicle, opts?.segmentoProyectoId);
 
   const newSub = liftToCron(subTareaFromImanItem(item), enfoqueHeredado);
@@ -194,7 +211,7 @@ export function injectCrisolOpeningRing(
   const prevSc = vehicle.situacionCronometro;
   const retoNumero = nextRetoNumero(prevSc);
   const proyectoEnfoqueId =
-    item.proyectoId?.trim() ||
+    nidoCrisol ||
     dominanteProyectoIdEnSubs(subTareas.filter(st => st.enDesgloseCronometro)) ||
     vehicle.proyectoId?.trim() ||
     opts?.segmentoProyectoId?.trim();
@@ -226,6 +243,7 @@ export function injectCrisolOpeningRing(
     subTareas,
     situacionCronometro,
     situacionCupoAnchor,
+    ...(nidoCrisol ? { proyectoId: nidoCrisol } : {}),
     mode: "open_ring",
   };
 }

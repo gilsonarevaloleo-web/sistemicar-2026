@@ -102,4 +102,23 @@ describe("vehicleOperationalSlots", () => {
     const check = assertCanOpenVehicle([parent], "interrupcion", { parentDesglosadorId: "p1" });
     assert.equal(check.allowed, true);
   });
+
+  it("enfoque postergado no consume slot (libera para el siguiente)", () => {
+    const list = [
+      v({
+        id: "enf",
+        titulo: "Enfoque",
+        tipoFlota: "situacion",
+        situacionNestedPause: {
+          pausedAt: Date.now(),
+          kind: "postergacion",
+          situacionCronometro: { activo: true },
+          minutosRestantesAlPausar: 18,
+        },
+      }),
+      v({ id: "conq", titulo: "Conquista", tipoFlota: "tiempo" }),
+    ];
+    assert.equal(getOperationalActives(list).length, 1);
+    assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
+  });
 });
