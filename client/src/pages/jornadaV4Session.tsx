@@ -64,17 +64,19 @@ export default function JornadaV4Session() {
   const [mobileTab, setMobileTab] = useState<Jornada4MobileTab>("operar");
   const [huecosRefresh, setHuecosRefresh] = useState(0);
   const [hubLaunchPeldanoId, setHubLaunchPeldanoId] = useState<string | null>(null);
+  const [hubLaunchOleadaPuntoId, setHubLaunchOleadaPuntoId] = useState<string | null>(null);
   const [notifPermission, setNotifPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
 
-  // Deep link desde Hub: /jornada-v4?proyectoId&peldanoId&launch=desglosador_*
+  // Deep link desde Hub: /jornada-v4?proyectoId&peldanoId&oleadaPuntoId&launch=desglosador_*
   useEffect(() => {
     const params = new URLSearchParams(search);
     const proyectoId = params.get("proyectoId")?.trim();
     const peldanoId = params.get("peldanoId")?.trim();
+    const oleadaPuntoId = params.get("oleadaPuntoId")?.trim();
     const launch = params.get("launch");
     if (!proyectoId && !peldanoId && !launch) return;
 
@@ -86,12 +88,14 @@ export default function JornadaV4Session() {
           : undefined;
 
     if (peldanoId) setHubLaunchPeldanoId(peldanoId);
+    if (oleadaPuntoId) setHubLaunchOleadaPuntoId(oleadaPuntoId);
     setMobileTab("operar");
     const t = window.setTimeout(() => {
       requestJornada4OpenLaunch({
         ...(tipoFlota ? { tipoFlota } : {}),
         ...(proyectoId ? { proyectoId } : {}),
         ...(peldanoId ? { peldanoId } : {}),
+        ...(oleadaPuntoId ? { oleadaPuntoId } : {}),
         modo: "desglose",
       });
       setLocation("/jornada-v4", { replace: true });
@@ -324,6 +328,7 @@ export default function JornadaV4Session() {
                   : null
               }
               hubPeldanoId={entitlements.hasNorte ? hubLaunchPeldanoId : null}
+              hubOleadaPuntoId={entitlements.hasNorte ? hubLaunchOleadaPuntoId : null}
               canSituacion={entitlements.hasRitmo}
               canProyectos={entitlements.hasNorte}
               canModoEntrenamientoRing={canModoEntrenamientoRing}

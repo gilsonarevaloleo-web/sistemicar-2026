@@ -45,9 +45,14 @@ import {
   buildLaunchUrl,
   updateProyectoClaridadActiva,
   setOleadaComoDireccion,
+  addOleadaPunto,
+  updateOleadaPunto,
+  deleteOleadaPunto,
+  reorderOleadaPunto,
   type Proyecto,
   type ProyectoPeldano,
   type ProyectoEtiqueta,
+  type OleadaPuntoStatus,
 } from "@/lib/proyectos";
 import {
   buildDefaultClaridadDireccion,
@@ -55,9 +60,11 @@ import {
   resolveClaridadParaProyecto,
   type RutasMentalesSet,
 } from "@/lib/claridadDireccion";
+import { getFocoOleadaPunto, sortOleadaPuntos } from "@/lib/oleadaPuntos";
 import { RUTA_BANDA_META } from "@/lib/rutaEnfoque";
 import { RutasMentalesGrafo } from "@/components/RutasMentalesGrafo";
 import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
+import { OleadaDesglosePanel } from "@/components/OleadaDesglosePanel";
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
 import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
@@ -457,6 +464,20 @@ export default function ProyectosPage() {
     [peldanos, oleadaActiva]
   );
 
+  const oleadaPuntos = useMemo(
+    () => sortOleadaPuntos(oleadaPeldano?.oleadaPuntos ?? []),
+    [oleadaPeldano]
+  );
+  const oleadaFocoPunto = useMemo(() => getFocoOleadaPunto(oleadaPuntos), [oleadaPuntos]);
+
+  const refreshOleadaPeldanoLocal = useCallback(
+    (updated: ProyectoPeldano | null) => {
+      if (!updated) return;
+      setPeldanos(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+    },
+    []
+  );
+
   const handleGuardarClaridad = async () => {
     if (!user || !detailId || !claridadEdit) return;
     setGuardandoClaridad(true);
@@ -473,6 +494,36 @@ export default function ProyectosPage() {
     if (!user || !detailId) return;
     await setOleadaComoDireccion(user.uid, detailId, peldanoId);
     await reloadDetail();
+  };
+
+  const handleAddOleadaPunto = async (titulo: string) => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await addOleadaPunto(user.uid, oleadaPeldano.id, titulo);
+    refreshOleadaPeldanoLocal(updated);
+  };
+
+  const handleUpdateOleadaPuntoTitulo = async (puntoId: string, titulo: string) => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await updateOleadaPunto(user.uid, oleadaPeldano.id, puntoId, { titulo });
+    refreshOleadaPeldanoLocal(updated);
+  };
+
+  const handleCycleOleadaPuntoStatus = async (puntoId: string, next: OleadaPuntoStatus) => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await updateOleadaPunto(user.uid, oleadaPeldano.id, puntoId, { status: next });
+    refreshOleadaPeldanoLocal(updated);
+  };
+
+  const handleDeleteOleadaPunto = async (puntoId: string) => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await deleteOleadaPunto(user.uid, oleadaPeldano.id, puntoId);
+    refreshOleadaPeldanoLocal(updated);
+  };
+
+  const handleReorderOleadaPunto = async (puntoId: string, direction: "up" | "down") => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await reorderOleadaPunto(user.uid, oleadaPeldano.id, puntoId, direction);
+    refreshOleadaPeldanoLocal(updated);
   };
 
   const handleCreateProyecto = useCallback(
@@ -663,6 +714,28 @@ export default function ProyectosPage() {
               ) : null}
             </div>
 
+            {oleadaPeldano ? (
+              <OleadaDesglosePanel
+                puntos={oleadaPuntos}
+                tint={tint}
+                onAdd={handleAddOleadaPunto}
+                onUpdateTitulo={handleUpdateOleadaPuntoTitulo}
+                onCycleStatus={handleCycleOleadaPuntoStatus}
+                onDelete={handleDeleteOleadaPunto}
+                onReorder={handleReorderOleadaPunto}
+              />
+            ) : (
+              <div
+                className="p-3 rounded-xl border border-dashed border-white/10"
+                data-testid="hub-oleada-desglose-sin-oleada"
+              >
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Activa una oleada en Escalera para desglosar la dirección de producción y sintonizarla
+                  con la realidad.
+                </p>
+              </div>
+            )}
+
             {claridadEdit ? (
               <div
                 className="p-3 rounded-xl border space-y-3"
@@ -753,7 +826,14 @@ export default function ProyectosPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(buildLaunchUrl(proyecto.id, oleadaPeldano.id, "desglosador_tiempo"))
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_tiempo",
+                        oleadaFocoPunto?.id
+                      )
+                    )
                   }
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
                   style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
@@ -763,7 +843,14 @@ export default function ProyectosPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(buildLaunchUrl(proyecto.id, oleadaPeldano.id, "desglosador_situacion"))
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_situacion",
+                        oleadaFocoPunto?.id
+                      )
+                    )
                   }
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
                   style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}

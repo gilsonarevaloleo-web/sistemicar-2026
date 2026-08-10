@@ -20,6 +20,16 @@ import {
   buildTranscriptFromVehicles,
   filterDecisionsForProyecto,
 } from "./ringDecisionTranscript";
+import {
+  createOleadaPunto,
+  getFocoOleadaPunto,
+  inferOleadaPuntoStatusFromProduccion,
+  renumberOleadaPuntos,
+  sintonizarOleadaPunto,
+  sortOleadaPuntos,
+  type OleadaPunto,
+  type OleadaPuntoStatus,
+} from "./oleadaPuntos";
 
 export type {
   ClaridadProfundidad,
@@ -29,6 +39,14 @@ export type {
   RutaMentalPaso,
   RutasMentalesSet,
 } from "./claridadDireccion";
+
+export type { OleadaPunto, OleadaPuntoStatus } from "./oleadaPuntos";
+export {
+  getFocoOleadaPunto,
+  summarizeOleadaPuntos,
+  OLEADA_PUNTO_STATUS_LABEL,
+  nextOleadaPuntoStatus,
+} from "./oleadaPuntos";
 
 export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
 
@@ -110,6 +128,11 @@ export interface ProyectoPeldano {
   horaInicio?: string;
   horaFin?: string;
   rutasMentales?: RutasMentalesSet;
+  /**
+   * Desglose de la oleada = propuesta futura numerada (ordenamiento mental).
+   * No es checklist rígido: se edita/borra libremente; la producción solo sintoniza.
+   */
+  oleadaPuntos?: OleadaPunto[];
   createdAt: number;
   updatedAt: number;
 }
@@ -619,6 +642,135 @@ export async function deletePeldanoIdea(userId: string, id: string): Promise<voi
   void syncFirestorePeldano(userId, pel, true);
 }
 
+function readOleadaPuntos(peldano: ProyectoPeldano): OleadaPunto[] {
+  return sortOleadaPuntos(peldano.oleadaPuntos ?? []);
+}
+
+/** Añade un punto a la propuesta de oleada (siempre nace como `propuesta`). */
+export async function addOleadaPunto(
+  userId: string,
+  peldanoId: string,
+  titulo: string
+): Promise<ProyectoPeldano | null> {
+  const trimmed = titulo.trim();
+  if (!trimmed) return null;
+  const all = getLocalPeldanos(userId);
+  const pel = all.find(p => p.id === peldanoId);
+  if (!pel) return null;
+  const puntos = readOleadaPuntos(pel);
+  const next = renumberOleadaPuntos([
+    ...puntos,
+    createOleadaPunto(trimmed, puntos.length + 1),
+  ]);
+  return updatePeldano(userId, peldanoId, { oleadaPuntos: next });
+}
+
+/** Edita título o estatus de un punto — libertad de reordenar la mente. */
+export async function updateOleadaPunto(
+  userId: string,
+  peldanoId: string,
+  puntoId: string,
+  patch: Partial<Pick<OleadaPunto, "titulo" | "status">>
+): Promise<ProyectoPeldano | null> {
+  const all = getLocalPeldanos(userId);
+  const pel = all.find(p => p.id === peldanoId);
+  if (!pel) return null;
+  const now = Date.now();
+  const puntos = readOleadaPuntos(pel).map(p => {
+    if (p.id !== puntoId) return p;
+    return {
+      ...p,
+      ...(patch.titulo !== undefined ? { titulo: patch.titulo.trim() || p.titulo } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      updatedAt: now,
+    };
+  });
+  return updatePeldano(userId, peldanoId, { oleadaPuntos: puntos });
+}
+
+/** Borra un punto y renumerara la propuesta — sin castigo de cumplimiento. */
+export async function deleteOleadaPunto(
+  userId: string,
+  peldanoId: string,
+  puntoId: string
+): Promise<ProyectoPeldano | null> {
+  const all = getLocalPeldanos(userId);
+  const pel = all.find(p => p.id === peldanoId);
+  if (!pel) return null;
+  const next = renumberOleadaPuntos(readOleadaPuntos(pel).filter(p => p.id !== puntoId));
+  return updatePeldano(userId, peldanoId, { oleadaPuntos: next });
+}
+
+/** Mueve un punto arriba/abajo en el orden de producción propuesto. */
+export async function reorderOleadaPunto(
+  userId: string,
+  peldanoId: string,
+  puntoId: string,
+  direction: "up" | "down"
+): Promise<ProyectoPeldano | null> {
+  const all = getLocalPeldanos(userId);
+  const pel = all.find(p => p.id === peldanoId);
+  if (!pel) return null;
+  const puntos = readOleadaPuntos(pel);
+  const idx = puntos.findIndex(p => p.id === puntoId);
+  if (idx === -1) return pel;
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= puntos.length) return pel;
+  const copy = [...puntos];
+  const tmp = copy[idx]!;
+  copy[idx] = copy[swapIdx]!;
+  copy[swapIdx] = tmp;
+  return updatePeldano(userId, peldanoId, { oleadaPuntos: renumberOleadaPuntos(copy) });
+}
+
+/**
+ * Sintonía suave: la producción escribe señal en el punto de oleada.
+ * Si el vehículo trae oleadaPuntoId, toca ese; si no, el foco actual.
+ * Nunca bloquea editar/borrar después.
+ */
+export async function sintonizarOleadaConProduccion(
+  userId: string,
+  opts: {
+    proyectoId: string;
+    peldanoId?: string;
+    oleadaPuntoId?: string;
+    vehicleId?: string;
+    tipoOrigen: "tiempo" | "situacion";
+    subStatuses?: string[];
+    situacionResultados?: string[];
+    vehicleStatus?: string;
+  }
+): Promise<ProyectoPeldano | null> {
+  const peldanos = getPeldanosByProyectoLocal(userId, opts.proyectoId);
+  const oleada = getOleadaEnCurso(peldanos);
+  const targetId =
+    opts.peldanoId && peldanos.some(p => p.id === opts.peldanoId && !p.origenSegmento)
+      ? opts.peldanoId
+      : oleada?.id;
+  if (!targetId) return null;
+  const pel = peldanos.find(p => p.id === targetId);
+  if (!pel) return null;
+  const puntos = readOleadaPuntos(pel);
+  if (puntos.length === 0) return pel;
+
+  const sugerido = inferOleadaPuntoStatusFromProduccion({
+    tipoOrigen: opts.tipoOrigen,
+    subStatuses: opts.subStatuses,
+    situacionResultados: opts.situacionResultados,
+    vehicleStatus: opts.vehicleStatus,
+  });
+
+  let target =
+    (opts.oleadaPuntoId ? puntos.find(p => p.id === opts.oleadaPuntoId) : undefined) ??
+    getFocoOleadaPunto(puntos);
+  if (!target) return pel;
+
+  const next = puntos.map(p =>
+    p.id === target!.id ? sintonizarOleadaPunto(p, sugerido, opts.vehicleId) : p
+  );
+  return updatePeldano(userId, targetId, { oleadaPuntos: next });
+}
+
 export async function markPeldanoEnCurso(
   userId: string,
   peldanoId: string,
@@ -838,6 +990,7 @@ export async function markPeldanoConquistadoSituacion(
  * - Oleada activa / solo proyectoId / sombra de segmento → crea peldaño conquistado nuevo
  *   (se camina SOBRE la oleada; no se apaga con un solo cierre).
  * - La sombra de segmento la sella además el cierre de puerta.
+ * - Además: sintoniza el desglose de oleada (propuesta) con la señal de producción.
  */
 export async function recordProgresoHubAlCerrarVehiculo(
   userId: string,
@@ -853,9 +1006,34 @@ export async function recordProgresoHubAlCerrarVehiculo(
   }
 ): Promise<void> {
   const destino = resolveDestinoCierre(vehicle.destinoCierre, opts.destinoCierre);
-  if (!feedsProyectoHub(destino)) return;
-
   const proyectoId = vehicle.proyectoId;
+  const feedsHub = feedsProyectoHub(destino);
+
+  const maybeSintonizarOleada = async () => {
+    if (!proyectoId) return;
+    // Presencia no ensucia escalera; solo sintoniza si el vehículo apunta a un punto.
+    if (!feedsHub && !vehicle.oleadaPuntoId) return;
+    const subs = opts.subs ?? vehicle.subVehiculos ?? [];
+    const subTareas = opts.subTareas ?? vehicle.subTareas ?? [];
+    await sintonizarOleadaConProduccion(userId, {
+      proyectoId,
+      peldanoId: vehicle.proyectoPeldanoId,
+      oleadaPuntoId: vehicle.oleadaPuntoId,
+      vehicleId: vehicle.id,
+      tipoOrigen: opts.tipoOrigen,
+      subStatuses: subs.map(s => s.status),
+      situacionResultados: subTareas.map(
+        st => st.resultadoSituacion ?? (st.completada ? "cumplido" : "pendiente")
+      ),
+      vehicleStatus: vehicle.status,
+    });
+  };
+
+  if (!feedsHub) {
+    await maybeSintonizarOleada();
+    return;
+  }
+
   if (!proyectoId) return;
 
   if (vehicle.proyectoPeldanoId) {
@@ -886,6 +1064,7 @@ export async function recordProgresoHubAlCerrarVehiculo(
   }
 
   await spawnConquistadoDesdeVehiculo(userId, vehicle, opts);
+  await maybeSintonizarOleada();
 }
 
 /** Peldaño conquistado nuevo = un paso caminado sobre la oleada/proyecto. */
@@ -1118,8 +1297,10 @@ export function subscribeToProyectos(userId: string, onData: () => void): () => 
 export function buildLaunchUrl(
   proyectoId: string,
   peldanoId: string,
-  launch: "desglosador_tiempo" | "desglosador_situacion"
+  launch: "desglosador_tiempo" | "desglosador_situacion",
+  oleadaPuntoId?: string | null
 ): string {
   const q = new URLSearchParams({ proyectoId, peldanoId, launch });
+  if (oleadaPuntoId?.trim()) q.set("oleadaPuntoId", oleadaPuntoId.trim());
   return `/jornada-v4?${q.toString()}`;
 }

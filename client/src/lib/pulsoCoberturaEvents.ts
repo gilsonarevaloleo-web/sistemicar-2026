@@ -5,6 +5,8 @@ export type Jornada4OpenLaunchDetail = {
   tipoFlota?: "tiempo" | "situacion";
   proyectoId?: string;
   peldanoId?: string;
+  /** Punto de desglose de oleada (propuesta) a sintonizar con la producción. */
+  oleadaPuntoId?: string;
   /** Prefiere desglose al abrir desde Hub. */
   modo?: "rapido" | "desglose";
 };
