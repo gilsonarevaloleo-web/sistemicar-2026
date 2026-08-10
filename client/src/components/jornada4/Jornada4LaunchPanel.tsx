@@ -57,6 +57,8 @@ type Props = {
   canAnclarDesglosadorSegmento?: boolean;
   /** Peldaño Hub (idea/oleada) al que se amarran los vehículos lanzados. */
   hubPeldanoId?: string | null;
+  /** Punto de desglose de oleada (foco) a sintonizar. */
+  hubOleadaPuntoId?: string | null;
 };
 
 function makeSub(): DesglosadorSubFormRow {
@@ -109,6 +111,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   canModoEntrenamientoRing = false,
   canAnclarDesglosadorSegmento = false,
   hubPeldanoId = null,
+  hubOleadaPuntoId = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -120,6 +123,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
   const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
   const [peldanoIdLaunch, setPeldanoIdLaunch] = useState(hubPeldanoId?.trim() || "");
+  const [oleadaPuntoIdLaunch, setOleadaPuntoIdLaunch] = useState(hubOleadaPuntoId?.trim() || "");
   /** Conquista multi: un desglosador en secuencia vs N tareas independientes. */
   const [conquistaMultiModo, setConquistaMultiModo] = useState<
     "secuencia" | "independientes"
@@ -179,10 +183,12 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         tipoFlota?: "tiempo" | "situacion";
         proyectoId?: string;
         peldanoId?: string;
+        oleadaPuntoId?: string;
         modo?: FlotaLaunchModo;
       }>).detail;
       if (detail?.proyectoId?.trim()) setVehiculoProyectoId(detail.proyectoId.trim());
       if (detail?.peldanoId?.trim()) setPeldanoIdLaunch(detail.peldanoId.trim());
+      if (detail?.oleadaPuntoId?.trim()) setOleadaPuntoIdLaunch(detail.oleadaPuntoId.trim());
       if (detail?.modo) setModo(detail.modo);
       setTipo(detail?.tipoFlota ?? null);
       setOpen(true);
@@ -194,6 +200,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   useEffect(() => {
     if (hubPeldanoId?.trim()) setPeldanoIdLaunch(hubPeldanoId.trim());
   }, [hubPeldanoId]);
+
+  useEffect(() => {
+    if (hubOleadaPuntoId?.trim()) setOleadaPuntoIdLaunch(hubOleadaPuntoId.trim());
+  }, [hubOleadaPuntoId]);
 
   useEffect(() => {
     if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
@@ -242,6 +252,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setFilasProyectoIds([""]);
     setVehiculoProyectoId(defaultProyectoId?.trim() || "");
     setPeldanoIdLaunch(hubPeldanoId?.trim() || "");
+    setOleadaPuntoIdLaunch(hubOleadaPuntoId?.trim() || "");
     setConquistaMultiModo("secuencia");
     setSituacionHoraFin(
       resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ??
@@ -254,7 +265,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
     setOpen(false);
-  }, [segmentoHoraFin, defaultProyectoId, hubPeldanoId]);
+  }, [segmentoHoraFin, defaultProyectoId, hubPeldanoId, hubOleadaPuntoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     if (t === "situacion" && !canSituacion) {
@@ -316,6 +327,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     try {
       const dirVehiculo = vehiculoProyectoId.trim() || undefined;
       const dirPeldano = peldanoIdLaunch.trim() || undefined;
+      const dirPunto = oleadaPuntoIdLaunch.trim() || undefined;
       const validSubs = subs.filter(
         s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
       );
@@ -335,6 +347,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           conquistaComoIndependientes: asIndependientes,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
           ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
+          ...(dirPunto ? { oleadaPuntoId: dirPunto } : {}),
           ...(canAnclarDesglosadorSegmento && ancladoAlSegmento
             ? { ancladoAlSegmento: true }
             : {}),
@@ -349,6 +362,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
           ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
+          ...(dirPunto ? { oleadaPuntoId: dirPunto } : {}),
         });
       } else {
         id = await onLaunch({
@@ -361,6 +375,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
           ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
+          ...(dirPunto ? { oleadaPuntoId: dirPunto } : {}),
           ...(canModoEntrenamientoRing && modoEntrenamientoRing
             ? { modoEntrenamientoRing: true }
             : {}),
@@ -382,6 +397,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     filasProyectoIds,
     vehiculoProyectoId,
     peldanoIdLaunch,
+    oleadaPuntoIdLaunch,
     situacionHoraFin,
     terminoDetalle,
     conquistaMultiModo,

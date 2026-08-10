@@ -106,6 +106,9 @@ export async function executeJornada4Launch(
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
+          ...(baseForm.oleadaPuntoId?.trim()
+            ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
+            : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
@@ -178,6 +181,9 @@ export async function executeJornada4Launch(
               ? { proyectoId: baseForm.proyectoId.trim() }
               : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
+          ...(baseForm.oleadaPuntoId?.trim()
+            ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
+            : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });

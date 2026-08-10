@@ -103,6 +103,8 @@ export type FlotaLaunchForm = {
    * Si se omite, hereda la sombra del segmento (para sellar puerta).
    */
   peldanoId?: string;
+  /** Punto de desglose de oleada a sintonizar al cerrar. */
+  oleadaPuntoId?: string;
   /**
    * Semilla situacional (ring o lista libre) incluida en el paint + remote del launch.
    * Evita persistir un shell sin cronómetro/filas si el usuario sale al instante.
@@ -284,6 +286,7 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
         : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
       ...(resolvedPeldanoId ? { proyectoPeldanoId: resolvedPeldanoId } : {}),
+      ...(form.oleadaPuntoId?.trim() ? { oleadaPuntoId: form.oleadaPuntoId.trim() } : {}),
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,
       segmentosCruzados: 0,
