@@ -1,6 +1,6 @@
 /**
- * Umbral v2 — API de evaluación con Gemini.
- * Spec: umbral v2. segunda parte
+ * Umbral v2 — API de evaluación con Gemini + persistencia de sesiones.
+ * Spec: umbral v2. segunda parte + persistencia/métricas
  */
 
 import type { Express, Request, Response } from "express";
@@ -17,6 +17,17 @@ import {
   type HistorialUmbralItem,
   type ModoUmbral,
 } from "../shared/umbral/engineConfig";
+import { calcularMetricasUmbral } from "../shared/umbral/metrics";
+import {
+  aplicarEvaluacionASesion,
+  crearSesionUmbral,
+} from "../shared/umbral/sessionLogic";
+import type { SesionUmbral } from "../shared/umbral/sessionTypes";
+import {
+  createMemoryUmbralSessionStore,
+  newSesionId,
+  type UmbralSessionStore,
+} from "./umbralSessionStore";
 
 export type GeminiCaller = (
   prompt: string,
@@ -29,6 +40,7 @@ export type GeminiJsonParser = (raw: string) => any;
 export interface UmbralV2RouteDeps {
   callGemini?: GeminiCaller;
   parseGeminiJSON?: GeminiJsonParser;
+  sessionStore?: UmbralSessionStore;
 }
 
 export interface UmbralEvaluarSuccess {
@@ -42,6 +54,8 @@ export interface UmbralEvaluarSuccess {
   nombreCodigo: string;
   userId: string;
   source: "gemini" | "local_fallback";
+  sesionId: string;
+  sesion: SesionUmbral;
 }
 
 export interface UmbralEvaluarErrorBody {
@@ -68,16 +82,53 @@ function normalizeHistorial(raw: unknown): HistorialUmbralItem[] {
     .filter((h) => h.texto.length > 0);
 }
 
+async function resolverSesionActiva(
+  store: UmbralSessionStore,
+  input: {
+    userId: string;
+    modo: ModoUmbral;
+    codigoActual: CodigoNumero;
+    sesionId?: string;
+  },
+): Promise<SesionUmbral> {
+  if (input.sesionId) {
+    const existing = await store.getById(input.sesionId);
+    if (
+      existing &&
+      existing.userId === input.userId &&
+      existing.modo === input.modo &&
+      existing.estado === "EN_PROGRESO"
+    ) {
+      return existing;
+    }
+  }
+
+  const active = await store.findActive(input.userId, input.modo);
+  if (active) return active;
+
+  return crearSesionUmbral({
+    id: newSesionId(),
+    userId: input.userId,
+    modo: input.modo,
+    codigoActual: input.codigoActual,
+  });
+}
+
 /**
- * Umbral v2 — POST /api/umbral/evaluar
+ * Umbral v2 — POST /api/umbral/evaluar + GET sesiones
  */
-export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {}) {
+export function registerUmbralV2Routes(
+  app: Express,
+  deps: UmbralV2RouteDeps = {},
+) {
   const callGemini = deps.callGemini;
+  const sessionStore = deps.sessionStore ?? createMemoryUmbralSessionStore();
 
   app.get("/api/umbral/meta", (_req: Request, res: Response) => {
     res.json({
-      version: "2.0.1-parte2-fix",
+      version: "2.1.0-sesiones-metricas",
       endpoint: "POST /api/umbral/evaluar",
+      sesiones: ["GET /api/umbral/sesiones", "GET /api/umbral/sesion/:id"],
       modos: ["INTERNO_HABILIDAD", "EXTERNO_VENTAS"],
       codigos: Object.values(DICCIONARIO_CODIGOS).map((c) => ({
         numero: c.numero,
@@ -89,12 +140,80 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
     });
   });
 
+  app.get("/api/umbral/sesiones", async (req: Request, res: Response) => {
+    try {
+      const userId = String(req.query.userId ?? "").trim();
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          error: "userId es requerido",
+        });
+      }
+      const sesiones = await sessionStore.listByUser(userId);
+      const metricas = calcularMetricasUmbral(sesiones);
+      return res.status(200).json({
+        success: true,
+        userId,
+        sesiones,
+        metricas,
+      });
+    } catch (error) {
+      console.error("[umbral/sesiones]", error);
+      return res.status(500).json({
+        success: false,
+        error: "Error al listar sesiones Umbral",
+      });
+    }
+  });
+
+  app.get("/api/umbral/sesion/:id", async (req: Request, res: Response) => {
+    try {
+      const id = String(req.params.id ?? "").trim();
+      const userId = String(req.query.userId ?? "").trim();
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: "id de sesión es requerido",
+        });
+      }
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          error: "userId es requerido",
+        });
+      }
+      const sesion = await sessionStore.getById(id);
+      if (!sesion || sesion.userId !== userId) {
+        return res.status(404).json({
+          success: false,
+          error: "Sesión no encontrada",
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        sesion,
+      });
+    } catch (error) {
+      console.error("[umbral/sesion/:id]", error);
+      return res.status(500).json({
+        success: false,
+        error: "Error al obtener sesión Umbral",
+      });
+    }
+  });
+
   app.post("/api/umbral/evaluar", async (req: Request, res: Response) => {
     const userId = String(req.body?.userId ?? "").trim();
     const modoRaw = req.body?.modo;
     const codigoRaw = Number(req.body?.codigoActual);
     const respuestaUsuario = String(req.body?.respuestaUsuario ?? "").trim();
     const historialPrevio = normalizeHistorial(req.body?.historialPrevio);
+    const sesionIdRaw = String(req.body?.sesionId ?? "").trim();
+    const psOverrideRaw = req.body?.psGanados;
+    const psGanadosOverride =
+      typeof psOverrideRaw === "number" && Number.isFinite(psOverrideRaw)
+        ? psOverrideRaw
+        : undefined;
 
     const modo: ModoUmbral | null = isModoUmbral(modoRaw) ? modoRaw : null;
     const codigoActual: CodigoNumero | null = isCodigoNumero(codigoRaw)
@@ -191,6 +310,25 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
       const moduloCompletado =
         evaluacion.aprobado === true && codigoActual === 10;
 
+      let sesion = await resolverSesionActiva(sessionStore, {
+        userId,
+        modo,
+        codigoActual,
+        sesionId: sesionIdRaw || undefined,
+      });
+
+      sesion = aplicarEvaluacionASesion(sesion, {
+        codigo: codigoActual,
+        aprobado: evaluacion.aprobado,
+        respuestaUsuario,
+        feedbackGemini: evaluacion.feedbackConfrontativo,
+        codigoSiguiente: evaluacion.codigoSiguiente,
+        psGanadosOverride: evaluacion.aprobado
+          ? psGanadosOverride
+          : undefined,
+      });
+      sesion = await sessionStore.save(sesion);
+
       const body: UmbralEvaluarSuccess = {
         success: true,
         modo,
@@ -202,6 +340,8 @@ export function registerUmbralV2Routes(app: Express, deps: UmbralV2RouteDeps = {
         nombreCodigo: prompt.nombreCodigo,
         userId,
         source,
+        sesionId: sesion.id,
+        sesion,
       };
 
       return res.status(200).json(body);
