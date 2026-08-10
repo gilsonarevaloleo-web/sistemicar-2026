@@ -13,7 +13,12 @@ export interface OperationalSlotsCheck {
 /** Activos conscientes que consumen slot operativo (descanso no cuenta: recarga libre). */
 export function getOperationalActives(vehicles: Vehicle[]): Vehicle[] {
   return vehicles.filter(
-    v => v.status === "activo" && !v.autoVerdad && v.tipoFlota !== "descanso"
+    v =>
+      v.status === "activo" &&
+      !v.autoVerdad &&
+      v.tipoFlota !== "descanso" &&
+      // Postergado: cupo congelado; libera slot para el siguiente vehículo.
+      !v.situacionNestedPause
   );
 }
 

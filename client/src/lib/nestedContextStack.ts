@@ -2,13 +2,16 @@ import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { hardwareClockNow } from "@/lib/hardwareClock";
 
-export type NestedPauseKind = "punto_cero" | "interrupcion_situacion";
+export type DesglosadorNestedPauseKind = "punto_cero" | "interrupcion_situacion";
+export type NestedPauseKind = DesglosadorNestedPauseKind | "postergacion";
 
 export type SituacionNestedPause = {
   pausedAt: number;
   kind: NestedPauseKind;
   situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
   situacionCupoAnchor?: Vehicle["situacionCupoAnchor"];
+  /** Minutos de pared que quedaban al postergar (informativo / UI). */
+  minutosRestantesAlPausar?: number;
 };
 
 /** Desglosador tiempo activo con sub en curso — candidato a apilamiento. */
@@ -35,7 +38,7 @@ export function findActiveSituacionRingForNestedStack(vehicles: Vehicle[]): Vehi
 
 export function buildDesglosadorNestedPausePatch(
   vehicle: Vehicle,
-  kind: NestedPauseKind
+  kind: DesglosadorNestedPauseKind
 ): { subVehiculos: SubVehiculo[]; desglosadorPausa: NonNullable<Vehicle["desglosadorPausa"]>; interrupcionActiva: true } | null {
   const activeSub = (vehicle.subVehiculos ?? []).find(s => s.status === "activo");
   if (!activeSub?.aperturaAt) return null;
@@ -58,16 +61,21 @@ export function buildDesglosadorNestedPausePatch(
 
 export function buildSituacionNestedPausePatch(
   vehicle: Vehicle,
-  kind: NestedPauseKind
+  kind: NestedPauseKind,
+  opts?: { nowMs?: number; minutosRestantes?: number }
 ): Partial<Vehicle> | null {
   if (!vehicle.situacionCronometro) return null;
-  const now = hardwareClockNow();
+  if (vehicle.situacionNestedPause) return null;
+  const now = opts?.nowMs ?? hardwareClockNow();
   return {
     situacionNestedPause: {
       pausedAt: now,
       kind,
       situacionCronometro: { ...vehicle.situacionCronometro },
       situacionCupoAnchor: vehicle.situacionCupoAnchor ?? null,
+      ...(opts?.minutosRestantes != null && opts.minutosRestantes >= 0
+        ? { minutosRestantesAlPausar: opts.minutosRestantes }
+        : {}),
     },
     situacionCronometro: { ...vehicle.situacionCronometro, activo: false },
   };
@@ -94,16 +102,40 @@ export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehic
   };
 }
 
-/** Restaura ring situacional tras Punto Cero anidado. */
-export function resumeSituacionFromNestedPause(parent: Vehicle): Partial<Vehicle> | null {
+/**
+ * Restaura ring situacional tras pausa anidada / postergación.
+ * Desplaza anclas y meta de contrato por la duración de la pausa para
+ * conservar los minutos que sobraban (no se queman mientras está postergado).
+ */
+export function resumeSituacionFromNestedPause(
+  parent: Vehicle,
+  opts?: { nowMs?: number }
+): Partial<Vehicle> | null {
   const snap = parent.situacionNestedPause;
   if (!snap) return null;
-  const pauseMs = Math.max(0, hardwareClockNow() - snap.pausedAt);
-  let situacionCronometro = { ...snap.situacionCronometro };
+  const now = opts?.nowMs ?? hardwareClockNow();
+  const pauseMs = Math.max(0, now - snap.pausedAt);
+  let situacionCronometro: NonNullable<Vehicle["situacionCronometro"]> = {
+    ...snap.situacionCronometro,
+    activo: true,
+  };
   if (situacionCronometro.bloqueInicioAt != null) {
     situacionCronometro = {
       ...situacionCronometro,
       bloqueInicioAt: situacionCronometro.bloqueInicioAt + pauseMs,
+    };
+  }
+  // Conservar cupo de pared: la meta se mueve con la pausa.
+  if (situacionCronometro.horaFinContratoMs != null) {
+    situacionCronometro = {
+      ...situacionCronometro,
+      horaFinContratoMs: situacionCronometro.horaFinContratoMs + pauseMs,
+    };
+  }
+  if (situacionCronometro.horaFinMs != null) {
+    situacionCronometro = {
+      ...situacionCronometro,
+      horaFinMs: situacionCronometro.horaFinMs + pauseMs,
     };
   }
   let situacionCupoAnchor = snap.situacionCupoAnchor ?? null;

@@ -20,6 +20,9 @@ export const CRISOL_MOS_HINT =
   "MOS · S = situación · E = ejecución · M = tener en cuenta · Ordena antes del Ring y del Taller.";
 export const CRISOL_TAGLINE =
   "Ordena pensamientos en nidos y rutas antes de sellarlos en tiempo.";
+/** El nido del Crisol define el rumbo del vehículo de enfoque al enviar. */
+export const CRISOL_DIRECCION_HINT =
+  "Nido = dirección del enfoque. Al enviar, ese proyecto dirige las operaciones del vehículo.";
 
 /** @deprecated Usa CRISOL_TITLE */
 export const IMAN_PENSAMIENTOS_TITLE = CRISOL_TITLE;
