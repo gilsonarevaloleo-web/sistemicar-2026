@@ -7,7 +7,7 @@ import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
-import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess } from "@/lib/persistence";
+import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess } from "@/lib/persistence";
 import {
   consumePreviewOpsQueryUnlock,
   isPreviewOpsUnlocked,
@@ -44,6 +44,7 @@ import ComoFunciona from "@/pages/como-funciona";
 import Umbral from "@/pages/umbral";
 import UmbralV2 from "@/pages/umbral-v2";
 import UmbralMetricas from "@/pages/umbral-metricas";
+import UmbralEntrada from "@/pages/umbral-entrada";
 import Proyector from "@/pages/proyector";
 import Proyectos from "@/pages/proyectos";
 import TerminosCondiciones from "@/pages/terminos-condiciones";
@@ -176,6 +177,7 @@ function ModuleRoute({
     if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
     if (requiredModule === "operativo") return hasOperativoAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
+    if (requiredModule === "umbral") return hasUmbralAccess(...args);
     return false;
   };
 
@@ -197,12 +199,18 @@ function ModuleRoute({
           setProgression(prog);
           setCheckingTier(false);
           if (!isPreviewOpsUnlocked() && !hasAccess(prog)) {
-            navigate("/pagos");
+            navigate(
+              requiredModule === "umbral" ? "/pagos?plan=umbral" : "/pagos",
+            );
           }
         },
         () => {
           setCheckingTier(false);
-          if (!ownerBypass && !isPreviewOpsUnlocked()) navigate("/pagos");
+          if (!ownerBypass && !isPreviewOpsUnlocked()) {
+            navigate(
+              requiredModule === "umbral" ? "/pagos?plan=umbral" : "/pagos",
+            );
+          }
         }
       );
       return () => unsub();
@@ -411,11 +419,12 @@ function Router() {
         <Route path="/umbral">
           <ProtectedRoute component={Umbral} />
         </Route>
+        <Route path="/umbral/entrada" component={UmbralEntrada} />
         <Route path="/umbral/v2">
           <ProtectedRoute component={UmbralV2} />
         </Route>
         <Route path="/umbral/metricas">
-          <ProtectedRoute component={UmbralMetricas} />
+          <ModuleRoute component={UmbralMetricas} requiredModule="umbral" />
         </Route>
         <Route path="/proyector">
           <ProtectedRoute component={Proyector} />

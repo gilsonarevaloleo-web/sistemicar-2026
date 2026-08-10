@@ -21,6 +21,10 @@ import {
 } from "@shared/umbral/engineConfig";
 import type { UmbralPsAward } from "@shared/umbral/pointsConfig";
 import {
+  UMBRAL_SKU,
+  requierePagoUmbral,
+} from "@shared/umbralPricing";
+import {
   evaluarUmbral,
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
@@ -36,6 +40,9 @@ interface ConsolaUmbralProps {
   /** Link de retorno (Umbral v1 u otra vista). */
   backHref?: string;
   backLabel?: string;
+  /** Suscripción Umbral activa (Códigos 2–10 + métricas). */
+  hasPaidAccess?: boolean;
+  checkoutHref?: string;
 }
 
 type Veredicto =
@@ -65,6 +72,8 @@ export function ConsolaUmbral({
   userId,
   backHref = "/umbral",
   backLabel = "← UMBRAL V1",
+  hasPaidAccess = false,
+  checkoutHref = UMBRAL_SKU.checkoutHref,
 }: ConsolaUmbralProps) {
   const [modo, setModo] = useState<ModoUmbral>("INTERNO_HABILIDAD");
   const [codigoActual, setCodigoActual] = useState<CodigoNumero>(1);
@@ -78,9 +87,12 @@ export function ConsolaUmbral({
   const [resumenSesion, setResumenSesion] = useState<string[]>([]);
   const [psSesion, setPsSesion] = useState(0);
   const [sesionId, setSesionId] = useState<string | null>(null);
+  /** Paywall tras aprobar C1 en trial, o al intentar C2+. */
+  const [mostrarPaywall, setMostrarPaywall] = useState(false);
 
   const cfg = useMemo(() => obtenerCodigo(codigoActual), [codigoActual]);
   const modoMeta = MODOS_UMBRAL[modo];
+  const codigoBloqueadoPorPago = requierePagoUmbral(codigoActual, hasPaidAccess);
 
   const desafio = useMemo(() => {
     if (modo === "INTERNO_HABILIDAD") {
@@ -135,6 +147,10 @@ export function ConsolaUmbral({
   async function someter() {
     const texto = respuesta.trim();
     if (texto.length < 2 || loading || moduloCompletado) return;
+    if (requierePagoUmbral(codigoActual, hasPaidAccess)) {
+      setMostrarPaywall(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     setVeredicto(null);
@@ -197,11 +213,18 @@ export function ConsolaUmbral({
         if (data.moduloCompletado || data.codigoSiguiente == null) {
           setModuloCompletado(true);
         } else if (data.codigoSiguiente) {
-          // Avance suave tras ver el veredicto.
-          window.setTimeout(() => {
-            setCodigoActual(data.codigoSiguiente as CodigoNumero);
-            setVeredicto(null);
-          }, 1400);
+          const siguiente = data.codigoSiguiente as CodigoNumero;
+          // Trial: tras aprobar C1, no avanzar — mostrar paywall.
+          if (requierePagoUmbral(siguiente, hasPaidAccess)) {
+            window.setTimeout(() => {
+              setMostrarPaywall(true);
+            }, 1200);
+          } else {
+            window.setTimeout(() => {
+              setCodigoActual(siguiente);
+              setVeredicto(null);
+            }, 1400);
+          }
         }
       } else {
         setVeredicto({
@@ -216,6 +239,67 @@ export function ConsolaUmbral({
     } finally {
       setLoading(false);
     }
+  }
+
+  function PaywallUmbral({ motivo }: { motivo: string }) {
+    return (
+      <section
+        className="border-2 p-5"
+        style={{ borderColor: `${GOLD}88`, background: `${GOLD}10` }}
+        data-testid="umbral-v2-paywall"
+      >
+        <p
+          className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
+          style={{ color: GOLD }}
+        >
+          <Lock size={14} />
+          UMBRAL · ACCESO COMPLETO
+        </p>
+        <h2
+          className="mt-2 text-xl font-black text-white"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
+          ${UMBRAL_SKU.priceUsd} USD/mes
+        </h2>
+        <p className="mt-2 text-sm text-white/65">{motivo}</p>
+        <p className="mt-1 text-xs text-white/40">
+          {UMBRAL_SKU.identity}. Código 1 es trial; Códigos 2–10 + métricas
+          requieren membresía.
+        </p>
+        <ul className="mt-4 space-y-1.5">
+          {UMBRAL_SKU.unlocks.slice(1).map((u) => (
+            <li key={u} className="flex items-start gap-2 text-xs text-white/70">
+              <Check size={12} className="mt-0.5 shrink-0" style={{ color: GOLD }} />
+              {u}
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={checkoutHref}
+          className="mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.18em]"
+          style={{
+            background: `linear-gradient(90deg, ${GOLD}33, ${CYAN}22)`,
+            border: `1px solid ${GOLD}88`,
+            color: GOLD,
+          }}
+          data-testid="umbral-v2-paywall-cta"
+        >
+          ACTIVAR UMBRAL · ${UMBRAL_SKU.priceUsd}/MES
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            setMostrarPaywall(false);
+            setCodigoActual(1);
+            setVeredicto(null);
+          }}
+          className="mt-3 w-full text-center text-[11px] tracking-widest text-white/40 hover:text-white/70"
+          data-testid="umbral-v2-paywall-volver-trial"
+        >
+          VOLVER AL CÓDIGO 1 (TRIAL)
+        </button>
+      </section>
+    );
   }
 
   if (moduloCompletado) {
@@ -322,13 +406,32 @@ export function ConsolaUmbral({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
+            {hasPaidAccess ? (
+              <Link
+                href="/umbral/metricas"
+                className="flex items-center gap-1.5 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
+                data-testid="link-umbral-metricas"
+              >
+                <BarChart3 size={12} />
+                MÉTRICAS
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMostrarPaywall(true)}
+                className="flex items-center gap-1.5 text-[11px] tracking-widest text-white/40 hover:text-[#D4AF37]"
+                data-testid="link-umbral-metricas-locked"
+              >
+                <Lock size={12} />
+                MÉTRICAS
+              </button>
+            )}
             <Link
-              href="/umbral/metricas"
-              className="flex items-center gap-1.5 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-              data-testid="link-umbral-metricas"
+              href="/umbral/entrada"
+              className="text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
+              data-testid="link-umbral-entrada"
             >
-              <BarChart3 size={12} />
-              MÉTRICAS
+              ENTRADA
             </Link>
             <Link
               href={backHref}
@@ -339,6 +442,16 @@ export function ConsolaUmbral({
             </Link>
           </div>
         </div>
+
+        {!hasPaidAccess && (
+          <p
+            className="border border-[#D4AF37]/25 bg-[#D4AF37]/08 px-3 py-2 text-[11px] text-[#D4AF37]/90"
+            data-testid="umbral-v2-trial-banner"
+          >
+            TRIAL · Código 1 gratis · Códigos 2–10 requieren Umbral ($
+            {UMBRAL_SKU.priceUsd}/mes)
+          </p>
+        )}
 
         {/* Selector de modo */}
         <div
@@ -416,15 +529,22 @@ export function ConsolaUmbral({
           <div className="flex flex-wrap gap-1.5">
             {CODIGOS_NUMERO.map((n) => {
               const done = aprobados.has(n);
-              const active = n === codigoActual;
-              const locked = n > codigoActual && !done;
+              const active = n === codigoActual && !mostrarPaywall;
+              const paidLock = requierePagoUmbral(n, hasPaidAccess);
+              const seqLocked = n > codigoActual && !done;
+              const locked = paidLock || seqLocked;
               return (
                 <button
                   key={n}
                   type="button"
-                  disabled={locked || loading}
+                  disabled={(seqLocked && !paidLock) || loading}
                   onClick={() => {
+                    if (paidLock) {
+                      setMostrarPaywall(true);
+                      return;
+                    }
                     if (done || n === codigoActual) {
+                      setMostrarPaywall(false);
                       setCodigoActual(n);
                       setVeredicto(null);
                       setError(null);
@@ -436,7 +556,9 @@ export function ConsolaUmbral({
                       ? CYAN
                       : done
                         ? `${GOLD}88`
-                        : "rgba(255,255,255,0.12)",
+                        : paidLock
+                          ? `${GOLD}44`
+                          : "rgba(255,255,255,0.12)",
                     color: active
                       ? CYAN
                       : done
@@ -451,7 +573,7 @@ export function ConsolaUmbral({
                         : "rgba(0,0,0,0.4)",
                   }}
                   aria-current={active ? "step" : undefined}
-                  aria-label={`Código ${n}${done ? " aprobado" : active ? " activo" : " bloqueado"}`}
+                  aria-label={`Código ${n}${done ? " aprobado" : paidLock ? " requiere pago" : active ? " activo" : " bloqueado"}`}
                   data-testid={`umbral-v2-codigo-${n}`}
                 >
                   {done && !active ? (
@@ -471,98 +593,112 @@ export function ConsolaUmbral({
       {/* PANEL CENTRAL */}
       <AnimatePresence mode="wait">
         <motion.section
-          key={`${modo}-${codigoActual}`}
+          key={`${modo}-${codigoActual}-${mostrarPaywall || codigoBloqueadoPorPago ? "pay" : "ok"}`}
           {...fade}
           className="space-y-4"
           data-testid="umbral-v2-desafio"
         >
-          {modo === "EXTERNO_VENTAS" && (
+          {(mostrarPaywall || codigoBloqueadoPorPago) && (
+            <PaywallUmbral
+              motivo={
+                aprobados.has(1) && !hasPaidAccess
+                  ? "Aprobaste el Código 1. Para atravesar los Códigos 2–10 necesitas la membresía Umbral."
+                  : "Los Códigos 2–10, ambos modos completos y el panel de métricas requieren Umbral."
+              }
+            />
+          )}
+
+          {!mostrarPaywall && !codigoBloqueadoPorPago && modo === "EXTERNO_VENTAS" && (
             <CardPerfilCliente
               codigoNumero={cfg.numero}
               perfil={cfg.modoExterno}
             />
           )}
 
-          <div className="border border-white/12 bg-black/45 p-5">
-            <p className="text-[10px] tracking-[0.2em] text-white/40">
-              CÓDIGO ACTIVO · {modoMeta.label.toUpperCase()}
-            </p>
-            <h2
-              className="mt-2 text-xl font-black text-white sm:text-2xl"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-              data-testid="umbral-v2-titulo-codigo"
-            >
-              {cfg.nombre}
-            </h2>
-            <p className="mt-2 text-sm text-white/55" data-testid="umbral-v2-concepto">
-              {cfg.conceptoClave}
-            </p>
+          {!mostrarPaywall && !codigoBloqueadoPorPago && (
+            <>
+              <div className="border border-white/12 bg-black/45 p-5">
+                <p className="text-[10px] tracking-[0.2em] text-white/40">
+                  CÓDIGO ACTIVO · {modoMeta.label.toUpperCase()}
+                </p>
+                <h2
+                  className="mt-2 text-xl font-black text-white sm:text-2xl"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                  data-testid="umbral-v2-titulo-codigo"
+                >
+                  {cfg.nombre}
+                </h2>
+                <p className="mt-2 text-sm text-white/55" data-testid="umbral-v2-concepto">
+                  {cfg.conceptoClave}
+                </p>
 
-            <div className="mt-5 border-l-2 pl-3" style={{ borderColor: CYAN }}>
-              <p className="text-[10px] tracking-widest text-[#00FFC3]/80">
-                {desafio.etiqueta.toUpperCase()}
-              </p>
-              <p
-                className="mt-1 text-[15px] leading-relaxed text-white/90"
-                data-testid="umbral-v2-pregunta"
-              >
-                {desafio.texto}
-              </p>
-            </div>
+                <div className="mt-5 border-l-2 pl-3" style={{ borderColor: CYAN }}>
+                  <p className="text-[10px] tracking-widest text-[#00FFC3]/80">
+                    {desafio.etiqueta.toUpperCase()}
+                  </p>
+                  <p
+                    className="mt-1 text-[15px] leading-relaxed text-white/90"
+                    data-testid="umbral-v2-pregunta"
+                  >
+                    {desafio.texto}
+                  </p>
+                </div>
 
-            <div className="mt-4 border border-white/8 bg-white/[0.03] p-3">
-              <p className="text-[10px] tracking-widest text-white/35">
-                {desafio.posturaLabel.toUpperCase()}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-white/50">
-                {desafio.postura}
-              </p>
-            </div>
-          </div>
+                <div className="mt-4 border border-white/8 bg-white/[0.03] p-3">
+                  <p className="text-[10px] tracking-widest text-white/35">
+                    {desafio.posturaLabel.toUpperCase()}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-white/50">
+                    {desafio.postura}
+                  </p>
+                </div>
+              </div>
 
-          <div className="space-y-3">
-            <label className="block">
-              <span className="mb-2 block text-[10px] tracking-widest text-white/40">
-                ÁREA DE VOLCADO
-              </span>
-              <textarea
-                value={respuesta}
-                onChange={(e) => setRespuesta(e.target.value)}
-                rows={7}
-                disabled={loading}
-                placeholder={
-                  modo === "INTERNO_HABILIDAD"
-                    ? "Escribe tu respuesta confrontativa al límite..."
-                    : "Escribe tu respuesta de vendedor ante la objeción..."
-                }
-                className="w-full resize-y border border-white/15 bg-black/50 px-4 py-3 text-[15px] leading-relaxed text-white/90 outline-none placeholder:text-white/25 focus:border-[#00FFC3]/50"
-                style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif" }}
-                data-testid="umbral-v2-textarea"
-              />
-            </label>
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-2 block text-[10px] tracking-widest text-white/40">
+                    ÁREA DE VOLCADO
+                  </span>
+                  <textarea
+                    value={respuesta}
+                    onChange={(e) => setRespuesta(e.target.value)}
+                    rows={7}
+                    disabled={loading}
+                    placeholder={
+                      modo === "INTERNO_HABILIDAD"
+                        ? "Escribe tu respuesta confrontativa al límite..."
+                        : "Escribe tu respuesta de vendedor ante la objeción..."
+                    }
+                    className="w-full resize-y border border-white/15 bg-black/50 px-4 py-3 text-[15px] leading-relaxed text-white/90 outline-none placeholder:text-white/25 focus:border-[#00FFC3]/50"
+                    style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif" }}
+                    data-testid="umbral-v2-textarea"
+                  />
+                </label>
 
-            <button
-              type="button"
-              onClick={() => void someter()}
-              disabled={loading || respuesta.trim().length < 2}
-              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.18em] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                background: `linear-gradient(90deg, ${GOLD}22, ${CYAN}18)`,
-                border: `1px solid ${GOLD}66`,
-                color: GOLD,
-              }}
-              data-testid="umbral-v2-someter"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  EVALUANDO…
-                </>
-              ) : (
-                "SOMETER A EVALUACIÓN"
-              )}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => void someter()}
+                  disabled={loading || respuesta.trim().length < 2}
+                  className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.18em] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: `linear-gradient(90deg, ${GOLD}22, ${CYAN}18)`,
+                    border: `1px solid ${GOLD}66`,
+                    color: GOLD,
+                  }}
+                  data-testid="umbral-v2-someter"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      EVALUANDO…
+                    </>
+                  ) : (
+                    "SOMETER A EVALUACIÓN"
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </motion.section>
       </AnimatePresence>
 

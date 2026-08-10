@@ -5248,7 +5248,7 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
     const pid = typeof planId === "string" ? planId.trim() : "";
     if (!pid || modulesGrantedByPlan(pid).length === 0) {
       return res.status(400).json({
-        error: "Plan no válido. Usa: planificacion_base, soberania_dia u operativo.",
+        error: "Plan no válido. Usa: planificacion_base, soberania_dia, operativo o umbral.",
       });
     }
 

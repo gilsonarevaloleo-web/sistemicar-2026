@@ -1,12 +1,41 @@
+import { useEffect, useState } from "react";
 import { ConsolaUmbral } from "@/components/umbral/ConsolaUmbral";
 import { useAuthContext } from "@/App";
+import {
+  hasUmbralAccess,
+  subscribeToProgression,
+  type UserProgression,
+} from "@/lib/persistence";
+import { isPreviewOpsUnlocked } from "@/lib/previewOps";
+import { UMBRAL_SKU } from "@shared/umbralPricing";
 
 /**
  * Consola Umbral v2 — UI del motor de 10 Códigos.
- * Spec: umbral v2. tercer parte
+ * Trial: Código 1 gratis. Paid: Códigos 2–10 + métricas.
  */
 export default function UmbralV2() {
   const { user } = useAuthContext();
+  const [progression, setProgression] = useState<UserProgression | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setReady(false);
+      return;
+    }
+    const unsub = subscribeToProgression(
+      user.uid,
+      (prog) => {
+        setProgression(prog);
+        setReady(true);
+      },
+      () => {
+        setProgression(null);
+        setReady(true);
+      },
+    );
+    return () => unsub();
+  }, [user?.uid]);
 
   if (!user?.uid) {
     return (
@@ -15,6 +44,15 @@ export default function UmbralV2() {
       </div>
     );
   }
+
+  const paid =
+    isPreviewOpsUnlocked() ||
+    hasUmbralAccess(
+      progression?.subscriptionPlan,
+      user.email,
+      progression?.rank,
+      progression?.activeModules,
+    );
 
   return (
     <div
@@ -34,7 +72,15 @@ export default function UmbralV2() {
         }}
       />
       <div className="relative mx-auto max-w-3xl px-4 py-6 pb-28 sm:py-10">
-        <ConsolaUmbral userId={user.uid} />
+        {!ready ? (
+          <p className="text-center text-white/40">Verificando acceso…</p>
+        ) : (
+          <ConsolaUmbral
+            userId={user.uid}
+            hasPaidAccess={paid}
+            checkoutHref={UMBRAL_SKU.checkoutHref}
+          />
+        )}
       </div>
     </div>
   );

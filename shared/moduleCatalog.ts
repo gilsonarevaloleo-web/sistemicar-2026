@@ -13,7 +13,6 @@ export interface ModuleCatalogEntry {
 /** Módulos del ecosistema — Jornada (Base/Ritmo/Norte) y Espejo tienen precio hoy. */
 export const MODULOS_EN_CAMINO: ModuleCatalogEntry[] = [
   { id: "alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", route: "/alquimia", enCamino: true, color: "#A855F7" },
-  { id: "umbral", nombre: "Umbral", desc: "Expansión de límites", route: "/umbral", enCamino: true, color: "#3B82F6" },
   { id: "deposito", nombre: "Depósito", desc: "Batería de Certeza (Esperanza)", route: "/esperanza", enCamino: true, color: "#F97316" },
   { id: "proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura", route: "/proyector", enCamino: true, color: "#6366F1" },
   { id: "mentor", nombre: "Mentor IA", desc: "Diagnóstico avanzado", route: "/mentor", enCamino: true, color: "#3B82F6" },
