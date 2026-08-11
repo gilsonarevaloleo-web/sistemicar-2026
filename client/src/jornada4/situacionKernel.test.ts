@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   applySituacionRowClose,
   applySituacionBlockClose,
+  postergarFilaEnFocoACola,
 } from "./situacionKernel.ts";
 import type { SubTarea, Vehicle } from "../lib/persistence.ts";
 
@@ -129,5 +130,47 @@ describe("situacionKernel", () => {
     );
     assert.ok(block);
     assert.equal(block!.status, "archivado");
+  });
+
+  it("postergar fila en foco la manda a cola con minutos restantes", () => {
+    const now = 2_000_000;
+    const startedAt = now - 10 * 60_000; // 10 min transcurridos
+    const v = {
+      ...vehicle([
+        row({ id: "r1", texto: "Revisión", minutosCupo: 40 }),
+        row({ id: "r2", texto: "Siguiente", minutosCupo: 30 }),
+        row({ id: "r3", texto: "Otra", minutosCupo: 20 }),
+      ]),
+      situacionCupoAnchor: { subTareaId: "r1", startedAt },
+      situacionCronometro: {
+        activo: true,
+        bloqueInicioAt: startedAt,
+        horaFinMs: now + 90 * 60_000,
+        horaFinContratoMs: now + 90 * 60_000,
+      },
+    } as Vehicle;
+
+    const patch = postergarFilaEnFocoACola(v, now);
+    assert.ok(patch);
+    assert.equal(patch!.filaPostergadaId, "r1");
+    assert.equal(patch!.minutosConservados, 30); // 40 - 10
+    assert.equal(patch!.nuevoFocoId, "r2");
+    assert.equal(patch!.situacionCupoAnchor.subTareaId, "r2");
+
+    const pending = patch!.subTareas.filter(
+      s => s.enDesgloseCronometro && (s.resultadoSituacion ?? "pendiente") === "pendiente"
+    );
+    assert.deepEqual(
+      pending.map(p => p.id),
+      ["r2", "r3", "r1"]
+    );
+    const postergada = pending.find(p => p.id === "r1")!;
+    assert.equal(postergada.minutosCupo, 30);
+    assert.equal(postergada.cupoFijo, true);
+  });
+
+  it("postergar requiere al menos 2 filas pendientes", () => {
+    const v = vehicle([row({ id: "r1", texto: "Solo" })]);
+    assert.equal(postergarFilaEnFocoACola(v), null);
   });
 });

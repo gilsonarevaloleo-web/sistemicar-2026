@@ -22,6 +22,7 @@ import {
 import {
   applySituacionRowClose,
   applySituacionBlockClose,
+  postergarFilaEnFocoACola,
 } from "@/jornada4/situacionKernel";
 import {
   applySituacionDistraccionFail,
@@ -71,9 +72,7 @@ import {
 } from "@/lib/destinoCierre";
 import {
   buildDesglosadorNestedPausePatch,
-  buildSituacionNestedPausePatch,
   resumeDesglosadorFromNestedPause,
-  resumeSituacionFromNestedPause,
 } from "@/lib/nestedContextStack";
 import {
   firstPendingCronometroTexto,
@@ -1468,118 +1467,46 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle]
   );
 
-  /** Postergar ring de enfoque: congela cupo restante y libera slot operativo. */
-  const postergarEnfoque = useCallback(
-    async (vehicleId: string) => {
-      if (!userId) return;
-      const key = `postergar:${vehicleId}`;
-      if (inFlightRef.current.has(key)) return;
+  /** Postergar fila en foco → final de cola con minutos restantes (no congela el ring). */
+  const postergarFilaEnFoco = useCallback(
+    (vehicleId: string) => {
       const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-      if (!vehicle || vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return;
-      if (vehicle.situacionNestedPause) {
-        toast.info("Este enfoque ya está postergado", {
-          style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
-        });
-        return;
-      }
-      if (vehicle.situacionCronometro?.activo !== true) {
-        toast.error("No hay ring activo para postergar", {
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-        });
-        return;
-      }
-
-      const now = Date.now();
-      const minutosRestantes =
-        remainingCronometroBudgetMin(
-          vehicle.situacionCronometro,
-          vehicle.subTareas,
-          now
-        ) ?? 0;
-      const patch = buildSituacionNestedPausePatch(vehicle, "postergacion", {
-        nowMs: now,
-        minutosRestantes,
-      });
+      if (!vehicle) return;
+      const patch = postergarFilaEnFocoACola(vehicle);
       if (!patch) {
-        toast.error("No se pudo postergar el enfoque", {
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-        });
-        return;
-      }
-
-      inFlightRef.current.add(key);
-      try {
-        paintVehicle(vehicleId, patch);
-        scheduleSaveLocalVehicles(vehiclesRef.current);
-        toast.success("Enfoque postergado", {
-          description:
-            minutosRestantes > 0
-              ? `Quedan ${minutosRestantes} min. Lanza el siguiente vehículo; reanuda cuando vuelvas.`
-              : "Cupo congelado. Reanuda cuando vuelvas.",
+        toast.info("Necesitas al menos 2 filas pendientes", {
+          description: "Postergar manda la fila en foco al final de la cola.",
           style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
-          duration: 4500,
-        });
-        void runShadowTaskAsync(async () => {
-          try {
-            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
-          } catch (e) {
-            console.error("[jornada4.postergarEnfoque]", e);
-          }
-        });
-      } finally {
-        inFlightRef.current.delete(key);
-      }
-    },
-    [userId, vehiclesRef, paintVehicle]
-  );
-
-  /** Reanudar enfoque postergado: restaura ring y conserva minutos restantes. */
-  const reanudarEnfoque = useCallback(
-    async (vehicleId: string) => {
-      if (!userId) return;
-      const key = `reanudar:${vehicleId}`;
-      if (inFlightRef.current.has(key)) return;
-      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-      if (!vehicle?.situacionNestedPause) return;
-
-      const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "flota_general");
-      // El postergado no cuenta en slots; si hay 2 activos reales, bloquear.
-      if (!slotsCheck.allowed) {
-        toast.error("Límite de misiones", {
-          description: formatOperationalSlotsBlockMessage(slotsCheck),
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-          duration: 5500,
+          duration: 3200,
         });
         return;
       }
-
-      const now = Date.now();
-      const patch = resumeSituacionFromNestedPause(vehicle, { nowMs: now });
-      if (!patch) return;
-
-      const minGuardados = vehicle.situacionNestedPause.minutosRestantesAlPausar;
-      inFlightRef.current.add(key);
-      try {
-        paintVehicle(vehicleId, patch);
-        scheduleSaveLocalVehicles(vehiclesRef.current);
-        toast.success("Enfoque reanudado", {
-          description:
-            minGuardados != null && minGuardados > 0
-              ? `Recuperas ~${minGuardados} min de cupo.`
-              : "Ring activo de nuevo.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
-          duration: 3800,
-        });
-        void runShadowTaskAsync(async () => {
-          try {
-            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
-          } catch (e) {
-            console.error("[jornada4.reanudarEnfoque]", e);
-          }
-        });
-      } finally {
-        inFlightRef.current.delete(key);
-      }
+      paintVehicle(vehicleId, {
+        subTareas: patch.subTareas,
+        situacionCupoAnchor: patch.situacionCupoAnchor,
+      });
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      toast.success("Fila postergada a la cola", {
+        description: `«${patch.filaPostergadaTexto}» · ${patch.minutosConservados} min → ahora: ${patch.nuevoFocoTexto}`,
+        style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
+        duration: 3800,
+      });
+      if (!userId) return;
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            vehicleId,
+            {
+              subTareas: patch.subTareas,
+              situacionCupoAnchor: patch.situacionCupoAnchor,
+            },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[jornada4.postergarFilaEnFoco]", e);
+        }
+      });
     },
     [userId, vehiclesRef, paintVehicle]
   );
@@ -1695,8 +1622,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     archiveAncladoPorSegmento,
     pausaInterrupcion,
     resumeDesglosador,
-    postergarEnfoque,
-    reanudarEnfoque,
+    postergarFilaEnFoco,
     closeExpressVehicle,
   };
 }

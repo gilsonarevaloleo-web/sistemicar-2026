@@ -46,10 +46,8 @@ type Props = {
   onSetCupo: (subTareaId: string, minutos: number | undefined) => void;
   onReorderFilas?: (movedId: string, direction: ReorderDirection) => void;
   onSustituirFoco?: (subTareaId: string) => void;
-  /** Congelar cupo restante y liberar slot para otro vehículo. */
-  onPostergar?: () => void;
-  /** Reanudar ring postergado conservando minutos. */
-  onReanudar?: () => void;
+  /** Manda la fila en foco al final de la cola con sus minutos restantes. */
+  onPostergarFoco?: () => void;
 };
 
 export function SituacionCard({
@@ -63,8 +61,7 @@ export function SituacionCard({
   onSetCupo,
   onReorderFilas,
   onSustituirFoco,
-  onPostergar,
-  onReanudar,
+  onPostergarFoco,
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
@@ -72,10 +69,7 @@ export function SituacionCard({
   const focusId = vehicle.situacionCupoAnchor?.subTareaId;
   const focus = pending.find(st => st.id === focusId) ?? pending[0] ?? null;
   const sc = vehicle.situacionCronometro;
-  const postergado = Boolean(vehicle.situacionNestedPause);
-  const minutosPostergados =
-    vehicle.situacionNestedPause?.minutosRestantesAlPausar ?? null;
-  const cronActivo = sc?.activo === true && !postergado;
+  const cronActivo = sc?.activo === true;
   const entrenamiento = isRingModoEntrenamiento(vehicle);
 
   // Solo tickear con ring activo (como Conquista). Idle = sin setState/s.
@@ -154,53 +148,21 @@ export function SituacionCard({
               ) : null}
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              {postergado
-                ? `Postergado${minutosPostergados != null ? ` · ${minutosPostergados} min guardados` : ""}`
-                : `Ring · ${situacionProgressLabel(vehicle)}${remBudget != null ? ` · cupo ${remBudget} min` : ""}${vehicle.criterioDetalle ? ` · ${vehicle.criterioDetalle}` : ""}`}
+              Ring · {situacionProgressLabel(vehicle)}
+              {remBudget != null ? ` · cupo ${remBudget} min` : ""}
+              {vehicle.criterioDetalle ? ` · ${vehicle.criterioDetalle}` : ""}
             </p>
-            {entrenamiento && !postergado ? (
+            {entrenamiento ? (
               <p className="text-[9px] mt-1 leading-snug" style={{ color: CYAN }}>
                 {ENTRENAMIENTO_COPY.ringHint}
               </p>
             ) : null}
           </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {postergado && onReanudar ? (
-              <button
-                type="button"
-                onClick={onReanudar}
-                className="text-[8px] font-black uppercase tracking-wider px-2 py-1.5 rounded-lg touch-manipulation"
-                style={{
-                  backgroundColor: `${CYAN}18`,
-                  color: CYAN,
-                  border: `1px solid ${CYAN}50`,
-                }}
-                data-testid="j4-situacion-reanudar"
-              >
-                Reanudar
-              </button>
-            ) : cronActivo && onPostergar ? (
-              <button
-                type="button"
-                onClick={onPostergar}
-                className="text-[8px] font-black uppercase tracking-wider px-2 py-1.5 rounded-lg touch-manipulation"
-                style={{
-                  backgroundColor: `${AMBER}14`,
-                  color: AMBER,
-                  border: `1px solid ${AMBER}45`,
-                }}
-                data-testid="j4-situacion-postergar"
-                title="Congela los minutos restantes y libera el slot para otro vehículo"
-              >
-                Postergar
-              </button>
-            ) : null}
-            <div className="flex items-center gap-1">
-              <Zap size={10} style={{ color: flotaColor }} />
-              <span className="text-xs font-black" style={{ color: flotaColor }}>
-                {desglosadorProfundidadPotencialPs(cronRows.length)} PS
-              </span>
-            </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Zap size={10} style={{ color: flotaColor }} />
+            <span className="text-xs font-black" style={{ color: flotaColor }}>
+              {desglosadorProfundidadPotencialPs(cronRows.length)} PS
+            </span>
           </div>
         </div>
 
@@ -217,44 +179,7 @@ export function SituacionCard({
       </div>
 
       <div className="px-3 pb-3 space-y-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-        {postergado ? (
-          <div
-            className="mt-3 p-3 rounded-xl border space-y-2"
-            style={{
-              backgroundColor: "rgba(245,158,11,0.08)",
-              borderColor: `${AMBER}45`,
-            }}
-            data-testid="j4-situacion-postergado-banner"
-          >
-            <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: AMBER }}>
-              Enfoque postergado
-            </p>
-            <p className="text-[9px] leading-snug" style={{ color: MUTED }}>
-              Cupo congelado
-              {minutosPostergados != null && minutosPostergados > 0
-                ? ` (${minutosPostergados} min).`
-                : "."}{" "}
-              Ejecuta el siguiente vehículo y reanuda cuando vuelvas.
-            </p>
-            {onReanudar ? (
-              <button
-                type="button"
-                onClick={onReanudar}
-                className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
-                style={{
-                  backgroundColor: `${CYAN}18`,
-                  color: CYAN,
-                  border: `1px solid ${CYAN}50`,
-                }}
-                data-testid="j4-situacion-reanudar-banner"
-              >
-                Reanudar con minutos guardados
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!postergado && timer.visible ? (
+        {timer.visible ? (
           <div className="mt-3 text-center">
             <p
               className="text-3xl font-black tabular-nums tracking-tight"
@@ -279,7 +204,7 @@ export function SituacionCard({
           </div>
         ) : null}
 
-        {postergado ? null : focus ? (
+        {focus ? (
           <div
             className="p-3 rounded-xl border-2 space-y-3"
             style={{
@@ -288,11 +213,29 @@ export function SituacionCard({
               boxShadow: `0 0 16px ${flotaColor}18`,
             }}
           >
-            <div className="flex items-center gap-2">
-              <Flag size={12} style={{ color: flotaColor }} />
-              <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>
-                Fila en foco
-              </p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Flag size={12} style={{ color: flotaColor }} />
+                <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: flotaColor }}>
+                  Fila en foco
+                </p>
+              </div>
+              {cronActivo && pending.length >= 2 && onPostergarFoco ? (
+                <button
+                  type="button"
+                  onClick={onPostergarFoco}
+                  className="shrink-0 text-[8px] font-black uppercase tracking-wider px-2 py-1.5 rounded-lg touch-manipulation"
+                  style={{
+                    backgroundColor: `${AMBER}14`,
+                    color: AMBER,
+                    border: `1px solid ${AMBER}45`,
+                  }}
+                  data-testid="j4-situacion-postergar-foco"
+                  title="Manda esta fila al final de la cola con sus minutos restantes"
+                >
+                  Postergar
+                </button>
+              ) : null}
             </div>
             <p className="text-sm font-bold" style={{ color: INK }}>
               {focus.texto}
