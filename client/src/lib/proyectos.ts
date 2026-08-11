@@ -15,6 +15,10 @@ import {
   type RutasMentalesSet,
 } from "./claridadDireccion";
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
+import {
+  pushPresenciaVehicleId,
+  resolveDuracionMinCierre,
+} from "./concienciaProyecto";
 import { safeSetItem } from "./storageHygiene";
 import {
   buildTranscriptFromVehicles,
@@ -161,7 +165,19 @@ export interface Proyecto {
   orden?: number;
   peldanosConquistados: number;
   profundidadMaxima?: FocusBandId;
+  /** Minutos Norte = suma de duraciones en peldaños conquistados. */
   minutosTotales?: number;
+  /**
+   * Minutos de presencia vinculados al proyecto (destino presencia).
+   * No escriben peldaños; alimentan etapa Presente.
+   */
+  minutosPresencia?: number;
+  /** Cierres presencia contados (idempotentes por vehicleId). */
+  sesionesPresencia?: number;
+  /** Ring de vehicleIds ya contabilizados en presencia (anti doble conteo). */
+  presenciaVehicleIds?: string[];
+  primeraPresenciaAt?: number;
+  primerNorteAt?: number;
   /** Acumulado desde segmentos vinculados en Planificación (sin peldaño). */
   metricasSegmentoVinculado?: ProyectoMetricasFlota;
   /** Fuente de verdad: pasos de claridad para segmentos (rutina solo copia al aplicar). */
@@ -798,15 +814,58 @@ async function refreshProyectoStats(userId: string, proyectoId: string): Promise
   const conquistados = (await getPeldanosByProyecto(userId, proyectoId)).filter(p => p.estado === "conquistado");
   let profundidad: FocusBandId = "fluido";
   let minutos = 0;
+  let primerNorteFromPel: number | undefined;
   for (const p of conquistados) {
     if (p.resumen?.profundidadMaxima) profundidad = maxBanda(profundidad, p.resumen.profundidadMaxima);
     minutos += p.resumen?.duracionMin ?? 0;
+    if (p.cerradoAt != null) {
+      primerNorteFromPel =
+        primerNorteFromPel == null ? p.cerradoAt : Math.min(primerNorteFromPel, p.cerradoAt);
+    }
   }
-  await updateProyecto(userId, proyectoId, {
+  const prev = getLocalProyectos(userId).find(p => p.id === proyectoId);
+  const patch: Partial<Omit<Proyecto, "id" | "createdAt">> = {
     peldanosConquistados: conquistados.length,
     profundidadMaxima: profundidad,
     minutosTotales: minutos,
-  });
+  };
+  if (conquistados.length > 0) {
+    patch.primerNorteAt = prev?.primerNorteAt ?? primerNorteFromPel ?? Date.now();
+  }
+  await updateProyecto(userId, proyectoId, patch);
+}
+
+/**
+ * Cierre presencia vinculado a proyecto: minutos + etapa Presente.
+ * No crea peldaños. Local + sync sombra; idempotente por vehicleId.
+ */
+export function registrarCierrePresenciaEnProyecto(
+  userId: string,
+  proyectoId: string,
+  act: { vehicleId: string; minutos: number; at?: number }
+): Proyecto | null {
+  const list = getLocalProyectos(userId);
+  const idx = list.findIndex(p => p.id === proyectoId);
+  if (idx === -1) return null;
+
+  const { next, isNew } = pushPresenciaVehicleId(list[idx].presenciaVehicleIds, act.vehicleId);
+  if (!isNew) return list[idx];
+
+  const minutos = Math.max(0, Math.round(act.minutos));
+  const at = act.at ?? Date.now();
+  const prev = list[idx];
+  const updated: Proyecto = {
+    ...prev,
+    minutosPresencia: (prev.minutosPresencia ?? 0) + minutos,
+    sesionesPresencia: (prev.sesionesPresencia ?? 0) + 1,
+    presenciaVehicleIds: next,
+    primeraPresenciaAt: prev.primeraPresenciaAt ?? at,
+    updatedAt: Date.now(),
+  };
+  list[idx] = updated;
+  saveLocalProyectos(userId, list);
+  void syncFirestoreProyecto(userId, updated);
+  return updated;
 }
 
 export async function markPeldanoConquistadoTiempo(
@@ -1008,6 +1067,8 @@ export async function recordProgresoHubAlCerrarVehiculo(
   const destino = resolveDestinoCierre(vehicle.destinoCierre, opts.destinoCierre);
   const proyectoId = vehicle.proyectoId;
   const feedsHub = feedsProyectoHub(destino);
+  const duracionMin = resolveDuracionMinCierre(vehicle, opts.duracionMin);
+  const optsConDuracion = { ...opts, duracionMin };
 
   const maybeSintonizarOleada = async () => {
     if (!proyectoId) return;
@@ -1030,6 +1091,14 @@ export async function recordProgresoHubAlCerrarVehiculo(
   };
 
   if (!feedsHub) {
+    if (proyectoId) {
+      // Minutos Presente: no crean peldaño; sí alimentan etapa de conciencia.
+      registrarCierrePresenciaEnProyecto(userId, proyectoId, {
+        vehicleId: vehicle.id,
+        minutos: duracionMin,
+        at: vehicle.cierreAt ?? Date.now(),
+      });
+    }
     await maybeSintonizarOleada();
     return;
   }
@@ -1048,13 +1117,13 @@ export async function recordProgresoHubAlCerrarVehiculo(
       if (opts.tipoOrigen === "tiempo") {
         await markPeldanoConquistadoTiempo(
           userId,
-          vehicle,
+          { ...vehicle, duracionFinal: duracionMin || vehicle.duracionFinal },
           opts.subs ?? vehicle.subVehiculos ?? [],
           opts.psGanados
         );
       } else {
         await markPeldanoConquistadoSituacion(userId, vehicle, {
-          duracionMin: opts.duracionMin ?? vehicle.duracionFinal ?? 0,
+          duracionMin,
           psGanados: opts.psGanados,
           subTareas: opts.subTareas ?? vehicle.subTareas ?? [],
         });
@@ -1063,7 +1132,7 @@ export async function recordProgresoHubAlCerrarVehiculo(
     }
   }
 
-  await spawnConquistadoDesdeVehiculo(userId, vehicle, opts);
+  await spawnConquistadoDesdeVehiculo(userId, vehicle, optsConDuracion);
   await maybeSintonizarOleada();
 }
 
@@ -1094,7 +1163,7 @@ async function spawnConquistadoDesdeVehiculo(
 
   const subs = opts.subs ?? vehicle.subVehiculos ?? [];
   const subTareas = opts.subTareas ?? vehicle.subTareas ?? [];
-  const duracionMin = opts.duracionMin ?? vehicle.duracionFinal ?? 0;
+  const duracionMin = resolveDuracionMinCierre(vehicle, opts.duracionMin);
   const ahora = Date.now();
   const maxOrden = existing.reduce((m, p) => Math.max(m, p.orden), -1);
 
