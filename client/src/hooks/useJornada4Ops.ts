@@ -374,10 +374,13 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               desglosadorBloqueDepthPsGranted: depthPs,
               destinoCierre: destino,
             };
+            const apertura = vehicle.aperturaAt ?? patch.cierreAt;
+            const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "tiempo",
               psGanados: cyclePs + depthPs,
               subs: patch.subVehiculos,
+              duracionMin,
               destinoCierre: destino,
             });
           } catch (e) {
