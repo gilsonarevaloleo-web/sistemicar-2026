@@ -198,3 +198,82 @@ export function situacionFilaResultado(
   if (r === "fallado") return "fallado";
   return "pendiente";
 }
+
+export type PostergarFilaEnFocoResult = {
+  vehicleId: string;
+  subTareas: SubTarea[];
+  situacionCupoAnchor: { subTareaId: string; startedAt: number };
+  filaPostergadaId: string;
+  filaPostergadaTexto: string;
+  minutosConservados: number;
+  nuevoFocoId: string;
+  nuevoFocoTexto: string;
+};
+
+/**
+ * Posterga la fila en foco: la manda al final de la cola con sus minutos restantes
+ * (cupoFijo) y pone el siguiente pendiente en foco. No congela el ring completo.
+ */
+export function postergarFilaEnFocoACola(
+  vehicle: Vehicle,
+  now = Date.now()
+): PostergarFilaEnFocoResult | null {
+  if (!isSituacionDesglosador(vehicle) || vehicle.status !== "activo") return null;
+  if (vehicle.situacionNestedPause) return null;
+  if (vehicle.situacionCronometro?.activo !== true) return null;
+  const subs = vehicle.subTareas;
+  if (!subs?.length) return null;
+
+  const pendingSlots = subs
+    .map((st, i) => ({ st, i }))
+    .filter(({ st }) => situacionFilaCronometroPendiente(st));
+  if (pendingSlots.length < 2) return null;
+
+  const focusId =
+    vehicle.situacionCupoAnchor?.subTareaId &&
+    pendingSlots.some(({ st }) => st.id === vehicle.situacionCupoAnchor!.subTareaId)
+      ? vehicle.situacionCupoAnchor.subTareaId
+      : pendingSlots[0]!.st.id;
+
+  const focusSlot = pendingSlots.find(({ st }) => st.id === focusId);
+  if (!focusSlot) return null;
+
+  const cupoMin = focusSlot.st.minutosCupo ?? 0;
+  let minutosConservados = Math.max(1, cupoMin);
+  if (vehicle.situacionCupoAnchor?.subTareaId === focusId && cupoMin > 0) {
+    const elapsedMin = Math.floor(
+      Math.max(0, now - vehicle.situacionCupoAnchor.startedAt) / 60_000
+    );
+    minutosConservados = Math.max(1, cupoMin - elapsedMin);
+  }
+
+  // Actualizar cupo de la fila postergada (fijo = no se lo come la redistribución).
+  const withCupo = subs.map(st =>
+    st.id === focusId
+      ? { ...st, minutosCupo: minutosConservados, cupoFijo: true }
+      : st
+  );
+
+  // Reordenar solo slots pendientes: quitar foco del frente → final de cola.
+  const pendingWithoutFocus = pendingSlots.filter(({ st }) => st.id !== focusId);
+  const reorderedPending = [
+    ...pendingWithoutFocus.map(({ st }) => withCupo.find(s => s.id === st.id)!),
+    withCupo.find(s => s.id === focusId)!,
+  ];
+  const subTareas = [...withCupo];
+  pendingSlots.forEach(({ i }, orderIdx) => {
+    subTareas[i] = reorderedPending[orderIdx]!;
+  });
+
+  const nuevo = pendingWithoutFocus[0]!.st;
+  return {
+    vehicleId: vehicle.id,
+    subTareas,
+    situacionCupoAnchor: { subTareaId: nuevo.id, startedAt: now },
+    filaPostergadaId: focusId,
+    filaPostergadaTexto: focusSlot.st.texto,
+    minutosConservados,
+    nuevoFocoId: nuevo.id,
+    nuevoFocoTexto: nuevo.texto,
+  };
+}
