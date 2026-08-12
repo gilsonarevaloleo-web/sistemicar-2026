@@ -6,7 +6,8 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, Crosshair, RotateCcw } from "lucide-react";
+import { ArrowRight, Crosshair, Phone, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import {
   VENDEDOR_TRIAGE_PREGUNTAS,
   opcionesMatizParaPlaneta,
@@ -20,7 +21,6 @@ import {
 } from "@/lib/vendedorFijacion";
 
 const GOLD = "#D4AF37";
-const INK = "#E8E8E8";
 
 export default function VendedorTriagePage() {
   const [paso, setPaso] = useState(0);
@@ -30,6 +30,9 @@ export default function VendedorTriagePage() {
   const [matizPick, setMatizPick] = useState<VendedorTriageOpcion | null>(
     null,
   );
+  const [telefono, setTelefono] = useState("");
+  const [callLoading, setCallLoading] = useState(false);
+  const [callDone, setCallDone] = useState(false);
 
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
@@ -63,6 +66,8 @@ export default function VendedorTriagePage() {
     setGrietaPick(null);
     setMatizPick(null);
     setPaso(0);
+    setTelefono("");
+    setCallDone(false);
   }
 
   return (
@@ -277,6 +282,81 @@ export default function VendedorTriagePage() {
             >
               {fijacion.checkoutLabel}
             </Link>
+
+            <div
+              className="border p-4 space-y-3"
+              style={{
+                borderColor: "rgba(255,255,255,0.12)",
+                background: "rgba(0,0,0,0.35)",
+              }}
+              data-testid="vendedor-llamame"
+            >
+              <p
+                className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
+                style={{ color: GOLD }}
+              >
+                <Phone size={14} />
+                ¿QUIERES QUE TE LLAME EL VENDEDOR?
+              </p>
+              <p className="text-[12px] text-white/50 leading-relaxed">
+                Solo si escribes <span className="text-white/80">Llámame</span>{" "}
+                y dejas tu número. Primero teléfono; si no contestas, WhatsApp.
+              </p>
+              <input
+                type="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                placeholder="WhatsApp / teléfono (+51…)"
+                className="w-full px-3 py-2.5 bg-black/50 border border-white/10 text-sm text-white"
+                data-testid="vendedor-telefono"
+                disabled={callDone || callLoading}
+              />
+              <button
+                type="button"
+                disabled={callDone || callLoading || !telefono.trim()}
+                onClick={async () => {
+                  setCallLoading(true);
+                  try {
+                    const res = await fetch("/api/vendedor/solicitar-llamada", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        telefono: telefono.trim(),
+                        whatsapp: telefono.trim(),
+                        codigo: fijacion.codigo,
+                        planeta: fijacion.planeta,
+                        sellerRef: sellerRef || undefined,
+                        consentimiento: "llamame",
+                      }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Error");
+                    setCallDone(true);
+                    toast.success(data.message || "Solicitud registrada");
+                  } catch (e: unknown) {
+                    toast.error(
+                      e instanceof Error ? e.message : "No se pudo solicitar",
+                    );
+                  } finally {
+                    setCallLoading(false);
+                  }
+                }}
+                className="flex w-full items-center justify-center gap-2 px-4 py-3 text-[12px] font-bold tracking-[0.14em] disabled:opacity-40"
+                style={{
+                  background: callDone ? "rgba(255,255,255,0.06)" : `${GOLD}22`,
+                  border: `1px solid ${GOLD}55`,
+                  color: GOLD,
+                }}
+                data-testid="vendedor-btn-llamame"
+              >
+                <Phone size={14} />
+                {callDone
+                  ? "SOLICITUD ENVIADA"
+                  : callLoading
+                    ? "ENVIANDO…"
+                    : "LLÁMAME"}
+              </button>
+            </div>
 
             <button
               type="button"
