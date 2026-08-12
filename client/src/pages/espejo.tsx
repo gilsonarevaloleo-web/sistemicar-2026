@@ -1904,7 +1904,7 @@ export default function Espejo() {
                       </p>
                     </div>
                     <Link
-                      href="/pagos"
+                      href="/pagos?plan=espejo_inicio"
                       className="w-full py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02]"
                       style={{
                         background: `linear-gradient(135deg, ${RED_ALERT} 0%, ${GOLD} 100%)`,
@@ -2763,7 +2763,7 @@ export default function Espejo() {
                                   >
                                     <p className="text-[10px] text-center" style={{ color: GOLD, fontFamily: "monospace" }}>
                                       CRÉDITOS INSUFICIENTES.{" "}
-                                      <Link href="/pagos" className="underline font-bold">
+                                      <Link href="/pagos?plan=espejo_inicio" className="underline font-bold">
                                         VER PLANES DE JORNADA
                                       </Link>
                                     </p>
@@ -3815,22 +3815,22 @@ export default function Espejo() {
                 </div>
                 
                 <h3 className="text-xl font-bold text-white mb-2">
-                  Acceso a Jornada
+                  Créditos Espejo
                 </h3>
                 
                 <p className="text-sm text-slate-400 mb-6">
-                  El pack Espejo de $17 ya no está a la venta. El catálogo actual es Jornada V4:
-                  Base, Ritmo del día y Norte.
+                  Espejo se vende por créditos (pago único): Inicio $9.90 (6 créditos) o
+                  Recarga $19.90 (15 créditos). Sin suscripción.
                 </p>
 
                 <Link
-                  href="/pagos"
+                  href="/pagos?plan=espejo_inicio"
                   data-testid="btn-actualizar-datos-pago"
                   className="block w-full py-4 rounded-xl font-bold text-center"
                   style={{ background: `linear-gradient(135deg, ${WARM_ROSE} 0%, ${GOLD} 100%)`, color: "#fff" }}
                   onClick={() => setShowPaywall(false)}
                 >
-                  Ver planes de Jornada
+                  Comprar créditos Espejo
                 </Link>
                 
                 <button

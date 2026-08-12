@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { auth } from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
-import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords } from "lucide-react";
+import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PLANIFICACION_CHECKOUT_PLANS, UMBRAL_CHECKOUT_PLANS } from "@shared/mercadopagoPlans";
+import {
+  PLANIFICACION_CHECKOUT_PLANS,
+  UMBRAL_CHECKOUT_PLANS,
+  ESPEJO_CHECKOUT_PLANS,
+} from "@shared/mercadopagoPlans";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
 import { modulesGrantedByPlan } from "@shared/moduleAccess";
 import {
@@ -17,12 +21,18 @@ import {
   SKU_RITMO,
 } from "@shared/planificacionPricing";
 import { UMBRAL_SKU } from "@shared/umbralPricing";
+import {
+  ESPEJO_SKU_INICIO,
+  ESPEJO_SKU_RECARGA,
+  isEspejoSkuId,
+} from "@shared/espejoPricing";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
 
 const GOLD = "#D4AF37";
 const UMBRAL_ACCENT = "#FF6B35";
+const ESPEJO_ACCENT = "#38BDF8";
 
 const PAYPAL_LINK = "https://paypal.me/ElimanAte";
 const WHATSAPP_NUMBER = "51918260514";
@@ -139,7 +149,51 @@ const umbralPlan: Plan = {
   popular: false,
 };
 
-const allCheckoutPlans: Plan[] = [...planificacionPlans, umbralPlan];
+const espejoPlans: Plan[] = [
+  {
+    id: ESPEJO_SKU_INICIO.id,
+    name: ESPEJO_SKU_INICIO.name,
+    price: ESPEJO_SKU_INICIO.priceUsd,
+    pricePEN: ESPEJO_SKU_INICIO.pricePen,
+    isOneTime: true,
+    peldaño: "Pack · 6 créditos",
+    forWho: ESPEJO_SKU_INICIO.forWho,
+    anchorCopy: ESPEJO_SKU_INICIO.identity,
+    roiCopy: "2–3 limpiezas. Sin suscripción: pagas solo cuando la carga emocional frena.",
+    features: ESPEJO_SKU_INICIO.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
+    icon: Zap,
+    color: ESPEJO_ACCENT,
+    badge: "INICIO",
+    funnelHint: ESPEJO_SKU_INICIO.funnelHint,
+    popular: true,
+  },
+  {
+    id: ESPEJO_SKU_RECARGA.id,
+    name: ESPEJO_SKU_RECARGA.name,
+    price: ESPEJO_SKU_RECARGA.priceUsd,
+    pricePEN: ESPEJO_SKU_RECARGA.pricePen,
+    isOneTime: true,
+    peldaño: "Pack · 15 créditos",
+    forWho: ESPEJO_SKU_RECARGA.forWho,
+    anchorCopy: ESPEJO_SKU_RECARGA.identity,
+    roiCopy: "Mejor precio por crédito. Ideal si ya usaste el Espejo y vuelves cuando hace falta.",
+    features: ESPEJO_SKU_RECARGA.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
+    icon: Zap,
+    color: "#60A5FA",
+    badge: "RECARGA",
+    funnelHint: ESPEJO_SKU_RECARGA.funnelHint,
+  },
+];
+
+const allCheckoutPlans: Plan[] = [...planificacionPlans, umbralPlan, ...espejoPlans];
 
 const STACK_COLORS: Record<string, string> = {
   ritmo: "#00C851",
@@ -229,24 +283,39 @@ export default function Pagos() {
     const planParam = params.get("plan");
     const producto = params.get("producto");
 
-    // Espejo $17 retirado de venta — deep links de compra caen en Jornada V4.
-    // No tocar URL en status=success (compras legacy aún acreditan créditos).
-    if ((producto === "espejo" || planParam === "corazon-sabio") && status !== "success") {
-      toast.info("El pack Espejo ($17) ya no está a la venta. Elige un plan de Jornada.");
+    // Deep link producto=espejo → pack Inicio (si no hay plan concreto).
+    if (producto === "espejo" && !planParam && status !== "success") {
       const url = new URL(window.location.href);
+      url.searchParams.set("plan", ESPEJO_SKU_INICIO.id);
       url.searchParams.delete("producto");
-      if (planParam === "corazon-sabio") url.searchParams.delete("plan");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+    // corazon-sabio retirado — redirigir a packs de créditos.
+    if (planParam === "corazon-sabio" && status !== "success") {
+      toast.info("Espejo ahora se vende por créditos. Elige Inicio o Recarga.");
+      const url = new URL(window.location.href);
+      url.searchParams.set("plan", ESPEJO_SKU_INICIO.id);
       window.history.replaceState({}, "", url.pathname + url.search);
     }
 
+    const effectivePlan =
+      planParam === "corazon-sabio"
+        ? ESPEJO_SKU_INICIO.id
+        : producto === "espejo" && !planParam
+          ? ESPEJO_SKU_INICIO.id
+          : planParam;
+
     const isPlanificacion = PLANIFICACION_CHECKOUT_PLANS.includes(
-      planParam as (typeof PLANIFICACION_CHECKOUT_PLANS)[number],
+      effectivePlan as (typeof PLANIFICACION_CHECKOUT_PLANS)[number],
     );
     const isUmbral = UMBRAL_CHECKOUT_PLANS.includes(
-      planParam as (typeof UMBRAL_CHECKOUT_PLANS)[number],
+      effectivePlan as (typeof UMBRAL_CHECKOUT_PLANS)[number],
     );
-    if (planParam && (isPlanificacion || isUmbral)) {
-      const p = allCheckoutPlans.find((x) => x.id === planParam);
+    const isEspejo = ESPEJO_CHECKOUT_PLANS.includes(
+      effectivePlan as (typeof ESPEJO_CHECKOUT_PLANS)[number],
+    );
+    if (effectivePlan && (isPlanificacion || isUmbral || isEspejo)) {
+      const p = allCheckoutPlans.find((x) => x.id === effectivePlan);
       if (p) {
         setSelectedPlan(p);
         setTimeout(() => {
@@ -256,9 +325,12 @@ export default function Pagos() {
     }
 
     if (status === "success") {
-      // Respaldo para compras legacy de Espejo que aún regresan del checkout MP.
-      if (planParam === "corazon-sabio") {
-        toast.success("¡Pago confirmado! Activando tus 10 créditos de Espejo…");
+      if (planParam && isEspejoSkuId(planParam)) {
+        const credits =
+          planParam === "espejo_recarga"
+            ? ESPEJO_SKU_RECARGA.credits
+            : ESPEJO_SKU_INICIO.credits;
+        toast.success(`¡Pago confirmado! Activando tus ${credits} créditos de Espejo…`);
         void claimEspejoCredits();
         if (!auth?.currentUser) {
           toast.info("Inicia sesión con el mismo correo del pago para ver tus créditos en /espejo.");
@@ -319,8 +391,11 @@ export default function Pagos() {
     }
     const method = paymentMethod === "paypal" ? "PayPal" : "Yape";
     const amount = paymentMethod === "paypal" ? `$${selectedPlan.price} USD` : `S/ ${selectedPlan.pricePEN.toFixed(2)}`;
+    const purchaseLabel = selectedPlan.isOneTime
+      ? "pack de créditos Espejo"
+      : "suscripción a SISTEMICAR";
     const message = encodeURIComponent(
-      `Hola Gilson, acabo de pagar mi suscripción a SISTEMICAR.\n\n` +
+      `Hola Gilson, acabo de pagar mi ${purchaseLabel}.\n\n` +
       `📧 Mi correo es: ${userEmail}\n` +
       `📦 Plan: ${selectedPlan.name}\n` +
       `💰 Monto: ${amount}\n` +
@@ -632,6 +707,91 @@ export default function Pagos() {
               </div>
             </div>
           </motion.button>
+        </div>
+
+        {/* Espejo — packs de créditos (pago único) */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} style={{ color: ESPEJO_ACCENT }} />
+            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: ESPEJO_ACCENT }}>
+              Espejo · Créditos (pago único)
+            </h2>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+            Sin suscripción. Compras limpiezas cuando la carga emocional frena; si ya estás en ritmo de Jornada, no pagas de más.
+          </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            {espejoPlans.map((plan) => {
+              const Icon = plan.icon;
+              const isSelected = selectedPlan.id === plan.id;
+              return (
+                <motion.button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedPlan(plan)}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  data-testid={`select-plan-${plan.id}`}
+                  className="relative p-6 rounded-2xl border-2 text-left transition-all"
+                  style={{
+                    borderColor: isSelected ? plan.color : "rgba(255,255,255,0.12)",
+                    background: isSelected ? `${plan.color}15` : "rgba(0,0,0,0.35)",
+                  }}
+                >
+                  {plan.badge && (
+                    <div
+                      className="absolute -top-3 right-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-black"
+                      style={{ background: plan.color }}
+                    >
+                      {plan.badge}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-xl" style={{ background: `${plan.color}20` }}>
+                      <Icon size={22} style={{ color: plan.color }} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-lg">{plan.name}</h3>
+                      <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: plan.color }}>
+                        {plan.peldaño}
+                      </p>
+                    </div>
+                  </div>
+                  {plan.funnelHint && (
+                    <p className="text-[9px] font-bold uppercase tracking-wide mb-2" style={{ color: plan.color }}>
+                      {plan.funnelHint}
+                    </p>
+                  )}
+                  {plan.roiCopy && (
+                    <p className="text-[10px] mb-3 leading-relaxed" style={{ color: plan.color }}>
+                      {plan.roiCopy}
+                    </p>
+                  )}
+                  <div className="mb-3">
+                    <span className="text-3xl font-black text-white">${plan.price.toFixed(2)}</span>
+                    <span className="text-slate-500 text-sm"> pago único</span>
+                    <p className="text-[10px] text-slate-600 mt-0.5">S/ {plan.pricePEN.toFixed(0)} soles</p>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-slate-300">
+                        <Check size={14} style={{ color: plan.color }} />
+                        {feature.name}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/espejo"
+                    className="inline-block mt-3 text-[10px] tracking-widest uppercase"
+                    style={{ color: plan.color }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Ir al Espejo →
+                  </Link>
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
         </section>
 
