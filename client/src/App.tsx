@@ -62,6 +62,7 @@ import VentasEspejo from "@/pages/ventas-espejo";
 import MetricasDocumento from "@/pages/metricas-documento";
 import MapaSistemicar from "@/pages/mapa-sistemicar";
 import VendedoresPlanificacion from "@/pages/vendedores-planificacion";
+import VendedorTriagePage from "@/pages/vendedor";
 import { SellerRefCapture } from "./components/seller-ref-capture";
 import Manuales from "@/pages/manuales";
 import AdminSemillas from "@/pages/admin-semillas";
@@ -436,6 +437,7 @@ function Router() {
         <Route path="/embudo" component={EmbudoSistemicar} />
         <Route path="/documentos" component={Documentos} />
         <Route path="/vendedores-planificacion" component={VendedoresPlanificacion} />
+        <Route path="/vendedor" component={VendedorTriagePage} />
         <Route path="/espejo/v2" component={EspejoV2} />
         <Route path="/espejo" component={Espejo} />
         <Route path="/espejo/expedientes/:id" component={EspejoExpedienteDetalle} />

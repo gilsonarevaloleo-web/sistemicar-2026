@@ -446,6 +446,7 @@ export function DoctorIAChat() {
     "/gracias-compra",
     "/umbral-leads",
     "/ventas-espejo",
+    "/vendedor",
     "/jornada-v4", // Dual Kernel: sin FAB ni ~10 listeners Firebase
   ];
   if (!user || hiddenPages.includes(location) || location.startsWith("/jornada-v4?")) return null;
