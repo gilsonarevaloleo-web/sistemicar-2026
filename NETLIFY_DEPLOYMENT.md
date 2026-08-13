@@ -77,7 +77,7 @@ https://TU-DOMINIO/api/mercadopago/webhook
 - **2** reglas de redirect (API + SPA), no solo 1
 
 **Pasos:**
-1. Push de todo el repo a la rama que usa Netlify (**`principal`** en tu proyecto, commit reciente).
+1. Push de todo el repo a la rama que usa Netlify (**`main`**).
 2. Variables: **`GEMINI_API_KEY`** obligatoria (chat + taller libros).
 3. Netlify ? Deploys ? **Clear cache and deploy site**
 4. Reprobar `/api/health`
@@ -94,14 +94,15 @@ Sirve frontend + functions como en producciùn.
 
 ## Lùmites a tener en cuenta
 
-- **Timeout:** 26 s mùximo en plan Pro (10 s en free). Rutas pesadas (`generar-capitulo`, renders de video) pueden necesitar optimizaciùn o cola externa.
+- **Timeout:** el lÌmite sÌncrono de Functions lo fija Netlify (ya no se configura en `netlify.toml`). Rutas pesadas (`generar-capitulo`, renders de video) pueden necesitar cola externa.
 - **Filesystem:** `/videos` y renders locales no persisten en serverless; la fùbrica sensorial con ffmpeg puede no funcionar en Netlify Functions.
 - **Tamaùo del bundle:** la funciùn incluye todo `server/index.ts`; el cold start puede tardar unos segundos.
 
 ## Flujo de deploy
 
-1. Commit + push a **`principal`** (rama de producciÛn en Netlify) en GitHub (`gilson-leos/sistemicar-2026`)
-2. Netlify build automùtico
+1. Commit + push a **`main`** (rama de producciÛn en Netlify).
+2. Netlify build autom·tico
 3. Revisar **Deploy log** ? Build succeeded ? Functions bundled
 4. Probar `/api/health`
-RESEND_API_KEY=tu_clave_de_resend_aqui
+
+Si Building falla con *Secrets scanning found ... secret env var*: las variables `VITE_*` (Firebase y Gemini del cliente) est·n omitidas en `netlify.toml` (`SECRETS_SCAN_OMIT_KEYS`). No marques `VITE_GEMINI_API_KEY` como secret sin esa omisiÛn: Vite la incrusta en el JS.
