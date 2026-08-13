@@ -32,13 +32,14 @@ function isModuleId(value: string): value is ModuleId {
   return VALID_MODULE_IDS.has(value as ModuleId);
 }
 
-/** Planes de checkout activos (Planificación mensual + Umbral + Espejo aparte). */
+/** Planes de checkout activos (Planificación + Umbral + packs Espejo). */
 export type ActivePlanId =
-  | "corazon-sabio"
   | "planificacion_base"
   | "soberania_dia"
   | "operativo"
-  | "umbral";
+  | "umbral"
+  | "espejo_inicio"
+  | "espejo_recarga";
 
 /** Planes legacy — solo grandfather / webhooks antiguos. */
 export type LegacyPlanId = "arquitecto" | "soberano_operativo" | "soberano" | "soberania-mental";

@@ -4,19 +4,28 @@ import {
   PLANIFICACION_SKU_BY_ID,
 } from "./planificacionPricing";
 import { UMBRAL_SKU } from "./umbralPricing";
+import {
+  ESPEJO_CHECKOUT_ORDER,
+  ESPEJO_SKU_INICIO,
+  ESPEJO_SKU_RECARGA,
+} from "./espejoPricing";
 
 export const SUBSCRIPTION_PLANS = {
-  /**
-   * Legacy — Espejo v1 ($17). Ya no se vende en checkout.
-   * Se conserva para webhooks / créditos de compras antiguas.
-   */
-  "corazon-sabio": {
-    id: "corazon-sabio",
-    name: "El Corazón Sabio™",
-    price: 17,
-    isOneTime: true,
-    espejoCredits: 10,
-    legacy: true,
+  /** Espejo — pack créditos entrada (pago único). */
+  espejo_inicio: {
+    id: ESPEJO_SKU_INICIO.id,
+    name: ESPEJO_SKU_INICIO.name,
+    price: ESPEJO_SKU_INICIO.priceUsd,
+    isOneTime: true as const,
+    espejoCredits: ESPEJO_SKU_INICIO.credits,
+  },
+  /** Espejo — pack créditos recarga (pago único). */
+  espejo_recarga: {
+    id: ESPEJO_SKU_RECARGA.id,
+    name: ESPEJO_SKU_RECARGA.name,
+    price: ESPEJO_SKU_RECARGA.priceUsd,
+    isOneTime: true as const,
+    espejoCredits: ESPEJO_SKU_RECARGA.credits,
   },
   "soberania-mental": { id: "soberania-mental", name: "Soberanía Mental", price: 9.99, legacy: true },
   /** Jornada Base — vehículos + PS + Conquista */
@@ -73,3 +82,7 @@ export type PlanificacionCheckoutPlanId = (typeof PLANIFICACION_CHECKOUT_PLANS)[
 /** Planes Umbral seleccionables vía /pagos?plan=umbral */
 export const UMBRAL_CHECKOUT_PLANS = ["umbral"] as const;
 export type UmbralCheckoutPlanId = (typeof UMBRAL_CHECKOUT_PLANS)[number];
+
+/** Packs Espejo (créditos, pago único) vía /pagos?plan=espejo_inicio|espejo_recarga */
+export const ESPEJO_CHECKOUT_PLANS = ESPEJO_CHECKOUT_ORDER;
+export type EspejoCheckoutPlanId = (typeof ESPEJO_CHECKOUT_PLANS)[number];

@@ -1,6 +1,6 @@
 # Kit vendedores — Jornada SISTEMICAR
 
-**Versión:** 2.0 · **Actualizado:** agosto 2026  
+**Versión:** 2.1 · **Actualizado:** agosto 2026  
 **Audiencia:** vendedores afiliados, closers, partners de distribución  
 **Contacto operativo:** Gilson · WhatsApp +51 918 260 514  
 **Documento maestro embudo:** `EMBUDO_PLANIFICACION.md`  
@@ -21,7 +21,7 @@ Jornada V4 es un **embudo de maduración** (fácil → valioso):
 
 **Apilado:** el comprometido paga ≈ **$89.97/mes** (Base + Ritmo + Norte).
 
-**Espejo es otro producto.** Comisión **30% recurrente** mientras el cliente pague.
+**Espejo** es otro producto: **packs de créditos** (pago único), no suscripción. Corazón Sabio ($17) está retirado.
 
 ---
 
@@ -30,20 +30,22 @@ Jornada V4 es un **embudo de maduración** (fácil → valioso):
 | Regla | Detalle |
 |-------|---------|
 | **Porcentaje** | **30%** del monto pagado |
-| **Cuándo aplica** | Cada pago mensual de Base, Ritmo u Norte |
-| **Cuándo se corta** | Si cancela / deja de pagar |
-| **Espejo** | $17 único → ~$5.10 una vez |
+| **Cuándo aplica** | Cada pago mensual de Base, Ritmo, Norte u Umbral; y cada pack Espejo |
+| **Cuándo se corta** | Si cancela / deja de pagar (suscripciones). Packs Espejo = una sola comisión |
+| **Espejo** | Inicio $9.90 → ~$2.97 · Recarga $19.90 → ~$5.97 (una vez) |
 | **Atribución** | Link con `ref=TU-CODIGO` en `/pagos` |
 
 ### Tabla por producto
 
-| Producto | Precio | Comisión / mes |
-|----------|--------|----------------|
-| Jornada Base | $24.99 | ~$7.50 |
-| Ritmo del día | $29.99 | ~$9.00 |
-| Norte | $34.99 | ~$10.50 |
-| Completo (3 capas) | $89.97 | ~$27.00 |
-| Día con ritmo (Base+Ritmo) | $54.98 | ~$16.50 |
+| Producto | Precio | Comisión |
+|----------|--------|----------|
+| Jornada Base | $24.99/mes | ~$7.50/mes |
+| Ritmo del día | $29.99/mes | ~$9.00/mes |
+| Norte | $34.99/mes | ~$10.50/mes |
+| Completo (3 capas) | $89.97/mes | ~$27.00/mes |
+| Día con ritmo (Base+Ritmo) | $54.98/mes | ~$16.50/mes |
+| Espejo Inicio (6 créd.) | $9.90 único | ~$2.97 |
+| Espejo Recarga (15 créd.) | $19.90 único | ~$5.97 |
 
 ---
 
@@ -76,6 +78,8 @@ Jornada V4 es un **embudo de maduración** (fácil → valioso):
 
 | Comercial | ID checkout / módulo |
 |-----------|----------------------|
+| Espejo Inicio | `espejo_inicio` |
+| Espejo Recarga | `espejo_recarga` |
 | Jornada Base | `planificacion_base` |
 | Ritmo del día | `operativo` |
 | Norte | `soberania_dia` |
@@ -100,4 +104,4 @@ Jornada V4 es un **embudo de maduración** (fácil → valioso):
 
 ---
 
-*Kit vendedores Jornada · SISTEMICAR · v2.0*
+*Kit vendedores Jornada · SISTEMICAR · v2.1*

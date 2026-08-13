@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
+import { isEspejoSkuId } from "../shared/espejoPricing";
 
 type MpPaymentInfo = {
   id?: string | number;
@@ -8,7 +9,7 @@ type MpPaymentInfo = {
 };
 import {
   getEspejoDeliveryByPaymentId,
-  processCorazonSabioPayment,
+  processEspejoCreditPayment,
 } from "./espejoCreditDeliveries";
 import { sendPaymentConfirmationEmail } from "./emailService";
 
@@ -31,18 +32,24 @@ export function parseMpExternalRef(paymentInfo: MpPaymentInfo): MpExternalRef {
   return externalRef;
 }
 
-/** Entrega de cr�ditos Espejo para plan corazon-sabio (idempotente por payment id). */
-export async function deliverCorazonSabioIfNeeded(
+/** Entrega de créditos Espejo para packs espejo_inicio / espejo_recarga (idempotente por payment id). */
+export async function deliverEspejoCreditsIfNeeded(
   paymentInfo: MpPaymentInfo,
   externalRef: MpExternalRef
 ): Promise<void> {
-  if (externalRef.planId !== "corazon-sabio") return;
+  const planId = externalRef.planId;
+  if (!planId || !isEspejoSkuId(planId)) return;
 
-  const plan = SUBSCRIPTION_PLANS["corazon-sabio"];
-  const credits = plan.espejoCredits ?? 10;
+  const plan = SUBSCRIPTION_PLANS[planId];
+  const credits = "espejoCredits" in plan ? plan.espejoCredits : 0;
+  if (!credits) {
+    console.warn(`[MP] ${planId} sin espejoCredits configurados`);
+    return;
+  }
+
   const email = externalRef.email?.trim();
   if (!email) {
-    console.warn("[MP] corazon-sabio sin email � no se pueden acreditar cr�ditos");
+    console.warn(`[MP] ${planId} sin email — no se pueden acreditar créditos`);
     return;
   }
 
@@ -53,28 +60,29 @@ export async function deliverCorazonSabioIfNeeded(
     return;
   }
 
-  const result = await processCorazonSabioPayment({
+  const result = await processEspejoCreditPayment({
     mpPaymentId: paymentIdStr,
     buyerEmail: email,
     credits,
+    planId,
   });
 
   try {
     await sendPaymentConfirmationEmail({
       to: email,
       userName: externalRef.userName || "Explorador",
-      planName: plan.name,
+      planName: `${plan.name} (${credits} créditos)`,
       amount: paymentInfo.transaction_amount ?? plan.price,
     });
   } catch (emailErr) {
-    console.error(`[MP] Email confirmaci�n Espejo fall� para ${email}`, emailErr);
+    console.error(`[MP] Email confirmación Espejo falló para ${email}`, emailErr);
   }
 
   if (result.granted) {
-    console.log(`[MP] Espejo: cr�ditos activados para ${email}`);
+    console.log(`[MP] Espejo: créditos activados para ${email} (${planId})`);
   } else {
     console.log(
-      `[MP] Espejo: pago registrado para ${email} � claim al iniciar sesi�n con el mismo correo`
+      `[MP] Espejo: pago registrado para ${email} — claim al iniciar sesión con el mismo correo`
     );
   }
 }
