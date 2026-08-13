@@ -39,3 +39,9 @@ export function buildSellerPagosUrl(sellerCode: string): string {
   const code = normalizeSellerRef(sellerCode) ?? sellerCode;
   return `https://sistemicar.app/pagos?ref=${encodeURIComponent(code)}`;
 }
+
+/** Link de triage Capa 1 (Código + Planeta) con atribución. */
+export function buildSellerVendedorUrl(sellerCode: string): string {
+  const code = normalizeSellerRef(sellerCode) ?? sellerCode;
+  return `https://sistemicar.app/vendedor?ref=${encodeURIComponent(code)}`;
+}
