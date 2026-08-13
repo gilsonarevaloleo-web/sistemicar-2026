@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { access, rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -76,6 +76,11 @@ async function buildAll() {
     external: ["bufferutil", "utf-8-validate", "pg-native", "cpu-features"],
     logLevel: "info",
   });
+
+  for (const file of ["dist/public/index.html", "dist/netlify-api.cjs"]) {
+    await access(file);
+  }
+  console.log("build ok: dist/public + dist/netlify-api.cjs");
 }
 
 buildAll().catch((err) => {
