@@ -117,7 +117,7 @@ export function SecuenciaAncladaBar({
         <p className="text-[10px] truncate" style={{ color: INK }} data-testid="jornada4-secuencia-activa">
           {activeLetter} · {byLetra.get(activeLetter)!.titulo}
           {" · "}
-          {byLetra.get(activeLetter)!.subs.length} unidades
+          {byLetra.get(activeLetter)!.filas.length} filas
         </p>
       ) : null}
 
@@ -191,7 +191,7 @@ export function SecuenciaAncladaBar({
         </div>
       ) : (
         <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-          En parálisis: una letra carga la alternativa. El horario sugiere “ahora”
+          En parálisis: una letra carga las filas. El horario sugiere “ahora”
           ±30 min. Confirma el lanzamiento tú.
         </p>
       )}

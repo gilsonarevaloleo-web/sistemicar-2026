@@ -14,7 +14,7 @@ import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaL
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
 import {
   detectLetterTrigger,
-  isEmptyConquistaDraft,
+  isEmptySituacionDraft,
   recallSecuencia,
   shouldAutoFillDue,
   suggestDueLetter,
@@ -161,7 +161,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const { user } = useAuthContext();
   const userId = user?.uid ?? "";
   const keyboardInset = useKeyboardInset();
-  const tick = useJornada4Tick(open && tipo === "tiempo");
+  const tick = useJornada4Tick(open && (tipo === "tiempo" || tipo === "situacion"));
   /** Overflow previo del body — liberar al abrir <select> nativo (evita bloqueo móvil). */
   const bodyOverflowPrevRef = useRef<string | null>(null);
   const nativePickerOpenRef = useRef(false);
@@ -258,19 +258,13 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         }
         return;
       }
-      setTitulo(slot.titulo);
-      setSubs(
-        slot.subs.map((s, i) => {
-          const sug = getSubVehicleRecordSuggestions(s.titulo, 1)[0];
-          return {
-            tempId: `sub_${Date.now()}_${i}`,
-            titulo: s.titulo,
-            cantidadObjetivo: String(s.cantidadObjetivo),
-            tiempoRecordMinPerUnit: s.tiempoRecordMinPerUnit ?? sug?.minPerUnit,
-          };
-        })
-      );
-      setConquistaMultiModo("secuencia");
+      setModo(slot.modo);
+      setTitulo(slot.modo === "desglose" ? slot.titulo : "");
+      const nextFilas = slot.filas.length > 0 ? [...slot.filas] : [""];
+      const nextDirs = slot.filas.map((_, i) => slot.filasProyectoIds[i] ?? "");
+      while (nextDirs.length < nextFilas.length) nextDirs.push("");
+      setFilas(nextFilas);
+      setFilasProyectoIds(nextDirs);
       setSecuenciaLetraActiva(letra);
       if (slot.hora) setSecuenciaHora(slot.hora);
       setShowMissionSugs(false);
@@ -279,48 +273,47 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   );
 
   useEffect(() => {
-    if (!open || tipo !== "tiempo") return;
-    const letter = detectLetterTrigger(titulo);
+    if (!open || tipo !== "situacion") return;
+    const letter =
+      detectLetterTrigger(titulo) ?? detectLetterTrigger(filas[0] ?? "");
     if (!letter) return;
     const t = window.setTimeout(() => applySecuenciaRecall(letter, { silent: true }), 550);
     return () => window.clearTimeout(t);
-  }, [titulo, tipo, open, applySecuenciaRecall]);
+  }, [titulo, filas, tipo, open, applySecuenciaRecall]);
 
   const dueLetter = useMemo(
-    () => (tipo === "tiempo" && open ? suggestDueLetter(secuenciaSlots, Date.now()) : null),
+    () => (tipo === "situacion" && open ? suggestDueLetter(secuenciaSlots, Date.now()) : null),
     // tick refresca la ventana ±30 min sin montar otro reloj
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [secuenciaSlots, tipo, open, tick]
   );
 
   useEffect(() => {
-    if (!open || tipo !== "tiempo" || dueFilledRef.current) return;
-    if (!shouldAutoFillDue(isEmptyConquistaDraft(titulo, subs), dueLetter)) {
+    if (!open || tipo !== "situacion" || dueFilledRef.current) return;
+    if (!shouldAutoFillDue(isEmptySituacionDraft(titulo, filas), dueLetter)) {
       return;
     }
     dueFilledRef.current = true;
     applySecuenciaRecall(dueLetter);
-  }, [open, tipo, dueLetter, titulo, subs, applySecuenciaRecall]);
+  }, [open, tipo, dueLetter, titulo, filas, applySecuenciaRecall]);
 
   const canAnchorSecuencia =
-    tipo === "tiempo" &&
-    subs.some(s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0);
+    tipo === "situacion" && filas.some(f => f.trim().length > 0);
 
   const commitSecuenciaAnchor = useCallback(
     (letra: SecuenciaLetra, overwrite: boolean) => {
-      const valid = subs.filter(
-        s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
-      );
+      const validFilas = filas.map(f => f.trim()).filter(Boolean);
+      const validDirs = filas
+        .map((f, i) => (f.trim() ? (filasProyectoIds[i] ?? "") : null))
+        .filter((d): d is string => d != null);
       const result = upsertSecuenciaAnclada(
         secuenciaSlots,
         {
           letra,
-          titulo: titulo.trim() || valid[0]?.titulo || "",
-          subs: valid.map(s => ({
-            titulo: s.titulo,
-            cantidadObjetivo: s.cantidadObjetivo,
-            tiempoRecordMinPerUnit: s.tiempoRecordMinPerUnit,
-          })),
+          titulo: titulo.trim() || validFilas[0] || "",
+          filas: validFilas,
+          filasProyectoIds: validDirs,
+          modo,
           hora: secuenciaHora || null,
         },
         { overwrite }
@@ -333,7 +326,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         toast.message("No se pudo anclar", {
           description:
             result.error === "secuencia_invalida"
-              ? "Necesitas al menos una unidad con nombre y cantidad."
+              ? "Necesitas al menos una fila con nombre."
               : "Letra inválida.",
         });
         return;
@@ -348,7 +341,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           : "Secuencia lista. Una letra la recuerda.",
       });
     },
-    [secuenciaSlots, subs, titulo, secuenciaHora, userId]
+    [secuenciaSlots, filas, filasProyectoIds, titulo, modo, secuenciaHora, userId]
   );
 
   const handleAnchorLetter = useCallback(
@@ -360,7 +353,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           return;
         }
         toast.message("Llena la secuencia primero", {
-          description: "Nombre de unidad + cantidad. Luego anclas la letra.",
+          description: "Al menos una fila. Luego anclas la letra.",
         });
         return;
       }
@@ -862,8 +855,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         : "Desglosador · secuencia"}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                      Misión + unidades. A–F recuerda un hábito anclado (secuencia + horario)
-                      sin planear de nuevo. Con 2+ unidades: secuencia o independientes.
+                      Misión + unidades con cantidad y récord. Al añadir 2+ unidades puedes
+                      elegir secuencia (un desglosador) o independientes.
                     </p>
                   </div>
                   )}
@@ -944,7 +937,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     onNativePickerClose={restoreBodyAfterNativePicker}
                   />
 
-                  {tipo === "tiempo" ? (
+                  {tipo === "situacion" ? (
                     <SecuenciaAncladaBar
                       slots={secuenciaSlots}
                       dueLetter={dueLetter}
@@ -999,8 +992,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
                         placeholder={
                           tipo === "tiempo"
-                            ? "Letra A–F o nombre (ej: Armado)"
-                            : "Ej: Enfoque de la tarde"
+                            ? "Ej: Armado de bolsillo"
+                            : "Letra A–F o nombre (ej: Enfoque de la tarde)"
                         }
                         className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
                         style={{
@@ -1078,7 +1071,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         }}
                       >
                         Lista libre: vas directo a las tareas. Sin título de misión, sin meta
-                        de ring, sin presión de tiempo. Puedes añadir más filas.
+                        de ring, sin presión de tiempo. Una letra A–F carga un hábito anclado.
                       </p>
                       <p
                         className="text-[10px] font-black uppercase tracking-wider"

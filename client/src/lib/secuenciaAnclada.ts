@@ -1,6 +1,6 @@
 /**
- * Hábitos de secuencia para Conquista.
- * Letra A–F = alternativa anclada (snapshot + horario).
+ * Hábitos de secuencia para Situacional (lista libre y ring).
+ * Letra A–F = alternativa anclada (filas + horario).
  * Recuerda; nunca lanza. Kernel puro, sin red ni UI.
  */
 import { getClockDayStartMs, parseSegmentTime, segmentTimeToMinutes } from "./segmentTime";
@@ -9,23 +9,21 @@ export const SECUENCIA_LETRAS = ["A", "B", "C", "D", "E", "F"] as const;
 export type SecuenciaLetra = (typeof SECUENCIA_LETRAS)[number];
 
 export const SECUENCIA_MAX_SLOTS = SECUENCIA_LETRAS.length;
-export const SECUENCIA_MAX_SUBS = 12;
+export const SECUENCIA_MAX_FILAS = 12;
 export const SECUENCIA_MAX_TITULO = 80;
-export const SECUENCIA_MAX_SUB_TITULO = 60;
-export const SECUENCIA_MAX_CANTIDAD = 9999;
+export const SECUENCIA_MAX_FILA = 60;
 export const SECUENCIA_DUE_WINDOW_MIN = 30;
 
-export type SecuenciaAncladaSub = {
-  titulo: string;
-  cantidadObjetivo: number;
-  tiempoRecordMinPerUnit?: number;
-};
+export type SecuenciaModo = "rapido" | "desglose";
 
 export type SecuenciaAnclada = {
   letra: SecuenciaLetra;
+  /** Nombre del hábito / misión del ring. Si vacío al anclar, se toma la 1ª fila. */
   titulo: string;
-  subs: SecuenciaAncladaSub[];
-  /** HH:mm Lima; null = sin horario. */
+  filas: string[];
+  filasProyectoIds: string[];
+  modo: SecuenciaModo;
+  /** HH:mm Lima; null = sin horario. No es la meta del ring. */
   hora: string | null;
   /** 0=Dom … 6=Sáb; vacío = todos los días. */
   diasActivos: number[];
@@ -35,12 +33,10 @@ export type SecuenciaAnclada = {
 
 export type SecuenciaAnchorInput = {
   letra: string;
-  titulo: string;
-  subs: Array<{
-    titulo: string;
-    cantidadObjetivo: unknown;
-    tiempoRecordMinPerUnit?: unknown;
-  }>;
+  titulo?: string;
+  filas: unknown;
+  filasProyectoIds?: unknown;
+  modo?: unknown;
   hora?: string | null;
   diasActivos?: unknown;
 };
@@ -80,30 +76,6 @@ export function sanitizeTitulo(raw: unknown, max = SECUENCIA_MAX_TITULO): string
     .slice(0, max);
 }
 
-function sanitizeCantidad(raw: unknown): number | null {
-  const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw.replace(",", ".").trim())
-        : NaN;
-  if (!Number.isFinite(n) || n <= 0) return null;
-  const i = Math.floor(n);
-  if (i < 1 || i > SECUENCIA_MAX_CANTIDAD) return null;
-  return i;
-}
-
-function sanitizeRecord(raw: unknown): number | undefined {
-  const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw.replace(",", ".").trim())
-        : NaN;
-  if (!Number.isFinite(n) || n <= 0 || n > 24 * 60) return undefined;
-  return Math.round(n * 100) / 100;
-}
-
 export function sanitizeHora(raw: unknown): string | null {
   if (raw == null || raw === "") return null;
   if (typeof raw !== "string") return null;
@@ -123,24 +95,37 @@ function sanitizeDias(raw: unknown): number[] {
   return out.sort((a, b) => a - b);
 }
 
-export function sanitizeSubs(
-  raw: unknown
-): SecuenciaAncladaSub[] | null {
+function sanitizeModo(raw: unknown): SecuenciaModo {
+  return raw === "desglose" ? "desglose" : "rapido";
+}
+
+function sanitizeProyectoId(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  const id = raw.trim().slice(0, 128);
+  if (!id || /[/\\<>]/.test(id)) return "";
+  return id;
+}
+
+export function sanitizeFilas(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
-  const subs: SecuenciaAncladaSub[] = [];
+  const filas: string[] = [];
   for (const row of raw) {
-    if (subs.length >= SECUENCIA_MAX_SUBS) break;
-    if (!row || typeof row !== "object") continue;
-    const rec = row as Record<string, unknown>;
-    const titulo = sanitizeTitulo(rec.titulo, SECUENCIA_MAX_SUB_TITULO);
-    const cantidad = sanitizeCantidad(rec.cantidadObjetivo);
-    if (!titulo || cantidad == null) continue;
-    const sub: SecuenciaAncladaSub = { titulo, cantidadObjetivo: cantidad };
-    const recMin = sanitizeRecord(rec.tiempoRecordMinPerUnit);
-    if (recMin != null) sub.tiempoRecordMinPerUnit = recMin;
-    subs.push(sub);
+    if (filas.length >= SECUENCIA_MAX_FILAS) break;
+    const titulo =
+      typeof row === "string"
+        ? sanitizeTitulo(row, SECUENCIA_MAX_FILA)
+        : row && typeof row === "object"
+          ? sanitizeTitulo((row as { titulo?: unknown }).titulo, SECUENCIA_MAX_FILA)
+          : "";
+    if (!titulo) continue;
+    filas.push(titulo);
   }
-  return subs.length > 0 ? subs : null;
+  return filas.length > 0 ? filas : null;
+}
+
+function sanitizeFilasProyectoIds(raw: unknown, len: number): string[] {
+  const src = Array.isArray(raw) ? raw : [];
+  return Array.from({ length: len }, (_, i) => sanitizeProyectoId(src[i]));
 }
 
 export function buildSecuenciaSlot(
@@ -148,14 +133,16 @@ export function buildSecuenciaSlot(
   now = Date.now()
 ): SecuenciaAnclada | null {
   const letra = normalizeLetter(input.letra);
-  const titulo = sanitizeTitulo(input.titulo);
-  const subs = sanitizeSubs(input.subs);
-  if (!letra || !titulo || !subs) return null;
+  const filas = sanitizeFilas(input.filas);
+  if (!letra || !filas) return null;
+  const titulo = sanitizeTitulo(input.titulo) || filas[0]!;
   const ts = Number.isFinite(now) ? Math.floor(now) : Date.now();
   return {
     letra,
     titulo,
-    subs,
+    filas,
+    filasProyectoIds: sanitizeFilasProyectoIds(input.filasProyectoIds, filas.length),
+    modo: sanitizeModo(input.modo),
     hora: sanitizeHora(input.hora),
     diasActivos: sanitizeDias(input.diasActivos),
     ancladaAt: ts,
@@ -171,18 +158,24 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 export function normalizeSlot(raw: unknown, now = Date.now()): SecuenciaAnclada | null {
   const rec = asRecord(raw);
   if (!rec) return null;
+  const filasRaw = Array.isArray(rec.filas)
+    ? rec.filas
+    : Array.isArray(rec.subs)
+      ? rec.subs
+      : [];
   const slot = buildSecuenciaSlot(
     {
       letra: typeof rec.letra === "string" ? rec.letra : "",
       titulo: typeof rec.titulo === "string" ? rec.titulo : "",
-      subs: Array.isArray(rec.subs) ? rec.subs : [],
+      filas: filasRaw,
+      filasProyectoIds: rec.filasProyectoIds,
+      modo: rec.modo,
       hora: rec.hora as string | null | undefined,
       diasActivos: rec.diasActivos,
     },
     now
   );
   if (!slot) return null;
-  // Timestamps ausentes = 0, no "ahora": si no, basura vieja gana al snapshot reciente.
   const ancladaAt =
     typeof rec.ancladaAt === "number" && Number.isFinite(rec.ancladaAt)
       ? rec.ancladaAt
@@ -300,16 +293,9 @@ export function suggestDueLetter(
   return due[0]!.letra;
 }
 
-export function isEmptyConquistaDraft(
-  titulo: string,
-  subs: Array<{ titulo?: string; cantidadObjetivo?: string | number }>
-): boolean {
+export function isEmptySituacionDraft(titulo: string, filas: string[]): boolean {
   if (sanitizeTitulo(titulo).length > 0) return false;
-  return !subs.some(
-    s =>
-      sanitizeTitulo(s.titulo, SECUENCIA_MAX_SUB_TITULO).length > 0 ||
-      String(s.cantidadObjetivo ?? "").trim().length > 0
-  );
+  return !filas.some(f => sanitizeTitulo(f, SECUENCIA_MAX_FILA).length > 0);
 }
 
 export function shouldAutoFillDue(

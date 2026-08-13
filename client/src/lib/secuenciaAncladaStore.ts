@@ -7,7 +7,7 @@ import {
   type SecuenciaAnclada,
 } from "./secuenciaAnclada";
 
-const KEY_PREFIX = "sistemicar_secuencia_anclada_v1_";
+const KEY_PREFIX = "sistemicar_secuencia_anclada_v2_";
 
 export function secuenciaAncladaStorageKey(userId: string): string | null {
   const id = String(userId ?? "").trim();

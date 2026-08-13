@@ -27,8 +27,10 @@ function installMemoryLocalStorage() {
 
 const sample: SecuenciaAnclada = {
   letra: "A",
-  titulo: "Armado",
-  subs: [{ titulo: "Corte", cantidadObjetivo: 9 }],
+  titulo: "Cierre de tarde",
+  filas: ["Responder", "Cerrar caja"],
+  filasProyectoIds: ["", ""],
+  modo: "rapido",
   hora: "08:00",
   diasActivos: [1, 2, 3, 4, 5],
   ancladaAt: 10,
@@ -43,7 +45,7 @@ describe("secuenciaAncladaStore", () => {
   it("la clave es por usuario y rechaza ids con slash", () => {
     assert.equal(
       secuenciaAncladaStorageKey("user_1"),
-      "sistemicar_secuencia_anclada_v1_user_1"
+      "sistemicar_secuencia_anclada_v2_user_1"
     );
     assert.equal(secuenciaAncladaStorageKey("../etc"), null);
     assert.equal(secuenciaAncladaStorageKey("a/b"), null);
@@ -55,13 +57,13 @@ describe("secuenciaAncladaStore", () => {
     writeSecuenciasAncladas("u2", [
       { ...sample, letra: "B", titulo: "Otra" },
     ]);
-    assert.equal(readSecuenciasAncladas("u1")[0]?.titulo, "Armado");
+    assert.equal(readSecuenciasAncladas("u1")[0]?.titulo, "Cierre de tarde");
     assert.equal(readSecuenciasAncladas("u2")[0]?.letra, "B");
     assert.equal(readSecuenciasAncladas("u3").length, 0);
   });
 
   it("JSON roto no tira y no cruza cuentas", () => {
-    localStorage.setItem("sistemicar_secuencia_anclada_v1_u1", "{nope");
+    localStorage.setItem("sistemicar_secuencia_anclada_v2_u1", "{nope");
     assert.deepEqual(readSecuenciasAncladas("u1"), []);
   });
 });

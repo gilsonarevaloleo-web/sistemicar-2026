@@ -4,7 +4,7 @@ import {
   buildSecuenciaSlot,
   deleteSecuenciaAnclada,
   detectLetterTrigger,
-  isEmptyConquistaDraft,
+  isEmptySituacionDraft,
   isSecuenciaDue,
   nextFreeLetter,
   normalizeBank,
@@ -18,10 +18,14 @@ import {
   type SecuenciaAnclada,
 } from "./secuenciaAnclada.ts";
 
-function slot(partial: Partial<SecuenciaAnclada> & { letra: SecuenciaAnclada["letra"] }): SecuenciaAnclada {
+function slot(
+  partial: Partial<SecuenciaAnclada> & { letra: SecuenciaAnclada["letra"] }
+): SecuenciaAnclada {
   return {
-    titulo: "Armado de bolsillo",
-    subs: [{ titulo: "Corte", cantidadObjetivo: 9, tiempoRecordMinPerUnit: 1.2 }],
+    titulo: "Cierre de tarde",
+    filas: ["Responder mensajes", "Ordenar mesa"],
+    filasProyectoIds: ["", ""],
+    modo: "rapido",
     hora: null,
     diasActivos: [],
     ancladaAt: 1,
@@ -63,12 +67,12 @@ describe("secuenciaAnclada — sanitizado", () => {
     assert.equal(sanitizeHora("<b>08:00</b>"), null);
   });
 
-  it("rechaza secuencia sin subs válidos o letra falsa", () => {
+  it("rechaza secuencia sin filas válidas o letra falsa", () => {
     assert.equal(
       buildSecuenciaSlot({
         letra: "A",
         titulo: "X",
-        subs: [{ titulo: "", cantidadObjetivo: 1 }],
+        filas: ["", "   "],
       }),
       null
     );
@@ -76,10 +80,22 @@ describe("secuenciaAnclada — sanitizado", () => {
       buildSecuenciaSlot({
         letra: "Z",
         titulo: "X",
-        subs: [{ titulo: "Corte", cantidadObjetivo: 3 }],
+        filas: ["Responder"],
       }),
       null
     );
+  });
+
+  it("lista libre puede anclarse sin título: usa la 1ª fila", () => {
+    const built = buildSecuenciaSlot({
+      letra: "B",
+      filas: ["  Llamar  ", "Cerrar caja"],
+      modo: "rapido",
+    });
+    assert.ok(built);
+    assert.equal(built!.titulo, "Llamar");
+    assert.equal(built!.modo, "rapido");
+    assert.deepEqual(built!.filas, ["Llamar", "Cerrar caja"]);
   });
 
   it("normaliza banco corrupto y bloquea prototype pollution", () => {
@@ -88,13 +104,13 @@ describe("secuenciaAnclada — sanitizado", () => {
         {
           letra: "A",
           titulo: "Ok",
-          subs: [{ titulo: "Uno", cantidadObjetivo: 2 }],
+          filas: ["Uno"],
           __proto__: { admin: true },
           hora: "99:99",
           extra: "drop",
         },
-        { letra: "A", titulo: "Más nuevo", subs: [{ titulo: "Dos", cantidadObjetivo: 4 }], updatedAt: 9 },
-        { letra: "Q", titulo: "Basura", subs: [{ titulo: "X", cantidadObjetivo: 1 }] },
+        { letra: "A", titulo: "Más nuevo", filas: ["Dos"], updatedAt: 9 },
+        { letra: "Q", titulo: "Basura", filas: ["X"] },
       ],
     };
     const bank = normalizeBank(polluted, 10);
@@ -105,21 +121,26 @@ describe("secuenciaAnclada — sanitizado", () => {
     assert.equal(Object.prototype.hasOwnProperty.call(bank[0]!, "extra"), false);
   });
 
-  it("recorta a 12 subs y exige cantidad 1–9999", () => {
+  it("recorta a 12 filas y ignora vacías", () => {
     const slotBuilt = buildSecuenciaSlot({
       letra: "C",
       titulo: "Lote",
-      subs: [
-        ...Array.from({ length: 15 }, (_, i) => ({
-          titulo: `U${i + 1}`,
-          cantidadObjetivo: i === 0 ? 0 : 1,
-        })),
-        { titulo: "malo", cantidadObjetivo: 10000 },
-      ],
+      filas: ["", ...Array.from({ length: 15 }, (_, i) => `U${i + 1}`)],
     });
     assert.ok(slotBuilt);
-    assert.equal(slotBuilt!.subs.length, 12);
-    assert.equal(slotBuilt!.subs[0]!.titulo, "U2");
+    assert.equal(slotBuilt!.filas.length, 12);
+    assert.equal(slotBuilt!.filas[0], "U1");
+  });
+
+  it("migra snapshots viejos con subs de conquista a filas", () => {
+    const bank = normalizeBank([
+      {
+        letra: "D",
+        titulo: "Viejo",
+        subs: [{ titulo: "Corte", cantidadObjetivo: 9 }],
+      },
+    ]);
+    assert.equal(bank[0]!.filas[0], "Corte");
   });
 });
 
@@ -129,7 +150,7 @@ describe("secuenciaAnclada — anclar / recordar", () => {
     const blocked = upsertSecuenciaAnclada(current, {
       letra: "A",
       titulo: "Nuevo",
-      subs: [{ titulo: "Corte", cantidadObjetivo: 3 }],
+      filas: ["Otra"],
     });
     assert.equal(blocked.ok, false);
     if (!blocked.ok) assert.equal(blocked.error, "slot_ocupado");
@@ -139,13 +160,15 @@ describe("secuenciaAnclada — anclar / recordar", () => {
       {
         letra: "A",
         titulo: "Nuevo",
-        subs: [{ titulo: "Corte", cantidadObjetivo: 3 }],
+        filas: ["Otra"],
+        modo: "desglose",
       },
       { overwrite: true, now: 50 }
     );
     assert.equal(replaced.ok, true);
     if (replaced.ok) {
       assert.equal(replaced.slot.titulo, "Nuevo");
+      assert.equal(replaced.slot.modo, "desglose");
       assert.equal(replaced.slot.ancladaAt, 1);
       assert.equal(replaced.slot.updatedAt, 50);
     }
@@ -165,13 +188,11 @@ describe("secuenciaAnclada — anclar / recordar", () => {
 
 describe("secuenciaAnclada — horario y auto-fill", () => {
   it("marca due dentro de ±30 min Lima y respeta diasActivos", () => {
-    // 2026-08-13 08:10 Lima = 13:10 UTC
     const now = Date.UTC(2026, 7, 13, 13, 10, 0);
     const due = slot({ letra: "A", hora: "08:00", diasActivos: [] });
     assert.equal(isSecuenciaDue(due, now), true);
     const far = slot({ letra: "B", hora: "18:00", diasActivos: [] });
     assert.equal(isSecuenciaDue(far, now), false);
-    // 2026-08-13 Lima es jueves (4)
     const wrongDay = slot({ letra: "C", hora: "08:00", diasActivos: [1] });
     assert.equal(isSecuenciaDue(wrongDay, now), false);
     const thursday = slot({ letra: "D", hora: "08:00", diasActivos: [4] });
@@ -179,13 +200,10 @@ describe("secuenciaAnclada — horario y auto-fill", () => {
     assert.equal(suggestDueLetter([far, due], now), "A");
   });
 
-  it("auto-fill solo si el borrador está vacío", () => {
-    assert.equal(isEmptyConquistaDraft("", [{ titulo: "", cantidadObjetivo: "" }]), true);
-    assert.equal(isEmptyConquistaDraft("Armado", [{ titulo: "", cantidadObjetivo: "" }]), false);
-    assert.equal(
-      isEmptyConquistaDraft("", [{ titulo: "Corte", cantidadObjetivo: "" }]),
-      false
-    );
+  it("auto-fill solo si el borrador situacional está vacío", () => {
+    assert.equal(isEmptySituacionDraft("", [""]), true);
+    assert.equal(isEmptySituacionDraft("Enfoque", [""]), false);
+    assert.equal(isEmptySituacionDraft("", ["Responder"]), false);
     assert.equal(shouldAutoFillDue(true, "A"), true);
     assert.equal(shouldAutoFillDue(false, "A"), false);
     assert.equal(shouldAutoFillDue(true, null), false);
