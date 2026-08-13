@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import { toast } from "sonner";
+import { useAuthContext } from "@/App";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
@@ -11,6 +12,21 @@ import {
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
+import {
+  detectLetterTrigger,
+  isEmptyConquistaDraft,
+  recallSecuencia,
+  shouldAutoFillDue,
+  suggestDueLetter,
+  upsertSecuenciaAnclada,
+  type SecuenciaAnclada,
+  type SecuenciaLetra,
+} from "@/lib/secuenciaAnclada";
+import {
+  readSecuenciasAncladas,
+  writeSecuenciasAncladas,
+} from "@/lib/secuenciaAncladaStore";
+import { SecuenciaAncladaBar } from "./SecuenciaAncladaBar";
 import {
   projectDesglosadorEndFromSubs,
   projectUnitEndLabel,
@@ -137,6 +153,13 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const [modoEntrenamientoRing, setModoEntrenamientoRing] = useState(false);
   const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
+  const [secuenciaSlots, setSecuenciaSlots] = useState<SecuenciaAnclada[]>([]);
+  const [secuenciaLetraActiva, setSecuenciaLetraActiva] = useState<SecuenciaLetra | null>(null);
+  const [secuenciaHora, setSecuenciaHora] = useState("");
+  const [secuenciaOverwrite, setSecuenciaOverwrite] = useState<SecuenciaLetra | null>(null);
+  const dueFilledRef = useRef(false);
+  const { user } = useAuthContext();
+  const userId = user?.uid ?? "";
   const keyboardInset = useKeyboardInset();
   const tick = useJornada4Tick(open && tipo === "tiempo");
   /** Overflow previo del body — liberar al abrir <select> nativo (evita bloqueo móvil). */
@@ -213,6 +236,144 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
   }, [titulo, tipo, modo]);
 
+  useEffect(() => {
+    if (!open || !userId) {
+      if (!open) {
+        setSecuenciaSlots([]);
+        dueFilledRef.current = false;
+      }
+      return;
+    }
+    setSecuenciaSlots(readSecuenciasAncladas(userId));
+  }, [open, userId]);
+
+  const applySecuenciaRecall = useCallback(
+    (letra: SecuenciaLetra, opts?: { silent?: boolean }) => {
+      const slot = recallSecuencia(secuenciaSlots, letra);
+      if (!slot) {
+        if (!opts?.silent) {
+          toast.message(`No hay hábito ${letra}`, {
+            description: "Ancla una secuencia en esa letra primero.",
+          });
+        }
+        return;
+      }
+      setTitulo(slot.titulo);
+      setSubs(
+        slot.subs.map((s, i) => {
+          const sug = getSubVehicleRecordSuggestions(s.titulo, 1)[0];
+          return {
+            tempId: `sub_${Date.now()}_${i}`,
+            titulo: s.titulo,
+            cantidadObjetivo: String(s.cantidadObjetivo),
+            tiempoRecordMinPerUnit: s.tiempoRecordMinPerUnit ?? sug?.minPerUnit,
+          };
+        })
+      );
+      setConquistaMultiModo("secuencia");
+      setSecuenciaLetraActiva(letra);
+      if (slot.hora) setSecuenciaHora(slot.hora);
+      setShowMissionSugs(false);
+    },
+    [secuenciaSlots]
+  );
+
+  useEffect(() => {
+    if (!open || tipo !== "tiempo") return;
+    const letter = detectLetterTrigger(titulo);
+    if (!letter) return;
+    const t = window.setTimeout(() => applySecuenciaRecall(letter, { silent: true }), 550);
+    return () => window.clearTimeout(t);
+  }, [titulo, tipo, open, applySecuenciaRecall]);
+
+  const dueLetter = useMemo(
+    () => (tipo === "tiempo" && open ? suggestDueLetter(secuenciaSlots, Date.now()) : null),
+    // tick refresca la ventana ±30 min sin montar otro reloj
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [secuenciaSlots, tipo, open, tick]
+  );
+
+  useEffect(() => {
+    if (!open || tipo !== "tiempo" || dueFilledRef.current) return;
+    if (!shouldAutoFillDue(isEmptyConquistaDraft(titulo, subs), dueLetter)) {
+      return;
+    }
+    dueFilledRef.current = true;
+    applySecuenciaRecall(dueLetter);
+  }, [open, tipo, dueLetter, titulo, subs, applySecuenciaRecall]);
+
+  const canAnchorSecuencia =
+    tipo === "tiempo" &&
+    subs.some(s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0);
+
+  const commitSecuenciaAnchor = useCallback(
+    (letra: SecuenciaLetra, overwrite: boolean) => {
+      const valid = subs.filter(
+        s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
+      );
+      const result = upsertSecuenciaAnclada(
+        secuenciaSlots,
+        {
+          letra,
+          titulo: titulo.trim() || valid[0]?.titulo || "",
+          subs: valid.map(s => ({
+            titulo: s.titulo,
+            cantidadObjetivo: s.cantidadObjetivo,
+            tiempoRecordMinPerUnit: s.tiempoRecordMinPerUnit,
+          })),
+          hora: secuenciaHora || null,
+        },
+        { overwrite }
+      );
+      if (!result.ok) {
+        if (result.error === "slot_ocupado") {
+          setSecuenciaOverwrite(letra);
+          return;
+        }
+        toast.message("No se pudo anclar", {
+          description:
+            result.error === "secuencia_invalida"
+              ? "Necesitas al menos una unidad con nombre y cantidad."
+              : "Letra inválida.",
+        });
+        return;
+      }
+      const next = writeSecuenciasAncladas(userId, result.slots);
+      setSecuenciaSlots(next);
+      setSecuenciaLetraActiva(letra);
+      setSecuenciaOverwrite(null);
+      toast.message(`Hábito ${letra} anclado`, {
+        description: secuenciaHora
+          ? `Secuencia + ${secuenciaHora}. Una letra lo recuerda.`
+          : "Secuencia lista. Una letra la recuerda.",
+      });
+    },
+    [secuenciaSlots, subs, titulo, secuenciaHora, userId]
+  );
+
+  const handleAnchorLetter = useCallback(
+    (letra: SecuenciaLetra) => {
+      const occupied = recallSecuencia(secuenciaSlots, letra);
+      if (!canAnchorSecuencia) {
+        if (occupied) {
+          applySecuenciaRecall(letra);
+          return;
+        }
+        toast.message("Llena la secuencia primero", {
+          description: "Nombre de unidad + cantidad. Luego anclas la letra.",
+        });
+        return;
+      }
+      commitSecuenciaAnchor(letra, false);
+    },
+    [
+      secuenciaSlots,
+      canAnchorSecuencia,
+      applySecuenciaRecall,
+      commitSecuenciaAnchor,
+    ]
+  );
+
   const missionSuggestions =
     tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
       ? getDesglosadorMisionData(titulo, 5)
@@ -264,6 +425,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setActiveSubSugIdx(null);
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
+    setSecuenciaLetraActiva(null);
+    setSecuenciaHora("");
+    setSecuenciaOverwrite(null);
     setOpen(false);
   }, [segmentoHoraFin, defaultProyectoId, hubPeldanoId, hubOleadaPuntoId]);
 
@@ -698,8 +862,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         : "Desglosador · secuencia"}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                      Misión + unidades con cantidad y récord. Al añadir 2+ unidades puedes
-                      elegir secuencia (un desglosador) o independientes.
+                      Misión + unidades. A–F recuerda un hábito anclado (secuencia + horario)
+                      sin planear de nuevo. Con 2+ unidades: secuencia o independientes.
                     </p>
                   </div>
                   )}
@@ -780,6 +944,27 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     onNativePickerClose={restoreBodyAfterNativePicker}
                   />
 
+                  {tipo === "tiempo" ? (
+                    <SecuenciaAncladaBar
+                      slots={secuenciaSlots}
+                      dueLetter={dueLetter}
+                      activeLetter={secuenciaLetraActiva}
+                      canAnchor={canAnchorSecuencia}
+                      hora={secuenciaHora}
+                      overwriteLetter={secuenciaOverwrite}
+                      onHoraChange={setSecuenciaHora}
+                      onRecall={letra => applySecuenciaRecall(letra)}
+                      onAnchorLetter={handleAnchorLetter}
+                      onConfirmOverwrite={() => {
+                        if (secuenciaOverwrite) {
+                          commitSecuenciaAnchor(secuenciaOverwrite, true);
+                        }
+                      }}
+                      onCancelOverwrite={() => setSecuenciaOverwrite(null)}
+                      onClearHora={() => setSecuenciaHora("")}
+                    />
+                  ) : null}
+
                   {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
                   {((tipo === "tiempo" &&
                     !(
@@ -814,7 +999,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
                         placeholder={
                           tipo === "tiempo"
-                            ? "Ej: Armado de bolsillo"
+                            ? "Letra A–F o nombre (ej: Armado)"
                             : "Ej: Enfoque de la tarde"
                         }
                         className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
