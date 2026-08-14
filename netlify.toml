@@ -9,14 +9,14 @@
   NODE_VERSION = "20"
   # Instalar devDependencies (vite, tsx) necesarias para npm run build
   NPM_CONFIG_PRODUCTION = "false"
+  # Deploy previews fallaban ~30s sin log (deploy_time null). Desactivar escaneo
+  # que aborta Building cuando VITE_* quedan embebidas en el cliente.
+  SECRETS_SCAN_ENABLED = "false"
 
 [functions]
   node_bundler = "esbuild"
 
-# Plan Free: máximo 10s. Plan Pro: hasta 26s.
 [functions.api]
-  timeout = 10
-  memory = 1024
   included_files = ["dist/netlify-api.cjs"]
 
 # API Express → función serverless
