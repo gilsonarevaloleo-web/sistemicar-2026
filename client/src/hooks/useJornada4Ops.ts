@@ -74,6 +74,10 @@ import {
   type DestinoCierre,
 } from "@/lib/destinoCierre";
 import {
+  registrarCierreConcienciaTriada,
+  resolveDuracionMinCierre,
+} from "@/lib/concienciaTriadaOperador";
+import {
   buildDesglosadorNestedPausePatch,
   resumeDesglosadorFromNestedPause,
 } from "@/lib/nestedContextStack";
@@ -379,6 +383,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
             const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: closed.id,
+              minutos: resolveDuracionMinCierre(closed, duracionMin),
+              destino,
+              at: patch.cierreAt,
+            });
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "tiempo",
               psGanados: cyclePs + depthPs,
@@ -636,9 +646,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 : { aperturaAt: patch.cierreAt, duracionFinal: 0 }),
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
-            const duracionMin = feedsHub
-              ? Math.max(0, (patch.cierreAt - apertura) / 60_000)
-              : 0;
+            const wallMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(vehicle, wallMin),
+              destino,
+              at: patch.cierreAt,
+            });
+            const duracionMin = feedsHub ? wallMin : 0;
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "situacion",
               psGanados: awarded,
@@ -958,6 +973,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 aperturaAt: cierreAt,
                 duracionFinal: 0,
               };
+              const apertura = vehicle.aperturaAt ?? cierreAt;
+              const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
+              registrarCierreConcienciaTriada(userId, {
+                vehicleId: vehicle.id,
+                minutos: resolveDuracionMinCierre(vehicle, wallMin),
+                destino,
+                at: cierreAt,
+              });
               await recordProgresoHubAlCerrarVehiculo(userId, closed, {
                 tipoOrigen: "situacion",
                 psGanados: awarded,

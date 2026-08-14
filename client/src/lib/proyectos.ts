@@ -15,10 +15,7 @@ import {
   type RutasMentalesSet,
 } from "./claridadDireccion";
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
-import {
-  pushPresenciaVehicleId,
-  resolveDuracionMinCierre,
-} from "./concienciaProyecto";
+import { resolveDuracionMinCierre } from "./concienciaTriadaOperador";
 import {
   minutosFromSegundos,
   resolveRutaMinutosSituacion,
@@ -892,60 +889,18 @@ async function refreshProyectoStats(userId: string, proyectoId: string): Promise
   const conquistados = (await getPeldanosByProyecto(userId, proyectoId)).filter(p => p.estado === "conquistado");
   let profundidad: FocusBandId = "fluido";
   let minutosConquista = 0;
-  let primerNorteFromPel: number | undefined;
   for (const p of conquistados) {
     if (p.resumen?.profundidadMaxima) profundidad = maxBanda(profundidad, p.resumen.profundidadMaxima);
     if (peldanoSumaMinutosNorte(p)) minutosConquista += p.resumen?.duracionMin ?? 0;
-    if (p.cerradoAt != null) {
-      primerNorteFromPel =
-        primerNorteFromPel == null ? p.cerradoAt : Math.min(primerNorteFromPel, p.cerradoAt);
-    }
   }
   const prev = getLocalProyectos(userId).find(p => p.id === proyectoId);
   const minutosNorte =
     minutosConquista + minutosFromSegundos(prev?.segundosNorteSituacion);
-  const patch: Partial<Omit<Proyecto, "id" | "createdAt">> = {
+  await updateProyecto(userId, proyectoId, {
     peldanosConquistados: conquistados.length,
     profundidadMaxima: profundidad,
     minutosTotales: minutosNorte,
-  };
-  if (conquistados.length > 0 || (prev?.segundosNorteSituacion ?? 0) > 0) {
-    patch.primerNorteAt = prev?.primerNorteAt ?? primerNorteFromPel ?? Date.now();
-  }
-  await updateProyecto(userId, proyectoId, patch);
-}
-
-/**
- * Cierre presencia vinculado a proyecto: minutos + etapa Presente.
- * No crea peldaños. Local + sync sombra; idempotente por vehicleId.
- */
-export function registrarCierrePresenciaEnProyecto(
-  userId: string,
-  proyectoId: string,
-  act: { vehicleId: string; minutos: number; at?: number }
-): Proyecto | null {
-  const list = getLocalProyectos(userId);
-  const idx = list.findIndex(p => p.id === proyectoId);
-  if (idx === -1) return null;
-
-  const { next, isNew } = pushPresenciaVehicleId(list[idx].presenciaVehicleIds, act.vehicleId);
-  if (!isNew) return list[idx];
-
-  const minutos = Math.max(0, Math.round(act.minutos));
-  const at = act.at ?? Date.now();
-  const prev = list[idx];
-  const updated: Proyecto = {
-    ...prev,
-    minutosPresencia: (prev.minutosPresencia ?? 0) + minutos,
-    sesionesPresencia: (prev.sesionesPresencia ?? 0) + 1,
-    presenciaVehicleIds: next,
-    primeraPresenciaAt: prev.primeraPresenciaAt ?? at,
-    updatedAt: Date.now(),
-  };
-  list[idx] = updated;
-  saveLocalProyectos(userId, list);
-  void syncFirestoreProyecto(userId, updated);
-  return updated;
+  });
 }
 
 const SITUACION_CREDIT_RING = 256;
@@ -1269,14 +1224,6 @@ export async function recordProgresoHubAlCerrarVehiculo(
   };
 
   if (!feedsHub) {
-    if (proyectoId) {
-      // Minutos Presente: no crean peldaño; sí alimentan etapa de conciencia.
-      registrarCierrePresenciaEnProyecto(userId, proyectoId, {
-        vehicleId: vehicle.id,
-        minutos: duracionMin,
-        at: vehicle.cierreAt ?? Date.now(),
-      });
-    }
     await maybeSintonizarOleada();
     return;
   }

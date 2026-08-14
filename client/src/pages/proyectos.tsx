@@ -74,28 +74,13 @@ import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
-import {
-  buildConcienciaProyectoResumen,
-  ETAPA_CONCIENCIA_META,
-  type EtapaConcienciaProyecto,
-} from "@/lib/concienciaProyecto";
-import {
-  resolveMinutosNorteDisplay,
-  resolveMinutosPresenciaDisplay,
-} from "@/lib/rutaMinutosSituacionProyecto";
+import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
 const GOLD = "#D4AF37";
 const PLATA = "#C0C0C0";
 const NARANJA = "#F97316";
-const EMERALD = "#34D399";
-
-const ETAPA_COLOR: Record<EtapaConcienciaProyecto, string> = {
-  inconsciente: "#64748B",
-  presente: EMERALD,
-  norte: GOLD,
-};
 const PROYECTO_COLORS = ["#38BDF8", "#A855F7", "#F97316", "#10b981", "#D4AF37", "#f87171"];
 
 function formatFecha(ts?: number) {
@@ -448,23 +433,9 @@ export default function ProyectosPage() {
   );
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
-  const conciencia = useMemo(
-    () =>
-      buildConcienciaProyectoResumen({
-        minutosPresencia: resolveMinutosPresenciaDisplay(
-          proyecto?.minutosPresencia ?? 0,
-          proyecto?.segundosPresenciaRing
-        ),
-        sesionesPresencia: proyecto?.sesionesPresencia,
-        minutosNorte: resolveMinutosNorteDisplay(
-          stats.minutosTotales,
-          proyecto?.segundosNorteSituacion
-        ),
-        peldanosConquistados: stats.conquistados,
-        primeraPresenciaAt: proyecto?.primeraPresenciaAt,
-        primerNorteAt: proyecto?.primerNorteAt,
-      }),
-    [proyecto, stats]
+  const minutosNorte = resolveMinutosNorteDisplay(
+    stats.minutosTotales,
+    proyecto?.segundosNorteSituacion
   );
   // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
   const ideas = useMemo(
@@ -1027,68 +998,15 @@ export default function ProyectosPage() {
                 <p className="text-[7px] uppercase text-slate-500 tracking-wider">Peldaños</p>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-lg font-black text-white">{conciencia.minutosNorte}</p>
-                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Min norte</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-lg font-black" style={{ color: EMERALD }}>
-                  {conciencia.minutosPresencia}
-                </p>
-                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Min presencia</p>
-              </div>
-            </div>
-
-            <div
-              className="px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] space-y-2"
-              data-testid="hub-conciencia-etapas"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[8px] uppercase tracking-widest text-slate-500">
-                  Conciencia · {ETAPA_CONCIENCIA_META[conciencia.etapa].label}
-                </p>
-                <p
-                  className="text-[8px] font-bold uppercase tracking-wider"
-                  style={{ color: RUTA_BANDA_META[stats.profundidadMaxima].color }}
-                >
+                <p className="text-lg font-black" style={{ color: RUTA_BANDA_META[stats.profundidadMaxima].color }}>
                   {RUTA_BANDA_META[stats.profundidadMaxima].label}
                 </p>
+                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Profundidad</p>
               </div>
-              <div className="flex items-center gap-1.5">
-                {(["inconsciente", "presente", "norte"] as const).map((etapa, i) => {
-                  const meta = ETAPA_CONCIENCIA_META[etapa];
-                  const reached = ETAPA_CONCIENCIA_META[conciencia.etapa].orden >= meta.orden;
-                  const current = conciencia.etapa === etapa;
-                  return (
-                    <div key={etapa} className="flex items-center gap-1.5 min-w-0 flex-1">
-                      {i > 0 && (
-                        <div
-                          className="h-px flex-1 min-w-[6px]"
-                          style={{ backgroundColor: reached ? `${ETAPA_COLOR[etapa]}55` : "rgba(255,255,255,0.08)" }}
-                        />
-                      )}
-                      <div className="flex flex-col items-center gap-0.5 min-w-0">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: reached ? ETAPA_COLOR[etapa] : "rgba(255,255,255,0.15)",
-                            boxShadow: current ? `0 0 8px ${ETAPA_COLOR[etapa]}88` : undefined,
-                          }}
-                          aria-hidden
-                        />
-                        <span
-                          className="text-[7px] uppercase tracking-wide truncate max-w-full"
-                          style={{ color: current ? ETAPA_COLOR[etapa] : "#64748B" }}
-                        >
-                          {meta.label}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+                <p className="text-lg font-black text-white">{minutosNorte}</p>
+                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Min norte</p>
               </div>
-              <p className="text-[9px] text-slate-400 leading-relaxed" data-testid="hub-conciencia-relato">
-                {conciencia.relatoInicio}
-              </p>
             </div>
 
             <HubCollapsible
