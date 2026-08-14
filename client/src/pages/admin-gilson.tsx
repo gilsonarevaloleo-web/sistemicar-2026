@@ -135,6 +135,26 @@ export default function AdminGilson() {
   const [sellerSalesLoading, setSellerSalesLoading] = useState(false);
   const [newSellerCode, setNewSellerCode] = useState("");
   const [newSellerName, setNewSellerName] = useState("");
+  const [vendedorCalls, setVendedorCalls] = useState<Array<{
+    id: string;
+    telefono: string;
+    whatsapp: string | null;
+    codigo: number;
+    planeta: string;
+    sellerRef: string | null;
+    status: string;
+    canalUsado: string | null;
+    intentos: number;
+    error: string | null;
+    guionResumen: string;
+    createdAt: string;
+  }>>([]);
+  const [vendedorCallsLoading, setVendedorCallsLoading] = useState(false);
+  const [vendedorCallsDaily, setVendedorCallsDaily] = useState<{
+    used: number;
+    limit: number;
+    remaining: number;
+  } | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,8 +357,25 @@ export default function AdminGilson() {
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
+      void loadVendedorCalls();
     }
   }, [activeTab, isAuthenticated]);
+
+  const loadVendedorCalls = async () => {
+    setVendedorCallsLoading(true);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch("/api/admin/vendedor-calls?limit=50", { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error");
+      setVendedorCalls(data.calls || []);
+      setVendedorCallsDaily(data.daily || null);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Error cargando llamadas");
+    } finally {
+      setVendedorCallsLoading(false);
+    }
+  };
 
   const loadSellerSales = async () => {
     setSellerSalesLoading(true);
@@ -1604,6 +1641,64 @@ export default function AdminGilson() {
                       ) : (
                         <span className="text-emerald-500 mt-1 inline-block">Comisión pagada</span>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20">
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <div>
+                  <h3 className="text-sky-400 font-bold text-sm">Llamadas Vendedor Algorítmico</h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Cupo hoy:{" "}
+                    {vendedorCallsDaily
+                      ? `${vendedorCallsDaily.used}/${vendedorCallsDaily.limit} (quedan ${vendedorCallsDaily.remaining})`
+                      : "—"}
+                    {" · "}Teléfono → WhatsApp · solo admin
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void loadVendedorCalls()}
+                  className="text-xs text-sky-400 shrink-0"
+                  disabled={vendedorCallsLoading}
+                >
+                  Actualizar
+                </button>
+              </div>
+              {vendedorCallsLoading ? (
+                <p className="text-xs text-slate-500">Cargando...</p>
+              ) : vendedorCalls.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  Sin llamadas. Se generan desde /vendedor con «Llámame». Log: data/vendedor-calls.json
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {vendedorCalls.map((c) => (
+                    <div key={c.id} className="p-3 rounded-lg bg-black/30 border border-white/5 text-xs">
+                      <div className="flex justify-between gap-2 mb-1">
+                        <span className="font-black text-sky-400">
+                          C{c.codigo} · {c.planeta}
+                        </span>
+                        <span className="text-slate-500">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-white">
+                        {c.telefono}
+                        {c.sellerRef ? ` · ref ${c.sellerRef}` : ""}
+                      </p>
+                      <p className="text-slate-400 mt-0.5">
+                        status <span className="text-sky-300">{c.status}</span>
+                        {c.canalUsado ? ` · canal ${c.canalUsado}` : ""}
+                        {` · intentos ${c.intentos}`}
+                      </p>
+                      {c.error && (
+                        <p className="text-amber-500/80 mt-1 break-all">{c.error}</p>
+                      )}
+                      <p className="text-slate-600 mt-1 line-clamp-2">{c.guionResumen}</p>
                     </div>
                   ))}
                 </div>

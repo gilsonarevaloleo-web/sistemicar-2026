@@ -71,10 +71,18 @@ import {
   adminGrantEspejoCredits,
   listEspejoDeliveries,
 } from "./espejoCreditDeliveries";
-import { deliverCorazonSabioIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
+import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
+import { isEspejoSkuId } from "../shared/espejoPricing";
 import { activateModulesForEmail, activateModulesForUserById, adminLookupUserByEmail, isFirebaseAdminReady } from "./firebaseAdmin";
 import { modulesGrantedByPlan } from "../shared/moduleAccess";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
+import {
+  solicitarLlamadaVendedor,
+  handleTwilioVoiceStatus,
+  getGuionForCall,
+} from "./vendedorCallService";
+import { listVendedorCalls, canAcceptNewCall } from "./vendedorCallsStore";
+import { buildTwimlSay } from "./twilioVendedor";
 import { registerEspejoV2Routes } from "./espejoV2Routes";
 import { registerUmbralV2Routes } from "./umbralV2Routes";
 import {
@@ -2011,10 +2019,11 @@ app.post("/api/mercadopago/create-preference", async (req, res) => {
       return res.status(400).json({ error: "Plan no válido" });
     }
 
-    // Espejo $17 y otros planes legacy: fuera de lista de venta (solo Jornada V4 + API).
+    // Planes legacy: fuera de lista de venta.
     if ("legacy" in plan && plan.legacy) {
       return res.status(400).json({
-        error: "Este plan ya no está a la venta. Usa Jornada Base, Ritmo del día o Norte.",
+        error:
+          "Este plan ya no está a la venta. Usa Jornada, Umbral o packs Espejo (créditos).",
       });
     }
 
@@ -2094,8 +2103,8 @@ app.post("/api/mercadopago/webhook", async (req, res) => {
         const plan = SUBSCRIPTION_PLANS[externalRef.planId as keyof typeof SUBSCRIPTION_PLANS];
         const paymentIdStr = String(paymentInfo.id);
 
-        if (externalRef.planId === "corazon-sabio") {
-          await deliverCorazonSabioIfNeeded(paymentInfo, externalRef);
+        if (externalRef.planId && isEspejoSkuId(externalRef.planId)) {
+          await deliverEspejoCreditsIfNeeded(paymentInfo, externalRef);
         } else if (
           externalRef.email &&
           modulesGrantedByPlan(externalRef.planId ?? "").length > 0
@@ -2187,8 +2196,11 @@ app.post("/api/mercadopago/webhook", async (req, res) => {
             await updateApiKeyDeliveryStatus(record.id, "failed");
             console.error(`[MP] Error enviando email a ${externalRef.email} — key ${record.id} marcada como failed`, emailErr);
           }
-        } else if (externalRef.email && externalRef.planId !== "corazon-sabio") {
-          // Plan personal: email de confirmación estándar (Espejo ya envía en deliverCorazonSabioIfNeeded)
+        } else if (
+          externalRef.email &&
+          !(externalRef.planId && isEspejoSkuId(externalRef.planId))
+        ) {
+          // Plan personal: email de confirmación estándar (Espejo ya envía en deliverEspejoCreditsIfNeeded)
           await sendPaymentConfirmationEmail({
             to: externalRef.email,
             userName: externalRef.userName || "Guerrero",
@@ -5176,7 +5188,7 @@ app.post("/api/admin/espejo/grant-credits", requireAdminToken, async (req, res) 
       note: typeof note === "string" ? note : undefined,
       mode: grantMode,
       grantedBy: adminEmail,
-      planId: typeof planId === "string" ? planId : "corazon-sabio",
+      planId: typeof planId === "string" ? planId : "espejo_inicio",
     });
 
     if (result.duplicate) {
@@ -5188,11 +5200,16 @@ app.post("/api/admin/espejo/grant-credits", requireAdminToken, async (req, res) 
 
     if (sendEmail !== false && result.granted) {
       try {
+        const grantPlanId =
+          typeof planId === "string" && isEspejoSkuId(planId)
+            ? planId
+            : "espejo_inicio";
+        const grantPlan = SUBSCRIPTION_PLANS[grantPlanId];
         await sendPaymentConfirmationEmail({
           to: email.trim().toLowerCase(),
           userName: email.split("@")[0],
-          planName: "El Corazón Sabio™",
-          amount: 17,
+          planName: `${grantPlan.name} (${credits} créditos)`,
+          amount: grantPlan.price,
         });
       } catch (emailErr) {
         console.error("[admin/espejo/grant-credits] email:", emailErr);
@@ -5292,6 +5309,77 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
     const message = error instanceof Error ? error.message : "Error activando módulo.";
     console.error("[admin/modules/grant]", error);
     res.status(500).json({ error: message });
+  }
+});
+
+// ===== VENDEDOR ALGORÍTMICO: LLAMADAS (Twilio) =====
+app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
+  try {
+    const result = await solicitarLlamadaVendedor({
+      telefono: String(req.body?.telefono || ""),
+      whatsapp: req.body?.whatsapp ? String(req.body.whatsapp) : null,
+      codigo: Number(req.body?.codigo),
+      planeta: String(req.body?.planeta || ""),
+      sellerRef: req.body?.sellerRef ? String(req.body.sellerRef) : null,
+      consentimiento: String(req.body?.consentimiento || ""),
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      callId: result.call.id,
+      status: result.call.status,
+      twilioReady: result.twilioReady,
+      message: result.twilioReady
+        ? "Llamada encolada. Primero teléfono; si no contesta, WhatsApp."
+        : "Solicitud registrada. Twilio aún no está configurado — visible en admin.",
+    });
+  } catch (error) {
+    console.error("[vendedor/solicitar-llamada]", error);
+    res.status(500).json({ error: "Error solicitando llamada." });
+  }
+});
+
+app.get("/api/vendedor/twilio/twiml", (req, res) => {
+  const callId = typeof req.query.callId === "string" ? req.query.callId : "";
+  const guion = callId ? getGuionForCall(callId) : null;
+  const xml = buildTwimlSay(
+    guion ||
+      "Hola. Soy el vendedor de Sistemicar. Entra en sistemicar punto app para continuar.",
+  );
+  res.type("text/xml").send(xml);
+});
+
+app.post("/api/vendedor/twilio/status", async (req, res) => {
+  try {
+    const callId =
+      (typeof req.query.callId === "string" && req.query.callId) ||
+      (typeof req.body?.callId === "string" && req.body.callId) ||
+      "";
+    const callStatus = String(req.body?.CallStatus || req.body?.callStatus || "");
+    if (callId && callStatus) {
+      await handleTwilioVoiceStatus({ callId, callStatus });
+    }
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("[vendedor/twilio/status]", error);
+    res.status(200).send("OK");
+  }
+});
+
+app.get("/api/admin/vendedor-calls", requireAdminToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "50";
+    const limit = parseInt(limitStr, 10) || 50;
+    const cupo = canAcceptNewCall();
+    res.json({
+      calls: listVendedorCalls(limit),
+      daily: { used: cupo.used, limit: cupo.limit, remaining: Math.max(0, cupo.limit - cupo.used) },
+    });
+  } catch (error) {
+    console.error("[admin/vendedor-calls]", error);
+    res.status(500).json({ error: "Error listando llamadas del vendedor." });
   }
 });
 

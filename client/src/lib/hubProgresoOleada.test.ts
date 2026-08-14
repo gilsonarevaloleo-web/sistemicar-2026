@@ -206,6 +206,9 @@ describe("hub progreso oleada", () => {
     const all = getPeldanosByProyectoLocal(USER, p.id);
     assert.equal(all.filter(x => x.estado === "conquistado").length, 0);
     assert.equal(all.find(x => x.id === idea.id)?.estado, "en_curso");
+    // Presencia ya no escribe minutos en el Hub (va a la triada del operador).
+    const updated = getProyectosLocal(USER).find(x => x.id === p.id);
+    assert.equal(updated?.minutosPresencia ?? 0, 0);
   });
 
   it("cierre peldaño marca minutos en stats del Hub", async () => {

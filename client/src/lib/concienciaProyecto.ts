@@ -3,6 +3,4 @@
  * La triada vive en `concienciaTriadaOperador.ts`.
  * Se mantiene `resolveDuracionMinCierre` reexportado por compat de tests viejos.
  */
-export {
-  resolveDuracionMinCierre,
-} from "./concienciaTriadaOperador";
+export { resolveDuracionMinCierre } from "./concienciaTriadaOperador";

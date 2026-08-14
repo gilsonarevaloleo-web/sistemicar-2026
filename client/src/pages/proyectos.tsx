@@ -19,6 +19,7 @@ import {
   Flag,
   ArrowLeft,
   Trash2,
+  RotateCcw,
   Sparkles,
   TrendingUp,
   Link2,
@@ -36,6 +37,8 @@ import {
   getPeldanosByProyectoLocal,
   addProyecto,
   updateProyecto,
+  deleteProyecto,
+  resetProyecto,
   addPeldanoIdea,
   deletePeldanoIdea,
   reorderPeldano,
@@ -289,6 +292,7 @@ export default function ProyectosPage() {
   const [detailTab, setDetailTab] = useState<"enfoque" | "jornada" | "escalera">("enfoque");
   /** Dirección: lectura limpia por defecto; inputs detrás de [Editar Dirección]. */
   const [editandoDireccion, setEditandoDireccion] = useState(false);
+  const [focoBusy, setFocoBusy] = useState<"reset" | "delete" | null>(null);
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
@@ -580,6 +584,49 @@ export default function ProyectosPage() {
     void reloadDetail();
   };
 
+  const handleResetProyecto = async () => {
+    if (!user || !detailId || !proyecto || focoBusy) return;
+    const ok = window.confirm(
+      `¿Reiniciar «${proyecto.titulo}»?\n\nSe borra la escalera, la oleada y los minutos. El nombre y el nido se quedan, para volver a enfocar. No se puede deshacer.`
+    );
+    if (!ok) return;
+    setFocoBusy("reset");
+    try {
+      const reset = await resetProyecto(user.uid, detailId);
+      if (!reset) {
+        toast.error("No se pudo reiniciar. Intenta de nuevo.");
+        return;
+      }
+      setProyectos(getProyectosLocal(user.uid));
+      applyDetailState(reset, []);
+      setEditandoDireccion(false);
+      toast.success(`«${reset.titulo}» reiniciado — foco limpio`);
+    } catch {
+      toast.error("No se pudo reiniciar. Intenta de nuevo.");
+    } finally {
+      setFocoBusy(null);
+    }
+  };
+
+  const handleDeleteProyecto = async () => {
+    if (!user || !detailId || !proyecto || focoBusy) return;
+    const ok = window.confirm(
+      `¿Borrar «${proyecto.titulo}»?\n\nSale del Hub. Los pensamientos del Crisol van a aterrizaje pendiente. No se puede deshacer.`
+    );
+    if (!ok) return;
+    setFocoBusy("delete");
+    try {
+      await deleteProyecto(user.uid, detailId);
+      setProyectos(getProyectosLocal(user.uid));
+      toast.success(`«${proyecto.titulo}» borrado`);
+      navigate("/proyectos");
+    } catch {
+      toast.error("No se pudo borrar. Intenta de nuevo.");
+    } finally {
+      setFocoBusy(null);
+    }
+  };
+
   if (!user) {
     return (
       <div className="p-6 text-center text-slate-500 text-sm min-h-screen" style={{ backgroundColor: "#020202" }}>
@@ -631,7 +678,7 @@ export default function ProyectosPage() {
           <ArrowLeft size={14} /> Todos los proyectos
         </button>
 
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
             <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">
               {proyecto.etiqueta}
@@ -639,6 +686,31 @@ export default function ProyectosPage() {
             <h1 className="text-lg font-black text-white truncate leading-tight">{proyecto.titulo}</h1>
           </div>
           <ProyectoIcono etiqueta={proyecto.etiqueta} color={tint} size={24} />
+        </div>
+
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            disabled={focoBusy !== null}
+            onClick={() => void handleResetProyecto()}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50"
+            style={{ color: tint, border: `1px solid ${tint}40`, backgroundColor: `${tint}10` }}
+            data-testid="hub-reiniciar-proyecto"
+          >
+            <RotateCcw size={12} />
+            {focoBusy === "reset" ? "Reiniciando…" : "Reiniciar"}
+          </button>
+          <button
+            type="button"
+            disabled={focoBusy !== null}
+            onClick={() => void handleDeleteProyecto()}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50 text-red-400"
+            style={{ border: "1px solid rgba(248,113,113,0.35)", backgroundColor: "rgba(248,113,113,0.08)" }}
+            data-testid="hub-borrar-proyecto"
+          >
+            <Trash2 size={12} />
+            {focoBusy === "delete" ? "Borrando…" : "Borrar"}
+          </button>
         </div>
 
         <Tabs
@@ -1211,7 +1283,8 @@ export default function ProyectosPage() {
           Proyectos y Centros
         </h1>
         <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-          Construye tu futuro peldaño a peldaño. Calendario de pasos dados — no de promesas.
+          Construye tu futuro peldaño a peldaño. Si un proyecto cambia o se amontona, ábrelo y
+          reinícialo o bórralo — el Hub es foco, no archivo.
         </p>
       </header>
 

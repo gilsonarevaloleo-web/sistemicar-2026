@@ -82,7 +82,7 @@ IDs estables (webhooks): `planificacion_base` · `operativo` (Ritmo) · `soberan
 - **No** vender Hub/Proyectos como gancho de entrada.
 - Operativo/Ritmo **después** de habituar cierre de unidades.
 - Norte es el peldaño más caro y el último en el embudo.
-- Espejo (Corazón Sabio) es otro producto.
+- Espejo es otro producto: packs de créditos (`espejo_inicio` / `espejo_recarga`). Corazón Sabio retirado.
 
 ---
 

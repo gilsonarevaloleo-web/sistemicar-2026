@@ -1,14 +1,16 @@
 import { SUBSCRIPTION_PLANS } from "./mercadopagoPlans";
 
-/** Comisión del vendedor: 30% de cada pago mientras la suscripción siga activa (corte al cancelar). */
+/** Comisión del vendedor: 30% de cada pago (recurrente en suscripciones; una vez en packs Espejo). */
 export const SELLER_COMMISSION_RATE = 0.3;
 
-/** Catálogo actual de /pagos con comisión vendedor. Espejo $17 ya no se vende. */
+/** Catálogo actual de /pagos con comisión vendedor. */
 export const SELLER_PLAN_IDS = [
   "planificacion_base",
   "soberania_dia",
   "operativo",
   "umbral",
+  "espejo_inicio",
+  "espejo_recarga",
 ] as const;
 
 export type SellerPlanId = (typeof SELLER_PLAN_IDS)[number];

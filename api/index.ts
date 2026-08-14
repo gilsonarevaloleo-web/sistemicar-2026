@@ -4,7 +4,8 @@ import OpenAI from "openai";
 import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import { getPublicAppBaseUrl } from "../shared/publicBaseUrl";
 import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
-import { deliverCorazonSabioIfNeeded, parseMpExternalRef } from "../server/mercadopagoEspejo";
+import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "../server/mercadopagoEspejo";
+import { isEspejoSkuId } from "../shared/espejoPricing";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
 import {
   createDefaultUmbralSessionStore,
@@ -647,8 +648,8 @@ app.post("/api/mercadopago/webhook", async (req: Request, res: Response) => {
 
       if (paymentInfo.status === "approved") {
         const externalRef = parseMpExternalRef(paymentInfo);
-        if (externalRef.planId === "corazon-sabio") {
-          await deliverCorazonSabioIfNeeded(paymentInfo, externalRef);
+        if (externalRef.planId && isEspejoSkuId(externalRef.planId)) {
+          await deliverEspejoCreditsIfNeeded(paymentInfo, externalRef);
         }
       }
     }

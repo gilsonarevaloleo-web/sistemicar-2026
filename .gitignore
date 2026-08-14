@@ -1,5 +1,6 @@
-# Local seller sales log (server)
+# Local seller sales / vendedor calls log (server)
 data/seller-sales.json
+data/vendedor-calls.json
 
 node_modules/
 

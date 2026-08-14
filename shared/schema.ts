@@ -1,7 +1,12 @@
 // Tipos puros de TypeScript para SISTEMICAR (Firebase-only)
 // No se usa PostgreSQL - todos los datos van a Firebase Firestore
 
-export type SubscriptionPlanId = "corazon-sabio" | "arquitecto" | "soberano_operativo" | "soberano";
+export type SubscriptionPlanId =
+  | "espejo_inicio"
+  | "espejo_recarga"
+  | "arquitecto"
+  | "soberano_operativo"
+  | "soberano";
 
 export interface User {
   id: string;

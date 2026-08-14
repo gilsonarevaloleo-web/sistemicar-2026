@@ -152,10 +152,11 @@ export async function grantPendingDeliveriesForEmail(
   return { grantedCredits: total, paymentIds };
 }
 
-export async function processCorazonSabioPayment(params: {
+export async function processEspejoCreditPayment(params: {
   mpPaymentId: string;
   buyerEmail: string;
   credits: number;
+  planId: string;
 }): Promise<{ granted: boolean; uid?: string }> {
   const email = params.buyerEmail.trim().toLowerCase();
   if (!email) return { granted: false };
@@ -164,7 +165,7 @@ export async function processCorazonSabioPayment(params: {
     mpPaymentId: params.mpPaymentId,
     buyerEmail: email,
     credits: params.credits,
-    planId: "corazon-sabio",
+    planId: params.planId,
   });
 
   const existing = await getEspejoDeliveryByPaymentId(params.mpPaymentId);
@@ -263,7 +264,7 @@ export async function adminGrantEspejoCredits(params: {
       deliveryId,
       email,
       credits,
-      params.planId || "corazon-sabio",
+      params.planId || "espejo_inicio",
       params.source,
       params.note?.trim() || null,
       params.grantedBy?.trim() || null,

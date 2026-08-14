@@ -17,6 +17,7 @@ import {
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import { resolveDuracionMinCierre } from "./concienciaTriadaOperador";
 import { safeSetItem } from "./storageHygiene";
+import { unlinkProyectoVinculosLocal } from "./proyectoLifecycle";
 import {
   buildTranscriptFromVehicles,
   filterDecisionsForProyecto,
@@ -164,6 +165,17 @@ export interface Proyecto {
   profundidadMaxima?: FocusBandId;
   /** Minutos Norte = suma de duraciones en peldaños conquistados. */
   minutosTotales?: number;
+  /**
+   * Minutos de presencia vinculados al proyecto (destino presencia).
+   * No escriben peldaños; alimentan etapa Presente.
+   */
+  minutosPresencia?: number;
+  /** Cierres presencia contados (idempotentes por vehicleId). */
+  sesionesPresencia?: number;
+  /** Ring de vehicleIds ya contabilizados en presencia (anti doble conteo). */
+  presenciaVehicleIds?: string[];
+  primeraPresenciaAt?: number;
+  primerNorteAt?: number;
   /** Acumulado desde segmentos vinculados en Planificación (sin peldaño). */
   metricasSegmentoVinculado?: ProyectoMetricasFlota;
   /** Fuente de verdad: pasos de claridad para segmentos (rutina solo copia al aplicar). */
@@ -221,7 +233,13 @@ function saveLocalPeldanos(userId: string, list: ProyectoPeldano[]): void {
   }
 }
 
-async function syncFirestoreProyecto(userId: string, proyecto: Proyecto, isDelete = false): Promise<void> {
+async function syncFirestoreProyecto(
+  userId: string,
+  proyecto: Proyecto,
+  isDelete = false,
+  replace = false
+): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
   const { db, getPrivatePath, isFirebaseConfigured } = await import("./firebase");
   if (!isFirebaseConfigured() || !db) return;
   try {
@@ -229,13 +247,25 @@ async function syncFirestoreProyecto(userId: string, proyecto: Proyecto, isDelet
     const path = getPrivatePath(userId, "proyectos");
     const ref = doc(collection(db, path), proyecto.id);
     if (isDelete) await deleteDoc(ref);
+    else if (replace) await setDoc(ref, proyecto);
     else await setDoc(ref, proyecto, { merge: true });
   } catch {
     // local ok
   }
 }
 
+function removeLocalPeldanosOfProyecto(userId: string, proyectoId: string): ProyectoPeldano[] {
+  const pelToRemove = getLocalPeldanos(userId).filter(p => p.proyectoId === proyectoId);
+  if (pelToRemove.length === 0) return [];
+  saveLocalPeldanos(
+    userId,
+    getLocalPeldanos(userId).filter(p => p.proyectoId !== proyectoId)
+  );
+  return pelToRemove;
+}
+
 async function syncFirestorePeldano(userId: string, peldano: ProyectoPeldano, isDelete = false): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
   const { db, getPrivatePath, isFirebaseConfigured } = await import("./firebase");
   if (!isFirebaseConfigured() || !db) return;
   try {
@@ -484,10 +514,50 @@ export async function deleteProyecto(userId: string, id: string): Promise<void> 
   const prev = getLocalProyectos(userId);
   const removed = prev.find(p => p.id === id);
   saveLocalProyectos(userId, prev.filter(p => p.id !== id));
-  const pelToRemove = getLocalPeldanos(userId).filter(p => p.proyectoId === id);
-  saveLocalPeldanos(userId, getLocalPeldanos(userId).filter(p => p.proyectoId !== id));
+  const pelToRemove = removeLocalPeldanosOfProyecto(userId, id);
+  unlinkProyectoVinculosLocal(userId, id, "delete");
   if (removed) void syncFirestoreProyecto(userId, removed, true);
   for (const pel of pelToRemove) void syncFirestorePeldano(userId, pel, true);
+}
+
+/**
+ * Reinicia el proyecto sin perder el nido: mismo id, título, color y nota.
+ * Borra escalera, oleada, minutos y conciencia — para volver a enfocar.
+ */
+export async function resetProyecto(userId: string, id: string): Promise<Proyecto | null> {
+  const list = getLocalProyectos(userId);
+  const idx = list.findIndex(p => p.id === id);
+  if (idx === -1) return null;
+  const prev = list[idx];
+  const now = Date.now();
+  const reset: Proyecto = {
+    id: prev.id,
+    titulo: prev.titulo,
+    etiqueta: prev.etiqueta,
+    ...(prev.color ? { color: prev.color } : {}),
+    ...(prev.icono ? { icono: prev.icono } : {}),
+    ...(prev.nota ? { nota: prev.nota } : {}),
+    ...(prev.orden != null ? { orden: prev.orden } : {}),
+    createdAt: prev.createdAt,
+    updatedAt: now,
+    peldanosConquistados: 0,
+    minutosTotales: 0,
+    minutosPresencia: 0,
+    sesionesPresencia: 0,
+    presenciaVehicleIds: [],
+    claridadActiva: buildDefaultClaridadDireccion({
+      tituloProyecto: prev.titulo,
+      etiqueta: prev.etiqueta,
+      focoTitulo: prev.titulo,
+    }),
+  };
+  list[idx] = reset;
+  saveLocalProyectos(userId, list);
+  const pelToRemove = removeLocalPeldanosOfProyecto(userId, id);
+  unlinkProyectoVinculosLocal(userId, id, "reset");
+  void syncFirestoreProyecto(userId, reset, false, true);
+  for (const pel of pelToRemove) void syncFirestorePeldano(userId, pel, true);
+  return reset;
 }
 
 /** Peldaños en local (sin esperar Firebase). */

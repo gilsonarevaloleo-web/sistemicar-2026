@@ -9,8 +9,12 @@ import {
   SKU_RITMO,
   EMBUDO_PREGUNTAS_V2,
 } from "@shared/planificacionPricing";
+import {
+  ESPEJO_SKU_INICIO,
+  ESPEJO_SKU_RECARGA,
+} from "@shared/espejoPricing";
 
-export const KIT_VERSION = "2.0";
+export const KIT_VERSION = "2.1";
 
 export const KIT_ELEVATOR_PITCH = SISTEMICAR_CATEGORY.elevator;
 
@@ -19,7 +23,8 @@ export const KIT_RESUMEN_30S = [
   `Peldaño 1 ${SKU_BASE.name} ($${SKU_BASE.priceUsd}) — vehículos Conquista + PS (urgente).`,
   `Peldaño 2 ${SKU_RITMO.name} (+$${SKU_RITMO.priceUsd}) — segmentos + Situacional.`,
   `Peldaño 3 ${SKU_NORTE.name} (+$${SKU_NORTE.priceUsd}) — Crisol + Hub Proyectos (último, alto valor).`,
-  `Comprometido paga ~$${PLANIFICACION_FULL_MONTHLY_USD}/mes (tres capas apiladas). Comisión 30% recurrente.`,
+  `Espejo: packs de créditos — Inicio $${ESPEJO_SKU_INICIO.priceUsd} (${ESPEJO_SKU_INICIO.credits} créd.) / Recarga $${ESPEJO_SKU_RECARGA.priceUsd} (${ESPEJO_SKU_RECARGA.credits} créd.), pago único.`,
+  `Comprometido paga ~$${PLANIFICACION_FULL_MONTHLY_USD}/mes (tres capas apiladas). Comisión 30%.`,
 ];
 
 export const ESCALERA_CAPAS = [
@@ -84,6 +89,22 @@ export const PRODUCTOS = [
     stack: "Peldaño 3 · Norte (alto valor)",
     comision: SKU_NORTE.commissionUsd,
     color: "#38BDF8",
+  },
+  {
+    id: ESPEJO_SKU_INICIO.id,
+    name: ESPEJO_SKU_INICIO.name,
+    price: ESPEJO_SKU_INICIO.priceUsd,
+    stack: `Espejo · ${ESPEJO_SKU_INICIO.credits} créditos (único)`,
+    comision: ESPEJO_SKU_INICIO.commissionUsd,
+    color: "#38BDF8",
+  },
+  {
+    id: ESPEJO_SKU_RECARGA.id,
+    name: ESPEJO_SKU_RECARGA.name,
+    price: ESPEJO_SKU_RECARGA.priceUsd,
+    stack: `Espejo · ${ESPEJO_SKU_RECARGA.credits} créditos (único)`,
+    comision: ESPEJO_SKU_RECARGA.commissionUsd,
+    color: "#60A5FA",
   },
 ] as const;
 
@@ -174,25 +195,31 @@ export const OBJECIONES = [
   },
   {
     q: "¿Incluye todo SISTEMICAR?",
-    a: "No. Solo Jornada/Planificación según catálogo de /pagos.",
+    a: "No. Solo lo que aparece en /pagos: Jornada, Umbral y packs Espejo.",
+  },
+  {
+    q: "¿Espejo es suscripción?",
+    a: `No. Packs de créditos: Inicio $${ESPEJO_SKU_INICIO.priceUsd} (${ESPEJO_SKU_INICIO.credits} créd.) o Recarga $${ESPEJO_SKU_RECARGA.priceUsd} (${ESPEJO_SKU_RECARGA.credits} créd.). Pagan solo cuando limpian.`,
   },
 ] as const;
 
 export const LISTA_ROJA = [
-  "Módulos en desarrollo (Alquimia, Umbral, Radar, Mentor, etc.)",
+  "Módulos en desarrollo (Alquimia, Radar, Mentor, etc.)",
   '"Todo incluido" o precios que no aparecen en /pagos',
   "Que la app planifica sola sin que el usuario cierre vehículos/subs",
   "Resultados garantizados — vende medición y método",
   "Comisión infinita si el cliente cancela",
   "Vender Hub/Proyectos a quien aún no cierra unidades",
+  "Vender Corazón Sabio / Espejo $17 — retirado; usa packs de créditos",
 ] as const;
 
 export const GUION_VENTA = [
   `¿Necesitas medir unidades hoy? → ${SKU_BASE.name} ($${SKU_BASE.priceUsd}).`,
   `¿Quieres estructura e imprevistos? → + ${SKU_RITMO.name} ($${SKU_RITMO.priceUsd}).`,
   `¿Ideas a proyectos con pasos? → + ${SKU_NORTE.name} ($${SKU_NORTE.priceUsd}) — último peldaño.`,
+  `¿Carga emocional / culpa que no deja pensar? → Espejo Inicio ($${ESPEJO_SKU_INICIO.priceUsd}, ${ESPEJO_SKU_INICIO.credits} créditos).`,
   "¿Comparas con Notion? → Ritmo, cierre y decisiones medidas — no listas.",
-  `Cierre: "Base mide; Ritmo ordena el día; Norte apunta al proyecto. Comprometido ≈ $${PLANIFICACION_FULL_MONTHLY_USD}/mes."`,
+  `Cierre: "Base mide; Ritmo ordena el día; Norte apunta al proyecto. Comprometido ≈ $${PLANIFICACION_FULL_MONTHLY_USD}/mes. Espejo es pack de créditos, no suscripción."`,
 ] as const;
 
 export const IMAN_FLUJO = [
@@ -239,7 +266,12 @@ export const INVENTARIO_PRODUCTO = [
     estado: "Producción",
     nota: `Peldaño 3 — ${PLANIFICACION_SKU_BY_ID.soberania_dia.name}`,
   },
-  { area: "Pagos recurrentes MP + ref vendedor", estado: "Producción", nota: "Verificar dominio producción" },
+  {
+    area: "Espejo créditos",
+    estado: "Producción",
+    nota: `Inicio $${ESPEJO_SKU_INICIO.priceUsd}/${ESPEJO_SKU_INICIO.credits} · Recarga $${ESPEJO_SKU_RECARGA.priceUsd}/${ESPEJO_SKU_RECARGA.credits}`,
+  },
+  { area: "Pagos MP + ref vendedor", estado: "Producción", nota: "Verificar dominio producción" },
 ] as const;
 
 export const KIT_MD_PATH = "/docs/KIT_Vendedores_Planificacion.md";
