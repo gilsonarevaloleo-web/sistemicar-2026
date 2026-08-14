@@ -9,9 +9,6 @@
   NODE_VERSION = "20"
   # Instalar devDependencies (vite, tsx) necesarias para npm run build
   NPM_CONFIG_PRODUCTION = "false"
-  # VITE_* se incrustan en el JS del cliente a propósito (Firebase público + Gemini del radar).
-  SECRETS_SCAN_OMIT_KEYS = "VITE_GEMINI_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,VITE_DEV_SERVER_PORT"
-  SECRETS_SCAN_OMIT_PATHS = ".env.example,dist/public/**,dist/netlify-api.cjs,dist/index.cjs"
 
 [functions]
   node_bundler = "esbuild"
