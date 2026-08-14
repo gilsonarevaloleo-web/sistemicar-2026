@@ -7,14 +7,16 @@
 
 [build.environment]
   # Vite 7 exige Node 20.19+ o 22.12+. Node 20 llegó a EOL en abril 2026.
-  NODE_VERSION = "22"
+  NODE_VERSION = "22.12.0"
   AWS_LAMBDA_JS_RUNTIME = "nodejs22.x"
   # Instalar devDependencies (vite, tsx) necesarias para npm run build
   NPM_CONFIG_PRODUCTION = "false"
   # VITE_* se incrustan en el JS del cliente a propósito (Firebase público + Gemini del radar).
   # Si Netlify las marca como secret, el escaneo aborta la fase Building.
   SECRETS_SCAN_OMIT_KEYS = "VITE_GEMINI_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,VITE_DEV_SERVER_PORT"
-  SECRETS_SCAN_OMIT_PATHS = ".env.example,dist/netlify-api.cjs,dist/index.cjs"
+  SECRETS_SCAN_OMIT_PATHS = ".env.example,dist/public/**,dist/netlify-api.cjs,dist/index.cjs"
+  # El cliente debe llevar Firebase/Gemini embebidos; no abortar el preview por smart-detection.
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 [functions]
   node_bundler = "esbuild"
