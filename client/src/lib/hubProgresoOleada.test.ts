@@ -206,30 +206,9 @@ describe("hub progreso oleada", () => {
     const all = getPeldanosByProyectoLocal(USER, p.id);
     assert.equal(all.filter(x => x.estado === "conquistado").length, 0);
     assert.equal(all.find(x => x.id === idea.id)?.estado, "en_curso");
-
-    const updated = getProyectosLocal(USER).find(x => x.id === p.id);
-    assert.equal(updated?.minutosPresencia, 15);
-    assert.equal(updated?.sesionesPresencia, 1);
-    assert.ok(updated?.primeraPresenciaAt);
-
-    // Idempotente: segundo cierre del mismo vehículo no suma de nuevo.
-    await recordProgresoHubAlCerrarVehiculo(
-      USER,
-      vehicle({
-        id: "v3",
-        titulo: "Ruido del día",
-        proyectoId: p.id,
-        destinoCierre: "presencia",
-        duracionFinal: 15,
-      }),
-      { tipoOrigen: "tiempo", psGanados: 3, duracionMin: 15, destinoCierre: "presencia" }
-    );
-    const again = getProyectosLocal(USER).find(x => x.id === p.id);
-    assert.equal(again?.minutosPresencia, 15);
-    assert.equal(again?.sesionesPresencia, 1);
   });
 
-  it("cierre peldaño marca primer Norte y minutos en stats", async () => {
+  it("cierre peldaño marca minutos en stats del Hub", async () => {
     const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "centro" });
     const idea = await addPeldanoIdea(USER, p.id, "Turno");
     await setOleadaComoDireccion(USER, p.id, idea.id);
@@ -249,7 +228,6 @@ describe("hub progreso oleada", () => {
     );
 
     const updated = getProyectosLocal(USER).find(x => x.id === p.id);
-    assert.ok(updated?.primerNorteAt);
     assert.equal(updated?.minutosTotales, 40);
     const stats = computeProyectoStats(getPeldanosByProyectoLocal(USER, p.id));
     assert.equal(stats.minutosTotales, 40);

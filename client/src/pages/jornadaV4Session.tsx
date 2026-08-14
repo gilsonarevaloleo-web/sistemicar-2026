@@ -419,6 +419,8 @@ export default function JornadaV4Session() {
             <Jornada4MetricasTab
               userId={user?.uid}
               segmentos={planillaApi.planilla?.segmentos ?? []}
+              vehicles={core.vehicles}
+              segmentoActivoId={planillaApi.segmentoActivo?.id ?? null}
               todayPs={core.dailyPS}
             />
           </Suspense>
