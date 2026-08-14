@@ -7,21 +7,27 @@ import { Jornada4DailyDisciplinaBar } from "@/components/jornada4/Jornada4DailyD
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
 import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
+import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4ConcienciaTriadaCard";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { useConcienciaTriadaOperador } from "@/hooks/useConcienciaTriadaOperador";
 import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
 import { getYesterdayDisciplinaPct } from "@/jornada4/yesterdayDisciplina";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
-import type { SegmentoV5 } from "@/lib/persistence";
+import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 
 export type Jornada4MetricasTabProps = {
   userId: string | undefined;
   segmentos: SegmentoV5[];
+  vehicles: Vehicle[];
+  segmentoActivoId?: string | null;
   todayPs: number;
 };
 
 export default function Jornada4MetricasTab({
   userId,
   segmentos,
+  vehicles,
+  segmentoActivoId = null,
   todayPs,
 }: Jornada4MetricasTabProps) {
   const [yesterdayPs, setYesterdayPs] = useState(0);
@@ -31,6 +37,14 @@ export default function Jornada4MetricasTab({
     void disciplinaTick;
     return computeDisciplinaPlanDia({ segmentos });
   }, [segmentos, disciplinaTick]);
+
+  const { model: triadaModel, series: triadaSeries } = useConcienciaTriadaOperador({
+    userId,
+    segmentos,
+    vehicles,
+    segmentoActivoId,
+    enabled: Boolean(userId),
+  });
 
   useEffect(() => {
     if (!userId) {
@@ -63,6 +77,7 @@ export default function Jornada4MetricasTab({
 
   return (
     <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
+      <Jornada4ConcienciaTriadaCard model={triadaModel} series={triadaSeries} />
       <Jornada4DisciplinaCard model={disciplinaModel} />
       <Jornada4DailyDisciplinaBar
         todayPct={disciplinaModel.porcentajeDia}

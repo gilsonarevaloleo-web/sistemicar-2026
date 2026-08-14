@@ -71,6 +71,10 @@ import {
   type DestinoCierre,
 } from "@/lib/destinoCierre";
 import {
+  registrarCierreConcienciaTriada,
+  resolveDuracionMinCierre,
+} from "@/lib/concienciaTriadaOperador";
+import {
   buildDesglosadorNestedPausePatch,
   resumeDesglosadorFromNestedPause,
 } from "@/lib/nestedContextStack";
@@ -376,6 +380,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
             const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: closed.id,
+              minutos: resolveDuracionMinCierre(closed, duracionMin),
+              destino,
+              at: patch.cierreAt,
+            });
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "tiempo",
               psGanados: cyclePs + depthPs,
@@ -617,6 +627,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
             const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: closed.id,
+              minutos: resolveDuracionMinCierre(closed, duracionMin),
+              destino,
+              at: patch.cierreAt,
+            });
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "situacion",
               psGanados: awarded,
@@ -945,6 +961,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               };
               const apertura = vehicle.aperturaAt ?? cierreAt;
               const duracionMin = Math.max(0, (cierreAt - apertura) / 60_000);
+              registrarCierreConcienciaTriada(userId, {
+                vehicleId: closed.id,
+                minutos: resolveDuracionMinCierre(closed, duracionMin),
+                destino,
+                at: cierreAt,
+              });
               await recordProgresoHubAlCerrarVehiculo(userId, closed, {
                 tipoOrigen: "situacion",
                 psGanados: awarded,
