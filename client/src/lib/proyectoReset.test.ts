@@ -60,6 +60,9 @@ describe("reset y borrar proyecto", () => {
       minutosTotales: 90,
       minutosPresencia: 20,
       sesionesPresencia: 2,
+      segundosNorteSituacion: 180,
+      segundosPresenciaRing: 60,
+      situacionCreditKeys: ["ring:v1:s1"],
       primerNorteAt: 1,
       primeraPresenciaAt: 1,
       pasosEjecutadosTotal: 4,
@@ -86,6 +89,9 @@ describe("reset y borrar proyecto", () => {
     assert.equal(reset.minutosTotales, 0);
     assert.equal(reset.minutosPresencia, 0);
     assert.equal(reset.sesionesPresencia, 0);
+    assert.equal(reset.segundosNorteSituacion, undefined);
+    assert.equal(reset.segundosPresenciaRing, undefined);
+    assert.equal(reset.situacionCreditKeys, undefined);
     assert.equal(reset.oleadaTitulo, undefined);
     assert.equal(reset.primerNorteAt, undefined);
     assert.equal(reset.primeraPresenciaAt, undefined);

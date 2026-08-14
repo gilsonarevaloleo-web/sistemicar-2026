@@ -21,6 +21,7 @@ import { buildSituacionRingSeed } from "./situacionLaunchSeed";
 import { buildSituacionLibreSeed } from "./situacionLibreSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
 import { reconcileCoberturaHuecos } from "./coberturaHuecosLog";
+import { destinoCierreAlLanzarSituacion } from "@/lib/rutaMinutosSituacionProyecto";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
   /** Filas situacionales (lista libre o ring). */
@@ -261,6 +262,17 @@ export async function executeJornada4Launch(
     }
   }
 
+  const destinoCierreSituacion =
+    baseForm.tipoFlota === "situacion"
+      ? destinoCierreAlLanzarSituacion({
+          esListaLibre: modo === "rapido",
+          tieneDireccion: Boolean(
+            baseForm.proyectoId?.trim() ||
+              rest.segmentoActivo?.proyectoVinculadoId?.trim()
+          ),
+        })
+      : undefined;
+
   const id = await executeFlotaLaunch({
     ...rest,
     userId,
@@ -270,6 +282,7 @@ export async function executeJornada4Launch(
       ...baseForm,
       titulo: situacionTitulo,
       ...(situacionLaunchSeed ? { situacionLaunchSeed } : {}),
+      ...(destinoCierreSituacion ? { destinoCierre: destinoCierreSituacion } : {}),
       ...(baseForm.tipoFlota === "tiempo" && ancladoAlSegmento === true
         ? { ancladoAlSegmento: true }
         : {}),

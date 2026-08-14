@@ -19,6 +19,11 @@ import {
   pushPresenciaVehicleId,
   resolveDuracionMinCierre,
 } from "./concienciaProyecto";
+import {
+  minutosFromSegundos,
+  resolveRutaMinutosSituacion,
+  type FuenteMinutosSituacion,
+} from "./rutaMinutosSituacionProyecto";
 import { safeSetItem } from "./storageHygiene";
 import { unlinkProyectoVinculosLocal } from "./proyectoLifecycle";
 import {
@@ -166,8 +171,19 @@ export interface Proyecto {
   orden?: number;
   peldanosConquistados: number;
   profundidadMaxima?: FocusBandId;
-  /** Minutos Norte = suma de duraciones en peldaños conquistados. */
+  /** Minutos Norte = peldaños conquista (no situacionales) + segundosNorteSituacion. */
   minutosTotales?: number;
+  /**
+   * Segundos reales del ring situacional (clic a clic) con dirección de escalera.
+   * No se recalculan desde peldaños: evita doble conteo al cerrar el bloque.
+   */
+  segundosNorteSituacion?: number;
+  /**
+   * Segundos de ring situacional con destino presencia explícito.
+   */
+  segundosPresenciaRing?: number;
+  /** Claves idempotentes `ring:vehicleId:subId` (anti doble clic). */
+  situacionCreditKeys?: string[];
   /**
    * Minutos de presencia vinculados al proyecto (destino presencia).
    * No escriben peldaños; alimentan etapa Presente.
@@ -548,6 +564,9 @@ export async function resetProyecto(userId: string, id: string): Promise<Proyect
     minutosPresencia: 0,
     sesionesPresencia: 0,
     presenciaVehicleIds: [],
+    segundosNorteSituacion: 0,
+    segundosPresenciaRing: 0,
+    situacionCreditKeys: [],
     claridadActiva: buildDefaultClaridadDireccion({
       tituloProyecto: prev.titulo,
       etiqueta: prev.etiqueta,
@@ -872,23 +891,25 @@ function profundidadFromSubs(subs: SubVehiculo[], rutaCruzada?: RutaCruzadaSnaps
 async function refreshProyectoStats(userId: string, proyectoId: string): Promise<void> {
   const conquistados = (await getPeldanosByProyecto(userId, proyectoId)).filter(p => p.estado === "conquistado");
   let profundidad: FocusBandId = "fluido";
-  let minutos = 0;
+  let minutosConquista = 0;
   let primerNorteFromPel: number | undefined;
   for (const p of conquistados) {
     if (p.resumen?.profundidadMaxima) profundidad = maxBanda(profundidad, p.resumen.profundidadMaxima);
-    minutos += p.resumen?.duracionMin ?? 0;
+    if (peldanoSumaMinutosNorte(p)) minutosConquista += p.resumen?.duracionMin ?? 0;
     if (p.cerradoAt != null) {
       primerNorteFromPel =
         primerNorteFromPel == null ? p.cerradoAt : Math.min(primerNorteFromPel, p.cerradoAt);
     }
   }
   const prev = getLocalProyectos(userId).find(p => p.id === proyectoId);
+  const minutosNorte =
+    minutosConquista + minutosFromSegundos(prev?.segundosNorteSituacion);
   const patch: Partial<Omit<Proyecto, "id" | "createdAt">> = {
     peldanosConquistados: conquistados.length,
     profundidadMaxima: profundidad,
-    minutosTotales: minutos,
+    minutosTotales: minutosNorte,
   };
-  if (conquistados.length > 0) {
+  if (conquistados.length > 0 || (prev?.segundosNorteSituacion ?? 0) > 0) {
     patch.primerNorteAt = prev?.primerNorteAt ?? primerNorteFromPel ?? Date.now();
   }
   await updateProyecto(userId, proyectoId, patch);
@@ -919,6 +940,104 @@ export function registrarCierrePresenciaEnProyecto(
     sesionesPresencia: (prev.sesionesPresencia ?? 0) + 1,
     presenciaVehicleIds: next,
     primeraPresenciaAt: prev.primeraPresenciaAt ?? at,
+    updatedAt: Date.now(),
+  };
+  list[idx] = updated;
+  saveLocalProyectos(userId, list);
+  void syncFirestoreProyecto(userId, updated);
+  return updated;
+}
+
+const SITUACION_CREDIT_RING = 256;
+
+function pushSituacionCreditKey(
+  prev: string[] | undefined,
+  key: string
+): { next: string[]; isNew: boolean } {
+  const id = key.trim();
+  if (!id) return { next: prev ?? [], isNew: false };
+  const cur = prev ?? [];
+  if (cur.includes(id)) return { next: cur, isNew: false };
+  const next = [...cur, id];
+  if (next.length > SITUACION_CREDIT_RING) {
+    return { next: next.slice(next.length - SITUACION_CREDIT_RING), isNew: true };
+  }
+  return { next, isNew: true };
+}
+
+/**
+ * Peldaños situacionales no suman a MIN NORTE: esos minutos ya se acreditaron
+ * clic a clic (segundosNorteSituacion). Evita doble conteo al cerrar el ring.
+ */
+export function peldanoSumaMinutosNorte(
+  p: Pick<ProyectoPeldano, "estado" | "tipoOrigen">
+): boolean {
+  if (p.estado !== "conquistado") return false;
+  return p.tipoOrigen !== "situacion";
+}
+
+/**
+ * Acredita el tiempo de un clic situacional en la casilla del proyecto.
+ * Local + firestore en sombra. Idempotente por fila. No recalcula bolsa.
+ */
+export function acreditarMinutosSituacionEnProyecto(
+  userId: string,
+  input: {
+    vehicle: Pick<Vehicle, "id" | "proyectoId" | "destinoCierre">;
+    sub: Pick<SubTarea, "id" | "proyectoId" | "duracionRealSec">;
+    fuente: FuenteMinutosSituacion;
+    at?: number;
+  }
+): Proyecto | null {
+  const ruta = resolveRutaMinutosSituacion({
+    vehicleId: input.vehicle.id,
+    subId: input.sub.id,
+    subProyectoId: input.sub.proyectoId,
+    vehicleProyectoId: input.vehicle.proyectoId,
+    destinoCierre: input.vehicle.destinoCierre,
+    fuente: input.fuente,
+    duracionRealSec: input.sub.duracionRealSec,
+  });
+  if (ruta.bucket === "none" || !ruta.proyectoId) return null;
+
+  const list = getLocalProyectos(userId);
+  const idx = list.findIndex(p => p.id === ruta.proyectoId);
+  if (idx === -1) return null;
+
+  const { next, isNew } = pushSituacionCreditKey(
+    list[idx].situacionCreditKeys,
+    ruta.creditKey
+  );
+  if (!isNew) return list[idx];
+
+  const at = input.at ?? Date.now();
+  const prev = list[idx];
+  const segundos = Math.max(0, ruta.segundos);
+
+  if (ruta.bucket === "norte") {
+    const segundosNorte = (prev.segundosNorteSituacion ?? 0) + segundos;
+    const updated: Proyecto = {
+      ...prev,
+      segundosNorteSituacion: segundosNorte,
+      situacionCreditKeys: next,
+      minutosTotales:
+        (prev.minutosTotales ?? 0) -
+        minutosFromSegundos(prev.segundosNorteSituacion) +
+        minutosFromSegundos(segundosNorte),
+      primerNorteAt: prev.primerNorteAt ?? at,
+      updatedAt: Date.now(),
+    };
+    list[idx] = updated;
+    saveLocalProyectos(userId, list);
+    void syncFirestoreProyecto(userId, updated);
+    return updated;
+  }
+
+  const segundosPresencia = (prev.segundosPresenciaRing ?? 0) + segundos;
+  const updated: Proyecto = {
+    ...prev,
+    segundosPresenciaRing: segundosPresencia,
+    situacionCreditKeys: next,
     updatedAt: Date.now(),
   };
   list[idx] = updated;
@@ -1288,7 +1407,7 @@ export function computeProyectoStats(peldanos: ProyectoPeldano[]) {
   let minutos = 0;
   let profundidad: FocusBandId = "fluido";
   for (const p of conquistados) {
-    minutos += p.resumen?.duracionMin ?? 0;
+    if (peldanoSumaMinutosNorte(p)) minutos += p.resumen?.duracionMin ?? 0;
     if (p.resumen?.profundidadMaxima) profundidad = maxBanda(profundidad, p.resumen.profundidadMaxima);
   }
   return {

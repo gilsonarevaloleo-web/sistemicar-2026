@@ -79,6 +79,10 @@ import {
   ETAPA_CONCIENCIA_META,
   type EtapaConcienciaProyecto,
 } from "@/lib/concienciaProyecto";
+import {
+  resolveMinutosNorteDisplay,
+  resolveMinutosPresenciaDisplay,
+} from "@/lib/rutaMinutosSituacionProyecto";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -447,9 +451,15 @@ export default function ProyectosPage() {
   const conciencia = useMemo(
     () =>
       buildConcienciaProyectoResumen({
-        minutosPresencia: proyecto?.minutosPresencia,
+        minutosPresencia: resolveMinutosPresenciaDisplay(
+          proyecto?.minutosPresencia ?? 0,
+          proyecto?.segundosPresenciaRing
+        ),
         sesionesPresencia: proyecto?.sesionesPresencia,
-        minutosNorte: stats.minutosTotales,
+        minutosNorte: resolveMinutosNorteDisplay(
+          stats.minutosTotales,
+          proyecto?.segundosNorteSituacion
+        ),
         peldanosConquistados: stats.conquistados,
         primeraPresenciaAt: proyecto?.primeraPresenciaAt,
         primerNorteAt: proyecto?.primerNorteAt,
