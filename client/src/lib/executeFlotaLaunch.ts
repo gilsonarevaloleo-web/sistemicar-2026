@@ -106,6 +106,11 @@ export type FlotaLaunchForm = {
   /** Punto de desglose de oleada a sintonizar al cerrar. */
   oleadaPuntoId?: string;
   /**
+   * Destino del cierre (presencia vs peldaño). Si se omite, el launch situacional
+   * lo sella: lista libre → presencia; ring con dirección → peldaño.
+   */
+  destinoCierre?: "presencia" | "peldano";
+  /**
    * Semilla situacional (ring o lista libre) incluida en el paint + remote del launch.
    * Evita persistir un shell sin cronómetro/filas si el usuario sale al instante.
    */
@@ -287,6 +292,7 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),
       ...(resolvedPeldanoId ? { proyectoPeldanoId: resolvedPeldanoId } : {}),
       ...(form.oleadaPuntoId?.trim() ? { oleadaPuntoId: form.oleadaPuntoId.trim() } : {}),
+      ...(form.destinoCierre ? { destinoCierre: form.destinoCierre } : {}),
       segmentoOrigen: segActualNombre,
       segmentoId: segActualId,
       segmentosCruzados: 0,

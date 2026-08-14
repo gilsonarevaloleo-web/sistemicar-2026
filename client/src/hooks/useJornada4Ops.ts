@@ -64,7 +64,10 @@ import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 import type { SubTarea } from "@/lib/persistence";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
 import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
-import { recordProgresoHubAlCerrarVehiculo } from "@/lib/proyectos";
+import {
+  acreditarMinutosSituacionEnProyecto,
+  recordProgresoHubAlCerrarVehiculo,
+} from "@/lib/proyectos";
 import {
   feedsProyectoHub,
   resolveDestinoCierre,
@@ -432,6 +435,19 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
 
+        const closedForCredit = patch.subTareas.find(s => s.id === subTareaId);
+        if (closedForCredit) {
+          try {
+            acreditarMinutosSituacionEnProyecto(userId, {
+              vehicle,
+              sub: closedForCredit,
+              fuente: "ring-click",
+            });
+          } catch (creditErr) {
+            console.error("[jornada4.closeSituacionRow] minutos proyecto", creditErr);
+          }
+        }
+
         let subsForRemote = patch.subTareas;
         try {
           if (status === "cumplido") {
@@ -616,6 +632,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               },
               { skipLocalSync: true }
             );
+            const feedsHub = feedsProyectoHub(destino);
             const closed: Vehicle = {
               ...vehicle,
               status: patch.status,
@@ -624,15 +641,19 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               situacionCronometro: patch.situacionCronometro,
               situacionCupoAnchor: patch.situacionCupoAnchor,
               destinoCierre: destino,
+              ...(feedsHub
+                ? {}
+                : { aperturaAt: patch.cierreAt, duracionFinal: 0 }),
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
-            const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            const wallMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
             registrarCierreConcienciaTriada(userId, {
-              vehicleId: closed.id,
-              minutos: resolveDuracionMinCierre(closed, duracionMin),
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(vehicle, wallMin),
               destino,
               at: patch.cierreAt,
             });
+            const duracionMin = feedsHub ? wallMin : 0;
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "situacion",
               psGanados: awarded,
@@ -892,14 +913,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle)) return;
-        const destino = resolveDestinoCierre(vehicle.destinoCierre);
-        if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
-          toast.error("Elige un proyecto para subir el peldaño", {
-            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
-            duration: 2800,
-          });
-          return;
-        }
+        // Lista libre no tiene tiempo: siempre presencia, nunca Norte.
+        const destino: DestinoCierre = "presencia";
         const cierreAt = Date.now();
         const anyOk = (vehicle.subTareas ?? []).some(
           s =>
@@ -919,18 +934,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             status,
             safeAwardPS
           );
-          const hubNote = feedsProyectoHub(destino)
-            ? " · peldaño al Hub"
-            : " · presencia";
           toast.success(
             awarded > 0
-              ? `Lista cerrada · +${awarded} PS${hubNote}`
-              : `Lista cerrada${hubNote}`,
+              ? `Lista cerrada · +${awarded} PS · presencia`
+              : "Lista cerrada · presencia",
             {
               style: {
                 backgroundColor: PIZARRA,
-                border: `1px solid ${feedsProyectoHub(destino) ? GOLD : EMERALD}`,
-                color: feedsProyectoHub(destino) ? GOLD : EMERALD,
+                border: `1px solid ${EMERALD}`,
+                color: EMERALD,
               },
               duration: 2400,
             }
@@ -958,19 +970,21 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 status,
                 cierreAt,
                 destinoCierre: destino,
+                aperturaAt: cierreAt,
+                duracionFinal: 0,
               };
               const apertura = vehicle.aperturaAt ?? cierreAt;
-              const duracionMin = Math.max(0, (cierreAt - apertura) / 60_000);
+              const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
               registrarCierreConcienciaTriada(userId, {
-                vehicleId: closed.id,
-                minutos: resolveDuracionMinCierre(closed, duracionMin),
+                vehicleId: vehicle.id,
+                minutos: resolveDuracionMinCierre(vehicle, wallMin),
                 destino,
                 at: cierreAt,
               });
               await recordProgresoHubAlCerrarVehiculo(userId, closed, {
                 tipoOrigen: "situacion",
                 psGanados: awarded,
-                duracionMin,
+                duracionMin: 0,
                 subTareas: vehicle.subTareas ?? [],
                 destinoCierre: destino,
               });

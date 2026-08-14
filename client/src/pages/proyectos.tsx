@@ -74,6 +74,7 @@ import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -432,6 +433,10 @@ export default function ProyectosPage() {
   );
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
+  const minutosNorte = resolveMinutosNorteDisplay(
+    stats.minutosTotales,
+    proyecto?.segundosNorteSituacion
+  );
   // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
   const ideas = useMemo(
     () => peldanos.filter(p => p.estado === "idea" && !p.origenSegmento),
@@ -999,7 +1004,7 @@ export default function ProyectosPage() {
                 <p className="text-[7px] uppercase text-slate-500 tracking-wider">Profundidad</p>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-lg font-black text-white">{stats.minutosTotales}</p>
+                <p className="text-lg font-black text-white">{minutosNorte}</p>
                 <p className="text-[7px] uppercase text-slate-500 tracking-wider">Min norte</p>
               </div>
             </div>

@@ -88,4 +88,34 @@ describe("proyectos", () => {
     assert.equal(s.minutosTotales, 30);
     assert.equal(s.profundidadMaxima, "concentrado");
   });
+
+  it("computeProyectoStats no suma peldaños situacionales (ya van por clic)", () => {
+    const peldanos: ProyectoPeldano[] = [
+      {
+        id: "p1",
+        proyectoId: "x",
+        orden: 0,
+        titulo: "Conquista",
+        estado: "conquistado",
+        tipoOrigen: "tiempo",
+        resumen: { duracionMin: 20 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: "p2",
+        proyectoId: "x",
+        orden: 1,
+        titulo: "Ring",
+        estado: "conquistado",
+        tipoOrigen: "situacion",
+        resumen: { duracionMin: 45 },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    const s = computeProyectoStats(peldanos);
+    assert.equal(s.conquistados, 2);
+    assert.equal(s.minutosTotales, 20);
+  });
 });

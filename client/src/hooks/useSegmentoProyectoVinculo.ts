@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo } from "react";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
-import { subscribeToProyectos } from "@/lib/proyectos";
-import { syncJornadaProyectosFromRemote } from "@/lib/jornadaProyectosStore";
+import { getProyectosLocal, subscribeToProyectos } from "@/lib/proyectos";
+import {
+  syncJornadaProyectosFromRemote,
+  useJornadaProyectosStore,
+} from "@/lib/jornadaProyectosStore";
 import {
   useJornadaProyectoIds,
   useJornadaProyectosHub,
@@ -27,7 +30,8 @@ export function useSegmentoProyectoVinculo(
     void syncJornadaProyectosFromRemote(userId, { force: true });
     return subscribeToProyectos(userId, () => {
       if (isInterModuleSyncBlocked()) return;
-      void syncJornadaProyectosFromRemote(userId);
+      // Solo local: un re-fetch Firestore en cada clic del ring congelaba el hilo.
+      useJornadaProyectosStore.getState().setProyectos(getProyectosLocal(userId));
     });
   }, [userId]);
 
