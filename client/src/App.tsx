@@ -338,6 +338,17 @@ function JornadaV4ModuleRoute() {
 }
 
 function Router() {
+  const [location] = useLocation();
+  // Embudos comerciales sin chrome de app (sidebar / bottom nav).
+  if (location === "/vendedor" || location.startsWith("/vendedor/")) {
+    return (
+      <>
+        <SellerRefCapture />
+        <VendedorTriagePage />
+      </>
+    );
+  }
+
   return (
     <Layout>
       <ViewTransitionBootstrap />
@@ -437,7 +448,6 @@ function Router() {
         <Route path="/embudo" component={EmbudoSistemicar} />
         <Route path="/documentos" component={Documentos} />
         <Route path="/vendedores-planificacion" component={VendedoresPlanificacion} />
-        <Route path="/vendedor" component={VendedorTriagePage} />
         <Route path="/espejo/v2" component={EspejoV2} />
         <Route path="/espejo" component={Espejo} />
         <Route path="/espejo/expedientes/:id" component={EspejoExpedienteDetalle} />
@@ -493,11 +503,17 @@ function VoiceBootstrap() {
       const p = window.location.pathname;
       // Hub de proyectos + Centro de Comando: sin TTS en el primer toque
       // (el unlock robaba el hilo y las tarjetas no abrían).
+      // /vendedor y entradas comerciales: mismo problema en Android.
       return (
         p === "/proyectos" ||
         p.startsWith("/proyectos/") ||
         p === "/menu" ||
-        p.startsWith("/menu/")
+        p.startsWith("/menu/") ||
+        p === "/vendedor" ||
+        p.startsWith("/vendedor/") ||
+        p === "/umbral/entrada" ||
+        p === "/pagos" ||
+        p.startsWith("/pagos")
       );
     };
     const unlock = (e: Event) => {

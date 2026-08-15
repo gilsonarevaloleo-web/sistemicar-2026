@@ -58,7 +58,7 @@ export default function VendedorTriagePage() {
   function elegirGrieta(op: VendedorTriageOpcion) {
     setGrietaPick(op);
     setFijacion(null);
-    window.setTimeout(() => setPaso(1), 120);
+    setPaso(1);
   }
 
   function elegirMatiz(op: VendedorTriageOpcion) {
@@ -137,12 +137,17 @@ export default function VendedorTriagePage() {
                 <button
                   key={op.id}
                   type="button"
+                  onPointerUp={(e) => {
+                    e.preventDefault();
+                    elegirGrieta(op);
+                  }}
                   onClick={() => elegirGrieta(op)}
-                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30"
+                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30 touch-manipulation"
                   style={{
                     borderColor: "rgba(255,255,255,0.12)",
                     background: "rgba(0,0,0,0.4)",
                     color: "rgba(255,255,255,0.8)",
+                    WebkitTapHighlightColor: "rgba(212,175,55,0.25)",
                   }}
                   data-testid={`vendedor-opcion-${op.id}`}
                 >
@@ -176,12 +181,17 @@ export default function VendedorTriagePage() {
                 <button
                   key={op.id}
                   type="button"
+                  onPointerUp={(e) => {
+                    e.preventDefault();
+                    elegirMatiz(op);
+                  }}
                   onClick={() => elegirMatiz(op)}
-                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30"
+                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30 touch-manipulation"
                   style={{
                     borderColor: "rgba(255,255,255,0.12)",
                     background: "rgba(0,0,0,0.4)",
                     color: "rgba(255,255,255,0.8)",
+                    WebkitTapHighlightColor: "rgba(212,175,55,0.25)",
                   }}
                   data-testid={`vendedor-opcion-${op.id}`}
                 >
