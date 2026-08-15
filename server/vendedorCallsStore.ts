@@ -6,30 +6,61 @@ import {
   type VendedorCallStatus,
 } from "../shared/vendedor/callTypes";
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const CALLS_FILE = path.join(DATA_DIR, "vendedor-calls.json");
+/** En Netlify el FS del bundle es read-only: usar /tmp + memoria. */
+function resolveDataDir(): string {
+  const serverless =
+    process.env.SERVERLESS === "1" ||
+    !!process.env.NETLIFY ||
+    !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  if (serverless) return path.join("/tmp", "sistemicar-data");
+  return path.resolve(process.cwd(), "data");
+}
+
+function callsFilePath(): string {
+  return path.join(resolveDataDir(), "vendedor-calls.json");
+}
+
+/** Cache en memoria (warm instances / serverless). */
+let memoryCalls: VendedorCallRecord[] | null = null;
 
 function ensureDataFile(): void {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(CALLS_FILE)) {
-    fs.writeFileSync(CALLS_FILE, "[]", "utf8");
+  const dir = resolveDataDir();
+  const file = callsFilePath();
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, "[]", "utf8");
+    }
+  } catch (err) {
+    console.warn("[vendedorCalls] FS no escribible, solo memoria:", (err as Error)?.message);
   }
 }
 
 function readCalls(): VendedorCallRecord[] {
+  if (memoryCalls) return memoryCalls;
   ensureDataFile();
   try {
-    const raw = fs.readFileSync(CALLS_FILE, "utf8");
+    const raw = fs.readFileSync(callsFilePath(), "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    memoryCalls = Array.isArray(parsed) ? parsed : [];
+    return memoryCalls;
   } catch {
-    return [];
+    memoryCalls = memoryCalls ?? [];
+    return memoryCalls;
   }
 }
 
 function writeCalls(rows: VendedorCallRecord[]): void {
+  memoryCalls = rows;
   ensureDataFile();
-  fs.writeFileSync(CALLS_FILE, JSON.stringify(rows, null, 2), "utf8");
+  try {
+    fs.writeFileSync(callsFilePath(), JSON.stringify(rows, null, 2), "utf8");
+  } catch (err) {
+    console.warn(
+      "[vendedorCalls] No se pudo persistir a disco (ok en serverless):",
+      (err as Error)?.message,
+    );
+  }
 }
 
 function startOfUtcDayIso(d = new Date()): string {

@@ -5337,7 +5337,9 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
     });
   } catch (error) {
     console.error("[vendedor/solicitar-llamada]", error);
-    res.status(500).json({ error: "Error solicitando llamada." });
+    const message =
+      error instanceof Error ? error.message : "Error solicitando llamada.";
+    res.status(500).json({ error: message });
   }
 });
 
