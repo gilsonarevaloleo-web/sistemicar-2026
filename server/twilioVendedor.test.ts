@@ -6,6 +6,9 @@ import {
   buildTwimlSay,
   resolvePublicBaseUrl,
   buildTwilioCallbackQuery,
+  humanizeTwilioWhatsAppError,
+  humanizeTwilioVoiceError,
+  buildWhatsAppContentVariables,
 } from "./twilioVendedor.ts";
 
 describe("Twilio vendedor helpers", () => {
@@ -49,5 +52,32 @@ describe("Twilio vendedor helpers", () => {
     assert.match(qs, /codigo=2/);
     assert.match(qs, /planeta=JORNADA/);
     assert.match(qs, /ref=ANA/);
+  });
+
+  it("humaniza ContentSid Required", () => {
+    assert.match(
+      humanizeTwilioWhatsAppError("ContentSid Required"),
+      /TWILIO_WHATSAPP_CONTENT_SID/,
+    );
+  });
+
+  it("humaniza From whatsapp en voz", () => {
+    assert.match(
+      humanizeTwilioVoiceError(
+        "TWILIO_VOICE_FROM is a whatsapp: address; Voice needs PSTN",
+      ),
+      /VOICE_FROM/,
+    );
+  });
+
+  it("content variables planeta/codigo/enlace", () => {
+    const v = buildWhatsAppContentVariables({
+      planeta: "JORNADA",
+      codigo: 2,
+      deepLink: "https://www.sistemicar.app/pagos?plan=planificacion_base",
+    });
+    assert.equal(v["1"], "JORNADA");
+    assert.equal(v["2"], "2");
+    assert.match(v["3"], /planificacion_base/);
   });
 });

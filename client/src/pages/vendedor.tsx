@@ -115,14 +115,21 @@ export default function VendedorTriagePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error");
-      setCallDone(true);
+      const bothFailed = !data.voiceOk && !data.whatsappOk;
       const msg =
+        (bothFailed && data.errorDetail) ||
         data.message ||
         (data.voiceOk
           ? "Llamada iniciada."
           : "Solicitud registrada.");
       setCallStatusMsg(msg);
-      toast.success(msg);
+      if (bothFailed) {
+        // No marcar done: permite reintentar tras corregir Twilio / ContentSid.
+        toast.error(msg);
+      } else {
+        setCallDone(true);
+        toast.success(data.message || msg);
+      }
     } catch (e: unknown) {
       const err = e instanceof Error ? e.message : "No se pudo solicitar";
       setCallStatusMsg(err);
@@ -354,7 +361,15 @@ export default function VendedorTriagePage() {
               {callStatusMsg && (
                 <p
                   className="text-[12px] leading-relaxed"
-                  style={{ color: callDone ? "#86EFAC" : GOLD }}
+                  style={{
+                    color: callDone
+                      ? "#86EFAC"
+                      : /ContentSid|plantilla|fall|Twilio|voz:/i.test(
+                            callStatusMsg,
+                          )
+                        ? "#FCA5A5"
+                        : GOLD,
+                  }}
                   data-testid="vendedor-call-status"
                 >
                   {callStatusMsg}
