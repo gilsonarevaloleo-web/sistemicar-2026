@@ -79,7 +79,7 @@ import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./s
 import {
   solicitarLlamadaVendedor,
   handleTwilioVoiceStatus,
-  getGuionForCall,
+  resolveGuionForTwiml,
 } from "./vendedorCallService";
 import { listVendedorCalls, canAcceptNewCall } from "./vendedorCallsStore";
 import { buildTwimlSay } from "./twilioVendedor";
@@ -5331,9 +5331,10 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
       callId: result.call.id,
       status: result.call.status,
       twilioReady: result.twilioReady,
-      message: result.twilioReady
-        ? "Llamada encolada. Primero teléfono; si no contesta, WhatsApp."
-        : "Solicitud registrada. Twilio aún no está configurado — visible en admin.",
+      voiceOk: result.voiceOk,
+      whatsappOk: result.whatsappOk,
+      message: result.detail,
+      errorDetail: result.call.error,
     });
   } catch (error) {
     console.error("[vendedor/solicitar-llamada]", error);
@@ -5345,12 +5346,17 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
 
 app.get("/api/vendedor/twilio/twiml", (req, res) => {
   const callId = typeof req.query.callId === "string" ? req.query.callId : "";
-  const guion = callId ? getGuionForCall(callId) : null;
-  const xml = buildTwimlSay(
-    guion ||
-      "Hola. Soy el vendedor de Sistemicar. Entra en sistemicar punto app para continuar.",
-  );
-  res.type("text/xml").send(xml);
+  const codigoRaw = typeof req.query.codigo === "string" ? req.query.codigo : "";
+  const planeta = typeof req.query.planeta === "string" ? req.query.planeta : "";
+  const sellerRef = typeof req.query.ref === "string" ? req.query.ref : null;
+  const codigo = parseInt(codigoRaw, 10);
+  const guion = resolveGuionForTwiml({
+    callId: callId || undefined,
+    codigo: Number.isFinite(codigo) ? codigo : undefined,
+    planeta: planeta || undefined,
+    sellerRef,
+  });
+  res.type("text/xml").send(buildTwimlSay(guion));
 });
 
 app.post("/api/vendedor/twilio/status", async (req, res) => {
@@ -5360,8 +5366,26 @@ app.post("/api/vendedor/twilio/status", async (req, res) => {
       (typeof req.body?.callId === "string" && req.body.callId) ||
       "";
     const callStatus = String(req.body?.CallStatus || req.body?.callStatus || "");
+    const telefono =
+      typeof req.query.telefono === "string" ? req.query.telefono : undefined;
+    const whatsapp =
+      typeof req.query.whatsapp === "string" ? req.query.whatsapp : undefined;
+    const planeta =
+      typeof req.query.planeta === "string" ? req.query.planeta : undefined;
+    const sellerRef =
+      typeof req.query.ref === "string" ? req.query.ref : null;
+    const codigoRaw =
+      typeof req.query.codigo === "string" ? parseInt(req.query.codigo, 10) : NaN;
     if (callId && callStatus) {
-      await handleTwilioVoiceStatus({ callId, callStatus });
+      await handleTwilioVoiceStatus({
+        callId,
+        callStatus,
+        telefono,
+        whatsapp,
+        planeta,
+        sellerRef,
+        codigo: Number.isFinite(codigoRaw) ? codigoRaw : undefined,
+      });
     }
     res.status(200).send("OK");
   } catch (error) {

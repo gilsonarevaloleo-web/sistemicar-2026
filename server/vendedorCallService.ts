@@ -13,6 +13,7 @@ import {
   placeVoiceCall,
   sendWhatsappMessage,
   getTwilioConfig,
+  type CallCallbackParams,
 } from "./twilioVendedor";
 
 const CODIGOS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -26,12 +27,20 @@ export type SolicitarLlamadaInput = {
   consentimiento: string;
 };
 
+export type SolicitarLlamadaResult =
+  | {
+      ok: true;
+      call: VendedorCallRecord;
+      twilioReady: boolean;
+      voiceOk: boolean;
+      whatsappOk: boolean;
+      detail: string;
+    }
+  | { ok: false; error: string; status?: number };
+
 export async function solicitarLlamadaVendedor(
   input: SolicitarLlamadaInput,
-): Promise<
-  | { ok: true; call: VendedorCallRecord; twilioReady: boolean }
-  | { ok: false; error: string; status?: number }
-> {
+): Promise<SolicitarLlamadaResult> {
   const phrase = (input.consentimiento || "").trim().toLowerCase();
   if (phrase !== "llamame" && phrase !== "llámame") {
     return {
@@ -54,9 +63,10 @@ export async function solicitarLlamadaVendedor(
     };
   }
 
-  const whatsappRaw = input.whatsapp?.trim()
-    ? normalizePhoneE164(input.whatsapp)
-    : telefono;
+  const whatsappRaw =
+    (input.whatsapp?.trim()
+      ? normalizePhoneE164(input.whatsapp)
+      : telefono) || telefono;
   const sellerRef = input.sellerRef?.trim().toUpperCase() || null;
   const codigo = input.codigo as CodigoNumero;
   const planeta = input.planeta as PlanetaId;
@@ -114,16 +124,40 @@ export async function solicitarLlamadaVendedor(
   insertVendedorCall(record);
 
   const twilioReady = !!getTwilioConfig();
-  // Disparo async de voz (no bloquea respuesta HTTP)
-  void attemptVoiceThenMaybeWhatsapp(id).catch((err) => {
-    console.error("[vendedor] attemptVoice", err);
-    updateVendedorCall(id, {
-      status: "failed",
-      error: err instanceof Error ? err.message : "voice_async_error",
-    });
-  });
 
-  return { ok: true, call: record, twilioReady };
+  // CRÍTICO en Netlify: await antes de responder. Si se dispara en void,
+  // el runtime mata el trabajo y no hay llamada ni WhatsApp.
+  const outcome = await attemptVoiceThenMaybeWhatsapp(id);
+
+  const finalCall = getVendedorCall(id) ?? outcome ?? record;
+  const voiceOk = Boolean(finalCall.twilioCallSid);
+  const whatsappOk = Boolean(finalCall.twilioMessageSid);
+
+  let detail = "Solicitud registrada.";
+  if (voiceOk && !whatsappOk) {
+    detail =
+      "Llamada iniciada. Si no contestas, te escribimos por WhatsApp.";
+  } else if (!voiceOk && whatsappOk) {
+    detail = "No se pudo llamar; se envió WhatsApp con tu puerta de entrada.";
+  } else if (voiceOk && whatsappOk) {
+    detail = "Llamada iniciada y WhatsApp de respaldo enviado.";
+  } else if (!twilioReady) {
+    detail =
+      "Registrado en admin, pero Twilio no está configurado en el servidor.";
+  } else {
+    detail =
+      finalCall.error ||
+      "Twilio no inició llamada ni WhatsApp. Revisa números y logs.";
+  }
+
+  return {
+    ok: true,
+    call: finalCall,
+    twilioReady,
+    voiceOk,
+    whatsappOk,
+    detail,
+  };
 }
 
 export async function attemptVoiceThenMaybeWhatsapp(
@@ -138,7 +172,16 @@ export async function attemptVoiceThenMaybeWhatsapp(
     intentos: call.intentos + 1,
   });
 
-  const voice = await placeVoiceCall({ to: call.telefono, callId });
+  const callback: CallCallbackParams = {
+    callId,
+    telefono: call.telefono,
+    whatsapp: call.whatsapp || call.telefono,
+    codigo: call.codigo,
+    planeta: call.planeta,
+    sellerRef: call.sellerRef,
+  };
+
+  const voice = await placeVoiceCall({ to: call.telefono, callback });
   if (voice.ok && voice.sid) {
     return updateVendedorCall(callId, {
       twilioCallSid: voice.sid,
@@ -147,20 +190,26 @@ export async function attemptVoiceThenMaybeWhatsapp(
     });
   }
 
-  // Sin Twilio o fallo inmediato → WhatsApp fallback
+  // Fallo inmediato al crear la llamada → WhatsApp ahora (misma invocación).
   return fallbackWhatsapp(callId, voice.error || "voice_failed");
 }
 
 export async function handleTwilioVoiceStatus(params: {
   callId: string;
   callStatus: string;
+  /** Params en query por si la instancia no tiene el registro en memoria. */
+  telefono?: string;
+  whatsapp?: string;
+  codigo?: number;
+  planeta?: string;
+  sellerRef?: string | null;
 }): Promise<VendedorCallRecord | null> {
-  const call = getVendedorCall(params.callId);
-  if (!call) return null;
-
   const status = params.callStatus.toLowerCase();
+
+  let call = getVendedorCall(params.callId);
+
   if (status === "completed" || status === "answered" || status === "in-progress") {
-    if (status === "completed" || status === "answered") {
+    if (call && (status === "completed" || status === "answered")) {
       return updateVendedorCall(params.callId, {
         status: "completed",
         canalUsado: "telefono",
@@ -170,12 +219,15 @@ export async function handleTwilioVoiceStatus(params: {
     return call;
   }
 
-  if (
+  const noAnswer =
     status === "no-answer" ||
     status === "busy" ||
     status === "failed" ||
-    status === "canceled"
-  ) {
+    status === "canceled";
+
+  if (!noAnswer) return call;
+
+  if (call) {
     updateVendedorCall(params.callId, {
       status: "no_answer",
       error: `voice:${status}`,
@@ -183,7 +235,45 @@ export async function handleTwilioVoiceStatus(params: {
     return fallbackWhatsapp(params.callId, status);
   }
 
-  return call;
+  // Instancia fría: reconstruir desde query y mandar WhatsApp igual.
+  if (
+    params.telefono &&
+    params.codigo &&
+    params.planeta &&
+    isPlanetaId(params.planeta) &&
+    CODIGOS.has(params.codigo)
+  ) {
+    const guion = construirGuionLlamada(
+      params.codigo as CodigoNumero,
+      params.planeta,
+      params.sellerRef,
+    );
+    const to = params.whatsapp || params.telefono;
+    const msg = await sendWhatsappMessage({ to, body: guion.whatsapp });
+    const now = new Date().toISOString();
+    const synthetic: VendedorCallRecord = {
+      id: params.callId,
+      telefono: params.telefono,
+      whatsapp: to,
+      codigo: params.codigo as CodigoNumero,
+      planeta: params.planeta,
+      sellerRef: params.sellerRef ?? null,
+      consentimiento: "llamame",
+      status: msg.ok ? "whatsapp_sent" : "failed",
+      canalUsado: msg.ok ? "whatsapp" : null,
+      intentos: 1,
+      twilioCallSid: null,
+      twilioMessageSid: msg.sid ?? null,
+      error: msg.ok ? `fallback_after:${status}` : msg.error || status,
+      guionResumen: guion.voz.slice(0, 160),
+      createdAt: now,
+      updatedAt: now,
+    };
+    insertVendedorCall(synthetic);
+    return synthetic;
+  }
+
+  return null;
 }
 
 async function fallbackWhatsapp(
@@ -218,8 +308,30 @@ async function fallbackWhatsapp(
   });
 }
 
-export function getGuionForCall(callId: string): string | null {
-  const call = getVendedorCall(callId);
-  if (!call) return null;
-  return construirGuionLlamada(call.codigo, call.planeta, call.sellerRef).voz;
+/** Guion para TwiML — desde registro o desde query (serverless). */
+export function resolveGuionForTwiml(params: {
+  callId?: string;
+  codigo?: number;
+  planeta?: string;
+  sellerRef?: string | null;
+}): string {
+  if (params.callId) {
+    const call = getVendedorCall(params.callId);
+    if (call) {
+      return construirGuionLlamada(call.codigo, call.planeta, call.sellerRef).voz;
+    }
+  }
+  if (
+    params.codigo &&
+    params.planeta &&
+    isPlanetaId(params.planeta) &&
+    CODIGOS.has(params.codigo)
+  ) {
+    return construirGuionLlamada(
+      params.codigo as CodigoNumero,
+      params.planeta,
+      params.sellerRef,
+    ).voz;
+  }
+  return "Hola. Soy el vendedor de Sistemicar. Entra en sistemicar punto app para continuar.";
 }

@@ -32,7 +32,9 @@ export default function VendedorTriagePage() {
   const [telefono, setTelefono] = useState("");
   const [callLoading, setCallLoading] = useState(false);
   const [callDone, setCallDone] = useState(false);
+  const [callStatusMsg, setCallStatusMsg] = useState<string | null>(null);
   const llamameRef = useRef<HTMLDivElement>(null);
+  const callInFlight = useRef(false);
 
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
@@ -84,6 +86,51 @@ export default function VendedorTriagePage() {
     setPaso(0);
     setTelefono("");
     setCallDone(false);
+    setCallStatusMsg(null);
+  }
+
+  async function solicitarLlamada() {
+    if (!fijacion || callLoading || callDone || callInFlight.current) return;
+    const tel = telefono.trim();
+    if (!tel) {
+      setCallStatusMsg("Escribe tu número primero.");
+      toast.error("Escribe tu número primero.");
+      return;
+    }
+    callInFlight.current = true;
+    setCallLoading(true);
+    setCallStatusMsg("Contactando Twilio…");
+    try {
+      const res = await fetch("/api/vendedor/solicitar-llamada", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefono: tel,
+          whatsapp: tel,
+          codigo: fijacion.codigo,
+          planeta: fijacion.planeta,
+          sellerRef: sellerRef || undefined,
+          consentimiento: "llamame",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error");
+      setCallDone(true);
+      const msg =
+        data.message ||
+        (data.voiceOk
+          ? "Llamada iniciada."
+          : "Solicitud registrada.");
+      setCallStatusMsg(msg);
+      toast.success(msg);
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e.message : "No se pudo solicitar";
+      setCallStatusMsg(err);
+      toast.error(err);
+    } finally {
+      callInFlight.current = false;
+      setCallLoading(false);
+    }
   }
 
   return (
@@ -284,37 +331,16 @@ export default function VendedorTriagePage() {
               <button
                 type="button"
                 disabled={callDone || callLoading || !telefono.trim()}
-                onClick={async () => {
-                  setCallLoading(true);
-                  try {
-                    const res = await fetch("/api/vendedor/solicitar-llamada", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        telefono: telefono.trim(),
-                        whatsapp: telefono.trim(),
-                        codigo: fijacion.codigo,
-                        planeta: fijacion.planeta,
-                        sellerRef: sellerRef || undefined,
-                        consentimiento: "llamame",
-                      }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Error");
-                    setCallDone(true);
-                    toast.success(data.message || "Solicitud registrada");
-                  } catch (e: unknown) {
-                    toast.error(
-                      e instanceof Error ? e.message : "No se pudo solicitar",
-                    );
-                  } finally {
-                    setCallLoading(false);
-                  }
+                onPointerUp={(e) => {
+                  e.preventDefault();
+                  void solicitarLlamada();
                 }}
-                className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.14em] disabled:opacity-40"
+                onClick={() => void solicitarLlamada()}
+                className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.14em] disabled:opacity-40 touch-manipulation"
                 style={{
                   background: callDone ? "rgba(255,255,255,0.08)" : GOLD,
                   color: callDone ? GOLD : "#0A0A0A",
+                  WebkitTapHighlightColor: "rgba(212,175,55,0.35)",
                 }}
                 data-testid="vendedor-btn-llamame"
               >
@@ -325,6 +351,15 @@ export default function VendedorTriagePage() {
                     ? "ENVIANDO…"
                     : "LLÁMAME"}
               </button>
+              {callStatusMsg && (
+                <p
+                  className="text-[12px] leading-relaxed"
+                  style={{ color: callDone ? "#86EFAC" : GOLD }}
+                  data-testid="vendedor-call-status"
+                >
+                  {callStatusMsg}
+                </p>
+              )}
             </div>
 
             <Link

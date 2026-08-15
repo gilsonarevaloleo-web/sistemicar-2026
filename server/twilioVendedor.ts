@@ -1,6 +1,9 @@
 /**
  * Twilio — Voice (1º) + WhatsApp (2º) para el Vendedor Algorítmico.
- * Sin SDK: REST con fetch. Si faltan credenciales, deja la cola en pending/failed.
+ * Sin SDK: REST con fetch.
+ *
+ * Importante (Netlify): TwiML y status callback deben llevar codigo/planeta/tel
+ * en la query — la memoria de la función no se comparte entre invocaciones.
  */
 
 export type TwilioConfig = {
@@ -8,9 +11,20 @@ export type TwilioConfig = {
   authToken: string;
   fromVoice: string;
   fromWhatsapp: string;
-  statusCallbackUrl: string;
-  twimlUrl: string;
+  publicBaseUrl: string;
 };
+
+/** Evita 301 sistemicar.app → www que rompe POST de Twilio. */
+export function resolvePublicBaseUrl(): string {
+  const raw =
+    process.env.PUBLIC_APP_URL?.trim() ||
+    process.env.URL?.trim() ||
+    process.env.DEPLOY_PRIME_URL?.trim() ||
+    "https://www.sistemicar.app";
+  return raw
+    .replace(/\/$/, "")
+    .replace("://sistemicar.app", "://www.sistemicar.app");
+}
 
 export function getTwilioConfig(): TwilioConfig | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
@@ -21,10 +35,6 @@ export function getTwilioConfig(): TwilioConfig | null {
     process.env.TWILIO_VOICE_FROM?.trim();
   if (!accountSid || !authToken || !fromVoice) return null;
 
-  const base =
-    process.env.PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "https://sistemicar.app";
-
   return {
     accountSid,
     authToken,
@@ -32,8 +42,7 @@ export function getTwilioConfig(): TwilioConfig | null {
     fromWhatsapp: fromWhatsapp!.startsWith("whatsapp:")
       ? fromWhatsapp!
       : `whatsapp:${fromWhatsapp}`,
-    statusCallbackUrl: `${base}/api/vendedor/twilio/status`,
-    twimlUrl: `${base}/api/vendedor/twilio/twiml`,
+    publicBaseUrl: resolvePublicBaseUrl(),
   };
 }
 
@@ -83,14 +92,34 @@ export function normalizePhoneE164(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
   if (digits.length < 9 || digits.length > 15) return null;
   if (raw.trim().startsWith("+")) return `+${digits}`;
-  // Perú por defecto si 9 dígitos
   if (digits.length === 9) return `+51${digits}`;
   return `+${digits}`;
 }
 
+export type CallCallbackParams = {
+  callId: string;
+  telefono: string;
+  whatsapp: string;
+  codigo: number;
+  planeta: string;
+  sellerRef?: string | null;
+};
+
+export function buildTwilioCallbackQuery(p: CallCallbackParams): string {
+  const q = new URLSearchParams({
+    callId: p.callId,
+    telefono: p.telefono,
+    whatsapp: p.whatsapp || p.telefono,
+    codigo: String(p.codigo),
+    planeta: p.planeta,
+  });
+  if (p.sellerRef) q.set("ref", p.sellerRef);
+  return q.toString();
+}
+
 export async function placeVoiceCall(params: {
   to: string;
-  callId: string;
+  callback: CallCallbackParams;
 }): Promise<{ ok: boolean; sid?: string; error?: string }> {
   const cfg = getTwilioConfig();
   if (!cfg) {
@@ -99,15 +128,18 @@ export async function placeVoiceCall(params: {
       error: "Twilio no configurado (TWILIO_ACCOUNT_SID / AUTH_TOKEN / VOICE_FROM)",
     };
   }
-  const twiml = `${cfg.twimlUrl}?callId=${encodeURIComponent(params.callId)}`;
+  const qs = buildTwilioCallbackQuery(params.callback);
+  const twiml = `${cfg.publicBaseUrl}/api/vendedor/twilio/twiml?${qs}`;
+  const statusCb = `${cfg.publicBaseUrl}/api/vendedor/twilio/status?${qs}`;
   return twilioForm(cfg, "/Calls.json", {
     To: params.to,
     From: cfg.fromVoice,
     Url: twiml,
     Method: "GET",
-    StatusCallback: `${cfg.statusCallbackUrl}?callId=${encodeURIComponent(params.callId)}`,
+    StatusCallback: statusCb,
     StatusCallbackMethod: "POST",
-    StatusCallbackEvent: "completed answered no-answer busy failed canceled",
+    // Twilio espera eventos separados por espacio en StatusCallbackEvent
+    "StatusCallbackEvent": "initiated ringing answered completed",
     Timeout: "25",
   });
 }
