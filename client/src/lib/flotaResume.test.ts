@@ -129,6 +129,46 @@ describe("flotaResume", () => {
     assert.equal(picked.subVehiculos?.[1]?.status, "activo");
   });
 
+  it("pausa stale no pisa el sub siguiente al volver de segundo plano", () => {
+    const progressed = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: false,
+      subVehiculos: [
+        { id: "u1", titulo: "A", status: "cumplido", cierreAt: 2_000 },
+        { id: "u2", titulo: "B", status: "activo", aperturaAt: 2_050 },
+      ] as Vehicle["subVehiculos"],
+    });
+    const stalePause = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        pausadoAt: 1_000,
+        subActivoId: "u1",
+        elapsedSecSnapshot: 40,
+        nestedKind: "interrupcion_situacion",
+      },
+      subVehiculos: [
+        { id: "u1", titulo: "A", status: "nested_paused", aperturaAt: 500 },
+        { id: "u2", titulo: "B", status: "pendiente" },
+      ] as Vehicle["subVehiculos"],
+    });
+    assert.equal(diskSessionRicherThanMemory(progressed, stalePause), false);
+    const result = rehydrateFlotaFromDiskSources({
+      memory: [progressed],
+      local: [stalePause],
+      parked: [stalePause],
+      nowMs: 3_000,
+      dayStartMs: 0,
+    });
+    assert.equal(result.next[0]!.interrupcionActiva, false);
+    assert.equal(result.next[0]!.subVehiculos?.[0]?.status, "cumplido");
+    assert.equal(result.next[0]!.subVehiculos?.[1]?.status, "activo");
+  });
+
   it("rehydrate actualiza shell en memoria con ring de disco", () => {
     const memory = [v({ id: "r1", titulo: "Ring shell" })];
     const local = [

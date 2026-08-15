@@ -9,6 +9,10 @@ import { shouldPreserveLocalActivo } from "./ghostVehicleEngine";
 import { getJournalDayStartMs } from "./segmentTime";
 import { ringSessionOperable } from "./ringEnfoqueReal";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge";
+import {
+  compareConquistaSession,
+  pruneStaleDesglosadorPause,
+} from "./conquistaSessionCompare";
 
 function situacionSessionRichness(v: Vehicle): number {
   if (v.tipoFlota !== "situacion") return 0;
@@ -32,32 +36,13 @@ function situacionSessionRichness(v: Vehicle): number {
   return score;
 }
 
-function conquistaSessionRichness(v: Vehicle): number {
-  if (v.tipoFlota !== "tiempo" || v.tipoReloj !== "desglosador") return 0;
-  const subs = v.subVehiculos ?? [];
-  let score = subs.length * 10;
-  score += subs.filter(s => s.status === "cumplido" || s.status === "fallado").length * 5;
-  score += subs.filter(s => s.status === "activo").length * 3;
-  // Timestamps / pausa: mismo conteo de filas no implica misma sesión.
-  for (const s of subs) {
-    if (s.aperturaAt != null) score += 2;
-    if (s.cierreAt != null) score += 2;
-  }
-  if (v.interrupcionActiva) score += 8;
-  if (v.desglosadorPausa?.subActivoId) score += 8;
-  if ((v.desglosadorBloqueDepthPsGranted ?? 0) > 0) {
-    score += v.desglosadorBloqueDepthPsGranted!;
-  }
-  return score;
-}
-
 /** Disco/parked/memoria más rico que el candidato (shell sin ring, etc.). */
 export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boolean {
   if (memory.id !== disk.id) return false;
   if (disk.status !== "activo" || memory.status !== "activo") return false;
   return (
     situacionSessionRichness(disk) > situacionSessionRichness(memory) ||
-    conquistaSessionRichness(disk) > conquistaSessionRichness(memory)
+    compareConquistaSession(disk, memory) > 0
   );
 }
 
@@ -78,7 +63,7 @@ export function pickRicherActiveVehicle(
       best = mergeActiveVehicleSessionState(best, src);
     }
   }
-  return best;
+  return pruneStaleDesglosadorPause(best);
 }
 
 /**
@@ -104,9 +89,13 @@ export function upgradeActiveSessionsFromSources(
   const next = incoming.map(v => {
     if (v.status !== "activo" || v.autoVerdad) return v;
     const richer = byId.get(v.id);
-    if (!richer || !diskSessionRicherThanMemory(v, richer)) return v;
+    if (!richer || !diskSessionRicherThanMemory(v, richer)) {
+      const pruned = pruneStaleDesglosadorPause(v);
+      if (pruned !== v) changed = true;
+      return pruned;
+    }
     changed = true;
-    return mergeActiveVehicleSessionState(v, richer);
+    return pruneStaleDesglosadorPause(mergeActiveVehicleSessionState(v, richer));
   });
   return changed ? next : incoming;
 }
@@ -147,13 +136,17 @@ export function rehydrateFlotaFromDiskSources(input: RehydrateFlotaInput): Rehyd
   }
 
   const upgradedIds: string[] = [];
+  let prunedOnly = false;
   const next = input.memory.map(mem => {
     const disk = diskById.get(mem.id);
-    if (!disk) return mem;
-    if (!diskSessionRicherThanMemory(mem, disk)) return mem;
+    if (!disk || !diskSessionRicherThanMemory(mem, disk)) {
+      const pruned = pruneStaleDesglosadorPause(mem);
+      if (pruned !== mem) prunedOnly = true;
+      return pruned;
+    }
     upgradedIds.push(mem.id);
     // memory = lean "remote-like"; disk = local rico → merge conserva ring/subs.
-    return mergeActiveVehicleSessionState(mem, disk);
+    return pruneStaleDesglosadorPause(mergeActiveVehicleSessionState(mem, disk));
   });
 
   const byId = new Map(next.map(v => [v.id, v]));
@@ -162,11 +155,12 @@ export function rehydrateFlotaFromDiskSources(input: RehydrateFlotaInput): Rehyd
     if (byId.has(v.id)) continue;
     if (wasClosed(v.id, v.clientRequestId)) continue;
     if (!shouldPreserveLocalActivo(v, nowMs, dayStart)) continue;
-    byId.set(v.id, v);
+    const parked = pruneStaleDesglosadorPause(v);
+    byId.set(v.id, parked);
     addedIds.push(v.id);
-    next.unshift(v);
+    next.unshift(parked);
   }
 
-  const changed = upgradedIds.length > 0 || addedIds.length > 0;
+  const changed = upgradedIds.length > 0 || addedIds.length > 0 || prunedOnly;
   return { next: changed ? [...next] : input.memory, changed, upgradedIds, addedIds };
 }
