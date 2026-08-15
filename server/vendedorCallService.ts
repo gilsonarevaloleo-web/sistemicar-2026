@@ -114,8 +114,14 @@ export async function solicitarLlamadaVendedor(
   insertVendedorCall(record);
 
   const twilioReady = !!getTwilioConfig();
-  // Disparo async de voz (no bloquea respuesta HTTP más de lo necesario)
-  void attemptVoiceThenMaybeWhatsapp(id);
+  // Disparo async de voz (no bloquea respuesta HTTP)
+  void attemptVoiceThenMaybeWhatsapp(id).catch((err) => {
+    console.error("[vendedor] attemptVoice", err);
+    updateVendedorCall(id, {
+      status: "failed",
+      error: err instanceof Error ? err.message : "voice_async_error",
+    });
+  });
 
   return { ok: true, call: record, twilioReady };
 }

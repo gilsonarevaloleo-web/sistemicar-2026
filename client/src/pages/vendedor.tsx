@@ -3,7 +3,7 @@
  * Público (sin login). Persiste fijación para fase de llamadas.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Crosshair, Phone, RotateCcw } from "lucide-react";
@@ -12,6 +12,7 @@ import {
   VENDEDOR_TRIAGE_PREGUNTAS,
   opcionesMatizParaPlaneta,
   resolverTriageVendedor,
+  type FijacionVendedor,
   type VendedorTriageOpcion,
 } from "@shared/vendedor/triageLogic";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
@@ -27,12 +28,11 @@ export default function VendedorTriagePage() {
   const [grietaPick, setGrietaPick] = useState<VendedorTriageOpcion | null>(
     null,
   );
-  const [matizPick, setMatizPick] = useState<VendedorTriageOpcion | null>(
-    null,
-  );
+  const [fijacion, setFijacion] = useState<FijacionVendedor | null>(null);
   const [telefono, setTelefono] = useState("");
   const [callLoading, setCallLoading] = useState(false);
   const [callDone, setCallDone] = useState(false);
+  const llamameRef = useRef<HTMLDivElement>(null);
 
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
@@ -44,27 +44,43 @@ export default function VendedorTriagePage() {
     ? opcionesMatizParaPlaneta(grietaPick.planeta)
     : [];
 
-  const fijacion = useMemo(() => {
-    if (!grietaPick || !matizPick) return null;
-    return resolverTriageVendedor([grietaPick, matizPick]);
-  }, [grietaPick, matizPick]);
+  useEffect(() => {
+    if (paso === 2 && fijacion) {
+      window.setTimeout(() => {
+        llamameRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 280);
+    }
+  }, [paso, fijacion]);
 
   function elegirGrieta(op: VendedorTriageOpcion) {
     setGrietaPick(op);
-    setMatizPick(null);
-    window.setTimeout(() => setPaso(1), 160);
+    setFijacion(null);
+    window.setTimeout(() => setPaso(1), 120);
   }
 
   function elegirMatiz(op: VendedorTriageOpcion) {
-    setMatizPick(op);
-    const result = resolverTriageVendedor([grietaPick!, op]);
-    saveFijacionVendedor(result);
-    setPaso(2);
+    try {
+      if (!grietaPick) {
+        toast.error("Vuelve a la pregunta 1 e intenta de nuevo.");
+        setPaso(0);
+        return;
+      }
+      const result = resolverTriageVendedor([grietaPick, op]);
+      saveFijacionVendedor(result);
+      setFijacion(result);
+      setPaso(2);
+    } catch (e: unknown) {
+      console.error("[vendedor] elegirMatiz", e);
+      toast.error("No se pudo fijar el diagnóstico. Intenta otra opción.");
+    }
   }
 
   function reiniciar() {
     setGrietaPick(null);
-    setMatizPick(null);
+    setFijacion(null);
     setPaso(0);
     setTelefono("");
     setCallDone(false);
@@ -79,7 +95,7 @@ export default function VendedorTriagePage() {
       }}
       data-testid="vendedor-triage-page"
     >
-      <div className="relative mx-auto max-w-xl px-4 py-8 pb-28 sm:py-12">
+      <div className="relative mx-auto max-w-xl px-4 py-8 pb-32 sm:py-12">
         <p
           className="text-[12px] tracking-[0.22em]"
           style={{ color: GOLD }}
@@ -93,7 +109,7 @@ export default function VendedorTriagePage() {
           ¿Por dónde entras?
         </h1>
         <p className="mt-2 text-sm text-white/55">
-          Dos preguntas. Fijamos tu Código y tu Planeta — sin chat, sin presión.
+          Dos preguntas. Toca una opción en cada paso — fijamos Código y Planeta.
         </p>
         {sellerRef && (
           <p className="mt-2 text-[10px] tracking-widest text-white/35">
@@ -115,13 +131,14 @@ export default function VendedorTriagePage() {
             <h2 className="text-lg font-bold text-white/90">
               {preguntaGrieta.pregunta}
             </h2>
+            <p className="text-[11px] text-white/35">Toca una opción para continuar</p>
             <div className="space-y-2">
               {preguntaGrieta.opciones.map((op) => (
                 <button
                   key={op.id}
                   type="button"
                   onClick={() => elegirGrieta(op)}
-                  className="w-full border px-4 py-3 text-left text-sm transition-colors hover:border-white/30"
+                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30"
                   style={{
                     borderColor: "rgba(255,255,255,0.12)",
                     background: "rgba(0,0,0,0.4)",
@@ -151,13 +168,16 @@ export default function VendedorTriagePage() {
             <h2 className="text-lg font-bold text-white/90">
               ¿Cuál te describe mejor hoy?
             </h2>
+            <p className="text-[11px] text-white/35">
+              Toca una opción → verás tu planeta y el botón Llámame
+            </p>
             <div className="space-y-2">
               {opcionesMatiz.map((op) => (
                 <button
                   key={op.id}
                   type="button"
                   onClick={() => elegirMatiz(op)}
-                  className="w-full border px-4 py-3 text-left text-sm transition-colors hover:border-white/30"
+                  className="w-full border px-4 py-3.5 text-left text-sm transition-colors active:scale-[0.99] hover:border-white/30"
                   style={{
                     borderColor: "rgba(255,255,255,0.12)",
                     background: "rgba(0,0,0,0.4)",
@@ -173,7 +193,7 @@ export default function VendedorTriagePage() {
               type="button"
               onClick={() => {
                 setPaso(0);
-                setMatizPick(null);
+                setFijacion(null);
               }}
               className="text-[11px] tracking-widest text-white/35 hover:text-white/60"
             >
@@ -218,76 +238,15 @@ export default function VendedorTriagePage() {
               <p className="mt-1 text-[12px] text-white/45">
                 {fijacion.nombreCodigo}
               </p>
-
-              <div
-                className="mt-4 border p-3"
-                style={{
-                  borderColor: `${fijacion.color}44`,
-                  background: "rgba(0,0,0,0.35)",
-                }}
-              >
-                <p
-                  className="text-[10px] tracking-widest"
-                  style={{ color: fijacion.color }}
-                >
-                  GRIETA
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-                  {fijacion.grieta}
-                </p>
-              </div>
-
-              <div
-                className="mt-3 border p-3"
-                style={{
-                  borderColor: `${GOLD}44`,
-                  background: `${GOLD}0d`,
-                }}
-              >
-                <p
-                  className="text-[10px] tracking-widest"
-                  style={{ color: GOLD }}
-                >
-                  PREGUNTA DISPARADORA
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-                  {fijacion.preguntaDisparadora}
-                </p>
-              </div>
-
-              <p className="mt-3 text-[11px] leading-relaxed text-white/45">
-                {fijacion.metodoEntrada}
-              </p>
             </div>
 
-            <Link
-              href={withSellerRef(fijacion.trialHref, sellerRef)}
-              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
-              style={{
-                background: `linear-gradient(90deg, ${fijacion.color}22, ${GOLD}18)`,
-                border: `1px solid ${fijacion.color}66`,
-                color: fijacion.color,
-              }}
-              data-testid="vendedor-cta-trial"
-            >
-              {fijacion.trialLabel}
-              <ArrowRight size={14} />
-            </Link>
-
-            <Link
-              href={withSellerRef(fijacion.checkoutHref, sellerRef)}
-              className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[11px] tracking-widest"
-              style={{ borderColor: `${GOLD}66`, color: GOLD }}
-              data-testid="vendedor-cta-checkout"
-            >
-              {fijacion.checkoutLabel}
-            </Link>
-
+            {/* Llámame arriba en móvil — no queda bajo el pliegue */}
             <div
+              ref={llamameRef}
               className="border p-4 space-y-3"
               style={{
-                borderColor: "rgba(255,255,255,0.12)",
-                background: "rgba(0,0,0,0.35)",
+                borderColor: `${GOLD}66`,
+                background: `${GOLD}12`,
               }}
               data-testid="vendedor-llamame"
             >
@@ -296,20 +255,21 @@ export default function VendedorTriagePage() {
                 style={{ color: GOLD }}
               >
                 <Phone size={14} />
-                ¿QUIERES QUE TE LLAME EL VENDEDOR?
+                LLÁMAME · VENDEDOR ALGORÍTMICO
               </p>
-              <p className="text-[12px] text-white/50 leading-relaxed">
-                Solo si escribes <span className="text-white/80">Llámame</span>{" "}
-                y dejas tu número. Primero teléfono; si no contestas, WhatsApp.
+              <p className="text-[12px] text-white/55 leading-relaxed">
+                Deja tu número. Primero te llamamos por teléfono; si no
+                contestas, WhatsApp.
               </p>
               <input
                 type="tel"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
-                placeholder="WhatsApp / teléfono (+51…)"
-                className="w-full px-3 py-2.5 bg-black/50 border border-white/10 text-sm text-white"
+                placeholder="Ej. 918260514 o +51…"
+                className="w-full px-3 py-3 bg-black/50 border border-white/15 text-sm text-white"
                 data-testid="vendedor-telefono"
                 disabled={callDone || callLoading}
+                autoComplete="tel"
               />
               <button
                 type="button"
@@ -341,21 +301,70 @@ export default function VendedorTriagePage() {
                     setCallLoading(false);
                   }
                 }}
-                className="flex w-full items-center justify-center gap-2 px-4 py-3 text-[12px] font-bold tracking-[0.14em] disabled:opacity-40"
+                className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.14em] disabled:opacity-40"
                 style={{
-                  background: callDone ? "rgba(255,255,255,0.06)" : `${GOLD}22`,
-                  border: `1px solid ${GOLD}55`,
-                  color: GOLD,
+                  background: callDone ? "rgba(255,255,255,0.08)" : GOLD,
+                  color: callDone ? GOLD : "#0A0A0A",
                 }}
                 data-testid="vendedor-btn-llamame"
               >
-                <Phone size={14} />
+                <Phone size={16} />
                 {callDone
                   ? "SOLICITUD ENVIADA"
                   : callLoading
                     ? "ENVIANDO…"
                     : "LLÁMAME"}
               </button>
+            </div>
+
+            <Link
+              href={withSellerRef(fijacion.trialHref, sellerRef)}
+              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
+              style={{
+                background: `linear-gradient(90deg, ${fijacion.color}22, ${GOLD}18)`,
+                border: `1px solid ${fijacion.color}66`,
+                color: fijacion.color,
+              }}
+              data-testid="vendedor-cta-trial"
+            >
+              {fijacion.trialLabel}
+              <ArrowRight size={14} />
+            </Link>
+
+            <Link
+              href={withSellerRef(fijacion.checkoutHref, sellerRef)}
+              className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[11px] tracking-widest"
+              style={{ borderColor: `${GOLD}66`, color: GOLD }}
+              data-testid="vendedor-cta-checkout"
+            >
+              {fijacion.checkoutLabel}
+            </Link>
+
+            <div
+              className="border p-3"
+              style={{
+                borderColor: `${fijacion.color}44`,
+                background: "rgba(0,0,0,0.35)",
+              }}
+            >
+              <p
+                className="text-[10px] tracking-widest"
+                style={{ color: fijacion.color }}
+              >
+                GRIETA
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-white/80">
+                {fijacion.grieta}
+              </p>
+              <p
+                className="mt-3 text-[10px] tracking-widest"
+                style={{ color: GOLD }}
+              >
+                PREGUNTA DISPARADORA
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-white/80">
+                {fijacion.preguntaDisparadora}
+              </p>
             </div>
 
             <button
