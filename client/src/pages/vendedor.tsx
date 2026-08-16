@@ -117,14 +117,15 @@ export default function VendedorTriagePage() {
       if (!res.ok) throw new Error(data.error || "Error");
       const bothFailed = !data.voiceOk && !data.whatsappOk;
       const msg =
-        (bothFailed && data.errorDetail) ||
+        (bothFailed &&
+          (data.voiceError || data.errorDetail || data.message)) ||
         data.message ||
         (data.voiceOk
           ? "Llamada iniciada."
           : "Solicitud registrada.");
       setCallStatusMsg(msg);
       if (bothFailed) {
-        // No marcar done: permite reintentar tras corregir Twilio / ContentSid.
+        // No marcar done: permite reintentar tras verificar número / ContentSid.
         toast.error(msg);
       } else {
         setCallDone(true);
@@ -324,6 +325,12 @@ export default function VendedorTriagePage() {
               <p className="text-[12px] text-white/55 leading-relaxed">
                 Deja tu número. Primero te llamamos por teléfono; si no
                 contestas, WhatsApp.
+                {callStatusMsg && /21219|verificad|trial/i.test(callStatusMsg) ? (
+                  <span className="block mt-2 text-[#FCA5A5]/55">
+                    Si Twilio está en trial: el +51 debe estar en Verified Caller
+                    IDs (o sube la cuenta a paga). Geo Permissions no alcanza.
+                  </span>
+                ) : null}
               </p>
               <input
                 type="tel"

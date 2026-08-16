@@ -70,10 +70,23 @@ function basicAuth(sid: string, token: string): string {
 async function twilioForm(
   cfg: TwilioConfig,
   path: string,
-  params: Record<string, string>,
-): Promise<{ ok: boolean; sid?: string; status?: string; error?: string }> {
+  params: Record<string, string | string[]>,
+): Promise<{
+  ok: boolean;
+  sid?: string;
+  status?: string;
+  error?: string;
+  code?: number;
+}> {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${cfg.accountSid}${path}`;
-  const body = new URLSearchParams(params);
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      for (const v of value) body.append(key, v);
+    } else {
+      body.append(key, value);
+    }
+  }
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -88,11 +101,17 @@ async function twilioForm(
       status?: string;
       message?: string;
       error_message?: string;
+      code?: number;
+      more_info?: string;
     };
     if (!res.ok) {
+      const msg =
+        data.message || data.error_message || `Twilio HTTP ${res.status}`;
+      const code = typeof data.code === "number" ? data.code : undefined;
       return {
         ok: false,
-        error: data.message || data.error_message || `Twilio HTTP ${res.status}`,
+        code,
+        error: code ? `[${code}] ${msg}` : msg,
       };
     }
     return { ok: true, sid: data.sid, status: data.status };
@@ -108,6 +127,17 @@ async function twilioForm(
 export function humanizeTwilioVoiceError(raw: string): string {
   const s = String(raw || "");
   const lower = s.toLowerCase();
+
+  // Códigos Twilio frecuentes (trial / from / geo)
+  if (/\b21219\b/.test(s) || /to.?phone.?number.?not.?verified/i.test(s)) {
+    return "[21219] Cuenta trial: el número DESTINO (+51…) no está verificado. Console → Phone Numbers → Verified Caller IDs → Add a new Caller ID (código por SMS/llamada). O actualiza la cuenta a paga.";
+  }
+  if (/\b21210\b/.test(s) || /from.?phone.?number.?not.?verified/i.test(s)) {
+    return "[21210] TWILIO_VOICE_FROM no es un Caller ID válido de esta cuenta. Usa un número Voice comprado en Twilio (E.164), no un móvil personal sin verificar.";
+  }
+  if (/\b21215\b/.test(s) || /\b21408\b/.test(s)) {
+    return `[${/\b21408\b/.test(s) ? "21408" : "21215"}] Geo Permissions: habilita el país del destino (p. ej. Perú) en Console → Voice → Settings → Geo Permissions.`;
+  }
   if (/whatsapp/i.test(s) && /from|caller|voice|call|pstn/i.test(s)) {
     return "TWILIO_VOICE_FROM no puede ser WhatsApp. Usa un número de voz E.164 (+…).";
   }
@@ -115,7 +145,7 @@ export function humanizeTwilioVoiceError(raw: string): string {
     /unverified|not.?verified|trial|only.?verified/i.test(s) ||
     lower.includes("permission to call")
   ) {
-    return "Twilio trial: solo llama a números verificados (Console → Verified Caller IDs) o pasa a cuenta de pago.";
+    return "Twilio trial: solo llama a números verificados (Console → Phone Numbers → Verified Caller IDs). Verifica el +51 del lead o pasa a cuenta de pago.";
   }
   if (/geo.?permission|geographic|not enabled for|destination.*not.*enabled/i.test(s)) {
     return "Twilio no tiene habilitadas llamadas a ese país. Console → Voice → Geo Permissions.";
@@ -214,11 +244,17 @@ export async function placeVoiceCall(params: {
     Method: "GET",
     StatusCallback: statusCb,
     StatusCallbackMethod: "POST",
-    // Twilio espera eventos separados por espacio en StatusCallbackEvent
-    StatusCallbackEvent: "initiated ringing answered completed",
-    Timeout: "25",
+    // Twilio exige el parámetro repetido (no un solo string con espacios).
+    StatusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    Timeout: "45",
   });
   if (!result.ok && result.error) {
+    console.error("[twilio-vendedor] voice failed", {
+      to: params.to.slice(0, 6) + "…",
+      from: cfg.fromVoice.slice(0, 6) + "…",
+      code: result.code,
+      error: result.error,
+    });
     return { ok: false, error: humanizeTwilioVoiceError(result.error) };
   }
   return result;

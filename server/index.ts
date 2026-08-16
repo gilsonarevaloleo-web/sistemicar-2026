@@ -5333,6 +5333,8 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
       twilioReady: result.twilioReady,
       voiceOk: result.voiceOk,
       whatsappOk: result.whatsappOk,
+      voiceError: result.voiceError,
+      whatsappError: result.whatsappError,
       message: result.detail,
       errorDetail: result.call.error,
     });

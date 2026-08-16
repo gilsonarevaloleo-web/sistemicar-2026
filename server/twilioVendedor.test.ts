@@ -70,6 +70,17 @@ describe("Twilio vendedor helpers", () => {
     );
   });
 
+  it("humaniza 21219 destino no verificado (trial)", () => {
+    assert.match(
+      humanizeTwilioVoiceError("[21219] 'To' phone number not verified"),
+      /21219/,
+    );
+    assert.match(
+      humanizeTwilioVoiceError("[21219] 'To' phone number not verified"),
+      /Verified Caller IDs/,
+    );
+  });
+
   it("content variables planeta/codigo/enlace", () => {
     const v = buildWhatsAppContentVariables({
       planeta: "JORNADA",

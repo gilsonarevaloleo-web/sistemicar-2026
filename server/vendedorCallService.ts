@@ -66,6 +66,8 @@ export type SolicitarLlamadaResult =
       twilioReady: boolean;
       voiceOk: boolean;
       whatsappOk: boolean;
+      voiceError: string | null;
+      whatsappError: string | null;
       detail: string;
     }
   | { ok: false; error: string; status?: number };
@@ -166,6 +168,20 @@ export async function solicitarLlamadaVendedor(
   const voiceOk = Boolean(finalCall.twilioCallSid);
   const whatsappOk = Boolean(finalCall.twilioMessageSid);
 
+  // Separar causas: "voz:… | wa:…" (no mezclar con el mensaje amable).
+  let voiceError: string | null = null;
+  let whatsappError: string | null = null;
+  if (finalCall.error) {
+    const vozMatch = finalCall.error.match(/voz:([^|]+)/i);
+    const waMatch = finalCall.error.match(/wa:([^|]+)/i);
+    if (vozMatch) voiceError = vozMatch[1].trim();
+    if (waMatch) whatsappError = waMatch[1].trim();
+    if (!voiceOk && !voiceError && !whatsappOk) {
+      // Error crudo sin prefijos (legacy)
+      voiceError = finalCall.error;
+    }
+  }
+
   let detail = "Solicitud registrada.";
   if (voiceOk && !whatsappOk) {
     detail =
@@ -177,14 +193,20 @@ export async function solicitarLlamadaVendedor(
   } else if (!twilioReady) {
     detail =
       "Registrado en admin, pero Twilio no está configurado en el servidor.";
+  } else if (voiceError && /21219|verificad/i.test(voiceError)) {
+    detail = voiceError;
   } else if (!contentSidReady && /ContentSid|plantilla/i.test(finalCall.error || "")) {
     detail =
-      finalCall.error ||
-      "Falta TWILIO_WHATSAPP_CONTENT_SID (plantilla HX…) y la llamada de voz también falló. Revisa Voice From, trial/geo y la plantilla WA.";
+      (voiceError ? `Voz: ${voiceError}. ` : "") +
+      (whatsappError ||
+        "Falta TWILIO_WHATSAPP_CONTENT_SID (plantilla HX…).");
   } else {
     detail =
+      [voiceError && `Voz: ${voiceError}`, whatsappError && `WA: ${whatsappError}`]
+        .filter(Boolean)
+        .join(" · ") ||
       finalCall.error ||
-      "Twilio no inició llamada ni WhatsApp. Revisa números, Geo Permissions y ContentSid.";
+      "Twilio no inició llamada ni WhatsApp. Revisa trial (número verificado), Voice From y ContentSid.";
   }
 
   return {
@@ -193,6 +215,8 @@ export async function solicitarLlamadaVendedor(
     twilioReady,
     voiceOk,
     whatsappOk,
+    voiceError,
+    whatsappError,
     detail,
   };
 }
