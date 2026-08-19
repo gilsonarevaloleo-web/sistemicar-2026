@@ -1658,6 +1658,10 @@ export default function AdminGilson() {
                       : "—"}
                     {" · "}Teléfono → WhatsApp · solo admin
                   </p>
+                  <p className="text-[10px] text-amber-500/70 mt-1">
+                    Trial Twilio: geo no basta — el destino debe estar en Verified
+                    Caller IDs (error 21219) o la cuenta debe estar pagada.
+                  </p>
                 </div>
                 <button
                   type="button"
