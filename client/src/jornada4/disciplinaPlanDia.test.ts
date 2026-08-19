@@ -4,8 +4,11 @@ import type { SegmentoV5 } from "../lib/persistence.ts";
 import { getLimaDayStartMs, segmentWindowMs } from "../lib/segmentTime.ts";
 import {
   computeDisciplinaPlanDia,
+  formatTardanzaPuertaLabel,
   pesoEntradaPct,
   puntualidadDesdeTardanzaMin,
+  puntualidadPuertaKind,
+  summarizePuntualidadPuertas,
 } from "./disciplinaPlanDia.ts";
 
 function seg(
@@ -116,5 +119,49 @@ describe("disciplinaPlanDia", () => {
     });
     assert.equal(r.porcentajeDia, 0);
     assert.equal(r.entradas[0]!.tieneEntrada, false);
+  });
+
+  it("puntualidad de puerta: a tiempo / tarde / sin entrada, no es hueco de cobertura", () => {
+    const s1 = segmentWindowMs("08:00", "10:00", dayStart);
+    const s2 = segmentWindowMs("10:00", "12:00", dayStart);
+    const segmentos = [
+      seg({
+        id: "a",
+        nombre: "Uno",
+        horaInicio: "08:00",
+        horaFin: "10:00",
+        estado: "cerrado_manual",
+        activadoAt: s1.start,
+      }),
+      seg({
+        id: "b",
+        nombre: "Dos",
+        horaInicio: "10:00",
+        horaFin: "12:00",
+        estado: "cerrado_manual",
+        activadoAt: s2.start + 12 * 60_000,
+      }),
+      seg({ id: "c", nombre: "Tres", horaInicio: "13:00", horaFin: "14:00" }),
+    ];
+    const s3 = segmentWindowMs("13:00", "14:00", dayStart);
+    const r = computeDisciplinaPlanDia({
+      segmentos,
+      dayStartMs: dayStart,
+      nowMs: s3.end + 1000,
+    });
+    assert.equal(puntualidadPuertaKind(r.entradas[0]!), "a_tiempo");
+    assert.equal(formatTardanzaPuertaLabel(r.entradas[0]!), "a tiempo");
+    assert.equal(puntualidadPuertaKind(r.entradas[1]!), "tardia");
+    assert.equal(formatTardanzaPuertaLabel(r.entradas[1]!), "+12′");
+    assert.equal(puntualidadPuertaKind(r.entradas[2]!), "sin_entrada");
+    assert.equal(formatTardanzaPuertaLabel(r.entradas[2]!), "sin entrada");
+    const sum = summarizePuntualidadPuertas(r.entradas);
+    assert.equal(sum.aTiempo, 1);
+    assert.equal(sum.tardias, 1);
+    assert.equal(sum.sinEntrada, 1);
+    assert.equal(sum.tardanzaMediaMin, 12);
+    assert.match(sum.headline, /Puntualidad de puertas/);
+    assert.match(sum.headline, /a tiempo/);
+    assert.doesNotMatch(sum.headline, /cobertura|sin vehículo/i);
   });
 });

@@ -28,7 +28,12 @@ import {
   canCerrarPuertaJ4,
   J4_PUERTA_MANTRA,
 } from "@/jornada4/segmentAttentionJ4";
-import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
+import {
+  computeDisciplinaPlanDia,
+  formatTardanzaPuertaLabel,
+  puntualidadPuertaKind,
+  summarizePuntualidadPuertas,
+} from "@/jornada4/disciplinaPlanDia";
 import { resolvePuertaTimelineVisual } from "@/jornada4/puertaTimelineVisual";
 import { J4_COLORS } from "./Jornada4Shell";
 
@@ -127,6 +132,10 @@ export function Jornada4SegmentosPanel({
       }),
     [segmentos, nowMs, dayStart]
   );
+  const puntualidadResumen = useMemo(
+    () => summarizePuntualidadPuertas(disciplinaTimeline.entradas),
+    [disciplinaTimeline]
+  );
   const entradaBySegId = useMemo(() => {
     const map = new Map<string, (typeof disciplinaTimeline.entradas)[number]>();
     for (const e of disciplinaTimeline.entradas) map.set(e.segmentoId, e);
@@ -178,10 +187,17 @@ export function Jornada4SegmentosPanel({
           data-testid="jornada4-puertas-timeline"
         >
           <p
-            className="text-[8px] font-black uppercase tracking-widest mb-2"
+            className="text-[8px] font-black uppercase tracking-widest mb-0.5"
             style={{ color: MUTED }}
           >
             Puertas del día
+          </p>
+          <p
+            className="text-[9px] leading-snug mb-2"
+            style={{ color: GOLD }}
+            data-testid="jornada4-puertas-puntualidad"
+          >
+            {puntualidadResumen.headline}
           </p>
           <div className="relative flex items-start justify-between gap-1">
             <div
@@ -190,10 +206,23 @@ export function Jornada4SegmentosPanel({
               aria-hidden
             />
             {segmentos.map((seg, idx) => {
+              const entrada = entradaBySegId.get(seg.id);
               const visual = resolvePuertaTimelineVisual({
                 seg,
-                entrada: entradaBySegId.get(seg.id),
+                entrada,
               });
+              const tardanzaLabel = entrada ? formatTardanzaPuertaLabel(entrada) : null;
+              const tardanzaKind = entrada ? puntualidadPuertaKind(entrada) : "pendiente";
+              const tardanzaColor =
+                tardanzaKind === "a_tiempo"
+                  ? EMERALD
+                  : tardanzaKind === "tardia"
+                    ? "#F59E0B"
+                    : tardanzaKind === "sin_entrada"
+                      ? BLOOD_BRIGHT
+                      : tardanzaKind === "en_ventana"
+                        ? GOLD
+                        : MUTED;
               return (
                 <div
                   key={seg.id}
@@ -223,6 +252,15 @@ export function Jornada4SegmentosPanel({
                   <span className="text-[7px] font-mono tabular-nums" style={{ color: MUTED }}>
                     {seg.horaInicio}
                   </span>
+                  {tardanzaLabel ? (
+                    <span
+                      className="text-[7px] font-black uppercase tracking-wide truncate max-w-full px-0.5 text-center leading-tight"
+                      style={{ color: tardanzaColor }}
+                      data-testid={`jornada4-puerta-tardanza-${seg.id}`}
+                    >
+                      {tardanzaLabel}
+                    </span>
+                  ) : null}
                 </div>
               );
             })}

@@ -198,6 +198,99 @@ export function formatDisciplinaPlanHeadline(d: DisciplinaPlanDia): string {
   return `${d.porcentajeDia}%`;
 }
 
+export type PuntualidadPuertaKind =
+  | "a_tiempo"
+  | "tardia"
+  | "sin_entrada"
+  | "en_ventana"
+  | "pendiente";
+
+/** Señal de puerta (impuntualidad), distinta de hueco de cobertura. */
+export function puntualidadPuertaKind(e: DisciplinaEntrada): PuntualidadPuertaKind {
+  if (e.estado === "pendiente") return "pendiente";
+  if (e.estado === "en_ventana") return "en_ventana";
+  if (!e.tieneEntrada) return "sin_entrada";
+  if ((e.tardanzaMin ?? 0) > 0) return "tardia";
+  return "a_tiempo";
+}
+
+/** Etiqueta corta bajo la hora de la puerta. null = aún no se evalúa. */
+export function formatTardanzaPuertaLabel(e: DisciplinaEntrada): string | null {
+  const kind = puntualidadPuertaKind(e);
+  if (kind === "pendiente") return null;
+  if (kind === "en_ventana") return "abrir";
+  if (kind === "sin_entrada") return "sin entrada";
+  if (kind === "tardia") return `+${e.tardanzaMin}′`;
+  return "a tiempo";
+}
+
+export type PuntualidadPuertasResumen = {
+  aTiempo: number;
+  tardias: number;
+  sinEntrada: number;
+  enVentana: number;
+  pendientes: number;
+  tardanzaMediaMin: number | null;
+  headline: string;
+};
+
+/**
+ * Resumen de puntualidad de puertas (plan). No usa huecos de cobertura.
+ */
+export function summarizePuntualidadPuertas(
+  entradas: DisciplinaEntrada[]
+): PuntualidadPuertasResumen {
+  let aTiempo = 0;
+  let tardias = 0;
+  let sinEntrada = 0;
+  let enVentana = 0;
+  let pendientes = 0;
+  const tardanzas: number[] = [];
+
+  for (const e of entradas) {
+    const kind = puntualidadPuertaKind(e);
+    if (kind === "a_tiempo") aTiempo += 1;
+    else if (kind === "tardia") {
+      tardias += 1;
+      if (e.tardanzaMin != null) tardanzas.push(e.tardanzaMin);
+    } else if (kind === "sin_entrada") sinEntrada += 1;
+    else if (kind === "en_ventana") enVentana += 1;
+    else pendientes += 1;
+  }
+
+  const tardanzaMediaMin =
+    tardanzas.length > 0
+      ? Math.round(tardanzas.reduce((a, n) => a + n, 0) / tardanzas.length)
+      : null;
+
+  const parts: string[] = [];
+  if (aTiempo > 0) parts.push(`${aTiempo} a tiempo`);
+  if (tardias > 0) {
+    parts.push(
+      tardanzaMediaMin != null
+        ? `${tardias} tarde (+${tardanzaMediaMin}′)`
+        : `${tardias} tarde`
+    );
+  }
+  if (sinEntrada > 0) parts.push(`${sinEntrada} sin entrada`);
+  if (enVentana > 0) parts.push("abrir ahora");
+
+  const headline =
+    parts.length === 0
+      ? "Puntualidad de puertas · aún no abre"
+      : `Puntualidad de puertas · ${parts.join(" · ")}`;
+
+  return {
+    aTiempo,
+    tardias,
+    sinEntrada,
+    enVentana,
+    pendientes,
+    tardanzaMediaMin,
+    headline,
+  };
+}
+
 export function formatDisciplinaPlanSub(d: DisciplinaPlanDia): string {
   if (d.fase === "sin_plan") {
     return "Programa segmentos: 100% ÷ N entradas";

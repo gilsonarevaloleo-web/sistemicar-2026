@@ -137,7 +137,7 @@ export function Jornada4DisciplinaCard({ model }: Props) {
 
       <p className="text-[7px] leading-snug" style={{ color: MUTED }}>
         100% ÷ {model.segmentosTotales || "N"} entradas. Cada minuto de tardanza resta del
-        100 de esa puerta; lo puntual se suma al día.
+        100 de esa puerta. Los cortes sin vehículo son huecos de cobertura, no de este marcador.
       </p>
     </section>
   );

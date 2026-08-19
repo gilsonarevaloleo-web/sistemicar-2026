@@ -1,5 +1,5 @@
 /**
- * Pestaña Plan — chunk diferido (Pulso + huecos + segmentos).
+ * Pestaña Plan — chunk diferido (Pulso + huecos de cobertura + puntualidad de puertas + segmentos).
  * No montar en Operar: evita arrastrar ConcienciaEngine/recompute al hot path.
  * Badges ±5 min tickean aquí (isla); toasts de puerta siguen en la sesión.
  */
