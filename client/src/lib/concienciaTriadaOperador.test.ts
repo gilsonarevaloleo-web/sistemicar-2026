@@ -11,6 +11,8 @@ import {
   sumMinutosPlanDelDia,
   upsertTriadaDaySnapshot,
   readTriadaSeriesLocal,
+  buildTriadaInputSig,
+  hasTriadaActiveVehicle,
 } from "./concienciaTriadaOperador.ts";
 import type { Vehicle } from "./persistence.ts";
 
@@ -248,5 +250,21 @@ describe("concienciaTriadaOperador", () => {
     assert.equal(series[0]?.pctInconsciente, 10);
     assert.equal(series[0]?.minutosPlan, 100);
     assert.equal(readTriadaSeriesLocal("u1").length, 1);
+  });
+
+  it("firma idle es barata y estable", () => {
+    const segs = [{ horaInicio: "09:00", horaFin: "12:00" }];
+    const vehicles = [
+      { id: "a", status: "activo", destinoCierre: "peldano", aperturaAt: 1_000 } as Vehicle,
+      { id: "b", status: "cumplido", destinoCierre: "presencia", duracionFinal: 20 } as Vehicle,
+    ];
+    const a = buildTriadaInputSig(segs, vehicles);
+    const b = buildTriadaInputSig(segs, vehicles);
+    assert.equal(a, b);
+    assert.equal(hasTriadaActiveVehicle(vehicles), true);
+    assert.equal(
+      hasTriadaActiveVehicle([{ id: "x", status: "cumplido" } as Vehicle]),
+      false
+    );
   });
 });

@@ -98,6 +98,64 @@ function skipsTriadaCoverage(vehicle: Pick<Vehicle, "autoVerdad" | "tipoFlota"> 
   return flota === "descanso" || flota === "verdad";
 }
 
+/** True si hay un vehículo consciente abierto (único caso que exige poll lento). */
+export function hasTriadaActiveVehicle(vehicles: Vehicle[]): boolean {
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (v && v.status === "activo" && !skipsTriadaCoverage(v)) return true;
+  }
+  return false;
+}
+
+/**
+ * Firma barata para el hook idle.
+ * O(n) numérico — no concatena la flota ni suma el plan en el render.
+ */
+export function buildTriadaInputSig(
+  segmentos: { horaInicio?: string; horaFin?: string }[],
+  vehicles: Vehicle[]
+): string {
+  let segPart = "";
+  for (let i = 0; i < segmentos.length; i++) {
+    const s = segmentos[i];
+    if (i) segPart += "|";
+    segPart += `${s?.horaInicio ?? ""}:${s?.horaFin ?? ""}`;
+  }
+  let active = 0;
+  let destMix = 0;
+  let aperturaMix = 0;
+  let closedN = 0;
+  let closedMix = 0;
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (skipsTriadaCoverage(v)) continue;
+    if (v.status === "activo") {
+      active += 1;
+      destMix = (destMix * 33 + (v.destinoCierre === "peldano" ? 3 : 1)) | 0;
+      aperturaMix ^= v.aperturaAt ?? 0;
+    } else {
+      closedN += 1;
+      const dur = typeof v.duracionFinal === "number" ? v.duracionFinal : 0;
+      closedMix = (closedMix * 33 + (dur | 0) + (v.destinoCierre === "peldano" ? 17 : 1)) | 0;
+    }
+  }
+  return `${segPart}::${vehicles.length}:${active}:${destMix}:${aperturaMix}:${closedN}:${closedMix}`;
+}
+
+export function triadaModelEquals(a: ConcienciaTriadaModel, b: ConcienciaTriadaModel): boolean {
+  return (
+    a.fecha === b.fecha &&
+    a.hasPlanificacion === b.hasPlanificacion &&
+    a.pctInconsciente === b.pctInconsciente &&
+    a.pctPresencia === b.pctPresencia &&
+    a.pctDireccion === b.pctDireccion &&
+    a.minutosInconsciente === b.minutosInconsciente &&
+    a.minutosPresencia === b.minutosPresencia &&
+    a.minutosDireccion === b.minutosDireccion &&
+    a.minutosPlan === b.minutosPlan
+  );
+}
+
 function vehicleJournalFecha(vehicle: Vehicle): string | null {
   const cierre = vehicle.cierreAt;
   if (typeof cierre === "number" && Number.isFinite(cierre) && cierre > 0) {
@@ -299,6 +357,7 @@ export function accumulateClosedTriadaMinutos(
   let minutosDireccion = 0;
   for (const v of vehicles) {
     if (skipsTriadaCoverage(v) || v.status === "activo") continue;
+    if (!v.cierreAt && !v.duracionFinal && !v.aperturaAt) continue;
     const id = (v.id ?? "").trim();
     if (!id) continue;
     if (vehicleJournalFecha(v) !== fecha) continue;

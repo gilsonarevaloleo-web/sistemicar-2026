@@ -1,17 +1,25 @@
 /**
- * Triada de conciencia del operador — idle only.
- * 100% = plan del día. No usa el pulso de cobertura.
- * Recalcula con ledger + vehículos (cierres y activos) contra minutos planificados.
+ * Triada de conciencia del operador — idle only, isla Métricas.
+ *
+ * Anti-freeze Dual Kernel:
+ * - No tick 1s, no motor de conciencia, no pulso, no ms0.
+ * - Firma O(n) numérica en render; suma del plan y localStorage solo en idle.
+ * - Poll lento SOLO si hay vehículo consciente abierto.
+ * - No escribe disco si el modelo no cambió.
+ * - No corre con la pestaña oculta.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   accumulateActiveTriadaMinutos,
   buildConcienciaTriadaModel,
+  buildTriadaInputSig,
   EMPTY_TRIADA_MODEL,
   getTriadaDayLedger,
+  hasTriadaActiveVehicle,
   readTriadaSeriesLocal,
   resolveTriadaClosedMinutos,
   sumMinutosPlanDelDia,
+  triadaModelEquals,
   upsertTriadaDaySnapshot,
   type ConcienciaTriadaModel,
   type TriadaDaySnapshot,
@@ -26,42 +34,36 @@ export type UseConcienciaTriadaOperadorParams = {
   enabled?: boolean;
 };
 
+/** rIC timeout / fallback — nunca clamp a 100–200 ms (robo de gesto). */
+const TRIADA_IDLE_MS = 1_600;
+const TRIADA_BOOT_MS = 400;
+
 function scheduleIdle(run: () => void, timeoutMs: number): () => void {
   if (typeof requestIdleCallback === "function") {
     const id = requestIdleCallback(() => run(), { timeout: timeoutMs });
     return () => cancelIdleCallback(id);
   }
-  const t = window.setTimeout(run, Math.min(timeoutMs, 200));
+  const t = window.setTimeout(run, timeoutMs);
   return () => window.clearTimeout(t);
 }
 
 function triadaRefreshIntervalMs(): number {
-  if (typeof window === "undefined") return 5_000;
+  if (typeof window === "undefined") return 10_000;
   try {
     if (
       window.matchMedia("(pointer: coarse)").matches ||
       window.matchMedia("(max-width: 768px)").matches
     ) {
-      return 10_000;
+      return 15_000;
     }
   } catch {
     /* ignore */
   }
-  return 5_000;
+  return 10_000;
 }
 
-function triadaInputSig(
-  segmentos: { horaInicio?: string; horaFin?: string }[],
-  vehicles: Vehicle[]
-): string {
-  const plan = sumMinutosPlanDelDia(segmentos);
-  const vPart = vehicles
-    .map(
-      v =>
-        `${v.id}:${v.status}:${v.destinoCierre ?? ""}:${v.aperturaAt ?? ""}:${v.cierreAt ?? ""}:${v.duracionFinal ?? ""}:${v.tipoFlota ?? ""}`
-    )
-    .join("|");
-  return `${plan}::${vPart}`;
+function isTabHidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
 export function useConcienciaTriadaOperador({
@@ -76,24 +78,55 @@ export function useConcienciaTriadaOperador({
   const [model, setModel] = useState<ConcienciaTriadaModel>(EMPTY_TRIADA_MODEL);
   const [series, setSeries] = useState<TriadaDaySnapshot[]>([]);
   const genRef = useRef(0);
-  const latestRef = useRef({ userId, segmentos, vehicles });
-  latestRef.current = { userId, segmentos, vehicles };
+  const modelRef = useRef<ConcienciaTriadaModel>(EMPTY_TRIADA_MODEL);
+  const latestRef = useRef({ userId, segmentos, vehicles, fecha: "" });
+  const computeRef = useRef<() => void>(() => {});
 
   const fecha = useMemo(() => getJournalDateString(), []);
-  const inputSig = useMemo(() => triadaInputSig(segmentos, vehicles), [segmentos, vehicles]);
+  latestRef.current = { userId, segmentos, vehicles, fecha };
+  modelRef.current = model;
+
+  const inputSig = useMemo(
+    () => buildTriadaInputSig(segmentos, vehicles),
+    [segmentos, vehicles]
+  );
+
+  computeRef.current = () => {
+    const src = latestRef.current;
+    const uid = src.userId;
+    if (!uid) return;
+    const minutosPlan = sumMinutosPlanDelDia(src.segmentos);
+    const ledger = getTriadaDayLedger(uid, src.fecha);
+    const closed = resolveTriadaClosedMinutos(ledger, src.vehicles, src.fecha);
+    const active = accumulateActiveTriadaMinutos(src.vehicles);
+    const next = buildConcienciaTriadaModel({
+      fecha: src.fecha,
+      minutosPlan,
+      minutosPresenciaCerrados: closed.minutosPresencia,
+      minutosDireccionCerrados: closed.minutosDireccion,
+      minutosPresenciaActivos: active.minutosPresencia,
+      minutosDireccionActivos: active.minutosDireccion,
+    });
+    if (triadaModelEquals(modelRef.current, next)) return;
+    modelRef.current = next;
+    setModel(next);
+    if (next.hasPlanificacion && next.minutosPlan > 0) {
+      setSeries(upsertTriadaDaySnapshot(uid, next));
+    }
+  };
 
   useEffect(() => {
     if (!enabled || !userId) {
       setModel(EMPTY_TRIADA_MODEL);
       setSeries([]);
+      modelRef.current = EMPTY_TRIADA_MODEL;
       return;
     }
     let cancelled = false;
-    const loadSeries = () => {
+    const cancelIdle = scheduleIdle(() => {
       if (cancelled) return;
       setSeries(readTriadaSeriesLocal(userId));
-    };
-    const cancelIdle = scheduleIdle(loadSeries, 1800);
+    }, TRIADA_IDLE_MS);
     return () => {
       cancelled = true;
       cancelIdle();
@@ -105,49 +138,25 @@ export function useConcienciaTriadaOperador({
     let cancelled = false;
     let cancelPending: (() => void) | null = null;
 
-    const runCompute = () => {
-      if (cancelled) return;
+    const runIdle = () => {
+      if (cancelled || isTabHidden()) return;
       const gen = ++genRef.current;
       cancelPending?.();
       cancelPending = scheduleIdle(() => {
-        if (cancelled || gen !== genRef.current) return;
-        const { segmentos: segs, vehicles: vs } = latestRef.current;
-        const minutosPlan = sumMinutosPlanDelDia(segs);
-        const ledger = getTriadaDayLedger(userId, fecha);
-        const closed = resolveTriadaClosedMinutos(ledger, vs, fecha);
-        const active = accumulateActiveTriadaMinutos(vs);
-        const next = buildConcienciaTriadaModel({
-          fecha,
-          minutosPlan,
-          minutosPresenciaCerrados: closed.minutosPresencia,
-          minutosDireccionCerrados: closed.minutosDireccion,
-          minutosPresenciaActivos: active.minutosPresencia,
-          minutosDireccionActivos: active.minutosDireccion,
-        });
-        setModel(prev =>
-          prev.fecha === next.fecha &&
-          prev.pctInconsciente === next.pctInconsciente &&
-          prev.pctPresencia === next.pctPresencia &&
-          prev.pctDireccion === next.pctDireccion &&
-          prev.minutosInconsciente === next.minutosInconsciente &&
-          prev.minutosPresencia === next.minutosPresencia &&
-          prev.minutosDireccion === next.minutosDireccion &&
-          prev.minutosPlan === next.minutosPlan &&
-          prev.hasPlanificacion === next.hasPlanificacion
-            ? prev
-            : next
-        );
-        if (next.hasPlanificacion && next.minutosPlan > 0) {
-          const ser = upsertTriadaDaySnapshot(userId, next);
-          setSeries(ser);
-        }
-      }, 900);
+        if (cancelled || gen !== genRef.current || isTabHidden()) return;
+        computeRef.current();
+      }, TRIADA_IDLE_MS);
     };
 
-    const boot = window.setTimeout(runCompute, 280);
-    const intervalId = window.setInterval(runCompute, triadaRefreshIntervalMs());
+    const boot = window.setTimeout(runIdle, TRIADA_BOOT_MS);
+    const intervalId = window.setInterval(() => {
+      if (cancelled || isTabHidden()) return;
+      if (!hasTriadaActiveVehicle(latestRef.current.vehicles)) return;
+      runIdle();
+    }, triadaRefreshIntervalMs());
+
     const onVisible = () => {
-      if (document.visibilityState === "visible") runCompute();
+      if (document.visibilityState === "visible") runIdle();
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -159,7 +168,20 @@ export function useConcienciaTriadaOperador({
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [userId, enabled, fecha, inputSig]);
+  }, [userId, enabled]);
+
+  useEffect(() => {
+    if (!enabled || !userId || isTabHidden()) return;
+    let cancelled = false;
+    const cancelIdle = scheduleIdle(() => {
+      if (cancelled || isTabHidden()) return;
+      computeRef.current();
+    }, TRIADA_IDLE_MS);
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
+  }, [inputSig, userId, enabled]);
 
   return { model, series };
 }
