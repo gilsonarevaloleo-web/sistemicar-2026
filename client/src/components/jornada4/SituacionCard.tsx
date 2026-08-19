@@ -48,6 +48,8 @@ type Props = {
   onSustituirFoco?: (subTareaId: string) => void;
   /** Manda la fila en foco al final de la cola con sus minutos restantes. */
   onPostergarFoco?: () => void;
+  /** Recorta una fila de cola: sale del plan, minutos al foco. Sin veredicto. */
+  onQuitarFila?: (subTareaId: string) => void;
 };
 
 export function SituacionCard({
@@ -62,6 +64,7 @@ export function SituacionCard({
   onReorderFilas,
   onSustituirFoco,
   onPostergarFoco,
+  onQuitarFila,
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
@@ -479,6 +482,26 @@ export function SituacionCard({
                         data-testid={`j4-situacion-sustituir-${row.id}`}
                       >
                         {ENTRENAMIENTO_COPY.sustituirFoco}
+                      </button>
+                    ) : null}
+                    {isPending &&
+                    !isFocus &&
+                    cronActivo &&
+                    pending.length >= 2 &&
+                    onQuitarFila ? (
+                      <button
+                        type="button"
+                        onClick={() => onQuitarFila(row.id)}
+                        className="text-[7px] font-black uppercase tracking-wider px-1.5 py-1 rounded shrink-0"
+                        style={{
+                          backgroundColor: "rgba(192,192,192,0.08)",
+                          color: PLATA,
+                          border: "1px solid rgba(192,192,192,0.35)",
+                        }}
+                        data-testid={`j4-situacion-quitar-${row.id}`}
+                        title={RING_COPY.quitarDelPlanHint}
+                      >
+                        {RING_COPY.quitarDelPlan}
                       </button>
                     ) : null}
                   </div>

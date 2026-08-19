@@ -5,6 +5,7 @@
 import type { SubTarea, Vehicle } from "@/lib/persistence";
 import {
   aplicarTiempoGanadoAlCumplir,
+  quitarFilaColaHaciaFoco,
   registrarCierreFalladoCronometro,
   resolveCronometroCupoAnchor,
   situacionFilaCronometroPendiente,
@@ -180,6 +181,57 @@ export function applySituacionBlockClose(
 
 export function situacionPendingCronRows(vehicle: Vehicle): SubTarea[] {
   return (vehicle.subTareas ?? []).filter(situacionFilaCronometroPendiente);
+}
+
+export type SituacionQuitarFilaResult = {
+  vehicleId: string;
+  subTareas: SubTarea[];
+  situacionCupoAnchor: Vehicle["situacionCupoAnchor"];
+  minutosAlFoco: number;
+  quitadaTexto: string;
+  focoTexto: string;
+  quitadaId: string;
+};
+
+/**
+ * Recorta el plan: saca una fila de cola (obsoleta) sin veredicto.
+ * Los minutos van al foco. No deja huella de proyecto — la gestión es el recorte.
+ */
+export function applySituacionQuitarFila(
+  vehicle: Vehicle,
+  subTareaId: string,
+  now = Date.now()
+): SituacionQuitarFilaResult | null {
+  if (!isSituacionDesglosador(vehicle) || vehicle.status !== "activo") return null;
+  if (!vehicle.subTareas?.length) return null;
+  if (!ringSessionOperable(vehicle.situacionCronometro, vehicle.subTareas)) return null;
+
+  const pending = situacionPendingCronRows(vehicle);
+  const focusId =
+    vehicle.situacionCupoAnchor?.subTareaId &&
+    pending.some(st => st.id === vehicle.situacionCupoAnchor!.subTareaId)
+      ? vehicle.situacionCupoAnchor.subTareaId
+      : pending[0]?.id;
+  if (!focusId) return null;
+
+  const result = quitarFilaColaHaciaFoco(vehicle.subTareas, subTareaId, focusId);
+  if (!result.ok) return null;
+
+  const foco = result.subTareas.find(st => st.id === focusId);
+  const situacionCupoAnchor =
+    vehicle.situacionCupoAnchor?.subTareaId === focusId
+      ? vehicle.situacionCupoAnchor
+      : { subTareaId: focusId, startedAt: now };
+
+  return {
+    vehicleId: vehicle.id,
+    subTareas: result.subTareas,
+    situacionCupoAnchor,
+    minutosAlFoco: result.minutosAlFoco,
+    quitadaTexto: result.quitada.texto,
+    focoTexto: foco?.texto ?? "",
+    quitadaId: result.quitada.id,
+  };
 }
 
 export function situacionProgressLabel(vehicle: Vehicle): string {

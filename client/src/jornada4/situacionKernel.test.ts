@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 import {
   applySituacionRowClose,
   applySituacionBlockClose,
+  applySituacionQuitarFila,
   postergarFilaEnFocoACola,
 } from "./situacionKernel.ts";
+import { collectExecutedDecisionsFromVehicle } from "../lib/ringDecisionTranscript.ts";
+import { sumMinutosCronometroPendientes } from "../lib/situacionCupoDistrib.ts";
 import type { SubTarea, Vehicle } from "../lib/persistence.ts";
 
 function row(partial: Partial<SubTarea> & { id: string; texto: string }): SubTarea {
@@ -172,5 +175,61 @@ describe("situacionKernel", () => {
   it("postergar requiere al menos 2 filas pendientes", () => {
     const v = vehicle([row({ id: "r1", texto: "Solo" })]);
     assert.equal(postergarFilaEnFocoACola(v), null);
+  });
+
+  it("quitar fila de cola pasa minutos al foco y no deja veredicto", () => {
+    const now = Date.now();
+    const v = vehicle([
+      row({ id: "r1", texto: "Foco", minutosCupo: 10 }),
+      row({ id: "r2", texto: "Obsoleta", minutosCupo: 8 }),
+      row({ id: "r3", texto: "Sigue", minutosCupo: 12 }),
+    ]);
+    const sumBefore = sumMinutosCronometroPendientes(v.subTareas!);
+    const patch = applySituacionQuitarFila(v, "r2", now);
+    assert.ok(patch);
+    assert.equal(patch!.subTareas.find(s => s.id === "r2"), undefined);
+    assert.equal(patch!.subTareas.find(s => s.id === "r1")?.minutosCupo, 18);
+    assert.equal(patch!.subTareas.find(s => s.id === "r3")?.minutosCupo, 12);
+    assert.equal(sumMinutosCronometroPendientes(patch!.subTareas), sumBefore);
+    assert.equal(patch!.minutosAlFoco, 8);
+    assert.equal(patch!.situacionCupoAnchor?.subTareaId, "r1");
+    assert.equal(
+      patch!.subTareas.some(s => s.resultadoSituacion && s.resultadoSituacion !== "pendiente"),
+      false
+    );
+    const decisions = collectExecutedDecisionsFromVehicle({
+      ...v,
+      subTareas: patch!.subTareas,
+    });
+    assert.equal(decisions.some(d => d.subId === "r2"), false);
+    assert.equal(decisions.length, 0);
+  });
+
+  it("quitar no actúa sobre el foco ni sobre la última pendiente", () => {
+    const v = vehicle([
+      row({ id: "r1", texto: "Foco", minutosCupo: 10 }),
+      row({ id: "r2", texto: "Cola", minutosCupo: 8 }),
+    ]);
+    assert.equal(applySituacionQuitarFila(v, "r1"), null);
+    const onlyFocus = vehicle([row({ id: "r1", texto: "Solo", minutosCupo: 10 })]);
+    assert.equal(applySituacionQuitarFila(onlyFocus, "r1"), null);
+
+    const lastCola = applySituacionQuitarFila(v, "r2");
+    assert.ok(lastCola);
+    assert.equal(lastCola!.subTareas.length, 1);
+    assert.equal(lastCola!.subTareas[0]!.id, "r1");
+    assert.equal(lastCola!.subTareas[0]!.minutosCupo, 18);
+
+    const withClosed = vehicle([
+      row({ id: "r1", texto: "Foco", minutosCupo: 10 }),
+      row({
+        id: "r2",
+        texto: "Ya cumplida",
+        minutosCupo: 8,
+        resultadoSituacion: "cumplido",
+        completada: true,
+      }),
+    ]);
+    assert.equal(applySituacionQuitarFila(withClosed, "r2"), null);
   });
 });

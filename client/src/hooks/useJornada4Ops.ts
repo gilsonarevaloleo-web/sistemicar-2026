@@ -22,6 +22,7 @@ import {
 import {
   applySituacionRowClose,
   applySituacionBlockClose,
+  applySituacionQuitarFila,
   postergarFilaEnFocoACola,
 } from "@/jornada4/situacionKernel";
 import {
@@ -1602,6 +1603,54 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle]
   );
 
+  const quitarSituacionFila = useCallback(
+    (vehicleId: string, subTareaId: string) => {
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle) return;
+      const patch = applySituacionQuitarFila(vehicle, subTareaId);
+      if (!patch) {
+        toast.info("Quitar solo recorta la cola", {
+          description: "El foco se cierra con Cumplido, Avance o Fallado.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
+          duration: 2800,
+        });
+        return;
+      }
+      paintVehicle(vehicleId, {
+        subTareas: patch.subTareas,
+        situacionCupoAnchor: patch.situacionCupoAnchor,
+      });
+      scheduleSaveLocalVehicles(vehiclesRef.current);
+      toast.success(
+        patch.minutosAlFoco > 0
+          ? `Plan recortado · +${patch.minutosAlFoco} min al foco`
+          : "Plan recortado",
+        {
+          description: `«${patch.quitadaTexto}» fuera · ahora: ${patch.focoTexto}`,
+          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
+          duration: 3200,
+        }
+      );
+      if (!userId) return;
+      void runShadowTaskAsync(async () => {
+        try {
+          await updateVehicle(
+            userId,
+            vehicleId,
+            {
+              subTareas: patch.subTareas,
+              situacionCupoAnchor: patch.situacionCupoAnchor,
+            },
+            { skipLocalSync: true }
+          );
+        } catch (e) {
+          console.error("[jornada4.quitarSituacionFila]", e);
+        }
+      });
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
   const closeExpressVehicle = useCallback(
     async (vehicleId: string, status: "cumplido" | "archivado") => {
       if (!userId) return;
@@ -1714,6 +1763,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     pausaInterrupcion,
     resumeDesglosador,
     postergarFilaEnFoco,
+    quitarSituacionFila,
     closeExpressVehicle,
   };
 }
