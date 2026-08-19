@@ -1,6 +1,7 @@
 /**
  * Métricas — evolución de conciencia del operador (triada).
- * Solo montar en pestaña Métricas (idle). Sin motores pesados en este archivo.
+ * 100% = plan del día. Los tres % se comparan día a día.
+ * Solo montar en pestaña Métricas (idle).
  */
 import {
   Area,
@@ -19,6 +20,14 @@ import {
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, MUTED, INK } = J4_COLORS;
+
+function formatPlanMin(min: number): string {
+  const m = Math.max(0, Math.round(min));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r > 0 ? `${h} h ${r} min` : `${h} h`;
+}
 
 export type Jornada4ConcienciaTriadaCardProps = {
   model: ConcienciaTriadaModel;
@@ -53,12 +62,13 @@ export function Jornada4ConcienciaTriadaCard({
           <p className="text-[11px] font-semibold mt-0.5" style={{ color: INK }}>
             {model.hasPlanificacion
               ? model.headline
-              : "Sin planificación — no hay huecos que medir."}
+              : "Sin planificación — no hay conciencia que medir."}
           </p>
         </div>
-        {model.hasPlanificacion && model.minutosPlanMedible > 0 ? (
-          <p className="text-[9px] tabular-nums shrink-0" style={{ color: MUTED }}>
-            {Math.round(model.minutosPlanMedible)} min
+        {model.hasPlanificacion && model.minutosPlan > 0 ? (
+          <p className="text-[9px] tabular-nums shrink-0 text-right" style={{ color: MUTED }}>
+            100% = {formatPlanMin(model.minutosPlan)}
+            <span className="block normal-case tracking-normal">del plan</span>
           </p>
         ) : null}
       </div>
@@ -125,13 +135,17 @@ export function Jornada4ConcienciaTriadaCard({
               );
             })}
           </div>
+          <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
+            Conforme avanza el día, cada % es una porción del plan. La meta es crecer Dirección
+            por encima de Presencia.
+          </p>
         </>
       ) : null}
 
       {chartData.length >= 2 ? (
         <div className="pt-1" data-testid="jornada4-conciencia-triada-chart">
           <p className="text-[8px] uppercase tracking-widest mb-2" style={{ color: MUTED }}>
-            Evolución · {chartData.length} días
+            Evolución · % del plan · {chartData.length} días
           </p>
           <div className="h-36 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -157,6 +171,7 @@ export function Jornada4ConcienciaTriadaCard({
                     borderRadius: 8,
                     fontSize: 11,
                   }}
+                  formatter={(value: number, name: string) => [`${value}%`, name]}
                 />
                 <Area
                   type="monotone"
@@ -188,7 +203,7 @@ export function Jornada4ConcienciaTriadaCard({
         </div>
       ) : model.hasPlanificacion ? (
         <p className="text-[9px] leading-relaxed" style={{ color: MUTED }}>
-          El gráfico aparece tras dos días con plan medible. Hoy alimenta la serie en idle.
+          El gráfico compara los tres % día a día. Aparece tras dos jornadas con plan.
         </p>
       ) : null}
     </div>

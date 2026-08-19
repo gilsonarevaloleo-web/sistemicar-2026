@@ -1,13 +1,14 @@
 /**
  * Conciencia del operador (Jornada) — triada sobre lo planificado.
- * Inconsciente (huecos) · Presencia · Dirección (Norte).
- * 100% = suma de los tres dentro del plan del día.
- * Sin segmentos → no hay medida (no hay inconciencia que inventar).
+ * Inconsciente · Presencia · Dirección (Norte).
+ * 100% = minutos únicos del plan del día (suma de horas asignadas).
+ * Inconsciente = plan aún no convertido a presencia ni dirección.
+ * No usa el pulso de cobertura ni el “vehículo abierto ahora”.
  * Persistencia local ligera; prohibido en ms0 — solo sombra / idle.
  */
 import { resolveDestinoCierre, feedsProyectoHub } from "./destinoCierre";
 import { safeSetItem } from "./storageHygiene";
-import { getJournalDateString } from "./segmentTime";
+import { getJournalDateString, segmentTimeToMinutes } from "./segmentTime";
 import type { DestinoCierre } from "./destinoCierre";
 import type { Vehicle } from "./persistence";
 
@@ -19,23 +20,23 @@ export const TRIADA_META: Record<
 > = {
   inconsciente: {
     label: "Inconsciente",
-    hint: "Hueco dentro del plan — sin vehículo consciente.",
+    hint: "Horas del plan aún no convertidas a presencia ni dirección.",
     color: "#64748B",
   },
   presencia: {
     label: "Presencia",
-    hint: "Cobertura consciente sin dirección de proyecto.",
+    hint: "Plan cubierto sin Norte — estuviste, no dirigiste.",
     color: "#34D399",
   },
   direccion: {
     label: "Dirección",
-    hint: "Cobertura con Norte — alimenta el Hub.",
+    hint: "Plan cubierto con Norte — el estado que conviene crecer.",
     color: "#D4AF37",
   },
 };
 
 const LEDGER_KEY = "sistemicar_conciencia_triada_v1";
-const SERIES_KEY = "sistemicar_conciencia_triada_series_v1";
+const SERIES_KEY = "sistemicar_conciencia_triada_series_v2";
 const MAX_SERIES_DAYS = 45;
 const VEHICLE_RING = 64;
 
@@ -56,6 +57,7 @@ export interface TriadaDaySnapshot {
   minutosInconsciente: number;
   minutosPresencia: number;
   minutosDireccion: number;
+  minutosPlan: number;
   hasPlanificacion: boolean;
   updatedAt: number;
 }
@@ -66,7 +68,8 @@ export interface ConcienciaTriadaModel {
   minutosInconsciente: number;
   minutosPresencia: number;
   minutosDireccion: number;
-  minutosPlanMedible: number;
+  /** 100% — minutos únicos asignados en el plan del día. */
+  minutosPlan: number;
   pctInconsciente: number;
   pctPresencia: number;
   pctDireccion: number;
@@ -80,13 +83,130 @@ export const EMPTY_TRIADA_MODEL: ConcienciaTriadaModel = {
   minutosInconsciente: 0,
   minutosPresencia: 0,
   minutosDireccion: 0,
-  minutosPlanMedible: 0,
+  minutosPlan: 0,
   pctInconsciente: 0,
   pctPresencia: 0,
   pctDireccion: 0,
   etapaDominante: null,
   headline: "Sin planificación — no hay conciencia que medir.",
 };
+
+function skipsTriadaCoverage(vehicle: Pick<Vehicle, "autoVerdad" | "tipoFlota"> | null | undefined): boolean {
+  if (!vehicle) return true;
+  if (vehicle.autoVerdad) return true;
+  const flota = vehicle.tipoFlota;
+  return flota === "descanso" || flota === "verdad";
+}
+
+/** True si hay un vehículo consciente abierto (único caso que exige poll lento). */
+export function hasTriadaActiveVehicle(vehicles: Vehicle[]): boolean {
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (v && v.status === "activo" && !skipsTriadaCoverage(v)) return true;
+  }
+  return false;
+}
+
+/**
+ * Firma barata para el hook idle.
+ * O(n) numérico — no concatena la flota ni suma el plan en el render.
+ */
+export function buildTriadaInputSig(
+  segmentos: { horaInicio?: string; horaFin?: string }[],
+  vehicles: Vehicle[]
+): string {
+  let segPart = "";
+  for (let i = 0; i < segmentos.length; i++) {
+    const s = segmentos[i];
+    if (i) segPart += "|";
+    segPart += `${s?.horaInicio ?? ""}:${s?.horaFin ?? ""}`;
+  }
+  let active = 0;
+  let destMix = 0;
+  let aperturaMix = 0;
+  let closedN = 0;
+  let closedMix = 0;
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (skipsTriadaCoverage(v)) continue;
+    if (v.status === "activo") {
+      active += 1;
+      destMix = (destMix * 33 + (v.destinoCierre === "peldano" ? 3 : 1)) | 0;
+      aperturaMix ^= v.aperturaAt ?? 0;
+    } else {
+      closedN += 1;
+      const dur = typeof v.duracionFinal === "number" ? v.duracionFinal : 0;
+      closedMix = (closedMix * 33 + (dur | 0) + (v.destinoCierre === "peldano" ? 17 : 1)) | 0;
+    }
+  }
+  return `${segPart}::${vehicles.length}:${active}:${destMix}:${aperturaMix}:${closedN}:${closedMix}`;
+}
+
+export function triadaModelEquals(a: ConcienciaTriadaModel, b: ConcienciaTriadaModel): boolean {
+  return (
+    a.fecha === b.fecha &&
+    a.hasPlanificacion === b.hasPlanificacion &&
+    a.pctInconsciente === b.pctInconsciente &&
+    a.pctPresencia === b.pctPresencia &&
+    a.pctDireccion === b.pctDireccion &&
+    a.minutosInconsciente === b.minutosInconsciente &&
+    a.minutosPresencia === b.minutosPresencia &&
+    a.minutosDireccion === b.minutosDireccion &&
+    a.minutosPlan === b.minutosPlan
+  );
+}
+
+function vehicleJournalFecha(vehicle: Vehicle): string | null {
+  const cierre = vehicle.cierreAt;
+  if (typeof cierre === "number" && Number.isFinite(cierre) && cierre > 0) {
+    return getJournalDateString(cierre);
+  }
+  const completed = vehicle.completedAt;
+  if (completed instanceof Date) {
+    const ms = completed.getTime();
+    if (Number.isFinite(ms) && ms > 0) return getJournalDateString(ms);
+  } else if (typeof completed === "number" && Number.isFinite(completed) && completed > 0) {
+    return getJournalDateString(completed);
+  }
+  const apertura = vehicle.aperturaAt;
+  if (typeof apertura === "number" && Number.isFinite(apertura) && apertura > 0) {
+    return getJournalDateString(apertura);
+  }
+  return null;
+}
+
+/** Minutos únicos del plan (ventanas fusionadas por solape). Ese total es el 100%. */
+export function sumMinutosPlanDelDia(
+  segmentos: { horaInicio?: string; horaFin?: string }[]
+): number {
+  if (!Array.isArray(segmentos) || segmentos.length === 0) return 0;
+  const windows: { start: number; end: number }[] = [];
+  for (const s of segmentos) {
+    if (!s) continue;
+    const ini = segmentTimeToMinutes(s.horaInicio || "");
+    const fin = segmentTimeToMinutes(s.horaFin || "");
+    if (!Number.isFinite(ini) || !Number.isFinite(fin)) continue;
+    const end = fin >= ini ? fin : fin + 1440;
+    if (end > ini) windows.push({ start: ini, end });
+  }
+  if (windows.length === 0) return 0;
+  windows.sort((a, b) => a.start - b.start);
+  let total = 0;
+  let curStart = windows[0].start;
+  let curEnd = windows[0].end;
+  for (let i = 1; i < windows.length; i++) {
+    const w = windows[i];
+    if (w.start <= curEnd) {
+      curEnd = Math.max(curEnd, w.end);
+    } else {
+      total += curEnd - curStart;
+      curStart = w.start;
+      curEnd = w.end;
+    }
+  }
+  total += curEnd - curStart;
+  return total;
+}
 
 /** Duración de cierre en minutos (vehículo). */
 export function resolveDuracionMinCierre(
@@ -207,7 +327,7 @@ export function accumulateActiveTriadaMinutos(
   let minutosPresencia = 0;
   let minutosDireccion = 0;
   for (const v of vehicles) {
-    if (!v || v.status !== "activo" || v.autoVerdad) continue;
+    if (skipsTriadaCoverage(v) || v.status !== "activo") continue;
     const apertura = v.aperturaAt ?? now;
     const elapsed = Math.max(0, (now - apertura) / 60_000);
     if (elapsed < 0.05) continue;
@@ -216,6 +336,99 @@ export function accumulateActiveTriadaMinutos(
     else minutosPresencia += elapsed;
   }
   return {
+    minutosPresencia: Math.round(minutosPresencia * 10) / 10,
+    minutosDireccion: Math.round(minutosDireccion * 10) / 10,
+  };
+}
+
+export type TriadaClosedItem = {
+  vehicleId: string;
+  minutos: number;
+  isDir: boolean;
+};
+
+/** Cierres conscientes del día (vehículos cumplidos/archivados de esa fecha). */
+export function accumulateClosedTriadaMinutos(
+  vehicles: Vehicle[],
+  fecha: string
+): { minutosPresencia: number; minutosDireccion: number; items: TriadaClosedItem[] } {
+  const items: TriadaClosedItem[] = [];
+  let minutosPresencia = 0;
+  let minutosDireccion = 0;
+  for (const v of vehicles) {
+    if (skipsTriadaCoverage(v) || v.status === "activo") continue;
+    if (!v.cierreAt && !v.duracionFinal && !v.aperturaAt) continue;
+    const id = (v.id ?? "").trim();
+    if (!id) continue;
+    if (vehicleJournalFecha(v) !== fecha) continue;
+    const minutos = resolveDuracionMinCierre(v);
+    if (minutos <= 0) continue;
+    const isDir = feedsProyectoHub(resolveDestinoCierre(v.destinoCierre));
+    items.push({ vehicleId: id, minutos, isDir });
+    if (isDir) minutosDireccion += minutos;
+    else minutosPresencia += minutos;
+  }
+  return {
+    minutosPresencia: Math.round(minutosPresencia * 10) / 10,
+    minutosDireccion: Math.round(minutosDireccion * 10) / 10,
+    items,
+  };
+}
+
+/**
+ * Ledger (cierres ya registrados) + vehículos del día que el ledger aún no vio.
+ * No cuenta activos — esos van aparte.
+ */
+export function resolveTriadaClosedMinutos(
+  ledger: TriadaDayLedger | null,
+  vehicles: Vehicle[],
+  fecha: string
+): { minutosPresencia: number; minutosDireccion: number } {
+  const closed = accumulateClosedTriadaMinutos(vehicles, fecha);
+  const known = new Set(ledger?.vehicleIds ?? []);
+  let minutosPresencia = ledger?.minutosPresencia ?? 0;
+  let minutosDireccion = ledger?.minutosDireccion ?? 0;
+  for (const item of closed.items) {
+    if (known.has(item.vehicleId)) continue;
+    if (item.isDir) minutosDireccion += item.minutos;
+    else minutosPresencia += item.minutos;
+  }
+  return {
+    minutosPresencia: Math.round(Math.max(0, minutosPresencia) * 10) / 10,
+    minutosDireccion: Math.round(Math.max(0, minutosDireccion) * 10) / 10,
+  };
+}
+
+/**
+ * Reparte el 100% del plan. Si presencia+dirección superan el plan,
+ * se conserva Dirección (el estado que se quiere crecer) y se recorta Presencia.
+ */
+export function allocateTriadaAgainstPlan(params: {
+  minutosPlan: number;
+  minutosPresencia: number;
+  minutosDireccion: number;
+}): {
+  minutosPlan: number;
+  minutosInconsciente: number;
+  minutosPresencia: number;
+  minutosDireccion: number;
+} {
+  const minutosPlan = Math.max(0, params.minutosPlan);
+  let minutosDireccion = Math.max(0, params.minutosDireccion);
+  let minutosPresencia = Math.max(0, params.minutosPresencia);
+  if (minutosPlan <= 0) {
+    return { minutosPlan: 0, minutosInconsciente: 0, minutosPresencia: 0, minutosDireccion: 0 };
+  }
+  if (minutosDireccion >= minutosPlan) {
+    minutosDireccion = minutosPlan;
+    minutosPresencia = 0;
+  } else if (minutosDireccion + minutosPresencia > minutosPlan) {
+    minutosPresencia = minutosPlan - minutosDireccion;
+  }
+  const minutosInconsciente = Math.max(0, minutosPlan - minutosPresencia - minutosDireccion);
+  return {
+    minutosPlan,
+    minutosInconsciente: Math.round(minutosInconsciente * 10) / 10,
     minutosPresencia: Math.round(minutosPresencia * 10) / 10,
     minutosDireccion: Math.round(minutosDireccion * 10) / 10,
   };
@@ -255,32 +468,33 @@ function dominante(
 }
 
 /**
- * Modelo vivo: ledger + activos + entropía del pulso (huecos del plan).
- * Llamar solo en idle / sombra.
+ * Modelo vivo: 100% = plan del día. Presencia/dirección acumuladas (cierres + activos).
+ * Inconsciente = resto del plan. Llamar solo en idle / sombra.
  */
 export function buildConcienciaTriadaModel(params: {
   fecha?: string;
-  hasPlanificacion: boolean;
-  /** Huecos dentro del plan (entropía capada). */
-  minutosInconsciente: number;
+  minutosPlan: number;
   minutosPresenciaCerrados: number;
   minutosDireccionCerrados: number;
   minutosPresenciaActivos?: number;
   minutosDireccionActivos?: number;
 }): ConcienciaTriadaModel {
   const fecha = params.fecha ?? getJournalDateString();
-  if (!params.hasPlanificacion) {
+  const minutosPlan = Math.max(0, params.minutosPlan);
+  if (minutosPlan <= 0) {
     return { ...EMPTY_TRIADA_MODEL, fecha };
   }
 
-  const minutosPresencia =
-    Math.max(0, params.minutosPresenciaCerrados) +
-    Math.max(0, params.minutosPresenciaActivos ?? 0);
-  const minutosDireccion =
-    Math.max(0, params.minutosDireccionCerrados) +
-    Math.max(0, params.minutosDireccionActivos ?? 0);
-  const minutosInconsciente = Math.max(0, params.minutosInconsciente);
-  const minutosPlanMedible = minutosPresencia + minutosDireccion + minutosInconsciente;
+  const allocated = allocateTriadaAgainstPlan({
+    minutosPlan,
+    minutosPresencia:
+      Math.max(0, params.minutosPresenciaCerrados) +
+      Math.max(0, params.minutosPresenciaActivos ?? 0),
+    minutosDireccion:
+      Math.max(0, params.minutosDireccionCerrados) +
+      Math.max(0, params.minutosDireccionActivos ?? 0),
+  });
+  const { minutosInconsciente, minutosPresencia, minutosDireccion } = allocated;
   const { pctInconsciente, pctPresencia, pctDireccion } = roundPctTriplet(
     minutosInconsciente,
     minutosPresencia,
@@ -289,23 +503,21 @@ export function buildConcienciaTriadaModel(params: {
   const etapaDominante = dominante(minutosInconsciente, minutosPresencia, minutosDireccion);
 
   let headline: string;
-  if (minutosPlanMedible <= 0) {
-    headline = "Plan listo — aún sin tramo vivido que medir.";
-  } else if (etapaDominante === "direccion") {
-    headline = `Dominante Dirección · ${pctDireccion}% del plan medible.`;
+  if (etapaDominante === "direccion") {
+    headline = `Dominante Dirección · ${pctDireccion}% del plan.`;
   } else if (etapaDominante === "presencia") {
-    headline = `Dominante Presencia · ${pctPresencia}% — cobertura sin Norte.`;
+    headline = `Dominante Presencia · ${pctPresencia}% del plan — cubre, no dirige.`;
   } else {
-    headline = `Dominante Inconsciente · ${pctInconsciente}% — huecos en el plan.`;
+    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — horas asignadas sin convertir.`;
   }
 
   return {
     hasPlanificacion: true,
     fecha,
-    minutosInconsciente: Math.round(minutosInconsciente * 10) / 10,
-    minutosPresencia: Math.round(minutosPresencia * 10) / 10,
-    minutosDireccion: Math.round(minutosDireccion * 10) / 10,
-    minutosPlanMedible: Math.round(minutosPlanMedible * 10) / 10,
+    minutosInconsciente,
+    minutosPresencia,
+    minutosDireccion,
+    minutosPlan: Math.round(minutosPlan * 10) / 10,
     pctInconsciente,
     pctPresencia,
     pctDireccion,
@@ -338,10 +550,10 @@ export function readTriadaSeriesLocal(userId: string): TriadaDaySnapshot[] {
   }
 }
 
-/** Upsert snapshot del día (idle). Serie ≤ 45 días. */
+/** Upsert snapshot del día (idle). Serie ≤ 45 días. Porcentajes sobre el plan. */
 export function upsertTriadaDaySnapshot(userId: string, model: ConcienciaTriadaModel): TriadaDaySnapshot[] {
   if (!userId || !model.fecha) return readTriadaSeriesLocal(userId);
-  if (!model.hasPlanificacion && model.minutosPlanMedible <= 0) {
+  if (!model.hasPlanificacion || model.minutosPlan <= 0) {
     return readTriadaSeriesLocal(userId);
   }
   const snap: TriadaDaySnapshot = {
@@ -353,6 +565,7 @@ export function upsertTriadaDaySnapshot(userId: string, model: ConcienciaTriadaM
     minutosInconsciente: model.minutosInconsciente,
     minutosPresencia: model.minutosPresencia,
     minutosDireccion: model.minutosDireccion,
+    minutosPlan: model.minutosPlan,
     hasPlanificacion: model.hasPlanificacion,
     updatedAt: Date.now(),
   };

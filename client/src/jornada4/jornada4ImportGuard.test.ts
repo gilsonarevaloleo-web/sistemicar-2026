@@ -111,4 +111,24 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     // Toasts sí; tick UI de badges no (false = sin setState root cada 1s).
     assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
   });
+
+  it("triada de Métricas no arrastra pulso ni reloj 1s", () => {
+    const hook = readFileSync(
+      join(clientSrc, "hooks/useConcienciaTriadaOperador.ts"),
+      "utf8"
+    );
+    assert.equal(hook.includes('from "@/hooks/usePulsoCobertura"'), false);
+    assert.equal(hook.includes('from "@/engines/ConcienciaEngine"'), false);
+    assert.equal(hook.includes('from "@/lib/concienciaClock"'), false);
+    assert.equal(hook.includes("useJornada4Tick"), false);
+    assert.equal(hook.includes("useIslandConcienciaClock"), false);
+    assert.match(hook, /requestIdleCallback/);
+    assert.match(hook, /hasTriadaActiveVehicle/);
+    const metricas = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4MetricasTab.tsx"),
+      "utf8"
+    );
+    assert.equal(metricas.includes('from "@/hooks/usePulsoCobertura"'), false);
+    assert.equal(metricas.includes('from "@/engines/ConcienciaEngine"'), false);
+  });
 });
