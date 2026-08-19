@@ -853,6 +853,52 @@ export function extraerSubTareaAReserva(
   };
 }
 
+export type QuitarFilaColaHaciaFocoResult =
+  | {
+      ok: true;
+      subTareas: SubTarea[];
+      minutosAlFoco: number;
+      quitada: SubTarea;
+      focusId: string;
+    }
+  | {
+      ok: false;
+      reason: "no_target" | "es_foco" | "dejaría_vacio" | "foco_no_pendiente";
+    };
+
+/**
+ * Quita una fila de cola (no el foco): sale del plan sin veredicto.
+ * Sus minutos de cupo pasan al foco. Σ de cupos pendientes se conserva.
+ * No marca resultadoSituacion — no es huella de proyecto.
+ */
+export function quitarFilaColaHaciaFoco(
+  subTareas: SubTarea[],
+  subTareaId: string,
+  focusSubTareaId: string
+): QuitarFilaColaHaciaFocoResult {
+  if (subTareaId === focusSubTareaId) return { ok: false, reason: "es_foco" };
+
+  const { subTareas: without, extraido } = extraerSubTareaAReserva(subTareas, subTareaId);
+  if (!extraido) return { ok: false, reason: "no_target" };
+
+  const pendingAfter = without.filter(situacionFilaCronometroPendiente);
+  if (pendingAfter.length === 0) return { ok: false, reason: "dejaría_vacio" };
+
+  const foco = without.find(st => st.id === focusSubTareaId);
+  if (!foco || !situacionFilaCronometroPendiente(foco)) {
+    return { ok: false, reason: "foco_no_pendiente" };
+  }
+
+  const minutosAlFoco = Math.max(0, extraido.minutosCupo ?? 0);
+  return {
+    ok: true,
+    subTareas: transferirMinutosAlFoco(without, focusSubTareaId, minutosAlFoco),
+    minutosAlFoco,
+    quitada: extraido,
+    focusId: focusSubTareaId,
+  };
+}
+
 /** Cierra todas las filas pendientes del cronómetro de un golpe (fallado con tiempo real en foco). */
 export function cerrarCronometroDeGolpe(
   subTareas: SubTarea[],

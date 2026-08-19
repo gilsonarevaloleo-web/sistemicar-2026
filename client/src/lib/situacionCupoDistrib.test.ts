@@ -11,6 +11,7 @@ import {
   situacionGananciaVsContratoMin,
   descontarMinutosDeFlexiblesPosteriores,
   extraerSubTareaAReserva,
+  quitarFilaColaHaciaFoco,
   quitarMinutosHaciaFoco,
   reacomodarColaCronometroAMeta,
   redistribuirMinutosSituacionCronometro,
@@ -420,6 +421,29 @@ describe("cerrarCronometroDeGolpe", () => {
     );
     assert.equal(out.filter(s => s.resultadoSituacion === "fallado").length, 2);
     assert.equal(out.find(s => s.id === "a")!.duracionRealSec, 300);
+  });
+});
+
+describe("quitarFilaColaHaciaFoco", () => {
+  it("saca la cola y transfiere cupo al foco conservando Σ", () => {
+    const subs = [st("a", 10), st("b", 15), st("c", 5)];
+    const sumBefore = sumMinutosCronometroPendientes(subs);
+    const r = quitarFilaColaHaciaFoco(subs, "b", "a");
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.minutosAlFoco, 15);
+    assert.equal(r.subTareas.find(s => s.id === "b"), undefined);
+    assert.equal(r.subTareas.find(s => s.id === "a")!.minutosCupo, 25);
+    assert.equal(r.subTareas.find(s => s.id === "c")!.minutosCupo, 5);
+    assert.equal(sumMinutosCronometroPendientes(r.subTareas), sumBefore);
+    assert.equal(r.quitada.resultadoSituacion, "pendiente");
+  });
+
+  it("rechaza quitar el foco o dejar el ring vacío", () => {
+    const subs = [st("a", 10), st("b", 8)];
+    assert.equal(quitarFilaColaHaciaFoco(subs, "a", "a").ok, false);
+    const only = [st("a", 10)];
+    assert.equal(quitarFilaColaHaciaFoco(only, "a", "a").ok, false);
   });
 });
 

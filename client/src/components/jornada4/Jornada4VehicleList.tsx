@@ -76,6 +76,7 @@ type Ops = {
   pausaInterrupcion: (vehicleId: string, titulo: string) => Promise<void>;
   resumeDesglosador: (parentId: string) => Promise<void>;
   postergarFilaEnFoco: (vehicleId: string) => void;
+  quitarSituacionFila: (vehicleId: string, subTareaId: string) => void;
   closeExpressVehicle: (
     vehicleId: string,
     status: "cumplido" | "archivado"
@@ -200,6 +201,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                         : undefined
                     }
                     onPostergarFoco={() => ops.postergarFilaEnFoco(v.id)}
+                    onQuitarFila={id => ops.quitarSituacionFila(v.id, id)}
                   />
                 );
               }
@@ -232,7 +234,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
               return null;
             })}
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · pausa · postergar fila · reorden · conquista · ring
+              Dual Kernel · pausa · postergar · quitar cola · reorden · conquista · ring
             </p>
           </div>
         ) : null}
