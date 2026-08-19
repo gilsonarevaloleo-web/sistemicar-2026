@@ -30,7 +30,7 @@ export type CrisolInjectOk = {
   subTareas: SubTarea[];
   situacionCronometro?: Vehicle["situacionCronometro"];
   situacionCupoAnchor?: Vehicle["situacionCupoAnchor"];
-  /** Dirección del vehículo: el nido del Crisol dirige el rumbo. */
+  /** Rumbo del nido (el sello Dirección del vehículo se decide al enviar, con oleada+foco). */
   proyectoId?: string;
   mode: "lista_libre" | "enqueue_ring" | "open_ring";
 };

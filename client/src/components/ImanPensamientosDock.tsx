@@ -298,12 +298,12 @@ function ImanPensamientosDock({
                 onChange={e => setProyectoDraft(e.target.value)}
                 className="w-full px-2 py-1.5 rounded-lg bg-black/40 border border-white/10 text-[9px] text-slate-300 focus:outline-none focus:border-white/25"
                 data-testid="iman-proyecto-pick"
-                aria-label="Dirección (nido) del pensamiento"
+                aria-label="Nido del pensamiento (no reclama Dirección)"
               >
-                <option value="">Aterrizaje pendiente (sin dirección)</option>
+                <option value="">Aterrizaje pendiente (presencia)</option>
                 {proyectos.map(p => (
                   <option key={p.id} value={p.id}>
-                    Dirección · {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
+                    Nido · {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
                   </option>
                 ))}
               </select>

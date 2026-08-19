@@ -806,8 +806,9 @@ export default function ProyectosPage() {
                 data-testid="hub-oleada-desglose-sin-oleada"
               >
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Activa una oleada en Escalera para desglosar la dirección de producción y sintonizarla
-                  con la realidad.
+                  Activa una oleada en Escalera y desglosa al menos un foco. Hasta entonces
+                  los vehículos no pueden llegar a Dirección: presencia cubre el día sin ensuciar
+                  el proyecto.
                 </p>
               </div>
             )}

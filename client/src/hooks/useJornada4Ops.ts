@@ -66,6 +66,8 @@ import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoH
 import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
 import {
   acreditarMinutosSituacionEnProyecto,
+  getPeldanosByProyectoLocal,
+  getProyectosLocal,
   recordProgresoHubAlCerrarVehiculo,
 } from "@/lib/proyectos";
 import {
@@ -73,6 +75,12 @@ import {
   resolveDestinoCierre,
   type DestinoCierre,
 } from "@/lib/destinoCierre";
+import {
+  DIRECCION_SIN_PROYECTO,
+  evaluateDireccionElegibilidad,
+  noPuedesLlegarADireccion,
+  resolveClaimDestinoCierre,
+} from "@/lib/direccionElegibilidad";
 import {
   registrarCierreConcienciaTriada,
   resolveDuracionMinCierre,
@@ -94,6 +102,20 @@ import {
 } from "@/lib/vehicleOperationalSlots";
 import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
 import { generateStableUuid } from "@/lib/stableUuid";
+
+function destinoCierreVivo(
+  userId: string | undefined,
+  vehicle: Pick<Vehicle, "destinoCierre" | "proyectoId">
+): DestinoCierre {
+  const requested = resolveDestinoCierre(vehicle.destinoCierre);
+  if (requested !== "peldano" || !userId) return "presencia";
+  const pid = vehicle.proyectoId?.trim();
+  const proyectos = getProyectosLocal(userId);
+  const p = (pid ? proyectos.find(x => x.id === pid) : undefined) ?? proyectos[0];
+  if (!p) return "presencia";
+  const gate = evaluateDireccionElegibilidad(p, getPeldanosByProyectoLocal(userId, p.id));
+  return gate.ok ? "peldano" : "presencia";
+}
 
 function noteHuecoAfterClose(vehicles: Vehicle[]): void {
   try {
@@ -187,7 +209,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             try {
               await syncDesglosadorSubToProyectoHub(
                 userId,
-                vehicle,
+                { ...vehicle, destinoCierre: destinoCierreVivo(userId, vehicle) },
                 patch.closedSub,
                 status,
                 segmentoRef.current
@@ -262,10 +284,35 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
   const setDestinoCierre = useCallback(
     (vehicleId: string, destino: DestinoCierre, proyectoId?: string) => {
-      // Pintar siempre (ms0): el toque no puede depender de auth/red.
-      const patch: Partial<Vehicle> = { destinoCierre: destino };
-      if (destino === "peldano" && proyectoId) {
-        patch.proyectoId = proyectoId;
+      let nextDestino = destino;
+      let nextProyectoId = proyectoId;
+      if (destino === "peldano") {
+        const proyectos = userId ? getProyectosLocal(userId) : [];
+        const pid = proyectoId?.trim() || "";
+        const p = proyectos.find(x => x.id === pid) ?? proyectos[0];
+        const gate = p && userId
+          ? evaluateDireccionElegibilidad(p, getPeldanosByProyectoLocal(userId, p.id))
+          : DIRECCION_SIN_PROYECTO;
+        const claim = resolveClaimDestinoCierre({
+          requested: "peldano",
+          proyectoId: pid || p?.id,
+          gate,
+        });
+        if (!claim.accepted) {
+          toast.message(noPuedesLlegarADireccion(gate), {
+            description: "Presencia cubre el día sin ensuciar el proyecto.",
+            style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
+            duration: 3200,
+          });
+          nextDestino = "presencia";
+          nextProyectoId = undefined;
+        } else {
+          nextProyectoId = pid || p?.id;
+        }
+      }
+      const patch: Partial<Vehicle> = { destinoCierre: nextDestino };
+      if (nextDestino === "peldano" && nextProyectoId) {
+        patch.proyectoId = nextProyectoId;
       }
       paintVehicle(vehicleId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -290,9 +337,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
-        const destino = resolveDestinoCierre(vehicle.destinoCierre);
+        const destino = destinoCierreVivo(userId, vehicle);
         if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
-          toast.error("Elige un proyecto para subir el peldaño", {
+          toast.error("No puedes llegar a Dirección: elige un proyecto con oleada y foco", {
+            description: "Presencia cubre el día sin ensuciar el proyecto.",
             style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
             duration: 2800,
           });
@@ -439,7 +487,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         if (closedForCredit) {
           try {
             acreditarMinutosSituacionEnProyecto(userId, {
-              vehicle,
+              vehicle: {
+                ...vehicle,
+                destinoCierre: destinoCierreVivo(userId, vehicle),
+              },
               sub: closedForCredit,
               fuente: "ring-click",
             });
@@ -514,7 +565,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               try {
                 const hub = await syncRingDecisionToProyectoHub(
                   userId,
-                  vehicle,
+                  { ...vehicle, destinoCierre: destinoCierreVivo(userId, vehicle) },
                   closedSub,
                   status,
                   Date.now()
@@ -561,9 +612,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
-        const destino = resolveDestinoCierre(vehicle.destinoCierre);
+        const destino = destinoCierreVivo(userId, vehicle);
         if (feedsProyectoHub(destino) && !vehicle.proyectoId) {
-          toast.error("Elige un proyecto para subir el peldaño", {
+          toast.error("No puedes llegar a Dirección: elige un proyecto con oleada y foco", {
+            description: "Presencia cubre el día sin ensuciar el proyecto.",
             style: { backgroundColor: PIZARRA, border: `1px solid ${GOLD}`, color: GOLD },
             duration: 2800,
           });

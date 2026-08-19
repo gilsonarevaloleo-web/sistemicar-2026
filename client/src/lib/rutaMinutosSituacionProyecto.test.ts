@@ -22,7 +22,7 @@ describe("rutaMinutosSituacionProyecto", () => {
     assert.equal(r.segundos, 0);
   });
 
-  it("ring con dirección de escalera va a Norte (aunque destinoCierre esté vacío)", () => {
+  it("proyectoId sin sello de Dirección alimenta presencia — no reclama Norte", () => {
     const r = resolveRutaMinutosSituacion({
       vehicleId: "v1",
       subId: "s1",
@@ -30,13 +30,26 @@ describe("rutaMinutosSituacionProyecto", () => {
       fuente: "ring-click",
       duracionRealSec: 185,
     });
-    assert.equal(r.bucket, "norte");
+    assert.equal(r.bucket, "presencia");
     assert.equal(r.proyectoId, "proy-costura");
     assert.equal(r.segundos, 185);
     assert.equal(r.creditKey, situacionCreditKey("v1", "s1"));
   });
 
-  it("dirección de la fila gana sobre el vehículo", () => {
+  it("Dirección explícita (peldaño) manda el ring a Norte", () => {
+    const r = resolveRutaMinutosSituacion({
+      vehicleId: "v1",
+      subId: "s1",
+      vehicleProyectoId: "proy-costura",
+      destinoCierre: "peldano",
+      fuente: "ring-click",
+      duracionRealSec: 185,
+    });
+    assert.equal(r.bucket, "norte");
+    assert.equal(r.segundos, 185);
+  });
+
+  it("dirección de la fila gana sobre el vehículo y sin sello queda en presencia", () => {
     const r = resolveRutaMinutosSituacion({
       vehicleId: "v1",
       subId: "s1",
@@ -46,7 +59,7 @@ describe("rutaMinutosSituacionProyecto", () => {
       duracionRealSec: 60,
     });
     assert.equal(r.proyectoId, "proy-fila");
-    assert.equal(r.bucket, "norte");
+    assert.equal(r.bucket, "presencia");
   });
 
   it("destino presencia explícito manda el ring a presencia, no a Norte", () => {
@@ -75,7 +88,7 @@ describe("rutaMinutosSituacionProyecto", () => {
     assert.equal(r.segundos, 0);
   });
 
-  it("el segundo del clic cuenta aunque duracionRealSec sea 0", () => {
+  it("el segundo del clic cuenta aunque duracionRealSec sea 0 — sin sello es presencia", () => {
     const r = resolveRutaMinutosSituacion({
       vehicleId: "v1",
       subId: "s1",
@@ -83,18 +96,26 @@ describe("rutaMinutosSituacionProyecto", () => {
       fuente: "ring-click",
       duracionRealSec: 0,
     });
-    assert.equal(r.bucket, "norte");
+    assert.equal(r.bucket, "presencia");
     assert.equal(r.segundos, 1);
     assert.equal(segundosTrabajadosAlClic(0), 0);
   });
 
-  it("lanzar ring con dirección sella peldaño; lista libre sella presencia", () => {
+  it("lanzar ring sella Dirección solo con rumbo abierto; lista libre es presencia", () => {
     assert.equal(
-      destinoCierreAlLanzarSituacion({ esListaLibre: true, tieneDireccion: true }),
+      destinoCierreAlLanzarSituacion({ esListaLibre: true, tieneDireccion: true, direccionAbierta: true }),
       "presencia"
     );
     assert.equal(
       destinoCierreAlLanzarSituacion({ esListaLibre: false, tieneDireccion: true }),
+      "presencia"
+    );
+    assert.equal(
+      destinoCierreAlLanzarSituacion({
+        esListaLibre: false,
+        tieneDireccion: true,
+        direccionAbierta: true,
+      }),
       "peldano"
     );
     assert.equal(

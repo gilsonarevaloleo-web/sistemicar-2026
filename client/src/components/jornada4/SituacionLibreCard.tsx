@@ -198,6 +198,7 @@ export function SituacionLibreCard({
                 value={vehicle.destinoCierre}
                 proyectoId={vehicle.proyectoId}
                 onChange={onDestinoChange}
+                blockedPorqueTodavia="todavía es lista libre — cubre el día sin ensuciar el proyecto"
               />
             ) : null}
             <button

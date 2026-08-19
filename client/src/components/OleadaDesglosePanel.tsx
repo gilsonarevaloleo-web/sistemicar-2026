@@ -136,7 +136,7 @@ export function OleadaDesglosePanel({
 
       {puntos.length === 0 ? (
         <p className="text-[10px] text-slate-600 py-1" data-testid="hub-oleada-desglose-vacio">
-          Aún no hay puntos. Enumera la dirección de producción de esta oleada.
+          Aún no hay puntos. Enumera la dirección de producción. Sin foco, los vehículos no llegan a Dirección.
         </p>
       ) : (
         <ul className="space-y-1.5" data-testid="hub-oleada-puntos-lista">

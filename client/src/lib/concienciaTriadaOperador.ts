@@ -29,7 +29,7 @@ export const TRIADA_META: Record<
   },
   direccion: {
     label: "Dirección",
-    hint: "Cobertura con Norte — alimenta el Hub.",
+    hint: "Norte ganado: oleada + foco, no un clic de ego.",
     color: "#D4AF37",
   },
 };
