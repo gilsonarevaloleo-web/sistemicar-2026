@@ -27,7 +27,6 @@ export default function Jornada4MetricasTab({
   userId,
   segmentos,
   vehicles,
-  segmentoActivoId = null,
   todayPs,
 }: Jornada4MetricasTabProps) {
   const [yesterdayPs, setYesterdayPs] = useState(0);
@@ -42,7 +41,6 @@ export default function Jornada4MetricasTab({
     userId,
     segmentos,
     vehicles,
-    segmentoActivoId,
     enabled: Boolean(userId),
   });
 
