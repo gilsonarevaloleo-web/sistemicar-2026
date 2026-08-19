@@ -25,7 +25,7 @@ import {
 } from "@/lib/situacionGanancia";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
-import { SegmentoProyectoSelect } from "@/components/planeacion/SegmentoProyectoSelect";
+import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPicker";
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
 import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
@@ -250,7 +250,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setSubs([makeSub()]);
     setFilas([""]);
     setFilasProyectoIds([""]);
-    setVehiculoProyectoId(defaultProyectoId?.trim() || "");
+    setVehiculoProyectoId("");
     setPeldanoIdLaunch(hubPeldanoId?.trim() || "");
     setOleadaPuntoIdLaunch(hubOleadaPuntoId?.trim() || "");
     setConquistaMultiModo("secuencia");
@@ -265,7 +265,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
     setOpen(false);
-  }, [segmentoHoraFin, defaultProyectoId, hubPeldanoId, hubOleadaPuntoId]);
+  }, [segmentoHoraFin, hubPeldanoId, hubOleadaPuntoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     if (t === "situacion" && !canSituacion) {
@@ -293,12 +293,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       if (!terminoDetalle.trim()) setTerminoDetalle("Al cerrar este bloque");
     }
     setOpen(true);
-  }, [terminoDetalle, segmentoHoraFin, defaultProyectoId, canSituacion, canProyectos]);
-
-  useEffect(() => {
-    if (!open) return;
-    setVehiculoProyectoId(prev => prev || defaultProyectoId?.trim() || "");
-  }, [open, defaultProyectoId]);
+  }, [terminoDetalle, segmentoHoraFin, canSituacion, canProyectos]);
 
   const canLaunch =
     tipo != null &&
@@ -761,23 +756,16 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                   ) : null}
 
                   {/* Dirección del vehículo (hereda segmento; se puede cambiar). */}
-                  <SegmentoProyectoSelect
+                  <DireccionDestinoPicker
                     value={vehiculoProyectoId}
                     onChange={setVehiculoProyectoId}
                     proyectos={proyectosHub}
                     compact
-                    label="Dirección del vehículo"
-                    emptyLabel={
-                      defaultProyectoId
-                        ? "Heredar del segmento"
-                        : "Sin dirección"
-                    }
-                    hint="Vacío = hereda del segmento. Elige otro proyecto para cambiar el rumbo. En Enfoque, el nido del Crisol también dirige."
+                    label="Rumbo del vehículo"
+                    emptyLabel="Presencia — no toca el proyecto"
                     testId="jornada4-launch-dir-vehiculo"
                     locked={!canProyectos}
                     onBeforeHubNavigate={closeBeforeHubNavigate}
-                    onNativePickerOpen={releaseBodyForNativePicker}
-                    onNativePickerClose={restoreBodyAfterNativePicker}
                   />
 
                   {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
@@ -939,7 +927,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
-                          <SegmentoProyectoSelect
+                          <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
                               setFilasProyectoIds(prev => {
@@ -951,13 +939,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             }}
                             proyectos={proyectosHub}
                             compact
-                            label="Dirección de esta fila"
+                            label="Rumbo de esta fila"
                             emptyLabel="Heredar del vehículo"
                             testId={`jornada4-launch-libre-dir-${idx}`}
                             locked={!canProyectos}
                             onBeforeHubNavigate={closeBeforeHubNavigate}
-                            onNativePickerOpen={releaseBodyForNativePicker}
-                            onNativePickerClose={restoreBodyAfterNativePicker}
                           />
                         </div>
                       ))}
@@ -1355,7 +1341,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
-                            <SegmentoProyectoSelect
+                            <DireccionDestinoPicker
                               value={sub.proyectoId ?? ""}
                               onChange={id => {
                                 setSubs(prev =>
@@ -1368,14 +1354,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               }}
                               proyectos={proyectosHub}
                               compact
-                              label="Dirección de esta unidad"
+                              label="Rumbo de esta unidad"
                               emptyLabel="Heredar del vehículo"
-                              hint="Sub ≠ proyecto del segmento → elige aquí."
                               testId={`jornada4-launch-sub-dir-${idx}`}
                               locked={!canProyectos}
                               onBeforeHubNavigate={closeBeforeHubNavigate}
-                              onNativePickerOpen={releaseBodyForNativePicker}
-                              onNativePickerClose={restoreBodyAfterNativePicker}
                             />
                           </div>
                         );
@@ -1513,7 +1496,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
-                          <SegmentoProyectoSelect
+                          <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
                               setFilasProyectoIds(prev => {
@@ -1525,13 +1508,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             }}
                             proyectos={proyectosHub}
                             compact
-                            label="Dirección de esta fila"
+                            label="Rumbo de esta fila"
                             emptyLabel="Heredar del vehículo"
                             testId={`jornada4-launch-ring-dir-${idx}`}
                             locked={!canProyectos}
                             onBeforeHubNavigate={closeBeforeHubNavigate}
-                            onNativePickerOpen={releaseBodyForNativePicker}
-                            onNativePickerClose={restoreBodyAfterNativePicker}
                           />
                         </div>
                       ))}

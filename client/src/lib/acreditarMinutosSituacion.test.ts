@@ -109,6 +109,18 @@ describe("acreditarMinutosSituacionEnProyecto", () => {
     assert.equal(updated?.minutosTotales, 0);
   });
 
+  it("proyectoId sin sello Dirección no llena MIN NORTE", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const updated = acreditarMinutosSituacionEnProyecto(USER, {
+      vehicle: { id: "v_ego", proyectoId: p.id },
+      sub: { id: "fila_e", duracionRealSec: 120 },
+      fuente: "ring-click",
+    });
+    assert.equal(updated?.segundosPresenciaRing, 120);
+    assert.equal(updated?.segundosNorteSituacion, undefined);
+    assert.equal(updated?.minutosTotales, 0);
+  });
+
   it("peldano situacional no alimenta MIN NORTE", () => {
     assert.equal(
       peldanoSumaMinutosNorte({ estado: "conquistado", tipoOrigen: "situacion" }),

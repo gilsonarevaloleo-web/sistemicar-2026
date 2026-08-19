@@ -26,6 +26,11 @@ import {
   type ImanProyectoOpcion,
 } from "@/lib/imanPensamientos";
 import {
+  evaluateDireccionElegibilidad,
+  resolveRumboTrasEnvio,
+} from "@/lib/direccionElegibilidad";
+import { getPeldanosByProyectoLocal, getProyectosLocal } from "@/lib/proyectos";
+import {
   addSituacionReserva,
   deleteSituacionReserva,
   getReservaActivas,
@@ -42,6 +47,7 @@ const PIZARRA = "#0a0a0a";
 const EMERALD = "#00C851";
 const BLOOD = "#FF2A2A";
 const PLATA = "#C0C0C0";
+const GOLD = "#D4AF37";
 
 export type UseJornada4CrisolParams = {
   userId: string | undefined;
@@ -313,9 +319,24 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       if (result.situacionCupoAnchor !== undefined) {
         patch.situacionCupoAnchor = result.situacionCupoAnchor;
       }
-      // Nido del Crisol = rumbo del vehículo de enfoque.
-      if (result.proyectoId?.trim()) {
-        patch.proyectoId = result.proyectoId.trim();
+      const nidoId = result.proyectoId?.trim() || item.proyectoId?.trim();
+      let rumboCopy = "Enviado a presencia.";
+      if (nidoId && userId) {
+        const hubTitulo = proyectosHub.find(h => h.id === nidoId)?.titulo;
+        const p = getProyectosLocal(userId).find(x => x.id === nidoId) ?? {
+          id: nidoId,
+          titulo: hubTitulo ?? "Proyecto",
+        };
+        const gate = evaluateDireccionElegibilidad(
+          p,
+          getPeldanosByProyectoLocal(userId, nidoId)
+        );
+        const rumbo = resolveRumboTrasEnvio({ nidoProyectoId: nidoId, gate });
+        rumboCopy = rumbo.copy;
+        if (rumbo.stampVehicle) {
+          patch.proyectoId = rumbo.proyectoId;
+          patch.destinoCierre = rumbo.destinoCierre;
+        }
       }
 
       paintVehicle(result.vehicleId, patch);
@@ -340,23 +361,30 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
 
       if (opts?.quietToast) return;
 
+      const claimedDireccion = patch.destinoCierre === "peldano";
+      const toastStyle = {
+        backgroundColor: PIZARRA,
+        border: `1px solid ${claimedDireccion ? GOLD : EMERALD}`,
+        color: claimedDireccion ? GOLD : EMERALD,
+      };
+
       if (result.mode === "lista_libre") {
         toast.success("Retomada en lista libre", {
-          description: item.texto,
-          style: { backgroundColor: PIZARRA, border: `1px solid ${EMERALD}`, color: EMERALD },
-          duration: 2800,
+          description: `${item.texto} · ${rumboCopy}`,
+          style: toastStyle,
+          duration: 3200,
         });
       } else if (result.mode === "open_ring") {
         toast.success("Ring abierto desde El Crisol", {
-          description: item.texto,
-          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
-          duration: 2800,
+          description: `${item.texto} · ${rumboCopy}`,
+          style: toastStyle,
+          duration: 3200,
         });
       } else {
         toast.success("Añadido a la cola del ring", {
-          description: item.texto,
-          style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
-          duration: 2800,
+          description: `${item.texto} · ${rumboCopy}`,
+          style: toastStyle,
+          duration: 3200,
         });
       }
     },
@@ -366,6 +394,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       vehiclesRef,
       expandedId,
       segmentoActivo,
+      proyectosHub,
       paintVehicle,
       setExpandedId,
       markReservaRetomada,

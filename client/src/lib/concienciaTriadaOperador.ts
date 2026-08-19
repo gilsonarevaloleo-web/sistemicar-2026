@@ -30,7 +30,7 @@ export const TRIADA_META: Record<
   },
   direccion: {
     label: "Dirección",
-    hint: "Plan cubierto con Norte — el estado que conviene crecer.",
+    hint: "Plan cubierto con Norte: oleada + foco, no un clic de ego.",
     color: "#D4AF37",
   },
 };

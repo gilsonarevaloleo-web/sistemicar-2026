@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DESTINO_CIERRE_COPY,
   DESTINO_CIERRE_DEFAULT,
   feedsProyectoHub,
   resolveDestinoCierre,
@@ -21,5 +22,11 @@ describe("destinoCierre", () => {
   it("solo peldano alimenta Hub", () => {
     assert.equal(feedsProyectoHub("peldano"), true);
     assert.equal(feedsProyectoHub("presencia"), false);
+  });
+
+  it("peldano en copy se llama Dirección — no un clic de ego", () => {
+    assert.equal(DESTINO_CIERRE_COPY.peldano.label, "Dirección");
+    assert.match(DESTINO_CIERRE_COPY.peldano.hint, /oleada/);
+    assert.match(DESTINO_CIERRE_COPY.presencia.hint, /No toca el proyecto/);
   });
 });

@@ -1,9 +1,9 @@
 /**
  * Destino del cierre consciente.
- * - presencia: alimenta día / disciplina / PS — no ensucia la escalera del Hub.
- * - peldano: sube el proyecto (pasos + peldaños conquistados).
+ * - presencia: cubre el día / disciplina / PS — no ensucia la escalera del Hub.
+ * - peldano: Dirección (Norte). Solo si el proyecto tiene oleada + foco.
  *
- * Por defecto: presencia. El peldaño es un gesto consciente de importancia.
+ * Por defecto: presencia. Dirección no se reclama con un clic de ego.
  */
 export type DestinoCierre = "presencia" | "peldano";
 
@@ -24,12 +24,12 @@ export function feedsProyectoHub(destino: DestinoCierre): boolean {
 export const DESTINO_CIERRE_COPY = {
   presencia: {
     label: "Presencia",
-    hint: "Cubrió el día. Estuviste.",
+    hint: "Cubrió el día. Estuviste. No toca el proyecto.",
     short: "Día",
   },
   peldano: {
-    label: "Peldaño",
-    hint: "Esto sube la escalera.",
-    short: "Proyecto",
+    label: "Dirección",
+    hint: "Solo con oleada y foco. Si no es el rumbo, ensucia.",
+    short: "Norte",
   },
 } as const;

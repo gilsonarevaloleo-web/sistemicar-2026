@@ -2,13 +2,14 @@
  * Ruta de minutos situacionales → casilla del proyecto.
  *
  * - Ring (tarea con tiempo): el clic acredita los segundos reales de la fila.
- *   Si hay dirección de escalera (proyectoId) y el destino no es presencia,
- *   van a MIN NORTE. Presencia explícita → MIN PRESENCIA.
+ *   Norte solo con destino explícito peldaño (Dirección). Un proyectoId
+ *   sin ese sello alimenta presencia — no se reclama Dirección de ego.
  * - Lista libre (sin tiempo): no llena minutos; el cierre alimenta presencia.
  * - La bolsa/trending NO se recalcula aquí: el kernel del ring ya lo hizo
  *   en applySituacionRowClose. Esta ruta es O(1) y segura para el gesto ms0.
  */
 import type { DestinoCierre } from "./destinoCierre";
+import { destinoCierreAlLanzarConGate } from "./direccionElegibilidad";
 import { resolveDireccionProyecto } from "./resolveDireccionProyecto";
 
 export type BucketMinutosProyecto = "norte" | "presencia" | "none";
@@ -69,8 +70,8 @@ export function situacionCreditKey(vehicleId: string, subId: string): string {
 
 /**
  * Clasifica a dónde va el tiempo del clic.
- * Lista libre → presencia (sin minutos). Ring con dirección → norte,
- * salvo destinoCierre explícito "presencia".
+ * Lista libre → presencia (sin minutos).
+ * Ring → Norte solo con destino peldaño explícito; el resto es presencia.
  */
 export function resolveRutaMinutosSituacion(
   input: RutaMinutosSituacionInput
@@ -104,9 +105,9 @@ export function resolveRutaMinutosSituacion(
   // El segundo del clic cuenta: si el kernel no dejó duración, 1 s de evidencia.
   const segundosAcreditados = segundos > 0 ? segundos : 1;
 
-  if (input.destinoCierre === "presencia") {
+  if (input.destinoCierre === "peldano") {
     return {
-      bucket: "presencia",
+      bucket: "norte",
       proyectoId,
       segundos: segundosAcreditados,
       creditKey,
@@ -114,10 +115,8 @@ export function resolveRutaMinutosSituacion(
     };
   }
 
-  // Dirección de escalera (proyectoId) → Norte, aunque destinoCierre aún no esté
-  // sellado como peldaño. El toggle de presencia es el único veto.
   return {
-    bucket: "norte",
+    bucket: "presencia",
     proyectoId,
     segundos: segundosAcreditados,
     creditKey,
@@ -128,8 +127,12 @@ export function resolveRutaMinutosSituacion(
 export function destinoCierreAlLanzarSituacion(opts: {
   esListaLibre: boolean;
   tieneDireccion: boolean;
+  /** Oleada + foco. Sin esto, vincular proyecto no sella Dirección. */
+  direccionAbierta?: boolean;
 }): DestinoCierre {
-  if (opts.esListaLibre) return "presencia";
-  if (opts.tieneDireccion) return "peldano";
-  return "presencia";
+  return destinoCierreAlLanzarConGate({
+    esListaLibre: opts.esListaLibre,
+    tieneDireccion: opts.tieneDireccion,
+    direccionAbierta: opts.direccionAbierta === true,
+  });
 }

@@ -22,6 +22,8 @@ import { buildSituacionLibreSeed } from "./situacionLibreSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
 import { reconcileCoberturaHuecos } from "./coberturaHuecosLog";
 import { destinoCierreAlLanzarSituacion } from "@/lib/rutaMinutosSituacionProyecto";
+import { evaluateDireccionElegibilidad } from "@/lib/direccionElegibilidad";
+import { getPeldanosByProyectoLocal, getProyectosLocal } from "@/lib/proyectos";
 
 export type Jornada4LaunchForm = FlotaLaunchForm & {
   /** Filas situacionales (lista libre o ring). */
@@ -48,6 +50,14 @@ export type Jornada4LaunchForm = FlotaLaunchForm & {
 export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form"> & {
   form: Jornada4LaunchForm;
 };
+
+function proyectoDireccionAbierta(userId: string, proyectoId: string | undefined): boolean {
+  const id = proyectoId?.trim();
+  if (!id) return false;
+  const p = getProyectosLocal(userId).find(x => x.id === id);
+  if (!p) return false;
+  return evaluateDireccionElegibilidad(p, getPeldanosByProyectoLocal(userId, id)).ok;
+}
 
 /**
  * Lanza Conquista/Situacional en modo rápido o desglose.
@@ -91,6 +101,7 @@ export async function executeJornada4Launch(
 
     let lastId: string | null = null;
     for (const task of tasks) {
+      const pid = task.proyectoId?.trim() || baseForm.proyectoId?.trim();
       const id = await executeFlotaLaunch({
         ...rest,
         userId,
@@ -101,11 +112,8 @@ export async function executeJornada4Launch(
           tipoFlota: "tiempo",
           modo: "desglose",
           desglosadorSubs: [task],
-          ...(task.proyectoId?.trim()
-            ? { proyectoId: task.proyectoId.trim() }
-            : baseForm.proyectoId?.trim()
-              ? { proyectoId: baseForm.proyectoId.trim() }
-              : {}),
+          ...(pid ? { proyectoId: pid } : {}),
+          ...(proyectoDireccionAbierta(userId, pid) ? { destinoCierre: "peldano" as const } : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
           ...(baseForm.oleadaPuntoId?.trim()
             ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
@@ -158,6 +166,7 @@ export async function executeJornada4Launch(
 
     let lastId: string | null = null;
     for (const task of toLaunch) {
+      const pid = task.proyectoId?.trim() || baseForm.proyectoId?.trim();
       const id = await executeFlotaLaunch({
         ...rest,
         userId,
@@ -176,11 +185,8 @@ export async function executeJornada4Launch(
               proyectoId: task.proyectoId,
             },
           ],
-          ...(task.proyectoId?.trim()
-            ? { proyectoId: task.proyectoId.trim() }
-            : baseForm.proyectoId?.trim()
-              ? { proyectoId: baseForm.proyectoId.trim() }
-              : {}),
+          ...(pid ? { proyectoId: pid } : {}),
+          ...(proyectoDireccionAbierta(userId, pid) ? { destinoCierre: "peldano" as const } : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
           ...(baseForm.oleadaPuntoId?.trim()
             ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
@@ -262,15 +268,21 @@ export async function executeJornada4Launch(
     }
   }
 
+  const explicitProyectoId = baseForm.proyectoId?.trim();
+  const direccionAbierta = proyectoDireccionAbierta(userId, explicitProyectoId);
+
   const destinoCierreSituacion =
     baseForm.tipoFlota === "situacion"
       ? destinoCierreAlLanzarSituacion({
           esListaLibre: modo === "rapido",
-          tieneDireccion: Boolean(
-            baseForm.proyectoId?.trim() ||
-              rest.segmentoActivo?.proyectoVinculadoId?.trim()
-          ),
+          tieneDireccion: Boolean(explicitProyectoId),
+          direccionAbierta,
         })
+      : undefined;
+
+  const destinoCierreConquista =
+    baseForm.tipoFlota === "tiempo" && direccionAbierta && explicitProyectoId
+      ? ("peldano" as const)
       : undefined;
 
   const id = await executeFlotaLaunch({
@@ -283,6 +295,7 @@ export async function executeJornada4Launch(
       titulo: situacionTitulo,
       ...(situacionLaunchSeed ? { situacionLaunchSeed } : {}),
       ...(destinoCierreSituacion ? { destinoCierre: destinoCierreSituacion } : {}),
+      ...(destinoCierreConquista ? { destinoCierre: destinoCierreConquista } : {}),
       ...(baseForm.tipoFlota === "tiempo" && ancladoAlSegmento === true
         ? { ancladoAlSegmento: true }
         : {}),
