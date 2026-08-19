@@ -4,6 +4,7 @@ import {
   buildCoberturaHuecoIntervals,
   clearCoberturaHuecosLog,
   formatHuecoDuration,
+  formatCoberturaHuecosSummary,
   reconcileCoberturaHuecos,
   readCoberturaHuecosEvents,
   COBERTURA_HUECOS_KEY,
@@ -99,5 +100,17 @@ describe("coberturaHuecosLog", () => {
   it("formatea duración", () => {
     assert.equal(formatHuecoDuration(0, 5 * 60_000), "5 min");
     assert.equal(formatHuecoDuration(0, 90 * 60_000), "1h 30min");
+  });
+
+  it("summary habla de cortes sin vehículo, no de impuntualidad", () => {
+    assert.equal(formatCoberturaHuecosSummary([]), "Sin cortes de cobertura hoy");
+    const closed = [
+      { startMs: 1, endMs: 2, open: false as const },
+      { startMs: 3, endMs: 4, open: false as const },
+    ];
+    assert.equal(formatCoberturaHuecosSummary(closed), "2 cortes sin vehículo");
+    const open = [{ startMs: 1, endMs: null, open: true as const }];
+    assert.match(formatCoberturaHuecosSummary(open), /sin vehículo/);
+    assert.doesNotMatch(formatCoberturaHuecosSummary(closed), /hueco|puntual/i);
   });
 });

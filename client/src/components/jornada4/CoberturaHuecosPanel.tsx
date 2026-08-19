@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Clock3 } from "lucide-react";
 import {
   buildCoberturaHuecoIntervals,
+  formatCoberturaHuecosSummary,
   formatHuecoClock,
   formatHuecoDuration,
   readCoberturaHuecosEvents,
@@ -25,7 +26,7 @@ function intervalLabel(it: CoberturaHuecoInterval, now: number): string {
   }
   const end = formatHuecoClock(it.endMs!);
   const dur = formatHuecoDuration(it.startMs, it.endMs!);
-  return `${start}–${end} · ${dur}`;
+  return `${start}–${end} · ${dur} sin vehículo`;
 }
 
 /**
@@ -48,13 +49,7 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
   }, [reload, refreshKey]);
 
   const openCount = intervals.filter(i => i.open).length;
-  const closedCount = intervals.length - openCount;
-  const summary =
-    intervals.length === 0
-      ? "Sin huecos registrados hoy"
-      : openCount > 0
-        ? `${intervals.length} hueco${intervals.length === 1 ? "" : "s"} · 1 abierto`
-        : `${closedCount} hueco${closedCount === 1 ? "" : "s"} cerrado${closedCount === 1 ? "" : "s"}`;
+  const summary = formatCoberturaHuecosSummary(intervals);
 
   return (
     <section className="px-4 pb-3" data-testid="jornada4-huecos">
@@ -82,7 +77,7 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
                 className="text-[9px] font-black uppercase tracking-widest"
                 style={{ color: openCount > 0 ? BLOOD : GOLD }}
               >
-                Revisión · huecos del día
+                Revisión · huecos de cobertura
               </p>
               <p className="text-[10px] truncate" style={{ color: MUTED }}>
                 {summary}
@@ -104,11 +99,15 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
           >
             {intervals.length === 0 ? (
               <p className="pt-2 text-[10px] leading-snug" style={{ color: MUTED }}>
-                Aquí verás en qué momento del día no hubo vehículo consciente.
-                Se registra al lanzar o cerrar — sin mapa del anillo.
+                Aquí verás cortes entre bloques: ratos sin vehículo consciente.
+                No es impuntualidad de puerta — eso vive en Puertas del día.
               </p>
             ) : (
-              intervals
+              <>
+                <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
+                  Cortes sin vehículo. La tardanza a la hora de la puerta no entra aquí.
+                </p>
+                {intervals
                 .slice()
                 .reverse()
                 .map((it, idx) => (
@@ -139,7 +138,8 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
                       ) : null}
                     </div>
                   </div>
-                ))
+                ))}
+              </>
             )}
           </div>
         ) : null}

@@ -168,3 +168,18 @@ export function formatHuecoDuration(startMs: number, endMs: number): string {
   const m = min % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
+
+/**
+ * Copy de cobertura (cortes sin vehículo). Distinto de puntualidad de puertas.
+ */
+export function formatCoberturaHuecosSummary(
+  intervals: CoberturaHuecoInterval[]
+): string {
+  const openCount = intervals.filter(i => i.open).length;
+  const closedCount = intervals.length - openCount;
+  if (intervals.length === 0) return "Sin cortes de cobertura hoy";
+  if (openCount > 0) {
+    return `${intervals.length} corte${intervals.length === 1 ? "" : "s"} sin vehículo · 1 abierto`;
+  }
+  return `${closedCount} corte${closedCount === 1 ? "" : "s"} sin vehículo`;
+}
