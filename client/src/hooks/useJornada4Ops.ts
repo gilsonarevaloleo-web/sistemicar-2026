@@ -171,15 +171,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   const closeConquistaSub = useCallback(
     async (vehicleId: string, status: "cumplido" | "fallado", cantidad?: number) => {
       if (!userId) return;
-      const key = `c:${vehicleId}`;
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle) return;
+      const active = vehicle.subVehiculos?.find(s => s.status === "activo");
+      if (!active) return;
+
+      const key = `c:${vehicleId}:${active.id}`;
       if (inFlightRef.current.has(key)) return;
       inFlightRef.current.add(key);
       try {
-        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle) return;
-        const active = vehicle.subVehiculos?.find(s => s.status === "activo");
-        if (!active) return;
-
         const patch = applyConquistaSubClose({
           vehicle,
           subId: active.id,

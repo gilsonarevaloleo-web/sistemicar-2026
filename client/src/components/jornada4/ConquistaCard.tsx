@@ -134,9 +134,11 @@ export function ConquistaCard({
   const [pausaTitulo, setPausaTitulo] = useState("");
   const [pausaEnviando, setPausaEnviando] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
+  const [cierreEnviando, setCierreEnviando] = useState<"cumplido" | "fallado" | "ciclo" | null>(null);
 
   useEffect(() => {
     setCantidad("");
+    setCierreEnviando(null);
   }, [active?.id]);
 
   const addSuggestions =
@@ -713,32 +715,52 @@ export function ConquistaCard({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                      disabled={cierreEnviando !== null}
+                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
                       style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
                       onClick={() => {
+                        if (cierreEnviando) return;
+                        setCierreEnviando("cumplido");
+                        try {
+                          navigator.vibrate?.(14);
+                        } catch {
+                          /* no haptic */
+                        }
                         const n = cantidad.trim() ? Number(cantidad) : undefined;
                         onCumplido(Number.isFinite(n as number) ? (n as number) : undefined);
                         setCantidad("");
                       }}
                       data-testid="j4-conquista-cumplido"
                     >
-                      Cumplido
+                      {cierreEnviando === "cumplido"
+                        ? "Enviando…"
+                        : vehicle.destinoCierre === "peldano"
+                          ? "Enviar · Dirección"
+                          : "Cumplido"}
                     </button>
                     <button
                       type="button"
-                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                      disabled={cierreEnviando !== null}
+                      className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
                       style={{
                         backgroundColor: "transparent",
                         color: BAD,
                         border: `1px solid ${BAD}60`,
                       }}
                       onClick={() => {
+                        if (cierreEnviando) return;
+                        setCierreEnviando("fallado");
+                        try {
+                          navigator.vibrate?.(14);
+                        } catch {
+                          /* no haptic */
+                        }
                         onFallado();
                         setCantidad("");
                       }}
                       data-testid="j4-conquista-fallado"
                     >
-                      Fallado
+                      {cierreEnviando === "fallado" ? "Enviando…" : "Fallado"}
                     </button>
                   </div>
                 </div>
@@ -832,16 +854,30 @@ export function ConquistaCard({
             ) : null}
             <button
               type="button"
-              className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
+              disabled={cierreEnviando !== null}
+              className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
               style={{
                 backgroundColor: "rgba(212,175,55,0.18)",
                 color: "#D4AF37",
                 border: "1px solid rgba(212,175,55,0.4)",
               }}
-              onClick={onCerrarCiclo}
+              onClick={() => {
+                if (cierreEnviando) return;
+                setCierreEnviando("ciclo");
+                try {
+                  navigator.vibrate?.(14);
+                } catch {
+                  /* no haptic */
+                }
+                onCerrarCiclo();
+              }}
               data-testid="j4-conquista-cerrar-ciclo"
             >
-              Cerrar ciclo
+              {cierreEnviando === "ciclo"
+                ? "Enviando…"
+                : vehicle.destinoCierre === "peldano"
+                  ? "Cerrar ciclo · Dirección"
+                  : "Cerrar ciclo"}
             </button>
           </div>
         ) : (
