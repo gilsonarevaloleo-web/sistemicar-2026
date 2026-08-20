@@ -24,6 +24,19 @@ describe("oleadaPuntos — ordenamiento mental", () => {
     );
   });
 
+  it("renumber respeta el orden del array al reordenar (no deshace el swap)", () => {
+    const a = createOleadaPunto("A", 1, 1);
+    const b = createOleadaPunto("B", 2, 2);
+    const next = renumberOleadaPuntos([b, a]);
+    assert.deepEqual(
+      next.map(p => ({ n: p.numero, t: p.titulo })),
+      [
+        { n: 1, t: "B" },
+        { n: 2, t: "A" },
+      ]
+    );
+  });
+
   it("foco prefiere avance sobre propuesta", () => {
     const a = { ...createOleadaPunto("A", 1, 1), status: "cumplido" as const };
     const b = { ...createOleadaPunto("B", 2, 2), status: "propuesta" as const };
