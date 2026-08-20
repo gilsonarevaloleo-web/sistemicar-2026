@@ -146,6 +146,7 @@ export function Sidebar() {
   const arquitectoLibrosItems: NavItem[] = [
     { path: "/manuales", icon: BookOpen, label: "Manuales" },
     { path: "/codice", icon: Shield, label: "Códice" },
+    { path: "/umbral/v2", icon: Zap, label: "Umbral V2" },
     { path: "/umbral", icon: Zap, label: "Umbral" },
   ];
 
