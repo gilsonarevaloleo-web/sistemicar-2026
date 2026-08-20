@@ -94,6 +94,100 @@ function formatTipoOrigen(tipo?: "tiempo" | "situacion") {
   return "—";
 }
 
+function ackDireccionTap() {
+  try {
+    navigator.vibrate?.(14);
+  } catch {
+    /* desktop / iOS sin haptic */
+  }
+}
+
+/** Flechas de orden: confirman el toque al instante (press + pulso) para que no se reiteren clics. */
+function BotonesDireccion({
+  tint,
+  pulseDir,
+  disabledUp,
+  disabledDown,
+  onUp,
+  onDown,
+  testIdUp,
+  testIdDown,
+  labelUp,
+  labelDown,
+  orientation = "vertical",
+}: {
+  tint: string;
+  pulseDir?: "up" | "down" | null;
+  disabledUp?: boolean;
+  disabledDown?: boolean;
+  onUp: () => void;
+  onDown: () => void;
+  testIdUp: string;
+  testIdDown: string;
+  labelUp: string;
+  labelDown: string;
+  orientation?: "vertical" | "horizontal";
+}) {
+  const [held, setHeld] = useState<"up" | "down" | null>(null);
+
+  const renderBtn = (dir: "up" | "down") => {
+    const disabled = dir === "up" ? !!disabledUp : !!disabledDown;
+    const onClick = dir === "up" ? onUp : onDown;
+    const testId = dir === "up" ? testIdUp : testIdDown;
+    const label = dir === "up" ? labelUp : labelDown;
+    const Icon = dir === "up" ? ChevronUp : ChevronDown;
+    const on = held === dir || pulseDir === dir;
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onPointerDown={() => {
+          if (disabled) return;
+          setHeld(dir);
+        }}
+        onPointerUp={() => setHeld(null)}
+        onPointerCancel={() => setHeld(null)}
+        onPointerLeave={() => setHeld(null)}
+        onClick={e => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={cn(
+          "flex items-center justify-center touch-manipulation select-none",
+          "transition-[transform,background-color,box-shadow,color] duration-100 ease-out",
+          "disabled:opacity-20 disabled:pointer-events-none",
+          orientation === "vertical" ? "flex-1 min-h-[40px] min-w-[40px]" : "p-1.5 rounded-md",
+          !on && "text-slate-500 hover:text-white hover:bg-white/10"
+        )}
+        style={{
+          color: on ? tint : undefined,
+          backgroundColor: on ? `${tint}30` : undefined,
+          boxShadow: on ? `0 0 14px ${tint}55` : undefined,
+          transform: on ? "scale(0.88)" : undefined,
+        }}
+        aria-label={label}
+        aria-pressed={on}
+        data-testid={testId}
+      >
+        <Icon size={orientation === "vertical" ? 16 : 14} />
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className={
+        orientation === "vertical"
+          ? "flex flex-col border-r border-white/5 shrink-0 bg-white/[0.03]"
+          : "flex items-center"
+      }
+    >
+      {renderBtn("up")}
+      {renderBtn("down")}
+    </div>
+  );
+}
+
 function ProyectoIcono({
   etiqueta,
   color,
@@ -294,12 +388,22 @@ export default function ProyectosPage() {
   /** Dirección: lectura limpia por defecto; inputs detrás de [Editar Dirección]. */
   const [editandoDireccion, setEditandoDireccion] = useState(false);
   const [focoBusy, setFocoBusy] = useState<"reset" | "delete" | null>(null);
+  /** Pulso breve en la flecha + tarjeta para confirmar que el orden ya se aplicó. */
+  const [ordenPulse, setOrdenPulse] = useState<{ id: string; dir: "up" | "down" } | null>(null);
+  const ordenPulseTimerRef = useRef<number | null>(null);
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
   proyectosLenRef.current = proyectos.length;
   const motorsQuietRef = useRef(motorsQuiet);
   motorsQuietRef.current = motorsQuiet;
+
+  const ackOrden = useCallback((id: string, dir: "up" | "down") => {
+    ackDireccionTap();
+    setOrdenPulse({ id, dir });
+    if (ordenPulseTimerRef.current) window.clearTimeout(ordenPulseTimerRef.current);
+    ordenPulseTimerRef.current = window.setTimeout(() => setOrdenPulse(null), 480);
+  }, []);
 
   const applyDetailState = useCallback((p: Proyecto | null, pel: ProyectoPeldano[]) => {
     setProyecto(p);
@@ -405,6 +509,12 @@ export default function ProyectosPage() {
     const heavyId = window.setTimeout(() => setDetailHeavyReady(true), 120);
     return () => window.clearTimeout(heavyId);
   }, [detailId]);
+
+  useEffect(() => {
+    return () => {
+      if (ordenPulseTimerRef.current) window.clearTimeout(ordenPulseTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!detailId || motorsQuiet) return;
@@ -528,11 +638,35 @@ export default function ProyectosPage() {
     refreshOleadaPeldanoLocal(updated);
   };
 
-  const handleReorderOleadaPunto = async (puntoId: string, direction: "up" | "down") => {
+  const handleReorderOleadaPunto = (puntoId: string, direction: "up" | "down") => {
     if (!user || !oleadaPeldano) return;
-    const updated = await reorderOleadaPunto(user.uid, oleadaPeldano.id, puntoId, direction);
-    refreshOleadaPeldanoLocal(updated);
+    ackOrden(puntoId, direction);
+    void reorderOleadaPunto(user.uid, oleadaPeldano.id, puntoId, direction);
+    const updated = getPeldanosByProyectoLocal(user.uid, oleadaPeldano.proyectoId).find(
+      p => p.id === oleadaPeldano.id
+    );
+    refreshOleadaPeldanoLocal(updated ?? null);
   };
+
+  const handleReorderProyecto = useCallback(
+    (proyectoId: string, direction: "up" | "down") => {
+      if (!user) return;
+      void reorderProyecto(user.uid, proyectoId, direction);
+      setProyectos(getProyectosLocal(user.uid));
+      ackOrden(proyectoId, direction);
+    },
+    [user, ackOrden]
+  );
+
+  const handleReorderIdea = useCallback(
+    (peldanoId: string, direction: "up" | "down") => {
+      if (!user || !detailId) return;
+      void reorderPeldano(user.uid, detailId, peldanoId, direction);
+      setPeldanos(getPeldanosByProyectoLocal(user.uid, detailId));
+      ackOrden(peldanoId, direction);
+    },
+    [user, detailId, ackOrden]
+  );
 
   const handleCreateProyecto = useCallback(
     async (data: { titulo: string; etiqueta: ProyectoEtiqueta; nota: string }) => {
@@ -794,6 +928,8 @@ export default function ProyectosPage() {
               <OleadaDesglosePanel
                 puntos={oleadaPuntos}
                 tint={tint}
+                pulseId={ordenPulse?.id}
+                pulseDir={ordenPulse?.dir}
                 onAdd={handleAddOleadaPunto}
                 onUpdateTitulo={handleUpdateOleadaPuntoTitulo}
                 onCycleStatus={handleCycleOleadaPuntoStatus}
@@ -1096,27 +1232,34 @@ export default function ProyectosPage() {
                     Añade ideas de oleada — no son el bloque del día; son el camino a caminar.
                   </p>
                 )}
-                {ideas.map(pel => (
+                {ideas.map((pel, ideaIdx) => (
                   <div
                     key={pel.id}
-                    className="p-3 rounded-xl border border-white/10"
-                    style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
+                    className="p-3 rounded-xl border border-white/10 transition-[border-color,box-shadow] duration-200"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.03)",
+                      borderColor:
+                        ordenPulse?.id === pel.id ? `${CYAN}55` : "rgba(255,255,255,0.1)",
+                      boxShadow:
+                        ordenPulse?.id === pel.id ? `0 0 16px ${CYAN}28` : undefined,
+                    }}
                   >
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="text-sm font-bold text-white">{pel.titulo}</span>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => void reorderPeldano(user!.uid, proyecto.id, pel.id, "up")}
-                          className="p-1 text-slate-500 hover:text-white"
-                        >
-                          <ChevronUp size={14} />
-                        </button>
-                        <button
-                          onClick={() => void reorderPeldano(user!.uid, proyecto.id, pel.id, "down")}
-                          className="p-1 text-slate-500 hover:text-white"
-                        >
-                          <ChevronDown size={14} />
-                        </button>
+                        <BotonesDireccion
+                          tint={CYAN}
+                          pulseDir={ordenPulse?.id === pel.id ? ordenPulse.dir : null}
+                          disabledUp={ideaIdx === 0}
+                          disabledDown={ideaIdx === ideas.length - 1}
+                          onUp={() => handleReorderIdea(pel.id, "up")}
+                          onDown={() => handleReorderIdea(pel.id, "down")}
+                          testIdUp={`idea-up-${pel.id}`}
+                          testIdDown={`idea-down-${pel.id}`}
+                          labelUp="Subir idea"
+                          labelDown="Bajar idea"
+                          orientation="horizontal"
+                        />
                         <button
                           onClick={() => void deletePeldanoIdea(user!.uid, pel.id).then(() => reloadDetail())}
                           className="p-1 text-slate-600 hover:text-red-400"
@@ -1321,46 +1464,35 @@ export default function ProyectosPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {proyectos.map((p, idx) => (
-            <div
+          {proyectos.map((p, idx) => {
+            const tintCard = p.color ?? CYAN;
+            const pulsing = ordenPulse?.id === p.id;
+            return (
+            <motion.div
               key={p.id}
-              className="rounded-xl border overflow-hidden"
-              style={{ backgroundColor: PIZARRA, borderColor: `${p.color ?? CYAN}30` }}
+              layout
+              transition={{ type: "spring", stiffness: 520, damping: 38, mass: 0.65 }}
+              className="rounded-xl border overflow-hidden transition-[border-color,box-shadow] duration-200"
+              style={{
+                backgroundColor: PIZARRA,
+                borderColor: pulsing ? `${tintCard}85` : `${tintCard}30`,
+                boxShadow: pulsing ? `0 0 22px ${tintCard}40` : undefined,
+              }}
               data-testid={`proyecto-card-${p.id}`}
             >
               <div className="flex">
-                <div className="flex flex-col border-r border-white/5 shrink-0">
-                  <button
-                    type="button"
-                    disabled={idx === 0}
-                    onClick={e => {
-                      e.stopPropagation();
-                      void reorderProyecto(user.uid, p.id, "up").then(() =>
-                        setProyectos(getProyectosLocal(user.uid))
-                      );
-                    }}
-                    className="p-2 text-slate-500 hover:text-white disabled:opacity-20"
-                    aria-label="Subir proyecto"
-                    data-testid={`proyecto-up-${p.id}`}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={idx === proyectos.length - 1}
-                    onClick={e => {
-                      e.stopPropagation();
-                      void reorderProyecto(user.uid, p.id, "down").then(() =>
-                        setProyectos(getProyectosLocal(user.uid))
-                      );
-                    }}
-                    className="p-2 text-slate-500 hover:text-white disabled:opacity-20"
-                    aria-label="Bajar proyecto"
-                    data-testid={`proyecto-down-${p.id}`}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
+                <BotonesDireccion
+                  tint={tintCard}
+                  pulseDir={pulsing ? ordenPulse?.dir : null}
+                  disabledUp={idx === 0}
+                  disabledDown={idx === proyectos.length - 1}
+                  onUp={() => handleReorderProyecto(p.id, "up")}
+                  onDown={() => handleReorderProyecto(p.id, "down")}
+                  testIdUp={`proyecto-up-${p.id}`}
+                  testIdDown={`proyecto-down-${p.id}`}
+                  labelUp="Subir proyecto"
+                  labelDown="Bajar proyecto"
+                />
                 <button
                   type="button"
                   onClick={() => openProyectoDetalle(p.id)}
@@ -1383,8 +1515,9 @@ export default function ProyectosPage() {
                   </div>
                 </button>
               </div>
-            </div>
-          ))}
+            </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

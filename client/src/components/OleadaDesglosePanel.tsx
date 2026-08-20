@@ -21,6 +21,8 @@ type Props = {
   puntos: OleadaPunto[];
   tint: string;
   disabled?: boolean;
+  pulseId?: string | null;
+  pulseDir?: "up" | "down" | null;
   onAdd: (titulo: string) => Promise<void> | void;
   onUpdateTitulo: (puntoId: string, titulo: string) => Promise<void> | void;
   onCycleStatus: (puntoId: string, next: OleadaPuntoStatus) => Promise<void> | void;
@@ -72,6 +74,8 @@ export function OleadaDesglosePanel({
   puntos,
   tint,
   disabled = false,
+  pulseId = null,
+  pulseDir = null,
   onAdd,
   onUpdateTitulo,
   onCycleStatus,
@@ -80,6 +84,7 @@ export function OleadaDesglosePanel({
 }: Props) {
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
+  const [held, setHeld] = useState<{ id: string; dir: "up" | "down" } | null>(null);
   const foco = getFocoOleadaPunto(puntos);
   const summary = summarizeOleadaPuntos(puntos);
 
@@ -147,35 +152,53 @@ export function OleadaDesglosePanel({
               <li
                 key={p.id}
                 className={cn(
-                  "rounded-lg px-2 py-1.5 flex items-start gap-1.5",
+                  "rounded-lg px-2 py-1.5 flex items-start gap-1.5 transition-[border-color,box-shadow,background-color] duration-150",
                   isFoco ? "bg-white/[0.04]" : "bg-transparent"
                 )}
                 style={{
-                  border: `1px solid ${isFoco ? `${tint}35` : "rgba(255,255,255,0.08)"}`,
+                  border: `1px solid ${
+                    pulseId === p.id ? `${tint}70` : isFoco ? `${tint}35` : "rgba(255,255,255,0.08)"
+                  }`,
+                  boxShadow: pulseId === p.id ? `0 0 12px ${tint}30` : undefined,
                 }}
                 data-testid={`hub-oleada-punto-${p.numero}`}
               >
                 <div className="flex flex-col gap-0.5 pt-0.5">
-                  <button
-                    type="button"
-                    disabled={disabled || idx === 0}
-                    onClick={() => void onReorder(p.id, "up")}
-                    className="p-0.5 text-slate-600 disabled:opacity-20 hover:text-slate-300"
-                    aria-label="Subir punto"
-                    data-testid={`hub-oleada-punto-up-${p.numero}`}
-                  >
-                    <ChevronUp size={11} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={disabled || idx === puntos.length - 1}
-                    onClick={() => void onReorder(p.id, "down")}
-                    className="p-0.5 text-slate-600 disabled:opacity-20 hover:text-slate-300"
-                    aria-label="Bajar punto"
-                    data-testid={`hub-oleada-punto-down-${p.numero}`}
-                  >
-                    <ChevronDown size={11} />
-                  </button>
+                  {(["up", "down"] as const).map(dir => {
+                    const disabledBtn = disabled || (dir === "up" ? idx === 0 : idx === puntos.length - 1);
+                    const on =
+                      !disabledBtn &&
+                      ((held?.id === p.id && held.dir === dir) ||
+                        (pulseId === p.id && pulseDir === dir));
+                    const Icon = dir === "up" ? ChevronUp : ChevronDown;
+                    return (
+                      <button
+                        key={dir}
+                        type="button"
+                        disabled={disabledBtn}
+                        onPointerDown={() => {
+                          if (disabledBtn) return;
+                          setHeld({ id: p.id, dir });
+                        }}
+                        onPointerUp={() => setHeld(null)}
+                        onPointerCancel={() => setHeld(null)}
+                        onPointerLeave={() => setHeld(null)}
+                        onClick={() => void onReorder(p.id, dir)}
+                        className="p-1 rounded touch-manipulation select-none transition-all duration-100 disabled:opacity-20"
+                        style={{
+                          color: on ? tint : undefined,
+                          backgroundColor: on ? `${tint}28` : undefined,
+                          boxShadow: on ? `0 0 10px ${tint}40` : undefined,
+                          transform: on ? "scale(0.88)" : undefined,
+                        }}
+                        aria-label={dir === "up" ? "Subir punto" : "Bajar punto"}
+                        aria-pressed={on}
+                        data-testid={`hub-oleada-punto-${dir}-${p.numero}`}
+                      >
+                        <Icon size={11} className={on ? undefined : "text-slate-600"} />
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <span
