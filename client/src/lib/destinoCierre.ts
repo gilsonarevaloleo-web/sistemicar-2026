@@ -21,6 +21,15 @@ export function feedsProyectoHub(destino: DestinoCierre): boolean {
   return destino === "peldano";
 }
 
+/** Chip activo: el toque pinta el proyecto antes de que el vehículo confirme `proyectoId`. */
+export function resolveProyectoChipId(
+  optimisticPid?: string | null,
+  proyectoId?: string | null,
+  fallbackId?: string | null
+): string {
+  return (optimisticPid || proyectoId || fallbackId || "").trim();
+}
+
 export const DESTINO_CIERRE_COPY = {
   presencia: {
     label: "Presencia",

@@ -38,9 +38,9 @@ export function sortOleadaPuntos(puntos: OleadaPunto[]): OleadaPunto[] {
   return [...puntos].sort((a, b) => a.numero - b.numero || a.createdAt - b.createdAt);
 }
 
-/** Renumerar 1..n tras añadir/borrar/reordenar — la propuesta se reordena libremente. */
+/** Renumerar 1..n según el orden del array. No reordenar por `numero` previo: eso deshacía el swap de las flechas. */
 export function renumberOleadaPuntos(puntos: OleadaPunto[]): OleadaPunto[] {
-  return sortOleadaPuntos(puntos).map((p, i) =>
+  return puntos.map((p, i) =>
     p.numero === i + 1 ? p : { ...p, numero: i + 1, updatedAt: Date.now() }
   );
 }

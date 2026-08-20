@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Flag, Lock, TrendingUp, X as XIcon, Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
@@ -68,12 +68,17 @@ export function SituacionCard({
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
+  const [cierreEnviando, setCierreEnviando] = useState<"cumplido" | "fallado" | "avance" | "bloque" | null>(null);
   const pending = situacionPendingCronRows(vehicle);
   const focusId = vehicle.situacionCupoAnchor?.subTareaId;
   const focus = pending.find(st => st.id === focusId) ?? pending[0] ?? null;
   const sc = vehicle.situacionCronometro;
   const cronActivo = sc?.activo === true;
   const entrenamiento = isRingModoEntrenamiento(vehicle);
+
+  useEffect(() => {
+    setCierreEnviando(null);
+  }, [focus?.id]);
 
   // Solo tickear con ring activo (como Conquista). Idle = sin setState/s.
   const tick = useJornada4Tick(cronActivo);
@@ -262,33 +267,67 @@ export function SituacionCard({
             <div className="flex gap-2">
               <button
                 type="button"
-                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                disabled={cierreEnviando !== null}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
                 style={{ backgroundColor: `${OK}22`, color: OK, border: `1px solid ${OK}50` }}
-                onClick={() => onCumplido(focus.id)}
+                onClick={() => {
+                  if (cierreEnviando) return;
+                  setCierreEnviando("cumplido");
+                  try {
+                    navigator.vibrate?.(14);
+                  } catch {
+                    /* no haptic */
+                  }
+                  onCumplido(focus.id);
+                }}
                 data-testid="j4-situacion-cumplido"
               >
-                Cumplido
+                {cierreEnviando === "cumplido"
+                  ? "Enviando…"
+                  : vehicle.destinoCierre === "peldano"
+                    ? "Enviar · Dirección"
+                    : "Cumplido"}
               </button>
               {!entrenamiento ? (
                 <button
                   type="button"
-                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation flex items-center justify-center gap-1"
+                  disabled={cierreEnviando !== null}
+                  className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-1"
                   style={{ backgroundColor: `${AMBER}18`, color: AMBER, border: `1px solid ${AMBER}55` }}
-                  onClick={() => onAvance(focus.id)}
+                  onClick={() => {
+                    if (cierreEnviando) return;
+                    setCierreEnviando("avance");
+                    try {
+                      navigator.vibrate?.(14);
+                    } catch {
+                      /* no haptic */
+                    }
+                    onAvance(focus.id);
+                  }}
                   data-testid="j4-situacion-avance"
                 >
                   <TrendingUp size={10} />
-                  Avance
+                  {cierreEnviando === "avance" ? "Enviando…" : "Avance"}
                 </button>
               ) : null}
               <button
                 type="button"
-                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation"
+                disabled={cierreEnviando !== null}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
                 style={{ backgroundColor: "transparent", color: BAD, border: `1px solid ${BAD}60` }}
-                onClick={() => onFallado(focus.id)}
+                onClick={() => {
+                  if (cierreEnviando) return;
+                  setCierreEnviando("fallado");
+                  try {
+                    navigator.vibrate?.(14);
+                  } catch {
+                    /* no haptic */
+                  }
+                  onFallado(focus.id);
+                }}
                 data-testid="j4-situacion-fallado"
               >
-                Fallado
+                {cierreEnviando === "fallado" ? "Enviando…" : "Fallado"}
               </button>
             </div>
           </div>
@@ -313,16 +352,30 @@ export function SituacionCard({
             ) : null}
             <button
               type="button"
-              className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
+              disabled={cierreEnviando !== null}
+              className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider touch-manipulation select-none transition-transform duration-100 active:scale-95 disabled:opacity-60"
               style={{
                 backgroundColor: "rgba(212,175,55,0.18)",
                 color: GOLD,
                 border: "1px solid rgba(212,175,55,0.4)",
               }}
-              onClick={onCerrarBloque}
+              onClick={() => {
+                if (cierreEnviando) return;
+                setCierreEnviando("bloque");
+                try {
+                  navigator.vibrate?.(14);
+                } catch {
+                  /* no haptic */
+                }
+                onCerrarBloque();
+              }}
               data-testid="j4-situacion-cerrar-bloque"
             >
-              Cerrar bloque
+              {cierreEnviando === "bloque"
+                ? "Enviando…"
+                : vehicle.destinoCierre === "peldano"
+                  ? "Cerrar bloque · Dirección"
+                  : "Cerrar bloque"}
             </button>
           </div>
         ) : (

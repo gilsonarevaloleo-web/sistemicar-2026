@@ -433,20 +433,20 @@ export async function addProyecto(
   return proyecto;
 }
 
-/** Reordena proyectos en el Hub (swap con vecino). */
+/** Reordena proyectos en el Hub (swap con vecino). Local es síncrono: la UI puede pintar el nuevo orden al instante. */
 export async function reorderProyecto(
   userId: string,
   proyectoId: string,
   direction: "up" | "down"
-): Promise<void> {
+): Promise<Proyecto[]> {
   const sorted = sortProyectos(getLocalProyectos(userId));
-  if (sorted.length < 2) return;
+  if (sorted.length < 2) return sorted;
   // Normaliza orden 0..n-1 para que el swap sea fiable aunque falten valores.
   const normalized = sorted.map((p, i) => ({ ...p, orden: i }));
   const idx = normalized.findIndex(p => p.id === proyectoId);
-  if (idx === -1) return;
+  if (idx === -1) return sorted;
   const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= normalized.length) return;
+  if (swapIdx < 0 || swapIdx >= normalized.length) return sorted;
   const a = normalized[idx]!;
   const b = normalized[swapIdx]!;
   const ordenA = a.orden;
@@ -459,6 +459,7 @@ export async function reorderProyecto(
   saveLocalProyectos(userId, merged);
   void syncFirestoreProyecto(userId, a);
   void syncFirestoreProyecto(userId, b);
+  return sortProyectos(merged);
 }
 
 /** Guarda dirección de claridad en el Hub (sincroniza a segmentos al aplicar rutina o crear bloque). */
@@ -713,16 +714,34 @@ export async function reorderPeldano(
   proyectoId: string,
   peldanoId: string,
   direction: "up" | "down"
-): Promise<void> {
-  const ideas = (await getPeldanosByProyecto(userId, proyectoId)).filter(p => p.estado === "idea");
+): Promise<ProyectoPeldano[]> {
+  const all = getLocalPeldanos(userId);
+  const ideas = all
+    .filter(x => x.proyectoId === proyectoId && x.estado === "idea")
+    .sort((a, b) => a.orden - b.orden);
+  const current = getPeldanosByProyectoLocal(userId, proyectoId);
   const idx = ideas.findIndex(p => p.id === peldanoId);
-  if (idx === -1) return;
+  if (idx === -1) return current;
   const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-  if (swapIdx < 0 || swapIdx >= ideas.length) return;
-  const a = ideas[idx];
-  const b = ideas[swapIdx];
-  await updatePeldano(userId, a.id, { orden: b.orden });
-  await updatePeldano(userId, b.id, { orden: a.orden });
+  if (swapIdx < 0 || swapIdx >= ideas.length) return current;
+  const a = ideas[idx]!;
+  const b = ideas[swapIdx]!;
+  const ordenA = a.orden;
+  const ordenB = b.orden;
+  const now = Date.now();
+  const next = all.map(p => {
+    if (p.id === a.id) return { ...p, orden: ordenB, updatedAt: now };
+    if (p.id === b.id) return { ...p, orden: ordenA, updatedAt: now };
+    return p;
+  });
+  saveLocalPeldanos(userId, next);
+  const updatedA = next.find(p => p.id === a.id);
+  const updatedB = next.find(p => p.id === b.id);
+  if (updatedA) void syncFirestorePeldano(userId, updatedA);
+  if (updatedB) void syncFirestorePeldano(userId, updatedB);
+  return next
+    .filter(x => x.proyectoId === proyectoId)
+    .sort((x, y) => x.orden - y.orden);
 }
 
 export async function deletePeldanoIdea(userId: string, id: string): Promise<void> {
