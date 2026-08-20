@@ -448,8 +448,18 @@ export function DoctorIAChat() {
     "/ventas-espejo",
     "/vendedor",
     "/jornada-v4", // Dual Kernel: sin FAB ni ~10 listeners Firebase
+    "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos
+    "/umbral/entrada",
+    "/umbral/metricas",
   ];
-  if (!user || hiddenPages.includes(location) || location.startsWith("/jornada-v4?")) return null;
+  if (
+    !user ||
+    hiddenPages.includes(location) ||
+    location.startsWith("/jornada-v4?") ||
+    location.startsWith("/umbral/")
+  ) {
+    return null;
+  }
 
   return (
     <>
