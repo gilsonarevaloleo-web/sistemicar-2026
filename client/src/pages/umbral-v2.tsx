@@ -8,6 +8,8 @@ import {
 } from "@/lib/persistence";
 import { isPreviewOpsUnlocked } from "@/lib/previewOps";
 import { UMBRAL_SKU } from "@shared/umbralPricing";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 /**
  * Consola Umbral v2 — UI del motor de 10 Códigos.
@@ -15,12 +17,20 @@ import { UMBRAL_SKU } from "@shared/umbralPricing";
  */
 export default function UmbralV2() {
   const { user } = useAuthContext();
+  useViewTransitionShield();
+  // Soft-start al venir de Dual Kernel: diferir Firestore para no clavar el hilo.
+  const motorsQuiet = useDualKernelMotorsQuiet();
   const [progression, setProgression] = useState<UserProgression | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) {
       setReady(false);
+      return;
+    }
+    if (motorsQuiet) {
+      // Durante soft-start mostramos consola en trial; el paid se confirma al soltar.
+      setReady(true);
       return;
     }
     const unsub = subscribeToProgression(
@@ -35,7 +45,7 @@ export default function UmbralV2() {
       },
     );
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, motorsQuiet]);
 
   if (!user?.uid) {
     return (

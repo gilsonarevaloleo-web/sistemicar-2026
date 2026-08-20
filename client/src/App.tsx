@@ -428,15 +428,15 @@ function Router() {
         <Route path="/manuales">
           <ProtectedRoute component={Manuales} />
         </Route>
-        <Route path="/umbral">
-          <ProtectedRoute component={Umbral} />
-        </Route>
         <Route path="/umbral/entrada" component={UmbralEntrada} />
         <Route path="/umbral/v2">
           <ProtectedRoute component={UmbralV2} />
         </Route>
         <Route path="/umbral/metricas">
           <ModuleRoute component={UmbralMetricas} requiredModule="umbral" />
+        </Route>
+        <Route path="/umbral">
+          <ProtectedRoute component={Umbral} />
         </Route>
         <Route path="/proyector">
           <ProtectedRoute component={Proyector} />
@@ -504,6 +504,7 @@ function VoiceBootstrap() {
       // Hub de proyectos + Centro de Comando: sin TTS en el primer toque
       // (el unlock robaba el hilo y las tarjetas no abrían).
       // /vendedor y entradas comerciales: mismo problema en Android.
+      // /umbral/*: misma robada en consola V2 (modos, códigos, links).
       return (
         p === "/proyectos" ||
         p.startsWith("/proyectos/") ||
@@ -511,7 +512,8 @@ function VoiceBootstrap() {
         p.startsWith("/menu/") ||
         p === "/vendedor" ||
         p.startsWith("/vendedor/") ||
-        p === "/umbral/entrada" ||
+        p === "/umbral" ||
+        p.startsWith("/umbral/") ||
         p === "/pagos" ||
         p.startsWith("/pagos")
       );

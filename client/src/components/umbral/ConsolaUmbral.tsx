@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
@@ -29,6 +28,7 @@ import {
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
+import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 
 const GOLD = "#D4AF37";
@@ -89,6 +89,13 @@ export function ConsolaUmbral({
   const [sesionId, setSesionId] = useState<string | null>(null);
   /** Paywall tras aprobar C1 en trial, o al intentar C2+. */
   const [mostrarPaywall, setMostrarPaywall] = useState(false);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    };
+  }, []);
 
   const cfg = useMemo(() => obtenerCodigo(codigoActual), [codigoActual]);
   const modoMeta = MODOS_UMBRAL[modo];
@@ -216,11 +223,13 @@ export function ConsolaUmbral({
           const siguiente = data.codigoSiguiente as CodigoNumero;
           // Trial: tras aprobar C1, no avanzar — mostrar paywall.
           if (requierePagoUmbral(siguiente, hasPaidAccess)) {
-            window.setTimeout(() => {
+            if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+            advanceTimerRef.current = setTimeout(() => {
               setMostrarPaywall(true);
             }, 1200);
           } else {
-            window.setTimeout(() => {
+            if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+            advanceTimerRef.current = setTimeout(() => {
               setCodigoActual(siguiente);
               setVeredicto(null);
             }, 1400);
@@ -274,18 +283,22 @@ export function ConsolaUmbral({
             </li>
           ))}
         </ul>
-        <Link
+        <NavTransitionLink
           href={checkoutHref}
-          className="mt-5 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.18em]"
-          style={{
-            background: `linear-gradient(90deg, ${GOLD}33, ${CYAN}22)`,
-            border: `1px solid ${GOLD}88`,
-            color: GOLD,
-          }}
-          data-testid="umbral-v2-paywall-cta"
+          className="mt-5 flex w-full items-center justify-center gap-2 border px-4 py-3.5 text-[12px] font-bold tracking-[0.18em] text-[#D4AF37]"
         >
-          ACTIVAR UMBRAL · ${UMBRAL_SKU.priceUsd}/MES
-        </Link>
+          <span
+            data-testid="umbral-v2-paywall-cta"
+            className="flex w-full items-center justify-center"
+            style={{
+              background: `linear-gradient(90deg, ${GOLD}33, ${CYAN}22)`,
+              border: `1px solid ${GOLD}88`,
+              padding: "0.85rem 1rem",
+            }}
+          >
+            ACTIVAR UMBRAL · ${UMBRAL_SKU.priceUsd}/MES
+          </span>
+        </NavTransitionLink>
         <button
           type="button"
           onClick={() => {
@@ -376,14 +389,18 @@ export function ConsolaUmbral({
               : "DE LA ARENA A LA FORJA"}
           </button>
         </div>
-        <Link
+        <NavTransitionLink
           href="/umbral/metricas"
           className="flex items-center justify-center gap-2 border border-white/15 px-4 py-3 text-[11px] tracking-widest text-white/55 hover:border-[#00FFC3]/40 hover:text-[#00FFC3]"
-          data-testid="link-umbral-metricas-completado"
         >
-          <BarChart3 size={14} />
-          VER MÉTRICAS DIAGNÓSTICAS
-        </Link>
+          <span
+            className="flex items-center justify-center gap-2"
+            data-testid="link-umbral-metricas-completado"
+          >
+            <BarChart3 size={14} />
+            VER MÉTRICAS DIAGNÓSTICAS
+          </span>
+        </NavTransitionLink>
       </div>
     );
   }
@@ -407,14 +424,15 @@ export function ConsolaUmbral({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             {hasPaidAccess ? (
-              <Link
+              <NavTransitionLink
                 href="/umbral/metricas"
                 className="flex items-center gap-1.5 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-                data-testid="link-umbral-metricas"
               >
-                <BarChart3 size={12} />
-                MÉTRICAS
-              </Link>
+                <span className="flex items-center gap-1.5" data-testid="link-umbral-metricas">
+                  <BarChart3 size={12} />
+                  MÉTRICAS
+                </span>
+              </NavTransitionLink>
             ) : (
               <button
                 type="button"
@@ -426,20 +444,18 @@ export function ConsolaUmbral({
                 MÉTRICAS
               </button>
             )}
-            <Link
+            <NavTransitionLink
               href="/umbral/entrada"
               className="text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-              data-testid="link-umbral-entrada"
             >
-              ENTRADA
-            </Link>
-            <Link
+              <span data-testid="link-umbral-entrada">ENTRADA</span>
+            </NavTransitionLink>
+            <NavTransitionLink
               href={backHref}
               className="text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-              data-testid="link-umbral-v1"
             >
-              {backLabel}
-            </Link>
+              <span data-testid="link-umbral-v1">{backLabel}</span>
+            </NavTransitionLink>
           </div>
         </div>
 
