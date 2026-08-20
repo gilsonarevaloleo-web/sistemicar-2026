@@ -1,6 +1,6 @@
 /**
  * Métricas — evolución de conciencia del operador (triada).
- * 100% = plan del día. Los tres % se comparan día a día.
+ * 100% = plan del día en tiempo de línea. Interrupt no multiplica.
  * Solo montar en pestaña Métricas (idle).
  */
 import {
@@ -68,7 +68,7 @@ export function Jornada4ConcienciaTriadaCard({
         {model.hasPlanificacion && model.minutosPlan > 0 ? (
           <p className="text-[9px] tabular-nums shrink-0 text-right" style={{ color: MUTED }}>
             100% = {formatPlanMin(model.minutosPlan)}
-            <span className="block normal-case tracking-normal">del plan</span>
+            <span className="block normal-case tracking-normal">línea del plan</span>
           </p>
         ) : null}
       </div>
@@ -135,9 +135,44 @@ export function Jornada4ConcienciaTriadaCard({
               );
             })}
           </div>
+          {model.paraleloMeritorio ? (
+            <div
+              className="rounded-lg px-2 py-1.5"
+              style={{ backgroundColor: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.28)" }}
+              data-testid="jornada4-conciencia-paralelo"
+            >
+              <p className="text-[8px] uppercase tracking-widest" style={{ color: "#D4AF37" }}>
+                Paralelo meritorio · {model.hilosAvanzando} hilos
+              </p>
+              <p className="text-[9px] mt-0.5" style={{ color: INK }}>
+                {model.minutosParaleloEnJuego > 0
+                  ? `${Math.round(model.minutosParaleloEnJuego)} min extra en juego — cuenta si ambos cumplen.`
+                  : "Dos hilos avanzan de verdad. La dopamina es al cumplir los dos."}
+              </p>
+            </div>
+          ) : model.interruptCubreLinea ? (
+            <p className="text-[8px] leading-relaxed" style={{ color: MUTED }} data-testid="jornada4-conciencia-interrupt">
+              Interrupt: el enfoque cubre la línea; la conquista está pausada. No es multiplicar tiempo.
+            </p>
+          ) : model.minutosParaleloGanado > 0 ? (
+            <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
+              Paralelo ganado hoy: {Math.round(model.minutosParaleloGanado)} min extra (ambos cumplidos).
+            </p>
+          ) : null}
           <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-            Conforme avanza el día, cada % es una porción del plan. La meta es crecer Dirección
-            por encima de Presencia.
+            La copa es tiempo de línea: un hilo.
+            {model.minutosPlanFuturo > 0 || model.minutosHueco > 0
+              ? ` Lo que falta del plan${
+                  model.minutosPlanFuturo > 0
+                    ? ` (${Math.round(model.minutosPlanFuturo)} min aún no ocurren)`
+                    : ""
+                }${
+                  model.minutosHueco > 0
+                    ? `${model.minutosPlanFuturo > 0 ? " y" : ""} ${Math.round(model.minutosHueco)} min de hueco`
+                    : ""
+                } sigue inconsciente.`
+              : ""}{" "}
+            La meta es crecer Dirección por encima de Presencia.
           </p>
         </>
       ) : null}

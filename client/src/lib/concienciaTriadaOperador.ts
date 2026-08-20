@@ -1,16 +1,29 @@
 /**
  * Conciencia del operador (Jornada) — triada sobre lo planificado.
  * Inconsciente · Presencia · Dirección (Norte).
- * 100% = minutos únicos del plan del día (suma de horas asignadas).
- * Inconsciente = plan aún no convertido a presencia ni dirección.
+ * 100% = minutos únicos del plan del día (tiempo de línea).
+ * Inconsciente = huecos de cobertura + plan que aún no ocurre.
+ * Interrupt cubre la línea; no multiplica. Paralelo meritorio es otro reloj.
  * No usa el pulso de cobertura ni el “vehículo abierto ahora”.
  * Persistencia local ligera; prohibido en ms0 — solo sombra / idle.
  */
 import { resolveDestinoCierre, feedsProyectoHub } from "./destinoCierre";
 import { safeSetItem } from "./storageHygiene";
 import { getJournalDateString, segmentTimeToMinutes } from "./segmentTime";
+import {
+  computeTriadaLineaOccupancy,
+  isTriadaAdvancingVehicle,
+  skipsTriadaCoverage,
+} from "./concienciaTriadaLinea";
 import type { DestinoCierre } from "./destinoCierre";
 import type { Vehicle } from "./persistence";
+
+export {
+  computeTriadaLineaOccupancy,
+  isTriadaAdvancingVehicle,
+  skipsTriadaCoverage,
+  type TriadaLineaOccupancy,
+} from "./concienciaTriadaLinea";
 
 export type TriadaEstadoId = "inconsciente" | "presencia" | "direccion";
 
@@ -20,7 +33,7 @@ export const TRIADA_META: Record<
 > = {
   inconsciente: {
     label: "Inconsciente",
-    hint: "Horas del plan aún no convertidas a presencia ni dirección.",
+    hint: "Huecos de cobertura y tramo del plan que aún no ocurre.",
     color: "#64748B",
   },
   presencia: {
@@ -75,6 +88,20 @@ export interface ConcienciaTriadaModel {
   pctDireccion: number;
   etapaDominante: TriadaEstadoId | null;
   headline: string;
+  /** Plan ya ocurrido sin vehículo (línea). */
+  minutosHueco: number;
+  /** Plan que todavía no ocurre — no se puede convertir aún. */
+  minutosPlanFuturo: number;
+  /** Hilos que avanzan de verdad (el padre en interrupt no cuenta). */
+  hilosAvanzando: number;
+  /** ≥2 hilos independientes avanzando. El interrupt no califica. */
+  paraleloMeritorio: boolean;
+  /** Enfoque cubre la línea con el padre congelado. */
+  interruptCubreLinea: boolean;
+  /** Extra apilado mientras el paralelo meritorio está en juego. */
+  minutosParaleloEnJuego: number;
+  /** Extra de hilos que ya cerraron cumplido y se solaparon de verdad. */
+  minutosParaleloGanado: number;
 }
 
 export const EMPTY_TRIADA_MODEL: ConcienciaTriadaModel = {
@@ -89,20 +116,19 @@ export const EMPTY_TRIADA_MODEL: ConcienciaTriadaModel = {
   pctDireccion: 0,
   etapaDominante: null,
   headline: "Sin planificación — no hay conciencia que medir.",
+  minutosHueco: 0,
+  minutosPlanFuturo: 0,
+  hilosAvanzando: 0,
+  paraleloMeritorio: false,
+  interruptCubreLinea: false,
+  minutosParaleloEnJuego: 0,
+  minutosParaleloGanado: 0,
 };
 
-function skipsTriadaCoverage(vehicle: Pick<Vehicle, "autoVerdad" | "tipoFlota"> | null | undefined): boolean {
-  if (!vehicle) return true;
-  if (vehicle.autoVerdad) return true;
-  const flota = vehicle.tipoFlota;
-  return flota === "descanso" || flota === "verdad";
-}
-
-/** True si hay un vehículo consciente abierto (único caso que exige poll lento). */
+/** True si hay un hilo consciente avanzando (único caso que exige poll lento). */
 export function hasTriadaActiveVehicle(vehicles: Vehicle[]): boolean {
   for (let i = 0; i < vehicles.length; i++) {
-    const v = vehicles[i];
-    if (v && v.status === "activo" && !skipsTriadaCoverage(v)) return true;
+    if (isTriadaAdvancingVehicle(vehicles[i], vehicles)) return true;
   }
   return false;
 }
@@ -133,6 +159,10 @@ export function buildTriadaInputSig(
       active += 1;
       destMix = (destMix * 33 + (v.destinoCierre === "peldano" ? 3 : 1)) | 0;
       aperturaMix ^= v.aperturaAt ?? 0;
+      destMix = (destMix * 17 + (v.interrupcionActiva ? 5 : 0)) | 0;
+      aperturaMix ^= v.desglosadorPausa?.pausadoAt ?? 0;
+      aperturaMix ^= v.situacionNestedPause?.pausedAt ?? 0;
+      destMix = (destMix * 19 + (v.vehiculoPadreDesglosadorId ? 7 : 1)) | 0;
     } else {
       closedN += 1;
       const dur = typeof v.duracionFinal === "number" ? v.duracionFinal : 0;
@@ -152,7 +182,14 @@ export function triadaModelEquals(a: ConcienciaTriadaModel, b: ConcienciaTriadaM
     a.minutosInconsciente === b.minutosInconsciente &&
     a.minutosPresencia === b.minutosPresencia &&
     a.minutosDireccion === b.minutosDireccion &&
-    a.minutosPlan === b.minutosPlan
+    a.minutosPlan === b.minutosPlan &&
+    a.minutosHueco === b.minutosHueco &&
+    a.minutosPlanFuturo === b.minutosPlanFuturo &&
+    a.hilosAvanzando === b.hilosAvanzando &&
+    a.paraleloMeritorio === b.paraleloMeritorio &&
+    a.interruptCubreLinea === b.interruptCubreLinea &&
+    a.minutosParaleloEnJuego === b.minutosParaleloEnJuego &&
+    a.minutosParaleloGanado === b.minutosParaleloGanado
   );
 }
 
@@ -319,7 +356,7 @@ export function registrarCierreConcienciaTriada(
   return updated;
 }
 
-/** Minutos activos aún abiertos (no centinela), clasificados por destino. */
+/** Minutos de hilos que avanzan de verdad (padre en interrupt no suma hasta now). */
 export function accumulateActiveTriadaMinutos(
   vehicles: Vehicle[],
   now = Date.now()
@@ -327,7 +364,7 @@ export function accumulateActiveTriadaMinutos(
   let minutosPresencia = 0;
   let minutosDireccion = 0;
   for (const v of vehicles) {
-    if (skipsTriadaCoverage(v) || v.status !== "activo") continue;
+    if (!isTriadaAdvancingVehicle(v, vehicles)) continue;
     const apertura = v.aperturaAt ?? now;
     const elapsed = Math.max(0, (now - apertura) / 60_000);
     if (elapsed < 0.05) continue;
@@ -468,8 +505,8 @@ function dominante(
 }
 
 /**
- * Modelo vivo: 100% = plan del día. Presencia/dirección acumuladas (cierres + activos).
- * Inconsciente = resto del plan. Llamar solo en idle / sombra.
+ * Modelo vivo: 100% = plan del día (línea). Presencia/dirección = minutos únicos ocupados.
+ * Inconsciente = huecos + futuro. Llamar solo en idle / sombra.
  */
 export function buildConcienciaTriadaModel(params: {
   fecha?: string;
@@ -478,6 +515,13 @@ export function buildConcienciaTriadaModel(params: {
   minutosDireccionCerrados: number;
   minutosPresenciaActivos?: number;
   minutosDireccionActivos?: number;
+  minutosHueco?: number;
+  minutosPlanFuturo?: number;
+  hilosAvanzando?: number;
+  paraleloMeritorio?: boolean;
+  interruptCubreLinea?: boolean;
+  minutosParaleloEnJuego?: number;
+  minutosParaleloGanado?: number;
 }): ConcienciaTriadaModel {
   const fecha = params.fecha ?? getJournalDateString();
   const minutosPlan = Math.max(0, params.minutosPlan);
@@ -494,21 +538,40 @@ export function buildConcienciaTriadaModel(params: {
       Math.max(0, params.minutosDireccionCerrados) +
       Math.max(0, params.minutosDireccionActivos ?? 0),
   });
-  const { minutosInconsciente, minutosPresencia, minutosDireccion } = allocated;
+  let { minutosInconsciente, minutosPresencia, minutosDireccion } = allocated;
+  const minutosHueco = Math.max(0, params.minutosHueco ?? 0);
+  const minutosPlanFuturo = Math.max(0, params.minutosPlanFuturo ?? 0);
+  if (params.minutosHueco != null || params.minutosPlanFuturo != null) {
+    minutosInconsciente = Math.round((minutosHueco + minutosPlanFuturo) * 10) / 10;
+  }
   const { pctInconsciente, pctPresencia, pctDireccion } = roundPctTriplet(
     minutosInconsciente,
     minutosPresencia,
     minutosDireccion
   );
   const etapaDominante = dominante(minutosInconsciente, minutosPresencia, minutosDireccion);
+  const hilosAvanzando = Math.max(0, params.hilosAvanzando ?? 0);
+  const paraleloMeritorio = params.paraleloMeritorio === true;
+  const interruptCubreLinea = params.interruptCubreLinea === true;
+  const minutosParaleloEnJuego = Math.max(0, params.minutosParaleloEnJuego ?? 0);
+  const minutosParaleloGanado = Math.max(0, params.minutosParaleloGanado ?? 0);
 
   let headline: string;
   if (etapaDominante === "direccion") {
     headline = `Dominante Dirección · ${pctDireccion}% del plan.`;
   } else if (etapaDominante === "presencia") {
     headline = `Dominante Presencia · ${pctPresencia}% del plan — cubre, no dirige.`;
+  } else if (minutosPlanFuturo > 0 && minutosHueco > 0) {
+    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — huecos y lo que aún no ocurre.`;
+  } else if (minutosPlanFuturo > 0) {
+    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — incluye lo que aún no ocurre.`;
   } else {
     headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — horas asignadas sin convertir.`;
+  }
+  if (paraleloMeritorio) {
+    headline += " Paralelo en juego.";
+  } else if (interruptCubreLinea) {
+    headline += " Interrupt cubre la línea; no multiplica.";
   }
 
   return {
@@ -523,7 +586,43 @@ export function buildConcienciaTriadaModel(params: {
     pctDireccion,
     etapaDominante,
     headline,
+    minutosHueco,
+    minutosPlanFuturo,
+    hilosAvanzando,
+    paraleloMeritorio,
+    interruptCubreLinea,
+    minutosParaleloEnJuego,
+    minutosParaleloGanado,
   };
+}
+
+/** Idle: ocupación de línea desde vehículos + plan. No suma ledger apilado. */
+export function buildConcienciaTriadaFromVehicles(params: {
+  fecha?: string;
+  segmentos: { horaInicio?: string; horaFin?: string }[];
+  vehicles: Vehicle[];
+  now?: number;
+}): ConcienciaTriadaModel {
+  const fecha = params.fecha ?? getJournalDateString(params.now);
+  const occ = computeTriadaLineaOccupancy({
+    fecha,
+    segmentos: params.segmentos,
+    vehicles: params.vehicles,
+    now: params.now,
+  });
+  return buildConcienciaTriadaModel({
+    fecha,
+    minutosPlan: occ.minutosPlan,
+    minutosPresenciaCerrados: occ.minutosPresencia,
+    minutosDireccionCerrados: occ.minutosDireccion,
+    minutosHueco: occ.minutosHueco,
+    minutosPlanFuturo: occ.minutosPlanFuturo,
+    hilosAvanzando: occ.hilosAvanzando,
+    paraleloMeritorio: occ.paraleloMeritorio,
+    interruptCubreLinea: occ.interruptCubreLinea,
+    minutosParaleloEnJuego: occ.minutosParaleloEnJuego,
+    minutosParaleloGanado: occ.minutosParaleloGanado,
+  });
 }
 
 function labelFromFecha(fecha: string): string {

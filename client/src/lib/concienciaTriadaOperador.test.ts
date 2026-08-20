@@ -197,6 +197,36 @@ describe("concienciaTriadaOperador", () => {
     assert.equal(acc.minutosDireccion, 10);
   });
 
+  it("padre en interrupt no acumula minutos activos hasta now", () => {
+    const now = 1_000_000 + 20 * 60_000;
+    const vehicles = [
+      {
+        id: "padre",
+        status: "activo",
+        aperturaAt: 1_000_000,
+        destinoCierre: "peldano",
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: 1_000_000 + 5 * 60_000, subActivoId: "s1" },
+      },
+      {
+        id: "hijo",
+        status: "activo",
+        tipoFlota: "situacion",
+        aperturaAt: 1_000_000 + 5 * 60_000,
+        destinoCierre: "presencia",
+        vehiculoPadreDesglosadorId: "padre",
+      },
+    ] as unknown as Vehicle[];
+    const acc = accumulateActiveTriadaMinutos(vehicles, now);
+    assert.equal(acc.minutosDireccion, 0);
+    assert.equal(acc.minutosPresencia, 15);
+    assert.equal(hasTriadaActiveVehicle(vehicles), true);
+    assert.equal(
+      hasTriadaActiveVehicle([vehicles[0]]),
+      false
+    );
+  });
+
   it("cierres del día se leen de vehículos aunque el ledger esté vacío", () => {
     const cierreAt = Date.parse("2026-08-19T15:00:00-05:00");
     const vehicles = [
@@ -266,5 +296,27 @@ describe("concienciaTriadaOperador", () => {
       hasTriadaActiveVehicle([{ id: "x", status: "cumplido" } as Vehicle]),
       false
     );
+    const paused = [
+      {
+        id: "p",
+        status: "activo",
+        destinoCierre: "peldano",
+        aperturaAt: 1_000,
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: 1_500, subActivoId: "s" },
+      } as Vehicle,
+    ];
+    assert.equal(hasTriadaActiveVehicle(paused), false);
+    const withPause = [
+      vehicles[0],
+      {
+        id: "p",
+        status: "activo",
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: 2_000, subActivoId: "s" },
+      } as Vehicle,
+    ];
+    const sigPause = buildTriadaInputSig(segs, withPause);
+    assert.notEqual(sigPause, a);
   });
 });
