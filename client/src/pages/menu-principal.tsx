@@ -56,6 +56,7 @@ import {
   previewPlaneacionHref,
 } from "@/lib/previewOps";
 import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
+import { UMBRAL_MENU } from "@shared/umbralPricing";
 import { toast } from "sonner";
 import {
   auth,
@@ -143,6 +144,15 @@ function buildMenuItems(
       color: SPECTRUM.VERDE,
     });
   }
+
+  items.push({
+    id: UMBRAL_MENU.id,
+    title: UMBRAL_MENU.title,
+    subtitle: UMBRAL_MENU.subtitle,
+    icon: Zap,
+    route: UMBRAL_MENU.route,
+    color: UMBRAL_MENU.color,
+  });
 
   for (const mod of MODULOS_EN_CAMINO) {
     items.push({
@@ -1101,6 +1111,7 @@ export default function MenuPrincipal() {
               ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
                 ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
+              { icon: Zap, color: UMBRAL_MENU.color, route: UMBRAL_MENU.route, label: "Umbral" },
             ];
 
             return navItems.map((item) => (

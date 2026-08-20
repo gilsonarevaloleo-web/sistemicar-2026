@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 import {
   UMBRAL_SKU,
   UMBRAL_TRIAL_MAX_CODIGO,
+  UMBRAL_MENU,
+  UMBRAL_CONSOLE_PATH,
   esCodigoUmbralEnTrial,
+  isUmbralModulePath,
   requierePagoUmbral,
 } from "./umbralPricing.ts";
 import { modulesGrantedByPlan, hasUmbralAccess } from "./moduleAccess.ts";
@@ -35,5 +38,15 @@ describe("Umbral pricing + acceso", () => {
       hasUmbralAccess({ activeModules: ["planificacion_base"], email: "x@y.com" }),
       false,
     );
+  });
+
+  it("el menú apunta a la consola Forja + Arena", () => {
+    assert.equal(UMBRAL_MENU.route, UMBRAL_CONSOLE_PATH);
+    assert.equal(UMBRAL_CONSOLE_PATH, "/umbral/v2");
+    assert.match(UMBRAL_MENU.subtitle, /donde se encuentran/i);
+    assert.equal(isUmbralModulePath("/umbral/v2"), true);
+    assert.equal(isUmbralModulePath("/umbral/entrada"), true);
+    assert.equal(isUmbralModulePath("/umbral-leads"), false);
+    assert.equal(isUmbralModulePath("/espejo"), false);
   });
 });
