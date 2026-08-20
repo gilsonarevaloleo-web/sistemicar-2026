@@ -131,6 +131,14 @@ function buildMenuItems(
       route: "/espejo/v2",
       color: "#00FFC3",
     },
+    {
+      id: "umbral-v2",
+      title: "UMBRAL V2",
+      subtitle: "Consola · 10 Códigos · Espejo / Arena",
+      icon: Zap,
+      route: "/umbral/v2",
+      color: "#D4AF37",
+    },
   ];
 
   if (previewOps || hasPlanificacionBaseAccess(...accessArgs)) {
