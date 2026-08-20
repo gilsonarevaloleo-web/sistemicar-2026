@@ -31,6 +31,7 @@ import { isOwner } from "@/lib/owner";
 import { getUserEmail } from "@/lib/firebase";
 import { JORNADA_MODULE, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
+import { isUmbralModulePath, UMBRAL_MENU } from "@shared/umbralPricing";
 
 type NavItem = { path: string; icon: React.ElementType; label: string };
 
@@ -43,6 +44,9 @@ function isNavPathActive(location: string, itemPath: string): boolean {
       location === "/jornada-v3" ||
       location === "/planeacion-v3"
     );
+  }
+  if (itemPath === UMBRAL_MENU.route) {
+    return isUmbralModulePath(location);
   }
   return location === itemPath;
 }
@@ -123,6 +127,7 @@ export function Sidebar() {
   const baseNavItems: NavItem[] = [
     { path: "/menu", icon: Home, label: "Menú" },
     { path: "/espejo", icon: Terminal, label: "Espejo" },
+    { path: UMBRAL_MENU.route, icon: Zap, label: "Umbral" },
     { path: "/manuales", icon: BookOpen, label: "Manuales" },
     { path: "/pagos", icon: CreditCard, label: "Pagos" },
     { path: "/acerca", icon: Scroll, label: "Manifiesto" },
@@ -134,6 +139,7 @@ export function Sidebar() {
     { path: "/radar", icon: Radio, label: "Radar" },
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
     { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
+    { path: UMBRAL_MENU.route, icon: Zap, label: "Umbral" },
     { path: "/esperanza", icon: Sparkles, label: "Esperanza" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
     { path: "/rewards", icon: Trophy, label: "Beneficios" },
@@ -146,7 +152,6 @@ export function Sidebar() {
   const arquitectoLibrosItems: NavItem[] = [
     { path: "/manuales", icon: BookOpen, label: "Manuales" },
     { path: "/codice", icon: Shield, label: "Códice" },
-    { path: "/umbral", icon: Zap, label: "Umbral" },
   ];
 
   const navItems = esArquitecto ? [...arquitectoModuleItems, ...arquitectoLibrosItems] : baseNavItems;

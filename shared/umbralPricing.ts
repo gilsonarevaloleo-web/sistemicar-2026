@@ -56,6 +56,24 @@ export const UMBRAL_SKU: UmbralSku = {
   checkoutHref: "/pagos?plan=umbral",
 };
 
+/** Consola Forja + Arena (trial C1; paywall 2–10). */
+export const UMBRAL_CONSOLE_PATH = "/umbral/v2" as const;
+
+export const UMBRAL_MENU = {
+  id: "umbral",
+  title: "UMBRAL",
+  subtitle: "Donde se encuentran Forja y Arena",
+  route: UMBRAL_CONSOLE_PATH,
+  color: "#FF6B35",
+} as const;
+
+/** Rutas del módulo Umbral (no /umbral-leads). */
+export function isUmbralModulePath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return path === "/umbral" || path.startsWith("/umbral/");
+}
+
 export const UMBRAL_CHECKOUT_PLANS = ["umbral"] as const;
 
 /** ¿El código está dentro del trial gratuito? */
