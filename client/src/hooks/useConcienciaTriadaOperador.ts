@@ -4,21 +4,17 @@
  * Anti-freeze Dual Kernel:
  * - No tick 1s, no motor de conciencia, no pulso, no ms0.
  * - Firma O(n) numérica en render; suma del plan y localStorage solo en idle.
- * - Poll lento SOLO si hay vehículo consciente abierto.
+ * - Poll lento SOLO si hay un hilo consciente avanzando (no el padre en interrupt).
  * - No escribe disco si el modelo no cambió.
  * - No corre con la pestaña oculta.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  accumulateActiveTriadaMinutos,
-  buildConcienciaTriadaModel,
+  buildConcienciaTriadaFromVehicles,
   buildTriadaInputSig,
   EMPTY_TRIADA_MODEL,
-  getTriadaDayLedger,
   hasTriadaActiveVehicle,
   readTriadaSeriesLocal,
-  resolveTriadaClosedMinutos,
-  sumMinutosPlanDelDia,
   triadaModelEquals,
   upsertTriadaDaySnapshot,
   type ConcienciaTriadaModel,
@@ -95,17 +91,10 @@ export function useConcienciaTriadaOperador({
     const src = latestRef.current;
     const uid = src.userId;
     if (!uid) return;
-    const minutosPlan = sumMinutosPlanDelDia(src.segmentos);
-    const ledger = getTriadaDayLedger(uid, src.fecha);
-    const closed = resolveTriadaClosedMinutos(ledger, src.vehicles, src.fecha);
-    const active = accumulateActiveTriadaMinutos(src.vehicles);
-    const next = buildConcienciaTriadaModel({
+    const next = buildConcienciaTriadaFromVehicles({
       fecha: src.fecha,
-      minutosPlan,
-      minutosPresenciaCerrados: closed.minutosPresencia,
-      minutosDireccionCerrados: closed.minutosDireccion,
-      minutosPresenciaActivos: active.minutosPresencia,
-      minutosDireccionActivos: active.minutosDireccion,
+      segmentos: src.segmentos,
+      vehicles: src.vehicles,
     });
     if (triadaModelEquals(modelRef.current, next)) return;
     modelRef.current = next;
