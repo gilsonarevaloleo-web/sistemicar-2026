@@ -162,24 +162,49 @@ export function formatHuecoClock(ms: number): string {
 }
 
 export function formatHuecoDuration(startMs: number, endMs: number): string {
-  const min = Math.max(0, Math.round((endMs - startMs) / 60_000));
+  const min = huecoDurationMin(startMs, endMs);
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
+/** Minutos enteros de un corte (misma regla que el rótulo de cada fila). */
+export function huecoDurationMin(startMs: number, endMs: number): number {
+  return Math.max(0, Math.round((endMs - startMs) / 60_000));
+}
+
+/**
+ * Suma de cortes sin vehículo hoy.
+ * Misma cifra que debe mostrar el Pulso como inconsciente.
+ */
+export function sumCoberturaHuecosMinutes(
+  intervals: CoberturaHuecoInterval[],
+  now = Date.now()
+): number {
+  let total = 0;
+  for (const it of intervals) {
+    const end = it.open ? now : (it.endMs ?? now);
+    total += huecoDurationMin(it.startMs, end);
+  }
+  return total;
+}
+
 /**
  * Copy de cobertura (cortes sin vehículo). Distinto de puntualidad de puertas.
  */
 export function formatCoberturaHuecosSummary(
-  intervals: CoberturaHuecoInterval[]
+  intervals: CoberturaHuecoInterval[],
+  now = Date.now()
 ): string {
   const openCount = intervals.filter(i => i.open).length;
   const closedCount = intervals.length - openCount;
   if (intervals.length === 0) return "Sin cortes de cobertura hoy";
+  const total = sumCoberturaHuecosMinutes(intervals, now);
+  const totalPart =
+    total > 0 ? ` · ${formatHuecoDuration(0, total * 60_000)}` : "";
   if (openCount > 0) {
-    return `${intervals.length} corte${intervals.length === 1 ? "" : "s"} sin vehículo · 1 abierto`;
+    return `${intervals.length} corte${intervals.length === 1 ? "" : "s"} sin vehículo · 1 abierto${totalPart}`;
   }
-  return `${closedCount} corte${closedCount === 1 ? "" : "s"} sin vehículo`;
+  return `${closedCount} corte${closedCount === 1 ? "" : "s"} sin vehículo${totalPart}`;
 }

@@ -6,6 +6,7 @@ import {
   formatHuecoClock,
   formatHuecoDuration,
   readCoberturaHuecosEvents,
+  sumCoberturaHuecosMinutes,
   type CoberturaHuecoInterval,
 } from "@/jornada4/coberturaHuecosLog";
 import { J4_COLORS } from "./Jornada4Shell";
@@ -49,7 +50,10 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
   }, [reload, refreshKey]);
 
   const openCount = intervals.filter(i => i.open).length;
-  const summary = formatCoberturaHuecosSummary(intervals);
+  const summary = formatCoberturaHuecosSummary(intervals, now);
+  const totalMin = sumCoberturaHuecosMinutes(intervals, now);
+  const totalLabel =
+    totalMin > 0 ? formatHuecoDuration(0, totalMin * 60_000) : null;
 
   return (
     <section className="px-4 pb-3" data-testid="jornada4-huecos">
@@ -106,7 +110,17 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
                   Cortes sin vehículo. La tardanza a la hora de la puerta no entra aquí.
+                  El Pulso de arriba usa esta misma suma.
                 </p>
+                {totalLabel ? (
+                  <p
+                    className="text-[11px] font-black uppercase tracking-wider"
+                    style={{ color: INK }}
+                    data-testid="jornada4-huecos-total"
+                  >
+                    Total · {totalLabel} inconsciente
+                  </p>
+                ) : null}
                 {intervals
                 .slice()
                 .reverse()

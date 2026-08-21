@@ -1,5 +1,5 @@
 /**
- * Cache compartido del Pulso — bucket temporal + firma de entrada.
+ * Cache compartido del Pulso — bucket temporal + firma de entrada + suma de huecos.
  * Evita recalcular computeLiveEntropy en cada mount o tick UI.
  */
 import { isCoarseConcienciaDevice } from "@/lib/concienciaClock";
@@ -10,6 +10,11 @@ import {
   type PulsoSegmentoLite,
 } from "@/lib/pulsoCoberturaCompute";
 import type { Vehicle } from "@/lib/persistence";
+import {
+  buildCoberturaHuecoIntervals,
+  readCoberturaHuecosEvents,
+  sumCoberturaHuecosMinutes,
+} from "@/jornada4/coberturaHuecosLog";
 
 /** Desktop ~5s; móvil coarse ~10s — nunca 1s. */
 export function pulsoCacheBucketMs(): number {
@@ -35,8 +40,11 @@ export function getCachedPulsoCobertura(params: {
   const now = params.now ?? Date.now();
   const segmentoActivoId = params.segmentoActivoId ?? null;
   const bucket = Math.floor(now / pulsoCacheBucketMs());
+  const intervals = buildCoberturaHuecoIntervals(readCoberturaHuecosEvents(), now);
+  const huecosMin =
+    intervals.length > 0 ? sumCoberturaHuecosMinutes(intervals, now) : null;
   const sig = buildPulsoInputSig(params.segmentos, params.vehicles, segmentoActivoId);
-  const key = `${bucket}|${sig}`;
+  const key = `${bucket}|${sig}|h${huecosMin ?? "x"}`;
   if (cache?.key === key) return cache.model;
 
   const model = computePulsoCobertura({
@@ -44,6 +52,7 @@ export function getCachedPulsoCobertura(params: {
     vehicles: params.vehicles,
     segmentoActivoId,
     now,
+    huecosMin,
     applyMonotonic: params.applyMonotonic,
   });
   cache = { key, model };

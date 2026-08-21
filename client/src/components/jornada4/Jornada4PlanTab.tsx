@@ -58,6 +58,7 @@ export default function Jornada4PlanTab({
     vehicles,
     segmentoActivoId: segmentoActivo?.id ?? null,
     enabled: hasPlan,
+    huecosRefresh,
   });
 
   const badgeTick = useJornada4Tick(Boolean(planilla?.segmentos?.length));

@@ -188,4 +188,77 @@ describe("pulsoCoberturaCompute", () => {
       );
     }
   });
+
+  it("inconsciente usa la suma de huecos, no el resto del plan", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 6, 26, 12, 59);
+    const model = computePulsoCobertura({
+      segmentos: [
+        {
+          id: "s1",
+          nombre: "Almuerzo",
+          horaInicio: "05:30",
+          horaFin: "17:30",
+          estado: "activo",
+        },
+      ],
+      vehicles: [
+        baseVehicle({
+          id: "v1",
+          aperturaAt: limaAt(2026, 6, 26, 5, 50),
+          cierreAt: limaAt(2026, 6, 26, 12, 54),
+          status: "cumplido",
+          tipoFlota: "tiempo",
+        }),
+      ],
+      segmentoActivoId: "s1",
+      now,
+      huecosMin: 25,
+    });
+    assert.equal(model.entropiaMin, 25);
+    assert.equal(model.entropiaLabel, "25 min");
+    assert.ok(
+      model.conquistaMin > 360,
+      `mañana cubierta debe ser conquista, no ${model.conquistaMin}`
+    );
+    const remainingPlanMin = 17.5 * 60 - 5.5 * 60; // 05:30–17:30
+    assert.ok(
+      model.entropiaMin < remainingPlanMin / 4,
+      "no debe pintar la tarde futura como inconsciente"
+    );
+  });
+
+  it("sin huecos, el inconsciente es el corte vivido — no plan − conquista", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 6, 26, 12, 59);
+    const model = computePulsoCobertura({
+      segmentos: [
+        {
+          id: "s1",
+          nombre: "Almuerzo",
+          horaInicio: "05:30",
+          horaFin: "17:30",
+          estado: "activo",
+        },
+      ],
+      vehicles: [
+        baseVehicle({
+          id: "v1",
+          aperturaAt: limaAt(2026, 6, 26, 5, 30),
+          cierreAt: limaAt(2026, 6, 26, 12, 54),
+          status: "cumplido",
+          tipoFlota: "tiempo",
+        }),
+      ],
+      segmentoActivoId: "s1",
+      now,
+    });
+    // 12:54–12:59 sin vehículo ≈ 5 min vividos, no 4h 31m hasta 17:30.
+    assert.ok(
+      model.entropiaMin >= 4 && model.entropiaMin <= 12,
+      `entropía vivida ~5 min, no terreno futuro (${model.entropiaMin})`
+    );
+    assert.equal(model.needsLaunch, true);
+    assert.equal(model.consciousNow, false);
+  });
 });
