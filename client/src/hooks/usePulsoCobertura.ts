@@ -22,6 +22,8 @@ export type UsePulsoCoberturaParams = {
   vehicles: Vehicle[];
   segmentoActivoId?: string | null;
   enabled?: boolean;
+  /** Bump tras launch/cierre para releer la suma de huecos. */
+  huecosRefresh?: number;
 };
 
 function scheduleIdle(run: () => void, timeoutMs: number): () => void {
@@ -38,6 +40,7 @@ export function usePulsoCobertura({
   vehicles,
   segmentoActivoId = null,
   enabled = true,
+  huecosRefresh = 0,
 }: UsePulsoCoberturaParams): PulsoCoberturaModel {
   const [model, setModel] = useState<PulsoCoberturaModel>(EMPTY_PULSO_MODEL);
   const genRef = useRef(0);
@@ -45,8 +48,8 @@ export function usePulsoCobertura({
   latestRef.current = { segmentos, vehicles, segmentoActivoId };
 
   const inputSig = useMemo(
-    () => buildPulsoInputSig(segmentos, vehicles, segmentoActivoId),
-    [segmentos, vehicles, segmentoActivoId]
+    () => `${buildPulsoInputSig(segmentos, vehicles, segmentoActivoId)}|h${huecosRefresh}`,
+    [segmentos, vehicles, segmentoActivoId, huecosRefresh]
   );
 
   useEffect(() => {

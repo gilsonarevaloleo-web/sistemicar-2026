@@ -1,7 +1,8 @@
 /**
  * Pulso de cobertura — métrica lite de conciencia (conquista vs inconsciente).
  * Solo existe dentro de la planificación del día: sin segmentos = sin pulso (ruido).
- * Usa computeLiveEntropy (sin arcos SVG / horizonte). Prohibido en ms0 de gestos.
+ * Inconsciente = cortes vividos sin vehículo (mismo idioma que Huecos), nunca el
+ * terreno futuro del plan ni el piso monótono del anillo. Prohibido en ms0 de gestos.
  */
 import {
   computeLiveEntropy,
@@ -110,7 +111,12 @@ export function computePulsoCobertura(params: {
   vehicles: Vehicle[];
   segmentoActivoId?: string | null;
   now?: number;
-  /** Solo tests: evita piso monótono en localStorage. */
+  /**
+   * Suma de cortes sin vehículo (Huecos). Si hay cifras, el Pulso las usa
+   * como inconsciente — no el reloj de terreno futuro del anillo.
+   */
+  huecosMin?: number | null;
+  /** @deprecated El pulso ya no aplica piso monótono; se ignora. */
   applyMonotonic?: boolean;
 }): PulsoCoberturaModel {
   const now = params.now ?? Date.now();
@@ -123,17 +129,22 @@ export function computePulsoCobertura(params: {
     return { ...EMPTY_PULSO_MODEL, computedAt: now };
   }
 
+  // Sin piso monótono ni reloj de hueco: esos caminos pintan el resto del plan
+  // (plan − conquista) como inconsciente cuando no hay vehículo ahora.
   const timeline = computeLiveEntropy({
     segmentos,
     vehiculos: vehicles,
     now,
-    applyMonotonic: params.applyMonotonic,
+    applyMonotonic: false,
   });
 
   const conquistaMin = timeline.dayStats.conquistaMin;
-  // Techo duro: solo el terreno planificado no conquistado puede ser inconsciente.
-  const entropiaCap = Math.max(0, plannedMin - conquistaMin);
-  const entropiaMin = Math.min(timeline.dayStats.entropiaMin, entropiaCap);
+  const huecosMin = params.huecosMin;
+  const livedEntropy = Math.max(0, timeline.dayStats.entropiaMin);
+  const entropiaMin =
+    huecosMin != null && Number.isFinite(huecosMin)
+      ? Math.max(0, huecosMin)
+      : livedEntropy;
   const fought = conquistaMin + entropiaMin;
   const coberturaPct =
     fought > 0 ? Math.min(100, Math.round((conquistaMin / fought) * 100)) : 0;

@@ -7,6 +7,7 @@ import {
   formatCoberturaHuecosSummary,
   reconcileCoberturaHuecos,
   readCoberturaHuecosEvents,
+  sumCoberturaHuecosMinutes,
   COBERTURA_HUECOS_KEY,
 } from "./coberturaHuecosLog.ts";
 import type { Vehicle } from "../lib/persistence.ts";
@@ -102,6 +103,17 @@ describe("coberturaHuecosLog", () => {
     assert.equal(formatHuecoDuration(0, 90 * 60_000), "1h 30min");
   });
 
+  it("suma los cortes con la misma regla de cada fila", () => {
+    const t0 = Date.now();
+    const intervals = [
+      { startMs: t0, endMs: t0 + 5 * 60_000, open: false as const },
+      { startMs: t0, endMs: t0 + 16 * 60_000, open: false as const },
+      { startMs: t0, endMs: t0 + 3 * 60_000, open: false as const },
+      { startMs: t0, endMs: t0 + 1 * 60_000, open: false as const },
+    ];
+    assert.equal(sumCoberturaHuecosMinutes(intervals, t0), 25);
+  });
+
   it("summary habla de cortes sin vehículo, no de impuntualidad", () => {
     assert.equal(formatCoberturaHuecosSummary([]), "Sin cortes de cobertura hoy");
     const closed = [
@@ -112,5 +124,9 @@ describe("coberturaHuecosLog", () => {
     const open = [{ startMs: 1, endMs: null, open: true as const }];
     assert.match(formatCoberturaHuecosSummary(open), /sin vehículo/);
     assert.doesNotMatch(formatCoberturaHuecosSummary(closed), /hueco|puntual/i);
+    const withMinutes = [
+      { startMs: 0, endMs: 25 * 60_000, open: false as const },
+    ];
+    assert.match(formatCoberturaHuecosSummary(withMinutes), /25 min/);
   });
 });

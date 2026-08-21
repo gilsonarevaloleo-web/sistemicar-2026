@@ -47,7 +47,7 @@ export const PulsoCobertura = memo(function PulsoCobertura({
   const hint = model.consciousNow
     ? "Hay vehículo cubriendo conciencia ahora."
     : model.needsLaunch
-      ? "Segmento activo sin vehículo — el tiempo planificado se vuelve inconsciente."
+      ? "Sin vehículo ahora. El inconsciente son los cortes de cobertura, no el resto del plan."
       : "Sin cobertura consciente en este instante.";
 
   return (
