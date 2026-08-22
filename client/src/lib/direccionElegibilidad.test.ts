@@ -11,6 +11,7 @@ import {
   resolveClaimDestinoCierre,
   resolveRumboTrasEnvio,
   riesgoEnsuciarProyecto,
+  rumboChipLabel,
   type DireccionPeldanoRef,
 } from "./direccionElegibilidad.ts";
 
@@ -35,31 +36,39 @@ describe("direccionElegibilidad", () => {
     assert.match(noPuedesLlegarADireccion(gate), /No puedes llegar a Dirección porque todavía/);
   });
 
-  it("oleada sin puntos: todavía no hay foco", () => {
+  it("oleada sin puntos: todavía no hay punto de producción", () => {
     const gate = evaluateDireccionElegibilidad(PROY, [oleada([])]);
     assert.equal(gate.ok, false);
     assert.equal(gate.gap, "sin_foco");
-    assert.match(gate.porqueTodavia, /todavía no hay foco/);
+    assert.match(gate.porqueTodavia, /todavía no hay punto de producción/);
   });
 
-  it("oleada con puntos cerrados: todavía no hay siguiente foco", () => {
-    const a = { ...createOleadaPunto("A", 1), status: "cumplido" as const };
-    const b = { ...createOleadaPunto("B", 2), status: "fallado" as const };
-    const gate = evaluateDireccionElegibilidad(PROY, [oleada([a, b])]);
-    assert.equal(gate.ok, false);
-    assert.equal(gate.gap, "sin_foco");
-    assert.match(gate.porqueTodavia, /siguiente foco/);
+  it("oleada con puntos cerrados: Dirección sigue abierta — el timón no caduca", () => {
+    const a = { ...createOleadaPunto("negro small", 1), status: "cumplido" as const };
+    const b = { ...createOleadaPunto("rojo small", 2), status: "fallado" as const };
+    const gate = evaluateDireccionElegibilidad(PROY, [
+      { ...oleada([a, b]), puntoProduccionId: a.id },
+    ]);
+    assert.equal(gate.ok, true);
+    assert.equal(gate.gap, null);
+    assert.equal(gate.puntoProduccionId, a.id);
+    assert.equal(gate.puntoProduccionTitulo, "negro small");
+    assert.match(gate.riesgoEnsuciar, /amontonan/);
+    assert.match(gate.riesgoEnsuciar, /negro small/);
   });
 
-  it("oleada + foco abre Dirección y nombra el riesgo de ensuciar", () => {
+  it("oleada + punto abre Dirección y nombra dónde se amontonan los envíos", () => {
     const foco = createOleadaPunto("Corte de patrón", 1);
     const gate = evaluateDireccionElegibilidad(PROY, [oleada([foco])]);
     assert.equal(gate.ok, true);
     assert.equal(gate.gap, null);
     assert.equal(noPuedesLlegarADireccion(gate), "");
-    assert.match(gate.riesgoEnsuciar, /Costura/);
-    assert.match(gate.riesgoEnsuciar, /ensucia/);
+    assert.equal(gate.puntoProduccionId, foco.id);
+    assert.equal(gate.puntoProduccionTitulo, "Corte de patrón");
+    assert.match(gate.riesgoEnsuciar, /amontonan/);
+    assert.match(gate.riesgoEnsuciar, /Corte de patrón/);
     assert.match(riesgoEnsuciarProyecto("Costura"), /escalera/);
+    assert.equal(rumboChipLabel(gate), "Costura · Corte de patrón");
   });
 
   it("mapDireccionGates separa abiertas de huecos", () => {
@@ -132,12 +141,14 @@ describe("direccionElegibilidad", () => {
     assert.match(r.copy, /presencia/);
     assert.match(r.copy, /todavía/);
 
-    const abierto = evaluateDireccionElegibilidad(PROY, [oleada([createOleadaPunto("F", 1)])]);
+    const punto = createOleadaPunto("F", 1);
+    const abierto = evaluateDireccionElegibilidad(PROY, [oleada([punto])]);
     const d = resolveRumboTrasEnvio({ nidoProyectoId: "p1", gate: abierto });
     assert.equal(d.stampVehicle, true);
     assert.equal(d.destinoCierre, "peldano");
     assert.equal(d.proyectoId, "p1");
-    assert.match(d.copy, /ensucia/);
+    assert.equal(d.oleadaPuntoId, punto.id);
+    assert.match(d.copy, /amontonan/);
   });
 
   it("sin proyecto: copy de hueco", () => {

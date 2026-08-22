@@ -11,6 +11,7 @@ import {
   DIRECCION_SIN_PROYECTO,
   noPuedesLlegarADireccion,
   resolveClaimDestinoCierre,
+  rumboChipLabel,
 } from "@/lib/direccionElegibilidad";
 import { useDireccionGates } from "@/hooks/useDireccionGates";
 
@@ -41,7 +42,7 @@ function ackGestoTap() {
 /**
  * Presencia vs Dirección.
  * Presencia: un toque, siempre abierta.
- * Dirección: no es un gemelo clickeable. Si no hay oleada+foco, el toque
+ * Dirección: no es un gemelo clickeable. Si no hay oleada+punto, el toque
  * enseña el hueco — no pinta oro.
  */
 export function DestinoCierreToggle({
@@ -304,7 +305,7 @@ export function DestinoCierreToggle({
                 aria-pressed={active}
                 data-testid={`destino-proyecto-${g.proyectoId}`}
               >
-                {g.titulo}
+                {rumboChipLabel(g)}
               </button>
             );
           })}

@@ -3,21 +3,30 @@
  *
  * Presencia cubre el día — siempre abierta, envío rápido, no ensucia la escalera.
  * Dirección (Norte / peldaño) no se reclama con un clic: solo abre si el proyecto
- * tiene oleada activa y un foco de producción. Si no, el operador siente:
+ * tiene oleada activa y un punto de producción. El punto no caduca con el día
+ * ni con un cierre: los envíos se amontonan ahí hasta que el operador cambia
+ * el timón. Si no hay rumbo, el operador siente:
  * «No puedes llegar a Dirección porque todavía…»
  *
  * Vincular un proyectoId no es Dirección. El ego no puede comprar Norte.
  */
 import type { DestinoCierre } from "./destinoCierre";
-import type { OleadaPuntoStatus } from "./oleadaPuntos";
+import { resolvePuntoProduccion, type OleadaPuntoStatus } from "./oleadaPuntos";
 
 export type DireccionGapId = "sin_proyecto" | "sin_oleada" | "sin_foco";
 
 export type DireccionPeldanoRef = {
   estado: "idea" | "en_curso" | "conquistado";
   origenSegmento?: boolean;
-  oleadaPuntos?: Array<{ status: OleadaPuntoStatus }>;
+  oleadaPuntos?: Array<{
+    id?: string;
+    titulo?: string;
+    status: OleadaPuntoStatus;
+    numero?: number;
+    createdAt?: number;
+  }>;
   titulo?: string;
+  puntoProduccionId?: string;
 };
 
 export type DireccionProyectoRef = {
@@ -34,6 +43,9 @@ export type DireccionGate = {
   /** Empieza por «todavía…» cuando hay hueco. */
   porqueTodavia: string;
   riesgoEnsuciar: string;
+  /** Timón: a dónde se amontonan los envíos. No caduca. */
+  puntoProduccionId?: string;
+  puntoProduccionTitulo?: string;
 };
 
 export const DIRECCION_SIN_PROYECTO: DireccionGate = {
@@ -55,6 +67,18 @@ export function noPuedesLlegarADireccion(
 export function riesgoEnsuciarProyecto(titulo: string): string {
   const name = titulo.trim() || "este proyecto";
   return `Mandar un vehículo a «${name}» entra a la escalera. Si no es el foco, ensucia el proyecto.`;
+}
+
+export function riesgoAmontonarEnPunto(puntoTitulo: string): string {
+  const name = puntoTitulo.trim() || "este punto";
+  return `Los envíos se amontonan en «${name}» hasta que cambies el punto de producción.`;
+}
+
+export function rumboChipLabel(
+  gate: Pick<DireccionGate, "titulo" | "puntoProduccionTitulo">
+): string {
+  const punto = gate.puntoProduccionTitulo?.trim();
+  return punto ? `${gate.titulo} · ${punto}` : gate.titulo;
 }
 
 /** Oleada real de dirección: en curso y no sombra de segmento del día. */
@@ -82,21 +106,28 @@ export function evaluateDireccionElegibilidad(
   }
 
   const puntos = oleada.oleadaPuntos ?? [];
-  const foco = puntos.find(p => p.status === "avance") ?? puntos.find(p => p.status === "propuesta");
-  if (!foco) {
-    const porqueTodavia =
-      puntos.length === 0
-        ? "todavía no hay foco — desglosa la oleada"
-        : "todavía no hay un siguiente foco en la oleada";
+  if (puntos.length === 0) {
     return {
       proyectoId: proyecto.id,
       titulo,
       ok: false,
       gap: "sin_foco",
-      porqueTodavia,
+      porqueTodavia: "todavía no hay punto de producción — desglosa la oleada",
       riesgoEnsuciar: riesgoEnsuciarProyecto(titulo),
     };
   }
+
+  const pin = resolvePuntoProduccion({
+    puntoProduccionId: oleada.puntoProduccionId,
+    oleadaPuntos: puntos.map((p, i) => ({
+      id: p.id ?? `op_${i}`,
+      numero: p.numero ?? i + 1,
+      titulo: p.titulo ?? "",
+      status: p.status,
+      createdAt: p.createdAt ?? i,
+      updatedAt: p.createdAt ?? i,
+    })),
+  });
 
   return {
     proyectoId: proyecto.id,
@@ -104,7 +135,9 @@ export function evaluateDireccionElegibilidad(
     ok: true,
     gap: null,
     porqueTodavia: "",
-    riesgoEnsuciar: riesgoEnsuciarProyecto(titulo),
+    riesgoEnsuciar: riesgoAmontonarEnPunto(pin?.titulo ?? "este punto"),
+    puntoProduccionId: pin?.id,
+    puntoProduccionTitulo: pin?.titulo,
   };
 }
 
@@ -121,7 +154,7 @@ export function direccionAbiertas(gates: DireccionGate[]): DireccionGate[] {
 
 /**
  * Sellar peldaño al lanzar solo si hay dirección viva.
- * Lista libre y rumbo sin oleada/foco quedan en presencia.
+ * Lista libre y rumbo sin oleada/punto quedan en presencia.
  */
 export function destinoCierreAlLanzarConGate(opts: {
   esListaLibre: boolean;
@@ -137,6 +170,7 @@ export type RumboTrasEnvio = {
   stampVehicle: boolean;
   destinoCierre: DestinoCierre;
   proyectoId?: string;
+  oleadaPuntoId?: string;
   copy: string;
 };
 
@@ -167,6 +201,7 @@ export function resolveRumboTrasEnvio(opts: {
     stampVehicle: true,
     destinoCierre: "peldano",
     proyectoId: nido,
+    oleadaPuntoId: opts.gate.puntoProduccionId,
     copy: opts.gate.riesgoEnsuciar,
   };
 }
