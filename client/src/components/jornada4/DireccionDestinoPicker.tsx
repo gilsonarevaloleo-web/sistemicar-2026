@@ -2,7 +2,7 @@ import { Compass, Eye } from "lucide-react";
 import { useAuthContext } from "@/App";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { useDireccionGates } from "@/hooks/useDireccionGates";
-import { noPuedesLlegarADireccion } from "@/lib/direccionElegibilidad";
+import { noPuedesLlegarADireccion, rumboChipLabel } from "@/lib/direccionElegibilidad";
 import type { Proyecto } from "@/lib/proyectos";
 
 const GOLD = "#D4AF37";
@@ -28,7 +28,7 @@ type Props = {
 
 /**
  * Elige rumbo rápido: Presencia (un toque) o chips de Dirección abierta.
- * Proyectos sin oleada/foco se ven — no se eligen — para sentir el hueco.
+ * Proyectos sin oleada/punto se ven — no se eligen — para sentir el hueco.
  */
 export function DireccionDestinoPicker({
   value,
@@ -129,7 +129,7 @@ export function DireccionDestinoPicker({
             >
               <Compass size={11} style={{ color: GOLD }} />
               <span className="text-[9px] font-black uppercase tracking-wider truncate" style={{ color: GOLD }}>
-                {g.titulo}
+                {rumboChipLabel(g)}
               </span>
             </button>
           );
@@ -145,7 +145,7 @@ export function DireccionDestinoPicker({
           {noPuedesLlegarADireccion(
             cerradas[0] ?? {
               ok: false,
-              porqueTodavia: "todavía no hay oleada con foco",
+              porqueTodavia: "todavía no hay oleada con punto de producción",
             }
           )}{" "}
           {hubLink}

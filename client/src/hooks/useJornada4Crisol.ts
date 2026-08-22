@@ -336,6 +336,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
         if (rumbo.stampVehicle) {
           patch.proyectoId = rumbo.proyectoId;
           patch.destinoCierre = rumbo.destinoCierre;
+          if (rumbo.oleadaPuntoId) patch.oleadaPuntoId = rumbo.oleadaPuntoId;
         }
       }
 
