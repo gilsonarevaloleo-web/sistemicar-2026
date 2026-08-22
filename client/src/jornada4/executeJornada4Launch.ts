@@ -51,12 +51,18 @@ export type ExecuteJornada4LaunchParams = Omit<ExecuteFlotaLaunchParams, "form">
   form: Jornada4LaunchForm;
 };
 
-function proyectoDireccionAbierta(userId: string, proyectoId: string | undefined): boolean {
+function resolveDireccionLaunch(
+  userId: string,
+  proyectoId: string | undefined,
+  explicitPuntoId?: string
+): { abierta: boolean; oleadaPuntoId?: string } {
   const id = proyectoId?.trim();
-  if (!id) return false;
+  if (!id) return { abierta: false };
   const p = getProyectosLocal(userId).find(x => x.id === id);
-  if (!p) return false;
-  return evaluateDireccionElegibilidad(p, getPeldanosByProyectoLocal(userId, id)).ok;
+  if (!p) return { abierta: false };
+  const gate = evaluateDireccionElegibilidad(p, getPeldanosByProyectoLocal(userId, id));
+  const oleadaPuntoId = explicitPuntoId?.trim() || gate.puntoProduccionId;
+  return { abierta: gate.ok, oleadaPuntoId };
 }
 
 /**
@@ -102,6 +108,7 @@ export async function executeJornada4Launch(
     let lastId: string | null = null;
     for (const task of tasks) {
       const pid = task.proyectoId?.trim() || baseForm.proyectoId?.trim();
+      const rumbo = resolveDireccionLaunch(userId, pid, baseForm.oleadaPuntoId);
       const id = await executeFlotaLaunch({
         ...rest,
         userId,
@@ -113,11 +120,9 @@ export async function executeJornada4Launch(
           modo: "desglose",
           desglosadorSubs: [task],
           ...(pid ? { proyectoId: pid } : {}),
-          ...(proyectoDireccionAbierta(userId, pid) ? { destinoCierre: "peldano" as const } : {}),
+          ...(rumbo.abierta ? { destinoCierre: "peldano" as const } : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
-          ...(baseForm.oleadaPuntoId?.trim()
-            ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
-            : {}),
+          ...(rumbo.oleadaPuntoId ? { oleadaPuntoId: rumbo.oleadaPuntoId } : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
@@ -167,6 +172,7 @@ export async function executeJornada4Launch(
     let lastId: string | null = null;
     for (const task of toLaunch) {
       const pid = task.proyectoId?.trim() || baseForm.proyectoId?.trim();
+      const rumbo = resolveDireccionLaunch(userId, pid, baseForm.oleadaPuntoId);
       const id = await executeFlotaLaunch({
         ...rest,
         userId,
@@ -186,11 +192,9 @@ export async function executeJornada4Launch(
             },
           ],
           ...(pid ? { proyectoId: pid } : {}),
-          ...(proyectoDireccionAbierta(userId, pid) ? { destinoCierre: "peldano" as const } : {}),
+          ...(rumbo.abierta ? { destinoCierre: "peldano" as const } : {}),
           ...(baseForm.peldanoId?.trim() ? { peldanoId: baseForm.peldanoId.trim() } : {}),
-          ...(baseForm.oleadaPuntoId?.trim()
-            ? { oleadaPuntoId: baseForm.oleadaPuntoId.trim() }
-            : {}),
+          ...(rumbo.oleadaPuntoId ? { oleadaPuntoId: rumbo.oleadaPuntoId } : {}),
           ...(ancladoAlSegmento === true ? { ancladoAlSegmento: true } : {}),
         },
       });
@@ -269,7 +273,8 @@ export async function executeJornada4Launch(
   }
 
   const explicitProyectoId = baseForm.proyectoId?.trim();
-  const direccionAbierta = proyectoDireccionAbierta(userId, explicitProyectoId);
+  const rumbo = resolveDireccionLaunch(userId, explicitProyectoId, baseForm.oleadaPuntoId);
+  const direccionAbierta = rumbo.abierta;
 
   const destinoCierreSituacion =
     baseForm.tipoFlota === "situacion"
@@ -296,6 +301,7 @@ export async function executeJornada4Launch(
       ...(situacionLaunchSeed ? { situacionLaunchSeed } : {}),
       ...(destinoCierreSituacion ? { destinoCierre: destinoCierreSituacion } : {}),
       ...(destinoCierreConquista ? { destinoCierre: destinoCierreConquista } : {}),
+      ...(rumbo.oleadaPuntoId ? { oleadaPuntoId: rumbo.oleadaPuntoId } : {}),
       ...(baseForm.tipoFlota === "tiempo" && ancladoAlSegmento === true
         ? { ancladoAlSegmento: true }
         : {}),

@@ -1,7 +1,7 @@
 /**
  * Destino del cierre consciente.
  * - presencia: cubre el día / disciplina / PS — no ensucia la escalera del Hub.
- * - peldano: Dirección (Norte). Solo si el proyecto tiene oleada + foco.
+ * - peldano: Dirección (Norte). Solo si el proyecto tiene oleada + punto de producción.
  *
  * Por defecto: presencia. Dirección no se reclama con un clic de ego.
  */
@@ -29,7 +29,7 @@ export const DESTINO_CIERRE_COPY = {
   },
   peldano: {
     label: "Dirección",
-    hint: "Solo con oleada y foco. Si no es el rumbo, ensucia.",
+    hint: "Oleada + punto de producción. Los envíos se amontonan ahí.",
     short: "Norte",
   },
 } as const;

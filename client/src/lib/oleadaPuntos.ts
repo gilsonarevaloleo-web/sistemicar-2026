@@ -46,9 +46,43 @@ export function renumberOleadaPuntos(puntos: OleadaPunto[]): OleadaPunto[] {
 }
 
 /**
- * Foco mental: el punto donde la propuesta aún no ha tomado control.
- * Prefiere avance activo; si no, la primera propuesta; ignora cumplidos/fallados.
+ * Punto de producción = timón.
+ * No caduca con el día ni con un cierre. Los envíos se amontonan aquí
+ * hasta que el operador marca otro punto (cambio consciente de dirección).
  */
+export function resolvePuntoProduccion(oleada: {
+  puntoProduccionId?: string | null;
+  oleadaPuntos?: Array<Pick<OleadaPunto, "id" | "numero" | "titulo" | "status" | "createdAt">>;
+}): OleadaPunto | null {
+  const puntos = sortOleadaPuntos((oleada.oleadaPuntos ?? []) as OleadaPunto[]);
+  if (puntos.length === 0) return null;
+  const pin = oleada.puntoProduccionId?.trim();
+  if (pin) {
+    const hit = puntos.find(p => p.id === pin);
+    if (hit) return hit;
+  }
+  return puntos[0] ?? null;
+}
+
+export function nextPuntoProduccionIdAfterDelete(
+  oleada: { puntoProduccionId?: string | null; oleadaPuntos?: OleadaPunto[] },
+  deletedId: string
+): string | undefined {
+  const remaining = sortOleadaPuntos(oleada.oleadaPuntos ?? []).filter(p => p.id !== deletedId);
+  if (remaining.length === 0) return undefined;
+  if (oleada.puntoProduccionId && oleada.puntoProduccionId !== deletedId) {
+    return oleada.puntoProduccionId;
+  }
+  return remaining[0]?.id;
+}
+
+/** Un cierre de vehículo no conquista el punto: solo señala que hay producción. */
+export function capSintoniaDesdeProduccion(sugerido: OleadaPuntoStatus): OleadaPuntoStatus {
+  if (sugerido === "cumplido" || sugerido === "fallado") return "avance";
+  return sugerido;
+}
+
+/** @deprecated Preferir resolvePuntoProduccion — el timón no caduca al cumplir un día. */
 export function getFocoOleadaPunto(puntos: OleadaPunto[]): OleadaPunto | null {
   const sorted = sortOleadaPuntos(puntos);
   const avance = sorted.find(p => p.status === "avance");

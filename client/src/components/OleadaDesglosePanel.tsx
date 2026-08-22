@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Plus, Target, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getFocoOleadaPunto,
   nextOleadaPuntoStatus,
   OLEADA_PUNTO_STATUS_LABEL,
+  resolvePuntoProduccion,
   summarizeOleadaPuntos,
   type OleadaPunto,
   type OleadaPuntoStatus,
@@ -19,6 +19,7 @@ const STATUS_COLOR: Record<OleadaPuntoStatus, string> = {
 
 type Props = {
   puntos: OleadaPunto[];
+  puntoProduccionId?: string;
   tint: string;
   disabled?: boolean;
   onAdd: (titulo: string) => Promise<void> | void;
@@ -26,6 +27,7 @@ type Props = {
   onCycleStatus: (puntoId: string, next: OleadaPuntoStatus) => Promise<void> | void;
   onDelete: (puntoId: string) => Promise<void> | void;
   onReorder: (puntoId: string, direction: "up" | "down") => Promise<void> | void;
+  onSetPuntoProduccion: (puntoId: string) => Promise<void> | void;
 };
 
 function PuntoTituloInput({
@@ -65,11 +67,12 @@ function PuntoTituloInput({
 }
 
 /**
- * Desglose de oleada = propuesta futura editable.
- * La producción solo sintoniza el estatus; aquí reordenas la mente sin obligación rígida.
+ * Desglose de oleada = puntos de producción.
+ * El pin es el timón: los envíos se amontonan ahí hasta un cambio consciente.
  */
 export function OleadaDesglosePanel({
   puntos,
+  puntoProduccionId,
   tint,
   disabled = false,
   onAdd,
@@ -77,10 +80,11 @@ export function OleadaDesglosePanel({
   onCycleStatus,
   onDelete,
   onReorder,
+  onSetPuntoProduccion,
 }: Props) {
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
-  const foco = getFocoOleadaPunto(puntos);
+  const pin = resolvePuntoProduccion({ puntoProduccionId, oleadaPuntos: puntos });
   const summary = summarizeOleadaPuntos(puntos);
 
   const handleAdd = async () => {
@@ -107,11 +111,11 @@ export function OleadaDesglosePanel({
             className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5"
             style={{ color: tint }}
           >
-            <Target size={12} /> Desglose de oleada
+            <Target size={12} /> Punto de producción
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
-            Propuesta futura — se sintoniza con la producción. Edita o borra libremente; no es orden
-            rígido de cumplimiento.
+            Timón de la oleada. No caduca con el día. Los envíos se amontonan aquí hasta que
+            marques otro punto — un cambio consciente de dirección.
           </p>
         </div>
         {summary.total > 0 ? (
@@ -121,37 +125,40 @@ export function OleadaDesglosePanel({
         ) : null}
       </div>
 
-      {foco ? (
+      {pin ? (
         <div
           className="px-2.5 py-2 rounded-lg"
           style={{ backgroundColor: `${tint}10`, border: `1px solid ${tint}28` }}
           data-testid="hub-oleada-foco"
         >
-          <p className="text-[8px] uppercase tracking-widest text-slate-500 mb-0.5">Foco ahora</p>
+          <p className="text-[8px] uppercase tracking-widest text-slate-500 mb-0.5">
+            Produciendo aquí
+          </p>
           <p className="text-[12px] font-semibold text-white leading-snug">
-            <span style={{ color: tint }}>{foco.numero}.</span> {foco.titulo}
+            <span style={{ color: tint }}>{pin.numero}.</span> {pin.titulo}
           </p>
         </div>
       ) : null}
 
       {puntos.length === 0 ? (
         <p className="text-[10px] text-slate-600 py-1" data-testid="hub-oleada-desglose-vacio">
-          Aún no hay puntos. Enumera la dirección de producción. Sin foco, los vehículos no llegan a Dirección.
+          Aún no hay puntos. Enumera el desglose (ej. color negro small). Sin punto de
+          producción, los vehículos no llegan a Dirección.
         </p>
       ) : (
         <ul className="space-y-1.5" data-testid="hub-oleada-puntos-lista">
           {puntos.map((p, idx) => {
-            const isFoco = foco?.id === p.id;
+            const isPin = pin?.id === p.id;
             const color = STATUS_COLOR[p.status];
             return (
               <li
                 key={p.id}
                 className={cn(
                   "rounded-lg px-2 py-1.5 flex items-start gap-1.5",
-                  isFoco ? "bg-white/[0.04]" : "bg-transparent"
+                  isPin ? "bg-white/[0.04]" : "bg-transparent"
                 )}
                 style={{
-                  border: `1px solid ${isFoco ? `${tint}35` : "rgba(255,255,255,0.08)"}`,
+                  border: `1px solid ${isPin ? `${tint}35` : "rgba(255,255,255,0.08)"}`,
                 }}
                 data-testid={`hub-oleada-punto-${p.numero}`}
               >
@@ -180,7 +187,7 @@ export function OleadaDesglosePanel({
 
                 <span
                   className="text-[11px] font-black tabular-nums pt-1.5 w-4 shrink-0"
-                  style={{ color: isFoco ? tint : "#64748b" }}
+                  style={{ color: isPin ? tint : "#64748b" }}
                 >
                   {p.numero}
                 </span>
@@ -191,21 +198,43 @@ export function OleadaDesglosePanel({
                     disabled={disabled}
                     onCommit={titulo => void onUpdateTitulo(p.id, titulo)}
                   />
-                  <button
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => void onCycleStatus(p.id, nextOleadaPuntoStatus(p.status))}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
-                    style={{
-                      color,
-                      backgroundColor: `${color}14`,
-                      border: `1px solid ${color}35`,
-                    }}
-                    title="Ciclar estatus (propuesta → avance → cumplido → fallado)"
-                    data-testid={`hub-oleada-punto-status-${p.numero}`}
-                  >
-                    {OLEADA_PUNTO_STATUS_LABEL[p.status]}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => void onCycleStatus(p.id, nextOleadaPuntoStatus(p.status))}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                      style={{
+                        color,
+                        backgroundColor: `${color}14`,
+                        border: `1px solid ${color}35`,
+                      }}
+                      title="Ciclar estatus (propuesta → avance → cumplido → fallado)"
+                      data-testid={`hub-oleada-punto-status-${p.numero}`}
+                    >
+                      {OLEADA_PUNTO_STATUS_LABEL[p.status]}
+                    </button>
+                    {isPin ? (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                        style={{ color: tint, border: `1px solid ${tint}40` }}
+                        data-testid={`hub-oleada-punto-pin-${p.numero}`}
+                      >
+                        Timón
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => void onSetPuntoProduccion(p.id)}
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-slate-400 hover:text-white"
+                        style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                        data-testid={`hub-oleada-punto-producir-${p.numero}`}
+                      >
+                        Producir aquí
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <button

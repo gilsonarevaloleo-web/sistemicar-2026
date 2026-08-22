@@ -28,10 +28,12 @@ import {
   filterDecisionsForProyecto,
 } from "./ringDecisionTranscript";
 import {
+  capSintoniaDesdeProduccion,
   createOleadaPunto,
-  getFocoOleadaPunto,
   inferOleadaPuntoStatusFromProduccion,
+  nextPuntoProduccionIdAfterDelete,
   renumberOleadaPuntos,
+  resolvePuntoProduccion,
   sintonizarOleadaPunto,
   sortOleadaPuntos,
   type OleadaPunto,
@@ -53,6 +55,7 @@ export {
   summarizeOleadaPuntos,
   OLEADA_PUNTO_STATUS_LABEL,
   nextOleadaPuntoStatus,
+  resolvePuntoProduccion,
 } from "./oleadaPuntos";
 
 export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
@@ -140,6 +143,11 @@ export interface ProyectoPeldano {
    * No es checklist rígido: se edita/borra libremente; la producción solo sintoniza.
    */
   oleadaPuntos?: OleadaPunto[];
+  /**
+   * Timón: a dónde se amontonan los envíos.
+   * No caduca con el día. Solo cambia si el operador marca otro punto.
+   */
+  puntoProduccionId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -749,11 +757,12 @@ export async function addOleadaPunto(
   const pel = all.find(p => p.id === peldanoId);
   if (!pel) return null;
   const puntos = readOleadaPuntos(pel);
-  const next = renumberOleadaPuntos([
-    ...puntos,
-    createOleadaPunto(trimmed, puntos.length + 1),
-  ]);
-  return updatePeldano(userId, peldanoId, { oleadaPuntos: next });
+  const created = createOleadaPunto(trimmed, puntos.length + 1);
+  const next = renumberOleadaPuntos([...puntos, created]);
+  return updatePeldano(userId, peldanoId, {
+    oleadaPuntos: next,
+    puntoProduccionId: pel.puntoProduccionId ?? created.id,
+  });
 }
 
 /** Edita título o estatus de un punto — libertad de reordenar la mente. */
@@ -789,7 +798,23 @@ export async function deleteOleadaPunto(
   const pel = all.find(p => p.id === peldanoId);
   if (!pel) return null;
   const next = renumberOleadaPuntos(readOleadaPuntos(pel).filter(p => p.id !== puntoId));
-  return updatePeldano(userId, peldanoId, { oleadaPuntos: next });
+  return updatePeldano(userId, peldanoId, {
+    oleadaPuntos: next,
+    puntoProduccionId: nextPuntoProduccionIdAfterDelete(pel, puntoId),
+  });
+}
+
+/** Timón consciente: de aquí en adelante los envíos se amontonan en este punto. */
+export async function setPuntoProduccion(
+  userId: string,
+  peldanoId: string,
+  puntoId: string
+): Promise<ProyectoPeldano | null> {
+  const all = getLocalPeldanos(userId);
+  const pel = all.find(p => p.id === peldanoId);
+  if (!pel) return null;
+  if (!(pel.oleadaPuntos ?? []).some(x => x.id === puntoId)) return pel;
+  return updatePeldano(userId, peldanoId, { puntoProduccionId: puntoId });
 }
 
 /** Mueve un punto arriba/abajo en el orden de producción propuesto. */
@@ -816,7 +841,8 @@ export async function reorderOleadaPunto(
 
 /**
  * Sintonía suave: la producción escribe señal en el punto de oleada.
- * Si el vehículo trae oleadaPuntoId, toca ese; si no, el foco actual.
+ * Si el vehículo trae oleadaPuntoId, toca ese; si no, el punto de producción.
+ * Un cierre no conquista el punto: solo señala avance. El timón no caduca.
  * Nunca bloquea editar/borrar después.
  */
 export async function sintonizarOleadaConProduccion(
@@ -844,22 +870,27 @@ export async function sintonizarOleadaConProduccion(
   const puntos = readOleadaPuntos(pel);
   if (puntos.length === 0) return pel;
 
-  const sugerido = inferOleadaPuntoStatusFromProduccion({
-    tipoOrigen: opts.tipoOrigen,
-    subStatuses: opts.subStatuses,
-    situacionResultados: opts.situacionResultados,
-    vehicleStatus: opts.vehicleStatus,
-  });
+  const sugerido = capSintoniaDesdeProduccion(
+    inferOleadaPuntoStatusFromProduccion({
+      tipoOrigen: opts.tipoOrigen,
+      subStatuses: opts.subStatuses,
+      situacionResultados: opts.situacionResultados,
+      vehicleStatus: opts.vehicleStatus,
+    })
+  );
 
-  let target =
+  const target =
     (opts.oleadaPuntoId ? puntos.find(p => p.id === opts.oleadaPuntoId) : undefined) ??
-    getFocoOleadaPunto(puntos);
+    resolvePuntoProduccion(pel);
   if (!target) return pel;
 
   const next = puntos.map(p =>
-    p.id === target!.id ? sintonizarOleadaPunto(p, sugerido, opts.vehicleId) : p
+    p.id === target.id ? sintonizarOleadaPunto(p, sugerido, opts.vehicleId) : p
   );
-  return updatePeldano(userId, targetId, { oleadaPuntos: next });
+  return updatePeldano(userId, targetId, {
+    oleadaPuntos: next,
+    puntoProduccionId: pel.puntoProduccionId ?? target.id,
+  });
 }
 
 export async function markPeldanoEnCurso(

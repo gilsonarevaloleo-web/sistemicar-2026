@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  capSintoniaDesdeProduccion,
   createOleadaPunto,
   getFocoOleadaPunto,
   inferOleadaPuntoStatusFromProduccion,
+  nextPuntoProduccionIdAfterDelete,
   renumberOleadaPuntos,
+  resolvePuntoProduccion,
   sintonizarOleadaPunto,
   sortOleadaPuntos,
 } from "./oleadaPuntos.ts";
@@ -64,6 +67,34 @@ describe("oleadaPuntos — ordenamiento mental", () => {
     const next = sintonizarOleadaPunto(p, "avance", "v1", 99);
     assert.equal(next.status, "cumplido");
     assert.equal(next.lastVehicleId, "v1");
+  });
+
+  it("punto de producción respeta el pin y no caduca al cumplir", () => {
+    const a = { ...createOleadaPunto("negro small", 1, 1), status: "cumplido" as const };
+    const b = { ...createOleadaPunto("rojo small", 2, 2), status: "propuesta" as const };
+    const pin = resolvePuntoProduccion({ puntoProduccionId: a.id, oleadaPuntos: [a, b] });
+    assert.equal(pin?.titulo, "negro small");
+    const fallback = resolvePuntoProduccion({ oleadaPuntos: [a, b] });
+    assert.equal(fallback?.titulo, "negro small");
+  });
+
+  it("borrar el pin mueve el timón al siguiente; borrar otro no lo mueve", () => {
+    const a = createOleadaPunto("A", 1, 1);
+    const b = createOleadaPunto("B", 2, 2);
+    const oleada = { puntoProduccionId: a.id, oleadaPuntos: [a, b] };
+    assert.equal(nextPuntoProduccionIdAfterDelete(oleada, a.id), b.id);
+    assert.equal(nextPuntoProduccionIdAfterDelete(oleada, b.id), a.id);
+    assert.equal(
+      nextPuntoProduccionIdAfterDelete({ puntoProduccionId: a.id, oleadaPuntos: [a] }, a.id),
+      undefined
+    );
+  });
+
+  it("un cierre no conquista el punto: cumplido/fallado se capan a avance", () => {
+    assert.equal(capSintoniaDesdeProduccion("cumplido"), "avance");
+    assert.equal(capSintoniaDesdeProduccion("fallado"), "avance");
+    assert.equal(capSintoniaDesdeProduccion("propuesta"), "propuesta");
+    assert.equal(capSintoniaDesdeProduccion("avance"), "avance");
   });
 
   it("sort es estable por numero", () => {

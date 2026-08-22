@@ -52,6 +52,7 @@ import {
   updateOleadaPunto,
   deleteOleadaPunto,
   reorderOleadaPunto,
+  setPuntoProduccion,
   type Proyecto,
   type ProyectoPeldano,
   type ProyectoEtiqueta,
@@ -63,7 +64,7 @@ import {
   resolveClaridadParaProyecto,
   type RutasMentalesSet,
 } from "@/lib/claridadDireccion";
-import { getFocoOleadaPunto, sortOleadaPuntos } from "@/lib/oleadaPuntos";
+import { resolvePuntoProduccion, sortOleadaPuntos } from "@/lib/oleadaPuntos";
 import { RUTA_BANDA_META } from "@/lib/rutaEnfoque";
 import { RutasMentalesGrafo } from "@/components/RutasMentalesGrafo";
 import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
@@ -476,7 +477,14 @@ export default function ProyectosPage() {
     () => sortOleadaPuntos(oleadaPeldano?.oleadaPuntos ?? []),
     [oleadaPeldano]
   );
-  const oleadaFocoPunto = useMemo(() => getFocoOleadaPunto(oleadaPuntos), [oleadaPuntos]);
+  const oleadaPuntoProduccion = useMemo(
+    () =>
+      resolvePuntoProduccion({
+        puntoProduccionId: oleadaPeldano?.puntoProduccionId,
+        oleadaPuntos: oleadaPuntos,
+      }),
+    [oleadaPeldano?.puntoProduccionId, oleadaPuntos]
+  );
 
   const refreshOleadaPeldanoLocal = useCallback(
     (updated: ProyectoPeldano | null) => {
@@ -531,6 +539,12 @@ export default function ProyectosPage() {
   const handleReorderOleadaPunto = async (puntoId: string, direction: "up" | "down") => {
     if (!user || !oleadaPeldano) return;
     const updated = await reorderOleadaPunto(user.uid, oleadaPeldano.id, puntoId, direction);
+    refreshOleadaPeldanoLocal(updated);
+  };
+
+  const handleSetPuntoProduccion = async (puntoId: string) => {
+    if (!user || !oleadaPeldano) return;
+    const updated = await setPuntoProduccion(user.uid, oleadaPeldano.id, puntoId);
     refreshOleadaPeldanoLocal(updated);
   };
 
@@ -766,6 +780,31 @@ export default function ProyectosPage() {
           <TabsContent value="enfoque" className="mt-0 space-y-3 focus-visible:ring-0">
             <div
               className="p-3 rounded-xl border"
+              style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.08)" }}
+              data-testid="hub-enfoque-glosario"
+            >
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+                Orden de la conciencia
+              </p>
+              <ul className="text-[9px] text-slate-500 leading-relaxed space-y-0.5">
+                <li>
+                  <span className="text-slate-300">Oleada</span> — la campaña (acabar casacas small).
+                </li>
+                <li>
+                  <span className="text-slate-300">Punto de producción</span> — el timón. Los envíos se
+                  amontonan ahí. No caduca con el día.
+                </li>
+                <li>
+                  <span className="text-slate-300">Escalera</span> — lo ya caminado.
+                </li>
+                <li>
+                  <span className="text-slate-300">Presencia</span> — el día, no el rumbo.
+                </li>
+              </ul>
+            </div>
+
+            <div
+              className="p-3 rounded-xl border"
               style={{ backgroundColor: PIZARRA, borderColor: `${tint}35` }}
               data-testid="hub-objetivo"
             >
@@ -793,12 +832,14 @@ export default function ProyectosPage() {
             {oleadaPeldano ? (
               <OleadaDesglosePanel
                 puntos={oleadaPuntos}
+                puntoProduccionId={oleadaPeldano.puntoProduccionId}
                 tint={tint}
                 onAdd={handleAddOleadaPunto}
                 onUpdateTitulo={handleUpdateOleadaPuntoTitulo}
                 onCycleStatus={handleCycleOleadaPuntoStatus}
                 onDelete={handleDeleteOleadaPunto}
                 onReorder={handleReorderOleadaPunto}
+                onSetPuntoProduccion={handleSetPuntoProduccion}
               />
             ) : (
               <div
@@ -806,7 +847,7 @@ export default function ProyectosPage() {
                 data-testid="hub-oleada-desglose-sin-oleada"
               >
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  Activa una oleada en Escalera y desglosa al menos un foco. Hasta entonces
+                  Activa una oleada en Escalera y marca un punto de producción. Hasta entonces
                   los vehículos no pueden llegar a Dirección: presencia cubre el día sin ensuciar
                   el proyecto.
                 </p>
@@ -908,7 +949,7 @@ export default function ProyectosPage() {
                         proyecto.id,
                         oleadaPeldano.id,
                         "desglosador_tiempo",
-                        oleadaFocoPunto?.id
+                        oleadaPuntoProduccion?.id
                       )
                     )
                   }
@@ -925,7 +966,7 @@ export default function ProyectosPage() {
                         proyecto.id,
                         oleadaPeldano.id,
                         "desglosador_situacion",
-                        oleadaFocoPunto?.id
+                        oleadaPuntoProduccion?.id
                       )
                     )
                   }
@@ -1070,8 +1111,8 @@ export default function ProyectosPage() {
               testId="hub-ideas"
             >
               <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
-                Horizontes amplios (más allá de un día o segmento). Actívalos como oleada para
-                lanzar vehículos sobre ellos — A/B/C orientan la oleada, no el hueco de hoy.
+                Próximas oleadas — no son el punto de producción ni el bloque del día.
+                Actívalas como oleada para que la conciencia tome el timón.
               </p>
               <div className="flex gap-2 mb-3">
                 <input

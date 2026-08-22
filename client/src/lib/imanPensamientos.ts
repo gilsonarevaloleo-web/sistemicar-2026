@@ -22,7 +22,7 @@ export const CRISOL_TAGLINE =
   "Ordena pensamientos en nidos y rutas antes de sellarlos en tiempo.";
 /** El nido del Crisol define el rumbo del vehículo de enfoque al enviar. */
 export const CRISOL_DIRECCION_HINT =
-  "Nido ordena el pensamiento. La dirección del vehículo solo abre con oleada y foco — si no, el envío queda en presencia para no ensuciar el proyecto.";
+  "Nido ordena el pensamiento. La dirección del vehículo solo abre con oleada y punto de producción — si no, el envío queda en presencia para no ensuciar el proyecto.";
 
 /** @deprecated Usa CRISOL_TITLE */
 export const IMAN_PENSAMIENTOS_TITLE = CRISOL_TITLE;

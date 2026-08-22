@@ -286,6 +286,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     (vehicleId: string, destino: DestinoCierre, proyectoId?: string) => {
       let nextDestino = destino;
       let nextProyectoId = proyectoId;
+      let stampedPuntoId: string | undefined;
       if (destino === "peldano") {
         const proyectos = userId ? getProyectosLocal(userId) : [];
         const pid = proyectoId?.trim() || "";
@@ -308,11 +309,13 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           nextProyectoId = undefined;
         } else {
           nextProyectoId = pid || p?.id;
+          stampedPuntoId = gate.puntoProduccionId;
         }
       }
       const patch: Partial<Vehicle> = { destinoCierre: nextDestino };
       if (nextDestino === "peldano" && nextProyectoId) {
         patch.proyectoId = nextProyectoId;
+        if (stampedPuntoId) patch.oleadaPuntoId = stampedPuntoId;
       }
       paintVehicle(vehicleId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
