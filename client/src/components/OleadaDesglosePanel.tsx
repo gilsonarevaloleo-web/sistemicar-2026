@@ -9,6 +9,13 @@ import {
   type OleadaPunto,
   type OleadaPuntoStatus,
 } from "@/lib/oleadaPuntos";
+import {
+  formatHoraLabel,
+  formatHorasCerradas,
+  horaEnCurso,
+  horasDeEpisodio,
+  type TimonEpisodio,
+} from "@/lib/timonHoras";
 
 const STATUS_COLOR: Record<OleadaPuntoStatus, string> = {
   propuesta: "#94a3b8",
@@ -20,6 +27,7 @@ const STATUS_COLOR: Record<OleadaPuntoStatus, string> = {
 type Props = {
   puntos: OleadaPunto[];
   puntoProduccionId?: string;
+  timonEpisodio?: TimonEpisodio | null;
   tint: string;
   disabled?: boolean;
   pulseId?: string | null;
@@ -70,11 +78,12 @@ function PuntoTituloInput({
 
 /**
  * Desglose de oleada = puntos de producción.
- * El pin es el timón: los envíos se amontonan ahí hasta un cambio consciente.
+ * El pin es el timón: los envíos se suman en horas enumeradas hasta un cambio consciente.
  */
 export function OleadaDesglosePanel({
   puntos,
   puntoProduccionId,
+  timonEpisodio = null,
   tint,
   disabled = false,
   pulseId = null,
@@ -91,6 +100,9 @@ export function OleadaDesglosePanel({
   const [held, setHeld] = useState<{ id: string; dir: "up" | "down" } | null>(null);
   const pin = resolvePuntoProduccion({ puntoProduccionId, oleadaPuntos: puntos });
   const summary = summarizeOleadaPuntos(puntos);
+  const horas = timonEpisodio ? horasDeEpisodio(timonEpisodio) : [];
+  const horaN = horaEnCurso(timonEpisodio?.minutosAcumulados ?? 0);
+  const vehiculosEnTimón = timonEpisodio?.vehiculos.length ?? 0;
 
   const handleAdd = async () => {
     const t = draft.trim();
@@ -119,8 +131,8 @@ export function OleadaDesglosePanel({
             <Target size={12} /> Punto de producción
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
-            Timón de la oleada. No caduca con el día. Los envíos se amontonan aquí hasta que
-            marques otro punto — un cambio consciente de dirección.
+            Timón de la oleada. Suma vehículos en horas 1, 2, 3… Cambiar de punto sella esa
+            numeración como peldaño y empieza otra vez en Hora 1.
           </p>
         </div>
         {summary.total > 0 ? (
@@ -142,6 +154,62 @@ export function OleadaDesglosePanel({
           <p className="text-[12px] font-semibold text-white leading-snug">
             <span style={{ color: tint }}>{pin.numero}.</span> {pin.titulo}
           </p>
+          <div
+            className="mt-2 flex items-end justify-between gap-2"
+            data-testid="hub-oleada-timon-horas"
+          >
+            <div>
+              <p className="text-[16px] font-black tabular-nums leading-none" style={{ color: tint }}>
+                {formatHoraLabel(horaN)}
+              </p>
+              <p className="text-[8px] text-slate-500 mt-1">
+                {vehiculosEnTimón === 0
+                  ? "Este enfoque acaba de empezar"
+                  : `${formatHorasCerradas(timonEpisodio?.minutosAcumulados ?? 0)} en este timón · ${vehiculosEnTimón} vehículo${vehiculosEnTimón === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            {timonEpisodio && timonEpisodio.minutosAcumulados > 0 ? (
+              <div
+                className="w-16 h-1 rounded-full overflow-hidden shrink-0 mb-0.5"
+                style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
+                aria-hidden
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, ((horas.find(h => h.numero === horaN)?.minutos ?? 0) / 60) * 100)}%`,
+                    backgroundColor: tint,
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+          {horas.some(h => h.vehiculos.length > 0) ? (
+            <ul className="mt-2 space-y-1" data-testid="hub-oleada-timon-horas-lista">
+              {horas.map(h => (
+                <li key={h.numero} className="text-[9px] text-slate-400 leading-snug">
+                  <span className="font-bold tabular-nums" style={{ color: h.completa ? tint : "#94a3b8" }}>
+                    {formatHoraLabel(h.numero)}
+                  </span>
+                  {h.completa ? (
+                    <span className="ml-1 text-[8px] uppercase tracking-wider" style={{ color: tint }}>
+                      cerrada
+                    </span>
+                  ) : (
+                    <span className="ml-1 text-[8px] uppercase tracking-wider text-slate-600">
+                      en curso
+                    </span>
+                  )}
+                  {h.vehiculos.length > 0 ? (
+                    <span className="text-slate-600">
+                      {" "}
+                      · {h.vehiculos.map(v => v.titulo).join(" · ")}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 

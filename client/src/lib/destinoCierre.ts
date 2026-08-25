@@ -38,7 +38,7 @@ export const DESTINO_CIERRE_COPY = {
   },
   peldano: {
     label: "Dirección",
-    hint: "Solo con oleada y punto de producción. Los envíos se amontonan ahí.",
+    hint: "Solo con oleada y punto de producción. Los envíos se suman en horas del timón.",
     short: "Norte",
   },
 } as const;

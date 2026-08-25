@@ -25,7 +25,10 @@ const firebaseConfig = {
 
 const APP_ID = 'sistemicar-v2-5';
 
+const isNodeTest = typeof process !== "undefined" && Boolean(process.env.NODE_TEST_CONTEXT);
+
 export const isFirebaseConfigured = (): boolean => {
+  if (isNodeTest) return false;
   return Boolean(
     firebaseConfig.apiKey &&
       firebaseConfig.authDomain &&
