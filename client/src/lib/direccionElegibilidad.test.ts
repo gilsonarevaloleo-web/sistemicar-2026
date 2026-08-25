@@ -53,11 +53,11 @@ describe("direccionElegibilidad", () => {
     assert.equal(gate.gap, null);
     assert.equal(gate.puntoProduccionId, a.id);
     assert.equal(gate.puntoProduccionTitulo, "negro small");
-    assert.match(gate.riesgoEnsuciar, /amontonan/);
+    assert.match(gate.riesgoEnsuciar, /horas enumeradas/);
     assert.match(gate.riesgoEnsuciar, /negro small/);
   });
 
-  it("oleada + punto abre Dirección y nombra dónde se amontonan los envíos", () => {
+  it("oleada + punto abre Dirección y nombra las horas del timón", () => {
     const foco = createOleadaPunto("Corte de patrón", 1);
     const gate = evaluateDireccionElegibilidad(PROY, [oleada([foco])]);
     assert.equal(gate.ok, true);
@@ -65,7 +65,7 @@ describe("direccionElegibilidad", () => {
     assert.equal(noPuedesLlegarADireccion(gate), "");
     assert.equal(gate.puntoProduccionId, foco.id);
     assert.equal(gate.puntoProduccionTitulo, "Corte de patrón");
-    assert.match(gate.riesgoEnsuciar, /amontonan/);
+    assert.match(gate.riesgoEnsuciar, /horas enumeradas/);
     assert.match(gate.riesgoEnsuciar, /Corte de patrón/);
     assert.match(riesgoEnsuciarProyecto("Costura"), /escalera/);
     assert.equal(rumboChipLabel(gate), "Costura · Corte de patrón");
@@ -148,7 +148,7 @@ describe("direccionElegibilidad", () => {
     assert.equal(d.destinoCierre, "peldano");
     assert.equal(d.proyectoId, "p1");
     assert.equal(d.oleadaPuntoId, punto.id);
-    assert.match(d.copy, /amontonan/);
+    assert.match(d.copy, /horas enumeradas/);
   });
 
   it("sin proyecto: copy de hueco", () => {

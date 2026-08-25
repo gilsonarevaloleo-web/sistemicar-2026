@@ -39,6 +39,16 @@ import {
   type OleadaPunto,
   type OleadaPuntoStatus,
 } from "./oleadaPuntos";
+import {
+  accrueVehiculoAlTimon,
+  crearTimonEpisodio,
+  episodioTimonVacio,
+  horasDeEpisodio,
+  resumenTimonDesdeEpisodio,
+  yaEstaEnTimon,
+  type TimonEpisodio,
+  type TimonResumenPeldano,
+} from "./timonHoras";
 
 export type {
   ClaridadProfundidad,
@@ -57,6 +67,14 @@ export {
   nextOleadaPuntoStatus,
   resolvePuntoProduccion,
 } from "./oleadaPuntos";
+export type { TimonEpisodio, TimonResumenPeldano } from "./timonHoras";
+export {
+  formatHoraLabel,
+  formatHorasCerradas,
+  horaEnCurso,
+  horasDeEpisodio,
+  horasCompletasDeMinutos,
+} from "./timonHoras";
 
 export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
 
@@ -117,6 +135,11 @@ export interface ProyectoPeldanoResumen {
   /** Transcripción numerada de decisiones ejecutadas (ring, taller, desglosador). */
   decisionesEnumeradas?: ProyectoDecisionEnumerada[];
   totalDecisiones?: number;
+  /**
+   * Estancia sellada del timón: horas enumeradas de un punto de producción.
+   * Un peldaño = lo ya caminado al cambiar de enfoque, no cada vehículo.
+   */
+  timon?: TimonResumenPeldano;
 }
 
 export interface ProyectoPeldano {
@@ -148,6 +171,11 @@ export interface ProyectoPeldano {
    * No caduca con el día. Solo cambia si el operador marca otro punto.
    */
   puntoProduccionId?: string;
+  /**
+   * Estancia viva del timón: vehículos sumados en horas 1, 2, 3…
+   * Se sella a peldaño al cambiar el punto de producción.
+   */
+  timonEpisodio?: TimonEpisodio;
   createdAt: number;
   updatedAt: number;
 }
@@ -778,9 +806,13 @@ export async function addOleadaPunto(
   const puntos = readOleadaPuntos(pel);
   const created = createOleadaPunto(trimmed, puntos.length + 1);
   const next = renumberOleadaPuntos([...puntos, created]);
+  const firstPin = !pel.puntoProduccionId;
   return updatePeldano(userId, peldanoId, {
     oleadaPuntos: next,
     puntoProduccionId: pel.puntoProduccionId ?? created.id,
+    ...(firstPin && !pel.timonEpisodio
+      ? { timonEpisodio: crearTimonEpisodio(created.id, created.titulo) }
+      : {}),
   });
 }
 
@@ -816,10 +848,20 @@ export async function deleteOleadaPunto(
   const all = getLocalPeldanos(userId);
   const pel = all.find(p => p.id === peldanoId);
   if (!pel) return null;
+  const pin = resolvePuntoProduccion(pel);
+  const deletingPin = pin?.id === puntoId;
+  if (deletingPin) {
+    await spawnPeldanoDesdeTimonEpisodio(userId, pel);
+  }
   const next = renumberOleadaPuntos(readOleadaPuntos(pel).filter(p => p.id !== puntoId));
+  const nextPinId = nextPuntoProduccionIdAfterDelete(pel, puntoId);
+  const nextPunto = next.find(p => p.id === nextPinId);
   return updatePeldano(userId, peldanoId, {
     oleadaPuntos: next,
-    puntoProduccionId: nextPuntoProduccionIdAfterDelete(pel, puntoId),
+    puntoProduccionId: nextPinId,
+    timonEpisodio: nextPunto
+      ? crearTimonEpisodio(nextPunto.id, nextPunto.titulo)
+      : undefined,
   });
 }
 
@@ -832,8 +874,17 @@ export async function setPuntoProduccion(
   const all = getLocalPeldanos(userId);
   const pel = all.find(p => p.id === peldanoId);
   if (!pel) return null;
-  if (!(pel.oleadaPuntos ?? []).some(x => x.id === puntoId)) return pel;
-  return updatePeldano(userId, peldanoId, { puntoProduccionId: puntoId });
+  const punto = (pel.oleadaPuntos ?? []).find(x => x.id === puntoId);
+  if (!punto) return pel;
+  const samePin = pel.puntoProduccionId === puntoId;
+  if (samePin && pel.timonEpisodio?.puntoId === puntoId) return pel;
+  if (!samePin) {
+    await spawnPeldanoDesdeTimonEpisodio(userId, pel);
+  }
+  return updatePeldano(userId, peldanoId, {
+    puntoProduccionId: puntoId,
+    timonEpisodio: crearTimonEpisodio(puntoId, punto.titulo),
+  });
 }
 
 /** Mueve un punto arriba/abajo en el orden de producción propuesto. */
@@ -1229,8 +1280,9 @@ export async function markPeldanoConquistadoSituacion(
 /**
  * Cierra un vehículo → peldaño en el Hub (sensación de caminar lejos).
  * - Idea puntual (no es la oleada activa) → conquista ese peldaño.
- * - Oleada activa / solo proyectoId / sombra de segmento → crea peldaño conquistado nuevo
- *   (se camina SOBRE la oleada; no se apaga con un solo cierre).
+ * - Oleada activa / solo proyectoId / sombra de segmento → el vehículo
+ *   se suma al timón en horas enumeradas. El peldaño nace al cambiar
+ *   el punto de producción (clasificación del enfoque), no por cada envío.
  * - La sombra de segmento la sella además el cierre de puerta.
  * - Además: sintoniza el desglose de oleada (propuesta) con la señal de producción.
  */
@@ -1307,8 +1359,130 @@ export async function recordProgresoHubAlCerrarVehiculo(
     }
   }
 
-  await spawnConquistadoDesdeVehiculo(userId, vehicle, optsConDuracion);
+  const credited = await acreditarTimonAlCerrarVehiculo(userId, vehicle, {
+    tipoOrigen: opts.tipoOrigen,
+    duracionMin,
+  });
+  if (!credited) {
+    await spawnConquistadoDesdeVehiculo(userId, vehicle, optsConDuracion);
+  }
   await maybeSintonizarOleada();
+}
+
+function ensureTimonEpisodio(pel: ProyectoPeldano): TimonEpisodio {
+  const pin = resolvePuntoProduccion(pel);
+  const titulo = pin?.titulo?.trim() || pel.titulo;
+  const puntoId = pin?.id ?? pel.puntoProduccionId ?? pel.id;
+  if (pel.timonEpisodio && pel.timonEpisodio.puntoId === puntoId) {
+    return pel.timonEpisodio.puntoTitulo === titulo
+      ? pel.timonEpisodio
+      : { ...pel.timonEpisodio, puntoTitulo: titulo };
+  }
+  return crearTimonEpisodio(puntoId, titulo);
+}
+
+/**
+ * Suma el vehículo a las horas enumeradas del timón actual.
+ * False = no hay oleada/pin o el envío es de otro punto (cae al legado).
+ */
+export async function acreditarTimonAlCerrarVehiculo(
+  userId: string,
+  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId" | "oleadaPuntoId">,
+  opts: { tipoOrigen: "tiempo" | "situacion"; duracionMin: number }
+): Promise<boolean> {
+  const proyectoId = vehicle.proyectoId;
+  if (!proyectoId) return false;
+  const peldanos = getPeldanosByProyectoLocal(userId, proyectoId);
+  const oleada = getOleadaEnCurso(peldanos);
+  const targetId =
+    vehicle.proyectoPeldanoId &&
+    peldanos.some(p => p.id === vehicle.proyectoPeldanoId && !p.origenSegmento)
+      ? vehicle.proyectoPeldanoId
+      : oleada?.id;
+  if (!targetId) return false;
+  const pel = peldanos.find(p => p.id === targetId);
+  if (!pel || pel.origenSegmento) return false;
+  const pin = resolvePuntoProduccion(pel);
+  if (!pin) return false;
+  const stamped = vehicle.oleadaPuntoId?.trim();
+  if (stamped && stamped !== pin.id) return false;
+  if (yaEstaEnTimon(pel.timonEpisodio, vehicle.id)) return true;
+
+  const minutos = Math.max(0, Math.round(opts.duracionMin));
+  if (minutos <= 0) return true;
+
+  const next = accrueVehiculoAlTimon(ensureTimonEpisodio(pel), {
+    vehicleId: vehicle.id,
+    titulo: vehicle.titulo,
+    minutos,
+    tipoOrigen: opts.tipoOrigen,
+  });
+  await updatePeldano(userId, pel.id, { timonEpisodio: next });
+  return true;
+}
+
+/**
+ * Peldaño = estancia ya caminada en un punto de producción.
+ * Las horas 1..N de ese timón quedan clasificadas en la escalera.
+ */
+async function spawnPeldanoDesdeTimonEpisodio(
+  userId: string,
+  oleada: ProyectoPeldano
+): Promise<void> {
+  const episodio = oleada.timonEpisodio;
+  if (episodioTimonVacio(episodio) || !episodio) return;
+
+  const existing = getPeldanosByProyectoLocal(userId, oleada.proyectoId);
+  const stampId = `timon:${episodio.id}`;
+  if (existing.some(p => p.vehicleId === stampId && p.estado === "conquistado")) {
+    return;
+  }
+
+  const horas = horasDeEpisodio(episodio);
+  const resumenTimon = resumenTimonDesdeEpisodio(episodio);
+  const horaCount = resumenTimon.horas;
+  const tieneTiempo = episodio.minutosTiempo > 0;
+  const tipoOrigen: "tiempo" | "situacion" = tieneTiempo ? "tiempo" : "situacion";
+  const duracionMin = tieneTiempo ? episodio.minutosTiempo : episodio.minutosAcumulados;
+  const ahora = Date.now();
+  const maxOrden = existing.reduce((m, p) => Math.max(m, p.orden), -1);
+  const horaLabel = horaCount === 1 ? "1 hora" : `${horaCount} horas`;
+
+  const peldano: ProyectoPeldano = {
+    id: `pel_timon_${ahora}_${Math.random().toString(36).slice(2, 6)}`,
+    proyectoId: oleada.proyectoId,
+    orden: maxOrden + 1,
+    titulo: episodio.puntoTitulo,
+    estado: "conquistado",
+    tipoOrigen,
+    vehicleId: stampId,
+    cerradoAt: ahora,
+    resumen: {
+      duracionMin,
+      subsCumplidos: episodio.vehiculos.length,
+      subsTotal: episodio.vehiculos.length,
+      segmentoResumen: {
+        rutaMentalLabel: `${horaLabel} · timón`,
+        vehiculosCerrados: episodio.vehiculos.length,
+      },
+      subResumen: episodio.vehiculos.map(v => ({
+        titulo:
+          v.horaInicio === v.horaFin
+            ? `Hora ${v.horaInicio} · ${v.titulo}`
+            : `Hora ${v.horaInicio}–${v.horaFin} · ${v.titulo}`,
+        status: "cumplido" as const,
+        duracionMin: v.minutos,
+      })),
+      timon: resumenTimon,
+    },
+    createdAt: ahora,
+    updatedAt: ahora,
+  };
+  const all = getLocalPeldanos(userId);
+  all.push(peldano);
+  saveLocalPeldanos(userId, all);
+  void syncFirestorePeldano(userId, peldano);
+  await refreshProyectoStats(userId, oleada.proyectoId);
 }
 
 /** Peldaño conquistado nuevo = un paso caminado sobre la oleada/proyecto. */
@@ -1414,6 +1588,12 @@ export function computeProyectoStats(peldanos: ProyectoPeldano[]) {
     profundidadMaxima: profundidad,
     ultimoConquistado: [...conquistados].sort((a, b) => (b.cerradoAt ?? 0) - (a.cerradoAt ?? 0))[0] ?? null,
   };
+}
+
+/** Minutos de origen tiempo aún vivos en el timón (aún no sellados a peldaño). */
+export function minutosTiempoTimonVivo(peldanos: ProyectoPeldano[]): number {
+  const oleada = getOleadaEnCurso(peldanos);
+  return Math.max(0, oleada?.timonEpisodio?.minutosTiempo ?? 0);
 }
 
 /** Volcado automático de métricas de flota durante un segmento vinculado. */

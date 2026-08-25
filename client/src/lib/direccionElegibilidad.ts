@@ -4,8 +4,8 @@
  * Presencia cubre el día — siempre abierta, envío rápido, no ensucia la escalera.
  * Dirección (Norte / peldaño) no se reclama con un clic: solo abre si el proyecto
  * tiene oleada activa y un punto de producción. El punto no caduca con el día
- * ni con un cierre: los envíos se amontonan ahí hasta que el operador cambia
- * el timón. Si no hay rumbo, el operador siente:
+ * ni con un cierre: los envíos se suman en horas enumeradas hasta que el operador
+ * cambia el timón (esa estancia se sella como peldaño). Si no hay rumbo, el operador siente:
  * «No puedes llegar a Dirección porque todavía…»
  *
  * Vincular un proyectoId no es Dirección. El ego no puede comprar Norte.
@@ -43,7 +43,7 @@ export type DireccionGate = {
   /** Empieza por «todavía…» cuando hay hueco. */
   porqueTodavia: string;
   riesgoEnsuciar: string;
-  /** Timón: a dónde se amontonan los envíos. No caduca. */
+  /** Timón: a dónde se suman las horas. No caduca. */
   puntoProduccionId?: string;
   puntoProduccionTitulo?: string;
 };
@@ -71,7 +71,7 @@ export function riesgoEnsuciarProyecto(titulo: string): string {
 
 export function riesgoAmontonarEnPunto(puntoTitulo: string): string {
   const name = puntoTitulo.trim() || "este punto";
-  return `Los envíos se amontonan en «${name}» hasta que cambies el punto de producción.`;
+  return `Los envíos se suman en horas enumeradas de «${name}». Cambiar el punto sella ese enfoque como peldaño.`;
 }
 
 export function rumboChipLabel(

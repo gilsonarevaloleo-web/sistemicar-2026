@@ -53,6 +53,7 @@ import {
   deleteOleadaPunto,
   reorderOleadaPunto,
   setPuntoProduccion,
+  minutosTiempoTimonVivo,
   type Proyecto,
   type ProyectoPeldano,
   type ProyectoEtiqueta,
@@ -76,6 +77,7 @@ import { getJournalDateString } from "@/lib/segmentTime";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
+import { formatHorasCerradas } from "@/lib/timonHoras";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -545,9 +547,10 @@ export default function ProyectosPage() {
 
   const stats = useMemo(() => computeProyectoStats(peldanos), [peldanos]);
   const minutosNorte = resolveMinutosNorteDisplay(
-    stats.minutosTotales,
+    stats.minutosTotales + minutosTiempoTimonVivo(peldanos),
     proyecto?.segundosNorteSituacion
   );
+  const horasNorteLabel = formatHorasCerradas(minutosNorte);
   // Ideas reales — nunca sombras de segmento (evita ruido "Desarrollo personal" × N).
   const ideas = useMemo(
     () => peldanos.filter(p => p.estado === "idea" && !p.origenSegmento),
@@ -925,11 +928,16 @@ export default function ProyectosPage() {
                   <span className="text-slate-300">Oleada</span> — la campaña (acabar casacas small).
                 </li>
                 <li>
-                  <span className="text-slate-300">Punto de producción</span> — el timón. Los envíos se
-                  amontonan ahí. No caduca con el día.
+                  <span className="text-slate-300">Punto de producción</span> — el timón. Suma
+                  vehículos en horas enumeradas. Cambiar de punto cierra esa numeración.
                 </li>
                 <li>
-                  <span className="text-slate-300">Escalera</span> — lo ya caminado.
+                  <span className="text-slate-300">Peldaño</span> — una estancia ya caminada en un
+                  timón: las horas de ese enfoque, no cada vehículo.
+                </li>
+                <li>
+                  <span className="text-slate-300">Escalera</span> — peldaños sellados, lo ya
+                  caminado.
                 </li>
                 <li>
                   <span className="text-slate-300">Presencia</span> — el día, no el rumbo.
@@ -967,6 +975,7 @@ export default function ProyectosPage() {
               <OleadaDesglosePanel
                 puntos={oleadaPuntos}
                 puntoProduccionId={oleadaPeldano.puntoProduccionId}
+                timonEpisodio={oleadaPeldano.timonEpisodio}
                 tint={tint}
                 pulseId={ordenPulse?.id}
                 pulseDir={ordenPulse?.dir}
@@ -1182,8 +1191,8 @@ export default function ProyectosPage() {
                 <p className="text-[7px] uppercase text-slate-500 tracking-wider">Profundidad</p>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-lg font-black text-white">{minutosNorte}</p>
-                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Min norte</p>
+                <p className="text-lg font-black text-white">{horasNorteLabel}</p>
+                <p className="text-[7px] uppercase text-slate-500 tracking-wider">Horas norte</p>
               </div>
             </div>
 
@@ -1354,7 +1363,8 @@ export default function ProyectosPage() {
             >
               {conquistados.length === 0 ? (
                 <p className="text-[10px] text-slate-600 text-center py-6 border border-dashed border-white/10 rounded-xl">
-                  Cierra un vehículo como Peldaño — aquí aparece el avance serio.
+                  Cambia el timón para sellar un peldaño. Cada estancia en un punto de producción
+                  — sus horas enumeradas — es un paso caminado.
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -1370,8 +1380,9 @@ export default function ProyectosPage() {
                       >
                         <div>
                           <p className="text-[8px] text-slate-500 uppercase">
-                            Peldaño {conquistados.length - i} · {formatFecha(pel.cerradoAt)} ·{" "}
-                            {formatTipoOrigen(pel.tipoOrigen)}
+                            {pel.resumen?.timon
+                              ? `${pel.resumen.timon.horas} ${pel.resumen.timon.horas === 1 ? "hora" : "horas"} · ${formatFecha(pel.cerradoAt)} · timón`
+                              : `Peldaño ${conquistados.length - i} · ${formatFecha(pel.cerradoAt)} · ${formatTipoOrigen(pel.tipoOrigen)}`}
                           </p>
                           <p className="text-sm font-bold text-white">{pel.titulo}</p>
                         </div>
