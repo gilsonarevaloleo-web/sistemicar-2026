@@ -162,15 +162,15 @@ export function Jornada4ConcienciaTriadaCard({
           <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
             La copa es tiempo de línea: un hilo.
             {model.minutosPlanFuturo > 0 || model.minutosHueco > 0
-              ? ` Lo que falta del plan${
+              ? ` Lo no conquistado${
                   model.minutosPlanFuturo > 0
-                    ? ` (${Math.round(model.minutosPlanFuturo)} min aún no ocurren)`
+                    ? ` (${Math.round(model.minutosPlanFuturo)} min aún no ocurren — no es deuda)`
                     : ""
                 }${
                   model.minutosHueco > 0
-                    ? `${model.minutosPlanFuturo > 0 ? " y" : ""} ${Math.round(model.minutosHueco)} min de hueco`
+                    ? `${model.minutosPlanFuturo > 0 ? " y" : ""} ${Math.round(model.minutosHueco)} min de hueco inconsciente`
                     : ""
-                } sigue inconsciente.`
+                }.`
               : ""}{" "}
             La meta es crecer Dirección por encima de Presencia.
           </p>

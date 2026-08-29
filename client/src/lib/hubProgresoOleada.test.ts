@@ -206,9 +206,12 @@ describe("hub progreso oleada", () => {
     const all = getPeldanosByProyectoLocal(USER, p.id);
     assert.equal(all.filter(x => x.estado === "conquistado").length, 0);
     assert.equal(all.find(x => x.id === idea.id)?.estado, "en_curso");
-    // Presencia ya no escribe minutos en el Hub (va a la triada del operador).
+    // Presencia sella gasto en el proyecto; no escribe peldaños.
     const updated = getProyectosLocal(USER).find(x => x.id === p.id);
-    assert.equal(updated?.minutosPresencia ?? 0, 0);
+    assert.equal(updated?.minutosPresencia, 15);
+    assert.equal(updated?.gastoTiempo?.secPresencia, 15 * 60);
+    assert.equal(updated?.gastoTiempo?.n, 1);
+    assert.equal(updated?.minutosTotales ?? 0, 0);
   });
 
   it("cierre peldaño marca minutos en stats del Hub", async () => {
@@ -232,8 +235,47 @@ describe("hub progreso oleada", () => {
 
     const updated = getProyectosLocal(USER).find(x => x.id === p.id);
     assert.equal(updated?.minutosTotales, 40);
+    assert.ok((updated?.gastoTiempo?.secDireccion ?? 0) >= 40 * 60);
     const stats = computeProyectoStats(getPeldanosByProyectoLocal(USER, p.id));
     assert.equal(stats.minutosTotales, 40);
     assert.equal(stats.conquistados, 1);
+  });
+
+  it("lista rápida e interrupt sellan pared en presencia sin peldaño", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "libre",
+        titulo: "Mandados",
+        proyectoId: p.id,
+        tipoFlota: "situacion",
+        situacionCronometro: null,
+        destinoCierre: "presencia",
+        aperturaAt: 1_000_000,
+        cierreAt: 1_000_000 + 8 * 60_000,
+      }),
+      { tipoOrigen: "situacion", psGanados: 1, duracionMin: 8, destinoCierre: "presencia" }
+    );
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "int1",
+        titulo: "Llamada",
+        proyectoId: p.id,
+        tipoFlota: "situacion",
+        vehiculoPadreDesglosadorId: "padre",
+        destinoCierre: "presencia",
+        aperturaAt: 2_000_000,
+        cierreAt: 2_000_000 + 5 * 60_000,
+      }),
+      { tipoOrigen: "situacion", psGanados: 1, duracionMin: 5, destinoCierre: "presencia" }
+    );
+    const updated = getProyectosLocal(USER).find(x => x.id === p.id);
+    assert.equal(updated?.minutosPresencia, 13);
+    assert.equal(updated?.gastoTiempo?.n, 2);
+    assert.equal(updated?.gastoTiempo?.sellos[0]?.src, "lista_rapida");
+    assert.equal(updated?.gastoTiempo?.sellos[1]?.src, "interrupt");
+    assert.equal(getPeldanosByProyectoLocal(USER, p.id).filter(x => x.estado === "conquistado").length, 0);
   });
 });

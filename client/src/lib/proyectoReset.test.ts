@@ -92,6 +92,7 @@ describe("reset y borrar proyecto", () => {
     assert.equal(reset.segundosNorteSituacion, undefined);
     assert.equal(reset.segundosPresenciaRing, undefined);
     assert.equal(reset.situacionCreditKeys, undefined);
+    assert.equal(reset.gastoTiempo, undefined);
     assert.equal(reset.oleadaTitulo, undefined);
     assert.equal(reset.primerNorteAt, undefined);
     assert.equal(reset.primeraPresenciaAt, undefined);

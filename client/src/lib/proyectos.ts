@@ -21,6 +21,12 @@ import {
   resolveRutaMinutosSituacion,
   type FuenteMinutosSituacion,
 } from "./rutaMinutosSituacionProyecto";
+import {
+  accrueGastoTiempo,
+  buildProyectoRendicion,
+  sealGastoTiempo,
+  type ProyectoGastoTiempo,
+} from "./gastoTiempo";
 import { safeSetItem } from "./storageHygiene";
 import { unlinkProyectoVinculosLocal } from "./proyectoLifecycle";
 import {
@@ -68,6 +74,8 @@ export {
   resolvePuntoProduccion,
 } from "./oleadaPuntos";
 export type { TimonEpisodio, TimonResumenPeldano } from "./timonHoras";
+export type { ProyectoGastoTiempo, ProyectoRendicionTiempo, GastoTiempoSello } from "./gastoTiempo";
+export { buildProyectoRendicion } from "./gastoTiempo";
 export {
   formatHoraLabel,
   formatHorasCerradas,
@@ -222,6 +230,11 @@ export interface Proyecto {
    * No escriben peldaños; alimentan etapa Presente.
    */
   minutosPresencia?: number;
+  /**
+   * Rendición de gasto: sellos de pared por vehículo (lista rápida, interrupt,
+   * idle de desglosador). No ensucia la escalera. Inconsciente = resto del plan.
+   */
+  gastoTiempo?: ProyectoGastoTiempo;
   /** Cierres presencia contados (idempotentes por vehicleId). */
   sesionesPresencia?: number;
   /** Ring de vehicleIds ya contabilizados en presencia (anti doble conteo). */
@@ -598,9 +611,6 @@ export async function resetProyecto(userId: string, id: string): Promise<Proyect
     minutosPresencia: 0,
     sesionesPresencia: 0,
     presenciaVehicleIds: [],
-    segundosNorteSituacion: 0,
-    segundosPresenciaRing: 0,
-    situacionCreditKeys: [],
     claridadActiva: buildDefaultClaridadDireccion({
       tituloProyecto: prev.titulo,
       etiqueta: prev.etiqueta,
@@ -1022,6 +1032,49 @@ function pushSituacionCreditKey(
 }
 
 /**
+ * Sella la pared del vehículo en el proyecto. No escribe peldaños.
+ * Lista rápida, interrupt e idle de desglosador entran aquí.
+ * Idempotente por vid+apertura. Sombra — no ms0.
+ */
+export function acreditarGastoTiempoEnProyecto(
+  userId: string,
+  vehicle: Vehicle,
+  opts?: { now?: number }
+): Proyecto | null {
+  if (!userId) return null;
+  const sello = sealGastoTiempo(vehicle, opts?.now);
+  if (!sello || !sello.pid) return null;
+
+  const list = getLocalProyectos(userId);
+  const idx = list.findIndex(p => p.id === sello.pid);
+  if (idx === -1) return null;
+
+  const prev = list[idx];
+  const nextGasto = accrueGastoTiempo(prev.gastoTiempo, sello);
+  if (nextGasto === prev.gastoTiempo) return prev;
+
+  const minutosPresencia = Math.round(nextGasto.secPresencia / 60);
+  const at = opts?.now ?? sello.z;
+  const updated: Proyecto = {
+    ...prev,
+    gastoTiempo: nextGasto,
+    minutosPresencia,
+    sesionesPresencia: nextGasto.n,
+    primeraPresenciaAt:
+      sello.dest === "presencia"
+        ? prev.primeraPresenciaAt ?? at
+        : prev.primeraPresenciaAt,
+    primerNorteAt:
+      sello.dest === "direccion" ? prev.primerNorteAt ?? at : prev.primerNorteAt,
+    updatedAt: Date.now(),
+  };
+  list[idx] = updated;
+  saveLocalProyectos(userId, list);
+  void syncFirestoreProyecto(userId, updated);
+  return updated;
+}
+
+/**
  * Peldaños situacionales no suman a MIN NORTE: esos minutos ya se acreditaron
  * clic a clic (segundosNorteSituacion). Evita doble conteo al cerrar el ring.
  */
@@ -1304,6 +1357,19 @@ export async function recordProgresoHubAlCerrarVehiculo(
   const feedsHub = feedsProyectoHub(destino);
   const duracionMin = resolveDuracionMinCierre(vehicle, opts.duracionMin);
   const optsConDuracion = { ...opts, duracionMin };
+
+  // Rendición: sello de pared siempre que haya proyecto. No ensucia escalera.
+  if (proyectoId) {
+    try {
+      acreditarGastoTiempoEnProyecto(userId, {
+        ...vehicle,
+        destinoCierre: destino,
+        duracionFinal: duracionMin || vehicle.duracionFinal,
+      });
+    } catch {
+      /* sello no bloquea el cierre */
+    }
+  }
 
   const maybeSintonizarOleada = async () => {
     if (!proyectoId) return;
