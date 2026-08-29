@@ -359,9 +359,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         }
 
         const depthPs = desglosadorProfundidadGanadaPs(patch.subVehiculos);
+        const wallMin = resolveDuracionMinCierre(
+          vehicle,
+          Math.max(0, (patch.cierreAt - (vehicle.aperturaAt ?? patch.cierreAt)) / 60_000)
+        );
         paintVehicle(vehicleId, {
           status: patch.status,
           cierreAt: patch.cierreAt,
+          duracionFinal: wallMin || undefined,
           subVehiculos: patch.subVehiculos,
           desglosadorBloqueDepthPsGranted: depthPs,
           destinoCierre: destino,
@@ -418,6 +423,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               {
                 status: patch.status,
                 cierreAt: patch.cierreAt,
+                duracionFinal: wallMin || undefined,
                 subVehiculos: patch.subVehiculos,
                 desglosadorBloqueDepthPsGranted: depthPs,
                 destinoCierre: destino,
@@ -429,12 +435,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               ...vehicle,
               status: patch.status,
               cierreAt: patch.cierreAt,
+              duracionFinal: wallMin || vehicle.duracionFinal,
               subVehiculos: patch.subVehiculos,
               desglosadorBloqueDepthPsGranted: depthPs,
               destinoCierre: destino,
             };
-            const apertura = vehicle.aperturaAt ?? patch.cierreAt;
-            const duracionMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
+            const duracionMin = wallMin;
             registrarCierreConcienciaTriada(userId, {
               vehicleId: closed.id,
               minutos: resolveDuracionMinCierre(closed, duracionMin),
@@ -633,9 +639,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           return;
         }
 
+        const wallMin = resolveDuracionMinCierre(
+          vehicle,
+          Math.max(0, (patch.cierreAt - (vehicle.aperturaAt ?? patch.cierreAt)) / 60_000)
+        );
         paintVehicle(vehicleId, {
           status: patch.status,
           cierreAt: patch.cierreAt,
+          duracionFinal: wallMin || undefined,
           subTareas: patch.subTareas,
           situacionCronometro: patch.situacionCronometro,
           situacionCupoAnchor: patch.situacionCupoAnchor,
@@ -680,6 +691,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               {
                 status: patch.status,
                 cierreAt: patch.cierreAt,
+                duracionFinal: wallMin || undefined,
                 subTareas: patch.subTareas,
                 situacionCronometro: patch.situacionCronometro,
                 situacionCupoAnchor: patch.situacionCupoAnchor,
@@ -688,18 +700,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               },
               { skipLocalSync: true }
             );
-            const feedsHub = feedsProyectoHub(destino);
             const closed: Vehicle = {
               ...vehicle,
               status: patch.status,
               cierreAt: patch.cierreAt,
+              duracionFinal: wallMin || vehicle.duracionFinal,
               subTareas: patch.subTareas,
               situacionCronometro: patch.situacionCronometro,
               situacionCupoAnchor: patch.situacionCupoAnchor,
               destinoCierre: destino,
-              ...(feedsHub
-                ? {}
-                : { aperturaAt: patch.cierreAt, duracionFinal: 0 }),
             };
             const apertura = vehicle.aperturaAt ?? patch.cierreAt;
             const wallMin = Math.max(0, (patch.cierreAt - apertura) / 60_000);
@@ -709,11 +718,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               destino,
               at: patch.cierreAt,
             });
-            const duracionMin = feedsHub ? wallMin : 0;
             await recordProgresoHubAlCerrarVehiculo(userId, closed, {
               tipoOrigen: "situacion",
               psGanados: awarded,
-              duracionMin,
+              duracionMin: wallMin,
               subTareas: patch.subTareas,
               destinoCierre: destino,
             });
@@ -837,15 +845,16 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isConquistaRapido(vehicle)) return;
         const cierreAt = Date.now();
-        const patch: Partial<Vehicle> = { status, cierreAt };
+        const apertura = vehicle.aperturaAt ?? cierreAt;
+        const durMin = Math.max(0, (cierreAt - apertura) / 60_000);
+        const patch: Partial<Vehicle> = {
+          status,
+          cierreAt,
+          ...(durMin > 0 ? { duracionFinal: durMin } : {}),
+        };
         if (cantidad != null && Number.isFinite(cantidad) && cantidad > 0) {
           patch.resultadoPorUnidad = cantidad;
-          const apertura = vehicle.aperturaAt ?? cierreAt;
-          const durMin = Math.max(0, (cierreAt - apertura) / 60_000);
-          if (durMin > 0) {
-            patch.duracionFinal = durMin;
-            patch.mejorTiempoPorUnidad = durMin / cantidad;
-          }
+          if (durMin > 0) patch.mejorTiempoPorUnidad = durMin / cantidad;
         }
         paintVehicle(vehicleId, patch);
         await yieldAfterPaint();
@@ -879,6 +888,24 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         void runShadowTaskAsync(async () => {
           try {
             await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+            const destino = destinoCierreVivo(userId, vehicle);
+            const closed: Vehicle = {
+              ...vehicle,
+              ...patch,
+              destinoCierre: destino,
+            };
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(vehicle, durMin),
+              destino,
+              at: cierreAt,
+            });
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: "tiempo",
+              psGanados: 0,
+              duracionMin: durMin,
+              destinoCierre: destino,
+            });
           } catch (e) {
             console.error("[jornada4.closeRapidoVehicle] remote", e);
           }
@@ -969,16 +996,23 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle)) return;
-        // Lista libre no tiene tiempo: siempre presencia, nunca Norte.
+        // Lista libre: sella pared al cerrar (presencia). No reclama Norte.
         const destino: DestinoCierre = "presencia";
         const cierreAt = Date.now();
+        const apertura = vehicle.aperturaAt ?? cierreAt;
+        const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
         const anyOk = (vehicle.subTareas ?? []).some(
           s =>
             s.resultadoSituacion === "cumplido" ||
             (s.completada && s.resultadoSituacion !== "fallado")
         );
         const status = anyOk ? ("cumplido" as const) : ("archivado" as const);
-        paintVehicle(vehicleId, { status, cierreAt, destinoCierre: destino });
+        paintVehicle(vehicleId, {
+          status,
+          cierreAt,
+          destinoCierre: destino,
+          ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
+        });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
 
@@ -1017,34 +1051,30 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 cierreAt,
                 destinoCierre: destino,
                 proyectoId: vehicle.proyectoId,
+                ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
               },
               { skipLocalSync: true }
             );
-            if (status === "cumplido") {
-              const closed: Vehicle = {
-                ...vehicle,
-                status,
-                cierreAt,
-                destinoCierre: destino,
-                aperturaAt: cierreAt,
-                duracionFinal: 0,
-              };
-              const apertura = vehicle.aperturaAt ?? cierreAt;
-              const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
-              registrarCierreConcienciaTriada(userId, {
-                vehicleId: vehicle.id,
-                minutos: resolveDuracionMinCierre(vehicle, wallMin),
-                destino,
-                at: cierreAt,
-              });
-              await recordProgresoHubAlCerrarVehiculo(userId, closed, {
-                tipoOrigen: "situacion",
-                psGanados: awarded,
-                duracionMin: 0,
-                subTareas: vehicle.subTareas ?? [],
-                destinoCierre: destino,
-              });
-            }
+            const closed: Vehicle = {
+              ...vehicle,
+              status,
+              cierreAt,
+              destinoCierre: destino,
+              ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
+            };
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(vehicle, wallMin),
+              destino,
+              at: cierreAt,
+            });
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: "situacion",
+              psGanados: awarded,
+              duracionMin: wallMin,
+              subTareas: vehicle.subTareas ?? [],
+              destinoCierre: destino,
+            });
           } catch (e) {
             console.error("[jornada4.closeSituacionLibreBloque] remote", e);
           }
@@ -1665,8 +1695,16 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         if (!vehicle || vehicle.status !== "activo") return;
         const cierreAt = Date.now();
         const parentId = vehicle.vehiculoPadreDesglosadorId;
+        const apertura = vehicle.aperturaAt ?? cierreAt;
+        const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
+        const destino = destinoCierreVivo(userId, vehicle);
 
-        paintVehicle(vehicleId, { status, cierreAt });
+        paintVehicle(vehicleId, {
+          status,
+          cierreAt,
+          destinoCierre: destino,
+          ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
+        });
         notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
         await yieldAfterPaint();
 
@@ -1708,9 +1746,33 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             await updateVehicle(
               userId,
               vehicleId,
-              { status, cierreAt },
+              {
+                status,
+                cierreAt,
+                destinoCierre: destino,
+                ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
+              },
               { skipLocalSync: true }
             );
+            const closed: Vehicle = {
+              ...vehicle,
+              status,
+              cierreAt,
+              destinoCierre: destino,
+              ...(wallMin > 0 ? { duracionFinal: wallMin } : {}),
+            };
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(vehicle, wallMin),
+              destino,
+              at: cierreAt,
+            });
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: "situacion",
+              psGanados: 0,
+              duracionMin: wallMin,
+              destinoCierre: destino,
+            });
           } catch (e) {
             console.error("[jornada4.closeExpressVehicle] remote", e);
           }

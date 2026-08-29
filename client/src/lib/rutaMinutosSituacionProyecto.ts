@@ -4,7 +4,8 @@
  * - Ring (tarea con tiempo): el clic acredita los segundos reales de la fila.
  *   Norte solo con destino explícito peldaño (Dirección). Un proyectoId
  *   sin ese sello alimenta presencia — no se reclama Dirección de ego.
- * - Lista libre (sin tiempo): no llena minutos; el cierre alimenta presencia.
+ * - Lista libre (sin ring): el clic de fila no llena minutos; el cierre del
+ *   vehículo sella la pared (`gastoTiempo`) como presencia.
  * - La bolsa/trending NO se recalcula aquí: el kernel del ring ya lo hizo
  *   en applySituacionRowClose. Esta ruta es O(1) y segura para el gesto ms0.
  */

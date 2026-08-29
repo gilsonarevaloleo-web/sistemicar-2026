@@ -33,7 +33,7 @@ export const TRIADA_META: Record<
 > = {
   inconsciente: {
     label: "Inconsciente",
-    hint: "Huecos de cobertura y tramo del plan que aún no ocurre.",
+    hint: "Huecos: plan ya ocurrido sin vehículo. Lo que aún no ocurre no es deuda — está no conquistado.",
     color: "#64748B",
   },
   presencia: {
@@ -562,9 +562,9 @@ export function buildConcienciaTriadaModel(params: {
   } else if (etapaDominante === "presencia") {
     headline = `Dominante Presencia · ${pctPresencia}% del plan — cubre, no dirige.`;
   } else if (minutosPlanFuturo > 0 && minutosHueco > 0) {
-    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — huecos y lo que aún no ocurre.`;
+    headline = `Huecos e inconsciencia: ${pctInconsciente}% del plan. Lo que aún no ocurre no es deuda — está no conquistado.`;
   } else if (minutosPlanFuturo > 0) {
-    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — incluye lo que aún no ocurre.`;
+    headline = `${pctInconsciente}% del plan aún no ocurre — no conquistado, no es deuda.`;
   } else {
     headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — horas asignadas sin convertir.`;
   }
