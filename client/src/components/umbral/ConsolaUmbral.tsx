@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   Check,
+  ChevronDown,
   Crown,
   Flame,
   Loader2,
@@ -20,13 +21,32 @@ import {
 } from "@shared/umbral/engineConfig";
 import type { UmbralPsAward } from "@shared/umbral/pointsConfig";
 import {
+  calcularProgresoCarrera,
+  codigoTrasAprobar,
+  esCodigoElegible,
+  historialDesdeLogro,
+  logrosDeCodigo,
+  mergeLogros,
+  primerCodigoPendiente,
+  type LogroCodigoUmbral,
+  type ProgresoCarreraUmbral,
+  type ProgresoModoUmbral,
+} from "@shared/umbral/progreso";
+import {
   UMBRAL_SKU,
   requierePagoUmbral,
 } from "@shared/umbralPricing";
 import {
   evaluarUmbral,
+  listarSesionesUmbral,
   type UmbralHistorialItem,
 } from "@/lib/umbral/api";
+import {
+  appendLogroUmbral,
+  cargarLogrosFirestore,
+  loadUmbralLogrosLocal,
+  persistirLogrosFusionados,
+} from "@/lib/umbral/logrosStore";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { CardPerfilCliente } from "./CardPerfilCliente";
@@ -34,6 +54,18 @@ import { CardPerfilCliente } from "./CardPerfilCliente";
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
 const WARN = "#FF6B35";
+
+function formatFechaLogro(iso: string): string {
+  if (!iso) return "Sin fecha";
+  try {
+    return new Date(iso).toLocaleString("es-PE", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 interface ConsolaUmbralProps {
   userId: string;
@@ -77,7 +109,21 @@ export function ConsolaUmbral({
 }: ConsolaUmbralProps) {
   const [modo, setModo] = useState<ModoUmbral>("INTERNO_HABILIDAD");
   const [codigoActual, setCodigoActual] = useState<CodigoNumero>(1);
-  const [aprobados, setAprobados] = useState<Set<CodigoNumero>>(new Set());
+  const [superadosPorModo, setSuperadosPorModo] = useState<
+    Record<ModoUmbral, Set<CodigoNumero>>
+  >({
+    INTERNO_HABILIDAD: new Set(),
+    EXTERNO_VENTAS: new Set(),
+  });
+  const [sesionIdPorModo, setSesionIdPorModo] = useState<
+    Record<ModoUmbral, string | null>
+  >({
+    INTERNO_HABILIDAD: null,
+    EXTERNO_VENTAS: null,
+  });
+  const [logros, setLogros] = useState<LogroCodigoUmbral[]>([]);
+  const [hidratando, setHidratando] = useState(true);
+  const [historialCodigoAbierto, setHistorialCodigoAbierto] = useState(false);
   const [respuesta, setRespuesta] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,16 +132,99 @@ export function ConsolaUmbral({
   const [moduloCompletado, setModuloCompletado] = useState(false);
   const [resumenSesion, setResumenSesion] = useState<string[]>([]);
   const [psSesion, setPsSesion] = useState(0);
-  const [sesionId, setSesionId] = useState<string | null>(null);
   /** Paywall tras aprobar C1 en trial, o al intentar C2+. */
   const [mostrarPaywall, setMostrarPaywall] = useState(false);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const aprobados = superadosPorModo[modo];
+  const sesionId = sesionIdPorModo[modo];
+  const progresoModo = useMemo<ProgresoModoUmbral>(() => {
+    const siguiente = primerCodigoPendiente(aprobados);
+    const superados = CODIGOS_NUMERO.filter((n) => aprobados.has(n));
+    return {
+      modo,
+      superados,
+      siguiente,
+      codigoPorDefecto: siguiente ?? 1,
+      elegibles:
+        siguiente == null
+          ? [...CODIGOS_NUMERO]
+          : CODIGOS_NUMERO.filter((n) => aprobados.has(n) || n === siguiente),
+    };
+  }, [modo, aprobados]);
+  const logrosCodigo = useMemo(
+    () => logrosDeCodigo(logros, modo, codigoActual),
+    [logros, modo, codigoActual],
+  );
+
+  function aplicarProgreso(
+    p: ProgresoCarreraUmbral,
+    opts?: { posicionar?: boolean; modoRef?: ModoUmbral },
+  ) {
+    setLogros(p.logros);
+    setSuperadosPorModo({
+      INTERNO_HABILIDAD: new Set(p.porModo.INTERNO_HABILIDAD.superados),
+      EXTERNO_VENTAS: new Set(p.porModo.EXTERNO_VENTAS.superados),
+    });
+    if (opts?.posicionar !== false) {
+      const m = opts?.modoRef ?? modo;
+      setCodigoActual(p.porModo[m].codigoPorDefecto);
+    }
+  }
 
   useEffect(() => {
     return () => {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function hidratar() {
+      setHidratando(true);
+      try {
+        const local = loadUmbralLogrosLocal(userId);
+        if (!cancelled && local.length > 0) {
+          aplicarProgreso(calcularProgresoCarrera(local), { posicionar: true });
+        }
+
+        const data = await listarSesionesUmbral(userId);
+        if (cancelled) return;
+        let firestore: LogroCodigoUmbral[] = [];
+        try {
+          firestore = await cargarLogrosFirestore(userId);
+        } catch {
+          firestore = [];
+        }
+        const progreso = persistirLogrosFusionados(
+          userId,
+          data.sesiones,
+          firestore,
+        );
+        if (cancelled) return;
+        aplicarProgreso(progreso, { posicionar: true });
+        const ids: Record<ModoUmbral, string | null> = {
+          INTERNO_HABILIDAD: null,
+          EXTERNO_VENTAS: null,
+        };
+        for (const s of data.sesiones) {
+          if (s.estado === "EN_PROGRESO" && !ids[s.modo]) {
+            ids[s.modo] = s.id;
+          }
+        }
+        setSesionIdPorModo(ids);
+      } catch (e) {
+        console.warn("[ConsolaUmbral] No se pudo hidratar progreso:", e);
+      } finally {
+        if (!cancelled) setHidratando(false);
+      }
+    }
+    void hidratar();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   const cfg = useMemo(() => obtenerCodigo(codigoActual), [codigoActual]);
   const modoMeta = MODOS_UMBRAL[modo];
@@ -118,37 +247,41 @@ export function ConsolaUmbral({
     };
   }, [cfg, modo]);
 
-  function cambiarModo(next: ModoUmbral) {
-    if (next === modo) return;
-    setModo(next);
-    setCodigoActual(1);
-    setAprobados(new Set());
+  function resetIntentoLocal() {
     setRespuesta("");
     setVeredicto(null);
     setError(null);
     setHistorial([]);
+    setHistorialCodigoAbierto(false);
+  }
+
+  function cambiarModo(next: ModoUmbral) {
+    if (next === modo) return;
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    setModo(next);
+    setCodigoActual(primerCodigoPendiente(superadosPorModo[next]) ?? 1);
+    resetIntentoLocal();
     setModuloCompletado(false);
     setResumenSesion([]);
     setPsSesion(0);
-    setSesionId(null);
+    setMostrarPaywall(false);
   }
 
   function reiniciar(mismoModo = true) {
-    setCodigoActual(1);
-    setAprobados(new Set());
-    setRespuesta("");
-    setVeredicto(null);
-    setError(null);
-    setHistorial([]);
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    const nextModo: ModoUmbral = mismoModo
+      ? modo
+      : modo === "INTERNO_HABILIDAD"
+        ? "EXTERNO_VENTAS"
+        : "INTERNO_HABILIDAD";
+    setSesionIdPorModo((prev) => ({ ...prev, [nextModo]: null }));
+    if (!mismoModo) setModo(nextModo);
+    setCodigoActual(primerCodigoPendiente(superadosPorModo[nextModo]) ?? 1);
+    resetIntentoLocal();
     setModuloCompletado(false);
     setResumenSesion([]);
     setPsSesion(0);
-    setSesionId(null);
-    if (!mismoModo) {
-      setModo((m) =>
-        m === "INTERNO_HABILIDAD" ? "EXTERNO_VENTAS" : "INTERNO_HABILIDAD",
-      );
-    }
+    setMostrarPaywall(false);
   }
 
   async function someter() {
@@ -172,13 +305,13 @@ export function ConsolaUmbral({
       });
 
       if (data.sesionId) {
-        setSesionId(data.sesionId);
+        setSesionIdPorModo((prev) => ({ ...prev, [modo]: data.sesionId }));
       }
 
       const nextHistorial: UmbralHistorialItem[] = [
         ...historial,
-        { rol: "user", texto },
-        { rol: "system", texto: data.feedbackConfrontativo },
+        { rol: "user" as const, texto },
+        { rol: "system" as const, texto: data.feedbackConfrontativo },
       ].slice(-16);
       setHistorial(nextHistorial);
 
@@ -201,39 +334,78 @@ export function ConsolaUmbral({
       }
 
       if (data.aprobado) {
-        setAprobados((prev) => {
-          const n = new Set(prev);
-          n.add(codigoActual);
-          return n;
-        });
+        const lastHist = [...(data.sesion?.historialCodigos ?? [])]
+          .reverse()
+          .find((h) => h.codigo === codigoActual);
+        const logro = lastHist
+          ? historialDesdeLogro(lastHist, modo, data.sesionId)
+          : historialDesdeLogro(
+              {
+                codigo: codigoActual,
+                intentos: 1,
+                respuestaAprobada: texto,
+                feedbackGemini: data.feedbackConfrontativo,
+                psGanados: psTotal,
+                fechaAprobacion: new Date().toISOString(),
+              },
+              modo,
+              data.sesionId,
+            );
+        if (logro) {
+          appendLogroUmbral(userId, logro);
+        }
+        if (data.progreso) {
+          const fused = persistirLogrosFusionados(
+            userId,
+            [],
+            data.progreso.logros,
+            logro ? [logro] : [],
+          );
+          aplicarProgreso(fused, { posicionar: false });
+        } else {
+          setSuperadosPorModo((prev) => {
+            const n = new Set(prev[modo]);
+            n.add(codigoActual);
+            return { ...prev, [modo]: n };
+          });
+          if (logro) {
+            setLogros((prev) => mergeLogros(prev, [logro]));
+          }
+        }
+
+        const siguiente = codigoTrasAprobar(aprobados, codigoActual);
         setResumenSesion((prev) =>
           prev.includes(cfg.nombre) ? prev : [...prev, cfg.nombre],
         );
         setVeredicto({
           kind: "aprobado",
           feedback: data.feedbackConfrontativo,
-          siguiente: data.codigoSiguiente,
+          siguiente,
           psAwards,
           psTotal,
         });
         setRespuesta("");
-        if (data.moduloCompletado || data.codigoSiguiente == null) {
+        setHistorial([]);
+        const superadosTrasPase: CodigoNumero[] = [];
+        aprobados.forEach((n) => superadosTrasPase.push(n));
+        superadosTrasPase.push(codigoActual);
+        if (
+          (data.moduloCompletado || codigoActual === 10) &&
+          primerCodigoPendiente(superadosTrasPase) == null
+        ) {
           setModuloCompletado(true);
-        } else if (data.codigoSiguiente) {
-          const siguiente = data.codigoSiguiente as CodigoNumero;
-          // Trial: tras aprobar C1, no avanzar — mostrar paywall.
-          if (requierePagoUmbral(siguiente, hasPaidAccess)) {
-            if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-            advanceTimerRef.current = setTimeout(() => {
-              setMostrarPaywall(true);
-            }, 1200);
-          } else {
-            if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-            advanceTimerRef.current = setTimeout(() => {
-              setCodigoActual(siguiente);
-              setVeredicto(null);
-            }, 1400);
-          }
+        } else if (requierePagoUmbral(siguiente, hasPaidAccess)) {
+          if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+          advanceTimerRef.current = setTimeout(() => {
+            setMostrarPaywall(true);
+          }, 1200);
+        } else {
+          if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+          advanceTimerRef.current = setTimeout(() => {
+            setCodigoActual(siguiente);
+            setVeredicto(null);
+            setHistorialCodigoAbierto(false);
+          }, 1400);
         }
       } else {
         setVeredicto({
@@ -419,7 +591,8 @@ export function ConsolaUmbral({
               PROC-UMBRAL // SISTEMICAR V2
             </p>
             <p className="mt-1 text-[11px] text-white/40">
-              Consola de evaluación · secuencia rígida de 10 Códigos
+              Práctica de 10 Códigos · el pendiente abre solo; los superados se
+              pueden repasar
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -532,7 +705,13 @@ export function ConsolaUmbral({
         {/* Progreso 1–10 */}
         <div data-testid="umbral-v2-progreso">
           <div className="mb-2 flex items-center justify-between text-[10px] tracking-widest text-white/40">
-            <span>PROGRESO DE CÓDIGOS</span>
+            <span>
+              {hidratando
+                ? "CARGANDO PROGRESO…"
+                : progresoModo.siguiente
+                  ? `PENDIENTE · CÓDIGO ${progresoModo.siguiente}`
+                  : "MODO SUPERADO · ELIGE CUALQUIER CÓDIGO"}
+            </span>
             <span className="flex items-center gap-3">
               {psSesion > 0 && (
                 <span style={{ color: CYAN }} data-testid="umbral-v2-ps-sesion">
@@ -547,23 +726,29 @@ export function ConsolaUmbral({
               const done = aprobados.has(n);
               const active = n === codigoActual && !mostrarPaywall;
               const paidLock = requierePagoUmbral(n, hasPaidAccess);
-              const seqLocked = n > codigoActual && !done;
+              const elegible = esCodigoElegible(progresoModo, n);
+              const seqLocked = !elegible;
               const locked = paidLock || seqLocked;
               return (
                 <button
                   key={n}
                   type="button"
-                  disabled={(seqLocked && !paidLock) || loading}
+                  disabled={(seqLocked && !paidLock) || loading || hidratando}
                   onClick={() => {
                     if (paidLock) {
                       setMostrarPaywall(true);
                       return;
                     }
-                    if (done || n === codigoActual) {
+                    if (elegible) {
+                      if (advanceTimerRef.current) {
+                        clearTimeout(advanceTimerRef.current);
+                      }
                       setMostrarPaywall(false);
                       setCodigoActual(n);
                       setVeredicto(null);
                       setError(null);
+                      setHistorial([]);
+                      setHistorialCodigoAbierto(false);
                     }
                   }}
                   className="relative flex h-9 w-9 items-center justify-center border text-[11px] font-bold tracking-wide transition-colors"
@@ -589,7 +774,7 @@ export function ConsolaUmbral({
                         : "rgba(0,0,0,0.4)",
                   }}
                   aria-current={active ? "step" : undefined}
-                  aria-label={`Código ${n}${done ? " aprobado" : paidLock ? " requiere pago" : active ? " activo" : " bloqueado"}`}
+                  aria-label={`Código ${n}${done ? " superado, elegible para repasar" : paidLock ? " requiere pago" : active ? " pendiente activo" : elegible ? " pendiente" : " bloqueado"}`}
                   data-testid={`umbral-v2-codigo-${n}`}
                 >
                   {done && !active ? (
@@ -668,6 +853,60 @@ export function ConsolaUmbral({
                     {desafio.postura}
                   </p>
                 </div>
+
+                {logrosCodigo.length > 0 && (
+                  <div
+                    className="mt-4 border border-[#D4AF37]/25 bg-[#D4AF37]/08"
+                    data-testid="umbral-v2-historial-codigo"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setHistorialCodigoAbierto((v) => !v)}
+                      className="flex w-full items-center justify-between px-3 py-2 text-left"
+                      aria-expanded={historialCodigoAbierto}
+                    >
+                      <span
+                        className="text-[10px] tracking-widest"
+                        style={{ color: GOLD }}
+                      >
+                        HISTORIAL DE ESTE CÓDIGO · {logrosCodigo.length} logro
+                        {logrosCodigo.length === 1 ? "" : "s"}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={`text-[#D4AF37]/70 transition-transform ${historialCodigoAbierto ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {historialCodigoAbierto && (
+                      <div className="space-y-2 border-t border-[#D4AF37]/20 px-3 py-3">
+                        <p className="text-[11px] text-white/45">
+                          Si hoy no pasa, revisa cómo lo cortaste antes.
+                        </p>
+                        {logrosCodigo.map((l) => (
+                          <article
+                            key={`${l.sesionId}-${l.fechaAprobacion}-${l.codigo}`}
+                            className="border border-white/10 bg-black/30 p-3"
+                          >
+                            <p className="text-[10px] tracking-widest text-white/40">
+                              {formatFechaLogro(l.fechaAprobacion)}
+                              {l.intentos > 0
+                                ? ` · ${l.intentos} intento${l.intentos === 1 ? "" : "s"}`
+                                : ""}
+                            </p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+                              {l.respuestaAprobada}
+                            </p>
+                            {l.feedbackGemini ? (
+                              <p className="mt-1.5 text-xs leading-relaxed text-white/45">
+                                Feedback: {l.feedbackGemini}
+                              </p>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -741,7 +980,7 @@ export function ConsolaUmbral({
             <p className="text-[10px] tracking-[0.2em]" style={{ color: GOLD }}>
               APROBADO
               {veredicto.siguiente
-                ? ` · AVANZA A CÓDIGO ${veredicto.siguiente}`
+                ? ` · SIGUE EN CÓDIGO ${veredicto.siguiente}`
                 : " · MÓDULO CERRADO"}
               {veredicto.psTotal > 0 ? ` · +${veredicto.psTotal} PS` : ""}
             </p>

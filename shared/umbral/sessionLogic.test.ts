@@ -103,4 +103,63 @@ describe("Umbral v2 — sessionLogic", () => {
     const reintento = estimarPsCodigoAprobado(4, 3);
     assert.ok(limpio > reintento);
   });
+
+  it("repasar un código ya aprobado agrega otro logro y no cierra el módulo", () => {
+    let s = crearSesionUmbral({
+      id: "s1",
+      userId: "u1",
+      modo: "INTERNO_HABILIDAD",
+    });
+    s = aplicarEvaluacionASesion(s, {
+      codigo: 1,
+      aprobado: true,
+      respuestaUsuario: "Primer pase: excusa puntual del celular.",
+      feedbackGemini: "Avanzas.",
+      codigoSiguiente: 2,
+      nowIso: "2026-08-01T10:00:00.000Z",
+    });
+    s = aplicarEvaluacionASesion(s, {
+      codigo: 1,
+      aprobado: true,
+      respuestaUsuario: "Repaso: la misma excusa, ahora con horario.",
+      feedbackGemini: "Sigue válido.",
+      codigoSiguiente: 2,
+      nowIso: "2026-08-02T10:00:00.000Z",
+    });
+    assert.equal(s.estado, "EN_PROGRESO");
+    assert.equal(s.historialCodigos.length, 2);
+    assert.equal(s.historialCodigos[0].codigo, 1);
+    assert.equal(s.historialCodigos[1].codigo, 1);
+    assert.match(s.historialCodigos[1].respuestaAprobada, /Repaso/);
+    assert.equal(s.codigoActual, 2);
+  });
+
+  it("diez códigos únicos cierran el módulo; un repaso extra no lo reabre", () => {
+    let s = crearSesionUmbral({
+      id: "s1",
+      userId: "u1",
+      modo: "INTERNO_HABILIDAD",
+    });
+    for (let n = 1; n <= 10; n++) {
+      const codigo = n as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+      s = aplicarEvaluacionASesion(s, {
+        codigo,
+        aprobado: true,
+        respuestaUsuario: `Pase denso del código ${n} con acción concreta.`,
+        feedbackGemini: "Ok.",
+        codigoSiguiente: n < 10 ? ((n + 1) as 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) : null,
+      });
+    }
+    assert.equal(s.estado, "COMPLETADO");
+    assert.equal(new Set(s.historialCodigos.map((h) => h.codigo)).size, 10);
+    s = aplicarEvaluacionASesion(s, {
+      codigo: 3,
+      aprobado: true,
+      respuestaUsuario: "Repaso del 3 después de cerrar el módulo.",
+      feedbackGemini: "Ok.",
+      codigoSiguiente: 4,
+    });
+    assert.equal(s.estado, "COMPLETADO");
+    assert.equal(s.historialCodigos.length, 11);
+  });
 });

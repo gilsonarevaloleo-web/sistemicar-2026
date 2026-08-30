@@ -9,14 +9,27 @@ import {
   RefreshCw,
   Sparkles,
   Target,
+  Trophy,
 } from "lucide-react";
 import {
+  CODIGOS_NUMERO,
+  DICCIONARIO_CODIGOS,
   MODOS_UMBRAL,
+  type CodigoNumero,
   type ModoUmbral,
 } from "@shared/umbral/engineConfig";
 import type { MetricasDiagnosticasUmbral } from "@shared/umbral/metrics";
+import {
+  logrosDeCodigo,
+  type LogroCodigoUmbral,
+  type ProgresoCarreraUmbral,
+} from "@shared/umbral/progreso";
 import type { SesionUmbral } from "@shared/umbral/sessionTypes";
 import { listarSesionesUmbral } from "@/lib/umbral/api";
+import {
+  cargarLogrosFirestore,
+  persistirLogrosFusionados,
+} from "@/lib/umbral/logrosStore";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -161,6 +174,141 @@ function SesionCard({ sesion }: { sesion: SesionUmbral }) {
   );
 }
 
+function HistorialLogrosPorCodigo({
+  progreso,
+}: {
+  progreso: ProgresoCarreraUmbral;
+}) {
+  const [modo, setModo] = useState<ModoUmbral>("INTERNO_HABILIDAD");
+  const [abierto, setAbierto] = useState<CodigoNumero | null>(null);
+  const modoMeta = MODOS_UMBRAL[modo];
+  const pModo = progreso.porModo[modo];
+
+  return (
+    <section
+      className="border border-white/12 bg-black/45 p-5"
+      data-testid="umbral-metricas-logros"
+    >
+      <p
+        className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
+        style={{ color: GOLD }}
+      >
+        <Trophy size={14} />
+        HISTORIAL DE LOGROS POR CÓDIGO
+      </p>
+      <p className="mt-1 text-[11px] text-white/40">
+        Cómo superaste cada código. Si en una sesión nueva no pasas, abre el
+        logro anterior.
+      </p>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {(
+          [
+            ["INTERNO_HABILIDAD", MODOS_UMBRAL.INTERNO_HABILIDAD.label],
+            ["EXTERNO_VENTAS", MODOS_UMBRAL.EXTERNO_VENTAS.label],
+          ] as const
+        ).map(([id, label]) => {
+          const active = modo === id;
+          const n = progreso.porModo[id].superados.length;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setModo(id);
+                setAbierto(null);
+              }}
+              className="border px-3 py-2 text-left text-[11px] tracking-widest"
+              style={{
+                borderColor: active ? `${CYAN}66` : "rgba(255,255,255,0.1)",
+                color: active ? CYAN : "rgba(255,255,255,0.55)",
+                background: active ? `${CYAN}12` : "transparent",
+              }}
+              data-testid={`umbral-metricas-logros-modo-${id}`}
+            >
+              {label.toUpperCase()} · {n}/10
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {CODIGOS_NUMERO.map((n) => {
+          const items = logrosDeCodigo(progreso.logros, modo, n);
+          const superado = pModo.superados.includes(n);
+          const open = abierto === n;
+          return (
+            <div
+              key={`${modo}-${n}`}
+              className="border border-white/10 bg-black/30"
+              data-testid={`umbral-metricas-logro-c${n}`}
+            >
+              <button
+                type="button"
+                onClick={() => setAbierto(open ? null : n)}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                aria-expanded={open}
+              >
+                <span
+                  className="text-[12px] font-bold"
+                  style={{ color: superado ? GOLD : "rgba(255,255,255,0.35)" }}
+                >
+                  C{n}
+                </span>
+                <span className="min-w-0 flex-1 text-sm text-white/75">
+                  {DICCIONARIO_CODIGOS[n].nombre.replace(/^Código \d+:\s*/, "")}
+                </span>
+                <span className="shrink-0 text-[10px] tracking-widest text-white/40">
+                  {superado
+                    ? `${items.length} logro${items.length === 1 ? "" : "s"}`
+                    : "PENDIENTE"}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`shrink-0 text-white/35 transition-transform ${open ? "rotate-180" : ""}`}
+                />
+              </button>
+              {open && (
+                <div className="space-y-2 border-t border-white/8 px-3 py-3">
+                  {items.length === 0 ? (
+                    <p className="text-xs text-white/40">
+                      Aún no hay un pase registrado en {modoMeta.label}.
+                    </p>
+                  ) : (
+                    items.map((l) => (
+                      <article
+                        key={`${l.sesionId}-${l.fechaAprobacion}-${l.respuestaAprobada.slice(0, 24)}`}
+                        className="border border-white/8 bg-white/[0.03] p-3"
+                      >
+                        <p
+                          className="text-[10px] tracking-widest"
+                          style={{ color: GOLD }}
+                        >
+                          {formatFecha(l.fechaAprobacion)}
+                          {` · ${l.intentos} intento${l.intentos === 1 ? "" : "s"}`}
+                          {l.psGanados > 0 ? ` · +${l.psGanados} PS` : ""}
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-white/85">
+                          {l.respuestaAprobada}
+                        </p>
+                        {l.feedbackGemini ? (
+                          <p className="mt-2 text-xs leading-relaxed text-white/45">
+                            Feedback: {l.feedbackGemini}
+                          </p>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function PanelMetricasUmbral({
   userId,
   backHref = "/umbral/v2",
@@ -172,14 +320,28 @@ export function PanelMetricasUmbral({
   const [metricas, setMetricas] = useState<MetricasDiagnosticasUmbral | null>(
     null,
   );
+  const [progreso, setProgreso] = useState<ProgresoCarreraUmbral | null>(null);
 
   async function cargar() {
     setLoading(true);
     setError(null);
     try {
       const data = await listarSesionesUmbral(userId);
+      let firestore: LogroCodigoUmbral[] = [];
+      try {
+        firestore = await cargarLogrosFirestore(userId);
+      } catch {
+        firestore = [];
+      }
+      const fused = persistirLogrosFusionados(
+        userId,
+        data.sesiones,
+        data.progreso?.logros,
+        firestore,
+      );
       setSesiones(data.sesiones);
       setMetricas(data.metricas);
+      setProgreso(fused);
     } catch (e: any) {
       setError(e?.message || "No se pudieron cargar las métricas.");
     } finally {
@@ -209,7 +371,7 @@ export function PanelMetricasUmbral({
             MÉTRICAS DIAGNÓSTICAS · UMBRAL V2
           </p>
           <p className="mt-1 text-[11px] text-white/40">
-            Cuellos de botella, corte limpio y fricción por código
+            Historial de logros por código, cuellos de botella y fricción
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -334,9 +496,12 @@ export function PanelMetricasUmbral({
               {metricas.tasaCorteLimpio}%
             </p>
             <p className="mt-1 text-sm text-white/50">
-              {metricas.cortesLimpios} de {metricas.codigosAprobados} códigos
-              aprobados al primer intento · {metricas.sesionesCompletadas}/
+              {metricas.cortesLimpios} de {metricas.codigosAprobados} pases al
+              primer intento · {metricas.sesionesCompletadas}/
               {metricas.totalSesiones} sesiones completadas
+              {progreso
+                ? ` · Forja ${progreso.porModo.INTERNO_HABILIDAD.superados.length}/10 · Arena ${progreso.porModo.EXTERNO_VENTAS.superados.length}/10`
+                : ""}
             </p>
           </section>
 
@@ -362,15 +527,25 @@ export function PanelMetricasUmbral({
             </div>
           </section>
 
+          {progreso && (
+            <HistorialLogrosPorCodigo progreso={progreso} />
+          )}
+
           {/* Historial */}
           <section data-testid="umbral-metricas-historial">
             <p className="mb-3 text-[10px] tracking-[0.2em] text-white/40">
-              HISTORIAL DE SESIONES COMPLETADAS
+              SESIONES (LOS LOGROS PERMANECEN AQUÍ Y ARRIBA, DÍA A DÍA)
             </p>
-            {completadas.length === 0 ? (
+            {completadas.length === 0 &&
+            !sesiones.some((s) => s.estado === "EN_PROGRESO") ? (
               <div className="border border-white/10 bg-black/35 px-4 py-6 text-sm text-white/40">
-                Aún no hay sesiones completadas. Cuando cierres los 10 Códigos,
-                aparecerán aquí con sus volcados y feedback.
+                Aún no hay sesiones. Cada código que apruebes queda en el
+                historial de logros, aunque no cierres los 10.
+              </div>
+            ) : completadas.length === 0 ? (
+              <div className="border border-white/10 bg-black/35 px-4 py-4 text-sm text-white/40">
+                Todavía no cierras un módulo de 10. Los pases de esta secuencia
+                ya están en el historial de logros.
               </div>
             ) : (
               <div className="space-y-2">

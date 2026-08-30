@@ -29,6 +29,28 @@ describe("Umbral v2 anti-freeze nav", () => {
     assert.match(src, /subscribeToProgression/);
   });
 
+  it("Consola hidrata progreso y trata códigos superados como elegibles", () => {
+    const src = readFileSync(
+      join(here, "../../components/umbral/ConsolaUmbral.tsx"),
+      "utf8",
+    );
+    assert.match(src, /listarSesionesUmbral/);
+    assert.match(src, /persistirLogrosFusionados/);
+    assert.match(src, /esCodigoElegible/);
+    assert.match(src, /codigoTrasAprobar/);
+    assert.match(src, /HISTORIAL DE ESTE CÓDIGO/);
+  });
+
+  it("Métricas muestran historial de logros por código", () => {
+    const src = readFileSync(
+      join(here, "../../components/umbral/PanelMetricasUmbral.tsx"),
+      "utf8",
+    );
+    assert.match(src, /HISTORIAL DE LOGROS POR CÓDIGO/);
+    assert.match(src, /persistirLogrosFusionados/);
+    assert.match(src, /umbral-metricas-logros/);
+  });
+
   it("Doctor IA no monta FAB en consola Umbral", () => {
     const src = readFileSync(
       join(here, "../../components/doctor-ia-chat.tsx"),

@@ -227,6 +227,12 @@ describe("Umbral v2 — POST /api/umbral/evaluar", () => {
         assert.equal(listBody.sesiones.length, 1);
         assert.equal(listBody.metricas.codigosAprobados, 1);
         assert.equal(listBody.metricas.tasaCorteLimpio, 100);
+        assert.deepEqual(listBody.progreso.porModo.INTERNO_HABILIDAD.superados, [
+          1,
+        ]);
+        assert.equal(listBody.progreso.porModo.INTERNO_HABILIDAD.siguiente, 2);
+        assert.equal(evalBody.codigoRecomendado, 2);
+        assert.equal(evalBody.progreso.logros.length, 1);
 
         const detRes = await fetch(
           `${base}/api/umbral/sesion/${evalBody.sesionId}?userId=u-persist`,

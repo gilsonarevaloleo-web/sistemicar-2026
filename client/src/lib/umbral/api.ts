@@ -1,5 +1,6 @@
 import type { CodigoNumero, ModoUmbral } from "@shared/umbral/engineConfig";
 import type { MetricasDiagnosticasUmbral } from "@shared/umbral/metrics";
+import type { ProgresoCarreraUmbral } from "@shared/umbral/progreso";
 import type { SesionUmbral } from "@shared/umbral/sessionTypes";
 
 export interface UmbralHistorialItem {
@@ -32,6 +33,8 @@ export interface UmbralEvaluarSuccess {
   source?: "gemini" | "local_fallback";
   sesionId: string;
   sesion: SesionUmbral;
+  progreso?: ProgresoCarreraUmbral;
+  codigoRecomendado?: CodigoNumero;
 }
 
 export interface UmbralEvaluarError {
@@ -51,6 +54,7 @@ export interface UmbralSesionesResponse {
   userId: string;
   sesiones: SesionUmbral[];
   metricas: MetricasDiagnosticasUmbral;
+  progreso?: ProgresoCarreraUmbral;
 }
 
 export interface UmbralSesionDetalleResponse {

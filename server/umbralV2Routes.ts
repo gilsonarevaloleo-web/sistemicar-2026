@@ -19,6 +19,10 @@ import {
 } from "../shared/umbral/engineConfig";
 import { calcularMetricasUmbral } from "../shared/umbral/metrics";
 import {
+  calcularProgresoDesdeSesiones,
+  type ProgresoCarreraUmbral,
+} from "../shared/umbral/progreso";
+import {
   aplicarEvaluacionASesion,
   crearSesionUmbral,
 } from "../shared/umbral/sessionLogic";
@@ -56,6 +60,8 @@ export interface UmbralEvaluarSuccess {
   source: "gemini" | "local_fallback";
   sesionId: string;
   sesion: SesionUmbral;
+  progreso: ProgresoCarreraUmbral;
+  codigoRecomendado: CodigoNumero;
 }
 
 export interface UmbralEvaluarErrorBody {
@@ -126,7 +132,7 @@ export function registerUmbralV2Routes(
 
   app.get("/api/umbral/meta", (_req: Request, res: Response) => {
     res.json({
-      version: "2.1.0-sesiones-metricas",
+      version: "2.2.0-historial-logros",
       endpoint: "POST /api/umbral/evaluar",
       sesiones: ["GET /api/umbral/sesiones", "GET /api/umbral/sesion/:id"],
       modos: ["INTERNO_HABILIDAD", "EXTERNO_VENTAS"],
@@ -151,11 +157,13 @@ export function registerUmbralV2Routes(
       }
       const sesiones = await sessionStore.listByUser(userId);
       const metricas = calcularMetricasUmbral(sesiones);
+      const progreso = calcularProgresoDesdeSesiones(sesiones);
       return res.status(200).json({
         success: true,
         userId,
         sesiones,
         metricas,
+        progreso,
       });
     } catch (error) {
       console.error("[umbral/sesiones]", error);
@@ -317,17 +325,25 @@ export function registerUmbralV2Routes(
         sesionId: sesionIdRaw || undefined,
       });
 
+      const codigoSiguiente = isCodigoNumero(evaluacion.codigoSiguiente)
+        ? evaluacion.codigoSiguiente
+        : null;
+
       sesion = aplicarEvaluacionASesion(sesion, {
         codigo: codigoActual,
         aprobado: evaluacion.aprobado,
         respuestaUsuario,
         feedbackGemini: evaluacion.feedbackConfrontativo,
-        codigoSiguiente: evaluacion.codigoSiguiente,
+        codigoSiguiente,
         psGanadosOverride: evaluacion.aprobado
           ? psGanadosOverride
           : undefined,
       });
       sesion = await sessionStore.save(sesion);
+
+      const sesionesUsuario = await sessionStore.listByUser(userId);
+      const progreso = calcularProgresoDesdeSesiones(sesionesUsuario);
+      const codigoRecomendado = progreso.porModo[modo].codigoPorDefecto;
 
       const body: UmbralEvaluarSuccess = {
         success: true,
@@ -335,13 +351,15 @@ export function registerUmbralV2Routes(
         codigoEvaluado: codigoActual,
         aprobado: evaluacion.aprobado,
         feedbackConfrontativo: evaluacion.feedbackConfrontativo,
-        codigoSiguiente: evaluacion.codigoSiguiente,
+        codigoSiguiente,
         moduloCompletado,
         nombreCodigo: prompt.nombreCodigo,
         userId,
         source,
         sesionId: sesion.id,
         sesion,
+        progreso,
+        codigoRecomendado,
       };
 
       return res.status(200).json(body);
