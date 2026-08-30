@@ -59,6 +59,7 @@ import EspejoExpedienteDetalle from "@/pages/espejo-expediente-detalle";
 import GraciasCompra from "@/pages/gracias-compra";
 import UmbralLeads from "@/pages/umbral-leads";
 import VentasEspejo from "@/pages/ventas-espejo";
+import VentasJornada from "@/pages/ventas-jornada";
 import MetricasDocumento from "@/pages/metricas-documento";
 import MapaSistemicar from "@/pages/mapa-sistemicar";
 import VendedoresPlanificacion from "@/pages/vendedores-planificacion";
@@ -348,6 +349,14 @@ function Router() {
       </>
     );
   }
+  if (location === "/ventas-jornada" || location.startsWith("/ventas-jornada")) {
+    return (
+      <>
+        <SellerRefCapture />
+        <VentasJornada />
+      </>
+    );
+  }
 
   return (
     <Layout>
@@ -512,6 +521,8 @@ function VoiceBootstrap() {
         p.startsWith("/menu/") ||
         p === "/vendedor" ||
         p.startsWith("/vendedor/") ||
+        p === "/ventas-jornada" ||
+        p.startsWith("/ventas-jornada") ||
         p === "/umbral" ||
         p.startsWith("/umbral/") ||
         p === "/pagos" ||

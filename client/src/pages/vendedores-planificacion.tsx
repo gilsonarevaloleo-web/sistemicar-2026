@@ -17,7 +17,11 @@ import {
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { SELLER_COMMISSION_RATE } from "@shared/sellerCommissions";
-import { buildSellerPagosUrl, buildSellerVendedorUrl } from "@/lib/sellerRef";
+import {
+  buildSellerPagosUrl,
+  buildSellerVendedorUrl,
+  buildSellerVentasJornadaUrl,
+} from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
 import {
@@ -109,6 +113,8 @@ export default function VendedoresPlanificacion() {
   const copyLink = (code: string) => copyText(buildSellerPagosUrl(code), "Link pagos copiado");
   const copyVendedorLink = (code: string) =>
     copyText(buildSellerVendedorUrl(code), "Link triage /vendedor copiado");
+  const copyVentasJornadaLink = (code: string) =>
+    copyText(buildSellerVentasJornadaUrl(code), "Link landing /ventas-jornada copiado");
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 pb-24">
@@ -462,7 +468,7 @@ export default function VendedoresPlanificacion() {
         <section className="p-5 rounded-xl border mb-6" style={{ borderColor: `${GOLD}40` }} data-testid="kit-link">
           <h2 className="text-sm font-bold text-white mb-2">Tus links de venta</h2>
           <p className="text-[11px] text-slate-500 mb-3">
-            Gilson te asigna un código. Usa el triage (`/vendedor`) para fijar Código + Planeta, o manda directo a `/pagos` con `ref=`:
+            Gilson te asigna un código. Anuncio Meta ? `/ventas-jornada`. Triage ? `/vendedor`. Checkout ? `/pagos` con `ref=`:
           </p>
           <div className="flex gap-2 mb-3">
             <input
@@ -474,6 +480,24 @@ export default function VendedoresPlanificacion() {
             />
           </div>
           <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">Landing anuncio Base</p>
+                <button
+                  type="button"
+                  onClick={() => copyVentasJornadaLink(demoCode)}
+                  className="px-3 py-1.5 rounded-lg font-bold text-black text-[10px] flex items-center gap-1"
+                  style={{ background: GOLD }}
+                  data-testid="button-copy-ventas-jornada-link"
+                >
+                  <Copy size={12} />
+                  Copiar
+                </button>
+              </div>
+              <p className="text-[10px] font-mono text-slate-600 break-all">
+                {buildSellerVentasJornadaUrl(demoCode || "TU-CODIGO")}
+              </p>
+            </div>
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <p className="text-[10px] uppercase tracking-wider text-slate-500">Triage Capa 1</p>

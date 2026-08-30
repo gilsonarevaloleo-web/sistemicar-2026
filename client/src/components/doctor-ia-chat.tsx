@@ -446,6 +446,7 @@ export function DoctorIAChat() {
     "/gracias-compra",
     "/umbral-leads",
     "/ventas-espejo",
+    "/ventas-jornada",
     "/vendedor",
     "/jornada-v4", // Dual Kernel: sin FAB ni ~10 listeners Firebase
     "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos
