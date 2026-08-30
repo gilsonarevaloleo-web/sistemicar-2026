@@ -12,15 +12,23 @@ const BLOOD = "#FF2A2A";
 
 type Props = {
   model: DisciplinaPlanDia;
+  /** Premios de cierre consciente en la última franja (puntos de %). */
+  bonoCierrePct?: number;
+  cierresConscientes?: number;
 };
 
 /**
  * Disciplina del día = planificación (N segmentos → 100/N c/u ± tardanza).
  */
-export function Jornada4DisciplinaCard({ model }: Props) {
+export function Jornada4DisciplinaCard({
+  model,
+  bonoCierrePct = 0,
+  cierresConscientes = 0,
+}: Props) {
   const headline = formatDisciplinaPlanHeadline(model);
   const sub = formatDisciplinaPlanSub(model);
   const fill = Math.min(100, Math.max(0, model.porcentajeDia));
+  const bono = Math.max(0, bonoCierrePct);
 
   return (
     <section
@@ -135,9 +143,22 @@ export function Jornada4DisciplinaCard({ model }: Props) {
         </div>
       ) : null}
 
+      {bono > 0 ? (
+        <p
+          className="text-[8px] leading-snug"
+          style={{ color: GOLD }}
+          data-testid="jornada4-disciplina-caracter"
+        >
+          +{bono}% carácter · {cierresConscientes} cierre
+          {cierresConscientes === 1 ? "" : "s"} consciente
+          {cierresConscientes === 1 ? "" : "s"} al término del plan.
+        </p>
+      ) : null}
+
       <p className="text-[7px] leading-snug" style={{ color: MUTED }}>
         100% ÷ {model.segmentosTotales || "N"} entradas. Cada minuto de tardanza resta del
         100 de esa puerta. Los cortes sin vehículo son huecos de cobertura, no de este marcador.
+        Cerrar a mano en la última hora suma disciplina; el cierre del sistema no.
       </p>
     </section>
   );

@@ -67,6 +67,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
       join(clientSrc, "hooks/useJornada4PuertaAlerts.ts"),
       join(clientSrc, "hooks/useJornada4SegmentAttention.ts"),
       join(clientSrc, "hooks/useJornada4EntrenamientoGuard.ts"),
+      join(clientSrc, "hooks/useJornada4PlanEnd.ts"),
       join(clientSrc, "components/jornada4"),
     ];
     const files: string[] = [];
@@ -110,6 +111,16 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.equal(session.includes('from "recharts"'), false);
     // Toasts sí; tick UI de badges no (false = sin setState root cada 1s).
     assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
+    assert.match(session, /useJornada4PlanEnd/);
+    assert.match(session, /Jornada4RevelacionCard/);
+    assert.equal(session.includes("useJornada4Tick"), false);
+    assert.equal(session.includes("HubRendicionTiempo"), false);
+  });
+
+  it("Hub Escalera no monta rendición per-proyecto", () => {
+    const hub = readFileSync(join(clientSrc, "pages/proyectos.tsx"), "utf8");
+    assert.equal(hub.includes("HubRendicionTiempo"), false);
+    assert.equal(hub.includes("buildProyectoRendicion"), false);
   });
 
   it("triada de Métricas no arrastra pulso ni reloj 1s", () => {

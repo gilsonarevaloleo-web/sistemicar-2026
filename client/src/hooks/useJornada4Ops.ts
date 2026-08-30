@@ -103,6 +103,23 @@ import {
 } from "@/lib/vehicleOperationalSlots";
 import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
 import { generateStableUuid } from "@/lib/stableUuid";
+import {
+  collectCierresConscientesAlTermino,
+  isCierreConscienteAlTermino,
+  markCierresConscientesPsAwarded,
+  PS_CIERRE_CONSCIENTE_PLAN,
+  readCierreConscientePlan,
+  recordCierresConscientesPlan,
+  vehiclesToCloseAtPlanEnd,
+} from "@/jornada4/cierrePlanSweep";
+import {
+  isPlanTerminado,
+  resolveLastSegmentWindowMs,
+  resolvePlanWindowMs,
+  sealRevelacionPlanDia,
+  readRevelacionPlanDia,
+} from "@/jornada4/revelacionPlanDia";
+import type { PlanEndSweepResult } from "@/jornada4/cierrePlanSweep";
 
 function destinoCierreVivo(
   userId: string | undefined,
@@ -149,13 +166,25 @@ export type UseJornada4OpsParams = {
   safeAwardPS: (amount: number, source: string) => Promise<boolean>;
   /** Segmento activo — fallback de dirección para peldaños/pasos. */
   segmentoActivo?: SegmentoV5 | null;
+  /** Plan del día — cierre al término y premio de carácter. */
+  segmentos?: { horaInicio?: string; horaFin?: string }[];
 };
 
 export function useJornada4Ops(params: UseJornada4OpsParams) {
-  const { userId, vehiclesRef, setVehicles, safeAwardPS, segmentoActivo = null } = params;
+  const {
+    userId,
+    vehiclesRef,
+    setVehicles,
+    safeAwardPS,
+    segmentoActivo = null,
+    segmentos = [],
+  } = params;
   const inFlightRef = useRef(new Set<string>());
+  const sweepInFlightRef = useRef(false);
   const segmentoRef = useRef(segmentoActivo);
   segmentoRef.current = segmentoActivo;
+  const segmentosRef = useRef(segmentos);
+  segmentosRef.current = segmentos;
 
   const paintVehicle = useCallback(
     (vehicleId: string, patch: Partial<Vehicle>) => {
@@ -166,6 +195,181 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       burstJornada4Tick();
     },
     [setVehicles, vehiclesRef]
+  );
+
+  const tryPremiarCierreConsciente = useCallback(
+    (closed: Pick<Vehicle, "id" | "titulo" | "status" | "cierreAt" | "cierreManual">) => {
+      if (!userId) return;
+      const segs = segmentosRef.current;
+      const last = resolveLastSegmentWindowMs(segs);
+      const win = resolvePlanWindowMs(segs);
+      if (!last || !win) return;
+      if (!isCierreConscienteAlTermino(closed, last.startMs, win.endMs)) return;
+      const { nuevos, ledger } = recordCierresConscientesPlan(userId, [closed.id]);
+      if (nuevos.length === 0) return;
+      const extraPs = nuevos.length * PS_CIERRE_CONSCIENTE_PLAN;
+      markCierresConscientesPsAwarded(userId, extraPs);
+      void safeAwardPS(
+        extraPs,
+        `Disciplina · cierre consciente al término · ${closed.titulo}`
+      );
+      toast.success(
+        `Carácter · +${extraPs} PS · +${ledger.bonoPct}% disciplina`,
+        {
+          description: "Cerrar a mano en la última hora del plan forma el carácter.",
+          duration: 3600,
+          style: {
+            backgroundColor: PIZARRA,
+            border: `1px solid ${GOLD}`,
+            color: GOLD,
+          },
+        }
+      );
+    },
+    [userId, safeAwardPS]
+  );
+
+  const closeVehiclePorTerminoPlan = useCallback(
+    async (vehicleId: string) => {
+      if (!userId) return;
+      const key = `planend:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      inFlightRef.current.add(key);
+      try {
+        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle || vehicle.status !== "activo") return;
+        const cierreAt = Date.now();
+        const wallMin = resolveDuracionMinCierre(
+          vehicle,
+          Math.max(0, (cierreAt - (vehicle.aperturaAt ?? cierreAt)) / 60_000)
+        );
+        const destino = destinoCierreVivo(userId, vehicle);
+        const patch: Partial<Vehicle> = {
+          status: "archivado",
+          cierreAt,
+          duracionFinal: wallMin || undefined,
+          cierreManual: false,
+          interrupcionActiva: false,
+          desglosadorPausa: undefined,
+          destinoCierre: destino,
+        };
+        notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+        paintVehicle(vehicleId, patch);
+        await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current);
+
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+            const closed: Vehicle = { ...vehicle, ...patch, destinoCierre: destino };
+            registrarCierreConcienciaTriada(userId, {
+              vehicleId: vehicle.id,
+              minutos: resolveDuracionMinCierre(closed, wallMin),
+              destino,
+              at: cierreAt,
+            });
+            await recordProgresoHubAlCerrarVehiculo(userId, closed, {
+              tipoOrigen: vehicle.tipoFlota === "situacion" ? "situacion" : "tiempo",
+              psGanados: 0,
+              duracionMin: wallMin,
+              destinoCierre: destino,
+            });
+          } catch (e) {
+            console.error("[jornada4.closeVehiclePorTerminoPlan]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const sweepPlanEnd = useCallback(
+    async (
+      segs: { horaInicio?: string; horaFin?: string }[]
+    ): Promise<PlanEndSweepResult> => {
+      const empty: PlanEndSweepResult = {
+        revelacion: userId ? readRevelacionPlanDia(userId) : null,
+        ledger: userId ? readCierreConscientePlan(userId) : null,
+        closed: 0,
+        premiados: 0,
+      };
+      if (!userId || sweepInFlightRef.current) return empty;
+      if (!isPlanTerminado(segs)) return empty;
+      sweepInFlightRef.current = true;
+      try {
+        const leftovers = vehiclesToCloseAtPlanEnd(vehiclesRef.current);
+        for (let i = 0; i < leftovers.length; i++) {
+          await closeVehiclePorTerminoPlan(leftovers[i].id);
+        }
+        const last = resolveLastSegmentWindowMs(segs);
+        const win = resolvePlanWindowMs(segs);
+        let premiados = 0;
+        let ledger = readCierreConscientePlan(userId);
+        if (last && win) {
+          const ids = collectCierresConscientesAlTermino(
+            vehiclesRef.current,
+            last.startMs,
+            win.endMs
+          );
+          const recorded = recordCierresConscientesPlan(userId, ids);
+          ledger = recorded.ledger;
+          if (recorded.nuevos.length > 0) {
+            const extraPs = recorded.nuevos.length * PS_CIERRE_CONSCIENTE_PLAN;
+            markCierresConscientesPsAwarded(userId, extraPs);
+            premiados = recorded.nuevos.length;
+            await safeAwardPS(
+              extraPs,
+              `Disciplina · ${premiados} cierre(s) consciente(s) al término`
+            );
+            toast.success(
+              `Carácter · +${extraPs} PS · +${recorded.ledger.bonoPct}% disciplina`,
+              {
+                description: "Cerrar a mano en la última hora del plan forma el carácter.",
+                duration: 4000,
+                style: {
+                  backgroundColor: PIZARRA,
+                  border: `1px solid ${GOLD}`,
+                  color: GOLD,
+                },
+              }
+            );
+          }
+        }
+        if (leftovers.length > 0) {
+          toast.message(
+            leftovers.length === 1
+              ? "El plan cerró 1 vehículo"
+              : `El plan cerró ${leftovers.length} vehículos`,
+            {
+              description:
+                "Regla: todo vehículo se cierra al término. Quien cierra a mano en la última hora suma disciplina.",
+              duration: 4200,
+              style: {
+                backgroundColor: PIZARRA,
+                border: `1px solid ${PLATA}`,
+                color: PLATA,
+              },
+            }
+          );
+        }
+        const revelacion = sealRevelacionPlanDia(userId, {
+          segmentos: segs,
+          vehicles: vehiclesRef.current,
+        });
+        return {
+          revelacion,
+          ledger,
+          closed: leftovers.length,
+          premiados,
+        };
+      } finally {
+        sweepInFlightRef.current = false;
+      }
+    },
+    [userId, vehiclesRef, closeVehiclePorTerminoPlan, safeAwardPS]
   );
 
   const closeConquistaSub = useCallback(
@@ -393,6 +597,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           );
           cyclePs = settled.cyclePs;
           noteHuecoAfterClose(vehiclesRef.current);
+          tryPremiarCierreConsciente({
+            id: vehicle.id,
+            titulo: vehicle.titulo,
+            status: patch.status,
+            cierreAt: patch.cierreAt,
+          });
           const hubNote = feedsProyectoHub(destino)
             ? " · peldaño al Hub"
             : " · presencia";
@@ -462,7 +672,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+    [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
   const closeSituacionRow = useCallback(
@@ -663,6 +873,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             safeAwardPS
           );
           noteHuecoAfterClose(vehiclesRef.current);
+          tryPremiarCierreConsciente({
+            id: vehicle.id,
+            titulo: vehicle.titulo,
+            status: patch.status,
+            cierreAt: patch.cierreAt,
+          });
           const hubNote = feedsProyectoHub(destino)
             ? " · peldaño al Hub"
             : " · presencia";
@@ -733,7 +949,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+    [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
   const addConquistaSub = useCallback(
@@ -866,6 +1082,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             await safeAwardPS(amount, `J4 rápido · ${status} · ${vehicle.titulo}`);
           }
           noteHuecoAfterClose(vehiclesRef.current);
+          tryPremiarCierreConsciente({
+            id: vehicle.id,
+            titulo: vehicle.titulo,
+            status,
+            cierreAt,
+          });
           toast.success(
             amount > 0
               ? `Cerrado · +${amount} PS`
@@ -914,7 +1136,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+    [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
   const closeSituacionLibreFila = useCallback(
@@ -1019,6 +1241,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         let awarded = 0;
         try {
           noteHuecoAfterClose(vehiclesRef.current);
+          tryPremiarCierreConsciente({
+            id: vehicle.id,
+            titulo: vehicle.titulo,
+            status,
+            cierreAt,
+          });
           awarded = await awardSituacionBlockPs(
             vehicle.titulo,
             status,
@@ -1083,7 +1311,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+    [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
   const addSituacionLibreFila = useCallback(
@@ -1707,6 +1935,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
         await yieldAfterPaint();
+        tryPremiarCierreConsciente({
+          id: vehicle.id,
+          titulo: vehicle.titulo,
+          status,
+          cierreAt,
+        });
 
         void runShadowTaskAsync(async () => {
           scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -1804,7 +2038,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, paintVehicle, safeAwardPS]
+    [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
   return {
@@ -1830,5 +2064,6 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     postergarFilaEnFoco,
     quitarSituacionFila,
     closeExpressVehicle,
+    sweepPlanEnd,
   };
 }

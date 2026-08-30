@@ -18,6 +18,8 @@ import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
+import { useJornada4PlanEnd } from "@/hooks/useJornada4PlanEnd";
+import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
 import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
@@ -124,6 +126,14 @@ export default function JornadaV4Session() {
     setVehicles: core.setVehicles,
     safeAwardPS: core.safeAwardPS,
     segmentoActivo: planillaApi.segmentoActivo,
+    segmentos: planillaApi.planilla?.segmentos ?? [],
+  });
+  const planEnd = useJornada4PlanEnd({
+    userId: user?.uid,
+    segmentos: planillaApi.planilla?.segmentos ?? [],
+    vehiclesRef: core.vehiclesRef,
+    sweepPlanEnd: ops.sweepPlanEnd,
+    enabled: Boolean(user),
   });
   useJornada4EntrenamientoGuard({
     enabled: Boolean(user),
@@ -311,6 +321,10 @@ export default function JornadaV4Session() {
       <div className="max-w-lg mx-auto pt-2">
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">
+            <Jornada4RevelacionCard
+              revelacion={planEnd.revelacion}
+              planEndLabel={planEnd.planEndLabel}
+            />
             <Jornada4LaunchPanel
               onLaunch={handleLaunch}
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
@@ -422,6 +436,8 @@ export default function JornadaV4Session() {
               vehicles={core.vehicles}
               segmentoActivoId={planillaApi.segmentoActivo?.id ?? null}
               todayPs={core.dailyPS}
+              bonoCierrePct={planEnd.ledger?.bonoPct ?? 0}
+              cierresConscientes={planEnd.ledger?.n ?? 0}
             />
           </Suspense>
         ) : null}

@@ -11,6 +11,7 @@ import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4Conc
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { useConcienciaTriadaOperador } from "@/hooks/useConcienciaTriadaOperador";
 import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
+import { applyBonoCierreConsciente } from "@/jornada4/cierrePlanSweep";
 import { getYesterdayDisciplinaPct } from "@/jornada4/yesterdayDisciplina";
 import { getYesterdayDailyPointsTotal } from "@/lib/persistence";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
@@ -21,6 +22,8 @@ export type Jornada4MetricasTabProps = {
   vehicles: Vehicle[];
   segmentoActivoId?: string | null;
   todayPs: number;
+  bonoCierrePct?: number;
+  cierresConscientes?: number;
 };
 
 export default function Jornada4MetricasTab({
@@ -28,14 +31,21 @@ export default function Jornada4MetricasTab({
   segmentos,
   vehicles,
   todayPs,
+  bonoCierrePct = 0,
+  cierresConscientes = 0,
 }: Jornada4MetricasTabProps) {
   const [yesterdayPs, setYesterdayPs] = useState(0);
   const [yesterdayDisciplinaPct, setYesterdayDisciplinaPct] = useState(0);
   const disciplinaTick = useJornada4Tick(Boolean(userId));
   const disciplinaModel = useMemo(() => {
     void disciplinaTick;
-    return computeDisciplinaPlanDia({ segmentos });
-  }, [segmentos, disciplinaTick]);
+    const base = computeDisciplinaPlanDia({ segmentos });
+    if (bonoCierrePct <= 0) return base;
+    return {
+      ...base,
+      porcentajeDia: applyBonoCierreConsciente(base.porcentajeDia, bonoCierrePct),
+    };
+  }, [segmentos, disciplinaTick, bonoCierrePct]);
 
   const { model: triadaModel, series: triadaSeries } = useConcienciaTriadaOperador({
     userId,
@@ -76,7 +86,11 @@ export default function Jornada4MetricasTab({
   return (
     <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
       <Jornada4ConcienciaTriadaCard model={triadaModel} series={triadaSeries} />
-      <Jornada4DisciplinaCard model={disciplinaModel} />
+      <Jornada4DisciplinaCard
+        model={disciplinaModel}
+        bonoCierrePct={bonoCierrePct}
+        cierresConscientes={cierresConscientes}
+      />
       <Jornada4DailyDisciplinaBar
         todayPct={disciplinaModel.porcentajeDia}
         yesterdayPct={yesterdayDisciplinaPct}
