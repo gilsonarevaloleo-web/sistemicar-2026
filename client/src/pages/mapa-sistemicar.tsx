@@ -70,6 +70,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     titulo: "Comercio y Acceso",
     color: ORANGE,
     rutas: [
+      { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Landing anuncio Base → vendedor o checkout", icon: ExternalLink, color: GOLD, acceso: "libre" },
       { path: "/embudo", nombre: "Embudo SISTEMICAR", desc: "Funnel de ventas principal", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/umbral", nombre: "Umbral", desc: "Página de entrada y conversión", icon: Lock, color: GOLD, acceso: "en_camino" },
       { path: "/umbral-leads", nombre: "Umbral Leads", desc: "Captura de prospectos interesados", icon: Users, color: BLUE, acceso: "libre" },

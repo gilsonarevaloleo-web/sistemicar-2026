@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowRight, Crosshair, Phone, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,10 @@ import {
   type FijacionVendedor,
   type VendedorTriageOpcion,
 } from "@shared/vendedor/triageLogic";
+import {
+  fijacionDesdeEntradaComercial,
+  parseEntradaComercialSearch,
+} from "@shared/vendedor/entradaComercial";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import {
   saveFijacionVendedor,
@@ -24,6 +28,7 @@ import {
 const GOLD = "#D4AF37";
 
 export default function VendedorTriagePage() {
+  const [, setLocation] = useLocation();
   const [paso, setPaso] = useState(0);
   const [grietaPick, setGrietaPick] = useState<VendedorTriageOpcion | null>(
     null,
@@ -35,10 +40,22 @@ export default function VendedorTriagePage() {
   const [callStatusMsg, setCallStatusMsg] = useState<string | null>(null);
   const llamameRef = useRef<HTMLDivElement>(null);
   const callInFlight = useRef(false);
+  const entradaAplicada = useRef(false);
 
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
     return getSellerRef();
+  }, []);
+
+  useEffect(() => {
+    if (entradaAplicada.current) return;
+    const parsed = parseEntradaComercialSearch(window.location.search);
+    if (!parsed) return;
+    entradaAplicada.current = true;
+    const fij = fijacionDesdeEntradaComercial(parsed.planeta, parsed.codigo);
+    saveFijacionVendedor(fij);
+    setFijacion(fij);
+    setPaso(2);
   }, []);
 
   const preguntaGrieta = VENDEDOR_TRIAGE_PREGUNTAS[0];
@@ -87,6 +104,13 @@ export default function VendedorTriagePage() {
     setTelefono("");
     setCallDone(false);
     setCallStatusMsg(null);
+    entradaAplicada.current = true;
+    const keepRef = sellerRef
+      ? `?ref=${encodeURIComponent(sellerRef)}`
+      : "";
+    if (/[?&]planeta=/.test(window.location.search)) {
+      setLocation(`/vendedor${keepRef}`);
+    }
   }
 
   async function solicitarLlamada() {
