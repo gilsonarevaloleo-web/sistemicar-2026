@@ -101,14 +101,9 @@ export function aplicarEvaluacionASesion(
     return next;
   }
 
-  // Evitar duplicar un código ya aprobado en esta sesión.
-  if (next.historialCodigos.some((h) => h.codigo === codigo)) {
-    next.intentosCodigoActual = 0;
-    if (input.codigoSiguiente != null && isCodigoNumero(input.codigoSiguiente)) {
-      next.codigoActual = input.codigoSiguiente;
-    }
-    return next;
-  }
+  const yaAprobadoEnSesion = next.historialCodigos.some(
+    (h) => h.codigo === codigo,
+  );
 
   const psGanados =
     typeof input.psGanadosOverride === "number" &&
@@ -116,6 +111,8 @@ export function aplicarEvaluacionASesion(
       ? Math.max(0, Math.round(input.psGanadosOverride))
       : estimarPsCodigoAprobado(codigo, intentosCodigoActual);
 
+  // Repaso de un código ya superado: se agrega al historial de logros
+  // (cómo lo volvió a hacer) sin cerrar el módulo por conteo de filas.
   next.historialCodigos.push({
     codigo,
     intentos: intentosCodigoActual,
@@ -126,14 +123,15 @@ export function aplicarEvaluacionASesion(
   });
   next.intentosCodigoActual = 0;
 
+  const unicos = new Set(next.historialCodigos.map((h) => h.codigo));
   const completa =
-    codigo === 10 ||
-    input.codigoSiguiente == null ||
-    next.historialCodigos.length >= 10;
+    next.estado === "COMPLETADO" ||
+    unicos.size >= 10 ||
+    (codigo === 10 && !yaAprobadoEnSesion);
 
   if (completa) {
     next.estado = "COMPLETADO";
-    next.codigoActual = codigo;
+    next.codigoActual = 10;
   } else if (
     input.codigoSiguiente != null &&
     isCodigoNumero(input.codigoSiguiente)
