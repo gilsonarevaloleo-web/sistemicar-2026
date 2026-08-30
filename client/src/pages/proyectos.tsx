@@ -54,7 +54,6 @@ import {
   reorderOleadaPunto,
   setPuntoProduccion,
   minutosTiempoTimonVivo,
-  buildProyectoRendicion,
   type Proyecto,
   type ProyectoPeldano,
   type ProyectoEtiqueta,
@@ -79,8 +78,6 @@ import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 import { formatHorasCerradas } from "@/lib/timonHoras";
-import { sumMinutosPlanDelDia } from "@/lib/concienciaTriadaOperador";
-import { HubRendicionTiempo } from "@/components/HubRendicionTiempo";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -577,15 +574,6 @@ export default function ProyectosPage() {
       ),
     [peldanos, hoyFecha]
   );
-  const rendicionTiempo = useMemo(() => {
-    const planMin = sumMinutosPlanDelDia(
-      enCursoPlan.map(p => ({ horaInicio: p.horaInicio, horaFin: p.horaFin }))
-    );
-    return buildProyectoRendicion({
-      gasto: proyecto?.gastoTiempo,
-      minutosPlanVinculado: planMin,
-    });
-  }, [proyecto?.gastoTiempo, enCursoPlan]);
   const oleadaActiva = useMemo(() => getOleadaEnCurso(peldanos), [peldanos]);
   const oleadaPeldano = useMemo(
     () =>
@@ -1191,7 +1179,6 @@ export default function ProyectosPage() {
 
           {/* ——— Escalera: peldaños, ideas e historial ——— */}
           <TabsContent value="escalera" className="mt-0 space-y-3 focus-visible:ring-0">
-            <HubRendicionTiempo model={rendicionTiempo} tint={tint} />
             <div className="grid grid-cols-3 gap-2">
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
                 <p className="text-lg font-black text-white">{stats.conquistados}</p>
