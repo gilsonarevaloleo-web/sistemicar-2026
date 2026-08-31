@@ -34,7 +34,29 @@ export function isMenuPrincipalPath(pathname: string | null | undefined): boolea
  * durante toda la visita — no solo en soft-start.
  */
 export function isAppShellQuietPath(pathname: string | null | undefined): boolean {
-  return isProyectosHubPath(pathname) || isMenuPrincipalPath(pathname);
+  return (
+    isProyectosHubPath(pathname) ||
+    isMenuPrincipalPath(pathname) ||
+    isCommercialEntryPath(pathname)
+  );
+}
+
+/**
+ * Landings / embudos públicos (anuncios, vendedor).
+ * Sin chrome de app y sin motores que roben el primer toque en Android.
+ */
+export function isCommercialEntryPath(
+  pathname: string | null | undefined,
+): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return (
+    path === "/ventas-jornada" ||
+    path.startsWith("/ventas-jornada/") ||
+    path === "/vendedor" ||
+    path.startsWith("/vendedor/") ||
+    path === "/ventas-espejo"
+  );
 }
 
 /** Pathname actual (SSR-safe). Para hot paths sin hooks (launch ms0). */

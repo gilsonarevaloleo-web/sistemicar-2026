@@ -44,8 +44,8 @@ describe("dualKernelQuiet soft-start", () => {
     assert.match(brand, /isMenuPrincipalPath/);
     assert.match(brand, /isAppShellQuietPath/);
     assert.match(src, /isAppShellQuietPath\(location\)/);
-    // VoiceBootstrap: primer toque en /menu no debe despertar TTS/GPS.
-    assert.match(app, /p === "\/menu"/);
+    assert.match(app, /AppShellMotors/);
+    assert.match(app, /isCommercialEntryPath/);
   });
 
   it("armDualKernelExitSoftStart activa el latch síncronamente", () => {

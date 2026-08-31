@@ -83,7 +83,11 @@ import { unlockSpeechSynthesis } from "@/lib/speechQueue";
 import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speechRecovery";
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
-import { isJornada4WindowPath, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
+import {
+  isCommercialEntryPath,
+  isJornada4WindowPath,
+  JORNADA_V4_PATH,
+} from "@/lib/jornadaBrand";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -562,6 +566,24 @@ function VoiceBootstrap() {
   return null;
 }
 
+/** Landings de anuncio: sin voz, Centinela ni cierre — el primer toque debe navegar. */
+function AppShellMotors() {
+  const [location] = useLocation();
+  if (isCommercialEntryPath(location) || isCommercialEntryPath(window.location.pathname)) {
+    return null;
+  }
+  return (
+    <>
+      <DoctorIAChat />
+      <CierreJornadaModal />
+      <SovereigntyListener />
+      <VoiceBootstrap />
+      <SegmentAttentionBackground />
+      <CentinelaEngine />
+    </>
+  );
+}
+
 function App() {
   useEffect(() => {
     // Deploy preview: ?preview_ops=1 desbloquea ANTES de que ModuleRoute mande a /pagos.
@@ -571,6 +593,7 @@ function App() {
         return;
       }
     }
+    if (isCommercialEntryPath(window.location.pathname)) return;
     const report = runStartupStorageHygiene();
     if (report && report.removedKeys > 0) {
       console.info(`[storage] Poda al inicio: ${report.removedKeys} claves (~${Math.round(report.freedBytesEstimate / 1024)} KB)`);
@@ -582,12 +605,7 @@ function App() {
       <AppErrorBoundary>
         <Router />
       </AppErrorBoundary>
-      <DoctorIAChat />
-      <CierreJornadaModal />
-      <SovereigntyListener />
-      <VoiceBootstrap />
-      <SegmentAttentionBackground />
-      <CentinelaEngine />
+      <AppShellMotors />
       <Toaster />
     </AuthProvider>
   );
