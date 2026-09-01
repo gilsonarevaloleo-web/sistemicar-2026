@@ -14,6 +14,7 @@ import {
   computeTriadaLineaOccupancy,
   isTriadaAdvancingVehicle,
   skipsTriadaCoverage,
+  type MsInterval,
 } from "./concienciaTriadaLinea";
 import type { DestinoCierre } from "./destinoCierre";
 import type { Vehicle } from "./persistence";
@@ -639,6 +640,8 @@ export function buildConcienciaTriadaFromVehicles(params: {
   segmentos: { horaInicio?: string; horaFin?: string }[];
   vehicles: Vehicle[];
   now?: number;
+  /** Cortes sin vehículo: agujerean cobertura inflada por un cierre largo. */
+  huecosLog?: MsInterval[];
 }): ConcienciaTriadaModel {
   const fecha = params.fecha ?? getJournalDateString(params.now);
   const occ = computeTriadaLineaOccupancy({
@@ -646,6 +649,7 @@ export function buildConcienciaTriadaFromVehicles(params: {
     segmentos: params.segmentos,
     vehicles: params.vehicles,
     now: params.now,
+    huecosLog: params.huecosLog,
   });
   const minutosNoConquistado = Math.max(0, 24 * 60 - occ.minutosPlan);
   return buildConcienciaTriadaModel({

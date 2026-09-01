@@ -132,7 +132,7 @@ export function OleadaDesglosePanel({
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
             Timón de la oleada. Suma la pared real de cada vehículo en horas 1, 2, 3…
-            Marca cumplido el timón para sellar el peldaño y pasar al siguiente punto.
+            Cada cumplido sella un peldaño. Si es el timón, el pin pasa al siguiente punto.
           </p>
         </div>
         {summary.total > 0 ? (

@@ -241,4 +241,44 @@ describe("concienciaTriadaLinea", () => {
     assert.equal(occ.minutosHueco, 60);
     assert.equal(occ.hilosAvanzando, 0);
   });
+
+  it("el log de huecos agujerea cobertura y sube inconsciencia", () => {
+    const now = lima("12:00");
+    const vehicles = [
+      v({
+        id: "largo",
+        status: "archivado",
+        aperturaAt: lima("09:00"),
+        cierreAt: lima("12:00"),
+        destinoCierre: "peldano",
+      }),
+    ];
+    const sinHueco = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+    });
+    assert.equal(sinHueco.minutosHueco, 0);
+    assert.equal(sinHueco.minutosDireccion, 180);
+
+    const conHueco = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+      huecosLog: [{ start: lima("10:00"), end: lima("11:00") }],
+    });
+    assert.equal(conHueco.minutosHueco, 60);
+    assert.equal(conHueco.minutosDireccion, 120);
+
+    const model = buildConcienciaTriadaFromVehicles({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+      huecosLog: [{ start: lima("10:00"), end: lima("11:00") }],
+    });
+    assert.equal(model.minutosInconsciente, 60);
+  });
 });
