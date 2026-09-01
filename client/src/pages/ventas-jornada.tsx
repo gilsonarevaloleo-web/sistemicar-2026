@@ -1,10 +1,13 @@
 /**
  * Landing del anuncio Jornada Base.
  * Público (sin login). Fija el destino al vendedor (planeta JORNADA) o al checkout Base.
+ *
+ * Enlaces nativos `<a href>` — no wouter Link.
+ * En Android el Link de SPA hace preventDefault; si el hilo está ocupado
+ * (voz, Firebase, higiene de storage) el toque no navega y la página se ve congelada.
  */
 
 import { useMemo } from "react";
-import { Link } from "wouter";
 import { ArrowRight, Phone } from "lucide-react";
 import { SKU_BASE } from "@shared/planificacionPricing";
 import {
@@ -35,7 +38,7 @@ export default function VentasJornada() {
       }}
       data-testid="ventas-jornada-page"
     >
-      <div className="relative mx-auto max-w-xl px-4 py-8 pb-28 sm:py-12">
+      <div className="relative z-10 mx-auto max-w-xl px-4 py-8 pb-28 sm:py-12">
         <p
           className="text-[12px] tracking-[0.22em]"
           style={{ color: GOLD }}
@@ -88,9 +91,9 @@ export default function VentasJornada() {
         </section>
 
         <div className="mt-6 space-y-3">
-          <Link
+          <a
             href={vendedorHref}
-            className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.12em]"
+            className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.12em] touch-manipulation"
             style={{
               background: GOLD,
               color: "#0A0A0A",
@@ -100,16 +103,16 @@ export default function VentasJornada() {
           >
             <Phone size={16} />
             QUE ME LLAME EL VENDEDOR
-          </Link>
-          <Link
+          </a>
+          <a
             href={pagosHref}
-            className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[12px] font-bold tracking-[0.12em]"
+            className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[12px] font-bold tracking-[0.12em] touch-manipulation"
             style={{ borderColor: `${GOLD}66`, color: GOLD }}
             data-testid="ventas-jornada-cta-pagos"
           >
             ACTIVAR JORNADA BASE
             <ArrowRight size={14} />
-          </Link>
+          </a>
         </div>
 
         <p className="mt-6 text-center text-[11px] leading-relaxed text-white/30">
