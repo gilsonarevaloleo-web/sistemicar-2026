@@ -1,9 +1,10 @@
 /**
- * Espejo de Operar — revelación GLOBAL del plan (no de un proyecto).
- * Antes del término: espera. Tras horaFin: sello congelado.
- * Sin tick 1s, sin recharts.
+ * Espejo de Operar — revelación GLOBAL del día-jornada al término.
+ * 100% = 24 h. Inconsciente = sin vehículo. Presencia = vehículos sin rumbo.
+ * Dirección = proyecto/centro. No conquistado = horario no planificado.
  */
-import { TRIADA_META } from "@/lib/concienciaTriadaOperador";
+import { NO_CONQUISTADO_META, TRIADA_META } from "@/lib/concienciaTriadaOperador";
+import { MINUTOS_DIA_JORNADA } from "@/lib/gastoConcienciaEngine";
 import {
   formatMinutosHoras,
   type RevelacionPlanDia,
@@ -11,7 +12,6 @@ import {
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { PIZARRA, MUTED, INK, GOLD } = J4_COLORS;
-const POR_CONQUISTAR = "#94a3b8";
 
 export type Jornada4RevelacionCardProps = {
   revelacion: RevelacionPlanDia | null;
@@ -43,22 +43,21 @@ export function Jornada4RevelacionCard({
           className="text-[9px] font-black uppercase tracking-widest"
           style={{ color: GOLD }}
         >
-          Revelación del plan
+          Revelación del día
         </p>
         <p className="text-[11px] mt-1 leading-snug" style={{ color: INK }}>
-          Se sella a las {planEndLabel}. Ahí verás en horas el inconsciente, la
-          presencia, la dirección y lo por conquistar — de todo el día, no de un
-          proyecto.
+          Se sella a las {planEndLabel}. Ahí verás en horas el inconsciente (sin
+          vehículo), la presencia, la dirección y lo no conquistado — el horario
+          que no planificaste.
         </p>
         <p className="text-[8px] mt-1.5 leading-relaxed" style={{ color: MUTED }}>
-          La tríada viva (se mueve con el reloj) sigue en Métricas. Esto es el
-          corte al término: el efecto darse cuenta.
+          Si planificas 24 h (incluido dormir), la conquista es el 100% del día.
         </p>
       </section>
     );
   }
 
-  const total = Math.max(revelacion.minutosPlan, 1);
+  const total = Math.max(revelacion.minutosDia || MINUTOS_DIA_JORNADA, 1);
   const buckets = [
     {
       id: "inconsciente",
@@ -80,9 +79,9 @@ export function Jornada4RevelacionCard({
     },
     {
       id: "por_conquistar",
-      label: "Por conquistar",
+      label: "No conquistado",
       min: revelacion.minutosPorConquistar,
-      color: POR_CONQUISTAR,
+      color: NO_CONQUISTADO_META.color,
     },
   ] as const;
   const widths = buckets.map(b => pct(b.min, total));
@@ -102,7 +101,7 @@ export function Jornada4RevelacionCard({
           className="text-[9px] font-black uppercase tracking-widest"
           style={{ color: GOLD }}
         >
-          Revelación del plan · {revelacion.planEndLabel}
+          Revelación del día · {revelacion.planEndLabel}
         </p>
         <p
           className="text-[12px] font-semibold mt-1 leading-snug"
@@ -143,10 +142,13 @@ export function Jornada4RevelacionCard({
       </div>
 
       <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-        100% = {formatMinutosHoras(revelacion.minutosPlan)} de línea de todos los
-        proyectos. Lo no planificado no es deuda. El hueco ya ocurrido es
-        inconsciente; lo que aún no ocurría era por conquistar — al término queda
-        en cero.
+        100% = 24 h del día-jornada. Plan = {formatMinutosHoras(revelacion.minutosPlan)}.
+        Inconsciente = sin vehículo. Presencia = vehículos sin rumbo. Dirección =
+        proyecto o centro. No conquistado = lo no planificado
+        {revelacion.minutosPorConquistar > 0
+          ? ` (${formatMinutosHoras(revelacion.minutosPorConquistar)})`
+          : " — si cubres las 24 h, queda en cero"}
+        .
       </p>
     </section>
   );

@@ -1,8 +1,8 @@
 /**
  * Conciencia del operador (Jornada) — triada sobre lo planificado.
- * Inconsciente · Presencia · Dirección (Norte).
- * 100% = minutos únicos del plan del día (tiempo de línea).
- * Inconsciente = huecos de cobertura + plan que aún no ocurre.
+ * Inconsciente · Presencia · Dirección (Norte) · No conquistado.
+ * 100% del darse cuenta = 24 h del día-jornada.
+ * Inconsciente = huecos (plan ya ocurrido sin vehículo).
  * Interrupt cubre la línea; no multiplica. Paralelo meritorio es otro reloj.
  * No usa el pulso de cobertura ni el “vehículo abierto ahora”.
  * Persistencia local ligera; prohibido en ms0 — solo sombra / idle.
@@ -14,6 +14,7 @@ import {
   computeTriadaLineaOccupancy,
   isTriadaAdvancingVehicle,
   skipsTriadaCoverage,
+  type MsInterval,
 } from "./concienciaTriadaLinea";
 import type { DestinoCierre } from "./destinoCierre";
 import type { Vehicle } from "./persistence";
@@ -33,20 +34,26 @@ export const TRIADA_META: Record<
 > = {
   inconsciente: {
     label: "Inconsciente",
-    hint: "Huecos: plan ya ocurrido sin vehículo. Lo que aún no ocurre no es deuda — está no conquistado.",
+    hint: "Sin actividad de vehículo en el plan ya ocurrido. Los huecos son inconsciencia.",
     color: "#64748B",
   },
   presencia: {
     label: "Presencia",
-    hint: "Plan cubierto sin Norte — estuviste, no dirigiste.",
+    hint: "Vehículos sin dirección — estuviste, no dirigiste.",
     color: "#34D399",
   },
   direccion: {
     label: "Dirección",
-    hint: "Plan cubierto con Norte: oleada + foco, no un clic de ego.",
+    hint: "Vehículos con proyecto o centro, dentro de la planificación.",
     color: "#D4AF37",
   },
 };
+
+export const NO_CONQUISTADO_META = {
+  label: "No conquistado",
+  hint: "Horario no planificado. Si planificas 24 h (incluido dormir), queda en cero.",
+  color: "#94a3b8",
+} as const;
 
 const LEDGER_KEY = "sistemicar_conciencia_triada_v1";
 const SERIES_KEY = "sistemicar_conciencia_triada_series_v2";
@@ -90,8 +97,13 @@ export interface ConcienciaTriadaModel {
   headline: string;
   /** Plan ya ocurrido sin vehículo (línea). */
   minutosHueco: number;
-  /** Plan que todavía no ocurre — no se puede convertir aún. */
+  /** Plan que todavía no ocurre — no es inconsciencia ni no conquistado. */
   minutosPlanFuturo: number;
+  /** Horario no planificado del día-jornada (p.ej. 23:00–05:00). */
+  minutosNoConquistado: number;
+  /** 100% del darse cuenta: 24 h (05:00→05:00). */
+  minutosDia: number;
+  pctNoConquistado: number;
   /** Hilos que avanzan de verdad (el padre en interrupt no cuenta). */
   hilosAvanzando: number;
   /** ≥2 hilos independientes avanzando. El interrupt no califica. */
@@ -118,6 +130,9 @@ export const EMPTY_TRIADA_MODEL: ConcienciaTriadaModel = {
   headline: "Sin planificación — no hay conciencia que medir.",
   minutosHueco: 0,
   minutosPlanFuturo: 0,
+  minutosNoConquistado: 0,
+  minutosDia: 24 * 60,
+  pctNoConquistado: 0,
   hilosAvanzando: 0,
   paraleloMeritorio: false,
   interruptCubreLinea: false,
@@ -185,6 +200,9 @@ export function triadaModelEquals(a: ConcienciaTriadaModel, b: ConcienciaTriadaM
     a.minutosPlan === b.minutosPlan &&
     a.minutosHueco === b.minutosHueco &&
     a.minutosPlanFuturo === b.minutosPlanFuturo &&
+    a.minutosNoConquistado === b.minutosNoConquistado &&
+    a.minutosDia === b.minutosDia &&
+    a.pctNoConquistado === b.pctNoConquistado &&
     a.hilosAvanzando === b.hilosAvanzando &&
     a.paraleloMeritorio === b.paraleloMeritorio &&
     a.interruptCubreLinea === b.interruptCubreLinea &&
@@ -505,8 +523,10 @@ function dominante(
 }
 
 /**
- * Modelo vivo: 100% = plan del día (línea). Presencia/dirección = minutos únicos ocupados.
- * Inconsciente = huecos + futuro. Llamar solo en idle / sombra.
+ * Modelo vivo. Inconsciente = huecos (sin vehículo).
+ * No conquistado = horario no planificado (24 h − plan).
+ * El futuro del plan no se llama inconsciencia ni conquista.
+ * Llamar solo en idle / sombra.
  */
 export function buildConcienciaTriadaModel(params: {
   fecha?: string;
@@ -517,6 +537,8 @@ export function buildConcienciaTriadaModel(params: {
   minutosDireccionActivos?: number;
   minutosHueco?: number;
   minutosPlanFuturo?: number;
+  minutosNoConquistado?: number;
+  minutosDia?: number;
   hilosAvanzando?: number;
   paraleloMeritorio?: boolean;
   interruptCubreLinea?: boolean;
@@ -525,8 +547,19 @@ export function buildConcienciaTriadaModel(params: {
 }): ConcienciaTriadaModel {
   const fecha = params.fecha ?? getJournalDateString();
   const minutosPlan = Math.max(0, params.minutosPlan);
+  const minutosDia = Math.max(24 * 60, params.minutosDia ?? 24 * 60);
+  const minutosNoConquistado = Math.max(
+    0,
+    params.minutosNoConquistado ?? Math.max(0, minutosDia - minutosPlan)
+  );
   if (minutosPlan <= 0) {
-    return { ...EMPTY_TRIADA_MODEL, fecha };
+    return {
+      ...EMPTY_TRIADA_MODEL,
+      fecha,
+      minutosDia,
+      minutosNoConquistado: minutosDia,
+      pctNoConquistado: 100,
+    };
   }
 
   const allocated = allocateTriadaAgainstPlan({
@@ -541,14 +574,16 @@ export function buildConcienciaTriadaModel(params: {
   let { minutosInconsciente, minutosPresencia, minutosDireccion } = allocated;
   const minutosHueco = Math.max(0, params.minutosHueco ?? 0);
   const minutosPlanFuturo = Math.max(0, params.minutosPlanFuturo ?? 0);
-  if (params.minutosHueco != null || params.minutosPlanFuturo != null) {
-    minutosInconsciente = Math.round((minutosHueco + minutosPlanFuturo) * 10) / 10;
+  if (params.minutosHueco != null) {
+    minutosInconsciente = Math.round(minutosHueco * 10) / 10;
   }
   const { pctInconsciente, pctPresencia, pctDireccion } = roundPctTriplet(
     minutosInconsciente,
     minutosPresencia,
     minutosDireccion
   );
+  const pctNoConquistado =
+    minutosDia > 0 ? Math.round((minutosNoConquistado / minutosDia) * 100) : 0;
   const etapaDominante = dominante(minutosInconsciente, minutosPresencia, minutosDireccion);
   const hilosAvanzando = Math.max(0, params.hilosAvanzando ?? 0);
   const paraleloMeritorio = params.paraleloMeritorio === true;
@@ -558,15 +593,15 @@ export function buildConcienciaTriadaModel(params: {
 
   let headline: string;
   if (etapaDominante === "direccion") {
-    headline = `Dominante Dirección · ${pctDireccion}% del plan.`;
+    headline = `Dominante Dirección · ${pctDireccion}% de lo vivido en el plan.`;
   } else if (etapaDominante === "presencia") {
-    headline = `Dominante Presencia · ${pctPresencia}% del plan — cubre, no dirige.`;
-  } else if (minutosPlanFuturo > 0 && minutosHueco > 0) {
-    headline = `Huecos e inconsciencia: ${pctInconsciente}% del plan. Lo que aún no ocurre no es deuda — está no conquistado.`;
+    headline = `Dominante Presencia · ${pctPresencia}% — vehículos sin rumbo.`;
+  } else if (minutosHueco > 0) {
+    headline = `Inconsciencia: ${Math.round(minutosHueco)} min sin vehículo en el plan.`;
   } else if (minutosPlanFuturo > 0) {
-    headline = `${pctInconsciente}% del plan aún no ocurre — no conquistado, no es deuda.`;
+    headline = `El plan aún no termina — lo no ocurrido no es inconsciencia.`;
   } else {
-    headline = `Dominante Inconsciente · ${pctInconsciente}% del plan — horas asignadas sin convertir.`;
+    headline = `Dominante Inconsciente · el plan ocurrió sin vehículos.`;
   }
   if (paraleloMeritorio) {
     headline += " Paralelo en juego.";
@@ -588,6 +623,9 @@ export function buildConcienciaTriadaModel(params: {
     headline,
     minutosHueco,
     minutosPlanFuturo,
+    minutosNoConquistado: Math.round(minutosNoConquistado * 10) / 10,
+    minutosDia,
+    pctNoConquistado,
     hilosAvanzando,
     paraleloMeritorio,
     interruptCubreLinea,
@@ -602,6 +640,8 @@ export function buildConcienciaTriadaFromVehicles(params: {
   segmentos: { horaInicio?: string; horaFin?: string }[];
   vehicles: Vehicle[];
   now?: number;
+  /** Cortes sin vehículo: agujerean cobertura inflada por un cierre largo. */
+  huecosLog?: MsInterval[];
 }): ConcienciaTriadaModel {
   const fecha = params.fecha ?? getJournalDateString(params.now);
   const occ = computeTriadaLineaOccupancy({
@@ -609,7 +649,9 @@ export function buildConcienciaTriadaFromVehicles(params: {
     segmentos: params.segmentos,
     vehicles: params.vehicles,
     now: params.now,
+    huecosLog: params.huecosLog,
   });
+  const minutosNoConquistado = Math.max(0, 24 * 60 - occ.minutosPlan);
   return buildConcienciaTriadaModel({
     fecha,
     minutosPlan: occ.minutosPlan,
@@ -617,6 +659,8 @@ export function buildConcienciaTriadaFromVehicles(params: {
     minutosDireccionCerrados: occ.minutosDireccion,
     minutosHueco: occ.minutosHueco,
     minutosPlanFuturo: occ.minutosPlanFuturo,
+    minutosNoConquistado,
+    minutosDia: 24 * 60,
     hilosAvanzando: occ.hilosAvanzando,
     paraleloMeritorio: occ.paraleloMeritorio,
     interruptCubreLinea: occ.interruptCubreLinea,

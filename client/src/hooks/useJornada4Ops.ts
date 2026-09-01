@@ -60,7 +60,11 @@ import {
   isConquistaRapido,
   isSituacionListaLibre,
 } from "@/jornada4/filters";
-import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
+import {
+  buildCoberturaHuecoIntervals,
+  readCoberturaHuecosEvents,
+  reconcileCoberturaHuecos,
+} from "@/jornada4/coberturaHuecosLog";
 import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
 import type { SubTarea } from "@/lib/persistence";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
@@ -358,6 +362,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const revelacion = sealRevelacionPlanDia(userId, {
           segmentos: segs,
           vehicles: vehiclesRef.current,
+          huecos: buildCoberturaHuecoIntervals(readCoberturaHuecosEvents()),
         });
         return {
           revelacion,

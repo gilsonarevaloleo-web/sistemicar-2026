@@ -1,8 +1,9 @@
 /**
  * Reloj de línea vs paralelo meritorio — tríada de conciencia (idle).
  *
- * Línea: minutos únicos del plan. Un hilo. El futuro del plan sigue inconsciente.
- * Hueco de cobertura: plan ya ocurrido sin vehículo. Resta al inconsciente de línea.
+ * Línea: minutos únicos del plan. Un hilo.
+ * Inconsciente = hueco: plan ya ocurrido sin vehículo. El futuro del plan no es
+ * inconsciencia ni deuda — aún no ocurre. Lo no conquistado es el horario no planificado.
  * Interrupt: el padre se congela en pausadoAt; el enfoque cubre la línea. No multiplica.
  * Paralelo meritorio: ≥2 hilos avanzando de verdad (no el par padre-pausado + hijo).
  * Dopamina: extra = apilado − único, y ambos cierran cumplido.
@@ -259,13 +260,16 @@ function splitPlanElapsedFuture(
 
 /**
  * Ocupación de línea: intersección única con el plan.
- * Dirección gana si se solapa con Presencia. El futuro no se puede convertir aún.
+ * Dirección gana si se solapa con Presencia.
+ * Inconsciente = huecos (plan ya ocurrido sin vehículo). El futuro no se suma.
+ * `huecosLog` agujerea cobertura cuando el registro de cortes dice que no había vehículo.
  */
 export function computeTriadaLineaOccupancy(params: {
   fecha: string;
   segmentos: { horaInicio?: string; horaFin?: string }[];
   vehicles: Vehicle[];
   now?: number;
+  huecosLog?: MsInterval[];
 }): TriadaLineaOccupancy {
   const now = params.now ?? Date.now();
   const limaMidnight =
@@ -310,9 +314,18 @@ export function computeTriadaLineaOccupancy(params: {
     if (v.status === "cumplido") cumplidoIv.push(...clipped);
   }
 
-  const dirOnPlan = intersectIntervalsWithWindows(dirIv, planElapsed);
+  let dirOnPlan = intersectIntervalsWithWindows(dirIv, planElapsed);
   const preOnPlanRaw = intersectIntervalsWithWindows(preIv, planElapsed);
-  const preOnPlan = subtractMsIntervals(preOnPlanRaw, dirOnPlan);
+  let preOnPlan = subtractMsIntervals(preOnPlanRaw, dirOnPlan);
+
+  const holes = params.huecosLog?.length
+    ? intersectIntervalsWithWindows(params.huecosLog, planElapsed)
+    : [];
+  if (holes.length > 0) {
+    dirOnPlan = subtractMsIntervals(dirOnPlan, holes);
+    preOnPlan = subtractMsIntervals(preOnPlan, holes);
+  }
+
   const covered = mergeMsIntervals([...dirOnPlan, ...preOnPlan]);
   const huecos = subtractMsIntervals(planElapsed, covered);
 
@@ -328,7 +341,8 @@ export function computeTriadaLineaOccupancy(params: {
     else if (minutosHueco + drift >= 0) minutosHueco = round1(minutosHueco + drift);
     else minutosPresencia = round1(Math.max(0, minutosPresencia + drift));
   }
-  const minutosInconsciente = round1(minutosHueco + minutosPlanFuturo);
+  /** Inconsciente = sin vehículo en el plan ya ocurrido. El futuro no se mezcla. */
+  const minutosInconsciente = minutosHueco;
 
   const interruptCubreLinea = interruptChildAdvancing && parentPaused;
   const paraleloMeritorio = hilosAvanzando >= 2;

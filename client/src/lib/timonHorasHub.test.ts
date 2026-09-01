@@ -12,6 +12,7 @@ import {
   recordProgresoHubAlCerrarVehiculo,
   setOleadaComoDireccion,
   setPuntoProduccion,
+  updateOleadaPunto,
 } from "./proyectos.ts";
 import { horaEnCurso, horasDeEpisodio } from "./timonHoras.ts";
 import type { Vehicle } from "./persistence.ts";
@@ -206,5 +207,112 @@ describe("timón — horas enumeradas en el Hub", () => {
     assert.equal(sellado?.resumen?.timon?.horas, 1);
     assert.equal(oleada.timonEpisodio?.puntoTitulo, "B");
     assert.equal(oleada.timonEpisodio?.minutosAcumulados, 0);
+  });
+
+  it("cumplir el timón sella el peldaño y pasa al siguiente punto", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const idea = await addPeldanoIdea(USER, p.id, "Busos");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Negros S");
+    await addOleadaPunto(USER, idea.id, "Negros M");
+    const oleada0 = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    const s = oleada0.oleadaPuntos!.find(x => x.titulo === "Negros S")!;
+    const m = oleada0.oleadaPuntos!.find(x => x.titulo === "Negros M")!;
+    await setPuntoProduccion(USER, idea.id, s.id);
+
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_s",
+        titulo: "Lote S",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        oleadaPuntoId: s.id,
+        destinoCierre: "peldano",
+        duracionFinal: 90,
+        aperturaAt: 1_000,
+        cierreAt: 1_000 + 90 * 60_000,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 2, duracionMin: 90, destinoCierre: "peldano" }
+    );
+
+    await updateOleadaPunto(USER, idea.id, s.id, { status: "cumplido" });
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    const oleada = all.find(x => x.id === idea.id)!;
+    const sellado = all.find(x => x.estado === "conquistado");
+    assert.equal(oleada.oleadaPuntos?.find(x => x.id === s.id)?.status, "cumplido");
+    assert.equal(oleada.puntoProduccionId, m.id);
+    assert.equal(oleada.timonEpisodio?.puntoId, m.id);
+    assert.equal(oleada.timonEpisodio?.minutosAcumulados, 0);
+    assert.ok(sellado);
+    assert.equal(sellado?.titulo, "Negros S");
+    assert.equal(sellado?.resumen?.timon?.minutos, 90);
+    assert.equal(all.filter(x => x.estado === "conquistado").length, 1);
+  });
+
+  it("tres cumplidos consecutivos del timón suben tres peldaños", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const idea = await addPeldanoIdea(USER, p.id, "Busos");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Negros S");
+    await addOleadaPunto(USER, idea.id, "Negros M");
+    await addOleadaPunto(USER, idea.id, "Acero");
+    const oleada0 = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    const s = oleada0.oleadaPuntos!.find(x => x.titulo === "Negros S")!;
+    const m = oleada0.oleadaPuntos!.find(x => x.titulo === "Negros M")!;
+    const a = oleada0.oleadaPuntos!.find(x => x.titulo === "Acero")!;
+    await setPuntoProduccion(USER, idea.id, s.id);
+
+    const closeOn = async (id: string, puntoId: string, min: number) => {
+      await recordProgresoHubAlCerrarVehiculo(
+        USER,
+        vehicle({
+          id,
+          titulo: id,
+          proyectoId: p.id,
+          proyectoPeldanoId: idea.id,
+          oleadaPuntoId: puntoId,
+          destinoCierre: "peldano",
+          duracionFinal: min,
+          aperturaAt: 1_000,
+          cierreAt: 1_000 + min * 60_000,
+        }),
+        { tipoOrigen: "tiempo", psGanados: 1, duracionMin: min, destinoCierre: "peldano" }
+      );
+    };
+
+    await closeOn("v_s", s.id, 60);
+    await updateOleadaPunto(USER, idea.id, s.id, { status: "cumplido" });
+    await closeOn("v_m", m.id, 60);
+    await updateOleadaPunto(USER, idea.id, m.id, { status: "cumplido" });
+    await closeOn("v_a", a.id, 60);
+    await updateOleadaPunto(USER, idea.id, a.id, { status: "cumplido" });
+
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(all.filter(x => x.estado === "conquistado").length, 3);
+    assert.equal(computeProyectoStats(all).conquistados, 3);
+  });
+
+  it("cumplir un punto que no es el pin también sella peldaño", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const idea = await addPeldanoIdea(USER, p.id, "Busos");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Uno");
+    await addOleadaPunto(USER, idea.id, "Dos");
+    await addOleadaPunto(USER, idea.id, "Tres");
+    const oleada0 = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    const uno = oleada0.oleadaPuntos!.find(x => x.titulo === "Uno")!;
+    const dos = oleada0.oleadaPuntos!.find(x => x.titulo === "Dos")!;
+    const tres = oleada0.oleadaPuntos!.find(x => x.titulo === "Tres")!;
+    await setPuntoProduccion(USER, idea.id, tres.id);
+
+    await updateOleadaPunto(USER, idea.id, uno.id, { status: "cumplido" });
+    await updateOleadaPunto(USER, idea.id, dos.id, { status: "cumplido" });
+    await updateOleadaPunto(USER, idea.id, tres.id, { status: "cumplido" });
+
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(all.filter(x => x.estado === "conquistado").length, 3);
+    const oleada = all.find(x => x.id === idea.id)!;
+    assert.equal(oleada.oleadaPuntos?.filter(x => x.status === "cumplido").length, 3);
   });
 });

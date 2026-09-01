@@ -49,8 +49,10 @@ import {
   accrueVehiculoAlTimon,
   crearTimonEpisodio,
   episodioTimonVacio,
-  horasDeEpisodio,
+  hydratePresenciaEpisodio,
+  hydrateTimonEpisodio,
   resumenTimonDesdeEpisodio,
+  wallMinutosReales,
   yaEstaEnTimon,
   type TimonEpisodio,
   type TimonResumenPeldano,
@@ -79,9 +81,12 @@ export { buildProyectoRendicion } from "./gastoTiempo";
 export {
   formatHoraLabel,
   formatHorasCerradas,
+  formatDuracionTimon,
   horaEnCurso,
   horasDeEpisodio,
   horasCompletasDeMinutos,
+  hydrateTimonEpisodio,
+  hydratePresenciaEpisodio,
 } from "./timonHoras";
 
 export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
@@ -232,9 +237,13 @@ export interface Proyecto {
   minutosPresencia?: number;
   /**
    * Rendición de gasto: sellos de pared por vehículo (lista rápida, interrupt,
-   * idle de desglosador). No ensucia la escalera. Inconsciente = resto del plan.
+   * idle de desglosador). No ensucia la escalera.
    */
   gastoTiempo?: ProyectoGastoTiempo;
+  /**
+   * Enumeración infinita de presencia (Hora 1, 2, 3… sin sellar peldaño).
+   */
+  presenciaEpisodio?: TimonEpisodio;
   /** Cierres presencia contados (idempotentes por vehicleId). */
   sesionesPresencia?: number;
   /** Ring de vehicleIds ya contabilizados en presencia (anti doble conteo). */
@@ -826,7 +835,20 @@ export async function addOleadaPunto(
   });
 }
 
-/** Edita título o estatus de un punto — libertad de reordenar la mente. */
+function nextPuntoTrasCumplir(
+  pel: ProyectoPeldano,
+  cumplidoId: string
+): OleadaPunto | null {
+  const puntos = sortOleadaPuntos(readOleadaPuntos(pel));
+  const following = puntos.filter(p => p.id !== cumplidoId && p.status !== "cumplido" && p.status !== "fallado");
+  if (following.length > 0) return following[0] ?? null;
+  return puntos.find(p => p.id !== cumplidoId) ?? null;
+}
+
+/**
+ * Cumplir un punto de producción sella un peldaño (horas de ese foco si las
+ * hay; si no, el paso cumplido). Si el punto es el timón, el pin pasa al siguiente.
+ */
 export async function updateOleadaPunto(
   userId: string,
   peldanoId: string,
@@ -837,6 +859,18 @@ export async function updateOleadaPunto(
   const pel = all.find(p => p.id === peldanoId);
   if (!pel) return null;
   const now = Date.now();
+  const pin = resolvePuntoProduccion(pel);
+  const prevPunto = readOleadaPuntos(pel).find(p => p.id === puntoId);
+  const becomingCumplido =
+    patch.status === "cumplido" &&
+    prevPunto != null &&
+    prevPunto.status !== "cumplido";
+  const fulfillingPin = Boolean(becomingCumplido && pin?.id === puntoId);
+
+  if (becomingCumplido && prevPunto) {
+    await spawnPeldanoDesdePunto(userId, pel, prevPunto);
+  }
+
   const puntos = readOleadaPuntos(pel).map(p => {
     if (p.id !== puntoId) return p;
     return {
@@ -846,7 +880,20 @@ export async function updateOleadaPunto(
       updatedAt: now,
     };
   });
-  return updatePeldano(userId, peldanoId, { oleadaPuntos: puntos });
+
+  if (!fulfillingPin) {
+    return updatePeldano(userId, peldanoId, { oleadaPuntos: puntos });
+  }
+
+  const pelWithStatus = { ...pel, oleadaPuntos: puntos };
+  const nextPin = nextPuntoTrasCumplir(pelWithStatus, puntoId);
+  return updatePeldano(userId, peldanoId, {
+    oleadaPuntos: puntos,
+    puntoProduccionId: nextPin?.id ?? puntoId,
+    timonEpisodio: nextPin
+      ? crearTimonEpisodio(nextPin.id, nextPin.titulo)
+      : crearTimonEpisodio(puntoId, pin?.titulo ?? pel.titulo),
+  });
 }
 
 /** Borra un punto y renumerara la propuesta — sin castigo de cumplimiento. */
@@ -1051,13 +1098,25 @@ export function acreditarGastoTiempoEnProyecto(
 
   const prev = list[idx];
   const nextGasto = accrueGastoTiempo(prev.gastoTiempo, sello);
-  if (nextGasto === prev.gastoTiempo) return prev;
+  const presenciaEpisodio =
+    sello.dest === "presencia"
+      ? hydratePresenciaEpisodio({
+          episodio: prev.presenciaEpisodio,
+          proyectoId: prev.id,
+          vehicles: [...tryReadLocalVehicles(), vehicle],
+          now: opts?.now,
+        })
+      : prev.presenciaEpisodio;
+  if (nextGasto === prev.gastoTiempo && presenciaEpisodio === prev.presenciaEpisodio) {
+    return prev;
+  }
 
   const minutosPresencia = Math.round(nextGasto.secPresencia / 60);
   const at = opts?.now ?? sello.z;
   const updated: Proyecto = {
     ...prev,
     gastoTiempo: nextGasto,
+    presenciaEpisodio,
     minutosPresencia,
     sesionesPresencia: nextGasto.n,
     primeraPresenciaAt:
@@ -1453,7 +1512,19 @@ function ensureTimonEpisodio(pel: ProyectoPeldano): TimonEpisodio {
  */
 export async function acreditarTimonAlCerrarVehiculo(
   userId: string,
-  vehicle: Pick<Vehicle, "id" | "titulo" | "proyectoId" | "proyectoPeldanoId" | "oleadaPuntoId">,
+  vehicle: Pick<
+    Vehicle,
+    | "id"
+    | "titulo"
+    | "proyectoId"
+    | "proyectoPeldanoId"
+    | "oleadaPuntoId"
+    | "aperturaAt"
+    | "cierreAt"
+    | "duracionFinal"
+    | "status"
+    | "tipoFlota"
+  >,
   opts: { tipoOrigen: "tiempo" | "situacion"; duracionMin: number }
 ): Promise<boolean> {
   const proyectoId = vehicle.proyectoId;
@@ -1474,7 +1545,10 @@ export async function acreditarTimonAlCerrarVehiculo(
   if (stamped && stamped !== pin.id) return false;
   if (yaEstaEnTimon(pel.timonEpisodio, vehicle.id)) return true;
 
-  const minutos = Math.max(0, Math.round(opts.duracionMin));
+  const minutos = Math.max(
+    wallMinutosReales(vehicle),
+    Math.max(0, Math.round(opts.duracionMin))
+  );
   if (minutos <= 0) return true;
 
   const next = accrueVehiculoAlTimon(ensureTimonEpisodio(pel), {
@@ -1491,28 +1565,105 @@ export async function acreditarTimonAlCerrarVehiculo(
  * Peldaño = estancia ya caminada en un punto de producción.
  * Las horas 1..N de ese timón quedan clasificadas en la escalera.
  */
-async function spawnPeldanoDesdeTimonEpisodio(
-  userId: string,
-  oleada: ProyectoPeldano
-): Promise<void> {
-  const episodio = oleada.timonEpisodio;
-  if (episodioTimonVacio(episodio) || !episodio) return;
+function tryReadLocalVehicles(): Vehicle[] {
+  try {
+    if (typeof localStorage === "undefined") return [];
+    const data = localStorage.getItem("sistemicar_vehicles");
+    if (!data) return [];
+    const parsed = JSON.parse(data) as Vehicle[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-  const existing = getPeldanosByProyectoLocal(userId, oleada.proyectoId);
-  const stampId = `timon:${episodio.id}`;
-  if (existing.some(p => p.vehicleId === stampId && p.estado === "conquistado")) {
+function hydrateOleadaTimonVivo(pel: ProyectoPeldano): ProyectoPeldano {
+  const pin = resolvePuntoProduccion(pel);
+  if (!pin) return pel;
+  const vehicles = tryReadLocalVehicles();
+  const timonEpisodio = hydrateTimonEpisodio({
+    episodio: pel.timonEpisodio,
+    puntoId: pin.id,
+    puntoTitulo: pin.titulo,
+    proyectoId: pel.proyectoId,
+    oleadaId: pel.id,
+    vehicles,
+  });
+  return { ...pel, timonEpisodio };
+}
+
+function yaHayPeldanoDePunto(
+  existing: ProyectoPeldano[],
+  puntoId: string,
+  episodioId?: string
+): boolean {
+  return existing.some(p => {
+    if (p.estado !== "conquistado") return false;
+    if (p.resumen?.timon?.puntoId === puntoId) return true;
+    if (episodioId && p.vehicleId === `timon:${episodioId}`) return true;
+    return false;
+  });
+}
+
+async function spawnPeldanoDesdePunto(
+  userId: string,
+  oleada: ProyectoPeldano,
+  punto: OleadaPunto
+): Promise<void> {
+  const pin = resolvePuntoProduccion(oleada);
+  if (pin?.id === punto.id) {
+    await spawnPeldanoDesdeTimonEpisodio(userId, oleada, { allowEmpty: true });
     return;
   }
+  const vehicles = tryReadLocalVehicles();
+  const episodio = hydrateTimonEpisodio({
+    episodio: null,
+    puntoId: punto.id,
+    puntoTitulo: punto.titulo,
+    proyectoId: oleada.proyectoId,
+    oleadaId: oleada.id,
+    vehicles,
+  });
+  await spawnPeldanoDesdeEpisodio(userId, oleada, episodio, { allowEmpty: true });
+}
 
-  const horas = horasDeEpisodio(episodio);
+async function spawnPeldanoDesdeTimonEpisodio(
+  userId: string,
+  oleada: ProyectoPeldano,
+  opts?: { allowEmpty?: boolean }
+): Promise<void> {
+  const vivo = hydrateOleadaTimonVivo(oleada);
+  if (!vivo.timonEpisodio) return;
+  await spawnPeldanoDesdeEpisodio(userId, oleada, vivo.timonEpisodio, opts);
+}
+
+async function spawnPeldanoDesdeEpisodio(
+  userId: string,
+  oleada: ProyectoPeldano,
+  episodio: TimonEpisodio,
+  opts?: { allowEmpty?: boolean }
+): Promise<void> {
+  if (!opts?.allowEmpty && episodioTimonVacio(episodio)) return;
+
+  const existing = getPeldanosByProyectoLocal(userId, oleada.proyectoId);
+  if (yaHayPeldanoDePunto(existing, episodio.puntoId, episodio.id)) return;
+
   const resumenTimon = resumenTimonDesdeEpisodio(episodio);
   const horaCount = resumenTimon.horas;
   const tieneTiempo = episodio.minutosTiempo > 0;
   const tipoOrigen: "tiempo" | "situacion" = tieneTiempo ? "tiempo" : "situacion";
-  const duracionMin = tieneTiempo ? episodio.minutosTiempo : episodio.minutosAcumulados;
+  const duracionMin = tieneTiempo
+    ? episodio.minutosTiempo
+    : episodio.minutosAcumulados;
   const ahora = Date.now();
   const maxOrden = existing.reduce((m, p) => Math.max(m, p.orden), -1);
-  const horaLabel = horaCount === 1 ? "1 hora" : `${horaCount} horas`;
+  const horaLabel =
+    horaCount <= 0
+      ? "paso cumplido"
+      : horaCount === 1
+        ? "1 hora"
+        : `${horaCount} horas`;
+  const stampId = `timon:${episodio.id}`;
 
   const peldano: ProyectoPeldano = {
     id: `pel_timon_${ahora}_${Math.random().toString(36).slice(2, 6)}`,
