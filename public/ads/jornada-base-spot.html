@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1080, initial-scale=1" />
+  <title>Spot Jornada Base</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 1080px;
+      height: 1920px;
+      background: #050505;
+      color: #f4f4f4;
+      overflow: hidden;
+      font-family: "Segoe UI", "Noto Sans", Avenir, Helvetica, Arial, sans-serif;
+    }
+    .scene {
+      display: none;
+      box-sizing: border-box;
+      width: 1080px;
+      height: 1920px;
+      padding: 140px 88px 120px;
+      background:
+        radial-gradient(ellipse 90% 55% at 50% -8%, #1a2030 0%, #0a0a0a 46%, #050505 100%);
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .scene.on { display: flex; }
+    .kicker {
+      letter-spacing: 0.28em;
+      font-size: 28px;
+      color: #D4AF37;
+      font-weight: 600;
+    }
+    h1 {
+      margin: 36px 0 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 86px;
+      line-height: 1.08;
+      font-weight: 900;
+      color: #fff;
+    }
+    h1.mid { font-size: 72px; }
+    p.lead {
+      margin: 40px 0 0;
+      font-size: 40px;
+      line-height: 1.35;
+      color: rgba(255,255,255,0.62);
+      font-weight: 400;
+    }
+    ul {
+      margin: 48px 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 40px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.86);
+    }
+    ul li { margin: 0 0 22px; }
+    .price {
+      font-size: 92px;
+      font-weight: 900;
+      color: #fff;
+      margin-top: 24px;
+    }
+    .price span {
+      font-size: 36px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.45);
+      margin-left: 12px;
+    }
+    .cta {
+      background: #D4AF37;
+      color: #0A0A0A;
+      text-align: center;
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      padding: 36px 28px;
+    }
+    .url {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 28px;
+      letter-spacing: 0.04em;
+      color: rgba(255,255,255,0.38);
+    }
+    .box {
+      border: 2px solid rgba(212,175,55,0.45);
+      background: rgba(212,175,55,0.08);
+      padding: 48px 44px;
+      margin-top: 48px;
+    }
+  </style>
+</head>
+<body>
+  <section class="scene" data-scene="1">
+    <div>
+      <p class="kicker">SISTEMICAR · JORNADA BASE</p>
+      <h1>El día se te fue.<br />¿Cuántas unidades cerraste?</h1>
+    </div>
+    <p class="lead">Trabajaste. Contestaste. Apagaste incendios.</p>
+  </section>
+
+  <section class="scene" data-scene="2">
+    <div>
+      <p class="kicker">SIN CIERRE</p>
+      <h1 class="mid">Al final no hay un número.</h1>
+      <p class="lead">Solo la sensación de que el día se evaporó.</p>
+    </div>
+    <p class="lead">Ocupado no cuenta.</p>
+  </section>
+
+  <section class="scene" data-scene="3">
+    <div>
+      <p class="kicker">QUÉ HACE BASE</p>
+      <div class="box">
+        <ul>
+          <li>Lanzas un bloque de trabajo.</li>
+          <li>Cierras unidades.</li>
+          <li>El día termina con evidencia, no con culpa.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="lead">No es otra lista.</p>
+  </section>
+
+  <section class="scene" data-scene="4">
+    <div>
+      <p class="kicker">PELDAÑO 1</p>
+      <p class="price">$24.99<span>/mes</span></p>
+      <p class="lead">El vendedor ya sabe que vienes por Jornada.</p>
+    </div>
+    <div>
+      <div class="cta">QUE ME LLAME EL VENDEDOR</div>
+      <p class="url">sistemicar.app/ventas-jornada</p>
+    </div>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const forced = params.get("s");
+    const scenes = [...document.querySelectorAll(".scene")];
+    function show(n) {
+      scenes.forEach((el) => el.classList.toggle("on", el.dataset.scene === String(n)));
+    }
+    if (forced) {
+      show(forced);
+    } else {
+      const order = [1, 2, 3, 4];
+      let i = 0;
+      show(order[0]);
+      setInterval(() => {
+        i = (i + 1) % order.length;
+        show(order[i]);
+      }, 3800);
+    }
+  </script>
+</body>
+</html>

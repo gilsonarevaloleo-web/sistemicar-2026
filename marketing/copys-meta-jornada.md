@@ -60,7 +60,10 @@ Cierra el día con unidades, no con culpa.
 
 **Emojis:** ninguno en el gancho. Si quieres uno, un solo ⚡ al final del cuerpo. Nada de filas de iconos.
 
-**Imagen:** captura de la landing `/ventas-jornada` (fondo oscuro, titular visible). No uses stock de “éxito” ni oficinas de stock.
+**Video del anuncio (vertical 9:16, 16 s):** `public/ads/jornada-base-spot.mp4`  
+Tras el deploy: https://sistemicar.app/ads/jornada-base-spot.mp4
+
+**Imagen / miniatura (si Meta la pide):** `public/ads/jornada-base-spot-thumb.png`
 
 ---
 
@@ -68,6 +71,4 @@ Cierra el día con unidades, no con culpa.
 
 - Versión B (interrupciones / Ritmo)
 - Versión C (apagar incendios / Norte / proyectos)
-- Videos Reels / TikTok / Shorts
-
-Cuando el anuncio A traiga al menos una llamada o un pago, se abre el siguiente corte.
+- Grabación de la pantalla de Jornada (Reloj, Desglosador) — eso es un segundo video, cuando este spot ya traiga clics.

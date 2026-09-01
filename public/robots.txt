@@ -8,6 +8,7 @@ Allow: /
 Allow: /umbral
 Allow: /ventas-espejo
 Allow: /ventas-jornada
+Allow: /ads
 Allow: /terminos-condiciones
 Allow: /libro-reclamaciones
 
