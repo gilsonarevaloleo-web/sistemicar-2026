@@ -60,17 +60,25 @@ No agregues 15 intereses. No excluyas ciudades. No copies públicos de otras pá
 
 ---
 
-## 4. El anuncio (el creativo)
+## 4. El anuncio (el creativo) — VIDEO
 
-1. Formato: **una imagen** (no carrusel, no video).
-2. Destino: pega la URL de arriba **completa**, con los `utm_`.
-3. Texto: copia el **texto corto** de `copys-meta-jornada.md`.
-4. Título: `El día se te fue sin un número.`
-5. Descripción: `Cierra el día con unidades, no con culpa.`
-6. Botón: **Más información**
-7. Imagen: captura de pantalla de la landing en el celular (titular visible). Recórtala en vertical si publicas en Instagram.
+1. Formato: **video** (un solo archivo, vertical).
+2. Archivo: `public/ads/jornada-base-spot.mp4`  
+   Cuando esté en producción: [sistemicar.app/ads/jornada-base-spot.mp4](https://sistemicar.app/ads/jornada-base-spot.mp4)  
+   En el celular: ábrelo → menú → **Descargar**. O pásatelo por WhatsApp a ti mismo.
+3. Destino del clic: pega esta URL **completa**
 
-Revisa la vista previa. El clic tiene que abrir `sistemicar.app/ventas-jornada`, no Facebook ni WhatsApp.
+```
+https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base
+```
+
+4. Texto del anuncio: copia el **texto corto** de `copys-meta-jornada.md`.
+5. Título: `El día se te fue sin un número.`
+6. Descripción: `Cierra el día con unidades, no con culpa.`
+7. Botón: **Más información**
+8. Miniatura (si Meta pide una): `public/ads/jornada-base-spot-thumb.png`
+
+Revisa la vista previa. Al tocar el anuncio debe abrir `sistemicar.app/ventas-jornada`, no WhatsApp ni el feed.
 
 ---
 
@@ -99,10 +107,9 @@ Si en **7 días** no hay ni una llamada ni un pago: paramos y cambiamos **solo**
 
 ## 7. Lo que no hagas
 
-- No impulsos desde el perfil de Instagram.
+- No impulsos desde el perfil de Instagram (usa el Administrador de anuncios).
 - No un segundo anuncio de Ritmo o Norte.
-- No videos todavía.
 - No subas el presupuesto “porque no vende” a los 2 días.
 - No pongas tu WhatsApp personal en el anuncio: el vendedor algoritmo debe recibir al cliente.
 
-Cuando tengas la primera llamada o el primer pago, me avisas y armamos el siguiente paso (remarketing o un video corto).
+Cuando tengas la primera llamada o el primer pago, me avisas y armamos el siguiente paso.
