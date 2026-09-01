@@ -70,14 +70,16 @@ import { RUTA_BANDA_META } from "@/lib/rutaEnfoque";
 import { RutasMentalesGrafo } from "@/components/RutasMentalesGrafo";
 import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
 import { OleadaDesglosePanel } from "@/components/OleadaDesglosePanel";
+import { ProyectoGastoConcienciaCard } from "@/components/ProyectoGastoConcienciaCard";
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
 import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
 import { getJournalDateString } from "@/lib/segmentTime";
+import { getLocalVehicles } from "@/lib/persistence";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
-import { formatHorasCerradas } from "@/lib/timonHoras";
+import { formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -599,12 +601,48 @@ export default function ProyectosPage() {
     [oleadaPeldano?.puntoProduccionId, oleadaPuntos]
   );
 
+  const flotaLocal = useMemo(() => {
+    try {
+      return getLocalVehicles();
+    } catch {
+      return [];
+    }
+  }, [peldanos, proyecto?.updatedAt, proyecto?.presenciaEpisodio]);
+
+  const timonHydrated = useMemo(() => {
+    if (!oleadaPeldano || !oleadaPuntoProduccion || !detailId) {
+      return oleadaPeldano?.timonEpisodio ?? null;
+    }
+    return hydrateTimonEpisodio({
+      episodio: oleadaPeldano.timonEpisodio,
+      puntoId: oleadaPuntoProduccion.id,
+      puntoTitulo: oleadaPuntoProduccion.titulo,
+      proyectoId: detailId,
+      oleadaId: oleadaPeldano.id,
+      vehicles: flotaLocal,
+    });
+  }, [oleadaPeldano, oleadaPuntoProduccion, detailId, flotaLocal]);
+
   const refreshOleadaPeldanoLocal = useCallback(
     (updated: ProyectoPeldano | null) => {
       if (!updated) return;
-      setPeldanos(prev => prev.map(p => (p.id === updated.id ? updated : p)));
+      setPeldanos(prev => {
+        const merged = prev.map(p => (p.id === updated.id ? updated : p));
+        if (detailId) {
+          const all = getPeldanosByProyectoLocal(user?.uid ?? "", detailId);
+          if (all.length > merged.length) return all;
+        }
+        return merged;
+      });
+      if (user) {
+        setProyectos(getProyectosLocal(user.uid));
+        if (detailId) {
+          const p = getProyectosLocal(user.uid).find(x => x.id === detailId);
+          if (p) setProyecto(p);
+        }
+      }
     },
-    []
+    [detailId, user]
   );
 
   const handleGuardarClaridad = async () => {
@@ -641,6 +679,10 @@ export default function ProyectosPage() {
     if (!user || !oleadaPeldano) return;
     const updated = await updateOleadaPunto(user.uid, oleadaPeldano.id, puntoId, { status: next });
     refreshOleadaPeldanoLocal(updated);
+    if (next === "cumplido") {
+      setPeldanos(getPeldanosByProyectoLocal(user.uid, oleadaPeldano.proyectoId));
+      setProyectos(getProyectosLocal(user.uid));
+    }
   };
 
   const handleDeleteOleadaPunto = async (puntoId: string) => {
@@ -683,6 +725,8 @@ export default function ProyectosPage() {
     if (!user || !oleadaPeldano) return;
     const updated = await setPuntoProduccion(user.uid, oleadaPeldano.id, puntoId);
     refreshOleadaPeldanoLocal(updated);
+    setPeldanos(getPeldanosByProyectoLocal(user.uid, oleadaPeldano.proyectoId));
+    setProyectos(getProyectosLocal(user.uid));
   };
 
   const handleCreateProyecto = useCallback(
@@ -929,7 +973,8 @@ export default function ProyectosPage() {
                 </li>
                 <li>
                   <span className="text-slate-300">Punto de producción</span> — el timón. Suma
-                  vehículos en horas enumeradas. Cambiar de punto cierra esa numeración.
+                  la pared real de cada vehículo en horas enumeradas. Cumplir el timón sella
+                  el peldaño.
                 </li>
                 <li>
                   <span className="text-slate-300">Peldaño</span> — una estancia ya caminada en un
@@ -940,7 +985,8 @@ export default function ProyectosPage() {
                   caminado.
                 </li>
                 <li>
-                  <span className="text-slate-300">Presencia</span> — el día, no el rumbo.
+                  <span className="text-slate-300">Presencia</span> — vehículos sin rumbo;
+                  enumeración infinita, no sube peldaños.
                 </li>
               </ul>
             </div>
@@ -975,7 +1021,7 @@ export default function ProyectosPage() {
               <OleadaDesglosePanel
                 puntos={oleadaPuntos}
                 puntoProduccionId={oleadaPeldano.puntoProduccionId}
-                timonEpisodio={oleadaPeldano.timonEpisodio}
+                timonEpisodio={timonHydrated}
                 tint={tint}
                 pulseId={ordenPulse?.id}
                 pulseDir={ordenPulse?.dir}
@@ -998,6 +1044,14 @@ export default function ProyectosPage() {
                 </p>
               </div>
             )}
+
+            {detailId ? (
+              <ProyectoGastoConcienciaCard
+                proyectoId={detailId}
+                vehicles={flotaLocal}
+                presenciaEpisodio={proyecto?.presenciaEpisodio}
+              />
+            ) : null}
 
             {claridadEdit ? (
               <div
@@ -1363,8 +1417,8 @@ export default function ProyectosPage() {
             >
               {conquistados.length === 0 ? (
                 <p className="text-[10px] text-slate-600 text-center py-6 border border-dashed border-white/10 rounded-xl">
-                  Cambia el timón para sellar un peldaño. Cada estancia en un punto de producción
-                  — sus horas enumeradas — es un paso caminado.
+                  Cumple el timón (o cámbialo) para sellar un peldaño. Cada estancia en un
+                  punto de producción — sus horas reales — es un paso caminado.
                 </p>
               ) : (
                 <div className="space-y-2">

@@ -20,7 +20,7 @@ function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
 }
 
 describe("concienciaTriadaLinea", () => {
-  it("sin vehículo: hueco lo ocurrido, inconsciente incluye el futuro", () => {
+  it("sin vehículo: hueco lo ocurrido; el futuro no es inconsciencia", () => {
     const now = lima("10:00");
     const occ = computeTriadaLineaOccupancy({
       fecha: FECHA,
@@ -31,7 +31,7 @@ describe("concienciaTriadaLinea", () => {
     assert.equal(occ.minutosPlan, 180);
     assert.equal(occ.minutosHueco, 60);
     assert.equal(occ.minutosPlanFuturo, 120);
-    assert.equal(occ.minutosInconsciente, 180);
+    assert.equal(occ.minutosInconsciente, 60);
     assert.equal(occ.minutosPresencia, 0);
     assert.equal(occ.paraleloMeritorio, false);
   });
@@ -60,7 +60,7 @@ describe("concienciaTriadaLinea", () => {
     });
     assert.equal(occ.minutosDireccion, 60);
     assert.equal(occ.minutosPlanFuturo, 120);
-    assert.equal(occ.minutosInconsciente, 120);
+    assert.equal(occ.minutosInconsciente, 0);
     assert.ok(occ.minutosDireccion < occ.minutosPlan);
     assert.equal(occ.paraleloMeritorio, true);
     assert.ok(occ.minutosParaleloEnJuego >= 59);
@@ -71,9 +71,9 @@ describe("concienciaTriadaLinea", () => {
       vehicles,
       now,
     });
-    assert.ok(model.pctDireccion < 100);
-    assert.ok(model.pctInconsciente > 0);
-    assert.match(model.headline, /aún no ocurre|Paralelo/);
+    assert.ok(model.pctDireccion <= 100);
+    assert.ok(model.minutosPlanFuturo > 0);
+    assert.match(model.headline, /Dirección|aún no termina|Paralelo/);
   });
 
   it("Dirección gana el minuto único si se solapa con Presencia", () => {

@@ -1,14 +1,19 @@
 /**
  * Revelación del plan — reporte GLOBAL sellado al término.
  *
- * No vive en un proyecto (allá solo llega Dirección).
- * 100% = minutos únicos del plan. Tras horaFin del último segmento
- * se sella: inconsciente (huecos) · presencia · dirección · por conquistar.
- * Lo no planificado no es deuda.
+ * 100% = 24 h del día-jornada (05:00→05:00).
+ * Inconsciente = plan ya ocurrido sin vehículo (huecos).
+ * Presencia = vehículos sin dirección.
+ * Dirección = vehículos con proyecto o centro, dentro del plan.
+ * No conquistado = horario no planificado. Si planificas 24 h, queda en cero.
  *
  * Prohibido en ms0 / tick 1s. Idle / sombra.
  */
-import { computeTriadaLineaOccupancy } from "@/lib/concienciaTriadaLinea";
+import {
+  computeGastoConcienciaDia,
+  huecosLogToIntervals,
+  MINUTOS_DIA_JORNADA,
+} from "@/lib/gastoConcienciaEngine";
 import { safeSetItem } from "@/lib/storageHygiene";
 import {
   getJournalDateString,
@@ -17,6 +22,7 @@ import {
   segmentWindowMs,
 } from "@/lib/segmentTime";
 import type { Vehicle } from "@/lib/persistence";
+import type { CoberturaHuecoInterval } from "./coberturaHuecosLog";
 
 export type RevelacionPlanDia = {
   fecha: string;
@@ -27,7 +33,9 @@ export type RevelacionPlanDia = {
   minutosInconsciente: number;
   minutosPresencia: number;
   minutosDireccion: number;
+  /** Horario no planificado (24 h − plan). Ya no es el futuro del plan. */
   minutosPorConquistar: number;
+  minutosDia?: number;
   headline: string;
 };
 
@@ -98,19 +106,23 @@ export function isPlanTerminado(
 }
 
 function buildHeadline(r: Omit<RevelacionPlanDia, "headline">): string {
-  const total = r.minutosPlan;
-  if (total <= 0) return "Sin plan — no hay revelación que sellar.";
+  const total = r.minutosDia || MINUTOS_DIA_JORNADA;
+  if (r.minutosPlan <= 0) return "Sin plan — no hay revelación que sellar.";
   const i = r.minutosInconsciente;
   const p = r.minutosPresencia;
   const d = r.minutosDireccion;
+  const nc = r.minutosPorConquistar;
   if (d >= p && d >= i && d > 0) {
-    return `El plan revela Dirección: ${formatMinutosHoras(d)} de rumbo.`;
+    return `El día revela Dirección: ${formatMinutosHoras(d)} de rumbo.`;
   }
   if (p >= i && p > 0) {
-    return `El plan revela Presencia: ${formatMinutosHoras(p)} sin reclamar Norte.`;
+    return `El día revela Presencia: ${formatMinutosHoras(p)} sin reclamar Norte.`;
   }
   if (i > 0) {
-    return `El plan revela inconsciencia: ${formatMinutosHoras(i)} sin vehículo.`;
+    return `El día revela inconsciencia: ${formatMinutosHoras(i)} sin vehículo.`;
+  }
+  if (nc > 0 && nc >= total / 2) {
+    return `El día revela lo no conquistado: ${formatMinutosHoras(nc)} fuera del plan.`;
   }
   return "El plan terminó. Así se gastó el tiempo.";
 }
@@ -120,29 +132,35 @@ export function buildRevelacionPlanDia(params: {
   segmentos: { horaInicio?: string; horaFin?: string }[];
   vehicles: Vehicle[];
   now?: number;
+  huecos?: CoberturaHuecoInterval[];
 }): RevelacionPlanDia | null {
   const now = params.now ?? Date.now();
   const win = resolvePlanWindowMs(params.segmentos, now);
   if (!win) return null;
   const fecha = params.fecha ?? getJournalDateString(now);
-  const occ = computeTriadaLineaOccupancy({
+  const huecosLog = params.huecos
+    ? huecosLogToIntervals(params.huecos, now)
+    : undefined;
+  const dia = computeGastoConcienciaDia({
     fecha,
     segmentos: params.segmentos,
     vehicles: params.vehicles,
     now,
+    huecosLog,
   });
-  if (occ.minutosPlan <= 0) return null;
+  if (dia.minutosPlan <= 0) return null;
 
   const body: Omit<RevelacionPlanDia, "headline"> = {
     fecha,
     sealedAt: now,
     planEndMs: win.endMs,
     planEndLabel: formatPlanEndLabel(win.endMs),
-    minutosPlan: occ.minutosPlan,
-    minutosInconsciente: occ.minutosHueco,
-    minutosPresencia: occ.minutosPresencia,
-    minutosDireccion: occ.minutosDireccion,
-    minutosPorConquistar: occ.minutosPlanFuturo,
+    minutosPlan: dia.minutosPlan,
+    minutosInconsciente: dia.minutosInconsciente,
+    minutosPresencia: dia.minutosPresencia,
+    minutosDireccion: dia.minutosDireccion,
+    minutosPorConquistar: dia.minutosNoConquistado,
+    minutosDia: dia.minutosDia,
   };
   return { ...body, headline: buildHeadline(body) };
 }
@@ -176,8 +194,8 @@ export function readRevelacionPlanDia(
 }
 
 /**
- * Sella una sola vez por fecha. Si ya hay sello, lo devuelve.
- * Llamar solo cuando el plan ya terminó.
+ * Sella (o actualiza) el reporte del día con la historia real de vehículos.
+ * La verdad de los registros gana a un sello viejo.
  */
 export function sealRevelacionPlanDia(
   userId: string,
@@ -186,21 +204,23 @@ export function sealRevelacionPlanDia(
     vehicles: Vehicle[];
     now?: number;
     fecha?: string;
+    huecos?: CoberturaHuecoInterval[];
   }
 ): RevelacionPlanDia | null {
   if (!userId) return null;
   const now = params.now ?? Date.now();
   const fecha = params.fecha ?? getJournalDateString(now);
-  const existing = readRevelacionPlanDia(userId, fecha);
-  if (existing) return existing;
-  if (!isPlanTerminado(params.segmentos, now)) return null;
+  if (!isPlanTerminado(params.segmentos, now)) {
+    return readRevelacionPlanDia(userId, fecha);
+  }
   const next = buildRevelacionPlanDia({
     fecha,
     segmentos: params.segmentos,
     vehicles: params.vehicles,
     now,
+    huecos: params.huecos,
   });
-  if (!next) return null;
+  if (!next) return readRevelacionPlanDia(userId, fecha);
   const map = readMap(userId);
   map[fecha] = next;
   writeMap(userId, map);

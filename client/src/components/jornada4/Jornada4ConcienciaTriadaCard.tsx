@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  NO_CONQUISTADO_META,
   TRIADA_META,
   type ConcienciaTriadaModel,
   type TriadaDaySnapshot,
@@ -67,8 +68,8 @@ export function Jornada4ConcienciaTriadaCard({
         </div>
         {model.hasPlanificacion && model.minutosPlan > 0 ? (
           <p className="text-[9px] tabular-nums shrink-0 text-right" style={{ color: MUTED }}>
-            100% = {formatPlanMin(model.minutosPlan)}
-            <span className="block normal-case tracking-normal">línea del plan</span>
+            100% = {formatPlanMin(model.minutosDia || 24 * 60)}
+            <span className="block normal-case tracking-normal">día-jornada</span>
           </p>
         ) : null}
       </div>
@@ -76,44 +77,47 @@ export function Jornada4ConcienciaTriadaCard({
       {model.hasPlanificacion ? (
         <>
           <div className="h-2.5 w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-            {model.pctInconsciente > 0 && (
+            {model.minutosInconsciente > 0 && (
               <div
                 style={{
-                  width: `${model.pctInconsciente}%`,
+                  width: `${Math.max(1, Math.round((model.minutosInconsciente / Math.max(model.minutosDia, 1)) * 100))}%`,
                   backgroundColor: TRIADA_META.inconsciente.color,
                 }}
-                title={`Inconsciente ${model.pctInconsciente}%`}
+                title={`Inconsciente ${formatPlanMin(model.minutosInconsciente)}`}
               />
             )}
-            {model.pctPresencia > 0 && (
+            {model.minutosPresencia > 0 && (
               <div
                 style={{
-                  width: `${model.pctPresencia}%`,
+                  width: `${Math.max(1, Math.round((model.minutosPresencia / Math.max(model.minutosDia, 1)) * 100))}%`,
                   backgroundColor: TRIADA_META.presencia.color,
                 }}
-                title={`Presencia ${model.pctPresencia}%`}
+                title={`Presencia ${formatPlanMin(model.minutosPresencia)}`}
               />
             )}
-            {model.pctDireccion > 0 && (
+            {model.minutosDireccion > 0 && (
               <div
                 style={{
-                  width: `${model.pctDireccion}%`,
+                  width: `${Math.max(1, Math.round((model.minutosDireccion / Math.max(model.minutosDia, 1)) * 100))}%`,
                   backgroundColor: TRIADA_META.direccion.color,
                 }}
-                title={`Dirección ${model.pctDireccion}%`}
+                title={`Dirección ${formatPlanMin(model.minutosDireccion)}`}
+              />
+            )}
+            {model.minutosNoConquistado > 0 && (
+              <div
+                style={{
+                  width: `${Math.max(1, Math.round((model.minutosNoConquistado / Math.max(model.minutosDia, 1)) * 100))}%`,
+                  backgroundColor: NO_CONQUISTADO_META.color,
+                }}
+                title={`No conquistado ${formatPlanMin(model.minutosNoConquistado)}`}
               />
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             {(["inconsciente", "presencia", "direccion"] as const).map(id => {
               const meta = TRIADA_META[id];
-              const pct =
-                id === "inconsciente"
-                  ? model.pctInconsciente
-                  : id === "presencia"
-                    ? model.pctPresencia
-                    : model.pctDireccion;
               const min =
                 id === "inconsciente"
                   ? model.minutosInconsciente
@@ -123,17 +127,22 @@ export function Jornada4ConcienciaTriadaCard({
               return (
                 <div key={id} className="text-center">
                   <p className="text-base font-black tabular-nums" style={{ color: meta.color }}>
-                    {pct}%
+                    {formatPlanMin(min)}
                   </p>
                   <p className="text-[7px] uppercase tracking-wider" style={{ color: MUTED }}>
                     {meta.label}
                   </p>
-                  <p className="text-[8px] tabular-nums" style={{ color: MUTED }}>
-                    {Math.round(min)} min
-                  </p>
                 </div>
               );
             })}
+            <div className="text-center" data-testid="jornada4-conciencia-no-conquistado">
+              <p className="text-base font-black tabular-nums" style={{ color: NO_CONQUISTADO_META.color }}>
+                {formatPlanMin(model.minutosNoConquistado)}
+              </p>
+              <p className="text-[7px] uppercase tracking-wider" style={{ color: MUTED }}>
+                {NO_CONQUISTADO_META.label}
+              </p>
+            </div>
           </div>
           {model.paraleloMeritorio ? (
             <div
@@ -160,17 +169,11 @@ export function Jornada4ConcienciaTriadaCard({
             </p>
           ) : null}
           <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-            La copa es tiempo de línea: un hilo.
-            {model.minutosPlanFuturo > 0 || model.minutosHueco > 0
-              ? ` Lo no conquistado${
-                  model.minutosPlanFuturo > 0
-                    ? ` (${Math.round(model.minutosPlanFuturo)} min aún no ocurren — no es deuda)`
-                    : ""
-                }${
-                  model.minutosHueco > 0
-                    ? `${model.minutosPlanFuturo > 0 ? " y" : ""} ${Math.round(model.minutosHueco)} min de hueco inconsciente`
-                    : ""
-                }.`
+            Inconsciente = sin vehículo. Presencia = vehículos sin rumbo. Dirección =
+            proyecto o centro, dentro del plan. No conquistado = horario no planificado
+            ({formatPlanMin(model.minutosNoConquistado)}).
+            {model.minutosPlanFuturo > 0
+              ? ` El plan aún tiene ${formatPlanMin(model.minutosPlanFuturo)} por ocurrir — no es inconsciencia.`
               : ""}{" "}
             La meta es crecer Dirección por encima de Presencia.
           </p>

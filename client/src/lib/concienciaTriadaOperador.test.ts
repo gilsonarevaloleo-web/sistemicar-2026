@@ -91,7 +91,7 @@ describe("concienciaTriadaOperador", () => {
     assert.equal(m.pctInconsciente, 100);
     assert.equal(m.minutosInconsciente, 240);
     assert.equal(m.minutosPlan, 240);
-    assert.match(m.headline, /del plan/);
+    assert.match(m.headline, /Inconsciente|sin vehículos|plan/);
   });
 
   it("exceso de cobertura conserva dirección y recorta presencia", () => {

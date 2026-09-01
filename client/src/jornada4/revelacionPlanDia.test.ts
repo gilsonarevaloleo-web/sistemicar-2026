@@ -74,7 +74,7 @@ describe("revelacionPlanDia", () => {
     assert.equal(last.endMs, lima("23:00"));
   });
 
-  it("tras el término: inconsciente = huecos, por conquistar = 0", () => {
+  it("tras el término: inconsciente = huecos; no conquistado = 24 h − plan", () => {
     const vehicles = [
       v({
         id: "dir",
@@ -101,13 +101,14 @@ describe("revelacionPlanDia", () => {
     assert.equal(r.minutosPlan, 360);
     assert.equal(r.minutosDireccion, 60);
     assert.equal(r.minutosPresencia, 60);
-    assert.equal(r.minutosPorConquistar, 0);
+    assert.equal(r.minutosPorConquistar, 24 * 60 - 360);
     assert.equal(r.minutosInconsciente, 240);
-    assert.match(r.headline, /inconsciencia|Dirección|Presencia/);
+    assert.equal(r.minutosDia, 24 * 60);
+    assert.match(r.headline, /inconsciencia|Dirección|Presencia|día/);
     assert.equal(r.planEndLabel, "23:00");
   });
 
-  it("sella una sola vez por fecha", () => {
+  it("actualiza el sello si llegan más registros", () => {
     const params = {
       fecha: FECHA,
       segmentos: SEGS,
@@ -129,8 +130,8 @@ describe("revelacionPlanDia", () => {
     });
     assert.ok(a);
     assert.equal(a.minutosDireccion, 0);
-    assert.equal(b?.minutosDireccion, 0);
-    assert.equal(readRevelacionPlanDia("u1", FECHA)?.sealedAt, a.sealedAt);
+    assert.equal(b?.minutosDireccion, 180);
+    assert.equal(readRevelacionPlanDia("u1", FECHA)?.minutosDireccion, 180);
   });
 
   it("no sella si el plan aún no terminó", () => {

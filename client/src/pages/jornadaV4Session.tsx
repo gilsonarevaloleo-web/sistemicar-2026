@@ -20,6 +20,15 @@ import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4PlanEnd } from "@/hooks/useJornada4PlanEnd";
 import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
+import {
+  buildRevelacionPlanDia,
+  isPlanTerminado,
+} from "@/jornada4/revelacionPlanDia";
+import {
+  buildCoberturaHuecoIntervals,
+  readCoberturaHuecosEvents,
+  reconcileCoberturaHuecos,
+} from "@/jornada4/coberturaHuecosLog";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { useJornada4PuertaAlerts } from "@/hooks/useJornada4PuertaAlerts";
 import { useJornada4SegmentAttention } from "@/hooks/useJornada4SegmentAttention";
@@ -29,7 +38,6 @@ import {
   executeJornada4Launch,
   type Jornada4LaunchForm,
 } from "@/jornada4/executeJornada4Launch";
-import { reconcileCoberturaHuecos } from "@/jornada4/coberturaHuecosLog";
 import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAlerts";
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
@@ -135,6 +143,22 @@ export default function JornadaV4Session() {
     sweepPlanEnd: ops.sweepPlanEnd,
     enabled: Boolean(user),
   });
+  const revelacionViva = useMemo(() => {
+    const segs = planillaApi.planilla?.segmentos ?? [];
+    if (!isPlanTerminado(segs)) return planEnd.revelacion;
+    try {
+      const huecos = buildCoberturaHuecoIntervals(readCoberturaHuecosEvents());
+      return (
+        buildRevelacionPlanDia({
+          segmentos: segs,
+          vehicles: core.vehicles,
+          huecos,
+        }) ?? planEnd.revelacion
+      );
+    } catch {
+      return planEnd.revelacion;
+    }
+  }, [planillaApi.planilla, core.vehicles, planEnd.revelacion]);
   useJornada4EntrenamientoGuard({
     enabled: Boolean(user),
     vehiclesRef: core.vehiclesRef,
@@ -322,7 +346,7 @@ export default function JornadaV4Session() {
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">
             <Jornada4RevelacionCard
-              revelacion={planEnd.revelacion}
+              revelacion={revelacionViva}
               planEndLabel={planEnd.planEndLabel}
             />
             <Jornada4LaunchPanel

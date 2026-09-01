@@ -12,6 +12,7 @@ import {
   horasCompletasDeMinutos,
   horasDeEpisodio,
   resumenTimonDesdeEpisodio,
+  formatDuracionTimon,
   yaEstaEnTimon,
 } from "./timonHoras.ts";
 
@@ -136,12 +137,15 @@ describe("timonHoras — enumeración del enfoque", () => {
     assert.equal(horasDeEpisodio(b)[0]?.completa, false);
   });
 
-  it("etiquetas para la conciencia: hora enumerada y horas cerradas, no minutos", () => {
+  it("formatDuracionTimon pinta minutos reales", () => {
     assert.equal(formatHoraLabel(1), "Hora 1");
     assert.equal(formatHoraLabel(3), "Hora 3");
     assert.equal(formatHorasCerradas(0), "menos de 1 h");
     assert.equal(formatHorasCerradas(40), "menos de 1 h");
     assert.equal(formatHorasCerradas(60), "1 h");
     assert.equal(formatHorasCerradas(185), "3 h");
+    assert.equal(formatDuracionTimon(40), "40 min");
+    assert.equal(formatDuracionTimon(90), "1 h 30 min");
+    assert.equal(formatDuracionTimon(180), "3 h");
   });
 });

@@ -10,8 +10,8 @@ import {
   type OleadaPuntoStatus,
 } from "@/lib/oleadaPuntos";
 import {
+  formatDuracionTimon,
   formatHoraLabel,
-  formatHorasCerradas,
   horaEnCurso,
   horasDeEpisodio,
   type TimonEpisodio,
@@ -131,8 +131,8 @@ export function OleadaDesglosePanel({
             <Target size={12} /> Punto de producción
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
-            Timón de la oleada. Suma vehículos en horas 1, 2, 3… Cambiar de punto sella esa
-            numeración como peldaño y empieza otra vez en Hora 1.
+            Timón de la oleada. Suma la pared real de cada vehículo en horas 1, 2, 3…
+            Marca cumplido el timón para sellar el peldaño y pasar al siguiente punto.
           </p>
         </div>
         {summary.total > 0 ? (
@@ -165,7 +165,7 @@ export function OleadaDesglosePanel({
               <p className="text-[8px] text-slate-500 mt-1">
                 {vehiculosEnTimón === 0
                   ? "Este enfoque acaba de empezar"
-                  : `${formatHorasCerradas(timonEpisodio?.minutosAcumulados ?? 0)} en este timón · ${vehiculosEnTimón} vehículo${vehiculosEnTimón === 1 ? "" : "s"}`}
+                  : `${formatDuracionTimon(timonEpisodio?.minutosAcumulados ?? 0)} en este timón · ${vehiculosEnTimón} vehículo${vehiculosEnTimón === 1 ? "" : "s"}`}
               </p>
             </div>
             {timonEpisodio && timonEpisodio.minutosAcumulados > 0 ? (
@@ -203,7 +203,7 @@ export function OleadaDesglosePanel({
                   {h.vehiculos.length > 0 ? (
                     <span className="text-slate-600">
                       {" "}
-                      · {h.vehiculos.map(v => v.titulo).join(" · ")}
+                      · {h.vehiculos.map(v => `${v.titulo} (${formatDuracionTimon(v.minutos)})`).join(" · ")}
                     </span>
                   ) : null}
                 </li>
