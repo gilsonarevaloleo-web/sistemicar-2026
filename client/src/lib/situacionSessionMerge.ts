@@ -1,5 +1,10 @@
 import type { DetalleSubTarea, SubTarea, SubVehiculo, Vehicle } from "./persistence";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
+import {
+  pickRicherConquistaSession,
+  pruneStaleDesglosadorPause,
+  subVehiculoProgressScore,
+} from "./conquistaSessionCompare";
 
 function countSubTareasEnCronometro(v: Vehicle): number {
   return v.subTareas?.filter(st => st.enDesgloseCronometro).length ?? 0;
@@ -164,12 +169,6 @@ export function applySituacionDesgloseMerge(
 /** Fusiona estado de sesi�n local sobre snapshot Firebase (desglosador tiempo + situaci�n). */
 function countSubsCerrados(subs: SubVehiculo[] | undefined): number {
   return (subs ?? []).filter(s => s.status === "cumplido" || s.status === "fallado").length;
-}
-
-function subVehiculoProgressScore(sub: SubVehiculo): number {
-  if (sub.status === "pendiente") return 0;
-  if (sub.status === "activo") return 10 + (sub.aperturaAt ?? 0) / 1e15;
-  return 20 + (sub.cierreAt ?? 0) / 1e15;
 }
 
 /** Fusiona sub-vehículos por id (el desglosador es la maleta; cada sub avanza a su ritmo). */
@@ -404,9 +403,13 @@ export function mergeActiveVehicleSessionState(firebaseV: Vehicle, localV: Vehic
       (localV.subVehiculos?.length ?? 0) > 0 &&
       localV.subVehiculos!.every(s => s.status === "cumplido" || s.status === "fallado");
     const localClosed = localV.status !== "activo" || localV.cierreAt != null;
-    const keepPause = localV.interrupcionActiva === true && !!localV.desglosadorPausa?.subActivoId;
+    const richer = pickRicherConquistaSession(sealedRemote, localV);
     merged = {
       ...merged,
+      interrupcionActiva: richer.interrupcionActiva === true,
+      desglosadorPausa:
+        richer.interrupcionActiva === true ? richer.desglosadorPausa : undefined,
+      subVehiculos: richer.subVehiculos ?? merged.subVehiculos,
       ...(localSubsDone && localClosed
         ? {
             status: localV.status !== "activo" ? localV.status : "cumplido",
@@ -417,17 +420,10 @@ export function mergeActiveVehicleSessionState(firebaseV: Vehicle, localV: Vehic
             desglosadorPausa: undefined,
           }
         : {}),
-      interrupcionActiva: keepPause || localV.interrupcionActiva === true,
-      desglosadorPausa: keepPause
-        ? localV.desglosadorPausa
-        : localV.interrupcionActiva
-          ? localV.desglosadorPausa
-          : undefined,
-      subVehiculos: localV.subVehiculos ?? merged.subVehiculos,
     };
   }
 
-  return finalizeSessionMerge(merged, sealedRemote, localV);
+  return pruneStaleDesglosadorPause(finalizeSessionMerge(merged, sealedRemote, localV));
 }
 
 /**

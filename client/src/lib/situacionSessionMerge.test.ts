@@ -258,6 +258,39 @@ describe("mergeActiveVehicleSessionState situacion", () => {
     assert.equal(merged.desglosadorPausa, undefined);
   });
 
+  it("no reaplica pausa stale sobre el sub siguiente ya activo", () => {
+    const progressed: Vehicle = {
+      ...(baseVehicle() as Vehicle),
+      id: "d1",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      interrupcionActiva: false,
+      subVehiculos: [
+        { id: "s0", titulo: "A", status: "cumplido", cierreAt: 2000 },
+        { id: "s1", titulo: "B", status: "activo", aperturaAt: 2050 },
+      ],
+    };
+    const stalePause: Vehicle = {
+      ...progressed,
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        pausadoAt: 1000,
+        subActivoId: "s0",
+        elapsedSecSnapshot: 30,
+        nestedKind: "interrupcion_situacion",
+      },
+      subVehiculos: [
+        { id: "s0", titulo: "A", status: "nested_paused", aperturaAt: 400 },
+        { id: "s1", titulo: "B", status: "pendiente" },
+      ],
+    };
+    const merged = mergeActiveVehicleSessionState(stalePause, progressed);
+    assert.equal(merged.interrupcionActiva, false);
+    assert.equal(merged.desglosadorPausa, undefined);
+    assert.equal(merged.subVehiculos?.[0]?.status, "cumplido");
+    assert.equal(merged.subVehiculos?.[1]?.status, "activo");
+  });
+
   it("mergeSubVehiculosById keeps local active sub when firebase still has first pending", () => {
     const fb: SubVehiculo[] = [
       { id: "s0", titulo: "A", status: "cumplido", cierreAt: 1000 },
@@ -270,6 +303,20 @@ describe("mergeActiveVehicleSessionState situacion", () => {
     const merged = mergeSubVehiculosById(fb, local);
     assert.equal(merged[1].status, "activo");
     assert.equal(merged[1].aperturaAt, 2000);
+  });
+
+  it("mergeSubVehiculosById no deja nested_paused pisar un Cumplido", () => {
+    const fb: SubVehiculo[] = [
+      { id: "s0", titulo: "A", status: "cumplido", cierreAt: 1000 },
+      { id: "s1", titulo: "B", status: "activo", aperturaAt: 1100 },
+    ];
+    const local: SubVehiculo[] = [
+      { id: "s0", titulo: "A", status: "nested_paused", aperturaAt: 400 },
+      { id: "s1", titulo: "B", status: "pendiente" },
+    ];
+    const merged = mergeSubVehiculosById(fb, local);
+    assert.equal(merged[0].status, "cumplido");
+    assert.equal(merged[1].status, "activo");
   });
 
   it("shouldPreferLocalSubVehiculos when active sub differs from firebase", () => {

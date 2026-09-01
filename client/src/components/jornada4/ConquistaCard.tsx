@@ -83,9 +83,14 @@ export function ConquistaCard({
   onReorderSubs,
 }: Props) {
   const active = conquistaActiveSub(vehicle);
+  const pausedSubId = vehicle.desglosadorPausa?.subActivoId;
   const paused =
-    vehicle.interrupcionActiva === true ||
-    (vehicle.subVehiculos ?? []).some(s => s.status === "nested_paused");
+    vehicle.interrupcionActiva === true &&
+    (pausedSubId
+      ? (vehicle.subVehiculos ?? []).some(
+          s => s.id === pausedSubId && s.status === "nested_paused"
+        )
+      : (vehicle.subVehiculos ?? []).some(s => s.status === "nested_paused") && !active);
   const tick = useJornada4Tick(Boolean(active?.aperturaAt) && !paused);
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),

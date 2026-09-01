@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Vehicle } from "./persistence.ts";
 import {
   buildSituacionNestedPausePatch,
+  resumeDesglosadorFromNestedPause,
   resumeSituacionFromNestedPause,
 } from "./nestedContextStack.ts";
 
@@ -99,5 +100,51 @@ describe("situacion nested pause / postergación", () => {
       }),
     } as Vehicle;
     assert.equal(buildSituacionNestedPausePatch(vehicle, "postergacion"), null);
+  });
+});
+
+describe("resumeDesglosadorFromNestedPause", () => {
+  it("no rebobina un sub ya cumplido al retomar", () => {
+    const parent = {
+      id: "c1",
+      status: "activo",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        pausadoAt: 1_000,
+        subActivoId: "a",
+        elapsedSecSnapshot: 40,
+        nestedKind: "interrupcion_situacion",
+      },
+      subVehiculos: [
+        { id: "a", titulo: "A", status: "cumplido", cierreAt: 2_000 },
+        { id: "b", titulo: "B", status: "activo", aperturaAt: 2_050 },
+      ],
+    } as Vehicle;
+    const resume = resumeDesglosadorFromNestedPause(parent);
+    assert.ok(resume);
+    assert.equal(resume!.interrupcionActiva, false);
+    assert.equal(resume!.desglosadorPausa, undefined);
+    assert.equal(resume!.subVehiculos, undefined);
+  });
+
+  it("restaura el mismo sub nested_paused", () => {
+    const parent = {
+      id: "c1",
+      status: "activo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        pausadoAt: 5_000,
+        subActivoId: "a",
+        elapsedSecSnapshot: 12,
+        nestedKind: "interrupcion_situacion",
+      },
+      subVehiculos: [{ id: "a", titulo: "A", status: "nested_paused", aperturaAt: 1_000 }],
+    } as Vehicle;
+    const resume = resumeDesglosadorFromNestedPause(parent);
+    assert.equal(resume!.subVehiculos?.[0]?.status, "activo");
+    assert.equal(resume!.interrupcionActiva, false);
   });
 });

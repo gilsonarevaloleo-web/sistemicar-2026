@@ -18,6 +18,7 @@ import {
   archiveOrphanDesglosadorInterrupts,
   mergeActiveVehicleSessionState,
 } from "./situacionSessionMerge";
+import { pickRicherConquistaSession } from "./conquistaSessionCompare";
 
 export interface ReconcileVehicleListParams {
   incoming: Vehicle[];
@@ -59,12 +60,7 @@ function applyClosedOverride(v: Vehicle, localSources: Vehicle[]): Vehicle {
 }
 
 function pickRicherDesglosador(a: Vehicle, b: Vehicle): Vehicle {
-  if (a.interrupcionActiva && !b.interrupcionActiva) return a;
-  if (b.interrupcionActiva && !a.interrupcionActiva) return b;
-  const aSubs = a.subVehiculos?.length ?? 0;
-  const bSubs = b.subVehiculos?.length ?? 0;
-  if (aSubs !== bSubs) return aSubs > bSubs ? a : b;
-  return a;
+  return pickRicherConquistaSession(a, b);
 }
 
 /** Evita dos desglosadores activos duplicados (sync Firebase + local). */

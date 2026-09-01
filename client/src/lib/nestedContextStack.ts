@@ -84,12 +84,26 @@ export function buildSituacionNestedPausePatch(
 /** Restaura desglosador tras Punto Cero anidado — mismo sub-paso donde se quedó. */
 export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehicle> | null {
   const pausa = parent.desglosadorPausa;
-  if (!pausa?.subActivoId) return null;
+  if (!pausa?.subActivoId && !parent.interrupcionActiva) return null;
   const subs = [...(parent.subVehiculos ?? [])];
-  const idx = subs.findIndex(s => s.id === pausa.subActivoId);
-  if (idx === -1) {
+  const existingActive = subs.find(s => s.status === "activo");
+  const idx = pausa?.subActivoId ? subs.findIndex(s => s.id === pausa.subActivoId) : -1;
+  const pausedSub = idx >= 0 ? subs[idx] : undefined;
+
+  // Ya se ejecutó ese sub y se pasó al siguiente: no rebobinar el reloj.
+  if (
+    pausedSub &&
+    (pausedSub.status === "cumplido" || pausedSub.status === "fallado")
+  ) {
     return { desglosadorPausa: undefined, interrupcionActiva: false };
   }
+  if (existingActive && pausa?.subActivoId && existingActive.id !== pausa.subActivoId) {
+    return { desglosadorPausa: undefined, interrupcionActiva: false };
+  }
+  if (idx === -1 || !pausa) {
+    return { desglosadorPausa: undefined, interrupcionActiva: false };
+  }
+
   const resumedApertura =
     pausa.elapsedSecSnapshot != null
       ? hardwareClockNow() - pausa.elapsedSecSnapshot * 1000
