@@ -13,6 +13,10 @@ import {
   shouldPreserveLocalActivo,
 } from "./ghostVehicleEngine.ts";
 import { getJournalDayStartMs } from "./segmentTime.ts";
+import {
+  resetVehicleSessionSealsForTests,
+  sealVehicleSessionClose,
+} from "./vehicleSessionSeal.ts";
 
 /** 08:00 Lima del 31-may-2026 (journal 05:00 Lima). */
 const NOW = Date.UTC(2026, 4, 31, 13, 0, 0);
@@ -34,6 +38,7 @@ function v(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
 describe("ghostVehicleEngine", () => {
   beforeEach(() => {
     resetGhostSessionCache();
+    resetVehicleSessionSealsForTests();
   });
 
   it("activo que empezó ~04:00 y sigue a las 08:00 no es fantasma", () => {
@@ -142,6 +147,14 @@ describe("ghostVehicleEngine", () => {
       () => false,
       id => id === "loc1"
     );
+    assert.equal(recovered.length, 0);
+  });
+
+  it("recoverMissingJournalDayActives no reabre un vehículo sellado", () => {
+    resetVehicleSessionSealsForTests();
+    sealVehicleSessionClose("loc1", { cierreAt: NOW, status: "cumplido" });
+    const parkedActivo = v({ id: "loc1", aperturaAt: DAY_START + 3600_000 });
+    const recovered = recoverMissingJournalDayActives([], [parkedActivo], NOW);
     assert.equal(recovered.length, 0);
   });
 

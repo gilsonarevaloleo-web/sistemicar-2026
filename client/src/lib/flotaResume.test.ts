@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import type { Vehicle } from "./persistence.ts";
 import {
   diskSessionRicherThanMemory,
+  mergeParkedActivesForResume,
   pickRicherActiveVehicle,
   rehydrateFlotaFromDiskSources,
   upgradeActiveSessionsFromSources,
 } from "./flotaResume.ts";
+import {
+  resetVehicleSessionSealsForTests,
+  sealVehicleSessionClose,
+} from "./vehicleSessionSeal.ts";
 
 function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
   return {
@@ -21,6 +26,9 @@ function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
 }
 
 describe("flotaResume", () => {
+  beforeEach(() => {
+    resetVehicleSessionSealsForTests();
+  });
   it("detecta shell en memoria vs ring en disco", () => {
     const memory = v({ id: "r1" });
     const disk = v({
@@ -272,5 +280,59 @@ describe("flotaResume", () => {
       dayStartMs: 0,
     });
     assert.equal(result.changed, false);
+  });
+
+  it("park no conserva el vehículo cerrado si el hermano sigue activo", () => {
+    const now = Date.now();
+    const familia = v({
+      id: "familia",
+      clientRequestId: "crq_fam",
+      aperturaAt: now - 60_000,
+      situacionCronometro: { activo: true, bloqueInicioAt: now - 60_000 },
+    });
+    const otro = v({ id: "otro", aperturaAt: now - 30_000 });
+    const prevParked = [familia, otro];
+    const incoming = [
+      v({
+        id: "familia",
+        clientRequestId: "crq_fam",
+        status: "cumplido",
+        cierreAt: now,
+        aperturaAt: now - 60_000,
+      }),
+      otro,
+    ];
+    const parked = mergeParkedActivesForResume(incoming, prevParked, () => false);
+    assert.equal(parked.some(p => p.id === "familia"), false);
+    assert.equal(parked.some(p => p.id === "otro"), true);
+  });
+
+  it("rehydrate no resucita parked sellado ni cubre huecos posteriores", () => {
+    const now = Date.now();
+    const cierreAt = now - 10 * 60_000;
+    sealVehicleSessionClose("familia", {
+      cierreAt,
+      status: "cumplido",
+      clientRequestId: "crq_fam",
+    });
+    const parked = [
+      v({
+        id: "familia",
+        clientRequestId: "crq_fam",
+        aperturaAt: now - 40 * 60_000,
+        createdAt: new Date(now - 40 * 60_000),
+        situacionCronometro: { activo: true, bloqueInicioAt: now - 40 * 60_000 },
+      }),
+    ];
+    const result = rehydrateFlotaFromDiskSources({
+      memory: [],
+      local: [],
+      parked,
+      nowMs: now,
+      dayStartMs: now - 8 * 3600_000,
+      wasRecentlyClosed: () => false,
+    });
+    assert.equal(result.addedIds.includes("familia"), false);
+    assert.equal(result.next.filter(x => x.status === "activo").length, 0);
   });
 });

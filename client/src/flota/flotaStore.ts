@@ -8,7 +8,10 @@ import {
   type Vehicle,
 } from "@/lib/persistence";
 import { registerFlotaMemoryGetter } from "@/lib/flotaMemoryBridge";
-import { reconcileVehicleListView } from "@/lib/vehicleSessionAuthority";
+import {
+  reconcileVehicleListView,
+  sealClosedVehicleTransitions,
+} from "@/lib/vehicleSessionAuthority";
 import { preferLocalSubTareasInVehicleList, preferLocalSubVehiculosInVehicleList } from "@/lib/situacionSessionMerge";
 import { vehiclesReactiveSignature } from "@/lib/situacionRepair";
 import { writeLocalFlota } from "@/services/jornadaFlotaCache";
@@ -178,7 +181,9 @@ export function setFlotaVehicles(
   update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])
 ): void {
   cancelRemoteSnapshotNotifySchedule();
+  const prev = vehicles;
   const next = typeof update === "function" ? update(vehicles) : update;
+  sealClosedVehicleTransitions(prev, next);
   setVehiclesInternal(next);
   setFlotaPaintedCount(next.length);
 }
@@ -232,6 +237,8 @@ function applyIncomingSnapshot(
     markSyncReady(generation);
     return;
   }
+
+  sealClosedVehicleTransitions(current, merged);
 
   if (uid && merged.length > 0) {
     // Park sync: sobrevivir kill antes del idle write de writeLocalFlota.

@@ -35,6 +35,7 @@ import {
   type TimonVehiculoStamp,
 } from "./timonHoras";
 import type { Vehicle } from "./persistence";
+import { applyVehicleSessionSeal } from "./vehicleSessionSeal";
 
 export const MINUTOS_DIA_JORNADA = 24 * 60;
 
@@ -121,17 +122,18 @@ function vehicleRegistro(
   v: Vehicle,
   now: number
 ): GastoVehiculoRegistro | null {
-  const vid = (v.id ?? "").trim();
+  const sealed = applyVehicleSessionSeal(v);
+  const vid = (sealed.id ?? "").trim();
   if (!vid) return null;
-  const a = v.aperturaAt;
+  const a = sealed.aperturaAt;
   if (typeof a !== "number" || !Number.isFinite(a) || a <= 0) return null;
-  const minutos = wallMinutosReales(v, now);
+  const minutos = wallMinutosReales(sealed, now);
   if (minutos <= 0) return null;
   let z: number;
-  if (v.status === "activo") {
+  if (sealed.status === "activo") {
     z = now;
-  } else if (typeof v.cierreAt === "number" && v.cierreAt > a) {
-    z = v.cierreAt;
+  } else if (typeof sealed.cierreAt === "number" && sealed.cierreAt > a) {
+    z = sealed.cierreAt;
   } else {
     z = a + minutos * 60_000;
   }

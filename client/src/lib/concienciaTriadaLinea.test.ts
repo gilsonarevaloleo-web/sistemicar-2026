@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import {
   computeTriadaLineaOccupancy,
   isTriadaAdvancingVehicle,
@@ -7,6 +7,10 @@ import {
 } from "./concienciaTriadaLinea.ts";
 import { buildConcienciaTriadaFromVehicles } from "./concienciaTriadaOperador.ts";
 import type { Vehicle } from "./persistence.ts";
+import {
+  resetVehicleSessionSealsForTests,
+  sealVehicleSessionClose,
+} from "./vehicleSessionSeal.ts";
 
 const FECHA = "2026-08-19";
 const SEG_MANANA = [{ horaInicio: "09:00", horaFin: "12:00" }];
@@ -20,6 +24,9 @@ function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
 }
 
 describe("concienciaTriadaLinea", () => {
+  beforeEach(() => {
+    resetVehicleSessionSealsForTests();
+  });
   it("sin vehículo: hueco lo ocurrido; el futuro no es inconsciencia", () => {
     const now = lima("10:00");
     const occ = computeTriadaLineaOccupancy({
@@ -280,5 +287,41 @@ describe("concienciaTriadaLinea", () => {
       huecosLog: [{ start: lima("10:00"), end: lima("11:00") }],
     });
     assert.equal(model.minutosInconsciente, 60);
+  });
+
+  it("vehículo sellado que reaparece activo no cubre inconciencia posterior al cierre", () => {
+    const cierreAt = lima("09:20");
+    sealVehicleSessionClose("familia", {
+      cierreAt,
+      status: "cumplido",
+      clientRequestId: "crq_fam",
+    });
+    const now = lima("10:00");
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles: [
+        v({
+          id: "familia",
+          clientRequestId: "crq_fam",
+          status: "activo",
+          aperturaAt: lima("09:00"),
+          destinoCierre: "presencia",
+        }),
+      ],
+      now,
+    });
+    assert.equal(occ.minutosPresencia, 20);
+    assert.equal(occ.minutosHueco, 40);
+    assert.equal(occ.minutosInconsciente, 40);
+    assert.equal(isTriadaAdvancingVehicle(
+      v({
+        id: "familia",
+        clientRequestId: "crq_fam",
+        status: "activo",
+        aperturaAt: lima("09:00"),
+      }),
+      []
+    ), false);
   });
 });

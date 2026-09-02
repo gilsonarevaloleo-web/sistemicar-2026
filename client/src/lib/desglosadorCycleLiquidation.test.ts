@@ -7,7 +7,10 @@ import {
   scheduleGlobalCycleLiquidation,
   type DesglosadorLiquidationDeps,
 } from "./desglosadorCycleLiquidation.ts";
-import { resetVehicleSessionSealsForTests } from "./vehicleSessionSeal.ts";
+import {
+  isVehicleSessionSealed,
+  resetVehicleSessionSealsForTests,
+} from "./vehicleSessionSeal.ts";
 
 function veh(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
   return {
@@ -65,6 +68,7 @@ describe("desglosadorCycleLiquidation", () => {
     assert.equal(vehicles[0].cierreManual, true);
     assert.ok(vehicles[0].cierreAt);
     assert.equal(persistCalls, 0);
+    assert.equal(isVehicleSessionSealed(vehicleId), true);
   });
 
   it("scheduleGlobalCycleLiquidation agenda executeGlobalCycleLiquidation", () => {

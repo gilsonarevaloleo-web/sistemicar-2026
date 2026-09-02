@@ -188,9 +188,9 @@ export function applyDesglosadorCloseOptimistic(
       v.vehiculoPadreDesglosadorId === vehicleId &&
       !wasVehicleRecentlyClosed(v.id, v.clientRequestId)
   );
+  const childCierreAt = childInterrupts.length > 0 ? Date.now() : 0;
 
   if (childInterrupts.length > 0) {
-    const nowChild = Date.now();
     for (const child of childInterrupts) {
       markOrphanInterrupt?.(child.id);
     }
@@ -200,8 +200,8 @@ export function applyDesglosadorCloseOptimistic(
           ? {
               ...v,
               status: "archivado" as const,
-              cierreAt: nowChild,
-              duracionFinal: Math.max(1, Math.round((nowChild - (v.aperturaAt || nowChild)) / 60000)),
+              cierreAt: childCierreAt,
+              duracionFinal: Math.max(1, Math.round((childCierreAt - (v.aperturaAt || childCierreAt)) / 60000)),
               cierreManual: false,
             }
           : v
@@ -233,6 +233,21 @@ export function applyDesglosadorCloseOptimistic(
   patchAllVehicles(list => list.map(v => (v.id === vehicleId ? { ...v, ...closePatch } : v)));
   onConquistaPulse();
 
+  notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+  sealVehicleSessionClose(vehicleId, {
+    cierreAt,
+    status: "cumplido",
+    clientRequestId: vehicle.clientRequestId,
+  });
+  for (const child of childInterrupts) {
+    notifyVehicleClosed(child.id, child.clientRequestId);
+    sealVehicleSessionClose(child.id, {
+      cierreAt: childCierreAt,
+      status: "archivado",
+      clientRequestId: child.clientRequestId,
+    });
+  }
+
   const shadowResult = {
     closePatch,
     subsConRuta,
@@ -246,15 +261,6 @@ export function applyDesglosadorCloseOptimistic(
   };
 
   runShadowTask(() => {
-    notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
-    sealVehicleSessionClose(vehicleId, {
-      cierreAt,
-      status: "cumplido",
-      clientRequestId: vehicle.clientRequestId,
-    });
-    for (const child of childInterrupts) {
-      notifyVehicleClosed(child.id, child.clientRequestId);
-    }
     armEntropyGapOnConsciousClose({
       segmentos,
       vehiculosAfterClose: getAllVehicles(),

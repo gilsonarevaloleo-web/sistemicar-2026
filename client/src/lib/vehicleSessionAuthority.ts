@@ -13,7 +13,11 @@ import {
   wasVehicleRecentlyClosed,
 } from "./persistence";
 import { recoverMissingJournalDayActives, excludeGhostActivesFromReconcile } from "./ghostVehicleEngine";
-import { applyVehicleSessionSeal, sealVehicleSessionClose } from "./vehicleSessionSeal";
+import {
+  applyVehicleSessionSeal,
+  isVehicleSessionSealed,
+  sealVehicleSessionClose,
+} from "./vehicleSessionSeal";
 import {
   archiveOrphanDesglosadorInterrupts,
   mergeActiveVehicleSessionState,
@@ -30,6 +34,7 @@ export interface ReconcileVehicleListParams {
 }
 
 function isVehicleLocallyClosed(v: Vehicle, localSources: Vehicle[]): boolean {
+  if (isVehicleSessionSealed(v.id, v.clientRequestId)) return true;
   if (wasVehicleRecentlyClosed(v.id, v.clientRequestId)) return true;
   if (findLocalClosedOverride(v, localSources)) return true;
   const match = resolveLocalVehicleMatch(v, localSources);
@@ -183,16 +188,48 @@ export interface CloseVehicleLocallyParams {
   currentList: Vehicle[];
 }
 
-/** Cierre optimista atómico: guard + estado local coherente. */
-export function closeVehicleLocally(params: CloseVehicleLocallyParams): Vehicle[] {
-  notifyVehicleClosed(params.vehicleId, params.clientRequestId);
-  if (params.patch.status !== "activo" && params.patch.cierreAt != null) {
-    sealVehicleSessionClose(params.vehicleId, {
-      cierreAt: params.patch.cierreAt,
-      status: params.patch.status,
-      clientRequestId: params.clientRequestId,
+function commitVehicleSessionClose(
+  vehicleId: string,
+  clientRequestId: string | undefined,
+  patch: Partial<Vehicle> & { status: Vehicle["status"] }
+): void {
+  notifyVehicleClosed(vehicleId, clientRequestId);
+  if (patch.status === "activo") return;
+  const cierreAt = patch.cierreAt ?? Date.now();
+  sealVehicleSessionClose(vehicleId, {
+    cierreAt,
+    status: patch.status,
+    clientRequestId,
+  });
+}
+
+/**
+ * Sella transiciones activo → cerrado en el store.
+ * Impide que park/Firebase resuciten el vehículo y cubran inconciencia
+ * que el operador no activó.
+ */
+export function sealClosedVehicleTransitions(prev: Vehicle[], next: Vehicle[]): void {
+  if (prev.length === 0 || next.length === 0) return;
+  const prevById = new Map(prev.map(v => [v.id, v]));
+  for (let i = 0; i < next.length; i++) {
+    const v = next[i];
+    if (!v || v.autoVerdad || v.status === "activo") continue;
+    const before =
+      prevById.get(v.id) ??
+      (v.clientRequestId
+        ? prev.find(p => p.clientRequestId === v.clientRequestId)
+        : undefined);
+    if (!before || before.status !== "activo") continue;
+    commitVehicleSessionClose(v.id, v.clientRequestId ?? before.clientRequestId, {
+      status: v.status,
+      cierreAt: v.cierreAt ?? Date.now(),
     });
   }
+}
+
+/** Cierre optimista atómico: guard + estado local coherente. */
+export function closeVehicleLocally(params: CloseVehicleLocallyParams): Vehicle[] {
+  commitVehicleSessionClose(params.vehicleId, params.clientRequestId, params.patch);
   return params.currentList.map(v =>
     v.id === params.vehicleId ? { ...v, ...params.patch } : v
   );

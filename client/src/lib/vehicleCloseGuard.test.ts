@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import type { Vehicle } from "./persistence.ts";
 import {
   findLocalClosedOverride,
@@ -8,7 +8,14 @@ import {
   wasVehicleRecentlyClosed,
 } from "./persistence.ts";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge.ts";
-import { reconcileVehicleList } from "./vehicleSessionAuthority.ts";
+import {
+  reconcileVehicleList,
+  sealClosedVehicleTransitions,
+} from "./vehicleSessionAuthority.ts";
+import {
+  isVehicleSessionSealed,
+  resetVehicleSessionSealsForTests,
+} from "./vehicleSessionSeal.ts";
 
 function veh(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
   return {
@@ -24,6 +31,9 @@ function veh(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
 }
 
 describe("vehicle close guard", () => {
+  beforeEach(() => {
+    resetVehicleSessionSealsForTests();
+  });
   it("findLocalClosedOverride empareja por clientRequestId tras remap de id", () => {
     const closed = veh({
       id: "vehicle_old",
@@ -118,5 +128,40 @@ describe("vehicle close guard", () => {
     const remote = veh({ id: "d1", status: "activo", tipoReloj: "desglosador" });
     const merged = mergeActiveVehicleSessionState(remote, local);
     assert.equal(merged.termoDecisionSnapshot?.subsDesglosadorCumplidos, 4);
+  });
+
+  it("sealClosedVehicleTransitions sella activo→cumplido y reconcile no lo resucita", () => {
+    const cierreAt = Date.now();
+    const prev = [
+      veh({ id: "familia", clientRequestId: "crq_fam", status: "activo" }),
+      veh({ id: "otro", status: "activo" }),
+    ];
+    const next = [
+      veh({
+        id: "familia",
+        clientRequestId: "crq_fam",
+        status: "cumplido",
+        cierreAt,
+        duracionFinal: 12,
+      }),
+      veh({ id: "otro", status: "activo" }),
+    ];
+    sealClosedVehicleTransitions(prev, next);
+    assert.equal(isVehicleSessionSealed("familia", "crq_fam"), true);
+
+    const remoteActive = veh({
+      id: "familia",
+      clientRequestId: "crq_fam",
+      status: "activo",
+    });
+    const merged = reconcileVehicleList({
+      incoming: [remoteActive, veh({ id: "otro", status: "activo" })],
+      localSources: [],
+    });
+    const familia = merged.find(v => v.id === "familia" || v.clientRequestId === "crq_fam");
+    assert.ok(familia);
+    assert.equal(familia.status, "cumplido");
+    assert.equal(familia.cierreAt, cierreAt);
+    assert.equal(merged.filter(v => v.status === "activo").length, 1);
   });
 });

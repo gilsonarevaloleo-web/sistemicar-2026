@@ -14,6 +14,7 @@ import {
   updateVehicle,
   updateVehicleStatus,
 } from "./persistence";
+import { sealVehicleSessionClose } from "./vehicleSessionSeal";
 import {
   applyDayRolloverEntropia,
   applySegmentAttentionTick,
@@ -270,6 +271,11 @@ export async function runSegmentAttentionCycle(
     if (!vehicle || vehicle.status !== "activo") continue;
     notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
     const cierreAt = Date.now();
+    sealVehicleSessionClose(vehicleId, {
+      cierreAt,
+      status: "archivado",
+      clientRequestId: vehicle.clientRequestId,
+    });
     const aperturaAt = vehicle.aperturaAt || vehicle.createdAt?.getTime() || cierreAt;
     const duracionFinal = Math.max(1, Math.round((cierreAt - aperturaAt) / 60000));
     const patch = {
