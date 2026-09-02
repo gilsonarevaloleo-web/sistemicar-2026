@@ -1,8 +1,8 @@
 # Reporte semanal de virtudes — Paso 1: spec
 
-**Estado:** contrato de producto. Sin UI. Sin motor todavía.  
+**Estado:** spec aceptado + motor puro (Paso 2). Sin UI. Sin persistencia.  
 **Fecha:** 2026-09-02  
-**Revisión:** 2 — puertas, Término, disposición del anillo, tono de los Códigos.  
+**Revisión:** 3 — `calcularReporteSemanal` en `shared/reporteSemanal/`.  
 **Módulo dueño:** Jornada (evidencia de cierre). Umbral y Espejo entran solo como capa opcional.  
 **Zona horaria:** día-jornada Lima (`getJournalDayStartMs`, corte 05:00). No usar medianoche del navegador.
 
@@ -42,7 +42,7 @@ Axiomas (tronco de Jornada + esta revisión):
 | Paso | Entrega | Este PR |
 |---|---|---|
 | **1** | Este spec: virtudes, fórmulas, umbral, tono | sí |
-| **2** | Motor puro (`calcularReporteSemanal`) + tests. Sin pantalla | no |
+| **2** | Motor puro (`calcularReporteSemanal`) + tests. Sin pantalla | sí |
 | **3** | Persistencia + sello semanal (una escritura por semana/usuario) | no |
 | **4** | Ritual de UI: espera → revelación → acción de la semana que entra | no |
 | **5** | Redacción del veredicto (plantillas; Gemini opcional y posterior) | no |
@@ -495,10 +495,10 @@ Salida: un `ReporteSemanal`. Función pura. Sin Firebase, sin Gemini, sin React.
 
 ## 12. Criterio de aceptación del Paso 2
 
-Cuando este spec esté aceptado, el Paso 2 entrega:
+El Paso 2 está entregado:
 
-1. `calcularReporteSemanal(input) → ReporteSemanal`.
-2. Tests de: umbral A/B/C/D; cada fórmula con denominador 0; `puertaSistema` no suma Disciplina; cierre del sistema al `horaFin` no suma Término; patrones Carga / Sin ley / Puerta hueca; `INSUFICIENTE`; delta vs. previa; exclusión de centinelas; ventana lunes 05:00.
+1. `shared/reporteSemanal/calcularReporteSemanal.ts` — `calcularReporteSemanal(input) → ReporteSemanal`.
+2. Tests en `shared/reporteSemanal/calcularReporteSemanal.test.ts`: umbral A/B/C/D; denominador 0; `puertaSistema` no suma Disciplina; cierre del sistema al `horaFin` no suma Término; patrones Carga / Sin ley / Puerta hueca; `INSUFICIENTE`; delta vs. previa; exclusión de centinelas; ventana lunes 05:00.
 3. Cero UI. Cero llamadas de red.
 
-Hasta entonces, este archivo es la única fuente de verdad.
+Siguiente: Paso 3 (persistencia + sello semanal). Este archivo sigue siendo la fuente de verdad del contrato.
