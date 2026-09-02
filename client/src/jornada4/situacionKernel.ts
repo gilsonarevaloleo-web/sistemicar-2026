@@ -4,6 +4,7 @@
  */
 import type { SubTarea, Vehicle } from "@/lib/persistence";
 import {
+  aplicarTiempoAlCerrarAvance,
   aplicarTiempoGanadoAlCumplir,
   quitarFilaColaHaciaFoco,
   registrarCierreFalladoCronometro,
@@ -83,25 +84,17 @@ export function applySituacionRowClose(
     subTareas = failed.subTareas;
     minutosPerdidos = failed.minutosPerdidos;
   } else {
-    // avance: cierre neutro — libera el ring, sin ganancia ni pérdida de tiempo
-    const anchor = vehicle.situacionCupoAnchor;
-    let duracionRealSec = 0;
-    if (anchor?.subTareaId === subTareaId) {
-      duracionRealSec = Math.max(0, Math.floor((now - anchor.startedAt) / 1000));
-    } else if (target.minutosCupo) {
-      duracionRealSec = target.minutosCupo * 60;
-    }
-    subTareas = subTareas.map(st =>
-      st.id === subTareaId
-        ? {
-            ...st,
-            completada: false,
-            resultadoSituacion: "avance" as const,
-            duracionRealSec,
-            cerradaAt: now,
-          }
-        : st
+    // avance: sin veredicto de ganancia, pero el tiempo no usado y la
+    // holgura hasta el tope se suman a la cola pendiente.
+    const advanced = aplicarTiempoAlCerrarAvance(
+      subTareas,
+      subTareaId,
+      vehicle.situacionCupoAnchor,
+      now,
+      bloqueInicio,
+      sc.horaFinContratoMs ?? sc.horaFinMs
     );
+    subTareas = advanced.subTareas;
   }
 
   const bloqueListo = !subTareas.some(situacionFilaCronometroPendiente);

@@ -27,6 +27,8 @@ import {
   buildSellarDirectoEnRingState,
   expandirColaCronometroHastaMeta,
   minutosGanadosEnVivoFoco,
+  aplicarTiempoAlCerrarAvance,
+  repartirHolguraHastaMeta,
 } from "./situacionCupoDistrib.ts";
 
 function st(id: string, minutosCupo: number, cupoFijo?: boolean): SubTarea {
@@ -405,6 +407,69 @@ describe("expandirColaCronometroHastaMeta / última en cola", () => {
     assert.equal(out.find(s => s.id === "a")!.resultadoSituacion, "cumplido");
     // Pared restante 55 min; b debe cubrirlos (20 + 15 ganados + estirado).
     assert.equal(out.find(s => s.id === "b")!.minutosCupo, 55);
+  });
+});
+
+describe("aplicarTiempoAlCerrarAvance", () => {
+  const base = 1_700_000_000_000;
+
+  it("tras ganancia, avance suma holgura al siguiente hasta el tope", () => {
+    const meta = base + 60 * 60000;
+    const afterGain = aplicarTiempoGanadoAlCumplir(
+      [st("a", 20), st("b", 20), st("c", 20)],
+      "a",
+      { subTareaId: "a", startedAt: base },
+      base + 5 * 60000,
+      base,
+      meta
+    ).subTareas;
+    assert.equal(afterGain.find(s => s.id === "a")!.resultadoSituacion, "cumplido");
+    const bAfterGain = afterGain.find(s => s.id === "b")!.minutosCupo ?? 0;
+    const cAfterGain = afterGain.find(s => s.id === "c")!.minutosCupo ?? 0;
+    assert.ok(bAfterGain + cAfterGain >= 55);
+
+    const nowAvance = base + 10 * 60000; // 5 min reales en B
+    const { subTareas: out } = aplicarTiempoAlCerrarAvance(
+      afterGain,
+      "b",
+      { subTareaId: "b", startedAt: base + 5 * 60000 },
+      nowAvance,
+      base,
+      meta
+    );
+    assert.equal(out.find(s => s.id === "b")!.resultadoSituacion, "avance");
+    assert.equal(out.find(s => s.id === "b")!.completada, false);
+    // Pared restante 50 min: C absorbe tope, no se queda en el cupo fijado tras A.
+    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 50);
+    assert.ok((out.find(s => s.id === "c")!.minutosCupo ?? 0) > cAfterGain);
+  });
+
+  it("avance con tope reparte holgura aunque el cupo siguiente esté fijado", () => {
+    const meta = base + 40 * 60000;
+    const now = base + 5 * 60000;
+    const { subTareas: out } = aplicarTiempoAlCerrarAvance(
+      [st("a", 20), st("b", 10, true)],
+      "a",
+      { subTareaId: "a", startedAt: base },
+      now,
+      base,
+      meta
+    );
+    assert.equal(out.find(s => s.id === "a")!.resultadoSituacion, "avance");
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 35);
+    assert.equal(out.find(s => s.id === "b")!.cupoFijo, true);
+  });
+});
+
+describe("repartirHolguraHastaMeta", () => {
+  const base = 1_700_000_000_000;
+
+  it("reparte holgura entre pendientes, no solo la última", () => {
+    const meta = base + 40 * 60000;
+    const out = repartirHolguraHastaMeta([st("b", 10), st("c", 10)], meta, base);
+    assert.equal(sumMinutosCronometroPendientes(out), 40);
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 20);
+    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 20);
   });
 });
 

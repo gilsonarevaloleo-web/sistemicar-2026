@@ -835,6 +835,94 @@ export function aplicarTiempoGanadoAlCumplir(
   return { subTareas: next, minutosGanados, saldoAdelantoMin };
 }
 
+function committedPendingMinutos(
+  subTareas: SubTarea[],
+  nowMs: number,
+  anchor?: { subTareaId: string; startedAt: number } | null
+): number {
+  const pending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
+  let committedMin = 0;
+  for (const st of pending) {
+    const cupo = st.minutosCupo ?? 0;
+    if (anchor?.subTareaId === st.id) {
+      const elapsed = Math.floor(Math.max(0, nowMs - anchor.startedAt) / 60000);
+      committedMin += Math.max(0, cupo - elapsed);
+    } else {
+      committedMin += cupo;
+    }
+  }
+  return committedMin;
+}
+
+/**
+ * Holgura de pared hasta el tope → todas las pendientes (incluye cupoFijo).
+ * El siguiente vehículo recibe su parte; no se queda en el cupo original.
+ */
+export function repartirHolguraHastaMeta(
+  subTareas: SubTarea[],
+  horaFinContratoMs: number,
+  nowMs: number = Date.now(),
+  anchor?: { subTareaId: string; startedAt: number } | null
+): SubTarea[] {
+  const wallMin = situacionWallMinHastaMeta(horaFinContratoMs, nowMs);
+  if (wallMin == null || wallMin <= 0) return subTareas;
+  if (!subTareas.some(situacionFilaCronometroPendiente)) return subTareas;
+  const slack = Math.max(0, wallMin - committedPendingMinutos(subTareas, nowMs, anchor));
+  if (slack <= 0) return subTareas;
+  return repartirDeltaMinutosEnCola(subTareas, slack).subTareas;
+}
+
+/**
+ * Avance: sin veredicto de ganancia/pérdida, pero el tiempo no usado y la
+ * holgura hasta el tope se suman a la cola (referencia = meta sellada).
+ */
+export function aplicarTiempoAlCerrarAvance(
+  subTareas: SubTarea[],
+  subTareaId: string,
+  anchor: { subTareaId: string; startedAt: number } | null | undefined,
+  now: number,
+  bloqueInicioAt?: number,
+  horaFinContratoMs?: number
+): { subTareas: SubTarea[] } {
+  const target = subTareas.find(st => st.id === subTareaId);
+  if (!target?.enDesgloseCronometro || (target.resultadoSituacion ?? "pendiente") !== "pendiente") {
+    return { subTareas };
+  }
+
+  const baseInicio = bloqueInicioAt ?? now;
+  const { duracionRealSec, deltaMinutosVsMeta } = calcDeltaCierreCronometro(
+    target,
+    anchor,
+    now,
+    baseInicio,
+    subTareas
+  );
+
+  let next = subTareas.map(st =>
+    st.id === subTareaId
+      ? {
+          ...st,
+          completada: false,
+          resultadoSituacion: "avance" as const,
+          duracionRealSec,
+          cerradaAt: now,
+        }
+      : st
+  );
+
+  if (deltaMinutosVsMeta > 0) {
+    next = repartirDeltaMinutosEnCola(next, deltaMinutosVsMeta).subTareas;
+  }
+
+  if (horaFinContratoMs != null && next.some(situacionFilaCronometroPendiente)) {
+    const resolved = resolveCronometroCupoAnchor(next, anchor, { forceResetSameRow: true, now });
+    const expandAnchor = resolved === "unchanged" ? (anchor ?? null) : resolved;
+    next = repartirHolguraHastaMeta(next, horaFinContratoMs, now, expandAnchor);
+  }
+
+  return { subTareas: next };
+}
+
 /**
  * Saca una fila pendiente del cronómetro hacia la reserva acumulativa (sin PS).
  * Conserva texto, cupo y detalles para retomar después.

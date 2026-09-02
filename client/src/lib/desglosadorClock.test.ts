@@ -7,6 +7,7 @@ import {
   computeSubCloseVerdict,
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
+  resolveConquistaTopeMs,
   suggestedSec,
   sumDesglosadorUnitCycle,
   validateSubCloseCantidad,
@@ -271,5 +272,42 @@ describe("sumDesglosadorUnitCycle", () => {
     const cycle = sumDesglosadorUnitCycle(subs);
     assert.equal(cycle.totalSec, 90);
     assert.equal(cycle.allRef, true);
+  });
+});
+
+describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
+  it("tope implícito = apertura + Σ sugeridos", () => {
+    const start = 1_700_000_000_000;
+    const subs: SubVehiculo[] = [
+      sub({ id: "a", tiempoSugeridoSeg: 600, status: "cumplido", duracionFinal: 300 }),
+      sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: start + 300_000 }),
+      sub({ id: "c", tiempoSugeridoSeg: 600, status: "pendiente" }),
+    ];
+    const tope = resolveConquistaTopeMs({ aperturaAt: start, criterioDetalle: "" }, subs, start + 300_000);
+    assert.equal(tope, start + 1800_000);
+  });
+
+  it("tras cerrar con ganancia, el siguiente sub absorbe holgura hasta el tope", () => {
+    const start = 1_700_000_000_000;
+    const now = start + 300_000; // A cerró 5 min antes de su cupo de 10
+    const subs: SubVehiculo[] = [
+      sub({
+        id: "a",
+        tiempoSugeridoSeg: 600,
+        status: "cumplido",
+        duracionFinal: 300,
+        cierreAt: now,
+      }),
+      sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+      sub({ id: "c", tiempoSugeridoSeg: 600, status: "pendiente" }),
+    ];
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      criterioDetalle: "",
+      subVehiculos: subs,
+    } as Vehicle);
+    // Tope original 30 min; quedan 25. C sigue con 10 → B recibe 15, no 10 fijados.
+    assert.equal(clocks.subRemainingSec, 900);
+    assert.equal(clocks.cycleRemainSec, 1500);
   });
 });

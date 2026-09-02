@@ -87,11 +87,50 @@ describe("situacionKernel", () => {
     assert.equal(closed?.resultadoSituacion, "avance");
     assert.equal(closed?.completada, false);
     assert.ok(closed?.cerradaAt);
-    // Sin ganancia ni pérdida de tiempo
+    // Sin veredicto de ganancia/pérdida (PS/bolsa); el tiempo sí se realinea al tope.
     assert.equal(patch!.minutosGanados, 0);
     assert.equal(patch!.minutosPerdidos, 0);
     // bloqueListo false porque queda r2 pendiente
     assert.equal(patch!.bloqueListo, false);
+  });
+
+  it("avance tras ganancia entrega al siguiente el tiempo hasta el tope", () => {
+    const base = 2_000_000;
+    const meta = base + 60 * 60_000;
+    const rows = [
+      row({ id: "r1", texto: "A", minutosCupo: 20 }),
+      row({ id: "r2", texto: "B", minutosCupo: 20 }),
+      row({ id: "r3", texto: "C", minutosCupo: 20 }),
+    ];
+    const v = {
+      ...vehicle(rows),
+      aperturaAt: base,
+      situacionCupoAnchor: { subTareaId: "r1", startedAt: base },
+      situacionCronometro: {
+        activo: true,
+        bloqueInicioAt: base,
+        horaFinMs: meta,
+        horaFinContratoMs: meta,
+      },
+    } as Vehicle;
+
+    const afterGain = applySituacionRowClose(v, "r1", "cumplido", base + 5 * 60_000);
+    assert.ok(afterGain);
+    assert.ok((afterGain!.minutosGanados ?? 0) > 0);
+
+    const mid = {
+      ...v,
+      subTareas: afterGain!.subTareas,
+      situacionCronometro: afterGain!.situacionCronometro,
+      situacionCupoAnchor: afterGain!.situacionCupoAnchor,
+    } as Vehicle;
+    const nowAvance = base + 10 * 60_000;
+    const patch = applySituacionRowClose(mid, "r2", "avance", nowAvance);
+    assert.ok(patch);
+    assert.equal(patch!.minutosGanados, 0);
+    assert.equal(patch!.subTareas.find(s => s.id === "r2")?.resultadoSituacion, "avance");
+    assert.equal(patch!.subTareas.find(s => s.id === "r3")?.minutosCupo, 50);
+    assert.equal(sumMinutosCronometroPendientes(patch!.subTareas), 50);
   });
 
   it("avance en la última fila: bloqueListo true y bloque status cumplido", () => {

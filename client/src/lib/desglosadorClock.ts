@@ -1,5 +1,6 @@
 import type { SubVehiculo, Vehicle } from "./persistence";
 import { hardwareElapsedMs } from "./hardwareClock";
+import { getLocalDayStartMs, parseSegmentTime } from "./segmentTime";
 
 /** Desfase al activar el siguiente sub — evita colisión ms0 con cierre del anterior. */
 export const SUB_APERTURA_ACTIVATION_SKEW_MS = 50;
@@ -12,6 +13,27 @@ export function suggestedSec(sub: SubVehiculo): number | null {
     return Math.round(sub.cantidadObjetivo * sub.tiempoRecordMinPerUnit * 60);
   }
   return sub.tiempoSugeridoSeg ?? null;
+}
+
+/** Tope del ciclo conquista: meta HH:mm si existe; si no, apertura + Σ sugeridos originales. */
+export function resolveConquistaTopeMs(
+  vehicle: Pick<Vehicle, "aperturaAt" | "criterioDetalle">,
+  subs: SubVehiculo[],
+  nowMs: number
+): number | null {
+  const meta = (vehicle.criterioDetalle ?? "").trim();
+  const parsed = parseSegmentTime(meta);
+  if (parsed) {
+    const dayStart = getLocalDayStartMs(nowMs);
+    let deadline = dayStart + (parsed.h * 60 + parsed.m) * 60_000;
+    if (deadline <= nowMs) deadline += 86_400_000;
+    return deadline;
+  }
+  const allSuggested = subs.reduce((acc, s) => acc + (suggestedSec(s) ?? 0), 0);
+  if (allSuggested <= 0) return null;
+  const start = vehicle.aperturaAt;
+  if (start == null || !Number.isFinite(start)) return null;
+  return start + allSuggested * 1000;
 }
 
 export interface DesglosadorClockResult {
@@ -76,9 +98,9 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
-  const subRemainingSec =
+  let subRemainingSec =
     objSecs != null ? Math.max(0, objSecs - subElapsedSec) : null;
-  const subEndAt =
+  let subEndAt =
     activeSub?.aperturaAt && objSecs != null
       ? activeSub.aperturaAt + objSecs * 1000
       : null;
@@ -120,10 +142,23 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   }
 
   const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
-  const cycleRemainSec = Math.max(0, remainActive + pendingSec + completedDelta);
-  const cycleEndAt = now + cycleRemainSec * 1000;
+  let cycleRemainSec = Math.max(0, remainActive + pendingSec + completedDelta);
+  let cycleEndAt = now + cycleRemainSec * 1000;
   const liveAccumDeltaSec =
     objSecs != null ? completedDelta + (subElapsedSec - objSecs) : completedDelta;
+
+  // Ganancia previa vs tope: el sub activo (siguiente vehículo) absorbe la holgura.
+  const topeMs = resolveConquistaTopeMs(vehicle, subs, now);
+  if (topeMs != null && objSecs != null) {
+    const topeRemainSec = Math.max(0, Math.floor((topeMs - now) / 1000));
+    const slackSec = topeRemainSec - pendingSec - remainActive;
+    if (slackSec > 0) {
+      subRemainingSec = remainActive + slackSec;
+      subEndAt = now + subRemainingSec * 1000;
+      cycleRemainSec = subRemainingSec + pendingSec;
+      cycleEndAt = now + cycleRemainSec * 1000;
+    }
+  }
 
   return {
     subElapsedSec,
