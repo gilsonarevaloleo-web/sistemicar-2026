@@ -315,4 +315,44 @@ describe("timón — horas enumeradas en el Hub", () => {
     const oleada = all.find(x => x.id === idea.id)!;
     assert.equal(oleada.oleadaPuntos?.filter(x => x.status === "cumplido").length, 3);
   });
+
+  it("30 min mañana + 15 min noche suman 45 en el mismo punto con dos nombres", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const idea = await addPeldanoIdea(USER, p.id, "Busos");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Hacer 27 busos negros XL");
+    const oleada0 = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    const xl = oleada0.oleadaPuntos![0]!;
+
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_am",
+        titulo: "Corte mañana",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        oleadaPuntoId: xl.id,
+        destinoCierre: "peldano",
+        duracionFinal: 30,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 30, destinoCierre: "peldano" }
+    );
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_pm",
+        titulo: "Costura noche",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        oleadaPuntoId: xl.id,
+        destinoCierre: "peldano",
+        duracionFinal: 15,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 15, destinoCierre: "peldano" }
+    );
+
+    const ep = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!.timonEpisodio!;
+    assert.equal(ep.minutosAcumulados, 45);
+    assert.equal(ep.vehiculos.map(v => `${v.titulo}:${v.minutos}`).join("|"), "Corte mañana:30|Costura noche:15");
+  });
 });

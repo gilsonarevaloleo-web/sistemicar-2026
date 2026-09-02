@@ -157,13 +157,13 @@ describe("timón — pared real", () => {
     );
   });
 
-  it("hidrata el timón con vehículos vivos y corrige sellos cortos", () => {
+  it("hidrata el timón con trabajo medido: cerrado no se infla; vivo sí crece", () => {
     const ep = hydrateTimonEpisodio({
       episodio: {
         id: "t1",
         puntoId: "pt_a",
         puntoTitulo: "Busos",
-        startedAt: 1,
+        startedAt: lima("08:00"),
         minutosAcumulados: 40,
         minutosTiempo: 40,
         vehiculos: [
@@ -205,9 +205,9 @@ describe("timón — pared real", () => {
       ],
       now: lima("20:00"),
     });
-    assert.equal(ep.minutosAcumulados, 10 * 60 + 2 * 60);
+    assert.equal(ep.minutosAcumulados, 40 + 120);
     assert.equal(ep.vehiculos.length, 2);
-    assert.equal(ep.vehiculos[0]?.minutos, 600);
+    assert.equal(ep.vehiculos[0]?.minutos, 40);
     assert.equal(ep.vehiculos[1]?.minutos, 120);
   });
 });

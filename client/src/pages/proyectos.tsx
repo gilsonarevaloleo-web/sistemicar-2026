@@ -995,8 +995,8 @@ export default function ProyectosPage() {
                 </li>
                 <li>
                   <span className="text-slate-300">Punto de producción</span> — el timón. Suma
-                  la pared real de cada vehículo en horas enumeradas. Cumplir el timón sella
-                  el peldaño.
+                  el trabajo de cada vehículo de este enfoque (30 min + 15 min = 45 min).
+                  Cumplir el timón sella el peldaño. No copia vehículos de otro punto.
                 </li>
                 <li>
                   <span className="text-slate-300">Peldaño</span> — una estancia ya caminada en un
