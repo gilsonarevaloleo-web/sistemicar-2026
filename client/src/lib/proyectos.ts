@@ -52,7 +52,7 @@ import {
   hydratePresenciaEpisodio,
   hydrateTimonEpisodio,
   resumenTimonDesdeEpisodio,
-  wallMinutosReales,
+  trabajoMinutosReales,
   yaEstaEnTimon,
   type TimonEpisodio,
   type TimonResumenPeldano,
@@ -87,6 +87,8 @@ export {
   horasCompletasDeMinutos,
   hydrateTimonEpisodio,
   hydratePresenciaEpisodio,
+  ledgerVehiculosTimon,
+  trabajoMinutosReales,
 } from "./timonHoras";
 
 export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
@@ -1545,10 +1547,11 @@ export async function acreditarTimonAlCerrarVehiculo(
   if (stamped && stamped !== pin.id) return false;
   if (yaEstaEnTimon(pel.timonEpisodio, vehicle.id)) return true;
 
-  const minutos = Math.max(
-    wallMinutosReales(vehicle),
-    Math.max(0, Math.round(opts.duracionMin))
-  );
+  const minutos = trabajoMinutosReales({
+    ...vehicle,
+    duracionFinal:
+      opts.duracionMin > 0 ? opts.duracionMin : vehicle.duracionFinal,
+  });
   if (minutos <= 0) return true;
 
   const next = accrueVehiculoAlTimon(ensureTimonEpisodio(pel), {

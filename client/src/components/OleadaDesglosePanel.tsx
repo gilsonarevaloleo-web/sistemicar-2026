@@ -14,6 +14,7 @@ import {
   formatHoraLabel,
   horaEnCurso,
   horasDeEpisodio,
+  ledgerVehiculosTimon,
   type TimonEpisodio,
 } from "@/lib/timonHoras";
 
@@ -103,6 +104,7 @@ export function OleadaDesglosePanel({
   const horas = timonEpisodio ? horasDeEpisodio(timonEpisodio) : [];
   const horaN = horaEnCurso(timonEpisodio?.minutosAcumulados ?? 0);
   const vehiculosEnTimón = timonEpisodio?.vehiculos.length ?? 0;
+  const ledger = ledgerVehiculosTimon(timonEpisodio);
 
   const handleAdd = async () => {
     const t = draft.trim();
@@ -131,8 +133,9 @@ export function OleadaDesglosePanel({
             <Target size={12} /> Punto de producción
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
-            Timón de la oleada. Suma la pared real de cada vehículo en horas 1, 2, 3…
-            Cada cumplido sella un peldaño. Si es el timón, el pin pasa al siguiente punto.
+            Timón de la oleada. Suma el trabajo de cada vehículo de este punto:
+            30 min en la mañana + 15 en la noche = 45 min. Cumplir sella un
+            peldaño. Los vehículos de otro enfoque no se copian aquí.
           </p>
         </div>
         {summary.total > 0 ? (
@@ -184,7 +187,25 @@ export function OleadaDesglosePanel({
               </div>
             ) : null}
           </div>
-          {horas.some(h => h.vehiculos.length > 0) ? (
+          {ledger.length > 0 ? (
+            <ul
+              className="mt-2 space-y-0.5"
+              data-testid="hub-oleada-timon-ledger"
+            >
+              {ledger.map(v => (
+                <li
+                  key={v.vehicleId}
+                  className="flex items-baseline justify-between gap-2 text-[9px] text-slate-300"
+                >
+                  <span className="truncate leading-snug">{v.titulo}</span>
+                  <span className="tabular-nums shrink-0" style={{ color: tint }}>
+                    {formatDuracionTimon(v.minutos)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {horas.some(h => h.cortes.length > 0 || h.vehiculos.length > 0) ? (
             <ul className="mt-2 space-y-1" data-testid="hub-oleada-timon-horas-lista">
               {horas.map(h => (
                 <li key={h.numero} className="text-[9px] text-slate-400 leading-snug">
@@ -200,10 +221,14 @@ export function OleadaDesglosePanel({
                       en curso
                     </span>
                   )}
-                  {h.vehiculos.length > 0 ? (
+                  <span className="text-slate-500 tabular-nums">
+                    {" "}
+                    · {formatDuracionTimon(h.minutos)}
+                  </span>
+                  {h.cortes.length > 0 ? (
                     <span className="text-slate-600">
                       {" "}
-                      · {h.vehiculos.map(v => `${v.titulo} (${formatDuracionTimon(v.minutos)})`).join(" · ")}
+                      · {h.cortes.map(c => `${c.titulo} (${formatDuracionTimon(c.minutosEnHora)})`).join(" · ")}
                     </span>
                   ) : null}
                 </li>

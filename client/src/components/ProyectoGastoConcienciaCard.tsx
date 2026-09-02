@@ -12,6 +12,11 @@ import {
   readLocalPlanillaSegmentos,
   type GastoVehiculoRegistro,
 } from "@/lib/gastoConcienciaEngine";
+import {
+  clasificarTiempoVehiculo,
+  ledgerNombresMinutos,
+  minutosDeProyecto,
+} from "@/lib/clasificarTiempoProyecto";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
   formatHoraLabel,
@@ -128,6 +133,15 @@ export function ProyectoGastoConcienciaCard({
     () => dia.registros.filter(r => r.pid === proyectoId),
     [dia.registros, proyectoId]
   );
+  const clasificados = useMemo(
+    () => vehicles.map(v => clasificarTiempoVehiculo(v)),
+    [vehicles]
+  );
+  const crecimiento = useMemo(
+    () => ledgerNombresMinutos(clasificados, proyectoId),
+    [clasificados, proyectoId]
+  );
+  const minutosProyecto = minutosDeProyecto(clasificados, proyectoId);
   const bucketsCal = useMemo(() => groupRegistros(propios, horizon), [propios, horizon]);
 
   const total = Math.max(dia.minutosDia || MINUTOS_DIA_JORNADA, 1);
@@ -148,8 +162,10 @@ export function ProyectoGastoConcienciaCard({
         En qué se gasta el tiempo
       </p>
       <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-        La barra es del día-jornada (24 h). Abajo, solo los vehículos de este
-        proyecto — presencia en enumeración infinita; dirección ordenada por el timón.
+        La barra es del día-jornada (24 h). Abajo, este proyecto suma:
+        cada vehículo con su nombre y minutos. 30 min mañana + 15 noche = 45.
+        Un desglosador combinado parte el tiempo entre proyectos; no se copia
+        un vehículo ajeno al timón.
       </p>
 
       <div
@@ -177,19 +193,43 @@ export function ProyectoGastoConcienciaCard({
         ))}
       </div>
 
+      {crecimiento.length > 0 ? (
+        <div data-testid="hub-gasto-conciencia-crecimiento">
+          <p className="text-[8px] uppercase tracking-widest mb-1" style={{ color: GOLD }}>
+            Este proyecto · {formatDuracionTimon(minutosProyecto)} · {crecimiento.length} vehículo
+            {crecimiento.length === 1 ? "" : "s"}
+          </p>
+          <ul className="space-y-0.5">
+            {crecimiento.map(v => (
+              <li
+                key={v.vehicleId}
+                className="flex items-baseline justify-between gap-2 text-[9px] text-slate-300"
+              >
+                <span className="truncate">{v.titulo}</span>
+                <span className="tabular-nums shrink-0" style={{ color: GOLD }}>
+                  {formatDuracionTimon(v.minutos)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {presencia.minutosAcumulados > 0 ? (
         <div data-testid="hub-presencia-enumeracion">
           <p className="text-[8px] uppercase tracking-widest mb-1" style={{ color: TRIADA_META.presencia.color }}>
             Presencia · {formatHoraLabel(horasPresencia[horasPresencia.length - 1]?.numero ?? 1)} · enumeración infinita
           </p>
           <ul className="space-y-0.5">
-            {horasPresencia.filter(h => h.vehiculos.length > 0).map(h => (
+            {horasPresencia.filter(h => h.cortes.length > 0).map(h => (
               <li key={h.numero} className="text-[9px] text-slate-400">
                 <span className="font-bold" style={{ color: TRIADA_META.presencia.color }}>
                   {formatHoraLabel(h.numero)}
                 </span>
                 {" · "}
-                {h.vehiculos.map(v => `${v.titulo} (${formatDuracionTimon(v.minutos)})`).join(" · ")}
+                {formatDuracionTimon(h.minutos)}
+                {" · "}
+                {h.cortes.map(c => `${c.titulo} (${formatDuracionTimon(c.minutosEnHora)})`).join(" · ")}
               </li>
             ))}
           </ul>
