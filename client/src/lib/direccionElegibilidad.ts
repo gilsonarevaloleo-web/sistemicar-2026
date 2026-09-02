@@ -33,6 +33,7 @@ export type DireccionProyectoRef = {
   id: string;
   titulo: string;
   oleadaTitulo?: string;
+  color?: string;
 };
 
 export type DireccionGate = {
@@ -46,6 +47,8 @@ export type DireccionGate = {
   /** Timón: a dónde se suman las horas. No caduca. */
   puntoProduccionId?: string;
   puntoProduccionTitulo?: string;
+  /** Tint del Hub. Operaciones solo lo leen. */
+  color?: string;
 };
 
 export const DIRECCION_SIN_PROYECTO: DireccionGate = {
@@ -81,6 +84,13 @@ export function rumboChipLabel(
   return punto ? `${gate.titulo} · ${punto}` : gate.titulo;
 }
 
+export function rumboChipLines(
+  gate: Pick<DireccionGate, "titulo" | "puntoProduccionTitulo">
+): { titulo: string; punto: string | null } {
+  const punto = gate.puntoProduccionTitulo?.trim() || null;
+  return { titulo: gate.titulo, punto };
+}
+
 /** Oleada real de dirección: en curso y no sombra de segmento del día. */
 export function oleadaDeDireccion(
   peldanos: DireccionPeldanoRef[]
@@ -89,15 +99,17 @@ export function oleadaDeDireccion(
 }
 
 export function evaluateDireccionElegibilidad(
-  proyecto: Pick<DireccionProyectoRef, "id" | "titulo">,
+  proyecto: Pick<DireccionProyectoRef, "id" | "titulo" | "color">,
   peldanos: DireccionPeldanoRef[]
 ): DireccionGate {
   const titulo = proyecto.titulo.trim() || "Proyecto";
+  const tint = proyecto.color?.trim() ? { color: proyecto.color } : {};
   const oleada = oleadaDeDireccion(peldanos);
   if (!oleada) {
     return {
       proyectoId: proyecto.id,
       titulo,
+      ...tint,
       ok: false,
       gap: "sin_oleada",
       porqueTodavia: "todavía no hay oleada activa",
@@ -110,6 +122,7 @@ export function evaluateDireccionElegibilidad(
     return {
       proyectoId: proyecto.id,
       titulo,
+      ...tint,
       ok: false,
       gap: "sin_foco",
       porqueTodavia: "todavía no hay punto de producción — desglosa la oleada",
@@ -132,6 +145,7 @@ export function evaluateDireccionElegibilidad(
   return {
     proyectoId: proyecto.id,
     titulo,
+    ...tint,
     ok: true,
     gap: null,
     porqueTodavia: "",
@@ -142,7 +156,7 @@ export function evaluateDireccionElegibilidad(
 }
 
 export function mapDireccionGates(
-  proyectos: Array<Pick<DireccionProyectoRef, "id" | "titulo">>,
+  proyectos: Array<Pick<DireccionProyectoRef, "id" | "titulo" | "color">>,
   peldanosOf: (proyectoId: string) => DireccionPeldanoRef[]
 ): DireccionGate[] {
   return proyectos.map(p => evaluateDireccionElegibilidad(p, peldanosOf(p.id)));

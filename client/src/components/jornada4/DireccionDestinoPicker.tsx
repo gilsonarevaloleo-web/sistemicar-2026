@@ -1,11 +1,11 @@
-import { Compass, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useAuthContext } from "@/App";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { useDireccionGates } from "@/hooks/useDireccionGates";
 import { noPuedesLlegarADireccion, rumboChipLabel } from "@/lib/direccionElegibilidad";
+import { proyectoColorAlpha, resolveProyectoColor } from "@/lib/proyectoColor";
 import type { Proyecto } from "@/lib/proyectos";
 
-const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
 const MUTED = "#64748b";
 const INK = "#f1f5f9";
@@ -114,21 +114,26 @@ export function DireccionDestinoPicker({
         </button>
         {abiertas.map(g => {
           const on = value === g.proyectoId;
+          const tint = resolveProyectoColor(g.proyectoId, g.color);
           return (
             <button
               key={g.proyectoId}
               type="button"
               onClick={() => onChange(g.proyectoId)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-left touch-manipulation active:scale-[0.98] max-w-full"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left touch-manipulation active:scale-[0.98] max-w-full"
               style={{
-                backgroundColor: on ? "rgba(212,175,55,0.2)" : "rgba(212,175,55,0.08)",
-                border: on ? `1.5px solid ${GOLD}` : "1px solid rgba(212,175,55,0.4)",
+                backgroundColor: on ? proyectoColorAlpha(tint, "28") : proyectoColorAlpha(tint, "10"),
+                border: on ? `1.5px solid ${tint}` : `1px solid ${proyectoColorAlpha(tint, "55")}`,
               }}
               data-testid={`${testId}-abierta-${g.proyectoId}`}
               aria-pressed={on}
             >
-              <Compass size={11} style={{ color: GOLD }} />
-              <span className="text-[9px] font-black uppercase tracking-wider truncate" style={{ color: GOLD }}>
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: tint }}
+                aria-hidden
+              />
+              <span className="text-[9px] font-black uppercase tracking-wider truncate" style={{ color: tint }}>
                 {rumboChipLabel(g)}
               </span>
             </button>
