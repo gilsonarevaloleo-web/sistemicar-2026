@@ -12,6 +12,7 @@ import {
   resolveRumboTrasEnvio,
   riesgoEnsuciarProyecto,
   rumboChipLabel,
+  rumboChipLines,
   type DireccionPeldanoRef,
 } from "./direccionElegibilidad.ts";
 
@@ -69,6 +70,23 @@ describe("direccionElegibilidad", () => {
     assert.match(gate.riesgoEnsuciar, /Corte de patrón/);
     assert.match(riesgoEnsuciarProyecto("Costura"), /escalera/);
     assert.equal(rumboChipLabel(gate), "Costura · Corte de patrón");
+    assert.deepEqual(rumboChipLines(gate), {
+      titulo: "Costura",
+      punto: "Corte de patrón",
+    });
+    assert.deepEqual(rumboChipLines({ titulo: "Salud" }), {
+      titulo: "Salud",
+      punto: null,
+    });
+  });
+
+  it("el tint del Hub viaja en el gate", () => {
+    const gate = evaluateDireccionElegibilidad(
+      { id: "p1", titulo: "Costura", color: "#F97316" },
+      []
+    );
+    assert.equal(gate.color, "#F97316");
+    assert.equal(gate.ok, false);
   });
 
   it("mapDireccionGates separa abiertas de huecos", () => {

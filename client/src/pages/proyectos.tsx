@@ -80,13 +80,14 @@ import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 import { formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
+import { PROYECTO_PALETTE, resolveProyectoColor } from "@/lib/proyectoColor";
+import { ProyectoColorSwatches } from "@/components/ProyectoColorSwatches";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
 const GOLD = "#D4AF37";
 const PLATA = "#C0C0C0";
 const NARANJA = "#F97316";
-const PROYECTO_COLORS = ["#38BDF8", "#A855F7", "#F97316", "#10b981", "#D4AF37", "#f87171"];
 
 function formatFecha(ts?: number) {
   if (!ts) return "—";
@@ -739,7 +740,7 @@ export default function ProyectosPage() {
       }
       setCreatingProyecto(true);
       try {
-        const color = PROYECTO_COLORS[proyectosLenRef.current % PROYECTO_COLORS.length];
+        const color = PROYECTO_PALETTE[proyectosLenRef.current % PROYECTO_PALETTE.length];
         const p = await addProyecto(user.uid, {
           titulo,
           etiqueta: data.etiqueta,
@@ -827,6 +828,15 @@ export default function ProyectosPage() {
     }
   };
 
+  const handleSetColor = async (color: string) => {
+    if (!user || !detailId || !proyecto) return;
+    const updated = await updateProyecto(user.uid, detailId, { color });
+    if (updated) {
+      setProyecto(updated);
+      setProyectos(getProyectosLocal(user.uid));
+    }
+  };
+
   if (!user) {
     return (
       <div className="p-6 text-center text-slate-500 text-sm min-h-screen" style={{ backgroundColor: "#020202" }}>
@@ -862,7 +872,7 @@ export default function ProyectosPage() {
   }
 
   if (detailReady && proyecto) {
-    const tint = proyecto.color ?? CYAN;
+    const tint = resolveProyectoColor(proyecto.id, proyecto.color);
     const objetivoLabel =
       oleadaTituloEdit.trim() ||
       oleadaActiva?.titulo ||
@@ -886,6 +896,18 @@ export default function ProyectosPage() {
             <h1 className="text-lg font-black text-white truncate leading-tight">{proyecto.titulo}</h1>
           </div>
           <ProyectoIcono etiqueta={proyecto.etiqueta} color={tint} size={24} />
+        </div>
+
+        <div className="mb-3">
+          <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+            Color del proyecto
+          </p>
+          <ProyectoColorSwatches
+            proyectoId={proyecto.id}
+            value={proyecto.color}
+            onChange={color => void handleSetColor(color)}
+            disabled={focoBusy !== null}
+          />
         </div>
 
         <div className="flex gap-2 mb-3">
@@ -1571,7 +1593,7 @@ export default function ProyectosPage() {
       ) : (
         <div className="space-y-3">
           {proyectos.map((p, idx) => {
-            const tintCard = p.color ?? CYAN;
+            const tintCard = resolveProyectoColor(p.id, p.color);
             const pulsing = ordenPulse?.id === p.id;
             return (
             <motion.div

@@ -11,9 +11,9 @@ import {
   DIRECCION_SIN_PROYECTO,
   noPuedesLlegarADireccion,
   resolveClaimDestinoCierre,
-  rumboChipLabel,
 } from "@/lib/direccionElegibilidad";
 import { useDireccionGates } from "@/hooks/useDireccionGates";
+import { RumboProyectoPicker } from "./RumboProyectoPicker";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -62,6 +62,7 @@ export function DestinoCierreToggle({
   const [held, setHeld] = useState<"presencia" | "peldano" | string | null>(null);
   const [pulse, setPulse] = useState<"presencia" | "peldano" | string | null>(null);
   const [acked, setAcked] = useState(false);
+  const [expandSignal, setExpandSignal] = useState(0);
   const pulseTimer = useRef<number | null>(null);
   const { gates, abiertas } = useDireccionGates(user?.uid);
 
@@ -137,6 +138,7 @@ export function DestinoCierreToggle({
     setOptimisticPid(claimPid ?? null);
     setGapOpen(false);
     kick("peldano");
+    if (destino === "presencia" && abiertas.length > 1) setExpandSignal(n => n + 1);
     onChange("peldano", claimPid);
   };
 
@@ -269,6 +271,19 @@ export function DestinoCierreToggle({
         </p>
       ) : null}
 
+      {peldanoOn && !blockedGate && abiertas.length > 0 ? (
+        <RumboProyectoPicker
+          abiertas={abiertas}
+          selected={selectedGate}
+          activePid={activePid}
+          held={held}
+          pulse={pulse}
+          onHold={setHeld}
+          onPick={pickAbierta}
+          expandSignal={expandSignal}
+        />
+      ) : null}
+
       {showRiesgo ? (
         <p
           className="text-[8px] leading-snug"
@@ -277,39 +292,6 @@ export function DestinoCierreToggle({
         >
           {selectedGate.riesgoEnsuciar}
         </p>
-      ) : null}
-
-      {peldanoOn && !blockedGate && abiertas.length > 0 ? (
-        <div className="flex flex-wrap gap-1" data-testid="destino-proyecto-picker">
-          {abiertas.map(g => {
-            const active = g.proyectoId === activePid;
-            const pressed = held === g.proyectoId || pulse === g.proyectoId;
-            return (
-              <button
-                key={g.proyectoId}
-                type="button"
-                onPointerDown={() => setHeld(g.proyectoId)}
-                onPointerUp={() => setHeld(null)}
-                onPointerCancel={() => setHeld(null)}
-                onPointerLeave={() => setHeld(null)}
-                onClick={() => pickAbierta(g.proyectoId)}
-                className="px-2 py-1.5 rounded-md text-[9px] font-bold truncate touch-manipulation select-none transition-[transform,background-color,box-shadow] duration-100 max-w-full"
-                style={{
-                  color: GOLD,
-                  backgroundColor:
-                    active || pressed ? "rgba(212,175,55,0.22)" : "transparent",
-                  border: `1px solid ${active || pressed ? GOLD : "rgba(212,175,55,0.35)"}`,
-                  boxShadow: active || pressed ? `0 0 12px ${GOLD}40` : undefined,
-                  transform: pressed ? "scale(0.94)" : undefined,
-                }}
-                aria-pressed={active}
-                data-testid={`destino-proyecto-${g.proyectoId}`}
-              >
-                {rumboChipLabel(g)}
-              </button>
-            );
-          })}
-        </div>
       ) : null}
     </div>
   );
