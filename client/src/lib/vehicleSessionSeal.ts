@@ -37,9 +37,12 @@ function writeSealedMap(map: Record<string, VehicleSealRecord>): void {
   if (typeof localStorage === "undefined") return;
   try {
     const journalDay = getJournalDayStartMs();
+    const prevJournal = journalDay - 24 * 3600_000;
     const pruned: Record<string, VehicleSealRecord> = {};
     for (const [id, rec] of Object.entries(map)) {
-      if (rec.journalDayMs === journalDay) pruned[id] = rec;
+      if (rec.journalDayMs === journalDay || rec.journalDayMs === prevJournal) {
+        pruned[id] = rec;
+      }
     }
     localStorage.setItem(SEALED_KEY, JSON.stringify(pruned));
   } catch {
@@ -73,12 +76,11 @@ export function sealVehicleSessionClose(
 
 export function getVehicleSealRecord(vehicleId: string, clientRequestId?: string): VehicleSealRecord | null {
   const map = readSealedMap();
-  const journalDay = getJournalDayStartMs();
   const byId = map[vehicleId];
-  if (byId && byId.journalDayMs === journalDay) return byId;
+  if (byId) return byId;
   if (clientRequestId) {
     const byCrq = map[`crq:${clientRequestId}`];
-    if (byCrq && byCrq.journalDayMs === journalDay) return byCrq;
+    if (byCrq) return byCrq;
   }
   return null;
 }
@@ -99,6 +101,10 @@ export function applyVehicleSessionSeal(v: Vehicle): Vehicle {
     cierreManual: v.cierreManual ?? true,
     interrupcionActiva: false,
     desglosadorPausa: undefined,
+    situacionCronometro: v.situacionCronometro
+      ? { ...v.situacionCronometro, activo: false }
+      : v.situacionCronometro,
+    situacionCupoAnchor: null,
   };
 }
 

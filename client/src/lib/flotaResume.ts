@@ -9,6 +9,10 @@ import { shouldPreserveLocalActivo } from "./ghostVehicleEngine";
 import { getJournalDayStartMs } from "./segmentTime";
 import { ringSessionOperable } from "./ringEnfoqueReal";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge";
+import {
+  applyVehicleSessionSeal,
+  isVehicleSessionSealed,
+} from "./vehicleSessionSeal";
 
 function situacionSessionRichness(v: Vehicle): number {
   if (v.tipoFlota !== "situacion") return 0;
@@ -120,6 +124,47 @@ export type RehydrateFlotaInput = {
   wasRecentlyClosed?: (id: string, clientRequestId?: string) => boolean;
 };
 
+function vehicleResumeBlocked(
+  v: Vehicle,
+  wasClosed: (id: string, clientRequestId?: string) => boolean
+): boolean {
+  if (v.autoVerdad) return true;
+  if (v.status !== "activo") return true;
+  if (wasClosed(v.id, v.clientRequestId)) return true;
+  if (isVehicleSessionSealed(v.id, v.clientRequestId)) return true;
+  return false;
+}
+
+/**
+ * Park durable: nunca conservar un id que este snapshot ya cerró.
+ * Lista incoming vacía no borra park (race de remount); sí recorta sellados.
+ */
+export function mergeParkedActivesForResume(
+  incoming: Vehicle[],
+  prevParked: Vehicle[],
+  wasRecentlyClosed: (id: string, clientRequestId?: string) => boolean
+): Vehicle[] {
+  const isBlocked = (v: Vehicle) => vehicleResumeBlocked(v, wasRecentlyClosed);
+
+  if (incoming.length === 0) {
+    return prevParked.filter(p => !isBlocked(p));
+  }
+
+  const incomingById = new Map(incoming.map(v => [v.id, v]));
+  const actives = incoming.filter(v => !isBlocked(v));
+  let toPark = upgradeActiveSessionsFromSources(actives, prevParked);
+  const activeIds = new Set(actives.map(v => v.id));
+
+  for (const p of prevParked) {
+    if (activeIds.has(p.id)) continue;
+    const seen = incomingById.get(p.id);
+    if (seen && seen.status !== "activo") continue;
+    if (isBlocked(p)) continue;
+    toPark.push(p);
+  }
+  return toPark;
+}
+
 export type RehydrateFlotaResult = {
   next: Vehicle[];
   changed: boolean;
@@ -135,11 +180,11 @@ export function rehydrateFlotaFromDiskSources(input: RehydrateFlotaInput): Rehyd
   const nowMs = input.nowMs ?? Date.now();
   const dayStart = input.dayStartMs ?? getJournalDayStartMs(nowMs);
   const wasClosed = input.wasRecentlyClosed ?? (() => false);
+  const memory = input.memory.map(applyVehicleSessionSeal);
 
   const diskById = new Map<string, Vehicle>();
   for (const v of [...input.local, ...input.parked]) {
-    if (v.status !== "activo" || v.autoVerdad) continue;
-    if (wasClosed(v.id, v.clientRequestId)) continue;
+    if (vehicleResumeBlocked(v, wasClosed)) continue;
     const prev = diskById.get(v.id);
     if (!prev || diskSessionRicherThanMemory(prev, v)) {
       diskById.set(v.id, v);
@@ -147,26 +192,29 @@ export function rehydrateFlotaFromDiskSources(input: RehydrateFlotaInput): Rehyd
   }
 
   const upgradedIds: string[] = [];
-  const next = input.memory.map(mem => {
-    const disk = diskById.get(mem.id);
-    if (!disk) return mem;
-    if (!diskSessionRicherThanMemory(mem, disk)) return mem;
-    upgradedIds.push(mem.id);
+  const next = memory.map(mem => {
+    const sealed = applyVehicleSessionSeal(mem);
+    if (sealed.status !== "activo") return sealed;
+    const disk = diskById.get(sealed.id);
+    if (!disk) return sealed;
+    if (!diskSessionRicherThanMemory(sealed, disk)) return sealed;
+    upgradedIds.push(sealed.id);
     // memory = lean "remote-like"; disk = local rico → merge conserva ring/subs.
-    return mergeActiveVehicleSessionState(mem, disk);
+    return mergeActiveVehicleSessionState(sealed, disk);
   });
 
   const byId = new Map(next.map(v => [v.id, v]));
   const addedIds: string[] = [];
   for (const v of Array.from(diskById.values())) {
     if (byId.has(v.id)) continue;
-    if (wasClosed(v.id, v.clientRequestId)) continue;
+    if (vehicleResumeBlocked(v, wasClosed)) continue;
     if (!shouldPreserveLocalActivo(v, nowMs, dayStart)) continue;
     byId.set(v.id, v);
     addedIds.push(v.id);
     next.unshift(v);
   }
 
-  const changed = upgradedIds.length > 0 || addedIds.length > 0;
+  const sealedChanged = memory.some((v, i) => v !== input.memory[i]);
+  const changed = upgradedIds.length > 0 || addedIds.length > 0 || sealedChanged;
   return { next: changed ? [...next] : input.memory, changed, upgradedIds, addedIds };
 }

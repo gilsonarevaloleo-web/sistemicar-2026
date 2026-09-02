@@ -13,6 +13,7 @@
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import { getJournalDateString, getLimaDayStartMs, segmentWindowMs } from "./segmentTime";
 import type { Vehicle } from "./persistence";
+import { applyVehicleSessionSeal } from "./vehicleSessionSeal";
 
 export type MsInterval = { start: number; end: number };
 
@@ -71,10 +72,11 @@ function hasActiveInterruptChild(parent: Vehicle, vehicles: Vehicle[]): boolean 
 
 /** True si el vehículo avanza de verdad (no padre congelado, no centinela). El hijo interrupt sí. */
 export function isTriadaAdvancingVehicle(vehicle: Vehicle, vehicles: Vehicle[] = []): boolean {
-  if (skipsTriadaCoverage(vehicle) || vehicle.status !== "activo") return false;
-  if (vehicle.interrupcionActiva) return false;
-  if (vehicle.situacionNestedPause) return false;
-  if (hasActiveInterruptChild(vehicle, vehicles)) return false;
+  const v = applyVehicleSessionSeal(vehicle);
+  if (skipsTriadaCoverage(v) || v.status !== "activo") return false;
+  if (v.interrupcionActiva) return false;
+  if (v.situacionNestedPause) return false;
+  if (hasActiveInterruptChild(v, vehicles)) return false;
   return true;
 }
 
@@ -179,21 +181,22 @@ export function plannedWindowsMs(
 }
 
 function vehicleRawSessionRange(v: Vehicle, now: number): MsInterval | null {
-  const start = v.aperturaAt;
+  const sealed = applyVehicleSessionSeal(v);
+  const start = sealed.aperturaAt;
   if (typeof start !== "number" || !Number.isFinite(start) || start <= 0) return null;
   let end: number;
-  if (v.status === "activo") {
-    if (v.interrupcionActiva && v.desglosadorPausa?.pausadoAt) {
-      end = v.desglosadorPausa.pausadoAt;
-    } else if (v.situacionNestedPause?.pausedAt) {
-      end = v.situacionNestedPause.pausedAt;
+  if (sealed.status === "activo") {
+    if (sealed.interrupcionActiva && sealed.desglosadorPausa?.pausadoAt) {
+      end = sealed.desglosadorPausa.pausadoAt;
+    } else if (sealed.situacionNestedPause?.pausedAt) {
+      end = sealed.situacionNestedPause.pausedAt;
     } else {
       end = now;
     }
-  } else if (typeof v.cierreAt === "number" && v.cierreAt > start) {
-    end = v.cierreAt;
-  } else if (typeof v.duracionFinal === "number" && v.duracionFinal > 0) {
-    end = start + v.duracionFinal * 60_000;
+  } else if (typeof sealed.cierreAt === "number" && sealed.cierreAt > start) {
+    end = sealed.cierreAt;
+  } else if (typeof sealed.duracionFinal === "number" && sealed.duracionFinal > 0) {
+    end = start + sealed.duracionFinal * 60_000;
   } else {
     return null;
   }
@@ -230,12 +233,13 @@ function vehicleIsDireccion(vehicle: Vehicle): boolean {
 }
 
 function vehicleOfJournalDay(vehicle: Vehicle, fecha: string): boolean {
-  if (vehicle.status === "activo") return true;
-  const cierre = vehicle.cierreAt;
+  const v = applyVehicleSessionSeal(vehicle);
+  if (v.status === "activo") return true;
+  const cierre = v.cierreAt;
   if (typeof cierre === "number" && Number.isFinite(cierre) && cierre > 0) {
     return getJournalDateString(cierre) === fecha;
   }
-  const apertura = vehicle.aperturaAt;
+  const apertura = v.aperturaAt;
   if (typeof apertura === "number" && Number.isFinite(apertura) && apertura > 0) {
     return getJournalDateString(apertura) === fecha;
   }
@@ -298,7 +302,7 @@ export function computeTriadaLineaOccupancy(params: {
       hilosAvanzando += 1;
       if (v.vehiculoPadreDesglosadorId) interruptChildAdvancing = true;
     }
-    if (v.interrupcionActiva && v.status === "activo") parentPaused = true;
+    if (v.interrupcionActiva && applyVehicleSessionSeal(v).status === "activo") parentPaused = true;
 
     const pieces = vehicleAdvancingIntervals(v, params.vehicles, now);
     if (pieces.length === 0) continue;
@@ -311,7 +315,7 @@ export function computeTriadaLineaOccupancy(params: {
     if (vehicleIsDireccion(v)) dirIv.push(...clipped);
     else preIv.push(...clipped);
     if (advancing) advancingIv.push(...clipped);
-    if (v.status === "cumplido") cumplidoIv.push(...clipped);
+    if (applyVehicleSessionSeal(v).status === "cumplido") cumplidoIv.push(...clipped);
   }
 
   let dirOnPlan = intersectIntervalsWithWindows(dirIv, planElapsed);

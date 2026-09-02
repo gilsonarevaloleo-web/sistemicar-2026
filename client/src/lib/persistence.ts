@@ -43,7 +43,8 @@ import {
   isOrphanDesglosadorInterrupt,
   archiveOrphanDesglosadorInterrupts,
 } from "./situacionSessionMerge";
-import { upgradeActiveSessionsFromSources } from "./flotaResume";
+import { mergeParkedActivesForResume, upgradeActiveSessionsFromSources } from "./flotaResume";
+import { isVehicleSessionSealed } from "./vehicleSessionSeal";
 import { getFlotaMemoryVehicles } from "./flotaMemoryBridge";
 import { getJournalDateString, getJournalDayStartMs, getNextJournalDayStartMs } from "./segmentTime";
 import {
@@ -796,40 +797,19 @@ function readParkedActivesRaw(): string | null {
 
 /**
  * Guarda activos al ir a segundo plano (session + localStorage durable).
- * Lista vacía NO borra el park durable: un remount/race no debe borrar
- * ring/conquista aparcados. El clear explícito es clearParkedActiveVehicles /
- * unpark por cierre.
+ * Incoming vacío NO borra el park (race de remount). Un id ya cerrado o
+ * sellado en este snapshot sí se recorta — no puede resucitar y cubrir huecos.
  */
 export function parkActiveVehiclesForResume(vehicles: Vehicle[]): void {
-  const actives = vehicles.filter(
-    v =>
-      v.status === "activo" &&
-      !v.autoVerdad &&
-      !wasVehicleRecentlyClosed(v.id, v.clientRequestId)
-  );
-  if (actives.length === 0) return;
-
-  // Conservar parked más rico si el incoming es shell lean del mismo id.
-  let toPark = actives;
+  let prev: Vehicle[] = [];
   try {
     const prevRaw = readParkedActivesRaw();
-    if (prevRaw) {
-      const prev = parseParkedVehicles(prevRaw);
-      if (prev.length > 0) {
-        toPark = upgradeActiveSessionsFromSources(actives, prev);
-        // Mantener parked de otros ids aún activos que no vienen en este snapshot.
-        const incomingIds = new Set(actives.map(v => v.id));
-        for (const p of prev) {
-          if (incomingIds.has(p.id)) continue;
-          if (p.status !== "activo" || p.autoVerdad) continue;
-          if (wasVehicleRecentlyClosed(p.id, p.clientRequestId)) continue;
-          toPark.push(p);
-        }
-      }
-    }
+    if (prevRaw) prev = parseParkedVehicles(prevRaw);
   } catch {
-    toPark = actives;
+    prev = [];
   }
+  const toPark = mergeParkedActivesForResume(vehicles, prev, wasVehicleRecentlyClosed);
+  if (vehicles.length === 0 && toPark.length === prev.length) return;
   writeParkedActives(toPark);
 }
 
@@ -879,7 +859,14 @@ function parseParkedVehicles(raw: string): Vehicle[] {
 export function getParkedActiveVehicles(): Vehicle[] {
   try {
     const raw = readParkedActivesRaw();
-    return raw ? parseParkedVehicles(raw) : [];
+    const parked = raw ? parseParkedVehicles(raw) : [];
+    return parked.filter(
+      v =>
+        v.status === "activo" &&
+        !v.autoVerdad &&
+        !wasVehicleRecentlyClosed(v.id, v.clientRequestId) &&
+        !isVehicleSessionSealed(v.id, v.clientRequestId)
+    );
   } catch {
     return [];
   }
