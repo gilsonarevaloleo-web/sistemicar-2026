@@ -79,10 +79,16 @@ import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./s
 import {
   solicitarLlamadaVendedor,
   handleTwilioVoiceStatus,
-  resolveGuionForTwiml,
+  resolveDialogContext,
 } from "./vendedorCallService";
 import { listVendedorCalls, canAcceptNewCall } from "./vendedorCallsStore";
-import { buildTwimlSay } from "./twilioVendedor";
+import {
+  buildTwimlGatherPrompt,
+  buildTwimlHangupSay,
+  resolvePublicBaseUrl,
+  buildTwilioCallbackQuery,
+} from "./twilioVendedor";
+import { buildDialogTurns, parseGatherChoice } from "../shared/vendedor/dialogoGather";
 import { registerEspejoV2Routes } from "./espejoV2Routes";
 import { registerUmbralV2Routes } from "./umbralV2Routes";
 import {
@@ -98,6 +104,7 @@ const isServerless =
   Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: false }));
 
 if (isServerless) {
   app.use((req, _res, next) => {
@@ -5352,13 +5359,137 @@ app.get("/api/vendedor/twilio/twiml", (req, res) => {
   const planeta = typeof req.query.planeta === "string" ? req.query.planeta : "";
   const sellerRef = typeof req.query.ref === "string" ? req.query.ref : null;
   const codigo = parseInt(codigoRaw, 10);
-  const guion = resolveGuionForTwiml({
+  const ctx = resolveDialogContext({
     callId: callId || undefined,
     codigo: Number.isFinite(codigo) ? codigo : undefined,
     planeta: planeta || undefined,
     sellerRef,
   });
-  res.type("text/xml").send(buildTwimlSay(guion));
+
+  if (!ctx) {
+    return res
+      .type("text/xml")
+      .send(
+        buildTwimlHangupSay(
+          "Hola. Soy la vendedora de Sistemicar. Entra en sistemicar punto app para continuar. Hasta luego.",
+        ),
+      );
+  }
+
+  const turns = buildDialogTurns(ctx.codigo, ctx.planeta, ctx.sellerRef);
+  const qs = buildTwilioCallbackQuery({
+    callId: callId || `anon_${Date.now()}`,
+    telefono:
+      typeof req.query.telefono === "string" ? req.query.telefono : "",
+    whatsapp:
+      typeof req.query.whatsapp === "string"
+        ? req.query.whatsapp
+        : typeof req.query.telefono === "string"
+          ? req.query.telefono
+          : "",
+    codigo: ctx.codigo,
+    planeta: ctx.planeta,
+    sellerRef: ctx.sellerRef,
+  });
+  const actionUrl = `${resolvePublicBaseUrl()}/api/vendedor/twilio/gather?step=mirror&${qs}`;
+
+  res
+    .type("text/xml")
+    .send(
+      buildTwimlGatherPrompt({
+        prompt: turns.opener,
+        actionUrl,
+        timeoutSay: turns.timeoutOpen,
+        timeoutSeconds: 8,
+      }),
+    );
+});
+
+/** Nivel B: ramas DTMF tras cada pregunta. */
+app.post("/api/vendedor/twilio/gather", (req, res) => {
+  try {
+    const stepRaw =
+      typeof req.query.step === "string" ? req.query.step : "mirror";
+    const step = stepRaw === "cta" ? "cta" : "mirror";
+    const callId = typeof req.query.callId === "string" ? req.query.callId : "";
+    const codigoRaw =
+      typeof req.query.codigo === "string" ? req.query.codigo : "";
+    const planeta =
+      typeof req.query.planeta === "string" ? req.query.planeta : "";
+    const sellerRef =
+      typeof req.query.ref === "string" ? req.query.ref : null;
+    const codigo = parseInt(codigoRaw, 10);
+    const ctx = resolveDialogContext({
+      callId: callId || undefined,
+      codigo: Number.isFinite(codigo) ? codigo : undefined,
+      planeta: planeta || undefined,
+      sellerRef,
+    });
+
+    if (!ctx) {
+      return res
+        .type("text/xml")
+        .send(buildTwimlHangupSay("No pude recuperar tu diagnóstico. Hasta luego."));
+    }
+
+    const turns = buildDialogTurns(ctx.codigo, ctx.planeta, ctx.sellerRef);
+    const choice = parseGatherChoice({
+      digits: typeof req.body?.Digits === "string" ? req.body.Digits : null,
+      speech:
+        typeof req.body?.SpeechResult === "string"
+          ? req.body.SpeechResult
+          : null,
+    });
+
+    const qs = buildTwilioCallbackQuery({
+      callId: callId || `anon_${Date.now()}`,
+      telefono:
+        typeof req.query.telefono === "string" ? req.query.telefono : "",
+      whatsapp:
+        typeof req.query.whatsapp === "string"
+          ? req.query.whatsapp
+          : typeof req.query.telefono === "string"
+            ? req.query.telefono
+            : "",
+      codigo: ctx.codigo,
+      planeta: ctx.planeta,
+      sellerRef: ctx.sellerRef,
+    });
+
+    if (step === "mirror") {
+      const prompt = choice === "2" ? turns.mirrorNo : turns.mirrorSi;
+      // Si no marcó, igual avanzamos con rama "sí" suave (mirrorSi) solo si digitó 1;
+      // sin dígito → timeout hangup text
+      if (!choice) {
+        return res
+          .type("text/xml")
+          .send(buildTwimlHangupSay(turns.timeoutOpen));
+      }
+      const actionUrl = `${resolvePublicBaseUrl()}/api/vendedor/twilio/gather?step=cta&${qs}`;
+      return res.type("text/xml").send(
+        buildTwimlGatherPrompt({
+          prompt,
+          actionUrl,
+          timeoutSay: turns.timeoutMirror,
+          timeoutSeconds: 8,
+        }),
+      );
+    }
+
+    // step === cta
+    if (choice === "1") {
+      return res.type("text/xml").send(buildTwimlHangupSay(turns.ctaSi));
+    }
+    if (choice === "2") {
+      return res.type("text/xml").send(buildTwimlHangupSay(turns.ctaNo));
+    }
+    return res.type("text/xml").send(buildTwimlHangupSay(turns.timeoutMirror));
+  } catch (error) {
+    console.error("[vendedor/twilio/gather]", error);
+    res
+      .type("text/xml")
+      .send(buildTwimlHangupSay("Hubo un problema técnico. Hasta luego."));
+  }
 });
 
 app.post("/api/vendedor/twilio/status", async (req, res) => {

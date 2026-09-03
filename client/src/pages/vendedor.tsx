@@ -348,7 +348,9 @@ export default function VendedorTriagePage() {
               </p>
               <p className="text-[12px] text-white/55 leading-relaxed">
                 Deja tu número. Primero te llamamos por teléfono; si no
-                contestas, WhatsApp.
+                contestas, WhatsApp. En la llamada marca <span className="text-white/80">1</span> o{" "}
+                <span className="text-white/80">2</span> para responder a la
+                vendedora.
                 {callStatusMsg && /21219|verificad|trial/i.test(callStatusMsg) ? (
                   <span className="block mt-2 text-[#FCA5A5]/55">
                     Si Twilio está en trial: el +51 debe estar en Verified Caller

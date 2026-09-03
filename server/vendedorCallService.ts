@@ -417,17 +417,25 @@ async function fallbackWhatsapp(
   });
 }
 
-/** Guion para TwiML — desde registro o desde query (serverless). */
-export function resolveGuionForTwiml(params: {
+/** Contexto de diálogo para TwiML Gather — desde registro o query (serverless). */
+export function resolveDialogContext(params: {
   callId?: string;
   codigo?: number;
   planeta?: string;
   sellerRef?: string | null;
-}): string {
+}): {
+  codigo: CodigoNumero;
+  planeta: PlanetaId;
+  sellerRef: string | null;
+} | null {
   if (params.callId) {
     const call = getVendedorCall(params.callId);
     if (call) {
-      return construirGuionLlamada(call.codigo, call.planeta, call.sellerRef).voz;
+      return {
+        codigo: call.codigo,
+        planeta: call.planeta,
+        sellerRef: call.sellerRef,
+      };
     }
   }
   if (
@@ -436,11 +444,25 @@ export function resolveGuionForTwiml(params: {
     isPlanetaId(params.planeta) &&
     CODIGOS.has(params.codigo)
   ) {
-    return construirGuionLlamada(
-      params.codigo as CodigoNumero,
-      params.planeta,
-      params.sellerRef,
-    ).voz;
+    return {
+      codigo: params.codigo as CodigoNumero,
+      planeta: params.planeta,
+      sellerRef: params.sellerRef ?? null,
+    };
+  }
+  return null;
+}
+
+/** Guion mono (WhatsApp / fallback legacy). */
+export function resolveGuionForTwiml(params: {
+  callId?: string;
+  codigo?: number;
+  planeta?: string;
+  sellerRef?: string | null;
+}): string {
+  const ctx = resolveDialogContext(params);
+  if (ctx) {
+    return construirGuionLlamada(ctx.codigo, ctx.planeta, ctx.sellerRef).voz;
   }
   return "Hola. Soy el vendedor de Sistemicar. Entra en sistemicar punto app para continuar.";
 }

@@ -334,12 +334,48 @@ export function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
+const SAY_VOICE = 'language="es-MX" voice="Polly.Mia"';
+
 export function buildTwimlSay(voiceScript: string): string {
   const safe = escapeXml(voiceScript);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="es-MX" voice="Polly.Mia">${safe}</Say>
+  <Say ${SAY_VOICE}>${safe}</Say>
   <Pause length="1"/>
-  <Say language="es-MX" voice="Polly.Mia">Hasta luego.</Say>
+  <Say ${SAY_VOICE}>Hasta luego.</Say>
+</Response>`;
+}
+
+/** Cierre simple (sin Gather). */
+export function buildTwimlHangupSay(text: string): string {
+  const safe = escapeXml(text);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say ${SAY_VOICE}>${safe}</Say>
+  <Hangup/>
+</Response>`;
+}
+
+/**
+ * Nivel B: pregunta + <Gather> DTMF (1 dígito).
+ * actionUrl debe ser absoluto (PUBLIC_APP_URL) e incluir query de contexto.
+ */
+export function buildTwimlGatherPrompt(opts: {
+  prompt: string;
+  actionUrl: string;
+  timeoutSay: string;
+  timeoutSeconds?: number;
+}): string {
+  const prompt = escapeXml(opts.prompt);
+  const timeoutSay = escapeXml(opts.timeoutSay);
+  const action = escapeXml(opts.actionUrl);
+  const timeout = opts.timeoutSeconds ?? 8;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="dtmf" numDigits="1" timeout="${timeout}" action="${action}" method="POST">
+    <Say ${SAY_VOICE}>${prompt}</Say>
+  </Gather>
+  <Say ${SAY_VOICE}>${timeoutSay}</Say>
+  <Hangup/>
 </Response>`;
 }
