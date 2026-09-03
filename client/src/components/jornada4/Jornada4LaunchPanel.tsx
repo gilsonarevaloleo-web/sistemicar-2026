@@ -29,6 +29,12 @@ import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPi
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
 import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
+import { isJ4GpsClipsEnabled } from "@/jornada4/gpsClipPref";
+import {
+  playJ4GpsClip,
+  stopJ4GpsClips,
+  unlockJ4GpsClips,
+} from "@/jornada4/gpsClipPlayer";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
 const ORANGE = "#f97316";
@@ -268,6 +274,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   }, [segmentoHoraFin, hubPeldanoId, hubOleadaPuntoId]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
+    if (isJ4GpsClipsEnabled()) unlockJ4GpsClips();
     if (t === "situacion" && !canSituacion) {
       toast.message("Situacional es parte de Ritmo del día", {
         description: "Base incluye Conquista (unidades). Activa Ritmo para imprevistos y ring.",
@@ -318,6 +325,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   const handleLaunch = useCallback(async () => {
     if (!tipo || saving || !canLaunch) return;
+    const gpsArmed = isJ4GpsClipsEnabled();
+    if (gpsArmed) {
+      unlockJ4GpsClips();
+      playJ4GpsClip("lanzar");
+    }
     setSaving(true);
     try {
       const dirVehiculo = vehiculoProyectoId.trim() || undefined;
@@ -377,6 +389,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         });
       }
       if (id) reset();
+      else if (gpsArmed) stopJ4GpsClips();
+    } catch {
+      if (gpsArmed) stopJ4GpsClips();
     } finally {
       setSaving(false);
     }
@@ -445,6 +460,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           type="button"
           disabled={disabled}
           onClick={() => {
+            if (isJ4GpsClipsEnabled()) unlockJ4GpsClips();
             setTipo(null);
             setOpen(true);
           }}

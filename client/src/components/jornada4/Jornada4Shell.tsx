@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Info } from "lucide-react";
+import { Info, Volume2, VolumeX } from "lucide-react";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
+import { isJ4GpsClipsEnabled, setJ4GpsClipsEnabled } from "@/jornada4/gpsClipPref";
+import {
+  playJ4GpsClip,
+  stopJ4GpsClips,
+  unlockJ4GpsClips,
+} from "@/jornada4/gpsClipPlayer";
 
 const PIZARRA = "#0a0a0a";
 const INK = "#f1f5f9";
@@ -17,6 +23,19 @@ type Props = {
 /** Shell Dual Kernel — Compact App Bar (una línea) para liberar above-the-fold. */
 export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props) {
   const [showHint, setShowHint] = useState(false);
+  const [gpsOn, setGpsOn] = useState(() => isJ4GpsClipsEnabled());
+
+  const toggleGps = () => {
+    const next = !gpsOn;
+    setJ4GpsClipsEnabled(next);
+    setGpsOn(next);
+    if (next) {
+      unlockJ4GpsClips();
+      playJ4GpsClip("activar");
+    } else {
+      stopJ4GpsClips();
+    }
+  };
 
   return (
     <header
@@ -69,6 +88,26 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
             className="flex items-center gap-2 text-[10px] shrink-0 tabular-nums"
             style={{ color: MUTED }}
           >
+            <button
+              type="button"
+              onClick={toggleGps}
+              aria-pressed={gpsOn}
+              aria-label={
+                gpsOn
+                  ? "Voz GPS activa. Toca para apagar."
+                  : "Voz GPS apagada. Toca para activar clips. No usa TTS."
+              }
+              title={
+                gpsOn
+                  ? "Voz GPS (clips) · ON"
+                  : "Voz GPS apagada · clips, no TTS"
+              }
+              className="p-1 rounded touch-manipulation shrink-0"
+              style={{ color: gpsOn ? GOLD : MUTED }}
+              data-testid="jornada4-gps-toggle"
+            >
+              {gpsOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            </button>
             <span>
               <strong style={{ color: INK }}>{dualCount}</strong>
               <span className="ml-0.5 opacity-70">act</span>
@@ -89,7 +128,8 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
             style={{ color: MUTED }}
             data-testid="jornada4-shell-hint-body"
           >
-            Conquista y Enfoque operables — sin descanso, verdad, anillo ni voz.
+            Conquista y Enfoque operables — sin descanso, verdad ni anillo.
+            Voz GPS por clips, apagada por defecto; nunca TTS en el reloj.
             {statusLine ? (
               <>
                 {" "}

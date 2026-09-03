@@ -22,7 +22,7 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | Persistencia flota + sombra | Escalera de conciencia |
 | Tick UI mínimo (islands) | Disciplina / puntualidad |
 | Resistencia en background | Reloj/scheduler de conciencia global |
-| **Crisol MOS** (dock clásico → ring / lista libre) | Voz (TTS / GPS clips) |
+| **Crisol MOS** (dock clásico → ring / lista libre) | TTS / speechQueue / GPS clásico |
 | | Termodinámica / segment attention acoplada |
 
 ---
@@ -75,7 +75,8 @@ Jornada 4 no intenta “optimizar el monolito otra vez”. **Corta el alcance** 
 | `disciplinaEngine` / `puntualidadEngine` | Acopla segmentos al hot path |
 | `SegmentAttentionBackground` en la ruta J4 | Pausado al entrar a `/jornada-v4` (App shell); se reanuda al salir |
 | `useDesglosadorManager` | Orquestador monolítico; V3 ya demostró que se puede partir |
-| Voz | Históricamente deja listeners / pelea con gestos; fase posterior |
+| Voz TTS / speechQueue / listeners globales | Históricamente deja listeners / pelea con gestos; **prohibido en J4** |
+| Voz GPS por clips (`gpsClipPlayer`) | Fase 4: opt-in, default OFF, fuera de kernels/tick |
 
 ---
 
@@ -250,7 +251,7 @@ Inventario + arquitectura + fuera-de-alcance.
 
 Solo bajo kill-switch y fuera del hot path de cierre:
 
-- Voz GPS por clips (nunca TTS en tick).
+- **Voz GPS por clips (implementado):** `gpsClipPlayer` + mp3 en `client/public/voice/j4/`. Un `HTMLAudioElement`. Interruptor **OFF por defecto** (ícono de volumen en el shell). Frases cableadas: activar (toggle) y lanzar (gesto de lanzamiento). Cero `speechSynthesis`, cero tick, cero retry. Si el audio falla, la Jornada sigue. Kernels/tick/executeLaunch no importan el reproductor.
 - Reserva / Crisol.
 - Lectura de anillo en **otra pestaña/ruta**, no montada en J4.
 

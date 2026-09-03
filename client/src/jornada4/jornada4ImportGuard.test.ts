@@ -88,6 +88,24 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     }
   });
 
+  it("kernels, tick y launch no importan gpsClip (fuera del hot path)", () => {
+    const names = [
+      "conquistaKernel.ts",
+      "situacionKernel.ts",
+      "jornada4Tick.ts",
+      "executeJornada4Launch.ts",
+    ];
+    for (const name of names) {
+      const src = readFileSync(join(dir, name), "utf8");
+      assert.equal(
+        src.includes("gpsClip"),
+        false,
+        `${name} no debe importar el reproductor GPS`
+      );
+      assert.equal(src.includes("speechSynthesis"), false, `${name} sin TTS`);
+    }
+  });
+
   it("sesión cablea El Crisol (dock clásico; gated por Norte)", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /PlaneacionCrisolDock/);
