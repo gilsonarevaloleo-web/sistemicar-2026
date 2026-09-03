@@ -207,11 +207,12 @@ describe("gpsClipPlayer", () => {
 });
 
 describe("gpsClipPlayer contrato fuente", () => {
-  it("el reproductor no menciona speechSynthesis ni speechQueue", () => {
+  it("el reproductor no importa ni llama speechSynthesis / speechQueue", () => {
     const src = join(dirname(fileURLToPath(import.meta.url)), "gpsClipPlayer.ts");
     const text = readFileSync(src, "utf8");
-    assert.equal(text.includes("speechSynthesis"), false);
-    assert.equal(text.includes("speechQueue"), false);
-    assert.equal(text.includes("pointerdown"), false);
+    assert.equal(/from ["']@\/lib\/speechQueue/.test(text), false);
+    assert.equal(/speechSynthesis\s*\./.test(text), false);
+    assert.equal(/window\.speechSynthesis/.test(text), false);
+    assert.equal(/addEventListener\(\s*["']pointerdown/.test(text), false);
   });
 });

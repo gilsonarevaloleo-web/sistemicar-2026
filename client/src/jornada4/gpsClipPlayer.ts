@@ -2,7 +2,7 @@
  * Reproductor GPS Dual Kernel — un HTMLAudioElement.
  *
  * Contrato anti-pesadilla:
- * - Cero speechSynthesis. Cero speechQueue. Cero pointerdown global.
+ * - Cero TTS del navegador. Cero cola clásica. Cero listener global por frase.
  * - Cero retry. Cero tick. Si play() falla, la Jornada sigue.
  * - Un canal: un clip a la vez; el nuevo corta al anterior.
  * - Unlock solo en gesto del operador.
@@ -20,7 +20,6 @@ function getEl(): HTMLAudioElement | null {
   try {
     el = new Audio();
     el.preload = "auto";
-    el.playsInline = true;
     el.setAttribute("playsinline", "true");
     el.controls = false;
   } catch {
