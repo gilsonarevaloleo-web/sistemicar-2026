@@ -4,6 +4,8 @@ import {
   normalizePhoneE164,
   escapeXml,
   buildTwimlSay,
+  buildTwimlGatherPrompt,
+  buildTwimlHangupSay,
   resolvePublicBaseUrl,
   buildTwilioCallbackQuery,
   humanizeTwilioWhatsAppError,
@@ -90,5 +92,18 @@ describe("Twilio vendedor helpers", () => {
     assert.equal(v["1"], "JORNADA");
     assert.equal(v["2"], "2");
     assert.match(v["3"], /planificacion_base/);
+  });
+
+  it("TwiML Gather tiene action y numDigits", () => {
+    const xml = buildTwimlGatherPrompt({
+      prompt: "Marca uno",
+      actionUrl: "https://www.sistemicar.app/api/vendedor/twilio/gather?step=mirror",
+      timeoutSay: "Sin marca",
+    });
+    assert.match(xml, /<Gather /);
+    assert.match(xml, /numDigits="1"/);
+    assert.match(xml, /action="https:\/\/www\.sistemicar\.app\/api\/vendedor\/twilio\/gather/);
+    assert.match(xml, /Marca uno/);
+    assert.match(buildTwimlHangupSay("Adiós <x>"), /Adiós &lt;x&gt;/);
   });
 });
