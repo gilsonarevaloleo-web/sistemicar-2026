@@ -25,6 +25,7 @@ import {
   Link2,
   Pencil,
   Target,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,7 +54,9 @@ import {
   deleteOleadaPunto,
   reorderOleadaPunto,
   setPuntoProduccion,
+  archivarOleada,
   minutosTiempoTimonVivo,
+  formatCuandoProduccion,
   type Proyecto,
   type ProyectoPeldano,
   type ProyectoEtiqueta,
@@ -70,6 +73,7 @@ import { RUTA_BANDA_META } from "@/lib/rutaEnfoque";
 import { RutasMentalesGrafo } from "@/components/RutasMentalesGrafo";
 import { RutasMentalesEditor } from "@/components/RutasMentalesEditor";
 import { OleadaDesglosePanel } from "@/components/OleadaDesglosePanel";
+import { OleadaCapitulosPanel } from "@/components/OleadaCapitulosPanel";
 import { ProyectoGastoConcienciaCard } from "@/components/ProyectoGastoConcienciaCard";
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
@@ -79,7 +83,7 @@ import { getLocalVehicles } from "@/lib/persistence";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
-import { formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
+import { formatDuracionTimon, formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
 import { PROYECTO_PALETTE, resolveProyectoColor } from "@/lib/proyectoColor";
 import { ProyectoColorSwatches } from "@/components/ProyectoColorSwatches";
 
@@ -89,9 +93,8 @@ const GOLD = "#D4AF37";
 const PLATA = "#C0C0C0";
 const NARANJA = "#F97316";
 
-function formatFecha(ts?: number) {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+function formatFechaHora(ts?: number) {
+  return formatCuandoProduccion(ts);
 }
 
 function formatTipoOrigen(tipo?: "tiempo" | "situacion") {
@@ -566,6 +569,13 @@ export default function ProyectosPage() {
         .sort((a, b) => (b.cerradoAt ?? 0) - (a.cerradoAt ?? 0)),
     [peldanos]
   );
+  const oleadasArchivadas = useMemo(
+    () =>
+      peldanos
+        .filter(p => p.estado === "archivada" && !p.origenSegmento)
+        .sort((a, b) => (b.cerradoAt ?? 0) - (a.cerradoAt ?? 0)),
+    [peldanos]
+  );
   const hoyFecha = useMemo(() => getJournalDateString(), []);
   const enCursoPlan = useMemo(
     () =>
@@ -662,6 +672,31 @@ export default function ProyectosPage() {
     if (!user || !detailId) return;
     await setOleadaComoDireccion(user.uid, detailId, peldanoId);
     await reloadDetail();
+    toast.success("Oleada activa. La anterior, si tenía camino, quedó en Capítulos.");
+  };
+
+  const handleArchivarOleada = async () => {
+    if (!user || !oleadaPeldano) return;
+    const ok = window.confirm(
+      `¿Cerrar la oleada «${oleadaPeldano.titulo}»?\n\nSe sella el timón vivo como peldaño. La oleada pasa a Escalera → Capítulos: puedes consultarla cuando quieras, no estorba el escritorio. Luego activas otra idea como oleada.`
+    );
+    if (!ok) return;
+    const updated = await archivarOleada(user.uid, oleadaPeldano.id);
+    if (!updated) {
+      toast.error("No se pudo cerrar la oleada.");
+      return;
+    }
+    setPeldanos(getPeldanosByProyectoLocal(user.uid, oleadaPeldano.proyectoId));
+    setProyectos(getProyectosLocal(user.uid));
+    toast.success(`«${oleadaPeldano.titulo}» cerrada — capítulo en Escalera`);
+  };
+
+  const handleReabrirOleada = async (peldanoId: string) => {
+    if (!user || !detailId) return;
+    await setOleadaComoDireccion(user.uid, detailId, peldanoId);
+    await reloadDetail();
+    setDetailTab("enfoque");
+    toast.success("Oleada reabierta en el escritorio");
   };
 
   const handleAddOleadaPunto = async (titulo: string) => {
@@ -1007,6 +1042,11 @@ export default function ProyectosPage() {
                   caminado.
                 </li>
                 <li>
+                  <span className="text-slate-300">Capítulo</span> — oleada cerrada. No estorba
+                  el escritorio; se consulta en Escalera. Cerrar una permite empezar otra
+                  sin perder el logro.
+                </li>
+                <li>
                   <span className="text-slate-300">Presencia</span> — vehículos sin rumbo;
                   enumeración infinita, no sube peldaños.
                 </li>
@@ -1053,6 +1093,7 @@ export default function ProyectosPage() {
                 onDelete={handleDeleteOleadaPunto}
                 onReorder={handleReorderOleadaPunto}
                 onSetPuntoProduccion={handleSetPuntoProduccion}
+                onArchivar={handleArchivarOleada}
               />
             ) : (
               <div
@@ -1333,7 +1374,8 @@ export default function ProyectosPage() {
             >
               <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
                 Próximas oleadas — no son el punto de producción ni el bloque del día.
-                Actívalas como oleada para que la conciencia tome el timón.
+                Actívalas como oleada para que la conciencia tome el timón. Si la
+                actual ya tiene camino, se cierra sola como capítulo.
               </p>
               <div className="flex gap-2 mb-3">
                 <input
@@ -1430,6 +1472,25 @@ export default function ProyectosPage() {
             </HubCollapsible>
 
             <HubCollapsible
+              title="Capítulos de oleada"
+              tint={GOLD}
+              icon={<Archive size={12} />}
+              count={oleadasArchivadas.length}
+              defaultOpen={oleadasArchivadas.length > 0 && oleadasArchivadas.length <= 3}
+              testId="hub-oleada-capitulos-wrap"
+            >
+              <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
+                Oleadas ya caminadas. No vuelven a Ideas: aquí está la estructura de
+                logro. Reabre una si quieres continuar ese rumbo.
+              </p>
+              <OleadaCapitulosPanel
+                oleadas={oleadasArchivadas}
+                tint={tint}
+                onReabrir={handleReabrirOleada}
+              />
+            </HubCollapsible>
+
+            <HubCollapsible
               title="Tu escalera — conquistados"
               tint={GOLD}
               icon={<TrendingUp size={12} />}
@@ -1457,8 +1518,8 @@ export default function ProyectosPage() {
                         <div>
                           <p className="text-[8px] text-slate-500 uppercase">
                             {pel.resumen?.timon
-                              ? `${pel.resumen.timon.horas} ${pel.resumen.timon.horas === 1 ? "hora" : "horas"} · ${formatFecha(pel.cerradoAt)} · timón`
-                              : `Peldaño ${conquistados.length - i} · ${formatFecha(pel.cerradoAt)} · ${formatTipoOrigen(pel.tipoOrigen)}`}
+                              ? `${pel.resumen.timon.horas} ${pel.resumen.timon.horas === 1 ? "hora" : "horas"} · ${formatFechaHora(pel.cerradoAt)} · timón`
+                              : `Peldaño ${conquistados.length - i} · ${formatFechaHora(pel.cerradoAt)} · ${formatTipoOrigen(pel.tipoOrigen)}`}
                           </p>
                           <p className="text-sm font-bold text-white">{pel.titulo}</p>
                         </div>
@@ -1514,6 +1575,26 @@ export default function ProyectosPage() {
                                     compact
                                   />
                                 )}
+                              {pel.resumen?.timon?.vehiculos && pel.resumen.timon.vehiculos.length > 0 ? (
+                                <ul className="space-y-0.5" data-testid={`hub-escalera-produccion-${pel.id}`}>
+                                  {pel.resumen.timon.vehiculos.map(v => (
+                                    <li
+                                      key={v.vehicleId}
+                                      className="flex items-baseline justify-between gap-2 pl-2 text-slate-400"
+                                    >
+                                      <span className="min-w-0">
+                                        <span className="truncate block">{v.titulo}</span>
+                                        <span className="text-[8px] text-slate-600">
+                                          {formatFechaHora(v.closedAt)}
+                                        </span>
+                                      </span>
+                                      <span className="tabular-nums shrink-0" style={{ color: GOLD }}>
+                                        {formatDuracionTimon(v.minutos)}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
                               {pel.resumen?.subResumen?.map((s, j) => (
                                 <p key={j} className="pl-2 text-slate-500">
                                   • {s.titulo} ({s.status})

@@ -16,7 +16,7 @@ import { resolvePuntoProduccion, type OleadaPuntoStatus } from "./oleadaPuntos";
 export type DireccionGapId = "sin_proyecto" | "sin_oleada" | "sin_foco";
 
 export type DireccionPeldanoRef = {
-  estado: "idea" | "en_curso" | "conquistado";
+  estado: "idea" | "en_curso" | "conquistado" | "archivada";
   origenSegmento?: boolean;
   oleadaPuntos?: Array<{
     id?: string;

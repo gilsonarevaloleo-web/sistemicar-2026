@@ -216,14 +216,41 @@ export function horasDeEpisodio(episodio: TimonEpisodio): TimonHoraVista[] {
   return horas;
 }
 
-/** Historia del timón: cada vehículo una vez, con su duración real. */
+export type TimonLedgerRow = {
+  vehicleId: string;
+  titulo: string;
+  minutos: number;
+  closedAt: number;
+  tipoOrigen: "tiempo" | "situacion";
+};
+
+/** Historia del timón: cada vehículo una vez, con su duración real y cuándo se hizo. */
 export function ledgerVehiculosTimon(
   episodio: TimonEpisodio | null | undefined
-): { vehicleId: string; titulo: string; minutos: number }[] {
+): TimonLedgerRow[] {
   if (!episodio) return [];
   return episodio.vehiculos
     .filter(v => v.minutos > 0)
-    .map(v => ({ vehicleId: v.vehicleId, titulo: v.titulo, minutos: v.minutos }));
+    .map(v => ({
+      vehicleId: v.vehicleId,
+      titulo: v.titulo,
+      minutos: v.minutos,
+      closedAt: v.closedAt,
+      tipoOrigen: v.tipoOrigen,
+    }));
+}
+
+/** Fecha + hora de un envío de producción, en el reloj Lima (es-PE). */
+export function formatCuandoProduccion(ts?: number | null): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("es-PE", {
+    timeZone: "America/Lima",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function formatHoraLabel(numero: number): string {

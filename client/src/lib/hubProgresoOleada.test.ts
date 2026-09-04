@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { before, beforeEach, describe, it } from "node:test";
 import {
+  addOleadaPunto,
   addPeldanoIdea,
   addProyecto,
+  archivarOleada,
   getPeldanosByProyectoLocal,
   getProyectosLocal,
   recordProgresoHubAlCerrarVehiculo,
@@ -10,7 +12,7 @@ import {
   upsertPeldanoDesdeSegmento,
   computeProyectoStats,
 } from "./proyectos.ts";
-import { buildDefaultClaridadDireccion } from "./claridadDireccion.ts";
+import { buildDefaultClaridadDireccion, getOleadaEnCurso } from "./claridadDireccion.ts";
 import type { Vehicle } from "./persistence.ts";
 
 const USER = "user_hub_progreso_test";
@@ -277,5 +279,105 @@ describe("hub progreso oleada", () => {
     assert.equal(updated?.gastoTiempo?.sellos[0]?.src, "lista_rapida");
     assert.equal(updated?.gastoTiempo?.sellos[1]?.src, "interrupt");
     assert.equal(getPeldanosByProyectoLocal(USER, p.id).filter(x => x.estado === "conquistado").length, 0);
+  });
+
+  it("archivarOleada sella el timón y deja un capítulo consultable", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "centro" });
+    const idea = await addPeldanoIdea(USER, p.id, "Casacas small");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Plomos");
+
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_cap",
+        titulo: "Coser plomo",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        destinoCierre: "peldano",
+        duracionFinal: 30,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 2, duracionMin: 30, destinoCierre: "peldano" }
+    );
+
+    const closed = await archivarOleada(USER, idea.id);
+    assert.equal(closed?.estado, "archivada");
+    assert.ok((closed?.cerradoAt ?? 0) > 0);
+    assert.equal((closed?.timonCerrados ?? []).length, 1);
+    assert.equal(closed?.timonCerrados?.[0]?.vehiculos.length, 1);
+
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(getOleadaEnCurso(all)?.id, undefined);
+    assert.equal(all.filter(x => x.estado === "idea" && x.id === idea.id).length, 0);
+    assert.ok(all.some(x => x.estado === "conquistado" && x.resumen?.timon));
+    const stats = computeProyectoStats(all);
+    assert.equal(stats.archivadas, 1);
+    const proyecto = getProyectosLocal(USER).find(x => x.id === p.id);
+    assert.equal(proyecto?.oleadaTitulo, undefined);
+  });
+
+  it("activar otra oleada archiva la que ya tenía producción y no la mezcla con ideas", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const a = await addPeldanoIdea(USER, p.id, "Oleada A");
+    const b = await addPeldanoIdea(USER, p.id, "Oleada B");
+    await setOleadaComoDireccion(USER, p.id, a.id);
+    await addOleadaPunto(USER, a.id, "Negro S");
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_a",
+        titulo: "Corte S",
+        proyectoId: p.id,
+        proyectoPeldanoId: a.id,
+        destinoCierre: "peldano",
+        duracionFinal: 20,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 20, destinoCierre: "peldano" }
+    );
+
+    await setOleadaComoDireccion(USER, p.id, b.id);
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(all.find(x => x.id === a.id)?.estado, "archivada");
+    assert.equal(all.find(x => x.id === b.id)?.estado, "en_curso");
+    assert.equal(all.filter(x => x.estado === "idea").length, 0);
+    assert.equal(getOleadaEnCurso(all)?.id, b.id);
+  });
+
+  it("activar otra oleada vacía devuelve la anterior a Ideas", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const a = await addPeldanoIdea(USER, p.id, "Borrador");
+    const b = await addPeldanoIdea(USER, p.id, "De verdad");
+    await setOleadaComoDireccion(USER, p.id, a.id);
+    await setOleadaComoDireccion(USER, p.id, b.id);
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    assert.equal(all.find(x => x.id === a.id)?.estado, "idea");
+    assert.equal(all.find(x => x.id === b.id)?.estado, "en_curso");
+  });
+
+  it("reabrir un capítulo la pone otra vez como oleada activa", async () => {
+    const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
+    const a = await addPeldanoIdea(USER, p.id, "Capítulo 1");
+    await setOleadaComoDireccion(USER, p.id, a.id);
+    await addOleadaPunto(USER, a.id, "Punto");
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_re",
+        titulo: "Turno 1",
+        proyectoId: p.id,
+        proyectoPeldanoId: a.id,
+        destinoCierre: "peldano",
+        duracionFinal: 15,
+      }),
+      { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 15, destinoCierre: "peldano" }
+    );
+    await archivarOleada(USER, a.id);
+    await setOleadaComoDireccion(USER, p.id, a.id);
+    const all = getPeldanosByProyectoLocal(USER, p.id);
+    const reabierta = all.find(x => x.id === a.id);
+    assert.equal(reabierta?.estado, "en_curso");
+    assert.equal((reabierta?.timonCerrados ?? []).length, 1);
+    assert.equal(reabierta?.timonEpisodio?.vehiculos.length ?? 0, 0);
+    assert.equal(getOleadaEnCurso(all)?.id, a.id);
   });
 });

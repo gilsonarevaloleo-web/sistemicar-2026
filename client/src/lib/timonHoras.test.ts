@@ -13,6 +13,7 @@ import {
   horasDeEpisodio,
   hydrateTimonEpisodio,
   ledgerVehiculosTimon,
+  formatCuandoProduccion,
   minutosCruceHora,
   resumenTimonDesdeEpisodio,
   formatDuracionTimon,
@@ -175,7 +176,24 @@ describe("timonHoras — historia verdadera del timón", () => {
     const ledger = ledgerVehiculosTimon(ep);
     assert.equal(ledger.length, 1);
     assert.equal(ledger[0]?.minutos, 136);
+    assert.ok((ledger[0]?.closedAt ?? 0) > 0);
     assert.equal(ep.minutosAcumulados, 136);
+  });
+
+  it("el ledger ubica fecha y hora de cada envío", () => {
+    const closedAt = Date.parse("2026-09-04T14:32:00-05:00");
+    let ep = crearTimonEpisodio("pt_xl", "Negros XL", closedAt - 30 * 60_000);
+    ep = accrueVehiculoAlTimon(ep, {
+      vehicleId: "v_am",
+      titulo: "Corte mañana",
+      minutos: 30,
+      tipoOrigen: "tiempo",
+      closedAt,
+    });
+    const ledger = ledgerVehiculosTimon(ep);
+    assert.equal(ledger[0]?.closedAt, closedAt);
+    assert.match(formatCuandoProduccion(closedAt), /14:32/);
+    assert.match(formatCuandoProduccion(closedAt), /4/);
   });
 
   it("30 min mañana + 15 min noche = 45 min con dos nombres", () => {

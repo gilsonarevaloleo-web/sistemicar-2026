@@ -38,6 +38,7 @@ import {
   createOleadaPunto,
   inferOleadaPuntoStatusFromProduccion,
   nextPuntoProduccionIdAfterDelete,
+  oleadaMereceCapitulo,
   renumberOleadaPuntos,
   resolvePuntoProduccion,
   sintonizarOleadaPunto,
@@ -71,6 +72,7 @@ export type { OleadaPunto, OleadaPuntoStatus } from "./oleadaPuntos";
 export {
   getFocoOleadaPunto,
   summarizeOleadaPuntos,
+  oleadaMereceCapitulo,
   OLEADA_PUNTO_STATUS_LABEL,
   nextOleadaPuntoStatus,
   resolvePuntoProduccion,
@@ -82,6 +84,7 @@ export {
   formatHoraLabel,
   formatHorasCerradas,
   formatDuracionTimon,
+  formatCuandoProduccion,
   horaEnCurso,
   horasDeEpisodio,
   horasCompletasDeMinutos,
@@ -91,7 +94,7 @@ export {
   trabajoMinutosReales,
 } from "./timonHoras";
 
-export type PeldanoEstado = "idea" | "en_curso" | "conquistado";
+export type PeldanoEstado = "idea" | "en_curso" | "conquistado" | "archivada";
 
 export interface ProyectoDetalleResumen {
   texto: string;
@@ -191,6 +194,11 @@ export interface ProyectoPeldano {
    * Se sella a peldaño al cambiar el punto de producción.
    */
   timonEpisodio?: TimonEpisodio;
+  /**
+   * Estancias del timón selladas al archivar (o al cambiar de oleada).
+   * El capítulo se consulta aquí; no vuelve a Ideas.
+   */
+  timonCerrados?: TimonEpisodio[];
   createdAt: number;
   updatedAt: number;
 }
@@ -554,22 +562,78 @@ export async function setOleadaComoDireccion(
       etiqueta: proyecto.etiqueta,
       focoTitulo: pel.titulo,
     });
-  // Solo demota otras oleadas/ideas en curso — nunca sombras de segmento del día
-  // (esas inundaban "Desglosar ideas" con el nombre del bloque repetido).
+  // Oleada anterior: si ya hay camino, se archiva como capítulo.
+  // Si estaba vacía, vuelve a Ideas. Nunca se tocan sombras de segmento.
   for (const p of peldanos.filter(
     x => x.estado === "en_curso" && x.id !== peldanoId && !x.origenSegmento
   )) {
-    await updatePeldano(userId, p.id, { estado: "idea" });
+    if (oleadaMereceCapitulo(p)) {
+      await archivarOleada(userId, p.id);
+    } else {
+      await updatePeldano(userId, p.id, { estado: "idea" });
+    }
   }
+  const pin = resolvePuntoProduccion(pel);
+  const reopenFromArchive = pel.estado === "archivada";
   await updatePeldano(userId, peldanoId, {
     estado: "en_curso",
     rutasMentales: claridad,
     origenSegmento: false,
+    ...(reopenFromArchive && pin
+      ? { timonEpisodio: crearTimonEpisodio(pin.id, pin.titulo) }
+      : {}),
   });
   return updateProyecto(userId, proyectoId, {
     oleadaTitulo: pel.titulo,
     claridadActiva: claridad,
   });
+}
+
+function appendTimonCerrado(
+  pel: ProyectoPeldano,
+  episodio: TimonEpisodio | null | undefined
+): TimonEpisodio[] {
+  const prev = pel.timonCerrados ?? [];
+  if (!episodio || episodioTimonVacio(episodio)) return prev;
+  if (prev.some(e => e.id === episodio.id)) return prev;
+  return [...prev, episodio];
+}
+
+/**
+ * Cierra la oleada como capítulo: sella el timón vivo, la saca del escritorio
+ * y la deja consultable. No borra el desglose ni las horas caminadas.
+ */
+export async function archivarOleada(
+  userId: string,
+  peldanoId: string,
+  opts?: { now?: number }
+): Promise<ProyectoPeldano | null> {
+  const pel = getLocalPeldanos(userId).find(p => p.id === peldanoId);
+  if (!pel) return null;
+  if (pel.origenSegmento) return pel;
+  if (pel.estado === "archivada") return pel;
+  if (pel.estado !== "en_curso" && pel.estado !== "idea") return pel;
+
+  const now = opts?.now ?? Date.now();
+  const wasActive = pel.estado === "en_curso" && !pel.origenSegmento;
+  const vivo = hydrateOleadaTimonVivo(pel);
+  await spawnPeldanoDesdeTimonEpisodio(userId, vivo);
+
+  const pin = resolvePuntoProduccion(pel);
+  const updated = await updatePeldano(userId, peldanoId, {
+    estado: "archivada",
+    cerradoAt: now,
+    timonCerrados: appendTimonCerrado(pel, vivo.timonEpisodio),
+    timonEpisodio: pin ? crearTimonEpisodio(pin.id, pin.titulo) : undefined,
+  });
+
+  if (wasActive) {
+    const proyecto = getLocalProyectos(userId).find(p => p.id === pel.proyectoId);
+    if (proyecto) {
+      await updateProyecto(userId, pel.proyectoId, { oleadaTitulo: undefined });
+    }
+  }
+  return updated;
 }
 
 export async function updateProyecto(
@@ -1795,6 +1859,7 @@ async function spawnConquistadoDesdeVehiculo(
 export function computeProyectoStats(peldanos: ProyectoPeldano[]) {
   const conquistados = peldanos.filter(p => p.estado === "conquistado");
   const ideas = peldanos.filter(p => p.estado === "idea");
+  const archivadas = peldanos.filter(p => p.estado === "archivada" && !p.origenSegmento);
   let minutos = 0;
   let profundidad: FocusBandId = "fluido";
   for (const p of conquistados) {
@@ -1804,6 +1869,7 @@ export function computeProyectoStats(peldanos: ProyectoPeldano[]) {
   return {
     conquistados: conquistados.length,
     ideas: ideas.length,
+    archivadas: archivadas.length,
     minutosTotales: minutos,
     profundidadMaxima: profundidad,
     ultimoConquistado: [...conquistados].sort((a, b) => (b.cerradoAt ?? 0) - (a.cerradoAt ?? 0))[0] ?? null,
