@@ -10,6 +10,7 @@ import {
   resolvePuntoProduccion,
   sintonizarOleadaPunto,
   sortOleadaPuntos,
+  oleadaMereceCapitulo,
 } from "./oleadaPuntos.ts";
 
 describe("oleadaPuntos — ordenamiento mental", () => {
@@ -116,6 +117,26 @@ describe("oleadaPuntos — ordenamiento mental", () => {
     assert.deepEqual(
       sortOleadaPuntos([b, a]).map(p => p.titulo),
       ["A", "B"]
+    );
+  });
+
+  it("oleadaMereceCapitulo solo si ya hay camino caminado", () => {
+    const a = createOleadaPunto("A", 1, 1);
+    assert.equal(oleadaMereceCapitulo({ oleadaPuntos: [a] }), false);
+    assert.equal(
+      oleadaMereceCapitulo({ oleadaPuntos: [{ ...a, status: "avance" }] }),
+      true
+    );
+    assert.equal(
+      oleadaMereceCapitulo({
+        oleadaPuntos: [a],
+        timonEpisodio: { minutosAcumulados: 12, vehiculos: [{}] },
+      }),
+      true
+    );
+    assert.equal(
+      oleadaMereceCapitulo({ origenSegmento: true, oleadaPuntos: [{ ...a, status: "cumplido" }] }),
+      false
     );
   });
 });

@@ -29,7 +29,7 @@ export type ClaridadProyectoRef = {
 export type ClaridadPeldanoRef = {
   id?: string;
   titulo: string;
-  estado: "idea" | "en_curso" | "conquistado";
+  estado: "idea" | "en_curso" | "conquistado" | "archivada";
   origenSegmento?: boolean;
   rutasMentales?: RutasMentalesSet;
   orden?: number;

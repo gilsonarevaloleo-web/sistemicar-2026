@@ -106,6 +106,28 @@ export function summarizeOleadaPuntos(puntos: OleadaPunto[]): {
   return out;
 }
 
+/**
+ * ¿Esta oleada ya tiene camino caminado?
+ * Si sí, al cambiar de rumbo se archiva como capítulo (no vuelve a Ideas).
+ */
+export function oleadaMereceCapitulo(oleada: {
+  origenSegmento?: boolean;
+  oleadaPuntos?: Array<{ status: OleadaPuntoStatus }>;
+  timonEpisodio?: { minutosAcumulados?: number; vehiculos?: unknown[] } | null;
+  timonCerrados?: Array<{ minutosAcumulados?: number; vehiculos?: unknown[] }>;
+}): boolean {
+  if (oleada.origenSegmento) return false;
+  const puntos = oleada.oleadaPuntos ?? [];
+  if (puntos.some(p => p.status !== "propuesta")) return true;
+  const live = oleada.timonEpisodio;
+  if ((live?.minutosAcumulados ?? 0) > 0) return true;
+  if ((live?.vehiculos?.length ?? 0) > 0) return true;
+  const cerrados = oleada.timonCerrados ?? [];
+  return cerrados.some(
+    e => (e.minutosAcumulados ?? 0) > 0 || (e.vehiculos?.length ?? 0) > 0
+  );
+}
+
 export function nextOleadaPuntoStatus(current: OleadaPuntoStatus): OleadaPuntoStatus {
   const idx = OLEADA_PUNTO_STATUS_CYCLE.indexOf(current);
   return OLEADA_PUNTO_STATUS_CYCLE[(idx + 1) % OLEADA_PUNTO_STATUS_CYCLE.length]!;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Plus, Target, Trash2 } from "lucide-react";
+import { Archive, ChevronDown, ChevronUp, Plus, Target, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   nextOleadaPuntoStatus,
@@ -10,6 +10,7 @@ import {
   type OleadaPuntoStatus,
 } from "@/lib/oleadaPuntos";
 import {
+  formatCuandoProduccion,
   formatDuracionTimon,
   formatHoraLabel,
   horaEnCurso,
@@ -31,6 +32,8 @@ type Props = {
   timonEpisodio?: TimonEpisodio | null;
   tint: string;
   disabled?: boolean;
+  /** Capítulo cerrado: se consulta, no se edita. */
+  modo?: "vivo" | "capitulo";
   pulseId?: string | null;
   pulseDir?: "up" | "down" | null;
   onAdd: (titulo: string) => Promise<void> | void;
@@ -39,6 +42,7 @@ type Props = {
   onDelete: (puntoId: string) => Promise<void> | void;
   onReorder: (puntoId: string, direction: "up" | "down") => Promise<void> | void;
   onSetPuntoProduccion: (puntoId: string) => Promise<void> | void;
+  onArchivar?: () => Promise<void> | void;
 };
 
 function PuntoTituloInput({
@@ -87,6 +91,7 @@ export function OleadaDesglosePanel({
   timonEpisodio = null,
   tint,
   disabled = false,
+  modo = "vivo",
   pulseId = null,
   pulseDir = null,
   onAdd,
@@ -95,6 +100,7 @@ export function OleadaDesglosePanel({
   onDelete,
   onReorder,
   onSetPuntoProduccion,
+  onArchivar,
 }: Props) {
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
@@ -105,10 +111,13 @@ export function OleadaDesglosePanel({
   const horaN = horaEnCurso(timonEpisodio?.minutosAcumulados ?? 0);
   const vehiculosEnTimón = timonEpisodio?.vehiculos.length ?? 0;
   const ledger = ledgerVehiculosTimon(timonEpisodio);
+  const readOnly = disabled || modo === "capitulo";
+  const desgloseCumplido =
+    summary.total > 0 && summary.cumplido + summary.fallado === summary.total;
 
   const handleAdd = async () => {
     const t = draft.trim();
-    if (!t || adding || disabled) return;
+    if (!t || adding || readOnly) return;
     setAdding(true);
     try {
       await onAdd(t);
@@ -130,12 +139,12 @@ export function OleadaDesglosePanel({
             className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5"
             style={{ color: tint }}
           >
-            <Target size={12} /> Punto de producción
+            <Target size={12} /> {modo === "capitulo" ? "Capítulo cerrado" : "Punto de producción"}
           </p>
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
-            Timón de la oleada. Suma el trabajo de cada vehículo de este punto:
-            30 min en la mañana + 15 en la noche = 45 min. Cumplir sella un
-            peldaño. Los vehículos de otro enfoque no se copian aquí.
+            {modo === "capitulo"
+              ? "Oleada ya caminada. Se consulta, no estorba el escritorio."
+              : "Timón de la oleada. Suma el trabajo de cada vehículo de este punto: 30 min en la mañana + 15 en la noche = 45 min. Cumplir sella un peldaño. Los vehículos de otro enfoque no se copian aquí."}
           </p>
         </div>
         {summary.total > 0 ? (
@@ -169,6 +178,12 @@ export function OleadaDesglosePanel({
                 {vehiculosEnTimón === 0
                   ? "Este enfoque acaba de empezar"
                   : `${formatDuracionTimon(timonEpisodio?.minutosAcumulados ?? 0)} en este timón · ${vehiculosEnTimón} vehículo${vehiculosEnTimón === 1 ? "" : "s"}`}
+                {timonEpisodio?.startedAt ? (
+                  <span className="text-slate-600">
+                    {" "}
+                    · desde {formatCuandoProduccion(timonEpisodio.startedAt)}
+                  </span>
+                ) : null}
               </p>
             </div>
             {timonEpisodio && timonEpisodio.minutosAcumulados > 0 ? (
@@ -196,8 +211,14 @@ export function OleadaDesglosePanel({
                 <li
                   key={v.vehicleId}
                   className="flex items-baseline justify-between gap-2 text-[9px] text-slate-300"
+                  data-testid={`hub-oleada-timon-ledger-${v.vehicleId}`}
                 >
-                  <span className="truncate leading-snug">{v.titulo}</span>
+                  <span className="min-w-0 leading-snug">
+                    <span className="truncate block">{v.titulo}</span>
+                    <span className="text-[8px] text-slate-500 tabular-nums">
+                      {formatCuandoProduccion(v.closedAt)}
+                    </span>
+                  </span>
                   <span className="tabular-nums shrink-0" style={{ color: tint }}>
                     {formatDuracionTimon(v.minutos)}
                   </span>
@@ -263,9 +284,10 @@ export function OleadaDesglosePanel({
                 }}
                 data-testid={`hub-oleada-punto-${p.numero}`}
               >
+                {modo !== "capitulo" ? (
                 <div className="flex flex-col gap-0.5 pt-0.5">
                   {(["up", "down"] as const).map(dir => {
-                    const disabledBtn = disabled || (dir === "up" ? idx === 0 : idx === puntos.length - 1);
+                    const disabledBtn = readOnly || (dir === "up" ? idx === 0 : idx === puntos.length - 1);
                     const on =
                       !disabledBtn &&
                       ((held?.id === p.id && held.dir === dir) ||
@@ -300,6 +322,7 @@ export function OleadaDesglosePanel({
                     );
                   })}
                 </div>
+                ) : null}
 
                 <span
                   className="text-[11px] font-black tabular-nums pt-1.5 w-4 shrink-0"
@@ -311,25 +334,38 @@ export function OleadaDesglosePanel({
                 <div className="flex-1 min-w-0 space-y-1">
                   <PuntoTituloInput
                     punto={p}
-                    disabled={disabled}
+                    disabled={readOnly}
                     onCommit={titulo => void onUpdateTitulo(p.id, titulo)}
                   />
                   <div className="flex flex-wrap items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => void onCycleStatus(p.id, nextOleadaPuntoStatus(p.status))}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
-                      style={{
-                        color,
-                        backgroundColor: `${color}14`,
-                        border: `1px solid ${color}35`,
-                      }}
-                      title="Ciclar estatus (propuesta → avance → cumplido → fallado)"
-                      data-testid={`hub-oleada-punto-status-${p.numero}`}
-                    >
-                      {OLEADA_PUNTO_STATUS_LABEL[p.status]}
-                    </button>
+                    {modo === "capitulo" ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                        style={{
+                          color,
+                          backgroundColor: `${color}14`,
+                          border: `1px solid ${color}35`,
+                        }}
+                      >
+                        {OLEADA_PUNTO_STATUS_LABEL[p.status]}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={() => void onCycleStatus(p.id, nextOleadaPuntoStatus(p.status))}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
+                        style={{
+                          color,
+                          backgroundColor: `${color}14`,
+                          border: `1px solid ${color}35`,
+                        }}
+                        title="Ciclar estatus (propuesta → avance → cumplido → fallado)"
+                        data-testid={`hub-oleada-punto-status-${p.numero}`}
+                      >
+                        {OLEADA_PUNTO_STATUS_LABEL[p.status]}
+                      </button>
+                    )}
                     {isPin ? (
                       <span
                         className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
@@ -338,10 +374,10 @@ export function OleadaDesglosePanel({
                       >
                         Timón
                       </span>
-                    ) : (
+                    ) : modo !== "capitulo" ? (
                       <button
                         type="button"
-                        disabled={disabled}
+                        disabled={readOnly}
                         onClick={() => void onSetPuntoProduccion(p.id)}
                         className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-slate-400 hover:text-white"
                         style={{ border: "1px solid rgba(255,255,255,0.12)" }}
@@ -349,13 +385,14 @@ export function OleadaDesglosePanel({
                       >
                         Producir aquí
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
+                {modo !== "capitulo" ? (
                 <button
                   type="button"
-                  disabled={disabled}
+                  disabled={readOnly}
                   onClick={() => void onDelete(p.id)}
                   className="p-1.5 text-slate-600 hover:text-red-400 shrink-0"
                   aria-label="Borrar punto"
@@ -363,16 +400,18 @@ export function OleadaDesglosePanel({
                 >
                   <Trash2 size={12} />
                 </button>
+                ) : null}
               </li>
             );
           })}
         </ul>
       )}
 
+      {modo !== "capitulo" ? (
       <div className="flex gap-1.5">
         <input
           value={draft}
-          disabled={disabled || adding}
+          disabled={readOnly || adding}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => {
             if (e.key === "Enter") {
@@ -386,7 +425,7 @@ export function OleadaDesglosePanel({
         />
         <button
           type="button"
-          disabled={disabled || adding || !draft.trim()}
+          disabled={readOnly || adding || !draft.trim()}
           onClick={() => void handleAdd()}
           className="px-2.5 rounded-lg disabled:opacity-40"
           style={{ backgroundColor: `${tint}18`, color: tint, border: `1px solid ${tint}40` }}
@@ -396,6 +435,37 @@ export function OleadaDesglosePanel({
           <Plus size={14} />
         </button>
       </div>
+      ) : null}
+
+      {modo === "vivo" && onArchivar ? (
+        <div className="space-y-1.5 pt-1">
+          {desgloseCumplido ? (
+            <p className="text-[8px] text-slate-500 leading-relaxed" data-testid="hub-oleada-lista-para-cerrar">
+              Desglose cumplido. Cerrar esta oleada la guarda como capítulo: el
+              escritorio queda libre y el camino queda para consultarlo.
+            </p>
+          ) : (
+            <p className="text-[8px] text-slate-600 leading-relaxed">
+              Cerrar la oleada no la borra. Pasa a Escalera → Capítulos, para
+              empezar otra sin perder el logro.
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => void onArchivar()}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider"
+            style={{
+              backgroundColor: desgloseCumplido ? `${tint}18` : "rgba(255,255,255,0.03)",
+              color: desgloseCumplido ? tint : "#94a3b8",
+              border: `1px solid ${desgloseCumplido ? `${tint}40` : "rgba(255,255,255,0.1)"}`,
+            }}
+            data-testid="hub-oleada-archivar"
+          >
+            <Archive size={12} /> Cerrar oleada
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
