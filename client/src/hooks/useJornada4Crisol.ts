@@ -14,9 +14,7 @@ import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
 import { runShadowTaskAsync, yieldAfterPaint } from "@/lib/desglosadorShadow";
 import { burstJornada4Tick } from "@/jornada4/jornada4Tick";
 import {
-  injectCrisolOpeningRing,
-  injectCrisolToActiveRing,
-  injectCrisolToListaLibre,
+  injectCrisolPensamiento,
   pickSituacionVehicleTarget,
 } from "@/jornada4/crisolKernel";
 import {
@@ -260,7 +258,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       }
 
       const activos = vehiclesRef.current.filter(
-        v => v.status === "activo" && v.tipoFlota === "situacion"
+        v => v.status === "activo" && v.tipoFlota === "situacion" && !v.situacionNestedPause
       );
       const preferred =
         item.origenVehiculoId
@@ -281,20 +279,12 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       }
 
       const vehicle = picked.vehicle;
-      const ruta = item.ruta ?? "ejecucion";
       const segProy = segmentoActivo?.proyectoVinculadoId;
 
-      const result =
-        ruta === "situacion_desglosador"
-          ? vehicle.situacionCronometro?.activo === true
-            ? injectCrisolToActiveRing(vehicle, item, {
-                segmentoProyectoId: segProy,
-              })
-            : injectCrisolOpeningRing(vehicle, item, {
-                segmentoHoraFin: segmentoActivo?.horaFin,
-                segmentoProyectoId: segProy,
-              })
-          : injectCrisolToListaLibre(vehicle, item);
+      const result = injectCrisolPensamiento(vehicle, item, {
+        segmentoHoraFin: segmentoActivo?.horaFin,
+        segmentoProyectoId: segProy,
+      });
 
       if (!result.ok) {
         if (result.reason === "invalid_objetivo") {

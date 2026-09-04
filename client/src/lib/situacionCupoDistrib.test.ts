@@ -490,17 +490,16 @@ describe("cerrarCronometroDeGolpe", () => {
 });
 
 describe("quitarFilaColaHaciaFoco", () => {
-  it("saca la cola y transfiere cupo al foco conservando Σ", () => {
+  it("saca la cola y NO transfiere cupo al foco", () => {
     const subs = [st("a", 10), st("b", 15), st("c", 5)];
-    const sumBefore = sumMinutosCronometroPendientes(subs);
     const r = quitarFilaColaHaciaFoco(subs, "b", "a");
     assert.equal(r.ok, true);
     if (!r.ok) return;
-    assert.equal(r.minutosAlFoco, 15);
+    assert.equal(r.minutosLiberados, 15);
     assert.equal(r.subTareas.find(s => s.id === "b"), undefined);
-    assert.equal(r.subTareas.find(s => s.id === "a")!.minutosCupo, 25);
+    assert.equal(r.subTareas.find(s => s.id === "a")!.minutosCupo, 10);
     assert.equal(r.subTareas.find(s => s.id === "c")!.minutosCupo, 5);
-    assert.equal(sumMinutosCronometroPendientes(r.subTareas), sumBefore);
+    assert.equal(sumMinutosCronometroPendientes(r.subTareas), 15);
     assert.equal(r.quitada.resultadoSituacion, "pendiente");
   });
 

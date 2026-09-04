@@ -13,8 +13,9 @@ export const RING_COPY = {
   cerrarRingGolpe: "Cerrar ring de golpe",
   anadirAlRing: "Añadir al ring de enfoque",
   sellarDirectoRing: "Sellar en ring",
-  quitarDelPlan: "Quitar",
-  quitarDelPlanHint: "El plan no cabía. Sale del ring; los minutos pasan al foco. No es un veredicto.",
+  quitarDelPlan: "Quitar de lista",
+  quitarDelPlanHint:
+    "Elimina esta fila del ring. El tiempo no se posterga ni se monta en el foco.",
   rondaLista: "Ronda lista — cierra el ring cuando quieras",
   tallerHint:
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",

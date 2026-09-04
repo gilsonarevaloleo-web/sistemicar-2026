@@ -945,7 +945,8 @@ export type QuitarFilaColaHaciaFocoResult =
   | {
       ok: true;
       subTareas: SubTarea[];
-      minutosAlFoco: number;
+      /** Minutos que salen del plan con la fila (no se montan en el foco). */
+      minutosLiberados: number;
       quitada: SubTarea;
       focusId: string;
     }
@@ -955,9 +956,9 @@ export type QuitarFilaColaHaciaFocoResult =
     };
 
 /**
- * Quita una fila de cola (no el foco): sale del plan sin veredicto.
- * Sus minutos de cupo pasan al foco. Σ de cupos pendientes se conserva.
- * No marca resultadoSituacion — no es huella de proyecto.
+ * Quita una fila de cola (no el foco): se elimina de la lista sin veredicto.
+ * El tiempo asignado se va con ella — no se posterga ni se monta en el foco.
+ * Postergar (mover a cola conservando cupo) es otra operación.
  */
 export function quitarFilaColaHaciaFoco(
   subTareas: SubTarea[],
@@ -977,11 +978,10 @@ export function quitarFilaColaHaciaFoco(
     return { ok: false, reason: "foco_no_pendiente" };
   }
 
-  const minutosAlFoco = Math.max(0, extraido.minutosCupo ?? 0);
   return {
     ok: true,
-    subTareas: transferirMinutosAlFoco(without, focusSubTareaId, minutosAlFoco),
-    minutosAlFoco,
+    subTareas: without,
+    minutosLiberados: Math.max(0, extraido.minutosCupo ?? 0),
     quitada: extraido,
     focusId: focusSubTareaId,
   };

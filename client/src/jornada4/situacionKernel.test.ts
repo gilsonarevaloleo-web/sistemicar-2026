@@ -216,7 +216,7 @@ describe("situacionKernel", () => {
     assert.equal(postergarFilaEnFocoACola(v), null);
   });
 
-  it("quitar fila de cola pasa minutos al foco y no deja veredicto", () => {
+  it("quitar fila de cola la elimina y no monta minutos en el foco", () => {
     const now = Date.now();
     const v = vehicle([
       row({ id: "r1", texto: "Foco", minutosCupo: 10 }),
@@ -227,10 +227,10 @@ describe("situacionKernel", () => {
     const patch = applySituacionQuitarFila(v, "r2", now);
     assert.ok(patch);
     assert.equal(patch!.subTareas.find(s => s.id === "r2"), undefined);
-    assert.equal(patch!.subTareas.find(s => s.id === "r1")?.minutosCupo, 18);
+    assert.equal(patch!.subTareas.find(s => s.id === "r1")?.minutosCupo, 10);
     assert.equal(patch!.subTareas.find(s => s.id === "r3")?.minutosCupo, 12);
-    assert.equal(sumMinutosCronometroPendientes(patch!.subTareas), sumBefore);
-    assert.equal(patch!.minutosAlFoco, 8);
+    assert.equal(sumMinutosCronometroPendientes(patch!.subTareas), sumBefore - 8);
+    assert.equal(patch!.minutosLiberados, 8);
     assert.equal(patch!.situacionCupoAnchor?.subTareaId, "r1");
     assert.equal(
       patch!.subTareas.some(s => s.resultadoSituacion && s.resultadoSituacion !== "pendiente"),
@@ -257,7 +257,7 @@ describe("situacionKernel", () => {
     assert.ok(lastCola);
     assert.equal(lastCola!.subTareas.length, 1);
     assert.equal(lastCola!.subTareas[0]!.id, "r1");
-    assert.equal(lastCola!.subTareas[0]!.minutosCupo, 18);
+    assert.equal(lastCola!.subTareas[0]!.minutosCupo, 10);
 
     const withClosed = vehicle([
       row({ id: "r1", texto: "Foco", minutosCupo: 10 }),

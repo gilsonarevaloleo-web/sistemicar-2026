@@ -4,6 +4,7 @@ import type { Vehicle } from "../lib/persistence.ts";
 import type { SituacionReservaItem } from "../lib/situacionReserva.ts";
 import {
   injectCrisolOpeningRing,
+  injectCrisolPensamiento,
   injectCrisolToActiveRing,
   injectCrisolToListaLibre,
   pickSituacionVehicleTarget,
@@ -150,6 +151,63 @@ describe("crisolKernel", () => {
     const { vehicle, ambiguous } = pickSituacionVehicleTarget([paused], null);
     assert.equal(ambiguous, false);
     assert.equal(vehicle, undefined);
+  });
+
+  it("ruta E a ring activo encola en el ring (visible, no taller)", () => {
+    const now = Date.now();
+    const vehicle = baseVehicle({
+      subTareas: [
+        {
+          id: "st0",
+          texto: "A",
+          completada: false,
+          creadaAt: now,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+          minutosCupo: 20,
+        },
+      ],
+      situacionCronometro: {
+        activo: true,
+        bloqueInicioAt: now,
+        horaFinMs: now + 20 * 60_000,
+        horaFinContratoMs: now + 20 * 60_000,
+        retoNumero: 1,
+        retosCompletados: 0,
+        minutosGanadosReto: 0,
+        minutosGanadosSesion: 0,
+        saldoAdelantoMin: 0,
+        depthBlockPsGranted: 0,
+      },
+      situacionCupoAnchor: { subTareaId: "st0", startedAt: now },
+    });
+    const r = injectCrisolPensamiento(vehicle, {
+      ...item,
+      ruta: "ejecucion",
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.mode, "enqueue_ring");
+    const last = r.subTareas[r.subTareas.length - 1];
+    assert.equal(last?.texto, "Pensar X");
+    assert.equal(last?.enDesgloseCronometro, true);
+    assert.ok((last?.minutosCupo ?? 0) > 0);
+    assert.equal(
+      r.subTareas.filter(s => s.enDesgloseCronometro && (s.resultadoSituacion ?? "pendiente") === "pendiente")
+        .length,
+      2
+    );
+  });
+
+  it("ruta E sin ring sigue en lista libre", () => {
+    const r = injectCrisolPensamiento(baseVehicle(), {
+      ...item,
+      ruta: "ejecucion",
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.mode, "lista_libre");
+    assert.equal(r.subTareas[0]?.enDesgloseCronometro, undefined);
   });
 
   it("abrir ring sin activo usa meta de segmento", () => {
