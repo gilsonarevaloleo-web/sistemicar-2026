@@ -1,4 +1,5 @@
 import type { Proyecto } from "@/lib/proyectos";
+import { nidoLabel } from "@/lib/nidoNaturaleza";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 
 type Props = {
@@ -115,7 +116,7 @@ export function SegmentoProyectoSelect({
         <option value="">{emptyLabel}</option>
         {proyectos.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
+            {nidoLabel(p.etiqueta)} · {p.titulo}
           </option>
         ))}
       </select>

@@ -14,7 +14,8 @@ import {
   type RutaMentalPaso,
   type RutasMentalesSet,
 } from "./claridadDireccion";
-import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
+import { resolveDestinoCierre } from "./destinoCierre";
+import { feedsEscaleraNido } from "./nidoNaturaleza";
 import { resolveDuracionMinCierre } from "./concienciaTriadaOperador";
 import {
   minutosFromSegundos,
@@ -1479,7 +1480,10 @@ export async function recordProgresoHubAlCerrarVehiculo(
 ): Promise<void> {
   const destino = resolveDestinoCierre(vehicle.destinoCierre, opts.destinoCierre);
   const proyectoId = vehicle.proyectoId;
-  const feedsHub = feedsProyectoHub(destino);
+  const etiquetaNido = proyectoId
+    ? getProyectosLocal(userId).find(p => p.id === proyectoId)?.etiqueta
+    : undefined;
+  const feedsHub = feedsEscaleraNido(destino, etiquetaNido);
   const duracionMin = resolveDuracionMinCierre(vehicle, opts.duracionMin);
   const optsConDuracion = { ...opts, duracionMin };
 

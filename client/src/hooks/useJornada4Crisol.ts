@@ -131,7 +131,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
             ? {
                 proyectoId: proy.id,
                 proyectoTitulo: proy.titulo,
-                proyectoEtiqueta: proy.etiqueta as "proyecto" | "centro" | undefined,
+                proyectoEtiqueta: proy.etiqueta,
               }
             : {}),
           ...(segmentoActivo

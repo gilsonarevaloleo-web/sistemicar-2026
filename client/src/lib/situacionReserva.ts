@@ -12,6 +12,7 @@ import { db, getPrivatePath, isFirebaseConfigured } from "./firebase";
 import { activateSovereignModeGlobal, deactivateSovereignModeGlobal, backupToLocal, restoreFromLocal } from "./sovereign-mode";
 import { emergencyPruneStorage, safeSetItem } from "./storageHygiene";
 import type { DetalleSubTarea } from "./persistence";
+import type { ProyectoEtiqueta } from "./nidoNaturaleza";
 
 export type SituacionReservaEstado = "activa" | "retomada_libre" | "retomada_cron";
 
@@ -54,7 +55,7 @@ export interface SituacionReservaItem {
   /** Nido: proyecto o centro donde aterriza el pensamiento. */
   proyectoId?: string;
   proyectoTitulo?: string;
-  proyectoEtiqueta?: "proyecto" | "centro";
+  proyectoEtiqueta?: ProyectoEtiqueta;
   /** Segmento del día en que se capturó (opcional). */
   segmentoId?: string;
   segmentoNombre?: string;
@@ -308,7 +309,7 @@ function buildFirestoreReservaPayload(
     estado: string;
     proyectoId?: string | null;
     proyectoTitulo?: string | null;
-    proyectoEtiqueta?: "proyecto" | "centro" | null;
+    proyectoEtiqueta?: ProyectoEtiqueta | null;
     segmentoId?: string | null;
     segmentoNombre?: string | null;
     rutaSeguimientoPaso?: 1 | 2 | 3 | null;

@@ -188,4 +188,25 @@ describe("sintonía oleada ↔ producción", () => {
     // keep unused var quiet
     assert.ok(oleada0);
   });
+
+  it("DESCANSO (consciencia) con rumbo no sella ni sintoniza peldaños", async () => {
+    const p = await addProyecto(USER, { titulo: "DESCANSO", etiqueta: "consciencia" });
+    const idea = await addPeldanoIdea(USER, p.id, "Noche");
+    await recordProgresoHubAlCerrarVehiculo(
+      USER,
+      vehicle({
+        id: "v_descanso",
+        titulo: "Siesta",
+        proyectoId: p.id,
+        proyectoPeldanoId: idea.id,
+        destinoCierre: "peldano",
+        duracionFinal: 30,
+        tipoFlota: "descanso",
+      }),
+      { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 30, destinoCierre: "peldano" }
+    );
+    const after = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    assert.equal(after.estado, "idea");
+    assert.equal((after.oleadaPuntos ?? []).length, 0);
+  });
 });

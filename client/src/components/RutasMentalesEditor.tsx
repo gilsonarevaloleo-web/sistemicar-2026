@@ -1,3 +1,4 @@
+import { nidoNaturaleza } from "@/lib/nidoNaturaleza";
 import type { ProyectoEtiqueta, RutaMentalId, RutasMentalesSet } from "@/lib/proyectos";
 import { RutasMentalesGrafo } from "./RutasMentalesGrafo";
 
@@ -54,9 +55,11 @@ export function RutasMentalesEditor({
             {desdeProyecto ? "Dirección de claridad (Hub)" : "Claridad de este bloque (hoy)"}
           </p>
           <p className="text-[8px] text-slate-600 mt-0.5 leading-relaxed">
-            {etiqueta === "centro"
-              ? "Centro = deber por circunstancia. Paso 1 = este bloque; 2 y 3 = cierre y handoff."
-              : "Proyecto = lo que eliges crecer. Paso 1 = este bloque; 2 y 3 = entrega y oleada."}
+            {nidoNaturaleza(etiqueta).id === "centro"
+              ? "Control = deber por circunstancia. Paso 1 = este bloque; 2 y 3 = cierre y handoff."
+              : nidoNaturaleza(etiqueta).id === "consciencia"
+                ? "Darse cuenta = información. Paso 1 = qué ves; 2 y 3 = registro, no peldaño."
+                : "Crecimiento = lo que eliges expandir. Paso 1 = este bloque; 2 y 3 = entrega y oleada."}
             {!desdeProyecto && " La rutina no guarda pasos: se leen del proyecto al cargar el día."}
           </p>
         </div>

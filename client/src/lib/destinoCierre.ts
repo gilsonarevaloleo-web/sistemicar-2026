@@ -1,7 +1,10 @@
 /**
  * Destino del cierre consciente.
  * - presencia: cubre el día / disciplina / PS — no ensucia la escalera del Hub.
- * - peldano: Dirección (Norte). Solo si el proyecto tiene oleada + punto de producción.
+ * - peldano: Dirección (Norte / rumbo). La conciencia tiene casa.
+ *
+ * Dirección ≠ crecimiento. Un nido de darse cuenta (p. ej. DESCANSO) puede
+ * recibir rumbo sin escribir peldaños. La escalera la decide `feedsEscaleraNido`.
  *
  * Por defecto: presencia. Dirección no se reclama con un clic de ego.
  */
@@ -16,7 +19,10 @@ export function resolveDestinoCierre(
   return override ?? vehicleDestino ?? DESTINO_CIERRE_DEFAULT;
 }
 
-/** Solo "peldano" escribe en Hub (pasos / escalera). */
+/**
+ * Rumbo del día (triada Dirección). No implica peldaños:
+ * un nido de consciencia recibe Dirección y no trepa.
+ */
 export function feedsProyectoHub(destino: DestinoCierre): boolean {
   return destino === "peldano";
 }
@@ -38,7 +44,7 @@ export const DESTINO_CIERRE_COPY = {
   },
   peldano: {
     label: "Dirección",
-    hint: "Solo con oleada y punto de producción. Los envíos se suman en horas del timón.",
+    hint: "Rumbo a un nido. Crecimiento y control piden oleada y punto; darse cuenta se registra sin peldaños.",
     short: "Norte",
   },
 } as const;

@@ -25,7 +25,7 @@ describe("destinoCierre", () => {
     assert.equal(feedsProyectoHub("presencia"), false);
   });
 
-  it("peldano en copy se llama Dirección — no un clic de ego", () => {
+  it("peldano en copy se llama Dirección — rumbo, no clic de ego", () => {
     assert.equal(DESTINO_CIERRE_COPY.peldano.label, "Dirección");
     assert.match(DESTINO_CIERRE_COPY.peldano.hint, /oleada/);
     assert.match(DESTINO_CIERRE_COPY.presencia.hint, /No toca el proyecto/);
