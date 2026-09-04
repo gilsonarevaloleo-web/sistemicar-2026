@@ -19,6 +19,7 @@ import {
   reservaEsEnviabeASituacion,
   type ImanProyectoOpcion,
 } from "@/lib/imanPensamientos";
+import { nidoLabel } from "@/lib/nidoNaturaleza";
 
 type Props = {
   items: SituacionReservaItem[];
@@ -303,7 +304,7 @@ function ImanPensamientosDock({
                 <option value="">Aterrizaje pendiente (presencia)</option>
                 {proyectos.map(p => (
                   <option key={p.id} value={p.id}>
-                    Nido · {p.etiqueta === "centro" ? "Centro" : "Proyecto"} · {p.titulo}
+                    Nido · {nidoLabel(p.etiqueta)} · {p.titulo}
                   </option>
                 ))}
               </select>
@@ -406,7 +407,9 @@ function ImanPensamientosDock({
                           />
                           <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 truncate flex-1">
                             Nido ·{" "}
-                            {grupo.etiqueta === "centro" ? "Centro" : grupo.nidoId === NIDO_INBOX_ID ? "" : "Proyecto"} ·{" "}
+                            {grupo.nidoId === NIDO_INBOX_ID
+                              ? ""
+                              : `${nidoLabel(grupo.etiqueta)} · `}
                             {grupo.titulo}
                           </span>
                           <span className="text-[8px] font-mono text-slate-600">{grupo.items.length}</span>

@@ -1,7 +1,9 @@
 import type { SubTarea, Vehicle } from "./persistence";
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
+import { nidoFeedsEscalera } from "./nidoNaturaleza";
 import {
   appendDecisionToPeldanoTranscript,
+  getProyectosLocal,
   registrarPasoEjecutadoEnProyecto,
   type ProyectoDecisionEnumerada,
 } from "./proyectos";
@@ -25,6 +27,12 @@ export async function syncRingDecisionToProyectoHub(
   if (!enumerated) return { pasoNumero: null };
 
   const proyectoId = sub.proyectoId?.trim() ?? vehicle.proyectoId?.trim();
+  if (
+    proyectoId &&
+    !nidoFeedsEscalera(getProyectosLocal(userId).find(p => p.id === proyectoId)?.etiqueta)
+  ) {
+    return { pasoNumero: null };
+  }
   let pasoNumero: number | null = null;
 
   if (proyectoId) {

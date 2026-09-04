@@ -30,6 +30,16 @@ describe("claridadDireccion", () => {
     assert.match(r.rutas.a.pasos[0].titulo, /debo cumplir/i);
   });
 
+  it("consciencia usa lenguaje de ver, no de trepar", () => {
+    const r = buildDefaultClaridadDireccion({
+      tituloProyecto: "DESCANSO",
+      etiqueta: "consciencia",
+      focoTitulo: "Noche",
+    });
+    assert.match(r.rutas.a.pasos[0].titulo, /viendo|darse cuenta|visible/i);
+    assert.doesNotMatch(r.rutas.a.pasos[1].titulo, /oleada|peldaño a peldaño/i);
+  });
+
   it("normalizeRutasMentales migra perfiles legacy", () => {
     const legacy = buildDefaultClaridadDireccion({
       tituloProyecto: "X",

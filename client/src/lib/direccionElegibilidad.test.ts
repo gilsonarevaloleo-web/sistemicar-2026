@@ -173,4 +173,30 @@ describe("direccionElegibilidad", () => {
     assert.equal(DIRECCION_SIN_PROYECTO.ok, false);
     assert.match(noPuedesLlegarADireccion(DIRECCION_SIN_PROYECTO), /todavía no hay un proyecto/);
   });
+
+  it("nido de darse cuenta abre Dirección sin oleada y sin peldaños", () => {
+    const gate = evaluateDireccionElegibilidad(
+      { id: "d1", titulo: "DESCANSO", etiqueta: "consciencia" },
+      []
+    );
+    assert.equal(gate.ok, true);
+    assert.equal(gate.gap, null);
+    assert.equal(gate.puntoProduccionId, undefined);
+    assert.match(gate.riesgoEnsuciar, /no sube peldaños/i);
+
+    const envio = resolveRumboTrasEnvio({ nidoProyectoId: "d1", gate });
+    assert.equal(envio.stampVehicle, true);
+    assert.equal(envio.destinoCierre, "peldano");
+    assert.equal(envio.oleadaPuntoId, undefined);
+    assert.match(envio.copy, /información|no sube peldaños/i);
+  });
+
+  it("crecimiento sigue exigiendo oleada", () => {
+    const gate = evaluateDireccionElegibilidad(
+      { id: "p1", titulo: "Costura", etiqueta: "proyecto" },
+      []
+    );
+    assert.equal(gate.ok, false);
+    assert.equal(gate.gap, "sin_oleada");
+  });
 });

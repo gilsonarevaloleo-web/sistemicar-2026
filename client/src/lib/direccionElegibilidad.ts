@@ -2,15 +2,15 @@
  * Presencia vs Dirección.
  *
  * Presencia cubre el día — siempre abierta, envío rápido, no ensucia la escalera.
- * Dirección (Norte / peldaño) no se reclama con un clic: solo abre si el proyecto
- * tiene oleada activa y un punto de producción. El punto no caduca con el día
- * ni con un cierre: los envíos se suman en horas enumeradas hasta que el operador
- * cambia el timón (esa estancia se sella como peldaño). Si no hay rumbo, el operador siente:
- * «No puedes llegar a Dirección porque todavía…»
+ * Dirección es rumbo: la conciencia tiene casa. No es sinónimo de crecimiento.
+ *
+ * Crecimiento y control: Dirección abre con oleada activa y punto de producción.
+ * Darse cuenta (p. ej. DESCANSO): el nido recibe rumbo sin oleada y sin peldaños.
  *
  * Vincular un proyectoId no es Dirección. El ego no puede comprar Norte.
  */
 import type { DestinoCierre } from "./destinoCierre";
+import { nidoRequiereOleada, nidoRiesgoEnsuciar, type ProyectoEtiqueta } from "./nidoNaturaleza";
 import { resolvePuntoProduccion, type OleadaPuntoStatus } from "./oleadaPuntos";
 
 export type DireccionGapId = "sin_proyecto" | "sin_oleada" | "sin_foco";
@@ -34,6 +34,7 @@ export type DireccionProyectoRef = {
   titulo: string;
   oleadaTitulo?: string;
   color?: string;
+  etiqueta?: ProyectoEtiqueta;
 };
 
 export type DireccionGate = {
@@ -67,9 +68,8 @@ export function noPuedesLlegarADireccion(
   return `No puedes llegar a Dirección porque ${gate.porqueTodavia}.`;
 }
 
-export function riesgoEnsuciarProyecto(titulo: string): string {
-  const name = titulo.trim() || "este proyecto";
-  return `Mandar un vehículo a «${name}» entra a la escalera. Si no es el foco, ensucia el proyecto.`;
+export function riesgoEnsuciarProyecto(titulo: string, etiqueta?: ProyectoEtiqueta): string {
+  return nidoRiesgoEnsuciar(titulo, etiqueta);
 }
 
 export function riesgoAmontonarEnPunto(puntoTitulo: string): string {
@@ -99,11 +99,22 @@ export function oleadaDeDireccion(
 }
 
 export function evaluateDireccionElegibilidad(
-  proyecto: Pick<DireccionProyectoRef, "id" | "titulo" | "color">,
+  proyecto: Pick<DireccionProyectoRef, "id" | "titulo" | "color" | "etiqueta">,
   peldanos: DireccionPeldanoRef[]
 ): DireccionGate {
   const titulo = proyecto.titulo.trim() || "Proyecto";
   const tint = proyecto.color?.trim() ? { color: proyecto.color } : {};
+  if (!nidoRequiereOleada(proyecto.etiqueta)) {
+    return {
+      proyectoId: proyecto.id,
+      titulo,
+      ...tint,
+      ok: true,
+      gap: null,
+      porqueTodavia: "",
+      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo, proyecto.etiqueta),
+    };
+  }
   const oleada = oleadaDeDireccion(peldanos);
   if (!oleada) {
     return {
@@ -113,7 +124,7 @@ export function evaluateDireccionElegibilidad(
       ok: false,
       gap: "sin_oleada",
       porqueTodavia: "todavía no hay oleada activa",
-      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo),
+      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo, proyecto.etiqueta),
     };
   }
 
@@ -126,7 +137,7 @@ export function evaluateDireccionElegibilidad(
       ok: false,
       gap: "sin_foco",
       porqueTodavia: "todavía no hay punto de producción — desglosa la oleada",
-      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo),
+      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo, proyecto.etiqueta),
     };
   }
 
@@ -156,7 +167,7 @@ export function evaluateDireccionElegibilidad(
 }
 
 export function mapDireccionGates(
-  proyectos: Array<Pick<DireccionProyectoRef, "id" | "titulo" | "color">>,
+  proyectos: Array<Pick<DireccionProyectoRef, "id" | "titulo" | "color" | "etiqueta">>,
   peldanosOf: (proyectoId: string) => DireccionPeldanoRef[]
 ): DireccionGate[] {
   return proyectos.map(p => evaluateDireccionElegibilidad(p, peldanosOf(p.id)));
