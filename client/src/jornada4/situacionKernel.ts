@@ -180,15 +180,16 @@ export type SituacionQuitarFilaResult = {
   vehicleId: string;
   subTareas: SubTarea[];
   situacionCupoAnchor: Vehicle["situacionCupoAnchor"];
-  minutosAlFoco: number;
+  /** Minutos que salen del plan (no se montan en el foco). */
+  minutosLiberados: number;
   quitadaTexto: string;
   focoTexto: string;
   quitadaId: string;
 };
 
 /**
- * Recorta el plan: saca una fila de cola (obsoleta) sin veredicto.
- * Los minutos van al foco. No deja huella de proyecto — la gestión es el recorte.
+ * Elimina una fila de cola del ring: sale de la lista, sin veredicto y sin
+ * postergar. El tiempo asignado se va con ella — no se monta en el foco.
  */
 export function applySituacionQuitarFila(
   vehicle: Vehicle,
@@ -220,7 +221,7 @@ export function applySituacionQuitarFila(
     vehicleId: vehicle.id,
     subTareas: result.subTareas,
     situacionCupoAnchor,
-    minutosAlFoco: result.minutosAlFoco,
+    minutosLiberados: result.minutosLiberados,
     quitadaTexto: result.quitada.texto,
     focoTexto: foco?.texto ?? "",
     quitadaId: result.quitada.id,

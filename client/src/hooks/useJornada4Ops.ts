@@ -1875,8 +1875,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       if (!vehicle) return;
       const patch = applySituacionQuitarFila(vehicle, subTareaId);
       if (!patch) {
-        toast.info("Quitar solo recorta la cola", {
-          description: "El foco se cierra con Cumplido, Avance o Fallado.",
+        toast.info("Quitar solo elimina filas de la cola", {
+          description: "El foco se cierra con Cumplido, Avance o Fallado. Postergar manda el foco al final.",
           style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
           duration: 2800,
         });
@@ -1888,11 +1888,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       });
       scheduleSaveLocalVehicles(vehiclesRef.current);
       toast.success(
-        patch.minutosAlFoco > 0
-          ? `Plan recortado · +${patch.minutosAlFoco} min al foco`
-          : "Plan recortado",
+        patch.minutosLiberados > 0
+          ? `Fuera de la lista · ${patch.minutosLiberados} min salen del plan`
+          : "Fuera de la lista",
         {
-          description: `«${patch.quitadaTexto}» fuera · ahora: ${patch.focoTexto}`,
+          description: `«${patch.quitadaTexto}» eliminada · foco sigue: ${patch.focoTexto}`,
           style: { backgroundColor: PIZARRA, border: `1px solid ${PLATA}`, color: PLATA },
           duration: 3200,
         }

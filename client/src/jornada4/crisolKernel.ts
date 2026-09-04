@@ -14,6 +14,7 @@ import {
   redistribuirMinutosSituacionCronometro,
   remainingCronometroBudgetMin,
   situacionFilaCronometroPendiente,
+  sumMinutosCronometroPendientes,
 } from "@/lib/situacionCupoDistrib";
 import {
   nextRetoNumero,
@@ -22,6 +23,7 @@ import {
   situacionObjetivoHoraToContratoMs,
 } from "@/lib/situacionGanancia";
 import type { SituacionReservaItem } from "@/lib/situacionReserva";
+import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { isSituacionDesglosador } from "@/jornada4/filters";
 
 export type CrisolInjectOk = {
@@ -109,17 +111,21 @@ export function injectCrisolToListaLibre(
   };
 }
 
-/** Ruta S con ring activo — encola y redistribuye cupo. */
+/** Ruta S con ring operable — encola y redistribuye cupo. */
 export function injectCrisolToActiveRing(
   vehicle: Vehicle,
   item: SituacionReservaItem,
   opts?: { segmentoProyectoId?: string }
 ): CrisolInjectResult {
-  if (!isSituacionDesglosador(vehicle) || !vehicle.subTareas) {
+  if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
     return { ok: false, reason: "no_vehicle" };
   }
   const sc = vehicle.situacionCronometro;
-  if (sc?.activo !== true) return { ok: false, reason: "ring_inactive_enqueue" };
+  const subs = vehicle.subTareas ?? [];
+  if (!ringSessionOperable(sc, subs) && sc?.activo !== true) {
+    return { ok: false, reason: "ring_inactive_enqueue" };
+  }
+  if (!sc) return { ok: false, reason: "ring_inactive_enqueue" };
 
   const nidoCrisol = item.proyectoId?.trim();
   // Crisol manda: nido del pensamiento define el rumbo del ring.
@@ -129,9 +135,13 @@ export function injectCrisolToActiveRing(
     resolveProyectoIdEnfoqueSituacion(vehicle, opts?.segmentoProyectoId);
 
   const newSub = liftToCron(subTareaFromImanItem(item), enfoqueHeredado);
-  let subTareas = [...vehicle.subTareas, newSub];
-  const budgetMin = remainingCronometroBudgetMin(sc, subTareas);
-  if (budgetMin == null) return { ok: false, reason: "invalid_budget" };
+  let subTareas = [...subs, newSub];
+  const budgetMin =
+    remainingCronometroBudgetMin(sc, subTareas) ??
+    Math.max(1, sumMinutosCronometroPendientes(subTareas));
+  if (budgetMin == null || !Number.isFinite(budgetMin)) {
+    return { ok: false, reason: "invalid_budget" };
+  }
 
   subTareas = redistribuirMinutosSituacionCronometro(subTareas, budgetMin);
 
@@ -246,4 +256,35 @@ export function injectCrisolOpeningRing(
     ...(nidoCrisol ? { proyectoId: nidoCrisol } : {}),
     mode: "open_ring",
   };
+}
+
+export type InjectCrisolPensamientoOpts = {
+  segmentoHoraFin?: string | null;
+  segmentoProyectoId?: string;
+};
+
+/**
+ * Envío Crisol → vehículo de enfoque.
+ * Si el ring está abierto (o operable), S y E encolan en el ring — la ruta E
+ * al taller de un ring no se ve en SituacionCard y el pensamiento «desaparece».
+ * Sin ring: S abre ring; E va a lista libre.
+ */
+export function injectCrisolPensamiento(
+  vehicle: Vehicle,
+  item: SituacionReservaItem,
+  opts?: InjectCrisolPensamientoOpts
+): CrisolInjectResult {
+  const ringAbierto =
+    vehicle.situacionCronometro?.activo === true || isSituacionDesglosador(vehicle);
+  if (ringAbierto) {
+    return injectCrisolToActiveRing(vehicle, item, {
+      segmentoProyectoId: opts?.segmentoProyectoId,
+    });
+  }
+
+  const ruta = item.ruta ?? "ejecucion";
+  if (ruta === "situacion_desglosador") {
+    return injectCrisolOpeningRing(vehicle, item, opts);
+  }
+  return injectCrisolToListaLibre(vehicle, item);
 }

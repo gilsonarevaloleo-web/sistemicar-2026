@@ -48,7 +48,7 @@ type Props = {
   onSustituirFoco?: (subTareaId: string) => void;
   /** Manda la fila en foco al final de la cola con sus minutos restantes. */
   onPostergarFoco?: () => void;
-  /** Recorta una fila de cola: sale del plan, minutos al foco. Sin veredicto. */
+  /** Elimina una fila de cola del ring (no posterga; el tiempo no pasa al foco). */
   onQuitarFila?: (subTareaId: string) => void;
 };
 
