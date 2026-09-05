@@ -22,6 +22,19 @@ describe("situacionLaunchSeed", () => {
     assert.equal(buildSituacionRingSeed({ filas: ["  "], minutosBloque: 20 }), null);
   });
 
+  it("conserva familia alineada si hay una fila vacía en el medio", () => {
+    const seed = buildSituacionRingSeed({
+      filas: ["cortar", "", "coser"],
+      filasSeccionTitulos: ["Armado de bolsillos", "basura", "Armado de bolsillos"],
+      minutosBloque: 20,
+    });
+    assert.ok(seed);
+    assert.equal(seed!.subTareas.length, 2);
+    assert.equal(seed!.subTareas[0]!.seccionTitulo, "Armado de bolsillos");
+    assert.equal(seed!.subTareas[1]!.texto, "coser");
+    assert.equal(seed!.subTareas[1]!.seccionTitulo, "Armado de bolsillos");
+  });
+
   it("sella modoEntrenamiento cuando se pide", () => {
     const seed = buildSituacionRingSeed({
       filas: ["A"],

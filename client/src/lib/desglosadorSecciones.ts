@@ -1,9 +1,11 @@
 /**
- * Familias (título propio) dentro de un desglosador Conquista.
+ * Familias (título propio) dentro de un desglosador.
  *
- * El reloj y el kernel siguen planos: una misión, unidades hoja.
+ * Conquista: el reloj sigue plano (una misión, unidades hoja).
+ * Enfoque: el ring sigue plano (un bloque, cupo por fila).
  * La familia solo agrupa visualmente cuando un lote no sale del título
- * de la misión (ej. «Armado de bolsillos» dentro de «Primera etapa»).
+ * (ej. «Armado de bolsillos» dentro de «Primera etapa»).
+ * No sustituye `detalles` de una fila situacional.
  */
 
 export function normalizeSeccionTitulo(raw?: string | null): string | null {

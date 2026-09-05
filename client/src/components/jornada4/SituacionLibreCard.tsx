@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Plus, TrendingUp, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
+import {
+  groupSubsBySeccion,
+  lastSeccionTitulo,
+} from "@/lib/desglosadorSecciones";
 import type { DestinoCierre } from "@/lib/destinoCierre";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
@@ -19,7 +23,7 @@ type Props = {
   onFallado: (subTareaId: string) => void;
   onCerrar: () => void;
   onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
-  onAddFila: (texto: string) => void;
+  onAddFila: (texto: string, seccionTitulo?: string) => void;
 };
 
 /**
@@ -36,7 +40,10 @@ export function SituacionLibreCard({
   onAddFila,
 }: Props) {
   const [draft, setDraft] = useState("");
+  const [draftSeccion, setDraftSeccion] = useState("");
   const rows = vehicle.subTareas ?? [];
+  const seccionGroups = useMemo(() => groupSubsBySeccion(rows), [rows]);
+  const familiaActiva = lastSeccionTitulo(rows);
   const pending = rows.filter(
     r => (r.resultadoSituacion ?? (r.completada ? "cumplido" : "pendiente")) === "pendiente"
   );
@@ -46,8 +53,9 @@ export function SituacionLibreCard({
   const add = () => {
     const t = draft.trim();
     if (!t) return;
-    onAddFila(t);
+    onAddFila(t, draftSeccion.trim() || undefined);
     setDraft("");
+    if (!draftSeccion.trim()) setDraftSeccion(familiaActiva ?? "");
   };
 
   return (
@@ -84,7 +92,24 @@ export function SituacionLibreCard({
         </div>
 
         <div className="space-y-1.5" data-testid="j4-situacion-libre-rows">
-          {rows.map((row, idx) => {
+          {seccionGroups.map(group => (
+            <div
+              key={`${group.seccion ?? "__lista"}-${group.items[0]?.id ?? "x"}`}
+              className="space-y-1.5"
+            >
+              {group.seccion ? (
+                <p
+                  className="text-[8px] font-black uppercase tracking-widest px-1"
+                  style={{ color: "#D4AF37" }}
+                  data-testid="j4-libre-familia-header"
+                >
+                  {group.seccion}
+                  <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
+                    · título propio
+                  </span>
+                </p>
+              ) : null}
+          {group.items.map(row => {
             const resultado =
               row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
             const isDone = resultado === "cumplido";
@@ -114,13 +139,13 @@ export function SituacionLibreCard({
                       color: isDone ? OK : isFail ? BAD : isAvance ? AMBER : flotaColor,
                     }}
                   >
-                    {isDone ? <Check size={10} /> : isFail ? <XIcon size={10} /> : isAvance ? <TrendingUp size={9} /> : idx + 1}
+                    {isDone ? <Check size={10} /> : isFail ? <XIcon size={10} /> : isAvance ? <TrendingUp size={9} /> : rows.findIndex(r => r.id === row.id) + 1}
                   </span>
                   <p
                     className="text-xs font-semibold flex-1 truncate"
                     style={{ color: isPending ? INK : MUTED }}
                   >
-                    {row.texto || `Fila ${idx + 1}`}
+                    {row.texto || `Fila ${rows.findIndex(r => r.id === row.id) + 1}`}
                   </p>
                 </div>
                 {isPending ? (
@@ -158,8 +183,22 @@ export function SituacionLibreCard({
               </div>
             );
           })}
+            </div>
+          ))}
         </div>
 
+        <div className="space-y-1.5">
+          <input
+            value={draftSeccion}
+            onChange={e => setDraftSeccion(e.target.value)}
+            placeholder="Familia / título propio (vacío = sin familia)"
+            className="w-full p-2.5 rounded-xl bg-black/40 border text-sm focus:outline-none"
+            style={{
+              color: INK,
+              borderColor: draftSeccion.trim() ? "#D4AF37" : "rgba(255,255,255,0.12)",
+            }}
+            data-testid="j4-libre-add-seccion"
+          />
         <div className="flex gap-2">
           <input
             value={draft}
@@ -189,6 +228,7 @@ export function SituacionLibreCard({
           >
             <Plus size={14} />
           </button>
+        </div>
         </div>
 
         {allDone || rows.length > 0 ? (

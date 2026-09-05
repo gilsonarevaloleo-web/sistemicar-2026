@@ -1204,6 +1204,8 @@ export type SellarDirectoEnRingOpts = {
   proyectoIdNuevaSub?: string;
   enfoqueHeredado?: string;
   segProyectoVinculadoId?: string;
+  /** Familia con título propio; no altera cupo ni ancla. */
+  seccionTitulo?: string;
 };
 
 export type SellarDirectoEnRingResult =
@@ -1238,6 +1240,7 @@ export function buildSellarDirectoEnRingState(
     sc.proyectoEnfoqueId?.trim() ||
     opts?.segProyectoVinculadoId?.trim();
 
+  const seccionTitulo = opts?.seccionTitulo?.trim() || undefined;
   const newSubRaw: SubTarea = {
     id: newSubId,
     texto: trimmed,
@@ -1246,6 +1249,7 @@ export function buildSellarDirectoEnRingState(
     enDesgloseCronometro: true,
     resultadoSituacion: "pendiente",
     ...(opts?.proyectoIdNuevaSub ? { proyectoId: opts.proyectoIdNuevaSub } : {}),
+    ...(seccionTitulo ? { seccionTitulo } : {}),
   };
   const newSub = aplicarProyectoHeredadoASub(newSubRaw, enfoqueHeredado);
 

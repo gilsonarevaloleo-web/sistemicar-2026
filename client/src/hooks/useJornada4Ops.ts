@@ -1001,7 +1001,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const addSituacionFila = useCallback(
-    async (vehicleId: string, texto: string) => {
+    async (vehicleId: string, texto: string, seccionTitulo?: string) => {
       if (!userId) return;
       const key = `sellar:${vehicleId}`;
       if (inFlightRef.current.has(key)) return;
@@ -1009,7 +1009,9 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionDesglosador(vehicle)) return;
-        const result = buildSellarDirectoEnRingState(vehicle, texto);
+        const result = buildSellarDirectoEnRingState(vehicle, texto, {
+          seccionTitulo,
+        });
         if (!result.ok) {
           toast.error(
             result.reason === "empty_text"
@@ -1320,7 +1322,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const addSituacionLibreFila = useCallback(
-    async (vehicleId: string, texto: string) => {
+    async (vehicleId: string, texto: string, seccionTitulo?: string) => {
       if (!userId) return;
       const trimmed = texto.trim();
       if (!trimmed) return;
@@ -1331,6 +1333,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle)) return;
         const now = Date.now();
+        const familia = seccionTitulo?.trim() || undefined;
         const row: SubTarea = {
           id: `st_j4_libre_${now}`,
           texto: trimmed,
@@ -1338,6 +1341,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           creadaAt: now,
           enDesgloseCronometro: false,
           resultadoSituacion: "pendiente",
+          ...(familia ? { seccionTitulo: familia } : {}),
         };
         const subTareas = [...(vehicle.subTareas ?? []), row];
         paintVehicle(vehicleId, { subTareas });

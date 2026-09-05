@@ -528,6 +528,13 @@ export interface SubTarea {
   rutaSeguimientoPaso?: 1 | 2 | 3;
   /** Número correlativo en el proyecto al cumplir (anti-miopía). */
   pasoEjecutadoNumero?: number;
+  /**
+   * Familia con título propio dentro del mismo bloque de Enfoque.
+   * Vacío = la fila sale del título del ring/lista.
+   * No es un ring anidado: el cupo sigue siendo por fila.
+   * No sustituye `detalles` (divisiones internas de UNA fila).
+   */
+  seccionTitulo?: string;
 }
 
 export interface SubVehiculo {

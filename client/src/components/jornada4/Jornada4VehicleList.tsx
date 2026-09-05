@@ -44,7 +44,11 @@ type Ops = {
     status: "cumplido" | "fallado" | "avance"
   ) => Promise<void>;
   closeSituacionLibreBloque: (vehicleId: string) => Promise<void>;
-  addSituacionLibreFila: (vehicleId: string, texto: string) => Promise<void>;
+  addSituacionLibreFila: (
+    vehicleId: string,
+    texto: string,
+    seccionTitulo?: string
+  ) => Promise<void>;
   addConquistaSub: (
     vehicleId: string,
     form: {
@@ -54,7 +58,11 @@ type Ops = {
       seccionTitulo?: string;
     }
   ) => Promise<void>;
-  addSituacionFila: (vehicleId: string, texto: string) => Promise<void>;
+  addSituacionFila: (
+    vehicleId: string,
+    texto: string,
+    seccionTitulo?: string
+  ) => Promise<void>;
   setSituacionCupo: (
     vehicleId: string,
     subTareaId: string,
@@ -195,7 +203,9 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onDestinoChange={(destino, proyectoId) =>
                       ops.setDestinoCierre(v.id, destino, proyectoId)
                     }
-                    onAddFila={texto => void ops.addSituacionFila(v.id, texto)}
+                    onAddFila={(texto, seccion) =>
+                      void ops.addSituacionFila(v.id, texto, seccion)
+                    }
                     onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
                     onReorderFilas={(movedId, direction) =>
                       ops.reorderSituacionFilas(v.id, movedId, direction)
@@ -222,7 +232,9 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onDestinoChange={(destino, proyectoId) =>
                       ops.setDestinoCierre(v.id, destino, proyectoId)
                     }
-                    onAddFila={texto => void ops.addSituacionLibreFila(v.id, texto)}
+                    onAddFila={(texto, seccion) =>
+                      void ops.addSituacionLibreFila(v.id, texto, seccion)
+                    }
                   />
                 );
               }

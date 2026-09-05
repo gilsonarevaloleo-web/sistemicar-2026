@@ -30,6 +30,8 @@ export type Jornada4LaunchForm = FlotaLaunchForm & {
   situacionFilas?: string[];
   /** Dirección por fila situacional (paralelo a situacionFilas). */
   situacionFilasProyectoIds?: Array<string | undefined>;
+  /** Familia / título propio por fila (paralelo a situacionFilas). */
+  situacionFilasSeccionTitulos?: Array<string | undefined>;
   /** @deprecated Preferir situacionObjetivoHora (HH:mm). */
   situacionMinutosBloque?: number;
   /** Hora de término del ring (HH:mm) — no minutos ciegos. */
@@ -78,6 +80,7 @@ export async function executeJornada4Launch(
   const {
     situacionFilas,
     situacionFilasProyectoIds,
+    situacionFilasSeccionTitulos,
     situacionMinutosBloque,
     situacionObjetivoHora,
     tareasIndependientes,
@@ -238,6 +241,7 @@ export async function executeJornada4Launch(
     const seed = buildSituacionRingSeed({
       filas: situacionFilas ?? [],
       filasProyectoIds: situacionFilasProyectoIds,
+      filasSeccionTitulos: situacionFilasSeccionTitulos,
       minutosBloque,
       now,
       horaFinMs: contratoMs ?? undefined,
@@ -261,6 +265,7 @@ export async function executeJornada4Launch(
     const seed = buildSituacionLibreSeed({
       filas: situacionFilas ?? [],
       filasProyectoIds: situacionFilasProyectoIds,
+      filasSeccionTitulos: situacionFilasSeccionTitulos,
       proyectoEnfoqueId,
     });
     if (seed) {

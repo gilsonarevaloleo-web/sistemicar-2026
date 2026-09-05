@@ -3,6 +3,7 @@
  * Filas directas: se cumplen en cualquier orden, sin cupos ni contrato.
  */
 import type { SubTarea, Vehicle } from "../lib/persistence";
+import { normalizeSeccionTitulo } from "../lib/desglosadorSecciones";
 import { ringSessionOperable } from "../lib/ringEnfoqueReal";
 
 export type SituacionLibreSeed = {
@@ -15,26 +16,35 @@ export function buildSituacionLibreSeed(opts: {
   filas: string[];
   /** Dirección por fila (vacío = hereda default). */
   filasProyectoIds?: Array<string | undefined>;
+  /** Familia / título propio por fila (vacío = sin familia). */
+  filasSeccionTitulos?: Array<string | undefined>;
   now?: number;
   proyectoEnfoqueId?: string;
 }): SituacionLibreSeed | null {
   const now = opts.now ?? Date.now();
-  const filas = opts.filas.map(f => f.trim()).filter(Boolean);
+  const ids = opts.filasProyectoIds ?? [];
+  const secciones = opts.filasSeccionTitulos ?? [];
+  const filas = opts.filas
+    .map((f, i) => ({
+      texto: f.trim(),
+      proyectoId: ids[i]?.trim() || undefined,
+      seccionTitulo: normalizeSeccionTitulo(secciones[i]) ?? undefined,
+    }))
+    .filter(f => f.texto.length > 0);
   if (filas.length === 0) return null;
   const proyectoEnfoqueId = opts.proyectoEnfoqueId?.trim() || undefined;
-  const ids = opts.filasProyectoIds ?? [];
 
-  const subTareas: SubTarea[] = filas.map((texto, i) => {
-    const filaId = ids[i]?.trim() || undefined;
-    const proyectoId = filaId || proyectoEnfoqueId;
+  const subTareas: SubTarea[] = filas.map((fila, i) => {
+    const proyectoId = fila.proyectoId || proyectoEnfoqueId;
     return {
       id: `st_j4_libre_${now}_${i}`,
-      texto,
+      texto: fila.texto,
       completada: false,
       creadaAt: now,
       enDesgloseCronometro: false,
       resultadoSituacion: "pendiente" as const,
       ...(proyectoId ? { proyectoId } : {}),
+      ...(fila.seccionTitulo ? { seccionTitulo: fila.seccionTitulo } : {}),
     };
   });
 
