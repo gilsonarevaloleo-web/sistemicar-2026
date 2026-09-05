@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import { toast } from "sonner";
+import { useAuthContext } from "@/App";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
@@ -11,6 +12,21 @@ import {
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
+import {
+  detectLetterTrigger,
+  isEmptySituacionDraft,
+  recallSecuencia,
+  shouldAutoFillDue,
+  suggestDueLetter,
+  upsertSecuenciaAnclada,
+  type SecuenciaAnclada,
+  type SecuenciaLetra,
+} from "@/lib/secuenciaAnclada";
+import {
+  readSecuenciasAncladas,
+  writeSecuenciasAncladas,
+} from "@/lib/secuenciaAncladaStore";
+import { SecuenciaAncladaBar } from "./SecuenciaAncladaBar";
 import {
   projectDesglosadorEndFromSubs,
   projectUnitEndLabel,
@@ -143,8 +159,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const [modoEntrenamientoRing, setModoEntrenamientoRing] = useState(false);
   const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
+  const [secuenciaSlots, setSecuenciaSlots] = useState<SecuenciaAnclada[]>([]);
+  const [secuenciaLetraActiva, setSecuenciaLetraActiva] = useState<SecuenciaLetra | null>(null);
+  const [secuenciaHora, setSecuenciaHora] = useState("");
+  const [secuenciaOverwrite, setSecuenciaOverwrite] = useState<SecuenciaLetra | null>(null);
+  const dueFilledRef = useRef(false);
+  const { user } = useAuthContext();
+  const userId = user?.uid ?? "";
   const keyboardInset = useKeyboardInset();
-  const tick = useJornada4Tick(open && tipo === "tiempo");
+  const tick = useJornada4Tick(open && (tipo === "tiempo" || tipo === "situacion"));
   /** Overflow previo del body — liberar al abrir <select> nativo (evita bloqueo móvil). */
   const bodyOverflowPrevRef = useRef<string | null>(null);
   const nativePickerOpenRef = useRef(false);
@@ -219,6 +242,137 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
   }, [titulo, tipo, modo]);
 
+  useEffect(() => {
+    if (!open || !userId) {
+      if (!open) {
+        setSecuenciaSlots([]);
+        dueFilledRef.current = false;
+      }
+      return;
+    }
+    setSecuenciaSlots(readSecuenciasAncladas(userId));
+  }, [open, userId]);
+
+  const applySecuenciaRecall = useCallback(
+    (letra: SecuenciaLetra, opts?: { silent?: boolean }) => {
+      const slot = recallSecuencia(secuenciaSlots, letra);
+      if (!slot) {
+        if (!opts?.silent) {
+          toast.message(`No hay hábito ${letra}`, {
+            description: "Ancla una secuencia en esa letra primero.",
+          });
+        }
+        return;
+      }
+      setModo(slot.modo);
+      setTitulo(slot.modo === "desglose" ? slot.titulo : "");
+      const nextFilas = slot.filas.length > 0 ? [...slot.filas] : [""];
+      const nextDirs = slot.filas.map((_, i) => slot.filasProyectoIds[i] ?? "");
+      while (nextDirs.length < nextFilas.length) nextDirs.push("");
+      setFilas(nextFilas);
+      setFilasProyectoIds(nextDirs);
+      setSecuenciaLetraActiva(letra);
+      if (slot.hora) setSecuenciaHora(slot.hora);
+      setShowMissionSugs(false);
+    },
+    [secuenciaSlots]
+  );
+
+  useEffect(() => {
+    if (!open || tipo !== "situacion") return;
+    const letter =
+      detectLetterTrigger(titulo) ?? detectLetterTrigger(filas[0] ?? "");
+    if (!letter) return;
+    const t = window.setTimeout(() => applySecuenciaRecall(letter, { silent: true }), 550);
+    return () => window.clearTimeout(t);
+  }, [titulo, filas, tipo, open, applySecuenciaRecall]);
+
+  const dueLetter = useMemo(
+    () => (tipo === "situacion" && open ? suggestDueLetter(secuenciaSlots, Date.now()) : null),
+    // tick refresca la ventana ±30 min sin montar otro reloj
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [secuenciaSlots, tipo, open, tick]
+  );
+
+  useEffect(() => {
+    if (!open || tipo !== "situacion" || dueFilledRef.current) return;
+    if (!shouldAutoFillDue(isEmptySituacionDraft(titulo, filas), dueLetter)) {
+      return;
+    }
+    dueFilledRef.current = true;
+    applySecuenciaRecall(dueLetter);
+  }, [open, tipo, dueLetter, titulo, filas, applySecuenciaRecall]);
+
+  const canAnchorSecuencia =
+    tipo === "situacion" && filas.some(f => f.trim().length > 0);
+
+  const commitSecuenciaAnchor = useCallback(
+    (letra: SecuenciaLetra, overwrite: boolean) => {
+      const validFilas = filas.map(f => f.trim()).filter(Boolean);
+      const validDirs = filas
+        .map((f, i) => (f.trim() ? (filasProyectoIds[i] ?? "") : null))
+        .filter((d): d is string => d != null);
+      const result = upsertSecuenciaAnclada(
+        secuenciaSlots,
+        {
+          letra,
+          titulo: titulo.trim() || validFilas[0] || "",
+          filas: validFilas,
+          filasProyectoIds: validDirs,
+          modo,
+          hora: secuenciaHora || null,
+        },
+        { overwrite }
+      );
+      if (!result.ok) {
+        if (result.error === "slot_ocupado") {
+          setSecuenciaOverwrite(letra);
+          return;
+        }
+        toast.message("No se pudo anclar", {
+          description:
+            result.error === "secuencia_invalida"
+              ? "Necesitas al menos una fila con nombre."
+              : "Letra inválida.",
+        });
+        return;
+      }
+      const next = writeSecuenciasAncladas(userId, result.slots);
+      setSecuenciaSlots(next);
+      setSecuenciaLetraActiva(letra);
+      setSecuenciaOverwrite(null);
+      toast.message(`Hábito ${letra} anclado`, {
+        description: secuenciaHora
+          ? `Secuencia + ${secuenciaHora}. Una letra lo recuerda.`
+          : "Secuencia lista. Una letra la recuerda.",
+      });
+    },
+    [secuenciaSlots, filas, filasProyectoIds, titulo, modo, secuenciaHora, userId]
+  );
+
+  const handleAnchorLetter = useCallback(
+    (letra: SecuenciaLetra) => {
+      const occupied = recallSecuencia(secuenciaSlots, letra);
+      if (!canAnchorSecuencia) {
+        if (occupied) {
+          applySecuenciaRecall(letra);
+          return;
+        }
+        toast.message("Llena la secuencia primero", {
+          description: "Al menos una fila. Luego anclas la letra.",
+        });
+        return;
+      }
+      commitSecuenciaAnchor(letra, false);
+    },
+    [
+      secuenciaSlots,
+      canAnchorSecuencia,
+      applySecuenciaRecall,
+      commitSecuenciaAnchor,
+    ]
+  );
+
   const missionSuggestions =
     tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
       ? getDesglosadorMisionData(titulo, 5)
@@ -270,6 +424,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setActiveSubSugIdx(null);
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
+    setSecuenciaLetraActiva(null);
+    setSecuenciaHora("");
+    setSecuenciaOverwrite(null);
     setOpen(false);
   }, [segmentoHoraFin, hubPeldanoId, hubOleadaPuntoId]);
 
@@ -784,6 +941,27 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     onBeforeHubNavigate={closeBeforeHubNavigate}
                   />
 
+                  {tipo === "situacion" ? (
+                    <SecuenciaAncladaBar
+                      slots={secuenciaSlots}
+                      dueLetter={dueLetter}
+                      activeLetter={secuenciaLetraActiva}
+                      canAnchor={canAnchorSecuencia}
+                      hora={secuenciaHora}
+                      overwriteLetter={secuenciaOverwrite}
+                      onHoraChange={setSecuenciaHora}
+                      onRecall={letra => applySecuenciaRecall(letra)}
+                      onAnchorLetter={handleAnchorLetter}
+                      onConfirmOverwrite={() => {
+                        if (secuenciaOverwrite) {
+                          commitSecuenciaAnchor(secuenciaOverwrite, true);
+                        }
+                      }}
+                      onCancelOverwrite={() => setSecuenciaOverwrite(null)}
+                      onClearHora={() => setSecuenciaHora("")}
+                    />
+                  ) : null}
+
                   {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
                   {((tipo === "tiempo" &&
                     !(
@@ -819,7 +997,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         placeholder={
                           tipo === "tiempo"
                             ? "Ej: Armado de bolsillo"
-                            : "Ej: Enfoque de la tarde"
+                            : "Letra A–F o nombre (ej: Enfoque de la tarde)"
                         }
                         className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
                         style={{
@@ -897,7 +1075,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         }}
                       >
                         Lista libre: vas directo a las tareas. Sin título de misión, sin meta
-                        de ring, sin presión de tiempo. Puedes añadir más filas.
+                        de ring, sin presión de tiempo. Una letra A–F carga un hábito anclado.
                       </p>
                       <p
                         className="text-[10px] font-black uppercase tracking-wider"
