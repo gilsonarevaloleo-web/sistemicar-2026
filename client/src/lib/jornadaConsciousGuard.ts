@@ -27,7 +27,7 @@ export function hasActiveConsciousJornadaProcess(vehicles: Vehicle[]): boolean {
   });
 }
 
-/** Solo montar cierre automático en Home, sin proceso consciente corriendo. */
+/** Recordatorio de sello en Home. No sella. No interrumpe un proceso consciente. */
 export function shouldMountAutoCierreJornada(
   vehicles: Vehicle[],
   location: string

@@ -16,5 +16,6 @@ export type {
 export {
   ACCION_MINIMA,
   TEXTO_INSUFICIENTE,
+  VIRTUD_LABEL,
   VIRTUD_ORDEN_INSTALACION,
 } from "./types.ts";

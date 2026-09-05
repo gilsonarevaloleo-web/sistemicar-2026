@@ -15,6 +15,7 @@ import {
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
+import { RecintoMinimoDock } from "@/components/jornada4/RecintoMinimoDock";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
@@ -80,6 +81,16 @@ export default function JornadaV4Session() {
   >(() =>
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("sello") !== "1") return;
+    setMobileTab("metricas");
+    const t = window.setTimeout(() => {
+      setLocation("/jornada-v4", { replace: true });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [search, setLocation]);
 
   // Deep link desde Hub: /jornada-v4?proyectoId&peldanoId&oleadaPuntoId&launch=desglosador_*
   useEffect(() => {
@@ -349,6 +360,7 @@ export default function JornadaV4Session() {
               revelacion={revelacionViva}
               planEndLabel={planEnd.planEndLabel}
             />
+            <RecintoMinimoDock />
             <Jornada4LaunchPanel
               onLaunch={handleLaunch}
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}

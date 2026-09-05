@@ -601,6 +601,16 @@ export interface CierreJornadaLog {
   descansosCuerpo?: number;
   /** Escalera de Conciencia al sellar (presencia · entrada · producción). */
   escaleraConciencia?: import("./escaleraConcienciaEngine").EscaleraCierreSnapshot;
+  /** Solo el operador emite sello. El recordatorio de las 21:00 no escribe esto. */
+  selladoPor?: "operador";
+  tension?: string;
+  evidenciaHechos?: string[];
+  mandato?: string;
+  recintosCerrados?: number;
+  recintosHeredados?: number;
+  recintosAbiertos?: number;
+  vehiculosCerradosManual?: number;
+  vehiculosCerradosSistema?: number;
 }
 
 export interface Vehicle {
@@ -1819,6 +1829,18 @@ function getLocalCierres(): CierreJornadaLog[] {
   } catch { return []; }
 }
 
+export function readLocalCierresJornada(): CierreJornadaLog[] {
+  return getLocalCierres();
+}
+
+export function readLocalCierreJornadaByFecha(fecha: string): CierreJornadaLog | null {
+  return getLocalCierres().find(c => c.fecha === fecha) ?? null;
+}
+
+export function readLocalPlanilla(fecha: string): Planilla | null {
+  return getLocalPlanilla(fecha);
+}
+
 function saveLocalCierres(cierres: CierreJornadaLog[]): boolean {
   try {
     localStorage.setItem(CIERRE_JORNADA_KEY, JSON.stringify(cierres));
@@ -1871,7 +1893,7 @@ export async function getLastCierreJornada(userId: string): Promise<CierreJornad
 }
 
 export async function getTodayCierreJornada(userId: string): Promise<CierreJornadaLog | null> {
-  const today = getLimaDateString();
+  const today = getJournalDateString();
   const local = getLocalCierres().find(c => c.fecha === today);
   if (local) return local;
 

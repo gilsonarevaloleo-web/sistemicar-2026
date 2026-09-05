@@ -8,6 +8,8 @@ import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
 import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
 import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4ConcienciaTriadaCard";
+import { SelloOperadorCard } from "@/components/jornada4/SelloOperadorCard";
+import { EspejoSemanalCard } from "@/components/jornada4/EspejoSemanalCard";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { useConcienciaTriadaOperador } from "@/hooks/useConcienciaTriadaOperador";
 import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
@@ -85,6 +87,13 @@ export default function Jornada4MetricasTab({
 
   return (
     <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
+      <SelloOperadorCard
+        userId={userId}
+        segmentos={segmentos}
+        vehicles={vehicles}
+        todayPs={todayPs}
+      />
+      <EspejoSemanalCard userId={userId} />
       <Jornada4ConcienciaTriadaCard model={triadaModel} series={triadaSeries} />
       <Jornada4DisciplinaCard
         model={disciplinaModel}
