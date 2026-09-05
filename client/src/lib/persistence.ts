@@ -550,6 +550,12 @@ export interface SubVehiculo {
   /** Cierre en segmento A con solo fluido y ganancia de tiempo. */
   conquistaFluidezAbsoluta?: boolean;
   tipoSub?: "normal" | "interrupcion";
+  /**
+   * Familia con título propio dentro de la misma misión.
+   * Vacío = la unidad sale del título del desglosador.
+   * No es un desglosador anidado: el reloj sigue plano.
+   */
+  seccionTitulo?: string;
   /** Interrupciones efímeras no entran al buscador/historial IA. */
   excluirDeHistorial?: boolean;
   /** PS ya sumados a la barra diaria por este sub (evita doble conteo). */

@@ -47,7 +47,12 @@ type Ops = {
   addSituacionLibreFila: (vehicleId: string, texto: string) => Promise<void>;
   addConquistaSub: (
     vehicleId: string,
-    form: { titulo: string; cantidadObjetivo: string; tiempoRecordMinPerUnit?: number }
+    form: {
+      titulo: string;
+      cantidadObjetivo: string;
+      tiempoRecordMinPerUnit?: number;
+      seccionTitulo?: string;
+    }
   ) => Promise<void>;
   addSituacionFila: (vehicleId: string, texto: string) => Promise<void>;
   setSituacionCupo: (

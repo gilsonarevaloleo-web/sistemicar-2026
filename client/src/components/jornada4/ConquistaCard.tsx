@@ -43,6 +43,10 @@ import {
 import { projectProductsUntilMeta } from "@/jornada4/desglosadorProjection";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import type { DestinoCierre } from "@/lib/destinoCierre";
+import {
+  groupSubsBySeccion,
+  lastSeccionTitulo,
+} from "@/lib/desglosadorSecciones";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
 const OK = "#00C851";
@@ -57,6 +61,7 @@ type AddSubForm = {
   titulo: string;
   cantidadObjetivo: string;
   tiempoRecordMinPerUnit?: number;
+  seccionTitulo?: string;
 };
 
 type Props = {
@@ -129,7 +134,10 @@ export function ConquistaCard({
   const [addTitulo, setAddTitulo] = useState("");
   const [addCant, setAddCant] = useState("");
   const [addRecord, setAddRecord] = useState<number | undefined>();
+  const [addSeccion, setAddSeccion] = useState("");
   const [showAddSugs, setShowAddSugs] = useState(false);
+  const seccionGroups = useMemo(() => groupSubsBySeccion(subs), [subs]);
+  const familiaActiva = lastSeccionTitulo(subs);
   const [showPausaForm, setShowPausaForm] = useState(false);
   const [pausaTitulo, setPausaTitulo] = useState("");
   const [pausaEnviando, setPausaEnviando] = useState(false);
@@ -150,8 +158,14 @@ export function ConquistaCard({
     setAddTitulo("");
     setAddCant("");
     setAddRecord(undefined);
+    setAddSeccion("");
     setShowAdd(false);
     setShowAddSugs(false);
+  };
+
+  const openAdd = (opts?: { nuevaFamilia?: boolean }) => {
+    setAddSeccion(opts?.nuevaFamilia ? "" : familiaActiva ?? "");
+    setShowAdd(true);
   };
 
   const restanteManual = hasCantidadObj
@@ -913,7 +927,30 @@ export function ConquistaCard({
                 </button>
               ) : null}
             </div>
-            {subs.map((sv, idx) => {
+            {seccionGroups.map(group => (
+              <div
+                key={`${group.seccion ?? "__mision"}-${group.items[0]?.id ?? "x"}`}
+                className="space-y-1.5"
+                data-testid={
+                  group.seccion
+                    ? `j4-conquista-familia-${group.seccion}`
+                    : "j4-conquista-familia-mision"
+                }
+              >
+                {group.seccion ? (
+                  <p
+                    className="text-[8px] font-black uppercase tracking-widest px-1 pt-1"
+                    style={{ color: GOLD }}
+                    data-testid="j4-conquista-familia-header"
+                  >
+                    {group.seccion}
+                    <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
+                      · título propio
+                    </span>
+                  </p>
+                ) : null}
+            {group.items.map(sv => {
+              const idx = subs.findIndex(s => s.id === sv.id);
               const isActive = sv.status === "activo";
               const done = sv.status === "cumplido";
               const fail = sv.status === "fallado";
@@ -1019,24 +1056,42 @@ export function ConquistaCard({
                 </div>
               );
             })}
+              </div>
+            ))}
           </div>
         ) : null}
 
         {onAddSub && vehicle.status === "activo" && !cycleReady && !paused ? (
           <div className="pt-1" data-testid="j4-conquista-add-sub">
             {!showAdd ? (
-              <button
-                type="button"
-                onClick={() => setShowAdd(true)}
-                className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                style={{
-                  backgroundColor: "rgba(249,115,22,0.08)",
-                  color: flotaColor,
-                  border: `1px solid ${flotaColor}35`,
-                }}
-              >
-                <ListPlus size={12} /> Añadir subtarea
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => openAdd()}
+                  className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: "rgba(249,115,22,0.08)",
+                    color: flotaColor,
+                    border: `1px solid ${flotaColor}35`,
+                  }}
+                  data-testid="j4-conquista-add-sub-open"
+                >
+                  <ListPlus size={12} /> Añadir unidad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openAdd({ nuevaFamilia: true })}
+                  className="py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: "rgba(212,175,55,0.08)",
+                    color: GOLD,
+                    border: `1px solid ${GOLD}40`,
+                  }}
+                  data-testid="j4-conquista-add-familia-open"
+                >
+                  <ListPlus size={12} /> Título propio
+                </button>
+              </div>
             ) : (
               <div
                 className="rounded-2xl border-2 p-3.5 space-y-3"
@@ -1050,8 +1105,32 @@ export function ConquistaCard({
                   className="text-[11px] font-black uppercase tracking-widest"
                   style={{ color: flotaColor }}
                 >
-                  Nueva subtarea · datos
+                  Nueva unidad · datos
                 </p>
+                <div>
+                  <label
+                    className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                    style={{ color: GOLD }}
+                  >
+                    Familia / título propio
+                  </label>
+                  <input
+                    value={addSeccion}
+                    onChange={e => setAddSeccion(e.target.value)}
+                    placeholder={`Vacío = sale de «${vehicle.titulo}»`}
+                    className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-base focus:outline-none"
+                    style={{
+                      color: INK,
+                      borderColor: addSeccion.trim() ? GOLD : "rgba(255,255,255,0.14)",
+                    }}
+                    data-testid="j4-add-sub-seccion"
+                  />
+                  <p className="text-[8px] leading-snug mt-1.5" style={{ color: MUTED }}>
+                    Si el lote no sale de la misión (ej. armado de bolsillos), ponle título
+                    aquí. El reloj sigue siendo este desglosador. Rumbo del proyecto se
+                    ordena en Dirección.
+                  </p>
+                </div>
                 <div>
                   <label
                     className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
@@ -1192,6 +1271,7 @@ export function ConquistaCard({
                         titulo: addTitulo.trim(),
                         cantidadObjetivo: addCant,
                         tiempoRecordMinPerUnit: addRecord,
+                        ...(addSeccion.trim() ? { seccionTitulo: addSeccion.trim() } : {}),
                       });
                       resetAdd();
                     }}

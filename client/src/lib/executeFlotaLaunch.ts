@@ -78,6 +78,8 @@ export type DesglosadorSubFormRow = {
   tiempoRecordMinPerUnit?: number;
   /** Dirección de proyecto de esta unidad (opcional). */
   proyectoId?: string;
+  /** Familia con título propio (si la unidad no sale de la misión). */
+  seccionTitulo?: string;
 };
 
 /** `rapido` = independientes (conquista: unidades sin secuencia; enfoque: lista libre). `desglose` = desglosador/ring. */
