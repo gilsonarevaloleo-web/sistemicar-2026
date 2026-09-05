@@ -261,8 +261,9 @@ export function OleadaDesglosePanel({
 
       {puntos.length === 0 ? (
         <p className="text-[10px] text-slate-600 py-1" data-testid="hub-oleada-desglose-vacio">
-          Aún no hay puntos. Enumera el desglose (ej. color negro small). Sin punto de
-          producción, los vehículos no llegan a Dirección.
+          Aún no hay puntos. Un punto = una familia con título (panquequiar, armado
+          de bolsillos). El desglosador ejecuta las unidades de ese rumbo. Sin punto,
+          los vehículos no llegan a Dirección.
         </p>
       ) : (
         <ul className="space-y-1.5" data-testid="hub-oleada-puntos-lista">

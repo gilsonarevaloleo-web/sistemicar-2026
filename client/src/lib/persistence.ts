@@ -528,6 +528,13 @@ export interface SubTarea {
   rutaSeguimientoPaso?: 1 | 2 | 3;
   /** Número correlativo en el proyecto al cumplir (anti-miopía). */
   pasoEjecutadoNumero?: number;
+  /**
+   * Familia con título propio dentro del mismo bloque de Enfoque.
+   * Vacío = la fila sale del título del ring/lista.
+   * No es un ring anidado: el cupo sigue siendo por fila.
+   * No sustituye `detalles` (divisiones internas de UNA fila).
+   */
+  seccionTitulo?: string;
 }
 
 export interface SubVehiculo {
@@ -550,6 +557,12 @@ export interface SubVehiculo {
   /** Cierre en segmento A con solo fluido y ganancia de tiempo. */
   conquistaFluidezAbsoluta?: boolean;
   tipoSub?: "normal" | "interrupcion";
+  /**
+   * Familia con título propio dentro de la misma misión.
+   * Vacío = la unidad sale del título del desglosador.
+   * No es un desglosador anidado: el reloj sigue plano.
+   */
+  seccionTitulo?: string;
   /** Interrupciones efímeras no entran al buscador/historial IA. */
   excluirDeHistorial?: boolean;
   /** PS ya sumados a la barra diaria por este sub (evita doble conteo). */

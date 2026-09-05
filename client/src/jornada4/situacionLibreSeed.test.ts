@@ -27,6 +27,19 @@ describe("situacionLibreSeed", () => {
     assert.equal(seed!.subTareas[1]!.proyectoId, "proy-default");
   });
 
+  it("alinea familia si hay una fila vacía en el medio", () => {
+    const seed = buildSituacionLibreSeed({
+      filas: ["cortar", "", "coser"],
+      filasSeccionTitulos: ["Armado de bolsillos", "ignorar", "Armado de bolsillos"],
+      now: 3000,
+    });
+    assert.ok(seed);
+    assert.equal(seed!.subTareas.length, 2);
+    assert.equal(seed!.subTareas[0]!.seccionTitulo, "Armado de bolsillos");
+    assert.equal(seed!.subTareas[1]!.texto, "coser");
+    assert.equal(seed!.subTareas[1]!.seccionTitulo, "Armado de bolsillos");
+  });
+
   it("detecta lista libre vs ring", () => {
     const libre = {
       id: "1",

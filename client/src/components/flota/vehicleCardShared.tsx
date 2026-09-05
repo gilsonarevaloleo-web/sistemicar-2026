@@ -32,6 +32,7 @@ import {
   measureKeyFromHistoryTitulo,
   measureTituloFromHistoryTitulo,
 } from "@/lib/vehicleHistoryMeasure";
+import { normalizeSeccionTitulo } from "@/lib/desglosadorSecciones";
 
 export const GOLD = "#D4AF37";
 export const AZURE = "#1E90FF";
@@ -221,6 +222,8 @@ export type DesglosadorSubFormRow = {
   cantidadObjetivo: string;
   tiempoRecordMinPerUnit?: number;
   rutaEnfoqueActiva?: boolean;
+  /** Familia con título propio (si la unidad no sale de la misión). */
+  seccionTitulo?: string;
 };
 
 export function buildDesglosadorSubFromForm(
@@ -232,6 +235,7 @@ export function buildDesglosadorSubFromForm(
   const record = s.tiempoRecordMinPerUnit;
   const rutaEnfoque =
     resolveRutaEnfoqueForSub(cant, record, undefined, { enabled: s.rutaEnfoqueActiva !== false }) ?? undefined;
+  const seccionTitulo = normalizeSeccionTitulo(s.seccionTitulo) ?? undefined;
   return {
     id: `sv_${idSuffix}_${idx}`,
     titulo: s.titulo.trim(),
@@ -242,6 +246,7 @@ export function buildDesglosadorSubFromForm(
     tiempoSugeridoSeg:
       cant && record && cant > 0 ? Math.round(cant * record * 60) : undefined,
     rutaEnfoque,
+    ...(seccionTitulo ? { seccionTitulo } : {}),
   };
 }
 
@@ -257,6 +262,7 @@ export function buildDesglosadorSubFromRuntime(
     resolveRutaEnfoqueForSub(cant, record, undefined, { enabled: form.rutaEnfoqueActiva !== false }) ?? undefined;
   const activate = opts?.activate ?? false;
   const now = Date.now();
+  const seccionTitulo = normalizeSeccionTitulo(form.seccionTitulo) ?? undefined;
   return {
     id: `sv_${now}_${existingSubs.length}`,
     titulo: form.titulo.trim(),
@@ -267,6 +273,7 @@ export function buildDesglosadorSubFromRuntime(
     tiempoSugeridoSeg:
       cant && record && cant > 0 ? Math.round(cant * record * 60) : undefined,
     rutaEnfoque,
+    ...(seccionTitulo ? { seccionTitulo } : {}),
   };
 }
 

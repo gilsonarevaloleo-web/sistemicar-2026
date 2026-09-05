@@ -67,11 +67,12 @@ type Props = {
   hubOleadaPuntoId?: string | null;
 };
 
-function makeSub(): DesglosadorSubFormRow {
+function makeSub(seccionTitulo?: string): DesglosadorSubFormRow {
   return {
     tempId: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     titulo: "",
     cantidadObjetivo: "",
+    ...(seccionTitulo ? { seccionTitulo } : {}),
   };
 }
 
@@ -127,6 +128,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [subs, setSubs] = useState<DesglosadorSubFormRow[]>([makeSub()]);
   const [filas, setFilas] = useState<string[]>([""]);
   const [filasProyectoIds, setFilasProyectoIds] = useState<string[]>([""]);
+  const [filasSeccionTitulos, setFilasSeccionTitulos] = useState<string[]>([""]);
   const [vehiculoProyectoId, setVehiculoProyectoId] = useState("");
   const [peldanoIdLaunch, setPeldanoIdLaunch] = useState(hubPeldanoId?.trim() || "");
   const [oleadaPuntoIdLaunch, setOleadaPuntoIdLaunch] = useState(hubOleadaPuntoId?.trim() || "");
@@ -256,6 +258,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setSubs([makeSub()]);
     setFilas([""]);
     setFilasProyectoIds([""]);
+    setFilasSeccionTitulos([""]);
     setVehiculoProyectoId("");
     setPeldanoIdLaunch(hubPeldanoId?.trim() || "");
     setOleadaPuntoIdLaunch(hubOleadaPuntoId?.trim() || "");
@@ -366,6 +369,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           modo: "rapido",
           situacionFilas: filas,
           situacionFilasProyectoIds: filasProyectoIds,
+          situacionFilasSeccionTitulos: filasSeccionTitulos,
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
           ...(dirPeldano ? { peldanoId: dirPeldano } : {}),
@@ -378,6 +382,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
           modo: "desglose",
           situacionFilas: filas,
           situacionFilasProyectoIds: filasProyectoIds,
+          situacionFilasSeccionTitulos: filasSeccionTitulos,
           situacionObjetivoHora: situacionHoraFin.trim(),
           terminoDetalle,
           ...(dirVehiculo ? { proyectoId: dirVehiculo } : {}),
@@ -405,6 +410,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     subs,
     filas,
     filasProyectoIds,
+    filasSeccionTitulos,
     vehiculoProyectoId,
     peldanoIdLaunch,
     oleadaPuntoIdLaunch,
@@ -709,7 +715,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         : "Desglosador · secuencia"}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                      Misión + unidades con cantidad y récord. Al añadir 2+ unidades puedes
+                      Misión + unidades con cantidad y récord. Si un lote no sale de la
+                      misión, dale título propio (familia). Al añadir 2+ unidades puedes
                       elegir secuencia (un desglosador) o independientes.
                     </p>
                   </div>
@@ -936,6 +943,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 onClick={() => {
                                   setFilas(filas.filter((_, i) => i !== idx));
                                   setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                  setFilasSeccionTitulos(filasSeccionTitulos.filter((_, i) => i !== idx));
                                 }}
                                 className="p-2 rounded-lg hover:bg-white/5"
                               >
@@ -943,6 +951,26 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
+                          <input
+                            value={filasSeccionTitulos[idx] ?? ""}
+                            onChange={e => {
+                              setFilasSeccionTitulos(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = e.target.value;
+                                return next;
+                              });
+                            }}
+                            placeholder="Familia / título propio (vacío = sin familia)"
+                            className="w-full p-2.5 rounded-xl bg-black/50 border text-sm focus:outline-none"
+                            style={{
+                              color: INK,
+                              borderColor: (filasSeccionTitulos[idx] ?? "").trim()
+                                ? GOLD
+                                : "rgba(255,255,255,0.12)",
+                            }}
+                            data-testid={`jornada4-launch-libre-seccion-${idx}`}
+                          />
                           <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
@@ -966,8 +994,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <button
                         type="button"
                         onClick={() => {
+                          const last = [...filasSeccionTitulos].reverse().find(s => s.trim());
                           setFilas([...filas, ""]);
                           setFilasProyectoIds([...filasProyectoIds, ""]);
+                          setFilasSeccionTitulos([...filasSeccionTitulos, last ?? ""]);
                         }}
                         className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
@@ -1124,15 +1154,37 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           sub.tiempoRecordMinPerUnit
                         );
                         const showSug = activeSubSugIdx === idx && suggestions.length > 0;
+                        const seccion = sub.seccionTitulo?.trim() || "";
+                        const prevSeccion = idx > 0 ? (subs[idx - 1]?.seccionTitulo?.trim() || "") : "";
+                        const showFamiliaHeader =
+                          conquistaMultiModo === "secuencia" &&
+                          seccion.length > 0 &&
+                          seccion !== prevSeccion;
                         return (
+                          <div key={sub.tempId} className="space-y-1.5">
+                        {showFamiliaHeader ? (
+                          <p
+                            className="text-[8px] font-black uppercase tracking-widest px-1"
+                            style={{ color: GOLD }}
+                            data-testid={`jornada4-launch-familia-${idx}`}
+                          >
+                            {seccion}
+                            <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
+                              · título propio
+                            </span>
+                          </p>
+                        ) : null}
                           <div
-                            key={sub.tempId}
                             className="rounded-2xl border-2 p-3.5 space-y-3"
                             style={{
-                              borderColor: sub.titulo.trim()
-                                ? `${ORANGE}45`
-                                : "rgba(255,255,255,0.12)",
-                              backgroundColor: "rgba(249,115,22,0.06)",
+                              borderColor: seccion
+                                ? `${GOLD}45`
+                                : sub.titulo.trim()
+                                  ? `${ORANGE}45`
+                                  : "rgba(255,255,255,0.12)",
+                              backgroundColor: seccion
+                                ? "rgba(212,175,55,0.06)"
+                                : "rgba(249,115,22,0.06)",
                               boxShadow: sub.titulo.trim()
                                 ? `0 0 18px rgba(249,115,22,0.08)`
                                 : undefined,
@@ -1357,6 +1409,44 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
+                            {conquistaMultiModo === "secuencia" ? (
+                              <div>
+                                <label
+                                  className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
+                                  style={{ color: GOLD }}
+                                >
+                                  Familia / título propio
+                                </label>
+                                <input
+                                  value={sub.seccionTitulo ?? ""}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setSubs(prev =>
+                                      prev.map((s, i) =>
+                                        i === idx
+                                          ? {
+                                              ...s,
+                                              seccionTitulo: val.trim() ? val : undefined,
+                                            }
+                                          : s
+                                      )
+                                    );
+                                  }}
+                                  placeholder={
+                                    titulo.trim()
+                                      ? `Vacío = sale de «${titulo.trim()}»`
+                                      : "Vacío = sale de la misión"
+                                  }
+                                  className="w-full p-3 rounded-xl bg-black/60 border-2 text-sm focus:outline-none"
+                                  style={{
+                                    color: INK,
+                                    borderColor: seccion ? GOLD : "rgba(255,255,255,0.14)",
+                                  }}
+                                  data-testid={`jornada4-launch-sub-seccion-${idx}`}
+                                />
+                              </div>
+                            ) : null}
+
                             <DireccionDestinoPicker
                               value={sub.proyectoId ?? ""}
                               onChange={id => {
@@ -1376,6 +1466,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               locked={!canProyectos}
                               onBeforeHubNavigate={closeBeforeHubNavigate}
                             />
+                          </div>
                           </div>
                         );
                       })}
@@ -1405,18 +1496,58 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => setSubs([...subs, makeSub()])}
-                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                        style={{
-                          backgroundColor: `${ORANGE}12`,
-                          color: ORANGE,
-                          border: `1px dashed ${ORANGE}45`,
-                        }}
+                      <div
+                        className={
+                          conquistaMultiModo === "secuencia"
+                            ? "grid grid-cols-2 gap-2"
+                            : undefined
+                        }
                       >
-                        <Plus size={12} /> Añadir unidad
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const last = [...subs].reverse().find(s => s.seccionTitulo?.trim());
+                            setSubs([
+                              ...subs,
+                              makeSub(
+                                conquistaMultiModo === "secuencia"
+                                  ? last?.seccionTitulo?.trim()
+                                  : undefined
+                              ),
+                            ]);
+                          }}
+                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                          style={{
+                            backgroundColor: `${ORANGE}12`,
+                            color: ORANGE,
+                            border: `1px dashed ${ORANGE}45`,
+                          }}
+                          data-testid="jornada4-launch-add-unidad"
+                        >
+                          <Plus size={12} /> Añadir unidad
+                        </button>
+                        {conquistaMultiModo === "secuencia" ? (
+                          <button
+                            type="button"
+                            onClick={() => setSubs([...subs, makeSub()])}
+                            className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                            style={{
+                              backgroundColor: `${GOLD}12`,
+                              color: GOLD,
+                              border: `1px dashed ${GOLD}45`,
+                            }}
+                            data-testid="jornada4-launch-add-familia"
+                          >
+                            <Plus size={12} /> Título propio
+                          </button>
+                        ) : null}
+                      </div>
+                      {conquistaMultiModo === "secuencia" ? (
+                        <p className="text-[8px] leading-snug text-center" style={{ color: MUTED }}>
+                          Título propio = lote con nombre (armado de bolsillos) dentro de
+                          esta misión. El rumbo del proyecto se ordena en Dirección.
+                        </p>
+                      ) : null}
                     </div>
                   ) : tipo === "situacion" && modo === "desglose" ? (
                     <div className="space-y-3">
@@ -1505,6 +1636,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 onClick={() => {
                                   setFilas(filas.filter((_, i) => i !== idx));
                                   setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
+                                  setFilasSeccionTitulos(filasSeccionTitulos.filter((_, i) => i !== idx));
                                 }}
                                 className="p-2 rounded-lg hover:bg-white/5"
                               >
@@ -1512,6 +1644,30 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
+                          <input
+                            value={filasSeccionTitulos[idx] ?? ""}
+                            onChange={e => {
+                              setFilasSeccionTitulos(prev => {
+                                const next = [...prev];
+                                while (next.length <= idx) next.push("");
+                                next[idx] = e.target.value;
+                                return next;
+                              });
+                            }}
+                            placeholder={
+                              titulo.trim()
+                                ? `Familia · vacío = sale de «${titulo.trim()}»`
+                                : "Familia / título propio"
+                            }
+                            className="w-full p-2.5 rounded-xl bg-black/50 border text-sm focus:outline-none"
+                            style={{
+                              color: INK,
+                              borderColor: (filasSeccionTitulos[idx] ?? "").trim()
+                                ? GOLD
+                                : "rgba(255,255,255,0.12)",
+                            }}
+                            data-testid={`jornada4-launch-ring-seccion-${idx}`}
+                          />
                           <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
@@ -1532,21 +1688,48 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           />
                         </div>
                       ))}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFilas([...filas, ""]);
-                          setFilasProyectoIds([...filasProyectoIds, ""]);
-                        }}
-                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                        style={{
-                          backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
-                          color: FLOTA_CONFIG.situacion.color,
-                          border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
-                        }}
-                      >
-                        <Plus size={12} /> Añadir fila
-                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const last = [...filasSeccionTitulos].reverse().find(s => s.trim());
+                            setFilas([...filas, ""]);
+                            setFilasProyectoIds([...filasProyectoIds, ""]);
+                            setFilasSeccionTitulos([...filasSeccionTitulos, last ?? ""]);
+                          }}
+                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                          style={{
+                            backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
+                            color: FLOTA_CONFIG.situacion.color,
+                            border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
+                          }}
+                          data-testid="jornada4-launch-ring-add-fila"
+                        >
+                          <Plus size={12} /> Añadir fila
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilas([...filas, ""]);
+                            setFilasProyectoIds([...filasProyectoIds, ""]);
+                            setFilasSeccionTitulos([...filasSeccionTitulos, ""]);
+                          }}
+                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                          style={{
+                            backgroundColor: `${GOLD}12`,
+                            color: GOLD,
+                            border: `1px dashed ${GOLD}45`,
+                          }}
+                          data-testid="jornada4-launch-ring-add-familia"
+                        >
+                          <Plus size={12} /> Título propio
+                        </button>
+                      </div>
+                      <p className="text-[8px] leading-snug text-center" style={{ color: MUTED }}>
+                        Título propio agrupa filas que no salen del bloque. El cupo sigue
+                        por fila — no se anida otro ring. Divisiones de una sola fila
+                        siguen en detalles.
+                      </p>
                     </div>
                   ) : null}
                 </>

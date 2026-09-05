@@ -22,6 +22,10 @@ import {
   ENTRENAMIENTO_COPY,
   isRingModoEntrenamiento,
 } from "@/jornada4/entrenamientoRestricciones";
+import {
+  groupSubsBySeccion,
+  lastSeccionTitulo,
+} from "@/lib/desglosadorSecciones";
 import type { DestinoCierre } from "@/lib/destinoCierre";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
 
@@ -42,7 +46,7 @@ type Props = {
   onFallado: (subTareaId: string) => void;
   onCerrarBloque: () => void;
   onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
-  onAddFila: (texto: string) => void;
+  onAddFila: (texto: string, seccionTitulo?: string) => void;
   onSetCupo: (subTareaId: string, minutos: number | undefined) => void;
   onReorderFilas?: (movedId: string, direction: ReorderDirection) => void;
   onSustituirFoco?: (subTareaId: string) => void;
@@ -67,6 +71,7 @@ export function SituacionCard({
   onQuitarFila,
 }: Props) {
   const [draftFila, setDraftFila] = useState("");
+  const [draftSeccion, setDraftSeccion] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
   const [cierreEnviando, setCierreEnviando] = useState<"cumplido" | "fallado" | "avance" | "bloque" | null>(null);
   const pending = situacionPendingCronRows(vehicle);
@@ -118,11 +123,16 @@ export function SituacionCard({
     return new Map(horarios.map(h => [h.subTareaId, h]));
   }, [cronActivo, cronRows, sc, vehicle.aperturaAt, vehicle.situacionCupoAnchor, nowMs]);
 
+  const familiaActiva = lastSeccionTitulo(rows);
+  const seccionGroups = useMemo(() => groupSubsBySeccion(cronRows), [cronRows]);
+
   const sellar = () => {
     const texto = draftFila.trim();
     if (!texto || !cronActivo) return;
-    onAddFila(texto);
+    const familia = draftSeccion.trim() || undefined;
+    onAddFila(texto, familia);
     setDraftFila("");
+    if (!familia) setDraftSeccion(familiaActiva ?? "");
   };
 
   return (
@@ -245,6 +255,14 @@ export function SituacionCard({
                 </button>
               ) : null}
             </div>
+            {focus.seccionTitulo?.trim() ? (
+              <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
+                {focus.seccionTitulo.trim()}
+                <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
+                  · título propio
+                </span>
+              </p>
+            ) : null}
             <p className="text-sm font-bold" style={{ color: INK }}>
               {focus.texto}
             </p>
@@ -414,7 +432,29 @@ export function SituacionCard({
                 )}
               </div>
             </div>
-            {cronRows.map((row, idx) => {
+            {seccionGroups.map(group => (
+              <div
+                key={`${group.seccion ?? "__bloque"}-${group.items[0]?.id ?? "x"}`}
+                className="space-y-1.5"
+                data-testid={
+                  group.seccion
+                    ? `j4-situacion-familia-${group.seccion}`
+                    : "j4-situacion-familia-bloque"
+                }
+              >
+                {group.seccion ? (
+                  <p
+                    className="text-[8px] font-black uppercase tracking-widest px-1 pt-1"
+                    style={{ color: GOLD }}
+                    data-testid="j4-situacion-familia-header"
+                  >
+                    {group.seccion}
+                    <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
+                      · título propio
+                    </span>
+                  </p>
+                ) : null}
+            {group.items.map(row => {
               const isPending = situacionFilaCronometroPendiente(row);
               const pIdx = isPending ? pending.findIndex(p => p.id === row.id) : -1;
               const isFocus = focus?.id === row.id;
@@ -489,14 +529,14 @@ export function SituacionCard({
                         color: done ? OK : fail ? BAD : avance ? AMBER : isFocus ? flotaColor : MUTED,
                       }}
                     >
-                      {done ? <Check size={10} /> : fail ? <XIcon size={10} /> : avance ? <TrendingUp size={9} /> : idx + 1}
+                      {done ? <Check size={10} /> : fail ? <XIcon size={10} /> : avance ? <TrendingUp size={9} /> : cronRows.findIndex(r => r.id === row.id) + 1}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-xs font-semibold truncate"
                         style={{ color: isFocus || isPending ? INK : avance ? AMBER : MUTED }}
                       >
-                        {row.texto || `Fila ${idx + 1}`}
+                        {row.texto || `Fila ${cronRows.findIndex(r => r.id === row.id) + 1}`}
                       </p>
                       {fail && row.motivoCierre === "distraccion" ? (
                         <p className="text-[9px] font-bold mt-0.5" style={{ color: BAD }}>
@@ -636,11 +676,27 @@ export function SituacionCard({
                 </div>
               );
             })}
+              </div>
+            ))}
           </div>
         ) : null}
 
         {cronActivo ? (
-          <div className="flex gap-2" data-testid={`j4-situacion-sellar-${vehicle.id}`}>
+          <div className="space-y-1.5" data-testid={`j4-situacion-sellar-${vehicle.id}`}>
+            <input
+              type="text"
+              value={draftSeccion}
+              onChange={e => setDraftSeccion(e.target.value)}
+              placeholder={
+                vehicle.titulo?.trim()
+                  ? `Familia · vacío = sale de «${vehicle.titulo.trim()}»`
+                  : "Familia / título propio (vacío = sale del bloque)"
+              }
+              className="w-full p-2 rounded-lg bg-black/40 border text-white text-[10px] placeholder:text-slate-600 focus:outline-none"
+              style={{ borderColor: draftSeccion.trim() ? `${GOLD}55` : "rgba(255,255,255,0.12)" }}
+              data-testid={`j4-situacion-sellar-seccion-${vehicle.id}`}
+            />
+            <div className="flex gap-2">
             <input
               type="text"
               value={draftFila}
@@ -671,6 +727,7 @@ export function SituacionCard({
             >
               {RING_COPY.sellarDirectoRing}
             </button>
+            </div>
           </div>
         ) : null}
 

@@ -660,6 +660,19 @@ describe("buildSellarDirectoEnRingState", () => {
     assert.ok((sub.minutosCupo ?? 0) >= 1);
     assert.equal(r.situacionCupoAnchor?.subTareaId, "st_ring");
     assert.equal(r.situacionCupoAnchor?.startedAt, now);
+    assert.equal(sub.seccionTitulo, undefined);
+  });
+
+  it("sella familia sin cambiar cupo ni ancla", () => {
+    const r = buildSellarDirectoEnRingState(situacionVehicle(), "Cortar bolsillo", {
+      nowMs: now,
+      newSubId: "st_fam",
+      seccionTitulo: "  Armado de bolsillos  ",
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.subTareas[0]!.seccionTitulo, "Armado de bolsillos");
+    assert.ok((r.subTareas[0]!.minutosCupo ?? 0) >= 1);
   });
 
   it("conserva anchor si la fila foco sigue válida", () => {
