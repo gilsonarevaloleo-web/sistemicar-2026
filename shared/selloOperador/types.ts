@@ -49,4 +49,10 @@ export interface SelloOperadorDraft {
   vehiculosActivos: number;
 }
 
-export const HORA_RECORDATORIO_SELLO = 21;
+/** Capas de cierre. Un sello de jornada no cierra un trabajo ni un proyecto. */
+export const CAPAS_CIERRE = {
+  bloque: "Cierre de bloque — un vehículo (costura, estudio, un imprevisto).",
+  puerta: "Cierre de puerta — una franja del anillo. Puede haber varias al día.",
+  jornada: "Sello de jornada — uno. Nace cuando termina el plan (última puerta).",
+  proyecto: "Cierre de proyecto — otra escala. Vive en el Hub, no en el reloj del día.",
+} as const;

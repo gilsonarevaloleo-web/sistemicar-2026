@@ -4,9 +4,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Moon, X } from "lucide-react";
 import { useAuthContext } from "@/App";
 import { isCommercialEntryPath, isJornada4Path, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
-import { getLocalVehicles, readLocalCierreJornadaByFecha } from "@/lib/persistence";
+import {
+  getLocalVehicles,
+  readLocalCierreJornadaByFecha,
+  readLocalPlanilla,
+} from "@/lib/persistence";
 import { shouldMountAutoCierreJornada } from "@/lib/jornadaConsciousGuard";
-import { debeRecordarSello } from "@shared/selloOperador";
+import {
+  debeRecordarSello,
+  formatTerminoLabel,
+  resolveTerminoPlanMs,
+} from "@shared/selloOperador";
 import { getJournalDateString } from "@/lib/segmentTime";
 
 const GOLD = "#D4AF37";
@@ -45,6 +53,11 @@ export function CierreJornadaModal() {
     isJornada4Path(location) || isCommercialEntryPath(location);
 
   const vehicles = useMemo(() => getLocalVehicles(), [isOpen]);
+  const planEndMs = useMemo(() => {
+    const planilla = readLocalPlanilla(fecha);
+    return resolveTerminoPlanMs(planilla?.segmentos ?? [], Date.now());
+  }, [fecha, isOpen]);
+  const planEndLabel = planEndMs != null ? formatTerminoLabel(planEndMs) : null;
 
   useEffect(() => {
     if (!user || silencioRuta) return;
@@ -54,7 +67,9 @@ export function CierreJornadaModal() {
         return;
       }
       if (Date.now() < snoozeUntil()) return;
-      if (!debeRecordarSello(Date.now(), false)) return;
+      const segs = readLocalPlanilla(getJournalDateString())?.segmentos ?? [];
+      const termino = resolveTerminoPlanMs(segs, Date.now());
+      if (!debeRecordarSello(Date.now(), false, termino)) return;
       if (!shouldMountAutoCierreJornada(getLocalVehicles(), location)) return;
       setIsOpen(true);
     };
@@ -112,8 +127,9 @@ export function CierreJornadaModal() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-sm text-slate-200 leading-snug">
-                El sistema avisa. No firma. El sello solo cuenta si lo emites tú en Jornada, con
-                los números del día ya clavados.
+                {planEndLabel
+                  ? `Tu plan terminó a las ${planEndLabel}. Eso no cierra un trabajo ni un proyecto. Cierra la jornada.`
+                  : "El sistema avisa. No firma. El sello solo cuenta si lo emites tú en Jornada."}
               </p>
               {vehicles.length > 0 ? (
                 <p className="text-[11px] text-slate-500">

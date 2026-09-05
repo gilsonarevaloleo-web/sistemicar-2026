@@ -1,8 +1,4 @@
-import {
-  HORA_RECORDATORIO_SELLO,
-  type EvidenciaSelloInput,
-  type SelloOperadorDraft,
-} from "./types.ts";
+import type { EvidenciaSelloInput, SelloOperadorDraft } from "./types.ts";
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
@@ -14,17 +10,6 @@ function minLabel(n: number): string {
   const h = Math.floor(v / 60);
   const m = v % 60;
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
-}
-
-export function limaHour(nowMs: number): number {
-  const lima = new Date(nowMs - 5 * 60 * 60 * 1000);
-  return lima.getUTCHours();
-}
-
-/** Recordatorio (no sello). El sistema avisa; el operador firma. */
-export function debeRecordarSello(nowMs: number, yaSellado: boolean): boolean {
-  if (yaSellado) return false;
-  return limaHour(nowMs) >= HORA_RECORDATORIO_SELLO;
 }
 
 export function construirSelloOperador(input: EvidenciaSelloInput): SelloOperadorDraft {

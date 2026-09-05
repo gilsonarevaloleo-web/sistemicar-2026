@@ -1,8 +1,10 @@
+export { construirSelloOperador, recordatorioNoEsSello } from "./construirSello.ts";
 export {
-  construirSelloOperador,
   debeRecordarSello,
-  limaHour,
-  recordatorioNoEsSello,
-} from "./construirSello.ts";
-export { HORA_RECORDATORIO_SELLO } from "./types.ts";
+  formatTerminoLabel,
+  planYaTermino,
+  resolveTerminoPlanMs,
+} from "./terminoPlan.ts";
+export { CAPAS_CIERRE } from "./types.ts";
 export type { EvidenciaSelloInput, SelloOperadorDraft, SelladoPor } from "./types.ts";
+export type { SegmentoTermino } from "./terminoPlan.ts";

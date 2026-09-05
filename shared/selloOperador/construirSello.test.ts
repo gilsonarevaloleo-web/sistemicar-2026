@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  construirSelloOperador,
-  debeRecordarSello,
-  limaHour,
-  recordatorioNoEsSello,
-} from "./construirSello.ts";
+import { construirSelloOperador, recordatorioNoEsSello } from "./construirSello.ts";
 import type { EvidenciaSelloInput } from "./types.ts";
 
 function input(partial: Partial<EvidenciaSelloInput> = {}): EvidenciaSelloInput {
@@ -60,18 +55,3 @@ describe("construirSelloOperador", () => {
   });
 });
 
-describe("debeRecordarSello", () => {
-  it("no recuerda si ya está sellado", () => {
-    assert.equal(debeRecordarSello(Date.UTC(2026, 8, 6, 3, 0, 0), true), false);
-  });
-
-  it("recuerda desde las 21:00 Lima", () => {
-    // 21:00 Lima = 02:00 UTC del día siguiente
-    const las21 = Date.UTC(2026, 8, 6, 2, 0, 0);
-    assert.equal(limaHour(las21), 21);
-    assert.equal(debeRecordarSello(las21, false), true);
-    const las20 = Date.UTC(2026, 8, 6, 1, 0, 0);
-    assert.equal(limaHour(las20), 20);
-    assert.equal(debeRecordarSello(las20, false), false);
-  });
-});

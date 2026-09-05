@@ -9,6 +9,11 @@ import {
   type Vehicle,
 } from "@/lib/persistence";
 import { getJournalDateString } from "@/lib/segmentTime";
+import {
+  formatTerminoLabel,
+  planYaTermino,
+  resolveTerminoPlanMs,
+} from "@shared/selloOperador";
 
 const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
 
@@ -60,6 +65,9 @@ export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Prop
   const tension = sellado ? sello?.tension ?? sello?.selloTexto : draft?.tension;
   const hechos = sellado ? sello?.evidenciaHechos : draft?.evidenciaHechos;
   const mandato = sellado ? sello?.mandato : draft?.mandato;
+  const terminoMs = resolveTerminoPlanMs(segmentos, Date.now());
+  const terminoLabel = terminoMs != null ? formatTerminoLabel(terminoMs) : null;
+  const terminoLlego = planYaTermino(segmentos, Date.now());
 
   return (
     <section
@@ -75,7 +83,15 @@ export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Prop
         style={{ color: MUTED }}
       >
         <Stamp size={10} style={{ color: GOLD }} />
-        Sello del operador
+        Sello de jornada
+      </p>
+      <p className="text-[10px] leading-snug" style={{ color: MUTED }} data-testid="sello-encuadre">
+        {terminoLabel
+          ? `Término del plan: ${terminoLabel}. Un bloque (costura, estudio) se cierra aparte. Si el trabajo se alarga, mueve la última puerta.`
+          : "Sin anillo no hay término. Puedes cosechar evidencia; no hay Puerta del Término que recordar."}
+        {!sellado && terminoLabel && !terminoLlego
+          ? " El plan aún no termina. Sellar ahora corta la jornada."
+          : ""}
       </p>
       <p className="text-[12px] leading-snug" style={{ color: INK }} data-testid="sello-tension">
         {tension}
@@ -109,7 +125,7 @@ export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Prop
           style={{ backgroundColor: `${GOLD}22`, color: GOLD }}
           data-testid="sello-operador-firmar"
         >
-          {busy ? "Sellando…" : "Yo sello este día"}
+          {busy ? "Sellando…" : "Yo sello la jornada"}
         </button>
       )}
       {error ? (
