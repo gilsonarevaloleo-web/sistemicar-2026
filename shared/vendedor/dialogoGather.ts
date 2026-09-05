@@ -1,10 +1,10 @@
 /**
  * Diálogo nivel B del Vendedor Algorítmico (Twilio <Gather> DTMF).
- * Usa psicología Umbral (modoExterno) + puerta del planeta.
+ * Usa psicología Umbral (modoExterno) + puerta comercial única: Jornada Base.
  *
  * Flujo:
  *   open  → ¿Te suena el código? (1=sí / 2=no)
- *   mirror → seducción + CTA (1=quiero la puerta / 2=no)
+ *   mirror → seducción + CTA Jornada (1=quiero la puerta / 2=no)
  *   end   → cierre
  */
 
@@ -12,7 +12,11 @@ import {
   DICCIONARIO_CODIGOS,
   type CodigoNumero,
 } from "../umbral/engineConfig.ts";
-import { PLANETAS, type PlanetaId } from "./planetasConfig.ts";
+import {
+  PUERTA_COMERCIAL_VENDEDOR,
+  puertaComercialVendedor,
+  type PlanetaId,
+} from "./planetasConfig.ts";
 
 export type DialogStep = "open" | "mirror";
 
@@ -30,14 +34,8 @@ const RESPUESTA_CODIGO: Record<CodigoNumero, string> = {
   10: "No desaparecemos al cobrar. Aquí hay referente y continuidad, no un producto huérfano.",
 };
 
-const CIERRE_VOZ: Record<PlanetaId, string> = {
-  ESPEJO:
-    "Tu puerta es el Espejo: limpiezas por créditos, sin suscripción. En sistemicar punto app, pagos, plan espejo inicio.",
-  JORNADA:
-    "Tu puerta es la Jornada Base: medir unidades y cerrar el día. En sistemicar punto app, pagos, plan planificacion base.",
-  UMBRAL:
-    "Tu puerta es el Umbral: prueba el Código uno gratis en la Forja. En sistemicar punto app, umbral, entrada.",
-};
+const CIERRE_JORNADA_VOZ =
+  "Tu puerta es la Jornada Base: medir unidades y cerrar el día. En sistemicar punto app, pagos, plan planificacion base.";
 
 function cleanSpeech(text: string): string {
   return text
@@ -49,18 +47,14 @@ function cleanSpeech(text: string): string {
 
 export type DialogTurns = {
   codigo: CodigoNumero;
+  /** Planeta de grieta (diagnóstico). La venta siempre va a Jornada. */
   planeta: PlanetaId;
-  /** Pregunta 1: ¿te suena? */
+  puertaComercial: PlanetaId;
   opener: string;
-  /** Tras 1 (sí): seducción + oferta de puerta */
   mirrorSi: string;
-  /** Tras 2 (no): reencuadre suave + oferta */
   mirrorNo: string;
-  /** Tras 1 en mirror: confirma puerta */
   ctaSi: string;
-  /** Tras 2 en mirror: cierra sin presión */
   ctaNo: string;
-  /** Timeout / sin dígito */
   timeoutOpen: string;
   timeoutMirror: string;
 };
@@ -72,11 +66,11 @@ export function buildDialogTurns(
 ): DialogTurns {
   const cfg = DICCIONARIO_CODIGOS[codigo];
   const ext = cfg.modoExterno;
-  const planetaLabel = PLANETAS[planeta].label;
+  const puerta = puertaComercialVendedor();
   const frase = cleanSpeech(ext.fraseTipica);
   const arquetipo = cleanSpeech(ext.arquetipoNombre);
   const respuesta = RESPUESTA_CODIGO[codigo];
-  const cierre = CIERRE_VOZ[planeta];
+  const cierre = CIERRE_JORNADA_VOZ;
   const refNota = sellerRef
     ? ` Al pagar, menciona el referido ${sellerRef}.`
     : "";
@@ -84,6 +78,7 @@ export function buildDialogTurns(
   return {
     codigo,
     planeta,
+    puertaComercial: PUERTA_COMERCIAL_VENDEDOR,
     opener: cleanSpeech(
       [
         "Hola. Soy la vendedora de Sistemicar.",
@@ -97,7 +92,7 @@ export function buildDialogTurns(
       [
         "Bien. Entonces vamos al grano.",
         respuesta,
-        `Tu planeta de entrada es ${planetaLabel}.`,
+        `La entrada es una sola: ${puerta.label}.`,
         cierre,
         refNota,
         "Si quieres entrar ahora, marca uno. Si prefieres pensarlo, marca dos.",
@@ -109,7 +104,7 @@ export function buildDialogTurns(
       [
         "Entiendo. Aun así, el patrón que vimos apunta a este bloqueo.",
         respuesta,
-        `La puerta que te corresponde es ${planetaLabel}.`,
+        `La puerta de entrada es ${puerta.label}.`,
         cierre,
         "Marca uno si quieres la puerta. Marca dos para colgar.",
       ].join(" "),
@@ -125,12 +120,12 @@ export function buildDialogTurns(
         .join(" "),
     ),
     ctaNo: cleanSpeech(
-      "Sin presión. Si más tarde quieres, te dejamos la puerta por WhatsApp. Hasta luego.",
+      "Sin presión. Si más tarde quieres, te dejamos la Jornada Base por WhatsApp. Hasta luego.",
     ),
     timeoutOpen: cleanSpeech(
       [
         "No recibí tu marca.",
-        `Tu puerta es ${planetaLabel}.`,
+        `Tu puerta es ${puerta.label}.`,
         cierre,
         "Hasta luego.",
       ].join(" "),

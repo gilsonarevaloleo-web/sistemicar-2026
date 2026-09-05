@@ -5,7 +5,11 @@ import {
   resolverTriageVendedor,
   VENDEDOR_TRIAGE_PREGUNTAS,
 } from "./triageLogic.ts";
-import { PLANETAS, CODIGO_A_PLANETA_DEFAULT } from "./planetasConfig.ts";
+import {
+  PLANETAS,
+  CODIGO_A_PLANETA_DEFAULT,
+  PUERTA_COMERCIAL_VENDEDOR,
+} from "./planetasConfig.ts";
 
 describe("Vendedor Capa 1 — triage", () => {
   it("tiene 2 preguntas (grieta + matiz)", () => {
@@ -14,7 +18,7 @@ describe("Vendedor Capa 1 — triage", () => {
     assert.equal(VENDEDOR_TRIAGE_PREGUNTAS[1].id, "matiz");
   });
 
-  it("carga emocional → ESPEJO", () => {
+  it("carga emocional diagnostica ESPEJO pero checkout = Jornada", () => {
     const r = resolverTriageVendedor([
       { planeta: "ESPEJO", codigo: 6 },
       { planeta: "ESPEJO", codigo: 4 },
@@ -22,7 +26,9 @@ describe("Vendedor Capa 1 — triage", () => {
     assert.equal(r.planeta, "ESPEJO");
     assert.equal(r.codigo, 4);
     assert.equal(r.planetaLabel, PLANETAS.ESPEJO.label);
-    assert.match(r.checkoutHref, /espejo_inicio|espejo/);
+    assert.equal(r.puertaComercial, PUERTA_COMERCIAL_VENDEDOR);
+    assert.match(r.checkoutHref, /planificacion_base/);
+    assert.match(r.trialHref, /planificacion_base/);
   });
 
   it("tiempo → JORNADA Base", () => {
@@ -35,7 +41,7 @@ describe("Vendedor Capa 1 — triage", () => {
     assert.match(r.checkoutHref, /planificacion_base/);
   });
 
-  it("miedo a vender → UMBRAL", () => {
+  it("miedo a vender diagnostica UMBRAL pero vende Jornada", () => {
     const r = resolverTriageVendedor([
       { planeta: "UMBRAL", codigo: 1 },
       { planeta: "UMBRAL", codigo: 7 },
@@ -43,7 +49,9 @@ describe("Vendedor Capa 1 — triage", () => {
     assert.equal(r.planeta, "UMBRAL");
     assert.equal(r.codigo, 7);
     assert.ok(r.arquetipoNombre);
-    assert.match(r.trialHref, /umbral/);
+    assert.match(r.trialHref, /planificacion_base/);
+    assert.match(r.checkoutHref, /planificacion_base/);
+    assert.equal(r.puertaComercial, "JORNADA");
   });
 
   it("sin Q2 usa código de Q1", () => {

@@ -9,6 +9,8 @@ import {
 } from "../umbral/engineConfig.ts";
 import {
   PLANETAS,
+  PUERTA_COMERCIAL_VENDEDOR,
+  puertaComercialVendedor,
   type PlanetaId,
   CODIGOS_POR_PLANETA,
 } from "./planetasConfig.ts";
@@ -142,6 +144,8 @@ export interface FijacionVendedor {
   checkoutLabel: string;
   color: string;
   fijadoEn: string;
+  /** Puerta de venta activa (hoy siempre JORNADA). */
+  puertaComercial: PlanetaId;
 }
 
 export type VendedorTriagePick = Pick<
@@ -175,6 +179,8 @@ export function resolverTriageVendedor(
 
   const cfg = DICCIONARIO_CODIGOS[codigo];
   const planetaCfg = PLANETAS[planeta];
+  // Venta activa: siempre Jornada Base (código diagnostica; puerta es una).
+  const puerta = puertaComercialVendedor();
 
   return {
     codigo,
@@ -182,15 +188,15 @@ export function resolverTriageVendedor(
     nombreCodigo: cfg.nombre,
     planetaLabel: planetaCfg.label,
     grieta: planetaCfg.grieta,
-    metodoEntrada: planetaCfg.metodoEntrada,
+    metodoEntrada: puerta.metodoEntrada,
     preguntaDisparadora: cfg.modoInterno.preguntaDisparadora,
-    arquetipoNombre:
-      planeta === "UMBRAL" ? cfg.modoExterno.arquetipoNombre : null,
-    trialHref: planetaCfg.trialHref,
-    trialLabel: planetaCfg.trialLabel,
-    checkoutHref: planetaCfg.checkoutHref,
-    checkoutLabel: planetaCfg.checkoutLabel,
-    color: planetaCfg.color,
+    arquetipoNombre: cfg.modoExterno.arquetipoNombre,
+    trialHref: puerta.trialHref,
+    trialLabel: puerta.trialLabel,
+    checkoutHref: puerta.checkoutHref,
+    checkoutLabel: puerta.checkoutLabel,
+    color: puerta.color,
     fijadoEn: new Date().toISOString(),
+    puertaComercial: PUERTA_COMERCIAL_VENDEDOR,
   };
 }

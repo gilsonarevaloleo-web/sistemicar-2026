@@ -20,16 +20,11 @@ import {
 
 const CODIGOS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-function deepLinkFor(planeta: PlanetaId, sellerRef?: string | null): string {
-  const base =
-    planeta === "ESPEJO"
-      ? "https://www.sistemicar.app/pagos?plan=espejo_inicio"
-      : planeta === "JORNADA"
-        ? "https://www.sistemicar.app/pagos?plan=planificacion_base"
-        : "https://www.sistemicar.app/umbral/entrada";
+function deepLinkFor(_planeta: PlanetaId, sellerRef?: string | null): string {
+  // Puerta comercial única: Jornada Base (Espejo/Umbral después).
+  const base = "https://www.sistemicar.app/pagos?plan=planificacion_base";
   if (!sellerRef) return base;
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}ref=${encodeURIComponent(sellerRef)}`;
+  return `${base}&ref=${encodeURIComponent(sellerRef)}`;
 }
 
 async function sendWhatsappWithTemplate(opts: {
@@ -43,7 +38,7 @@ async function sendWhatsappWithTemplate(opts: {
     to: opts.to,
     body: opts.body,
     contentVariables: buildWhatsAppContentVariables({
-      planeta: opts.planeta,
+      planeta: "JORNADA",
       codigo: opts.codigo,
       deepLink: deepLinkFor(opts.planeta, opts.sellerRef),
     }),
