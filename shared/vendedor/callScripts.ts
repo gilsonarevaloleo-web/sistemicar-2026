@@ -1,37 +1,28 @@
 /**
  * Guiones del Vendedor Algorítmico por Código (fase llamadas).
- * Text corto para TTS (Twilio Say) y WhatsApp.
+ * Diagnóstico = Código; puerta comercial = siempre Jornada Base.
  */
 
 import type { CodigoNumero } from "../umbral/engineConfig.ts";
 import type { PlanetaId } from "./planetasConfig.ts";
-import { PLANETAS } from "./planetasConfig.ts";
+import { PUERTA_COMERCIAL_VENDEDOR, puertaComercialVendedor } from "./planetasConfig.ts";
 
 export interface GuionLlamada {
   codigo: CodigoNumero;
   planeta: PlanetaId;
-  /** Texto hablado en la llamada (TTS). */
+  puertaComercial: PlanetaId;
+  /** Texto hablado en la llamada (TTS legacy / resumen). */
   voz: string;
   /** Mensaje WhatsApp si no contesta. */
   whatsapp: string;
 }
 
-const CIERRES: Record<PlanetaId, { voz: string; wa: string }> = {
-  ESPEJO: {
-    voz: "Tu puerta es el Espejo: limpiezas por créditos, sin suscripción. Entra en sistemicar punto app barra pagos, plan espejo inicio.",
-    wa: "Tu puerta: *El Espejo* (créditos). → https://sistemicar.app/pagos?plan=espejo_inicio",
-  },
-  JORNADA: {
-    voz: "Tu puerta es la Jornada Base: medir unidades y cerrar el día. Entra en sistemicar punto app barra pagos, plan planificacion base.",
-    wa: "Tu puerta: *La Jornada Base*. → https://sistemicar.app/pagos?plan=planificacion_base",
-  },
-  UMBRAL: {
-    voz: "Tu puerta es el Umbral: prueba el Código uno gratis en la Forja. Entra en sistemicar punto app barra umbral barra entrada.",
-    wa: "Tu puerta: *El Umbral* (Código 1 gratis). → https://sistemicar.app/umbral/entrada",
-  },
+const CIERRE_JORNADA = {
+  voz: "Tu puerta es la Jornada Base: medir unidades y cerrar el día. Entra en sistemicar punto app barra pagos, plan planificacion base.",
+  wa: "Tu puerta: *La Jornada Base*. → https://sistemicar.app/pagos?plan=planificacion_base",
 };
 
-/** Núcleo del guion por código (independiente del planeta). */
+/** Núcleo del guion por código (independiente del planeta de grieta). */
 const NUCLEO: Record<CodigoNumero, string> = {
   1: "Detectamos niebla de utilidad: no está claro para qué te sirve avanzar hoy.",
   2: "Detectamos sobrecarga: sientes que no das para una cosa más.",
@@ -50,8 +41,7 @@ export function construirGuionLlamada(
   planeta: PlanetaId,
   sellerRef?: string | null,
 ): GuionLlamada {
-  const cierre = CIERRES[planeta];
-  const planetaLabel = PLANETAS[planeta].label;
+  const puerta = puertaComercialVendedor();
   const nucleo = NUCLEO[codigo];
   const refNota = sellerRef
     ? ` Menciona el código de referido ${sellerRef} al pagar.`
@@ -60,8 +50,8 @@ export function construirGuionLlamada(
   const voz = [
     "Hola. Soy el vendedor de Sistemicar.",
     nucleo,
-    `Tu planeta de entrada es ${planetaLabel}, Código ${codigo}.`,
-    cierre.voz,
+    `Código ${codigo}. La entrada es una sola: ${puerta.label}.`,
+    CIERRE_JORNADA.voz,
     refNota.trim(),
     "Si no es el momento, ignora este mensaje. Gracias.",
   ]
@@ -69,11 +59,18 @@ export function construirGuionLlamada(
     .join(" ");
 
   const whatsapp = [
-    `SISTEMICAR — Código ${codigo} · ${planetaLabel}`,
+    `SISTEMICAR — Código ${codigo} · puerta ${puerta.label}`,
     nucleo,
-    cierre.wa + (sellerRef ? `&ref=${encodeURIComponent(sellerRef)}` : ""),
+    CIERRE_JORNADA.wa +
+      (sellerRef ? `&ref=${encodeURIComponent(sellerRef)}` : ""),
     "Pediste que te llamáramos. Si no aplica, ignora este mensaje.",
   ].join("\n\n");
 
-  return { codigo, planeta, voz, whatsapp };
+  return {
+    codigo,
+    planeta,
+    puertaComercial: PUERTA_COMERCIAL_VENDEDOR,
+    voz,
+    whatsapp,
+  };
 }

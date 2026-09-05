@@ -310,13 +310,13 @@ export default function VendedorTriagePage() {
                 style={{ color: fijacion.color }}
               >
                 <Crosshair size={14} />
-                CÓDIGO + PLANETA FIJADOS
+                CÓDIGO FIJADO · PUERTA JORNADA
               </p>
               <h2
                 className="mt-2 text-2xl font-black text-white"
                 style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
               >
-                {fijacion.planetaLabel}
+                La Jornada Base
               </h2>
               <p className="mt-1 text-sm text-white/60">
                 Código {fijacion.codigo}
@@ -326,6 +326,10 @@ export default function VendedorTriagePage() {
               </p>
               <p className="mt-1 text-[12px] text-white/45">
                 {fijacion.nombreCodigo}
+              </p>
+              <p className="mt-2 text-[11px] text-white/40 leading-relaxed">
+                Diagnóstico: {fijacion.planetaLabel}. Entrada comercial: solo
+                Jornada Base.
               </p>
             </div>
 
