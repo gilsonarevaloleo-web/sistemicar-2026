@@ -27,13 +27,15 @@ export function hasActiveConsciousJornadaProcess(vehicles: Vehicle[]): boolean {
   });
 }
 
-/** Recordatorio de sello en Home. No sella. No interrumpe un proceso consciente. */
+/** Recordatorio de sello en Home o Centro de Comando. No sella. */
 export function shouldMountAutoCierreJornada(
   vehicles: Vehicle[],
   location: string
 ): boolean {
-  const isHome = location === "/" || location.startsWith("/?");
-  if (!isHome) return false;
+  const path = (location || "/").split("?")[0] || "/";
+  const isRemindPath =
+    path === "/" || path === "/menu" || location.startsWith("/?");
+  if (!isRemindPath) return false;
   if (hasActiveConsciousJornadaProcess(vehicles)) return false;
   return true;
 }

@@ -3,10 +3,9 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Moon, X } from "lucide-react";
 import { useAuthContext } from "@/App";
-import { JORNADA_V4_PATH } from "@/lib/jornadaBrand";
+import { isCommercialEntryPath, isJornada4Path, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
 import { getLocalVehicles, readLocalCierreJornadaByFecha } from "@/lib/persistence";
 import { shouldMountAutoCierreJornada } from "@/lib/jornadaConsciousGuard";
-import { useAppShellMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { debeRecordarSello } from "@shared/selloOperador";
 import { getJournalDateString } from "@/lib/segmentTime";
 
@@ -38,16 +37,17 @@ function writeSnooze(untilMs: number): void {
 export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location, setLocation] = useLocation();
-  const motorsQuiet = useAppShellMotorsQuiet();
   const [isOpen, setIsOpen] = useState(false);
 
   const fecha = getJournalDateString();
   const yaSellado = readLocalCierreJornadaByFecha(fecha)?.selloEmitido === true;
+  const silencioRuta =
+    isJornada4Path(location) || isCommercialEntryPath(location);
 
   const vehicles = useMemo(() => getLocalVehicles(), [isOpen]);
 
   useEffect(() => {
-    if (motorsQuiet || !user) return;
+    if (!user || silencioRuta) return;
     const check = () => {
       if (readLocalCierreJornadaByFecha(getJournalDateString())?.selloEmitido) {
         setIsOpen(false);
@@ -61,14 +61,14 @@ export function CierreJornadaModal() {
     check();
     const interval = setInterval(check, 60_000);
     return () => clearInterval(interval);
-  }, [user, motorsQuiet, location]);
+  }, [user, silencioRuta, location]);
 
   const posponer = () => {
     writeSnooze(Date.now() + SNOOZE_MS);
     setIsOpen(false);
   };
 
-  if (motorsQuiet || yaSellado) return null;
+  if (silencioRuta || yaSellado) return null;
 
   return (
     <AnimatePresence>
