@@ -79,6 +79,39 @@ describe("segmentCrossEntropyEngine", () => {
     expect(grace.phase).toBe("none");
   });
 
+  it("excluye ring de enfoque vivo del cruce (sobrevive al salir de Dual Kernel)", () => {
+    const active = seg({ id: "b", estado: "activo", horaInicio: "10:00" });
+    const ring = vehicle({
+      id: "enf",
+      segmentoId: "a",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1, horaFinMs: 2 },
+      subTareas: [
+        {
+          id: "f1",
+          texto: "Fila",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    expect(isVehicleFromPreviousSegment(ring, active, dayStart)).toBe(false);
+    const { start } = segmentWindowMs("10:00", "12:00", dayStart);
+    const { events } = evaluateSegmentCrossEntropy({
+      vehicles: [ring],
+      segmentos: [
+        seg({ id: "a", estado: "activo", horaInicio: "08:00", nombre: "A" }),
+        seg({ id: "b", estado: "activo", horaInicio: "10:00", nombre: "B" }),
+      ],
+      nowMs: start + CRUCE_GRACE_MIN * 60000,
+      dayStartMs: dayStart,
+      warnedVehicleIds: new Set(),
+    });
+    expect(events.some(e => e.type === "auto_close" && e.vehicleId === "enf")).toBe(false);
+  });
+
   it("gracia activa antes de 8 min y expirada después", () => {
     const { start } = segmentWindowMs("10:00", "12:00", dayStart);
     const active = seg({ id: "b", estado: "activo", horaInicio: "10:00" });

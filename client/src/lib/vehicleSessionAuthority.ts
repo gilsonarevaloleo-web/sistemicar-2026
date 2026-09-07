@@ -20,8 +20,10 @@ import {
 } from "./vehicleSessionSeal";
 import {
   archiveOrphanDesglosadorInterrupts,
+  clearStuckDesglosadorPause,
   mergeActiveVehicleSessionState,
 } from "./situacionSessionMerge";
+import { diskSessionRicherThanMemory } from "./flotaResume";
 
 export interface ReconcileVehicleListParams {
   incoming: Vehicle[];
@@ -64,11 +66,11 @@ function applyClosedOverride(v: Vehicle, localSources: Vehicle[]): Vehicle {
 }
 
 function pickRicherDesglosador(a: Vehicle, b: Vehicle): Vehicle {
-  if (a.interrupcionActiva && !b.interrupcionActiva) return a;
-  if (b.interrupcionActiva && !a.interrupcionActiva) return b;
   const aSubs = a.subVehiculos?.length ?? 0;
   const bSubs = b.subVehiculos?.length ?? 0;
   if (aSubs !== bSubs) return aSubs > bSubs ? a : b;
+  if (diskSessionRicherThanMemory(a, b)) return b;
+  if (diskSessionRicherThanMemory(b, a)) return a;
   return a;
 }
 
@@ -163,6 +165,14 @@ export function reconcileVehicleListView(params: ReconcileVehicleListParams): Ve
   merged = dedupeVehiclesPreferClosed(merged);
   merged = dedupeActiveDesglosadorParents(merged);
   merged = excludeGhostActivesFromReconcile(merged, nowMs);
+  merged = clearStuckDesglosadorPause(merged, parentId =>
+    merged.some(
+      v =>
+        v.status === "activo" &&
+        !v.autoVerdad &&
+        v.vehiculoPadreDesglosadorId === parentId
+    )
+  );
 
   return merged.map(v => {
     const sealed = applyVehicleSessionSeal(v);

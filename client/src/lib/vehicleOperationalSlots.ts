@@ -31,10 +31,34 @@ export function isDesglosadorEnFoco(vehicle: Vehicle): boolean {
   return subs.some(s => s.status === "activo" || s.status === "pendiente");
 }
 
+/**
+ * Ring / lista / interrupción de enfoque aún operables.
+ * Deben sobrevivir ausencias largas y cruce de segmento (igual que conquista).
+ */
+export function isEnfoqueSessionLive(vehicle: Vehicle): boolean {
+  if (vehicle.status !== "activo" || vehicle.autoVerdad) return false;
+  if (vehicle.tipoFlota !== "situacion") return false;
+  if (vehicle.situacionCronometro?.activo === true) return true;
+  if (vehicle.situacionNestedPause) return true;
+  if (vehicle.vehiculoPadreDesglosadorId) return true;
+  const subs = vehicle.subTareas ?? [];
+  return subs.some(
+    st =>
+      !st.completada && (st.resultadoSituacion ?? "pendiente") === "pendiente"
+  );
+}
+
 export function isDesglosadorCrossSegmentExempt(vehicle: Vehicle): boolean {
   // Contrato opt-in: anclado al segmento pierde la exención de cruce.
   if (vehicle.ancladoAlSegmento === true) return false;
   return isDesglosadorEnFoco(vehicle);
+}
+
+/** Conquista o enfoque vivos: el motor de cruce no los archiva al salir de Dual Kernel. */
+export function isLiveWorkCrossSegmentExempt(vehicle: Vehicle): boolean {
+  if (isDesglosadorCrossSegmentExempt(vehicle)) return true;
+  if (vehicle.ancladoAlSegmento === true) return false;
+  return isEnfoqueSessionLive(vehicle);
 }
 
 function blockResult(

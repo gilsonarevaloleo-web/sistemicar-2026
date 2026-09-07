@@ -3,10 +3,12 @@
  */
 import {
   getLocalVehicles,
+  getParkedActiveVehicles,
   parkActiveVehiclesForResume,
   subscribeToVehicles,
   type Vehicle,
 } from "@/lib/persistence";
+import { rehydrateFlotaFromDiskSources } from "@/lib/flotaResume";
 import { registerFlotaMemoryGetter } from "@/lib/flotaMemoryBridge";
 import {
   reconcileVehicleListView,
@@ -295,11 +297,19 @@ function startFirebaseSubscription(uid: string): void {
   installVehiclesUpdatedBridge();
 
   const local = hydrateLocalCache();
-  if (local.length > 0 && vehicles.length === 0) {
-    setVehiclesInternal(local);
-    setFlotaPaintedCount(local.length);
+  const parked = getParkedActiveVehicles();
+  const memory = vehicles.length > 0 ? vehicles : local;
+  const recovered = rehydrateFlotaFromDiskSources({
+    memory,
+    local,
+    parked,
+  });
+  const initial = recovered.next.length > 0 ? recovered.next : memory;
+  if (initial.length > 0) {
+    setVehiclesInternal(initial);
+    setFlotaPaintedCount(initial.length);
     markFlotaStoreHydrated();
-    console.log("[flotaStore] pintado inicial desde local", local.length);
+    console.log("[flotaStore] pintado inicial desde local/park", initial.length);
     markSyncReady(fetchGeneration);
   }
 
@@ -334,13 +344,15 @@ export function refreshFlotaSession(opts?: { hasOptimisticPaint?: boolean }): nu
 
 /** Incrementa refcount; abre listener Firebase si es el primero. */
 export function acquireFlotaStore(uid: string): () => void {
-  if (userId !== uid) {
-    userId = uid;
+  // Solo vaciar al cambiar de usuario. userId=null tras release no debe borrar
+  // la flota en memoria: salir de Dual Kernel a otra página re-adquiere el store.
+  if (userId != null && userId !== uid) {
     vehicles = [];
     mergedSig = "";
     localCache = null;
     stopFirebaseSubscription();
   }
+  userId = uid;
   refCount += 1;
   if (refCount === 1) {
     startFirebaseSubscription(uid);
@@ -353,10 +365,9 @@ export function releaseFlotaStore(): void {
   refCount = Math.max(0, refCount - 1);
   if (refCount === 0) {
     stopFirebaseSubscription();
-    userId = null;
     mergeContext = null;
-    localCache = null;
     flotaStoreHydrated = false;
+    // Conservar userId + vehicles: la sesión Dual Kernel sigue viva al navegar.
   }
 }
 

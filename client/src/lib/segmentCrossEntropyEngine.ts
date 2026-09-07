@@ -5,7 +5,7 @@ import {
   EARLY_VEHICLE_MARGIN_MIN,
   resolveVehicleSegmentContext,
 } from "./segmentVehicleAssign";
-import { isDesglosadorCrossSegmentExempt } from "./vehicleOperationalSlots";
+import { isLiveWorkCrossSegmentExempt } from "./vehicleOperationalSlots";
 
 import { ENTROPY_TIME_POLICY } from "./entropyTimePolicy";
 
@@ -49,7 +49,7 @@ export function isExcludedFromCrossEntropy(vehicle: Vehicle): boolean {
   if (vehicle.autoVerdad) return true;
   if (vehicle.tipoFlota === "descanso") return true;
   if (vehicle.status !== "activo") return true;
-  if (isDesglosadorCrossSegmentExempt(vehicle)) return true;
+  if (isLiveWorkCrossSegmentExempt(vehicle)) return true;
   return false;
 }
 

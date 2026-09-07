@@ -7,6 +7,7 @@ import {
   computeSubCloseVerdict,
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
+  isDesglosadorClockPaused,
   resolveConquistaTopeMs,
   suggestedSec,
   sumDesglosadorUnitCycle,
@@ -224,6 +225,31 @@ describe("computeDesglosadorClocks nested_paused", () => {
     } as Vehicle;
     const clocks = computeDesglosadorClocks(1_010_000, v);
     assert.equal(clocks.subElapsedSec, 120);
+  });
+
+  it("interrupcionActiva huérfana no congela el reloj", () => {
+    const orphan = {
+      interrupcionActiva: true,
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "activo", aperturaAt: 1_000_000 },
+      ],
+    } as Vehicle;
+    assert.equal(isDesglosadorClockPaused(orphan), false);
+    const clocks = computeDesglosadorClocks(1_010_000, orphan);
+    assert.equal(clocks.subElapsedSec, 10);
+
+    const realPause = {
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        subActivoId: "s1",
+        elapsedSecSnapshot: 4,
+        pausadoAt: 1_004_000,
+      },
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "nested_paused", aperturaAt: 1_000_000 },
+      ],
+    } as Vehicle;
+    assert.equal(isDesglosadorClockPaused(realPause), true);
   });
 });
 

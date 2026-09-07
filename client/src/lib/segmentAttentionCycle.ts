@@ -15,6 +15,7 @@ import {
   updateVehicleStatus,
 } from "./persistence";
 import { sealVehicleSessionClose } from "./vehicleSessionSeal";
+import { resumeDesglosadorFromNestedPause } from "./nestedContextStack";
 import {
   applyDayRolloverEntropia,
   applySegmentAttentionTick,
@@ -289,6 +290,24 @@ export async function runSegmentAttentionCycle(
       situacionCupoAnchor: null,
     };
     vehicles = vehicles.map(v => (v.id === vehicleId ? { ...v, ...patch } : v));
+
+    const parentId = vehicle.vehiculoPadreDesglosadorId;
+    if (parentId) {
+      const parent = vehicles.find(v => v.id === parentId);
+      if (parent?.status === "activo" && (parent.interrupcionActiva || parent.desglosadorPausa)) {
+        const resume = resumeDesglosadorFromNestedPause(parent) ?? {
+          desglosadorPausa: undefined,
+          interrupcionActiva: false,
+        };
+        vehicles = vehicles.map(v => (v.id === parentId ? { ...v, ...resume } : v));
+        try {
+          await updateVehicle(userId, parentId, resume);
+        } catch (e) {
+          console.warn("[cruceEntropiaClose] resume parent", parentId, e);
+        }
+      }
+    }
+
     saveLocalVehicles(vehicles);
     try {
       await updateVehicle(userId, vehicleId, patch);
