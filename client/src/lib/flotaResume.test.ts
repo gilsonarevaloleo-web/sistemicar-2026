@@ -307,7 +307,7 @@ describe("flotaResume", () => {
     assert.equal(parked.some(p => p.id === "otro"), true);
   });
 
-  it("reloj conquista en curso gana a snapshot de pausa stale", () => {
+  it("pausa de interrupción no pierde frente a un snapshot en curso con la misma faena", () => {
     const running = v({
       id: "c1",
       tipoFlota: "tiempo",
@@ -328,19 +328,30 @@ describe("flotaResume", () => {
         { id: "u2", titulo: "Unidad 2", status: "pendiente" },
       ],
     });
-    assert.equal(diskSessionRicherThanMemory(paused, running), true);
+    assert.equal(diskSessionRicherThanMemory(paused, running), false);
     assert.equal(diskSessionRicherThanMemory(running, paused), false);
 
-    const result = rehydrateFlotaFromDiskSources({
+    const keepPause = rehydrateFlotaFromDiskSources({
       memory: [paused],
       local: [running],
       parked: [running],
       nowMs: Date.now(),
       dayStartMs: 0,
     });
-    assert.equal(result.changed, true);
-    assert.equal(result.next[0]!.interrupcionActiva, false);
-    assert.equal(result.next[0]!.subVehiculos?.[0]?.status, "activo");
+    assert.equal(keepPause.changed, false);
+    assert.equal(keepPause.next[0]!.interrupcionActiva, true);
+    assert.equal(keepPause.next[0]!.subVehiculos?.[0]?.status, "nested_paused");
+
+    const keepRunning = rehydrateFlotaFromDiskSources({
+      memory: [running],
+      local: [paused],
+      parked: [paused],
+      nowMs: Date.now(),
+      dayStartMs: 0,
+    });
+    assert.equal(keepRunning.changed, false);
+    assert.equal(keepRunning.next[0]!.interrupcionActiva, undefined);
+    assert.equal(keepRunning.next[0]!.subVehiculos?.[0]?.status, "activo");
   });
 
   it("rehydrate no resucita parked sellado ni cubre huecos posteriores", () => {

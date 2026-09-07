@@ -213,6 +213,7 @@ describe("computeDesglosadorClocks nested_paused", () => {
       titulo: "A",
       status: "nested_paused",
       aperturaAt: 1_000_000,
+      tiempoSugeridoSeg: 60,
     };
     const v = {
       interrupcionActiva: true,
@@ -225,6 +226,9 @@ describe("computeDesglosadorClocks nested_paused", () => {
     } as Vehicle;
     const clocks = computeDesglosadorClocks(1_010_000, v);
     assert.equal(clocks.subElapsedSec, 120);
+    const later = computeDesglosadorClocks(1_040_000, v);
+    assert.equal(later.subElapsedSec, 120);
+    assert.equal(later.liveAccumDeltaSec, clocks.liveAccumDeltaSec);
   });
 
   it("interrupcionActiva huérfana no congela el reloj", () => {
