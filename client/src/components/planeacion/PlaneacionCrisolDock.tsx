@@ -19,7 +19,7 @@ export interface PlaneacionCrisolDockProps {
   onAbrirNido?: (nidoId: string) => void | Promise<void>;
   onDelete: (reservaId: string) => void | Promise<void>;
   onRutaChange: (reservaId: string, ruta: ReservaTacticaRuta) => void | Promise<void>;
-  /** Deja el dock usable sobre el Foco unidad de conquista. */
+  /** Deja el dock usable sobre el Foco unidad (portal a body, z > overlay). */
   elevateAboveUnitFocus?: boolean;
   dockBottomPx?: number;
   panoramaHeadline?: string;

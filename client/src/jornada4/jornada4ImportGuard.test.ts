@@ -114,6 +114,18 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /entitlements\.hasNorte/);
   });
 
+  it("Crisol porta a body por encima del overlay naranja", () => {
+    const dock = readFileSync(join(clientSrc, "components/ImanPensamientosDock.tsx"), "utf8");
+    assert.match(dock, /createPortal/);
+    assert.match(dock, /z-\[250\]/);
+    assert.match(dock, /elevateAboveUnitFocus/);
+    const overlay = readFileSync(
+      join(clientSrc, "components/flota/ConquistaUnitFocusOverlay.tsx"),
+      "utf8"
+    );
+    assert.match(overlay, /z-\[230\]/);
+  });
+
   it("sesión monta atención de puertas Dual Kernel", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /useJornada4SegmentAttention/);

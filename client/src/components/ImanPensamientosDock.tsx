@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, FlaskConical, Plus, Send, Trash2 } from "lucide-react";
 import {
   RUTA_TACTICA_META,
@@ -45,8 +46,9 @@ type Props = {
   };
   dockBottomPx?: number;
   /**
-   * Por encima del Foco unidad (z-[230]) para capturar pensamientos
-   * mientras el cronómetro de conquista está abierto.
+   * Porta el dock a document.body por encima del Foco unidad (z-230).
+   * El overlay naranja vive en body; el main es z-10, así que sin portal
+   * el Crisol queda debajo y hay que cerrar las vueltas para escribir.
    */
   elevateAboveUnitFocus?: boolean;
   /** Espejo panorámico de puertas del día (Dual Kernel). */
@@ -184,10 +186,10 @@ function ImanPensamientosDock({
 
   const selectedCount = [...selectedIds].filter(id => enviableIds.has(id)).length;
 
-  return (
+  const dock = (
     <div
       className={`fixed left-0 right-0 pointer-events-none ${
-        elevateAboveUnitFocus ? "z-[240]" : "z-40"
+        elevateAboveUnitFocus ? "z-[250]" : "z-40"
       }`}
       style={{ bottom: dockBottomPx }}
       data-testid="iman-pensamientos-dock"
@@ -557,6 +559,12 @@ function ImanPensamientosDock({
       </div>
     </div>
   );
+
+  if (elevateAboveUnitFocus) {
+    if (typeof document === "undefined") return null;
+    return createPortal(dock, document.body);
+  }
+  return dock;
 }
 
 export default memo(ImanPensamientosDock);
