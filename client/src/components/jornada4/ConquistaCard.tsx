@@ -23,6 +23,10 @@ import {
   ConquistaUnitFocusOverlay,
 } from "@/components/flota/ConquistaUnitFocusOverlay";
 import {
+  formatGananciaDelta,
+  gananciaKindFromDelta,
+} from "@/lib/conquistaUnitFocusClock";
+import {
   computeDesglosadorClocks,
   desglosadorSubTimerUiFromClocks,
   formatHHMM,
@@ -178,6 +182,9 @@ export function ConquistaCard({
     timerUi.isCountdown && timerUi.expired
       ? `+${timerUi.display}`
       : timerUi.display || "00:00:00";
+  const gananciaKind = gananciaKindFromDelta(clocks.liveAccumDeltaSec);
+  const gananciaColor =
+    gananciaKind === "ganando" ? OK : gananciaKind === "perdiendo" ? "#FF3131" : MUTED;
 
   const refLabel = objSecs != null ? formatMMSS(objSecs) : null;
   const futuroSub = clocks.subEndAt != null ? formatHHMM(clocks.subEndAt) : "—";
@@ -375,47 +382,50 @@ export function ConquistaCard({
                   </p>
                 ) : null}
 
-                {(clocks.liveAccumDeltaSec < -5 || clocks.liveAccumDeltaSec > 5) &&
-                clocks.hasProjection ? (
+                {clocks.hasProjection ? (
                   <div
-                    className="flex items-center justify-center gap-2 py-1.5 rounded-lg"
+                    className="flex items-center justify-center gap-2 py-1.5 rounded-lg min-h-[36px]"
                     style={{
                       backgroundColor:
-                        clocks.liveAccumDeltaSec < 0
+                        gananciaKind === "ganando"
                           ? "rgba(0,200,81,0.08)"
-                          : "rgba(255,49,49,0.08)",
+                          : gananciaKind === "perdiendo"
+                            ? "rgba(255,49,49,0.08)"
+                            : "rgba(255,255,255,0.04)",
                       border: `1px solid ${
-                        clocks.liveAccumDeltaSec < 0
+                        gananciaKind === "ganando"
                           ? "rgba(0,200,81,0.25)"
-                          : "rgba(255,49,49,0.25)"
+                          : gananciaKind === "perdiendo"
+                            ? "rgba(255,49,49,0.25)"
+                            : "rgba(255,255,255,0.08)"
                       }`,
                     }}
+                    data-testid="j4-conquista-ganancia"
                   >
                     <span
                       className="text-[9px] font-black uppercase tracking-widest"
-                      style={{
-                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
-                      }}
+                      style={{ color: gananciaColor }}
                     >
-                      {clocks.liveAccumDeltaSec < 0 ? "↓" : "↑"}
+                      {gananciaKind === "ganando" ? "↓" : gananciaKind === "perdiendo" ? "↑" : "·"}
                     </span>
                     <span
                       className="text-[13px] font-black tabular-nums"
                       style={{
-                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
+                        color: gananciaColor,
                         fontFamily: "ui-monospace, monospace",
                       }}
                     >
-                      {Math.floor(Math.abs(clocks.liveAccumDeltaSec) / 60)}m{" "}
-                      {String(Math.abs(clocks.liveAccumDeltaSec) % 60).padStart(2, "0")}s
+                      {formatGananciaDelta(clocks.liveAccumDeltaSec)}
                     </span>
                     <span
                       className="text-[9px] font-black uppercase tracking-widest"
-                      style={{
-                        color: clocks.liveAccumDeltaSec < 0 ? OK : "#FF3131",
-                      }}
+                      style={{ color: gananciaColor }}
                     >
-                      {clocks.liveAccumDeltaSec < 0 ? "ganando" : "perdiendo"}
+                      {gananciaKind === "ganando"
+                        ? "ganando"
+                        : gananciaKind === "perdiendo"
+                          ? "perdiendo"
+                          : "en ritmo"}
                     </span>
                   </div>
                 ) : null}
@@ -1306,6 +1316,19 @@ export function ConquistaCard({
         onClose={() => setUnitFocusOpen(false)}
         accentColor={NARANJA}
         bottomInsetPx={168}
+        vehicleClock={
+          active
+            ? {
+                recordMinPerUnit: hasRecord ? active.tiempoRecordMinPerUnit ?? null : null,
+                unitsTarget: hasCantidadObj ? active.cantidadObjetivo ?? null : null,
+                elapsedSec: clocks.subElapsedSec,
+                timerDisplay,
+                timerExpired: timerUi.expired,
+                gananciaDeltaSec: clocks.liveAccumDeltaSec,
+                hasProjection: clocks.hasProjection,
+              }
+            : null
+        }
       />
     </article>
   );

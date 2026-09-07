@@ -1,18 +1,24 @@
 /**
  * Overlay naranja: cronómetro de unidad para conquista.
  * Sonido al segundo (Tik) + vueltas. Al cerrar se apaga (no corre en segundo plano).
- * Cero persistencia.
+ * Cero persistencia — el naranja es borrador.
+ *
+ * Ring: unidades del vehículo (van al récord) vs vueltas del naranja,
+ * con reloj de ganancia anclado para que no salte de sitio.
  */
-import { useEffect, useState, useCallback, useRef, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, X, Focus, Timer } from "lucide-react";
+import { RotateCcw, X, Focus, Timer, Trophy, TrendingDown, TrendingUp } from "lucide-react";
 import { NARANJA } from "@/components/flota/vehicleCardShared";
 import {
   buildUnitFocusLap,
+  buildUnitFocusRingView,
   formatUnitFocusElapsed,
+  unitFocusCurrentLapMs,
   unitFocusElapsedMs,
   type UnitFocusLap,
+  type UnitFocusVehicleClock,
 } from "@/lib/conquistaUnitFocusClock";
 import { hardwareClockNow } from "@/lib/hardwareClock";
 import { playTikTapTone } from "@/lib/tikTapTone";
@@ -27,6 +33,8 @@ type Props = {
    * cronómetro de unidad está activo.
    */
   bottomInsetPx?: number;
+  /** Reloj del sub activo (récord + ganancia). Display-only. */
+  vehicleClock?: UnitFocusVehicleClock | null;
 };
 
 export function ConquistaUnitFocusOverlay({
@@ -34,6 +42,7 @@ export function ConquistaUnitFocusOverlay({
   onClose,
   accentColor = NARANJA,
   bottomInsetPx = 0,
+  vehicleClock = null,
 }: Props) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => hardwareClockNow());
@@ -62,6 +71,34 @@ export function ConquistaUnitFocusOverlay({
   const elapsed =
     startedAt != null ? unitFocusElapsedMs(startedAt, nowMs) : 0;
   const elapsedSec = Math.floor(elapsed / 1000);
+  const lastLapAbs = laps.length > 0 ? laps[laps.length - 1]!.absoluteMs : 0;
+  const currentLapMs = unitFocusCurrentLapMs(elapsed, lastLapAbs);
+
+  const ring = useMemo(
+    () =>
+      buildUnitFocusRingView({
+        vehicleElapsedMs: (vehicleClock?.elapsedSec ?? 0) * 1000,
+        recordMinPerUnit: vehicleClock?.recordMinPerUnit,
+        unitsTarget: vehicleClock?.unitsTarget,
+        orangeUnits: laps.length,
+        orangeCurrentLapMs: currentLapMs,
+        gananciaDeltaSec: vehicleClock?.gananciaDeltaSec ?? 0,
+        hasProjection: vehicleClock?.hasProjection === true,
+        vehicleTimerDisplay: vehicleClock?.timerDisplay,
+        vehicleTimerExpired: vehicleClock?.timerExpired,
+      }),
+    [
+      vehicleClock?.elapsedSec,
+      vehicleClock?.recordMinPerUnit,
+      vehicleClock?.unitsTarget,
+      vehicleClock?.gananciaDeltaSec,
+      vehicleClock?.hasProjection,
+      vehicleClock?.timerDisplay,
+      vehicleClock?.timerExpired,
+      laps.length,
+      currentLapMs,
+    ]
+  );
 
   useEffect(() => {
     if (!open || startedAt == null) return;
@@ -120,7 +157,7 @@ export function ConquistaUnitFocusOverlay({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-x-0 top-0 z-[230] flex flex-col items-center justify-center"
+          className="fixed inset-x-0 top-0 z-[230] flex flex-col overflow-y-auto"
           style={{
             backgroundColor: accentColor,
             bottom: Math.max(0, bottomInsetPx),
@@ -133,7 +170,7 @@ export function ConquistaUnitFocusOverlay({
           <button
             type="button"
             onClick={e => handleClose(e)}
-            className="absolute top-4 right-4 p-3 rounded-full"
+            className="absolute top-4 right-4 p-3 rounded-full z-10"
             style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "#000" }}
             data-testid="conquista-unit-focus-close"
             aria-label="Cerrar cronómetro"
@@ -142,7 +179,7 @@ export function ConquistaUnitFocusOverlay({
           </button>
 
           <div
-            className="flex flex-col items-center gap-5 px-6 w-full max-w-md"
+            className="flex flex-col items-center gap-4 px-5 w-full max-w-md mx-auto my-auto py-8"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 opacity-80">
@@ -160,7 +197,7 @@ export function ConquistaUnitFocusOverlay({
               style={{
                 color: "#000",
                 fontFamily: "JetBrains Mono, ui-monospace, monospace",
-                fontSize: "clamp(4.5rem, 22vw, 8rem)",
+                fontSize: "clamp(3.6rem, 18vw, 6.5rem)",
                 letterSpacing: "-0.04em",
               }}
               data-testid="conquista-unit-focus-display"
@@ -168,14 +205,19 @@ export function ConquistaUnitFocusOverlay({
               {display}
             </p>
 
+            <UnitFocusRing
+              ring={ring}
+              currentLapDisplay={formatUnitFocusElapsed(currentLapMs)}
+            />
+
             <p
-              className="text-[10px] font-bold uppercase tracking-wider text-center max-w-[18rem]"
+              className="text-[10px] font-bold uppercase tracking-wider text-center max-w-[20rem]"
               style={{ color: "rgba(0,0,0,0.65)" }}
             >
               Tik cada segundo. Vuelta marca el tramo. Al salir se apaga.
             </p>
 
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-3 mt-0.5">
               <button
                 type="button"
                 onClick={handleReset}
@@ -207,7 +249,7 @@ export function ConquistaUnitFocusOverlay({
 
             {lapsNewestFirst.length > 0 && (
               <div
-                className="w-full max-h-[28vh] overflow-y-auto rounded-2xl px-3 py-2 space-y-1"
+                className="w-full max-h-[22vh] overflow-y-auto rounded-2xl px-3 py-2 space-y-1"
                 style={{ backgroundColor: "rgba(0,0,0,0.18)" }}
                 data-testid="conquista-unit-focus-laps"
               >
@@ -257,6 +299,255 @@ export function ConquistaUnitFocusOverlay({
       )}
     </AnimatePresence>,
     document.body
+  );
+}
+
+function UnitFocusRing({
+  ring,
+  currentLapDisplay,
+}: {
+  ring: ReturnType<typeof buildUnitFocusRingView>;
+  currentLapDisplay: string;
+}) {
+  const gananciaColor =
+    ring.gananciaKind === "ganando"
+      ? "#14532d"
+      : ring.gananciaKind === "perdiendo"
+        ? "#7f1d1d"
+        : "rgba(0,0,0,0.55)";
+  const GananciaIcon =
+    ring.gananciaKind === "ganando"
+      ? TrendingDown
+      : ring.gananciaKind === "perdiendo"
+        ? TrendingUp
+        : Timer;
+
+  return (
+    <div className="w-full space-y-2" data-testid="conquista-unit-focus-ring">
+      <div
+        className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2 rounded-2xl px-2 py-2.5"
+        style={{ backgroundColor: "rgba(0,0,0,0.22)" }}
+      >
+        <div className="min-w-0 text-center" data-testid="conquista-unit-focus-record">
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <Trophy size={11} strokeWidth={2.5} color="rgba(0,0,0,0.72)" />
+            <p
+              className="text-[8px] font-black uppercase tracking-[0.16em]"
+              style={{ color: "rgba(0,0,0,0.68)" }}
+            >
+              Récord
+            </p>
+          </div>
+          <p
+            className="text-[28px] font-black tabular-nums leading-none"
+            style={{
+              color: "#000",
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            }}
+            data-testid="conquista-unit-focus-record-units"
+          >
+            {ring.hasRecord ? ring.recordUnitsDone : "—"}
+          </p>
+          <p
+            className="text-[9px] font-black uppercase tracking-wider mt-0.5"
+            style={{ color: "rgba(0,0,0,0.62)" }}
+          >
+            {ring.hasRecord
+              ? ring.recordUnitsTarget != null
+                ? `u · obj ${ring.recordUnitsTarget}`
+                : "unidades"
+              : "sin récord"}
+          </p>
+          <p
+            className="text-[10px] font-black tabular-nums mt-1"
+            style={{
+              color: ring.vehicleTimerExpired ? "#7f1d1d" : "#000",
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            }}
+            data-testid="conquista-unit-focus-record-timer"
+          >
+            {ring.vehicleTimerDisplay ?? "—"}
+          </p>
+          <p
+            className="text-[8px] font-bold mt-0.5"
+            style={{ color: "rgba(0,0,0,0.55)" }}
+          >
+            {ring.recordPaceLabel ?? "primer ciclo"}
+          </p>
+          {ring.hasRecord ? (
+            <RaceBar frac={ring.recordUnitFrac} label={formatUnitFocusElapsed(ring.recordUnitRemainMs)} />
+          ) : (
+            <RaceBar frac={0} label="—" muted />
+          )}
+        </div>
+
+        <div className="flex flex-col items-center justify-center px-0.5">
+          <span
+            className="text-[9px] font-black uppercase tracking-widest"
+            style={{ color: "rgba(0,0,0,0.5)" }}
+          >
+            vs
+          </span>
+        </div>
+
+        <div className="min-w-0 text-center" data-testid="conquista-unit-focus-orange">
+          <div className="flex items-center justify-center gap-1 mb-0.5">
+            <Focus size={11} strokeWidth={2.5} color="rgba(0,0,0,0.72)" />
+            <p
+              className="text-[8px] font-black uppercase tracking-[0.16em]"
+              style={{ color: "rgba(0,0,0,0.68)" }}
+            >
+              Unidad
+            </p>
+          </div>
+          <p
+            className="text-[28px] font-black tabular-nums leading-none"
+            style={{
+              color: "#000",
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            }}
+            data-testid="conquista-unit-focus-orange-units"
+          >
+            {ring.orangeUnits}
+          </p>
+          <p
+            className="text-[9px] font-black uppercase tracking-wider mt-0.5"
+            style={{ color: "rgba(0,0,0,0.62)" }}
+          >
+            vueltas
+          </p>
+          <p
+            className="text-[10px] font-black tabular-nums mt-1"
+            style={{
+              color: "#000",
+              fontFamily: "JetBrains Mono, ui-monospace, monospace",
+            }}
+            data-testid="conquista-unit-focus-orange-lap"
+          >
+            {currentLapDisplay}
+          </p>
+          <p
+            className="text-[8px] font-bold mt-0.5"
+            style={{ color: "rgba(0,0,0,0.55)" }}
+          >
+            {ring.recordPaceDisplay ? `vs ${ring.recordPaceDisplay}` : "borrador"}
+          </p>
+          {ring.orangeLapFrac != null ? (
+            <RaceBar
+              frac={Math.min(1, ring.orangeLapFrac)}
+              label={ring.orangeLapFrac >= 1 ? "pasó" : "dentro"}
+              hot={ring.orangeLapFrac >= 1}
+            />
+          ) : (
+            <RaceBar frac={0} label="—" muted />
+          )}
+        </div>
+      </div>
+
+      {ring.matchLabel ? (
+        <p
+          className="text-center text-[9px] font-black uppercase tracking-[0.14em]"
+          style={{ color: "rgba(0,0,0,0.72)" }}
+          data-testid="conquista-unit-focus-match"
+        >
+          {ring.matchLabel}
+        </p>
+      ) : (
+        <p
+          className="text-center text-[9px] font-black uppercase tracking-[0.14em]"
+          style={{ color: "rgba(0,0,0,0.4)" }}
+          data-testid="conquista-unit-focus-match"
+        >
+          {ring.hasRecord ? " " : "Sin récord · no ensucia la bóveda"}
+        </p>
+      )}
+
+      <div
+        className="flex items-center justify-center gap-2 rounded-2xl px-3 py-2 min-h-[44px]"
+        style={{
+          backgroundColor:
+            ring.gananciaKind === "ganando"
+              ? "rgba(20,83,45,0.22)"
+              : ring.gananciaKind === "perdiendo"
+                ? "rgba(127,29,29,0.22)"
+                : "rgba(0,0,0,0.16)",
+        }}
+        data-testid="conquista-unit-focus-ganancia"
+      >
+        <GananciaIcon size={14} strokeWidth={2.5} color={gananciaColor} />
+        <span
+          className="text-[9px] font-black uppercase tracking-[0.16em]"
+          style={{ color: gananciaColor }}
+        >
+          Ganancia
+        </span>
+        {ring.showGananciaClock ? (
+          <>
+            <span
+              className="text-[15px] font-black tabular-nums"
+              style={{
+                color: gananciaColor,
+                fontFamily: "JetBrains Mono, ui-monospace, monospace",
+              }}
+            >
+              {ring.gananciaLabel}
+            </span>
+            <span
+              className="text-[9px] font-black uppercase tracking-widest"
+              style={{ color: gananciaColor }}
+            >
+              {ring.gananciaPhrase}
+            </span>
+          </>
+        ) : (
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: "rgba(0,0,0,0.45)" }}
+          >
+            en espera
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RaceBar({
+  frac,
+  label,
+  muted = false,
+  hot = false,
+}: {
+  frac: number;
+  label: string;
+  muted?: boolean;
+  hot?: boolean;
+}) {
+  const width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
+  return (
+    <div className="mt-1.5 px-1">
+      <div
+        className="h-1 rounded-full overflow-hidden"
+        style={{ backgroundColor: "rgba(0,0,0,0.18)" }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width,
+            backgroundColor: muted ? "transparent" : hot ? "#7f1d1d" : "#000",
+          }}
+        />
+      </div>
+      <p
+        className="text-[8px] font-black tabular-nums mt-0.5"
+        style={{
+          color: muted ? "rgba(0,0,0,0.35)" : hot ? "#7f1d1d" : "rgba(0,0,0,0.55)",
+          fontFamily: "JetBrains Mono, ui-monospace, monospace",
+        }}
+      >
+        {label}
+      </p>
+    </div>
   );
 }
 
