@@ -307,6 +307,42 @@ describe("flotaResume", () => {
     assert.equal(parked.some(p => p.id === "otro"), true);
   });
 
+  it("reloj conquista en curso gana a snapshot de pausa stale", () => {
+    const running = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        { id: "u1", titulo: "Unidad 1", status: "activo", aperturaAt: 200 },
+        { id: "u2", titulo: "Unidad 2", status: "pendiente" },
+      ],
+    });
+    const paused = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: 150, subActivoId: "u1", elapsedSecSnapshot: 10 },
+      subVehiculos: [
+        { id: "u1", titulo: "Unidad 1", status: "nested_paused", aperturaAt: 100 },
+        { id: "u2", titulo: "Unidad 2", status: "pendiente" },
+      ],
+    });
+    assert.equal(diskSessionRicherThanMemory(paused, running), true);
+    assert.equal(diskSessionRicherThanMemory(running, paused), false);
+
+    const result = rehydrateFlotaFromDiskSources({
+      memory: [paused],
+      local: [running],
+      parked: [running],
+      nowMs: Date.now(),
+      dayStartMs: 0,
+    });
+    assert.equal(result.changed, true);
+    assert.equal(result.next[0]!.interrupcionActiva, false);
+    assert.equal(result.next[0]!.subVehiculos?.[0]?.status, "activo");
+  });
+
   it("rehydrate no resucita parked sellado ni cubre huecos posteriores", () => {
     const now = Date.now();
     const cierreAt = now - 10 * 60_000;

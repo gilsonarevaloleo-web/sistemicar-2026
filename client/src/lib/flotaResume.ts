@@ -47,22 +47,37 @@ function conquistaSessionRichness(v: Vehicle): number {
     if (s.aperturaAt != null) score += 2;
     if (s.cierreAt != null) score += 2;
   }
-  if (v.interrupcionActiva) score += 8;
-  if (v.desglosadorPausa?.subActivoId) score += 8;
   if ((v.desglosadorBloqueDepthPsGranted ?? 0) > 0) {
     score += v.desglosadorBloqueDepthPsGranted!;
   }
   return score;
 }
 
+function isConquistaSessionPaused(v: Vehicle): boolean {
+  if (v.tipoFlota !== "tiempo" || v.tipoReloj !== "desglosador") return false;
+  if (v.interrupcionActiva === true && v.desglosadorPausa?.subActivoId) return true;
+  return (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
+}
+
+function isConquistaSessionRunning(v: Vehicle): boolean {
+  if (v.tipoFlota !== "tiempo" || v.tipoReloj !== "desglosador") return false;
+  if (isConquistaSessionPaused(v)) return false;
+  return (v.subVehiculos ?? []).some(s => s.status === "activo");
+}
+
 /** Disco/parked/memoria más rico que el candidato (shell sin ring, etc.). */
 export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boolean {
   if (memory.id !== disk.id) return false;
   if (disk.status !== "activo" || memory.status !== "activo") return false;
-  return (
-    situacionSessionRichness(disk) > situacionSessionRichness(memory) ||
-    conquistaSessionRichness(disk) > conquistaSessionRichness(memory)
-  );
+  const dSit = situacionSessionRichness(disk);
+  const mSit = situacionSessionRichness(memory);
+  if (dSit !== mSit) return dSit > mSit;
+  const dCon = conquistaSessionRichness(disk);
+  const mCon = conquistaSessionRichness(memory);
+  if (dCon !== mCon) return dCon > mCon;
+  // Misma faena: un reloj en curso gana a un snapshot de pausa stale (SPA / park).
+  if (isConquistaSessionRunning(disk) && isConquistaSessionPaused(memory)) return true;
+  return false;
 }
 
 /**

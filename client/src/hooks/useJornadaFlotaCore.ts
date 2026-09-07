@@ -79,11 +79,26 @@ export function useJornadaFlotaCore(options?: {
   const setupFlotaSubscription = useCallback(() => {
     if (!user) return;
     const cachedFlota = readLocalFlota(user.uid);
-    if (cachedFlota.length > 0 && vehiclesRef.current.length === 0) {
-      setVehicles(cachedFlota);
+    const nowMs = Date.now();
+    const result = rehydrateFlotaFromDiskSources({
+      memory: vehiclesRef.current.length > 0 ? vehiclesRef.current : cachedFlota,
+      local: getLocalVehicles(),
+      parked: getParkedActiveVehicles(),
+      nowMs,
+      dayStartMs: getJournalDayStartMs(nowMs),
+      wasRecentlyClosed: wasVehicleRecentlyClosed,
+    });
+    const next = result.changed
+      ? result.next
+      : vehiclesRef.current.length > 0
+        ? vehiclesRef.current
+        : cachedFlota;
+    if (next.length > 0 && (result.changed || vehiclesRef.current.length === 0)) {
+      vehiclesRef.current = next;
+      setVehicles(next);
     }
     refreshFlotaSession({
-      hasOptimisticPaint: cachedFlota.length > 0 || vehiclesRef.current.length > 0,
+      hasOptimisticPaint: next.length > 0 || vehiclesRef.current.length > 0,
     });
   }, [user, setVehicles]);
 
@@ -140,6 +155,8 @@ export function useJornadaFlotaCore(options?: {
       rehydrateFlotaFromLocalRef.current?.();
     });
     return () => {
+      // SPA: salir de Dual Kernel no dispara visibility/pagehide.
+      flushToLocal();
       rehydrateFlotaFromLocalRef.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushToLocal);

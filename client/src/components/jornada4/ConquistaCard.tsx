@@ -27,6 +27,7 @@ import {
   desglosadorSubTimerUiFromClocks,
   formatHHMM,
   formatMMSS,
+  isDesglosadorClockPaused,
   subSecPerUnit,
   suggestedSec,
   sumDesglosadorUnitCycle,
@@ -88,9 +89,7 @@ export function ConquistaCard({
   onReorderSubs,
 }: Props) {
   const active = conquistaActiveSub(vehicle);
-  const paused =
-    vehicle.interrupcionActiva === true ||
-    (vehicle.subVehiculos ?? []).some(s => s.status === "nested_paused");
+  const paused = isDesglosadorClockPaused(vehicle);
   const tick = useJornada4Tick(Boolean(active?.aperturaAt) && !paused);
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),

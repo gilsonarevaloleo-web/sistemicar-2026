@@ -6,6 +6,8 @@ import {
   getOperationalActives,
   isDesglosadorEnFoco,
   isDesglosadorCrossSegmentExempt,
+  isEnfoqueSessionLive,
+  isLiveWorkCrossSegmentExempt,
 } from "./vehicleOperationalSlots";
 
 function v(partial: Partial<Vehicle> & Pick<Vehicle, "id">): Vehicle {
@@ -72,6 +74,34 @@ describe("vehicleOperationalSlots", () => {
 
     const sit = v({ id: "s1", titulo: "Situación", tipoFlota: "situacion" });
     assert.equal(assertCanOpenVehicle([sit], "descanso").allowed, true);
+  });
+
+  it("enfoque ring vivo y su interrupción no cruzan segmento", () => {
+    const ring = v({
+      id: "enf",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: 1 },
+      subTareas: [
+        {
+          id: "f1",
+          texto: "Fila",
+          completada: false,
+          creadaAt: 1,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    assert.equal(isEnfoqueSessionLive(ring), true);
+    assert.equal(isLiveWorkCrossSegmentExempt(ring), true);
+
+    const interrupt = v({
+      id: "int",
+      tipoFlota: "situacion",
+      vehiculoPadreDesglosadorId: "d1",
+    });
+    assert.equal(isEnfoqueSessionLive(interrupt), true);
+    assert.equal(isLiveWorkCrossSegmentExempt(interrupt), true);
   });
 
   it("permite descanso aunque haya 2 misiones operativas abiertas", () => {

@@ -58,6 +58,20 @@ export function desglosadorSubActiveIdKey(sub: SubVehiculo | undefined): string 
   return sub?.id ?? "";
 }
 
+/**
+ * Pausa real del reloj conquista: interrupción anidada con snapshot,
+ * no un flag huérfano de `interrupcionActiva`.
+ */
+export function isDesglosadorClockPaused(vehicle: Vehicle): boolean {
+  const subs = vehicle.subVehiculos ?? [];
+  if (subs.some(s => s.status === "nested_paused")) return true;
+  return (
+    vehicle.interrupcionActiva === true &&
+    vehicle.desglosadorPausa?.subActivoId != null &&
+    vehicle.desglosadorPausa.elapsedSecSnapshot != null
+  );
+}
+
 /** Reloj del sub activo explícito (evita frames con find(activo) desincronizado). */
 export function computeActiveSubClocks(
   now: number,
