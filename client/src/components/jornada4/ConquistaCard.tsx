@@ -97,8 +97,17 @@ export function ConquistaCard({
   const tick = useJornada4Tick(Boolean(active?.aperturaAt) && !paused);
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick
-    [tick, active?.id, active?.aperturaAt, vehicle.id, vehicle.subVehiculos]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick; pausa congela
+    [
+      tick,
+      active?.id,
+      active?.aperturaAt,
+      vehicle.id,
+      vehicle.subVehiculos,
+      vehicle.interrupcionActiva,
+      vehicle.desglosadorPausa?.subActivoId,
+      vehicle.desglosadorPausa?.elapsedSecSnapshot,
+    ]
   );
 
   const objSecs = active ? suggestedSec(active) : null;

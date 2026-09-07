@@ -95,9 +95,9 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
       : undefined;
   const activeSub =
     subs.find(s => s.status === "activo") ??
-    (vehicle.interrupcionActiva && pausedSub?.status === "nested_paused" ? pausedSub : undefined);
+    (isDesglosadorClockPaused(vehicle) && pausedSub ? pausedSub : undefined);
   const frozen =
-    vehicle.interrupcionActiva &&
+    isDesglosadorClockPaused(vehicle) &&
     pausa?.elapsedSecSnapshot != null &&
     pausedSub != null &&
     pausa.subActivoId === pausedSub.id;

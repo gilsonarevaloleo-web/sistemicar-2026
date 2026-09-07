@@ -41,8 +41,9 @@ function conquistaSessionRichness(v: Vehicle): number {
   const subs = v.subVehiculos ?? [];
   let score = subs.length * 10;
   score += subs.filter(s => s.status === "cumplido" || s.status === "fallado").length * 5;
-  score += subs.filter(s => s.status === "activo").length * 3;
-  // Timestamps / pausa: mismo conteo de filas no implica misma sesión.
+  // nested_paused = misma faena en curso; no perder la interrupción frente a un snapshot "activo".
+  score += subs.filter(s => s.status === "activo" || s.status === "nested_paused").length * 3;
+  // Timestamps: mismo conteo de filas no implica misma sesión.
   for (const s of subs) {
     if (s.aperturaAt != null) score += 2;
     if (s.cierreAt != null) score += 2;
@@ -51,18 +52,6 @@ function conquistaSessionRichness(v: Vehicle): number {
     score += v.desglosadorBloqueDepthPsGranted!;
   }
   return score;
-}
-
-function isConquistaSessionPaused(v: Vehicle): boolean {
-  if (v.tipoFlota !== "tiempo" || v.tipoReloj !== "desglosador") return false;
-  if (v.interrupcionActiva === true && v.desglosadorPausa?.subActivoId) return true;
-  return (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
-}
-
-function isConquistaSessionRunning(v: Vehicle): boolean {
-  if (v.tipoFlota !== "tiempo" || v.tipoReloj !== "desglosador") return false;
-  if (isConquistaSessionPaused(v)) return false;
-  return (v.subVehiculos ?? []).some(s => s.status === "activo");
 }
 
 /** Disco/parked/memoria más rico que el candidato (shell sin ring, etc.). */
@@ -75,8 +64,7 @@ export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boo
   const dCon = conquistaSessionRichness(disk);
   const mCon = conquistaSessionRichness(memory);
   if (dCon !== mCon) return dCon > mCon;
-  // Misma faena: un reloj en curso gana a un snapshot de pausa stale (SPA / park).
-  if (isConquistaSessionRunning(disk) && isConquistaSessionPaused(memory)) return true;
+  // Pausa vs en curso con la misma faena no es riqueza: no pisar interrupción ni reanudación.
   return false;
 }
 

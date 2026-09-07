@@ -65,7 +65,15 @@ function applyClosedOverride(v: Vehicle, localSources: Vehicle[]): Vehicle {
   return v;
 }
 
+function hasRealDesglosadorPause(v: Vehicle): boolean {
+  return v.interrupcionActiva === true && !!v.desglosadorPausa?.subActivoId;
+}
+
 function pickRicherDesglosador(a: Vehicle, b: Vehicle): Vehicle {
+  const aPause = hasRealDesglosadorPause(a);
+  const bPause = hasRealDesglosadorPause(b);
+  if (aPause && !bPause) return a;
+  if (bPause && !aPause) return b;
   const aSubs = a.subVehiculos?.length ?? 0;
   const bSubs = b.subVehiculos?.length ?? 0;
   if (aSubs !== bSubs) return aSubs > bSubs ? a : b;
