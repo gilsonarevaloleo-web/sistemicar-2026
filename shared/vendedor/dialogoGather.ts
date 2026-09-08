@@ -1,41 +1,25 @@
 /**
- * Diálogo nivel B del Vendedor Algorítmico (Twilio <Gather> DTMF).
- * Usa psicología Umbral (modoExterno) + puerta comercial única: Jornada Base.
+ * Diálogo de la vendedora (Twilio <Gather> DTMF + voz).
+ * Tono conversacional. Solo Jornada Base, códigos 1 / 2 / 3.
+ * No nombra Umbral ni Espejo.
  *
  * Flujo:
- *   open  → ¿Te suena el código? (1=sí / 2=no)
- *   mirror → seducción + CTA Jornada (1=quiero la puerta / 2=no)
- *   end   → cierre
+ *   open  → ¿Te suena lo que marcaste? (1=sí / 2=no)
+ *   mirror → te ofrezco mandar el enlace por WhatsApp
+ *   end   → si dijo que sí (o que lo vea después), se envía el enlace
  */
 
-import {
-  DICCIONARIO_CODIGOS,
-  type CodigoNumero,
-} from "../umbral/engineConfig.ts";
+import type { CodigoNumero } from "../umbral/engineConfig.ts";
 import {
   PUERTA_COMERCIAL_VENDEDOR,
-  puertaComercialVendedor,
   type PlanetaId,
 } from "./planetasConfig.ts";
+import {
+  clampCodigoJornadaBase,
+  type CodigoJornadaBase,
+} from "./triageLogic.ts";
 
 export type DialogStep = "open" | "mirror";
-
-/** Respuesta hablada al cliente cuando confirma el código (seducción corta). */
-const RESPUESTA_CODIGO: Record<CodigoNumero, string> = {
-  1: "Te sirve para una cosa concreta: cortar la niebla y ver qué sí te mueve hoy, sin discurso vacío.",
-  2: "No te pedimos tirar lo que ya tienes. Sumamos un sistema ligero encima, con menos carga.",
-  3: "No es una agenda infinita. El primer paso cabe en un bloque corto y medible, hoy.",
-  4: "Sin floritura: límites claros, evidencia y una ruta seria. Si huele a humo, no es Sistemicar.",
-  5: "Hablamos en números: costo, retorno esperado y un rango honesto. Sin cuento.",
-  6: "Bajamos la ansiedad con una prueba concreta, de bajo roce, para que sientas control.",
-  7: "El precio sostiene un intercambio justo: qué recibes y qué se pierde al elegir lo barato.",
-  8: "No estiramos el proceso. Sostenemos el marco y el siguiente paso queda claro ahora.",
-  9: "No es un pico que se cae al mes: es un sistema que se sostiene después del cierre.",
-  10: "No desaparecemos al cobrar. Aquí hay referente y continuidad, no un producto huérfano.",
-};
-
-const CIERRE_JORNADA_VOZ =
-  "Tu puerta es la Jornada Base: medir unidades y cerrar el día. En sistemicar punto app, pagos, plan planificacion base.";
 
 function cleanSpeech(text: string): string {
   return text
@@ -45,18 +29,103 @@ function cleanSpeech(text: string): string {
     .trim();
 }
 
+function beats(parts: string[]): string[] {
+  return parts.map(cleanSpeech).filter(Boolean);
+}
+
+function joinBeats(parts: string[]): string {
+  return beats(parts).join(" ");
+}
+
+const APERTURA: Record<CodigoJornadaBase, string[]> = {
+  1: [
+    "Hola, te llamo de Sistemicar.",
+    "Marcaste que no tienes claro qué cerrar primero. Que el día se te mezcla.",
+    "¿Es eso lo que te está pasando hoy?",
+    "Si sí, marca 1 o di sí. Si no, marca 2.",
+  ],
+  2: [
+    "Hola, te llamo de Sistemicar.",
+    "Dijiste que ya no das para una cosa más.",
+    "No te voy a pedir que tires lo que usas. ¿Te suena eso, que estás a tope?",
+    "Si sí, marca 1 o di sí. Si no, marca 2.",
+  ],
+  3: [
+    "Hola, te llamo de Sistemicar.",
+    "Vi que el día se te va entre incendios y al final no hay un cierre.",
+    "¿Te pasa eso ahora?",
+    "Si sí, marca 1 o di sí. Si no, marca 2.",
+  ],
+};
+
+const MIRROR_SI: Record<CodigoJornadaBase, string[]> = {
+  1: [
+    "Vale. Entonces sin discurso.",
+    "Jornada Base es para cortar esa niebla: eliges una unidad, la cierras, y el día tiene un número.",
+    "Son veinticinco dólares al mes.",
+    "¿Te mando el enlace de pago ahora por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 si lo quieres ver después.",
+  ],
+  2: [
+    "Claro. No te pido que sueltes lo que ya tienes.",
+    "Jornada Base se pone encima: mides lo que cierras hoy, sin otra lista infinita.",
+    "Son veinticinco dólares al mes.",
+    "¿Te mando el enlace de pago ahora por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 si lo quieres ver después.",
+  ],
+  3: [
+    "Sí. Eso se siente: trabajar todo el día y no poder decir qué cerraste.",
+    "Jornada Base es justo para eso. Un bloque, una unidad, el día termina con evidencia.",
+    "Son veinticinco dólares al mes.",
+    "¿Te mando el enlace de pago ahora por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 si lo quieres ver después.",
+  ],
+};
+
+const MIRROR_NO: Record<CodigoJornadaBase, string[]> = {
+  1: [
+    "Entiendo. Aun así, lo que vimos es que te cuesta elegir qué cerrar primero.",
+    "Jornada Base sirve para eso: una unidad, un cierre, un número.",
+    "¿Quieres que te mande el enlace por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 para colgar.",
+  ],
+  2: [
+    "Entiendo. Igual, si el día ya viene lleno, no tiene sentido sumar otra carga pesada.",
+    "Jornada Base es liviana: mides lo que cierras, no te pide rearmar todo.",
+    "¿Quieres que te mande el enlace por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 para colgar.",
+  ],
+  3: [
+    "Bueno. Si no es exactamente eso, igual el patrón es el mismo: el día se evapora.",
+    "Jornada Base corta eso. Mides lo que sí cierras.",
+    "¿Quieres que te mande el enlace por WhatsApp?",
+    "Marca 1 y te lo envío. Marca 2 para colgar.",
+  ],
+};
+
 export type DialogTurns = {
-  codigo: CodigoNumero;
+  codigo: CodigoJornadaBase;
   /** Planeta de grieta (diagnóstico). La venta siempre va a Jornada. */
   planeta: PlanetaId;
   puertaComercial: PlanetaId;
   opener: string;
+  openerBeats: string[];
   mirrorSi: string;
+  mirrorSiBeats: string[];
   mirrorNo: string;
+  mirrorNoBeats: string[];
   ctaSi: string;
+  ctaSiBeats: string[];
+  ctaSiSinWhatsapp: string;
+  ctaSiSinWhatsappBeats: string[];
   ctaNo: string;
+  ctaNoBeats: string[];
+  ctaNoSinWhatsapp: string;
+  ctaNoSinWhatsappBeats: string[];
   timeoutOpen: string;
+  timeoutOpenBeats: string[];
   timeoutMirror: string;
+  timeoutMirrorBeats: string[];
 };
 
 export function buildDialogTurns(
@@ -64,79 +133,72 @@ export function buildDialogTurns(
   planeta: PlanetaId,
   sellerRef?: string | null,
 ): DialogTurns {
-  const cfg = DICCIONARIO_CODIGOS[codigo];
-  const ext = cfg.modoExterno;
-  const puerta = puertaComercialVendedor();
-  const frase = cleanSpeech(ext.fraseTipica);
-  const arquetipo = cleanSpeech(ext.arquetipoNombre);
-  const respuesta = RESPUESTA_CODIGO[codigo];
-  const cierre = CIERRE_JORNADA_VOZ;
+  const codigoJ = clampCodigoJornadaBase(codigo);
   const refNota = sellerRef
-    ? ` Al pagar, menciona el referido ${sellerRef}.`
+    ? ` Si pagas, menciona ${sellerRef}.`
     : "";
 
+  const openerBeats = beats(APERTURA[codigoJ]);
+  const mirrorSiBeats = beats([
+    ...MIRROR_SI[codigoJ],
+    refNota.trim(),
+  ]);
+  const mirrorNoBeats = beats(MIRROR_NO[codigoJ]);
+  const ctaSiBeats = beats([
+    "Listo. Te acabo de mandar el enlace por WhatsApp.",
+    "Ábrelo cuando cuelgues. Es Jornada Base, veinticinco al mes.",
+    refNota.trim(),
+    "Gracias por el rato. Cuídate.",
+  ]);
+  const ctaSiSinWhatsappBeats = beats([
+    "Listo. Al colgar te dejo el enlace por WhatsApp.",
+    "Es Jornada Base, veinticinco al mes.",
+    refNota.trim(),
+    "Gracias por el rato. Cuídate.",
+  ]);
+  const ctaNoBeats = beats([
+    "Sin problema.",
+    "Te dejo igual el enlace por WhatsApp, por si más tarde te late.",
+    "Que te vaya bien.",
+  ]);
+  const ctaNoSinWhatsappBeats = beats([
+    "Sin problema.",
+    "Cuando quieras, el enlace está en sistemicar punto app, pagos.",
+    "Que te vaya bien.",
+  ]);
+  const timeoutOpenBeats = beats([
+    "No te escuché marcar.",
+    "Si quieres, te dejo el enlace de Jornada Base por WhatsApp.",
+    "Hasta luego.",
+  ]);
+  const timeoutMirrorBeats = beats([
+    "No te escuché marcar.",
+    "Te dejo el enlace por WhatsApp por si quieres verlo con calma.",
+    "Hasta luego.",
+  ]);
+
   return {
-    codigo,
+    codigo: codigoJ,
     planeta,
     puertaComercial: PUERTA_COMERCIAL_VENDEDOR,
-    opener: cleanSpeech(
-      [
-        "Hola. Soy la vendedora de Sistemicar.",
-        `Por tu diagnóstico entramos al Código ${codigo}: ${arquetipo}.`,
-        `La objeción típica suena así: ${frase}`,
-        "¿Te suena?",
-        "Marca uno si sí. Marca dos si no.",
-      ].join(" "),
-    ),
-    mirrorSi: cleanSpeech(
-      [
-        "Bien. Entonces vamos al grano.",
-        respuesta,
-        `La entrada es una sola: ${puerta.label}.`,
-        cierre,
-        refNota,
-        "Si quieres entrar ahora, marca uno. Si prefieres pensarlo, marca dos.",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    ),
-    mirrorNo: cleanSpeech(
-      [
-        "Entiendo. Aun así, el patrón que vimos apunta a este bloqueo.",
-        respuesta,
-        `La puerta de entrada es ${puerta.label}.`,
-        cierre,
-        "Marca uno si quieres la puerta. Marca dos para colgar.",
-      ].join(" "),
-    ),
-    ctaSi: cleanSpeech(
-      [
-        "Perfecto.",
-        cierre,
-        refNota,
-        "Abre ese enlace cuando cuelgue. Gracias por pedirnos la llamada. Hasta luego.",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    ),
-    ctaNo: cleanSpeech(
-      "Sin presión. Si más tarde quieres, te dejamos la Jornada Base por WhatsApp. Hasta luego.",
-    ),
-    timeoutOpen: cleanSpeech(
-      [
-        "No recibí tu marca.",
-        `Tu puerta es ${puerta.label}.`,
-        cierre,
-        "Hasta luego.",
-      ].join(" "),
-    ),
-    timeoutMirror: cleanSpeech(
-      [
-        "No recibí tu marca.",
-        cierre,
-        "Puedes entrar cuando quieras. Hasta luego.",
-      ].join(" "),
-    ),
+    opener: joinBeats(openerBeats),
+    openerBeats,
+    mirrorSi: joinBeats(mirrorSiBeats),
+    mirrorSiBeats,
+    mirrorNo: joinBeats(mirrorNoBeats),
+    mirrorNoBeats,
+    ctaSi: joinBeats(ctaSiBeats),
+    ctaSiBeats,
+    ctaSiSinWhatsapp: joinBeats(ctaSiSinWhatsappBeats),
+    ctaSiSinWhatsappBeats,
+    ctaNo: joinBeats(ctaNoBeats),
+    ctaNoBeats,
+    ctaNoSinWhatsapp: joinBeats(ctaNoSinWhatsappBeats),
+    ctaNoSinWhatsappBeats,
+    timeoutOpen: joinBeats(timeoutOpenBeats),
+    timeoutOpenBeats,
+    timeoutMirror: joinBeats(timeoutMirrorBeats),
+    timeoutMirrorBeats,
   };
 }
 
@@ -153,7 +215,17 @@ export function parseGatherChoice(input: {
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
   if (!s.trim()) return null;
-  if (/\b(si|sí|yes|uno|1|claro|ok|dale|vamos)\b/.test(s)) return "1";
-  if (/\b(no|dos|2|luego|despues|después|nah)\b/.test(s)) return "2";
+  if (
+    /\b(si|yes|uno|1|claro|ok|dale|vamos|vale|bueno|manda|envia|quiero)\b/.test(
+      s,
+    )
+  ) {
+    return "1";
+  }
+  if (
+    /\b(no|dos|2|luego|despues|nah|ahora no|pensarlo)\b/.test(s)
+  ) {
+    return "2";
+  }
   return null;
 }

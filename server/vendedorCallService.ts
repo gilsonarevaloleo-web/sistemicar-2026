@@ -1,6 +1,10 @@
 import { construirGuionLlamada } from "../shared/vendedor/callScripts";
-import type { CodigoNumero } from "../shared/umbral/engineConfig";
-import { isPlanetaId, type PlanetaId } from "../shared/vendedor/planetasConfig";
+import { enlacePagoJornadaBase } from "../shared/vendedor/entradaComercial";
+import {
+  clampCodigoJornadaBase,
+  type CodigoJornadaBase,
+} from "../shared/vendedor/triageLogic";
+import type { PlanetaId } from "../shared/vendedor/planetasConfig";
 import {
   canAcceptNewCall,
   insertVendedorCall,
@@ -18,20 +22,10 @@ import {
   type CallCallbackParams,
 } from "./twilioVendedor";
 
-const CODIGOS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-
-function deepLinkFor(_planeta: PlanetaId, sellerRef?: string | null): string {
-  // Puerta comercial única: Jornada Base (Espejo/Umbral después).
-  const base = "https://www.sistemicar.app/pagos?plan=planificacion_base";
-  if (!sellerRef) return base;
-  return `${base}&ref=${encodeURIComponent(sellerRef)}`;
-}
-
 async function sendWhatsappWithTemplate(opts: {
   to: string;
   body: string;
-  codigo: CodigoNumero;
-  planeta: PlanetaId;
+  codigo: CodigoJornadaBase;
   sellerRef?: string | null;
 }): Promise<{ ok: boolean; sid?: string; error?: string }> {
   return sendWhatsappMessage({
@@ -40,7 +34,7 @@ async function sendWhatsappWithTemplate(opts: {
     contentVariables: buildWhatsAppContentVariables({
       planeta: "JORNADA",
       codigo: opts.codigo,
-      deepLink: deepLinkFor(opts.planeta, opts.sellerRef),
+      deepLink: enlacePagoJornadaBase(opts.sellerRef),
     }),
   });
 }
@@ -79,8 +73,8 @@ export async function solicitarLlamadaVendedor(
     };
   }
 
-  if (!CODIGOS.has(input.codigo) || !isPlanetaId(input.planeta)) {
-    return { ok: false, error: "Código o planeta inválido.", status: 400 };
+  if (!Number.isFinite(input.codigo)) {
+    return { ok: false, error: "Código inválido.", status: 400 };
   }
 
   const telefono = normalizePhoneE164(input.telefono);
@@ -97,8 +91,8 @@ export async function solicitarLlamadaVendedor(
       ? normalizePhoneE164(input.whatsapp)
       : telefono) || telefono;
   const sellerRef = input.sellerRef?.trim().toUpperCase() || null;
-  const codigo = input.codigo as CodigoNumero;
-  const planeta = input.planeta as PlanetaId;
+  const codigo = clampCodigoJornadaBase(input.codigo);
+  const planeta: PlanetaId = "JORNADA";
   const guion = construirGuionLlamada(codigo, planeta, sellerRef);
 
   const cupo = canAcceptNewCall();
@@ -292,24 +286,19 @@ export async function handleTwilioVoiceStatus(params: {
   }
 
   // Instancia fría: reconstruir desde query y mandar WhatsApp igual.
-  if (
-    params.telefono &&
-    params.codigo &&
-    params.planeta &&
-    isPlanetaId(params.planeta) &&
-    CODIGOS.has(params.codigo)
-  ) {
+  if (params.telefono && params.codigo) {
+    const codigo = clampCodigoJornadaBase(params.codigo);
+    const planeta: PlanetaId = "JORNADA";
     const guion = construirGuionLlamada(
-      params.codigo as CodigoNumero,
-      params.planeta,
+      codigo,
+      planeta,
       params.sellerRef,
     );
     const to = params.whatsapp || params.telefono;
     const msg = await sendWhatsappWithTemplate({
       to,
       body: guion.whatsapp,
-      codigo: params.codigo as CodigoNumero,
-      planeta: params.planeta,
+      codigo,
       sellerRef: params.sellerRef,
     });
     const now = new Date().toISOString();
@@ -336,8 +325,8 @@ export async function handleTwilioVoiceStatus(params: {
       id: params.callId,
       telefono: params.telefono,
       whatsapp: to,
-      codigo: params.codigo as CodigoNumero,
-      planeta: params.planeta,
+      codigo,
+      planeta,
       sellerRef: params.sellerRef ?? null,
       consentimiento: "llamame",
       status: statusFinal,
@@ -373,8 +362,7 @@ async function fallbackWhatsapp(
   const msg = await sendWhatsappWithTemplate({
     to,
     body: guion.whatsapp,
-    codigo: call.codigo,
-    planeta: call.planeta,
+    codigo: clampCodigoJornadaBase(call.codigo),
     sellerRef: call.sellerRef,
   });
 
@@ -419,7 +407,7 @@ export function resolveDialogContext(params: {
   planeta?: string;
   sellerRef?: string | null;
 }): {
-  codigo: CodigoNumero;
+  codigo: CodigoJornadaBase;
   planeta: PlanetaId;
   sellerRef: string | null;
 } | null {
@@ -427,21 +415,16 @@ export function resolveDialogContext(params: {
     const call = getVendedorCall(params.callId);
     if (call) {
       return {
-        codigo: call.codigo,
-        planeta: call.planeta,
+        codigo: clampCodigoJornadaBase(call.codigo),
+        planeta: "JORNADA",
         sellerRef: call.sellerRef,
       };
     }
   }
-  if (
-    params.codigo &&
-    params.planeta &&
-    isPlanetaId(params.planeta) &&
-    CODIGOS.has(params.codigo)
-  ) {
+  if (params.codigo) {
     return {
-      codigo: params.codigo as CodigoNumero,
-      planeta: params.planeta,
+      codigo: clampCodigoJornadaBase(params.codigo),
+      planeta: "JORNADA",
       sellerRef: params.sellerRef ?? null,
     };
   }
@@ -459,5 +442,187 @@ export function resolveGuionForTwiml(params: {
   if (ctx) {
     return construirGuionLlamada(ctx.codigo, ctx.planeta, ctx.sellerRef).voz;
   }
-  return "Hola. Soy el vendedor de Sistemicar. Entra en sistemicar punto app para continuar.";
+  return "Hola, te llamo de Sistemicar. Entra en sistemicar punto app cuando puedas.";
+}
+
+export type EnviarEnlacePagoInput = {
+  telefono: string;
+  whatsapp?: string | null;
+  codigo: number;
+  sellerRef?: string | null;
+  consentimiento: string;
+};
+
+export type EnviarEnlacePagoResult =
+  | {
+      ok: true;
+      call: VendedorCallRecord;
+      whatsappOk: boolean;
+      detail: string;
+    }
+  | { ok: false; error: string; status?: number };
+
+/** Desde la web: la vendedora manda el enlace de pago al WhatsApp. */
+export async function enviarEnlacePagoWhatsapp(
+  input: EnviarEnlacePagoInput,
+): Promise<EnviarEnlacePagoResult> {
+  const phrase = (input.consentimiento || "").trim().toLowerCase();
+  if (phrase !== "enlace-pago" && phrase !== "whatsapp") {
+    return {
+      ok: false,
+      error: "Consentimiento requerido: pide el enlace por WhatsApp.",
+      status: 400,
+    };
+  }
+
+  if (!Number.isFinite(input.codigo)) {
+    return { ok: false, error: "Código inválido.", status: 400 };
+  }
+
+  const telefono = normalizePhoneE164(input.telefono);
+  if (!telefono) {
+    return {
+      ok: false,
+      error: "WhatsApp inválido. Usa 9 dígitos Perú o formato internacional.",
+      status: 400,
+    };
+  }
+
+  const whatsappRaw =
+    (input.whatsapp?.trim()
+      ? normalizePhoneE164(input.whatsapp)
+      : telefono) || telefono;
+  const sellerRef = input.sellerRef?.trim().toUpperCase() || null;
+  const codigo = clampCodigoJornadaBase(input.codigo);
+  const planeta: PlanetaId = "JORNADA";
+  const guion = construirGuionLlamada(codigo, planeta, sellerRef);
+
+  const cupo = canAcceptNewCall();
+  const now = new Date().toISOString();
+  const id = `vc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  if (!cupo.ok) {
+    return {
+      ok: false,
+      error: `Límite de ${cupo.limit} envíos/día alcanzado. Intenta mañana.`,
+      status: 429,
+    };
+  }
+
+  const record: VendedorCallRecord = {
+    id,
+    telefono,
+    whatsapp: whatsappRaw,
+    codigo,
+    planeta,
+    sellerRef,
+    consentimiento: "enlace-pago",
+    status: "queued",
+    canalUsado: "whatsapp",
+    intentos: 1,
+    twilioCallSid: null,
+    twilioMessageSid: null,
+    error: null,
+    guionResumen: guion.whatsapp.slice(0, 160),
+    createdAt: now,
+    updatedAt: now,
+  };
+  insertVendedorCall(record);
+
+  const msg = await sendWhatsappWithTemplate({
+    to: whatsappRaw,
+    body: guion.whatsapp,
+    codigo,
+    sellerRef,
+  });
+
+  if (msg.ok && msg.sid) {
+    const updated = updateVendedorCall(id, {
+      status: "whatsapp_sent",
+      twilioMessageSid: msg.sid,
+    });
+    return {
+      ok: true,
+      call: updated ?? record,
+      whatsappOk: true,
+      detail: "Te mandé el enlace de Jornada Base por WhatsApp.",
+    };
+  }
+
+  const sms = await sendSmsMessage({ to: whatsappRaw, body: guion.whatsapp });
+  if (sms.ok && sms.sid) {
+    const updated = updateVendedorCall(id, {
+      status: "whatsapp_sent",
+      twilioMessageSid: sms.sid,
+      error: `wa:${msg.error || "failed"} | sms_ok`,
+    });
+    return {
+      ok: true,
+      call: updated ?? record,
+      whatsappOk: true,
+      detail: "WhatsApp no pasó; te lo mandé por SMS.",
+    };
+  }
+
+  const failed = updateVendedorCall(id, {
+    status: "failed",
+    error: `wa:${msg.error || "failed"}`,
+  });
+  return {
+    ok: true,
+    call: failed ?? record,
+    whatsappOk: false,
+    detail:
+      msg.error ||
+      "No pude enviar el WhatsApp. Revisa la plantilla o el número.",
+  };
+}
+
+/**
+ * Durante la llamada: si marca 1 (o 2, para dejarlo igual),
+ * mandar el enlace al WhatsApp que ya dejó.
+ */
+export async function enviarEnlacePagoDesdeLlamada(params: {
+  callId?: string;
+  telefono?: string;
+  whatsapp?: string;
+  codigo: number;
+  sellerRef?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const toRaw = params.whatsapp || params.telefono || "";
+  const to = normalizePhoneE164(toRaw) || (toRaw.startsWith("+") ? toRaw : null);
+  if (!to) {
+    return { ok: false, error: "sin_telefono" };
+  }
+
+  const codigo = clampCodigoJornadaBase(params.codigo);
+  const sellerRef = params.sellerRef ?? null;
+  const guion = construirGuionLlamada(codigo, "JORNADA", sellerRef);
+  const msg = await sendWhatsappWithTemplate({
+    to,
+    body: guion.whatsapp,
+    codigo,
+    sellerRef,
+  });
+
+  if (params.callId && msg.ok && msg.sid) {
+    updateVendedorCall(params.callId, {
+      twilioMessageSid: msg.sid,
+      canalUsado: "whatsapp",
+    });
+  }
+
+  if (msg.ok) return { ok: true };
+  const sms = await sendSmsMessage({ to, body: guion.whatsapp });
+  if (sms.ok && sms.sid) {
+    if (params.callId) {
+      updateVendedorCall(params.callId, {
+        twilioMessageSid: sms.sid,
+        canalUsado: "whatsapp",
+        error: `wa:${msg.error || "failed"} | sms_ok`,
+      });
+    }
+    return { ok: true };
+  }
+  return { ok: false, error: msg.error || "whatsapp_failed" };
 }

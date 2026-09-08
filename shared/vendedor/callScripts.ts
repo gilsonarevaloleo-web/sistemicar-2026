@@ -1,11 +1,14 @@
 /**
- * Guiones del Vendedor Algorítmico por Código (fase llamadas).
- * Diagnóstico = Código; puerta comercial = siempre Jornada Base.
+ * Guiones del Vendedor — WhatsApp y resumen de voz.
+ * Diagnóstico = códigos 1 / 2 / 3. Puerta comercial = siempre Jornada Base.
+ * Tono de persona, no de catálogo.
  */
 
 import type { CodigoNumero } from "../umbral/engineConfig.ts";
 import type { PlanetaId } from "./planetasConfig.ts";
-import { PUERTA_COMERCIAL_VENDEDOR, puertaComercialVendedor } from "./planetasConfig.ts";
+import { PUERTA_COMERCIAL_VENDEDOR } from "./planetasConfig.ts";
+import { enlacePagoJornadaBase } from "./entradaComercial.ts";
+import { clampCodigoJornadaBase } from "./triageLogic.ts";
 
 export interface GuionLlamada {
   codigo: CodigoNumero;
@@ -13,27 +16,14 @@ export interface GuionLlamada {
   puertaComercial: PlanetaId;
   /** Texto hablado en la llamada (TTS legacy / resumen). */
   voz: string;
-  /** Mensaje WhatsApp si no contesta. */
+  /** Mensaje WhatsApp con enlace de pago. */
   whatsapp: string;
 }
 
-const CIERRE_JORNADA = {
-  voz: "Tu puerta es la Jornada Base: medir unidades y cerrar el día. Entra en sistemicar punto app barra pagos, plan planificacion base.",
-  wa: "Tu puerta: *La Jornada Base*. → https://sistemicar.app/pagos?plan=planificacion_base",
-};
-
-/** Núcleo del guion por código (independiente del planeta de grieta). */
-const NUCLEO: Record<CodigoNumero, string> = {
-  1: "Detectamos niebla de utilidad: no está claro para qué te sirve avanzar hoy.",
-  2: "Detectamos sobrecarga: sientes que no das para una cosa más.",
-  3: "Detectamos fuga de tiempo: el día se va sin cierre medible.",
-  4: "Detectamos desconfianza por humo: ya te quemaron con promesas vacías.",
-  5: "Detectamos fricción de números: pides ROI y el marco se diluye.",
-  6: "Detectamos miedo o ansiedad que paraliza el siguiente paso.",
-  7: "Detectamos fricción de precio: te cuesta cobrar o justificar el valor.",
-  8: "Detectamos negociación compleja que estira la decisión.",
-  9: "Detectamos dificultad de cierre: casi, pero no hay veredicto.",
-  10: "Detectamos tema de autoridad y continuidad: quién sostiene el marco.",
+const NUCLEO_HUMANO: Record<1 | 2 | 3, string> = {
+  1: "Quedamos en esto: se te mezcla el día y no ves qué cerrar primero.",
+  2: "Quedamos en esto: ya vas a tope y no quieres otra carga.",
+  3: "Quedamos en esto: el día se te va entre incendios y no hay un cierre.",
 };
 
 export function construirGuionLlamada(
@@ -41,33 +31,33 @@ export function construirGuionLlamada(
   planeta: PlanetaId,
   sellerRef?: string | null,
 ): GuionLlamada {
-  const puerta = puertaComercialVendedor();
-  const nucleo = NUCLEO[codigo];
-  const refNota = sellerRef
-    ? ` Menciona el código de referido ${sellerRef} al pagar.`
-    : "";
+  const codigoJ = clampCodigoJornadaBase(codigo);
+  const nucleo = NUCLEO_HUMANO[codigoJ];
+  const link = enlacePagoJornadaBase(sellerRef);
 
   const voz = [
-    "Hola. Soy el vendedor de Sistemicar.",
+    "Hola, te llamo de Sistemicar.",
     nucleo,
-    `Código ${codigo}. La entrada es una sola: ${puerta.label}.`,
-    CIERRE_JORNADA.voz,
-    refNota.trim(),
-    "Si no es el momento, ignora este mensaje. Gracias.",
+    "La entrada es Jornada Base: mides lo que cierras hoy y el día termina con evidencia.",
+    sellerRef ? `Si pagas, menciona ${sellerRef}.` : "",
+    "Si no es el momento, déjalo. Gracias.",
   ]
     .filter(Boolean)
     .join(" ");
 
   const whatsapp = [
-    `SISTEMICAR — Código ${codigo} · puerta ${puerta.label}`,
+    "Hola, soy de Sistemicar.",
     nucleo,
-    CIERRE_JORNADA.wa +
-      (sellerRef ? `&ref=${encodeURIComponent(sellerRef)}` : ""),
-    "Pediste que te llamáramos. Si no aplica, ignora este mensaje.",
-  ].join("\n\n");
+    "Jornada Base es para medir lo que sí cierras hoy — no otra lista.",
+    `Aquí tienes el enlace para activarla:\n${link}`,
+    sellerRef ? `Al pagar, menciona ${sellerRef}.` : "",
+    "Si no es el momento, déjalo. Sin drama.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return {
-    codigo,
+    codigo: codigoJ,
     planeta,
     puertaComercial: PUERTA_COMERCIAL_VENDEDOR,
     voz,

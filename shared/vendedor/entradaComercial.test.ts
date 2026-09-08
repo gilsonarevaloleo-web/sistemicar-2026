@@ -7,6 +7,7 @@ import {
   JORNADA_ADS_CODIGO_DEFAULT,
   PAGOS_JORNADA_BASE_HREF,
   VENDEDOR_JORNADA_ADS_HREF,
+  enlacePagoJornadaBase,
 } from "./entradaComercial.ts";
 
 describe("Entrada comercial Jornada (anuncios)", () => {
@@ -29,6 +30,17 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.equal(parseEntradaComercialSearch(""), null);
   });
 
+  it("Espejo o Umbral en la query no saltan las preguntas", () => {
+    assert.equal(parseEntradaComercialSearch("?planeta=ESPEJO&codigo=6"), null);
+    assert.equal(parseEntradaComercialSearch("?planeta=UMBRAL&codigo=1"), null);
+  });
+
+  it("código fuera de 1–3 se recorta a 3", () => {
+    const p = parseEntradaComercialSearch("?planeta=JORNADA&codigo=7");
+    assert.ok(p);
+    assert.equal(p.codigo, 3);
+  });
+
   it("fijación de anuncio apunta a Jornada Base", () => {
     const f = fijacionDesdeEntradaComercial("JORNADA");
     assert.equal(f.planeta, "JORNADA");
@@ -44,6 +56,12 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.match(next, /planeta=JORNADA/);
     assert.match(next, /utm_source=facebook/);
     assert.match(next, /ref=GILSON/);
+  });
+
+  it("enlace de pago es Jornada Base y arrastra ref", () => {
+    assert.match(enlacePagoJornadaBase(), /plan=planificacion_base/);
+    assert.match(enlacePagoJornadaBase("ANA"), /ref=ANA/);
+    assert.doesNotMatch(enlacePagoJornadaBase("ANA"), /espejo|umbral/i);
   });
 
   it("checkout Base conserva tracking", () => {

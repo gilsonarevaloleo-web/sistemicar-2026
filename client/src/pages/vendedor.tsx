@@ -1,12 +1,12 @@
 /**
- * Vendedor Capa 1 — Triage determinista Código + Planeta.
- * Público (sin login). Persiste fijación para fase de llamadas.
+ * Vendedor Capa 1 — Jornada Base, códigos 1 / 2 / 3.
+ * Público (sin login). Persiste fijación para la llamada y el enlace de pago.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, Crosshair, Phone, RotateCcw } from "lucide-react";
+import { ArrowRight, MessageCircle, Phone, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   VENDEDOR_TRIAGE_PREGUNTAS,
@@ -38,8 +38,12 @@ export default function VendedorTriagePage() {
   const [callLoading, setCallLoading] = useState(false);
   const [callDone, setCallDone] = useState(false);
   const [callStatusMsg, setCallStatusMsg] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkDone, setLinkDone] = useState(false);
+  const [linkStatusMsg, setLinkStatusMsg] = useState<string | null>(null);
   const llamameRef = useRef<HTMLDivElement>(null);
   const callInFlight = useRef(false);
+  const linkInFlight = useRef(false);
   const entradaAplicada = useRef(false);
 
   const sellerRef = useMemo(() => {
@@ -83,7 +87,7 @@ export default function VendedorTriagePage() {
   function elegirMatiz(op: VendedorTriageOpcion) {
     try {
       if (!grietaPick) {
-        toast.error("Vuelve a la pregunta 1 e intenta de nuevo.");
+        toast.error("Vuelve un paso atrás e inténtalo de nuevo.");
         setPaso(0);
         return;
       }
@@ -93,7 +97,7 @@ export default function VendedorTriagePage() {
       setPaso(2);
     } catch (e: unknown) {
       console.error("[vendedor] elegirMatiz", e);
-      toast.error("No se pudo fijar el diagnóstico. Intenta otra opción.");
+      toast.error("No se pudo guardar. Prueba otra opción.");
     }
   }
 
@@ -104,6 +108,8 @@ export default function VendedorTriagePage() {
     setTelefono("");
     setCallDone(false);
     setCallStatusMsg(null);
+    setLinkDone(false);
+    setLinkStatusMsg(null);
     entradaAplicada.current = true;
     const keepRef = sellerRef
       ? `?ref=${encodeURIComponent(sellerRef)}`
@@ -123,7 +129,7 @@ export default function VendedorTriagePage() {
     }
     callInFlight.current = true;
     setCallLoading(true);
-    setCallStatusMsg("Contactando Twilio…");
+    setCallStatusMsg("Te estoy marcando…");
     try {
       const res = await fetch("/api/vendedor/solicitar-llamada", {
         method: "POST",
@@ -132,7 +138,7 @@ export default function VendedorTriagePage() {
           telefono: tel,
           whatsapp: tel,
           codigo: fijacion.codigo,
-          planeta: fijacion.planeta,
+          planeta: "JORNADA",
           sellerRef: sellerRef || undefined,
           consentimiento: "llamame",
         }),
@@ -145,11 +151,10 @@ export default function VendedorTriagePage() {
           (data.voiceError || data.errorDetail || data.message)) ||
         data.message ||
         (data.voiceOk
-          ? "Llamada iniciada."
+          ? "Ya te estoy llamando."
           : "Solicitud registrada.");
       setCallStatusMsg(msg);
       if (bothFailed) {
-        // No marcar done: permite reintentar tras verificar número / ContentSid.
         toast.error(msg);
       } else {
         setCallDone(true);
@@ -162,6 +167,50 @@ export default function VendedorTriagePage() {
     } finally {
       callInFlight.current = false;
       setCallLoading(false);
+    }
+  }
+
+  async function enviarEnlacePago() {
+    if (!fijacion || linkLoading || linkDone || linkInFlight.current) return;
+    const tel = telefono.trim();
+    if (!tel) {
+      setLinkStatusMsg("Escribe tu WhatsApp primero.");
+      toast.error("Escribe tu WhatsApp primero.");
+      return;
+    }
+    linkInFlight.current = true;
+    setLinkLoading(true);
+    setLinkStatusMsg("Mandando el enlace…");
+    try {
+      const res = await fetch("/api/vendedor/enviar-enlace-pago", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefono: tel,
+          whatsapp: tel,
+          codigo: fijacion.codigo,
+          planeta: "JORNADA",
+          sellerRef: sellerRef || undefined,
+          consentimiento: "enlace-pago",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error");
+      const msg = data.message || "Te mandé el enlace por WhatsApp.";
+      setLinkStatusMsg(msg);
+      if (data.whatsappOk) {
+        setLinkDone(true);
+        toast.success(msg);
+      } else {
+        toast.error(msg);
+      }
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e.message : "No se pudo enviar";
+      setLinkStatusMsg(err);
+      toast.error(err);
+    } finally {
+      linkInFlight.current = false;
+      setLinkLoading(false);
     }
   }
 
@@ -179,16 +228,16 @@ export default function VendedorTriagePage() {
           className="text-[12px] tracking-[0.22em]"
           style={{ color: GOLD }}
         >
-          SISTEMICAR · VENDEDOR
+          SISTEMICAR · JORNADA BASE
         </p>
         <h1
           className="mt-2 text-3xl font-black text-white"
           style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
         >
-          ¿Por dónde entras?
+          ¿Qué te está costando el día?
         </h1>
         <p className="mt-2 text-sm text-white/55">
-          Dos preguntas. Toca una opción en cada paso — fijamos Código y Planeta.
+          Dos toques. Con eso te dejo el camino a Jornada Base.
         </p>
         {sellerRef && (
           <p className="mt-2 text-[10px] tracking-widest text-white/35">
@@ -210,7 +259,9 @@ export default function VendedorTriagePage() {
             <h2 className="text-lg font-bold text-white/90">
               {preguntaGrieta.pregunta}
             </h2>
-            <p className="text-[11px] text-white/35">Toca una opción para continuar</p>
+            <p className="text-[11px] text-white/35">
+              Elige la que más se te parece hoy
+            </p>
             <div className="space-y-2">
               {preguntaGrieta.opciones.map((op) => (
                 <button
@@ -246,14 +297,13 @@ export default function VendedorTriagePage() {
             data-testid="vendedor-pregunta-matiz"
           >
             <p className="text-[10px] tracking-[0.2em] text-white/40">
-              PREGUNTA 2 / 2 ·{" "}
-              <span style={{ color: GOLD }}>{grietaPick.planeta}</span>
+              PREGUNTA 2 / 2
             </p>
             <h2 className="text-lg font-bold text-white/90">
-              ¿Cuál te describe mejor hoy?
+              ¿En qué se te nota más hoy?
             </h2>
             <p className="text-[11px] text-white/35">
-              Toca una opción → verás tu planeta y el botón Llámame
+              Un toque más y te digo cómo seguir
             </p>
             <div className="space-y-2">
               {opcionesMatiz.map((op) => (
@@ -306,34 +356,26 @@ export default function VendedorTriagePage() {
               }}
             >
               <p
-                className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
+                className="text-[10px] tracking-[0.2em]"
                 style={{ color: fijacion.color }}
               >
-                <Crosshair size={14} />
-                CÓDIGO FIJADO · PUERTA JORNADA
+                JORNADA BASE
               </p>
               <h2
                 className="mt-2 text-2xl font-black text-white"
                 style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
               >
-                La Jornada Base
+                Por aquí se entra
               </h2>
-              <p className="mt-1 text-sm text-white/60">
-                Código {fijacion.codigo}
-                {fijacion.arquetipoNombre
-                  ? ` · ${fijacion.arquetipoNombre}`
-                  : ""}
+              <p className="mt-3 text-sm leading-relaxed text-white/75">
+                {fijacion.resumenHumano}
               </p>
-              <p className="mt-1 text-[12px] text-white/45">
-                {fijacion.nombreCodigo}
-              </p>
-              <p className="mt-2 text-[11px] text-white/40 leading-relaxed">
-                Diagnóstico: {fijacion.planetaLabel}. Entrada comercial: solo
-                Jornada Base.
+              <p className="mt-2 text-[12px] text-white/45 leading-relaxed">
+                No es otra lista. Mides lo que cierras hoy y el día termina con
+                evidencia.
               </p>
             </div>
 
-            {/* Llámame arriba en móvil — no queda bajo el pliegue */}
             <div
               ref={llamameRef}
               className="border p-4 space-y-3"
@@ -348,13 +390,12 @@ export default function VendedorTriagePage() {
                 style={{ color: GOLD }}
               >
                 <Phone size={14} />
-                LLÁMAME · VENDEDOR ALGORÍTMICO
+                ¿TE LLAMO O TE MANDO EL ENLACE?
               </p>
               <p className="text-[12px] text-white/55 leading-relaxed">
-                Deja tu número. Primero te llamamos por teléfono; si no
-                contestas, WhatsApp. En la llamada marca <span className="text-white/80">1</span> o{" "}
-                <span className="text-white/80">2</span> para responder a la
-                vendedora.
+                Déjame tu WhatsApp. Te hablo un minuto — o, si prefieres, te
+                mando ahora el enlace de pago. En la llamada puedes marcar{" "}
+                <span className="text-white/80">1</span> o decir «sí».
                 {callStatusMsg && /21219|verificad|trial/i.test(callStatusMsg) ? (
                   <span className="block mt-2 text-[#FCA5A5]/55">
                     Si Twilio está en trial: el +51 debe estar en Verified Caller
@@ -366,10 +407,10 @@ export default function VendedorTriagePage() {
                 type="tel"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej. 918260514 o +51…"
+                placeholder="Tu WhatsApp. Ej. 918260514"
                 className="w-full px-3 py-3 bg-black/50 border border-white/15 text-sm text-white"
                 data-testid="vendedor-telefono"
-                disabled={callDone || callLoading}
+                disabled={(callDone && linkDone) || callLoading || linkLoading}
                 autoComplete="tel"
               />
               <button
@@ -390,10 +431,34 @@ export default function VendedorTriagePage() {
               >
                 <Phone size={16} />
                 {callDone
-                  ? "SOLICITUD ENVIADA"
+                  ? "YA TE ESTOY LLAMANDO"
                   : callLoading
-                    ? "ENVIANDO…"
+                    ? "MARCANDO…"
                     : "LLÁMAME"}
+              </button>
+              <button
+                type="button"
+                disabled={linkDone || linkLoading || !telefono.trim()}
+                onPointerUp={(e) => {
+                  e.preventDefault();
+                  void enviarEnlacePago();
+                }}
+                onClick={() => void enviarEnlacePago()}
+                className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[12px] font-bold tracking-[0.08em] disabled:opacity-40 touch-manipulation"
+                style={{
+                  borderColor: `${GOLD}88`,
+                  color: GOLD,
+                  background: "rgba(0,0,0,0.25)",
+                  WebkitTapHighlightColor: "rgba(212,175,55,0.35)",
+                }}
+                data-testid="vendedor-btn-enlace-whatsapp"
+              >
+                <MessageCircle size={16} />
+                {linkDone
+                  ? "ENLACE ENVIADO"
+                  : linkLoading
+                    ? "ENVIANDO…"
+                    : "MÁNDAME EL ENLACE POR WHATSAPP"}
               </button>
               {callStatusMsg && (
                 <p
@@ -410,6 +475,21 @@ export default function VendedorTriagePage() {
                   data-testid="vendedor-call-status"
                 >
                   {callStatusMsg}
+                </p>
+              )}
+              {linkStatusMsg && (
+                <p
+                  className="text-[12px] leading-relaxed"
+                  style={{
+                    color: linkDone
+                      ? "#86EFAC"
+                      : linkLoading
+                        ? GOLD
+                        : "#FCA5A5",
+                  }}
+                  data-testid="vendedor-link-status"
+                >
+                  {linkStatusMsg}
                 </p>
               )}
             </div>
@@ -437,33 +517,6 @@ export default function VendedorTriagePage() {
               {fijacion.checkoutLabel}
             </Link>
 
-            <div
-              className="border p-3"
-              style={{
-                borderColor: `${fijacion.color}44`,
-                background: "rgba(0,0,0,0.35)",
-              }}
-            >
-              <p
-                className="text-[10px] tracking-widest"
-                style={{ color: fijacion.color }}
-              >
-                GRIETA
-              </p>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-                {fijacion.grieta}
-              </p>
-              <p
-                className="mt-3 text-[10px] tracking-widest"
-                style={{ color: GOLD }}
-              >
-                PREGUNTA DISPARADORA
-              </p>
-              <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-                {fijacion.preguntaDisparadora}
-              </p>
-            </div>
-
             <button
               type="button"
               onClick={reiniciar}
@@ -471,11 +524,11 @@ export default function VendedorTriagePage() {
               data-testid="vendedor-rehacer"
             >
               <RotateCcw size={12} />
-              REHACER DIAGNÓSTICO
+              EMPEZAR DE NUEVO
             </button>
 
             <p className="text-center text-[10px] text-white/25">
-              SISTEMICAR · puerta de entrada por Código
+              SISTEMICAR · Jornada Base
             </p>
           </motion.section>
         )}
