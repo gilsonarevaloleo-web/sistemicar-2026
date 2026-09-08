@@ -29,7 +29,7 @@ import {
   formatDuracionTimon,
   hydratePresenciaEpisodio,
   hydrateTimonEpisodio,
-  wallMinutosReales,
+  trabajoMinutosReales,
   type TimonEpisodio,
   type TimonVehiculoFuente,
   type TimonVehiculoStamp,
@@ -127,7 +127,7 @@ function vehicleRegistro(
   if (!vid) return null;
   const a = sealed.aperturaAt;
   if (typeof a !== "number" || !Number.isFinite(a) || a <= 0) return null;
-  const minutos = wallMinutosReales(sealed, now);
+  const minutos = trabajoMinutosReales(sealed, now);
   if (minutos <= 0) return null;
   let z: number;
   if (sealed.status === "activo") {

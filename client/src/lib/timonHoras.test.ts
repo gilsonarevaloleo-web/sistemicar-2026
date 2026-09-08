@@ -317,6 +317,55 @@ describe("timonHoras — historia verdadera del timón", () => {
     );
   });
 
+  it("desglosador sin unidades no infla el reporte con la pared", () => {
+    assert.equal(
+      trabajoMinutosReales({
+        status: "archivado",
+        tipoReloj: "desglosador",
+        aperturaAt: 1_000,
+        cierreAt: 1_000 + 20 * 60_000,
+        duracionFinal: 20,
+        subVehiculos: [{ id: "s1", status: "pendiente" }],
+      }),
+      0
+    );
+  });
+
+  it("interrupción no suma al padre: el hijo es otro vehículo", () => {
+    const now = 1_000_000 + 40 * 60_000;
+    assert.equal(
+      trabajoMinutosReales(
+        {
+          status: "activo",
+          tipoReloj: "desglosador",
+          interrupcionActiva: true,
+          desglosadorPausa: {
+            pausadoAt: 1_000_000 + 10 * 60_000,
+            subActivoId: "u1",
+            elapsedSecSnapshot: 10 * 60,
+          },
+          subVehiculos: [
+            { id: "u1", status: "nested_paused", aperturaAt: 1_000_000 },
+          ],
+        },
+        now
+      ),
+      10
+    );
+    assert.equal(
+      trabajoMinutosReales(
+        {
+          status: "activo",
+          tipoFlota: "situacion",
+          vehiculoPadreDesglosadorId: "padre",
+          aperturaAt: 1_000_000 + 10 * 60_000,
+        },
+        now
+      ),
+      30
+    );
+  });
+
   it("minutosCruceHora parte 131 min en 60+60+11", () => {
     assert.equal(minutosCruceHora(0, 131, 1), 60);
     assert.equal(minutosCruceHora(0, 131, 2), 60);

@@ -17,6 +17,11 @@ import {
   ledgerNombresMinutos,
   minutosDeProyecto,
 } from "@/lib/clasificarTiempoProyecto";
+import {
+  trabajoMinutosReales,
+  wallMinutosReales,
+} from "@/lib/timonHoras";
+import { isContenedorDesglose } from "@/lib/vehiculoMinutos";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
   formatHoraLabel,
@@ -142,6 +147,14 @@ export function ProyectoGastoConcienciaCard({
     [clasificados, proyectoId]
   );
   const minutosProyecto = minutosDeProyecto(clasificados, proyectoId);
+  const minutosIdle = useMemo(() => {
+    let idle = 0;
+    for (const v of delProyecto) {
+      if (!isContenedorDesglose(v)) continue;
+      idle += Math.max(0, wallMinutosReales(v) - trabajoMinutosReales(v));
+    }
+    return idle;
+  }, [delProyecto]);
   const bucketsCal = useMemo(() => groupRegistros(propios, horizon), [propios, horizon]);
 
   const total = Math.max(dia.minutosDia || MINUTOS_DIA_JORNADA, 1);
@@ -162,10 +175,12 @@ export function ProyectoGastoConcienciaCard({
         En qué se gasta el tiempo
       </p>
       <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-        La barra es del día-jornada (24 h). Abajo, este proyecto suma:
-        cada vehículo con su nombre y minutos. 30 min mañana + 15 noche = 45.
-        Un desglosador combinado parte el tiempo entre proyectos; no se copia
-        un vehículo ajeno al timón.
+        La barra es del día-jornada (24 h). Abajo, este proyecto suma
+        minutos de vehículo: cada fila, unidad o interrupción con su nombre.
+        30 min mañana + 15 noche = 45. El hueco del desglosador sin vehículo
+        no entra aquí (idle). La interrupción de Conquista es otro vehículo,
+        no se suma al padre. Un desglosador combinado parte el tiempo entre
+        proyectos; no se copia un vehículo ajeno al timón.
       </p>
 
       <div
@@ -201,17 +216,22 @@ export function ProyectoGastoConcienciaCard({
           </p>
           <ul className="space-y-0.5">
             {crecimiento.map(v => (
-              <li
-                key={v.vehicleId}
-                className="flex items-baseline justify-between gap-2 text-[9px] text-slate-300"
-              >
-                <span className="truncate">{v.titulo}</span>
-                <span className="tabular-nums shrink-0" style={{ color: GOLD }}>
-                  {formatDuracionTimon(v.minutos)}
-                </span>
-              </li>
-            ))}
-          </ul>
+                <li
+                  key={v.vehicleId}
+                  className="flex items-baseline justify-between gap-2 text-[9px] text-slate-300"
+                >
+                  <span className="truncate">{v.titulo}</span>
+                  <span className="tabular-nums shrink-0" style={{ color: GOLD }}>
+                    {formatDuracionTimon(v.minutos)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {minutosIdle > 0 ? (
+              <p className="text-[8px] mt-1" style={{ color: MUTED }} data-testid="hub-gasto-idle">
+                Sin vehículo en el desglosador · {formatDuracionTimon(minutosIdle)} (idle, no suma)
+              </p>
+            ) : null}
         </div>
       ) : null}
 

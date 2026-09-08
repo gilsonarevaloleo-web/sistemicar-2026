@@ -11,6 +11,11 @@
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
 import type { DestinoCierre } from "./destinoCierre";
 import type { SubTarea, SubVehiculo, Vehicle } from "./persistence";
+import {
+  idleSecondsContenedor,
+  isContenedorDesglose,
+  measuredWorkSeconds,
+} from "./vehiculoMinutos";
 
 export type DestinoGasto = "presencia" | "direccion";
 
@@ -31,9 +36,12 @@ export type GastoTiempoSello = {
   a: number;
   /** endedAt ms */
   z: number;
-  /** Pared, segundos sellados. */
+  /**
+   * Segundos de trabajo (minutos de vehículo). En un contenedor es Σ filas/unidades,
+   * no la pared del desglosador. `a`/`z` siguen siendo el intervalo de pared.
+   */
   sec: number;
-  /** Pared no cubierta por subs de medida. Solo si > 0. */
+  /** Pared no cubierta por vehículos internos. Solo si > 0. */
   idle?: number;
 };
 
@@ -84,14 +92,16 @@ export function classifyFuenteGasto(
     | "situacionCronometro"
     | "vehiculoPadreDesglosadorId"
     | "subVehiculos"
+    | "subTareas"
+    | "status"
   >
 ): FuenteGasto {
   if (vehicle.vehiculoPadreDesglosadorId) return "interrupt";
   if (vehicle.tipoFlota === "situacion" && !vehicle.situacionCronometro) {
     return "lista_rapida";
   }
-  if (vehicle.tipoReloj === "desglosador") {
-    const measured = measuredSubSeconds(vehicle.subVehiculos);
+  if (isContenedorDesglose(vehicle)) {
+    const measured = measuredWorkSeconds(vehicle);
     if (measured <= 0) return "idle_desglose";
   }
   return "vehiculo";
@@ -160,17 +170,19 @@ export function resolveWallSeconds(
 }
 
 export function idleSecondsOfVehicle(
-  vehicle: Pick<Vehicle, "tipoReloj" | "tipoFlota" | "subVehiculos" | "subTareas">,
-  wallSec: number
+  vehicle: Parameters<typeof idleSecondsContenedor>[0],
+  wallSec: number,
+  now = Date.now()
 ): number {
   if (wallSec <= 0) return 0;
+  if (isContenedorDesglose(vehicle)) {
+    return idleSecondsContenedor(vehicle, wallSec, now);
+  }
   let measured = 0;
-  if (vehicle.tipoReloj === "desglosador") {
-    measured = measuredSubSeconds(vehicle.subVehiculos);
-  } else if (vehicle.tipoFlota === "situacion") {
+  if (vehicle.tipoFlota === "situacion") {
     measured = measuredSituacionSeconds(vehicle.subTareas);
   }
-  if (measured <= 0) return wallSec;
+  if (measured <= 0) return 0;
   const idle = wallSec - measured;
   return idle >= IDLE_FLOOR_SEC ? idle : 0;
 }
@@ -191,6 +203,11 @@ export function sealGastoTiempo(
     | "vehiculoPadreDesglosadorId"
     | "subVehiculos"
     | "subTareas"
+    | "status"
+    | "interrupcionActiva"
+    | "desglosadorPausa"
+    | "situacionNestedPause"
+    | "situacionCupoAnchor"
   >,
   now = Date.now()
 ): GastoTiempoSello | null {
@@ -200,7 +217,10 @@ export function sealGastoTiempo(
   if (!wall) return null;
   const dest = destinoGastoFromCierre(vehicle.destinoCierre);
   const src = classifyFuenteGasto(vehicle);
-  const idle = idleSecondsOfVehicle(vehicle, wall.sec);
+  const idle = idleSecondsOfVehicle(vehicle, wall.sec, now);
+  const workSec = isContenedorDesglose(vehicle)
+    ? measuredWorkSeconds(vehicle, now)
+    : wall.sec;
   const titulo = vehicle.titulo?.trim();
   const pid = vehicle.proyectoId?.trim();
   return {
@@ -211,7 +231,7 @@ export function sealGastoTiempo(
     src,
     a: wall.a,
     z: wall.z,
-    sec: wall.sec,
+    sec: workSec,
     ...(idle > 0 ? { idle } : {}),
   };
 }

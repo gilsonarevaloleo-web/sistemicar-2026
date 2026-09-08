@@ -97,4 +97,27 @@ describe("clasificarTiempoProyecto", () => {
     assert.equal(c.partes.length, 0);
     assert.equal(minutosDeProyecto([c], "costura"), 0);
   });
+
+  it("ring Enfoque suma filas, no la pared del desglosador", () => {
+    const c = clasificarTiempoVehiculo(
+      v({
+        id: "ring",
+        titulo: "Tarde de costura",
+        status: "archivado",
+        tipoFlota: "situacion",
+        situacionCronometro: { activo: false },
+        destinoCierre: "peldano",
+        proyectoId: "costura",
+        duracionFinal: 90,
+        aperturaAt: 1_000,
+        cierreAt: 1_000 + 90 * 60_000,
+        subTareas: [
+          { titulo: "Corte", proyectoId: "costura", duracionRealSec: 40 * 60, enDesgloseCronometro: true },
+          { titulo: "Costura", proyectoId: "costura", duracionRealSec: 20 * 60, enDesgloseCronometro: true },
+        ],
+      })
+    );
+    assert.equal(c.modo, "dedicado");
+    assert.equal(c.minutos, 60);
+  });
 });

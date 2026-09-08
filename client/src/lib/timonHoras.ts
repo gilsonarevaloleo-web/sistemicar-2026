@@ -7,6 +7,12 @@
  * (lo ya caminado). El nuevo punto empieza otra vez en Hora 1.
  */
 
+import {
+  isContenedorDesglose,
+  trabajoMinutosDeVehiculo,
+  type VehiculoMinutosFuente,
+} from "./vehiculoMinutos";
+
 export const MINUTOS_POR_HORA = 60;
 
 export interface TimonVehiculoStamp {
@@ -333,53 +339,24 @@ export function wallMinutosReales(
   return 0;
 }
 
-function measuredMinutosDeSubs(vehicle: {
-  tipoReloj?: string;
-  tipoFlota?: string;
-  subVehiculos?: Array<{ duracionFinal?: number }> | null;
-  subTareas?: Array<{ duracionRealSec?: number }> | null;
-}): number {
-  if (vehicle.tipoReloj === "desglosador" && vehicle.subVehiculos) {
-    let sec = 0;
-    for (const s of vehicle.subVehiculos) {
-      const d = s.duracionFinal;
-      if (typeof d === "number" && Number.isFinite(d) && d > 0) sec += d;
-    }
-    if (sec > 0) return Math.max(1, Math.round(sec / 60));
-  }
-  if (vehicle.tipoFlota === "situacion" && vehicle.subTareas) {
-    let sec = 0;
-    for (const s of vehicle.subTareas) {
-      const d = s.duracionRealSec;
-      if (typeof d === "number" && Number.isFinite(d) && d > 0) sec += d;
-    }
-    if (sec > 0) return Math.max(1, Math.round(sec / 60));
-  }
-  return 0;
-}
-
 /**
  * Minutos de trabajo para el reporte de producción.
- * Unidades/filas medidas ganan a la pared (un vehículo abierto 4 h con
- * 40 min de costura cuenta 40). Vivo sin medida → pared hasta ahora.
+ * Contenedor (Enfoque/Conquista): Σ minutos de cada vehículo interno
+ * (fila, unidad, tramo vivo). Hueco sin vehículo → 0, no la pared.
+ * Vehículo simple (lista libre, interrupción, rápido): pared propia.
  */
 export function trabajoMinutosReales(
-  vehicle: {
-    status?: string;
-    tipoReloj?: string;
-    tipoFlota?: string;
+  vehicle: VehiculoMinutosFuente & {
     aperturaAt?: number;
     cierreAt?: number;
     duracionFinal?: number;
-    interrupcionActiva?: boolean;
-    desglosadorPausa?: { pausadoAt?: number } | null;
-    situacionNestedPause?: { pausedAt?: number } | null;
-    subVehiculos?: Array<{ duracionFinal?: number }> | null;
-    subTareas?: Array<{ duracionRealSec?: number }> | null;
   },
   now = Date.now()
 ): number {
-  const medido = measuredMinutosDeSubs(vehicle);
+  if (isContenedorDesglose(vehicle)) {
+    return trabajoMinutosDeVehiculo(vehicle, now);
+  }
+  const medido = trabajoMinutosDeVehiculo(vehicle, now);
   if (medido > 0) return medido;
   if (vehicle.status !== "activo") {
     if (typeof vehicle.duracionFinal === "number" && vehicle.duracionFinal > 0) {
@@ -404,19 +381,27 @@ export type TimonVehiculoFuente = {
   cierreAt?: number;
   duracionFinal?: number;
   interrupcionActiva?: boolean;
-  desglosadorPausa?: { pausadoAt?: number } | null;
-  situacionNestedPause?: { pausedAt?: number } | null;
+  desglosadorPausa?: VehiculoMinutosFuente["desglosadorPausa"];
+  situacionNestedPause?: VehiculoMinutosFuente["situacionNestedPause"];
+  situacionCronometro?: VehiculoMinutosFuente["situacionCronometro"];
+  situacionCupoAnchor?: VehiculoMinutosFuente["situacionCupoAnchor"];
   vehiculoPadreDesglosadorId?: string;
   subVehiculos?: Array<{
+    id?: string;
     titulo?: string;
     proyectoId?: string;
     duracionFinal?: number;
+    status?: string;
+    aperturaAt?: number;
   }> | null;
   subTareas?: Array<{
+    id?: string;
     titulo?: string;
     proyectoId?: string;
     duracionRealSec?: number;
     duracionFinal?: number;
+    enDesgloseCronometro?: boolean;
+    resultadoSituacion?: string;
   }> | null;
 };
 
@@ -650,11 +635,11 @@ export function hydratePresenciaEpisodio(params: {
   for (const s of base.vehiculos) byId.set(s.vehicleId, s);
 
   for (const v of matching) {
-    const wall = wallMinutosReales(v, now);
-    if (wall <= 0) continue;
+    const trabajo = trabajoMinutosReales(v, now);
+    if (trabajo <= 0) continue;
     const prev = byId.get(v.id);
     if (prev) {
-      if (wall > prev.minutos) byId.set(v.id, { ...prev, minutos: wall });
+      if (trabajo > prev.minutos) byId.set(v.id, { ...prev, minutos: trabajo });
     } else {
       const stamp = stampFromVehicle(v, 0, now);
       if (stamp) byId.set(v.id, stamp);
