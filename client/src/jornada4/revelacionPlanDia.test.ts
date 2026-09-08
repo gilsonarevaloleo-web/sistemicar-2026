@@ -82,6 +82,7 @@ describe("revelacionPlanDia", () => {
         aperturaAt: lima("20:00"),
         cierreAt: lima("21:00"),
         destinoCierre: "peldano",
+        proyectoId: "n1",
       }),
       v({
         id: "pre",
@@ -125,6 +126,7 @@ describe("revelacionPlanDia", () => {
           aperturaAt: lima("20:00"),
           cierreAt: lima("23:00"),
           destinoCierre: "peldano",
+          proyectoId: "n1",
         }),
       ],
     });

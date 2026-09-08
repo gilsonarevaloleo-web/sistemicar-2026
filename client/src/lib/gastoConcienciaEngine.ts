@@ -23,7 +23,7 @@ import {
   type MsInterval,
   type TriadaLineaOccupancy,
 } from "./concienciaTriadaLinea";
-import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
+import { vehicleCuentaComoDireccion } from "./destinoCierre";
 import { getJournalDateString, getLimaDayStartMs } from "./segmentTime";
 import {
   formatDuracionTimon,
@@ -137,9 +137,7 @@ function vehicleRegistro(
   } else {
     z = a + minutos * 60_000;
   }
-  const dest: DestinoGastoConciencia = feedsProyectoHub(
-    resolveDestinoCierre(v.destinoCierre)
-  )
+  const dest: DestinoGastoConciencia = vehicleCuentaComoDireccion(v)
     ? "direccion"
     : "presencia";
   const pid = v.proyectoId?.trim();

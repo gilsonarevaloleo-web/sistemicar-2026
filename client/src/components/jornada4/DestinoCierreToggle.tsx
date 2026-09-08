@@ -256,7 +256,7 @@ export function DestinoCierreToggle({
         >
           {peldanoOn
             ? `Rumbo recibido · el envío va a «${selectedGate.titulo}»`
-            : "Rumbo recibido · el envío cubre el día"}
+            : "Presencia cubre el día. Nombrar el vehículo instala el piloto (21 días)."}
         </p>
       ) : null}
 

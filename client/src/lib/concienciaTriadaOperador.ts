@@ -7,7 +7,7 @@
  * No usa el pulso de cobertura ni el “vehículo abierto ahora”.
  * Persistencia local ligera; prohibido en ms0 — solo sombra / idle.
  */
-import { resolveDestinoCierre, feedsProyectoHub } from "./destinoCierre";
+import { resolveDestinoCierre, feedsProyectoHub, vehicleCuentaComoDireccion } from "./destinoCierre";
 import { safeSetItem } from "./storageHygiene";
 import { getJournalDateString, segmentTimeToMinutes } from "./segmentTime";
 import {
@@ -39,7 +39,7 @@ export const TRIADA_META: Record<
   },
   presencia: {
     label: "Presencia",
-    hint: "Vehículos sin dirección — estuviste, no dirigiste.",
+    hint: "Voluntad sin rumbo. Estuviste; no dirigiste.",
     color: "#34D399",
   },
   direccion: {
@@ -386,8 +386,7 @@ export function accumulateActiveTriadaMinutos(
     const apertura = v.aperturaAt ?? now;
     const elapsed = Math.max(0, (now - apertura) / 60_000);
     if (elapsed < 0.05) continue;
-    const destino = resolveDestinoCierre(v.destinoCierre);
-    if (feedsProyectoHub(destino)) minutosDireccion += elapsed;
+    if (vehicleCuentaComoDireccion(v)) minutosDireccion += elapsed;
     else minutosPresencia += elapsed;
   }
   return {
@@ -418,7 +417,7 @@ export function accumulateClosedTriadaMinutos(
     if (vehicleJournalFecha(v) !== fecha) continue;
     const minutos = resolveDuracionMinCierre(v);
     if (minutos <= 0) continue;
-    const isDir = feedsProyectoHub(resolveDestinoCierre(v.destinoCierre));
+    const isDir = vehicleCuentaComoDireccion(v);
     items.push({ vehicleId: id, minutos, isDir });
     if (isDir) minutosDireccion += minutos;
     else minutosPresencia += minutos;
@@ -595,7 +594,7 @@ export function buildConcienciaTriadaModel(params: {
   if (etapaDominante === "direccion") {
     headline = `Dominante Dirección · ${pctDireccion}% de lo vivido en el plan.`;
   } else if (etapaDominante === "presencia") {
-    headline = `Dominante Presencia · ${pctPresencia}% — vehículos sin rumbo.`;
+    headline = `Dominante Presencia · ${pctPresencia}% — voluntad sin rumbo.`;
   } else if (minutosHueco > 0) {
     headline = `Inconsciencia: ${Math.round(minutosHueco)} min sin vehículo en el plan.`;
   } else if (minutosPlanFuturo > 0) {

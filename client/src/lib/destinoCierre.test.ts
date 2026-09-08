@@ -29,6 +29,7 @@ describe("destinoCierre", () => {
     assert.equal(DESTINO_CIERRE_COPY.peldano.label, "Dirección");
     assert.match(DESTINO_CIERRE_COPY.peldano.hint, /oleada/);
     assert.match(DESTINO_CIERRE_COPY.presencia.hint, /No toca el proyecto/);
+    assert.match(DESTINO_CIERRE_COPY.presencia.hint, /21 días/);
   });
 
   it("resolveProyectoChipId pinta el toque antes que el vehículo", () => {
