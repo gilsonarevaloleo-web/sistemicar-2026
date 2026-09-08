@@ -104,8 +104,11 @@ describe("gastoTiempo", () => {
     );
     assert.equal(sello?.src, "idle_desglose");
     assert.equal(sello?.dest, "direccion");
-    assert.equal(sello?.sec, 1200);
+    assert.equal(sello?.sec, 0);
     assert.equal(sello?.idle, 1200);
+    const accrued = accrueGastoTiempo(null, sello!);
+    assert.equal(accrued.secDireccion, 0);
+    assert.equal(accrued.secIdle, 1200);
   });
 
   it("idle = pared − subs medidos (hueco entre unidades)", () => {
@@ -120,6 +123,31 @@ describe("gastoTiempo", () => {
       900
     );
     assert.equal(idle, 420);
+  });
+
+  it("sello de desglosador acredita minutos de vehículo, no la pared", () => {
+    const sello = sealGastoTiempo(
+      v({
+        id: "dg-work",
+        titulo: "Costura",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        destinoCierre: "peldano",
+        proyectoId: "p1",
+        subVehiculos: [
+          { id: "s1", titulo: "corte", status: "cumplido", duracionFinal: 300 },
+          { id: "s2", titulo: "costura", status: "cumplido", duracionFinal: 180 },
+        ],
+        aperturaAt: 1_000_000,
+        cierreAt: 1_000_000 + 20 * 60_000,
+      })
+    );
+    assert.equal(sello?.src, "vehiculo");
+    assert.equal(sello?.sec, 480);
+    assert.equal(sello?.idle, 720);
+    const accrued = accrueGastoTiempo(null, sello!);
+    assert.equal(accrued.secDireccion, 480);
+    assert.equal(accrued.secIdle, 720);
   });
 
   it("accrue es idempotente por vid+apertura", () => {

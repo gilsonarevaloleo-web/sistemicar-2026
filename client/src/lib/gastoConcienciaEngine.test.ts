@@ -211,3 +211,33 @@ describe("timón — pared real", () => {
     assert.equal(ep.vehiculos[1]?.minutos, 120);
   });
 });
+
+describe("gastoConcienciaEngine — minutos de vehículo", () => {
+  it("el registro del desglosador Enfoque usa Σ filas, no la pared", () => {
+    const r = computeGastoConcienciaDia({
+      fecha: FECHA,
+      segmentos: PLAN_5_23,
+      vehicles: [
+        v({
+          id: "ring",
+          titulo: "Tarde",
+          status: "archivado",
+          tipoFlota: "situacion",
+          situacionCronometro: { activo: false },
+          destinoCierre: "peldano",
+          proyectoId: "costura",
+          aperturaAt: lima("08:00"),
+          cierreAt: lima("12:00"),
+          duracionFinal: 240,
+          subTareas: [
+            { id: "a", texto: "Corte", completada: true, creadaAt: 1, enDesgloseCronometro: true, duracionRealSec: 40 * 60 },
+            { id: "b", texto: "Costura", completada: true, creadaAt: 1, enDesgloseCronometro: true, duracionRealSec: 25 * 60 },
+          ],
+        }),
+      ],
+      now: lima("23:05"),
+    });
+    assert.equal(r.registros.length, 1);
+    assert.equal(r.registros[0]?.minutos, 65);
+  });
+});
