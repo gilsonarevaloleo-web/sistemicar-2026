@@ -481,7 +481,11 @@ export default function VendedorTriagePage() {
                 <p
                   className="text-[12px] leading-relaxed"
                   style={{
-                    color: linkDone ? "#86EFAC" : "#FCA5A5",
+                    color: linkDone
+                      ? "#86EFAC"
+                      : linkLoading
+                        ? GOLD
+                        : "#FCA5A5",
                   }}
                   data-testid="vendedor-link-status"
                 >
