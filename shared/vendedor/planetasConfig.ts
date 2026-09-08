@@ -6,10 +6,9 @@
 export type PlanetaId = "ESPEJO" | "JORNADA" | "UMBRAL";
 
 /**
- * Puerta comercial activa del Vendedor Algorítmico.
- * Hoy: solo Jornada Base. Espejo/Umbral se venden después.
- * El triage sigue diagnosticando Código (+ planeta como contexto de grieta),
- * pero CTAs, voz y WhatsApp empujan siempre a esta puerta.
+ * Puerta comercial activa del Vendedor.
+ * Hoy: solo Jornada Base (códigos 1 / 2 / 3). Espejo/Umbral no se ofrecen
+ * en este corte: ni en preguntas, ni en voz, ni en WhatsApp.
  */
 export const PUERTA_COMERCIAL_VENDEDOR: PlanetaId = "JORNADA";
 

@@ -336,46 +336,56 @@ export function escapeXml(text: string): string {
 
 const SAY_VOICE = 'language="es-MX" voice="Polly.Mia"';
 
+/** Varias frases con pausa — se oye menos a robot. */
+export function buildTwimlSayParts(parts: string | string[]): string {
+  const beats = (Array.isArray(parts) ? parts : [parts]).filter((p) =>
+    p.trim(),
+  );
+  if (beats.length === 0) return "";
+  return beats
+    .map((t, i) => {
+      const say = `<Say ${SAY_VOICE}>${escapeXml(t)}</Say>`;
+      return i < beats.length - 1 ? `${say}\n  <Pause length="1"/>` : say;
+    })
+    .join("\n  ");
+}
+
 export function buildTwimlSay(voiceScript: string): string {
-  const safe = escapeXml(voiceScript);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say ${SAY_VOICE}>${safe}</Say>
+  ${buildTwimlSayParts(voiceScript)}
   <Pause length="1"/>
   <Say ${SAY_VOICE}>Hasta luego.</Say>
 </Response>`;
 }
 
-/** Cierre simple (sin Gather). */
-export function buildTwimlHangupSay(text: string): string {
-  const safe = escapeXml(text);
+/** Cierre simple (sin Gather). Acepta una frase o varias con pausa. */
+export function buildTwimlHangupSay(text: string | string[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say ${SAY_VOICE}>${safe}</Say>
+  ${buildTwimlSayParts(text)}
   <Hangup/>
 </Response>`;
 }
 
 /**
- * Nivel B: pregunta + <Gather> DTMF (1 dígito).
+ * Pregunta + <Gather> DTMF o voz corta (sí / no).
  * actionUrl debe ser absoluto (PUBLIC_APP_URL) e incluir query de contexto.
  */
 export function buildTwimlGatherPrompt(opts: {
-  prompt: string;
+  prompt: string | string[];
   actionUrl: string;
-  timeoutSay: string;
+  timeoutSay: string | string[];
   timeoutSeconds?: number;
 }): string {
-  const prompt = escapeXml(opts.prompt);
-  const timeoutSay = escapeXml(opts.timeoutSay);
   const action = escapeXml(opts.actionUrl);
-  const timeout = opts.timeoutSeconds ?? 8;
+  const timeout = opts.timeoutSeconds ?? 10;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="dtmf" numDigits="1" timeout="${timeout}" action="${action}" method="POST">
-    <Say ${SAY_VOICE}>${prompt}</Say>
+  <Gather input="dtmf speech" language="es-MX" speechTimeout="auto" hints="sí,si,no,uno,dos" numDigits="1" timeout="${timeout}" action="${action}" method="POST">
+    ${buildTwimlSayParts(opts.prompt)}
   </Gather>
-  <Say ${SAY_VOICE}>${timeoutSay}</Say>
+  ${buildTwimlSayParts(opts.timeoutSay)}
   <Hangup/>
 </Response>`;
 }

@@ -21,7 +21,7 @@ export interface VendedorCallRecord {
   codigo: CodigoNumero;
   planeta: PlanetaId;
   sellerRef: string | null;
-  consentimiento: "llamame";
+  consentimiento: "llamame" | "enlace-pago";
   status: VendedorCallStatus;
   canalUsado: VendedorCallCanal | null;
   intentos: number;

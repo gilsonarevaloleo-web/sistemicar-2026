@@ -78,6 +78,8 @@ import { modulesGrantedByPlan } from "../shared/moduleAccess";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
 import {
   solicitarLlamadaVendedor,
+  enviarEnlacePagoWhatsapp,
+  enviarEnlacePagoDesdeLlamada,
   handleTwilioVoiceStatus,
   resolveDialogContext,
 } from "./vendedorCallService";
@@ -5353,6 +5355,34 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
   }
 });
 
+app.post("/api/vendedor/enviar-enlace-pago", async (req, res) => {
+  try {
+    const result = await enviarEnlacePagoWhatsapp({
+      telefono: String(req.body?.telefono || ""),
+      whatsapp: req.body?.whatsapp ? String(req.body.whatsapp) : null,
+      codigo: Number(req.body?.codigo),
+      sellerRef: req.body?.sellerRef ? String(req.body.sellerRef) : null,
+      consentimiento: String(req.body?.consentimiento || ""),
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      callId: result.call.id,
+      status: result.call.status,
+      whatsappOk: result.whatsappOk,
+      message: result.detail,
+      errorDetail: result.call.error,
+    });
+  } catch (error) {
+    console.error("[vendedor/enviar-enlace-pago]", error);
+    const message =
+      error instanceof Error ? error.message : "Error enviando el enlace.";
+    res.status(500).json({ error: message });
+  }
+});
+
 app.get("/api/vendedor/twilio/twiml", (req, res) => {
   const callId = typeof req.query.callId === "string" ? req.query.callId : "";
   const codigoRaw = typeof req.query.codigo === "string" ? req.query.codigo : "";
@@ -5370,9 +5400,11 @@ app.get("/api/vendedor/twilio/twiml", (req, res) => {
     return res
       .type("text/xml")
       .send(
-        buildTwimlHangupSay(
-          "Hola. Soy la vendedora de Sistemicar. Entra en sistemicar punto app para continuar. Hasta luego.",
-        ),
+        buildTwimlHangupSay([
+          "Hola, te llamo de Sistemicar.",
+          "Entra en sistemicar punto app cuando puedas.",
+          "Hasta luego.",
+        ]),
       );
   }
 
@@ -5397,16 +5429,16 @@ app.get("/api/vendedor/twilio/twiml", (req, res) => {
     .type("text/xml")
     .send(
       buildTwimlGatherPrompt({
-        prompt: turns.opener,
+        prompt: turns.openerBeats,
         actionUrl,
-        timeoutSay: turns.timeoutOpen,
-        timeoutSeconds: 8,
+        timeoutSay: turns.timeoutOpenBeats,
+        timeoutSeconds: 10,
       }),
     );
 });
 
-/** Nivel B: ramas DTMF tras cada pregunta. */
-app.post("/api/vendedor/twilio/gather", (req, res) => {
+/** Nivel B: ramas DTMF / voz tras cada pregunta. */
+app.post("/api/vendedor/twilio/gather", async (req, res) => {
   try {
     const stepRaw =
       typeof req.query.step === "string" ? req.query.step : "mirror";
@@ -5429,7 +5461,10 @@ app.post("/api/vendedor/twilio/gather", (req, res) => {
     if (!ctx) {
       return res
         .type("text/xml")
-        .send(buildTwimlHangupSay("No pude recuperar tu diagnóstico. Hasta luego."));
+        .send(buildTwimlHangupSay([
+          "No pude recuperar lo que habíamos visto.",
+          "Hasta luego.",
+        ]));
     }
 
     const turns = buildDialogTurns(ctx.codigo, ctx.planeta, ctx.sellerRef);
@@ -5441,54 +5476,75 @@ app.post("/api/vendedor/twilio/gather", (req, res) => {
           : null,
     });
 
+    const telefono =
+      typeof req.query.telefono === "string" ? req.query.telefono : "";
+    const whatsapp =
+      typeof req.query.whatsapp === "string"
+        ? req.query.whatsapp
+        : telefono;
     const qs = buildTwilioCallbackQuery({
       callId: callId || `anon_${Date.now()}`,
-      telefono:
-        typeof req.query.telefono === "string" ? req.query.telefono : "",
-      whatsapp:
-        typeof req.query.whatsapp === "string"
-          ? req.query.whatsapp
-          : typeof req.query.telefono === "string"
-            ? req.query.telefono
-            : "",
+      telefono,
+      whatsapp,
       codigo: ctx.codigo,
       planeta: ctx.planeta,
       sellerRef: ctx.sellerRef,
     });
 
     if (step === "mirror") {
-      const prompt = choice === "2" ? turns.mirrorNo : turns.mirrorSi;
-      // Si no marcó, igual avanzamos con rama "sí" suave (mirrorSi) solo si digitó 1;
-      // sin dígito → timeout hangup text
+      const prompt =
+        choice === "2" ? turns.mirrorNoBeats : turns.mirrorSiBeats;
       if (!choice) {
         return res
           .type("text/xml")
-          .send(buildTwimlHangupSay(turns.timeoutOpen));
+          .send(buildTwimlHangupSay(turns.timeoutOpenBeats));
       }
       const actionUrl = `${resolvePublicBaseUrl()}/api/vendedor/twilio/gather?step=cta&${qs}`;
       return res.type("text/xml").send(
         buildTwimlGatherPrompt({
           prompt,
           actionUrl,
-          timeoutSay: turns.timeoutMirror,
-          timeoutSeconds: 8,
+          timeoutSay: turns.timeoutMirrorBeats,
+          timeoutSeconds: 10,
         }),
       );
     }
 
-    // step === cta
-    if (choice === "1") {
-      return res.type("text/xml").send(buildTwimlHangupSay(turns.ctaSi));
+    // step === cta — mandar enlace de pago al WhatsApp si marcó 1 o 2
+    if (choice === "1" || choice === "2") {
+      const sent = await enviarEnlacePagoDesdeLlamada({
+        callId: callId || undefined,
+        telefono,
+        whatsapp,
+        codigo: ctx.codigo,
+        sellerRef: ctx.sellerRef,
+      });
+      if (choice === "1") {
+        return res
+          .type("text/xml")
+          .send(
+            buildTwimlHangupSay(
+              sent.ok ? turns.ctaSiBeats : turns.ctaSiSinWhatsappBeats,
+            ),
+          );
+      }
+      return res
+        .type("text/xml")
+        .send(
+          buildTwimlHangupSay(
+            sent.ok ? turns.ctaNoBeats : turns.ctaNoSinWhatsappBeats,
+          ),
+        );
     }
-    if (choice === "2") {
-      return res.type("text/xml").send(buildTwimlHangupSay(turns.ctaNo));
-    }
-    return res.type("text/xml").send(buildTwimlHangupSay(turns.timeoutMirror));
+    return res.type("text/xml").send(buildTwimlHangupSay(turns.timeoutMirrorBeats));
   } catch (error) {
     console.error("[vendedor/twilio/gather]", error);
     res
       .type("text/xml")
-      .send(buildTwimlHangupSay("Hubo un problema técnico. Hasta luego."));
+      .send(buildTwimlHangupSay([
+        "Hubo un problema técnico.",
+        "Hasta luego.",
+      ]));
   }
 });
 

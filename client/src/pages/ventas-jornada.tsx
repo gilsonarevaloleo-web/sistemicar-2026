@@ -102,7 +102,7 @@ export default function VentasJornada() {
             data-testid="ventas-jornada-cta-vendedor"
           >
             <Phone size={16} />
-            QUE ME LLAME EL VENDEDOR
+            QUE ME LLAME
           </a>
           <a
             href={pagosHref}
@@ -116,8 +116,8 @@ export default function VentasJornada() {
         </div>
 
         <p className="mt-6 text-center text-[11px] leading-relaxed text-white/30">
-          El vendedor ya sabe que vienes por Jornada. Dos toques y te llama.
-          Si prefieres, pagas Base ahora.
+          Dos preguntas cortas y te llamo — o te mando el enlace de pago
+          por WhatsApp. Si ya lo tienes claro, activa Base ahora.
         </p>
       </div>
     </div>

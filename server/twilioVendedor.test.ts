@@ -102,8 +102,12 @@ describe("Twilio vendedor helpers", () => {
     });
     assert.match(xml, /<Gather /);
     assert.match(xml, /numDigits="1"/);
+    assert.match(xml, /input="dtmf speech"/);
     assert.match(xml, /action="https:\/\/www\.sistemicar\.app\/api\/vendedor\/twilio\/gather/);
     assert.match(xml, /Marca uno/);
     assert.match(buildTwimlHangupSay("Adiós <x>"), /Adiós &lt;x&gt;/);
+    const paced = buildTwimlHangupSay(["Hola.", "Te mando el enlace."]);
+    assert.match(paced, /<Pause length="1"\/>/);
+    assert.match(paced, /Te mando el enlace/);
   });
 });
