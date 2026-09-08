@@ -27,6 +27,31 @@ export function feedsProyectoHub(destino: DestinoCierre): boolean {
   return destino === "peldano";
 }
 
+/**
+ * Stamp mínimo para saber si el vehículo tiene casa (nido / punto / peldaño).
+ * No importa Vehicle entero — evita ciclo con persistence.
+ */
+export type VehicleRumboStamp = {
+  destinoCierre?: DestinoCierre | null;
+  proyectoId?: string | null;
+  oleadaPuntoId?: string | null;
+  proyectoPeldanoId?: string | null;
+};
+
+/**
+ * Dirección del día (triada / gasto): rumbo con casa.
+ * Un `peldano` sin nido ni punto es presencia extraída — no mancha Dirección.
+ * El Hub sigue usando `feedsProyectoHub(destino)`: la escalera se sella al lanzar.
+ */
+export function vehicleCuentaComoDireccion(vehicle: VehicleRumboStamp): boolean {
+  if (!feedsProyectoHub(resolveDestinoCierre(vehicle.destinoCierre))) return false;
+  return Boolean(
+    vehicle.proyectoId?.trim() ||
+      vehicle.oleadaPuntoId?.trim() ||
+      vehicle.proyectoPeldanoId?.trim()
+  );
+}
+
 /** Chip activo: el toque pinta el proyecto antes de que el vehículo confirme `proyectoId`. */
 export function resolveProyectoChipId(
   optimisticPid?: string | null,
@@ -39,7 +64,7 @@ export function resolveProyectoChipId(
 export const DESTINO_CIERRE_COPY = {
   presencia: {
     label: "Presencia",
-    hint: "Cubrió el día. Estuviste. No toca el proyecto.",
+    hint: "Cubrió el día. Estuviste. No toca el proyecto. Nombrar el vehículo instala el piloto (21 días).",
     short: "Día",
   },
   peldano: {

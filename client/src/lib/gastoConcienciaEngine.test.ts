@@ -91,6 +91,26 @@ describe("gastoConcienciaEngine — día-jornada 24 h", () => {
     assert.equal(r.registros[0]?.dest, "direccion");
   });
 
+  it("peldano sin casa se extrae a presencia — no mancha Dirección", () => {
+    const r = computeGastoConcienciaDia({
+      fecha: FECHA,
+      segmentos: PLAN_5_23,
+      vehicles: [
+        v({
+          id: "falso",
+          status: "archivado",
+          aperturaAt: lima("06:00"),
+          cierreAt: lima("07:00"),
+          destinoCierre: "peldano",
+        }),
+      ],
+      now: lima("23:05"),
+    });
+    assert.equal(r.registros[0]?.dest, "presencia");
+    assert.equal(r.minutosPresencia, 60);
+    assert.equal(r.minutosDireccion, 0);
+  });
+
   it("huecos log agujerea cobertura que el cierre infló", () => {
     const now = lima("23:05");
     const huecos = huecosLogToIntervals(
@@ -107,6 +127,7 @@ describe("gastoConcienciaEngine — día-jornada 24 h", () => {
           aperturaAt: lima("05:00"),
           cierreAt: lima("23:00"),
           destinoCierre: "peldano",
+          proyectoId: "p1",
         }),
       ],
       now,

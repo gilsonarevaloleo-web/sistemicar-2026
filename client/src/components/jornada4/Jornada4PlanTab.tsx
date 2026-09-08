@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
 import { CoberturaHuecosPanel } from "@/components/jornada4/CoberturaHuecosPanel";
 import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
+import { Jornada4UbicacionConcienciaCard } from "@/components/jornada4/Jornada4UbicacionConcienciaCard";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import type { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
@@ -75,6 +76,12 @@ export default function Jornada4PlanTab({
       <PulsoCobertura
         model={pulsoModel}
         showCta={Boolean(segmentoActivo)}
+      />
+      <Jornada4UbicacionConcienciaCard
+        segmentos={planilla?.segmentos ?? []}
+        vehicles={vehicles}
+        compact
+        tick={badgeTick}
       />
       <CoberturaHuecosPanel refreshKey={huecosRefresh} />
       <Jornada4SegmentosPanel

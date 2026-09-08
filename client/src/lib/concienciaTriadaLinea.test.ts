@@ -51,12 +51,14 @@ describe("concienciaTriadaLinea", () => {
         status: "activo",
         aperturaAt: lima("09:00"),
         destinoCierre: "peldano",
+        proyectoId: "n1",
       }),
       v({
         id: "b",
         status: "activo",
         aperturaAt: lima("09:00"),
         destinoCierre: "peldano",
+        proyectoId: "n1",
       }),
     ];
     const occ = computeTriadaLineaOccupancy({
@@ -83,7 +85,7 @@ describe("concienciaTriadaLinea", () => {
     assert.match(model.headline, /Dirección|aún no termina|Paralelo/);
   });
 
-  it("Dirección gana el minuto único si se solapa con Presencia", () => {
+  it("Presencia extraída: el solape no mancha Dirección", () => {
     const now = lima("10:00");
     const occ = computeTriadaLineaOccupancy({
       fecha: FECHA,
@@ -100,12 +102,33 @@ describe("concienciaTriadaLinea", () => {
           status: "activo",
           aperturaAt: lima("09:00"),
           destinoCierre: "peldano",
+          proyectoId: "n1",
         }),
       ],
       now,
     });
-    assert.equal(occ.minutosDireccion, 60);
-    assert.equal(occ.minutosPresencia, 0);
+    assert.equal(occ.minutosPresencia, 60);
+    assert.equal(occ.minutosDireccion, 0);
+    assert.equal(occ.minutosPresenciaExtraida, 60);
+  });
+
+  it("peldano sin casa cubre como presencia, no como Dirección", () => {
+    const now = lima("10:00");
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles: [
+        v({
+          id: "falso",
+          status: "activo",
+          aperturaAt: lima("09:00"),
+          destinoCierre: "peldano",
+        }),
+      ],
+      now,
+    });
+    assert.equal(occ.minutosPresencia, 60);
+    assert.equal(occ.minutosDireccion, 0);
   });
 
   it("interrupt: padre congelado + enfoque cubre línea y no es paralelo", () => {
@@ -115,6 +138,7 @@ describe("concienciaTriadaLinea", () => {
       status: "activo",
       aperturaAt: lima("09:00"),
       destinoCierre: "peldano",
+      proyectoId: "n1",
       interrupcionActiva: true,
       desglosadorPausa: { pausadoAt: lima("09:30"), subActivoId: "s1" },
     });
@@ -169,6 +193,7 @@ describe("concienciaTriadaLinea", () => {
         cierreAt: lima("11:00"),
         duracionFinal: 120,
         destinoCierre: "peldano",
+        proyectoId: "n1",
       }),
       v({
         id: "enfoque",
@@ -258,6 +283,7 @@ describe("concienciaTriadaLinea", () => {
         aperturaAt: lima("09:00"),
         cierreAt: lima("12:00"),
         destinoCierre: "peldano",
+        proyectoId: "n1",
       }),
     ];
     const sinHueco = computeTriadaLineaOccupancy({

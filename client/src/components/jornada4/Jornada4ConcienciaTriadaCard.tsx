@@ -169,13 +169,14 @@ export function Jornada4ConcienciaTriadaCard({
             </p>
           ) : null}
           <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-            Inconsciente = sin vehículo. Presencia = vehículos sin rumbo. Dirección =
-            proyecto o centro, dentro del plan. No conquistado = horario no planificado
+            Inconsciente = sin vehículo. Presencia = voluntad sin rumbo (extraída:
+            el solape no mancha Dirección). Dirección = nido o punto vivo.
+            No conquistado = horario no planificado
             ({formatPlanMin(model.minutosNoConquistado)}).
             {model.minutosPlanFuturo > 0
               ? ` El plan aún tiene ${formatPlanMin(model.minutosPlanFuturo)} por ocurrir — no es inconsciencia.`
               : ""}{" "}
-            La meta es crecer Dirección por encima de Presencia.
+            Presencia no es un fallo: es el surco del piloto. Dirección nace de orden.
           </p>
         </>
       ) : null}

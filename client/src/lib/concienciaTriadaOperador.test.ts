@@ -183,6 +183,7 @@ describe("concienciaTriadaOperador", () => {
         status: "activo",
         aperturaAt: 1_000_000,
         destinoCierre: "peldano",
+        proyectoId: "n1",
         autoVerdad: false,
       },
       {
@@ -205,6 +206,7 @@ describe("concienciaTriadaOperador", () => {
         status: "activo",
         aperturaAt: 1_000_000,
         destinoCierre: "peldano",
+        proyectoId: "n1",
         interrupcionActiva: true,
         desglosadorPausa: { pausadoAt: 1_000_000 + 5 * 60_000, subActivoId: "s1" },
       },
@@ -234,6 +236,7 @@ describe("concienciaTriadaOperador", () => {
         id: "cerrado-dir",
         status: "cumplido",
         destinoCierre: "peldano",
+        proyectoId: "n1",
         aperturaAt: cierreAt - 30 * 60_000,
         cierreAt,
         duracionFinal: 30,

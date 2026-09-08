@@ -143,8 +143,8 @@ export function Jornada4RevelacionCard({
 
       <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
         100% = 24 h del día-jornada. Plan = {formatMinutosHoras(revelacion.minutosPlan)}.
-        Inconsciente = sin vehículo. Presencia = vehículos sin rumbo. Dirección =
-        proyecto o centro. No conquistado = lo no planificado
+        Inconsciente = sin vehículo. Presencia = voluntad sin rumbo. Dirección =
+        proyecto o centro con casa. No conquistado = lo no planificado
         {revelacion.minutosPorConquistar > 0
           ? ` (${formatMinutosHoras(revelacion.minutosPorConquistar)})`
           : " — si cubres las 24 h, queda en cero"}

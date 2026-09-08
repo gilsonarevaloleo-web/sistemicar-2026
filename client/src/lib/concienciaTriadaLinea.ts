@@ -10,7 +10,7 @@
  *
  * No importa ConcienciaEngine / pulso / ms0.
  */
-import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
+import { vehicleCuentaComoDireccion } from "./destinoCierre";
 import { getJournalDateString, getLimaDayStartMs, segmentWindowMs } from "./segmentTime";
 import type { Vehicle } from "./persistence";
 import { applyVehicleSessionSeal } from "./vehicleSessionSeal";
@@ -21,6 +21,8 @@ export type TriadaLineaOccupancy = {
   minutosPlan: number;
   minutosPresencia: number;
   minutosDireccion: number;
+  /** Minutos de presencia que el solape habría pintado como Dirección. */
+  minutosPresenciaExtraida: number;
   minutosHueco: number;
   minutosPlanFuturo: number;
   minutosInconsciente: number;
@@ -35,6 +37,7 @@ export const EMPTY_TRIADA_LINEA: TriadaLineaOccupancy = {
   minutosPlan: 0,
   minutosPresencia: 0,
   minutosDireccion: 0,
+  minutosPresenciaExtraida: 0,
   minutosHueco: 0,
   minutosPlanFuturo: 0,
   minutosInconsciente: 0,
@@ -229,7 +232,7 @@ export function vehicleAdvancingIntervals(
 }
 
 function vehicleIsDireccion(vehicle: Vehicle): boolean {
-  return feedsProyectoHub(resolveDestinoCierre(vehicle.destinoCierre));
+  return vehicleCuentaComoDireccion(vehicle);
 }
 
 function vehicleOfJournalDay(vehicle: Vehicle, fecha: string): boolean {
@@ -264,7 +267,8 @@ function splitPlanElapsedFuture(
 
 /**
  * Ocupación de línea: intersección única con el plan.
- * Dirección gana si se solapa con Presencia.
+ * Presencia extraída: el solape con Dirección no mancha rumbo.
+ * Un `peldano` sin casa cuenta como presencia.
  * Inconsciente = huecos (plan ya ocurrido sin vehículo). El futuro no se suma.
  * `huecosLog` agujerea cobertura cuando el registro de cortes dice que no había vehículo.
  */
@@ -320,7 +324,9 @@ export function computeTriadaLineaOccupancy(params: {
 
   let dirOnPlan = intersectIntervalsWithWindows(dirIv, planElapsed);
   const preOnPlanRaw = intersectIntervalsWithWindows(preIv, planElapsed);
-  let preOnPlan = subtractMsIntervals(preOnPlanRaw, dirOnPlan);
+  let overlapPreDir = intersectIntervalsWithWindows(preOnPlanRaw, dirOnPlan);
+  let preOnPlan = preOnPlanRaw;
+  dirOnPlan = subtractMsIntervals(dirOnPlan, preOnPlanRaw);
 
   const holes = params.huecosLog?.length
     ? intersectIntervalsWithWindows(params.huecosLog, planElapsed)
@@ -328,6 +334,7 @@ export function computeTriadaLineaOccupancy(params: {
   if (holes.length > 0) {
     dirOnPlan = subtractMsIntervals(dirOnPlan, holes);
     preOnPlan = subtractMsIntervals(preOnPlan, holes);
+    overlapPreDir = subtractMsIntervals(overlapPreDir, holes);
   }
 
   const covered = mergeMsIntervals([...dirOnPlan, ...preOnPlan]);
@@ -335,6 +342,7 @@ export function computeTriadaLineaOccupancy(params: {
 
   let minutosDireccion = round1(sumIntervalMinutes(dirOnPlan));
   let minutosPresencia = round1(sumIntervalMinutes(preOnPlan));
+  const minutosPresenciaExtraida = round1(sumIntervalMinutes(overlapPreDir));
   let minutosHueco = round1(sumIntervalMinutes(huecos));
   let minutosPlanFuturo = round1(sumIntervalMinutes(planFuture));
   const planR = round1(minutosPlan);
@@ -357,6 +365,7 @@ export function computeTriadaLineaOccupancy(params: {
     minutosPlan: planR,
     minutosPresencia,
     minutosDireccion,
+    minutosPresenciaExtraida,
     minutosHueco,
     minutosPlanFuturo,
     minutosInconsciente,
