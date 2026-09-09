@@ -93,8 +93,9 @@ export default function Jornada4MetricasTab({
         segmentos={segmentos}
         vehicles={vehicles}
         todayPs={todayPs}
+        tick={disciplinaTick}
       />
-      <EspejoSemanalCard userId={userId} />
+      <EspejoSemanalCard userId={userId} tick={disciplinaTick} />
       <Jornada4UbicacionConcienciaCard
         segmentos={segmentos}
         vehicles={vehicles}

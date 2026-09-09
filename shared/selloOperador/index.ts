@@ -1,5 +1,6 @@
 export { construirSelloOperador, recordatorioNoEsSello } from "./construirSello.ts";
 export {
+  debeMostrarRelatoSello,
   debeRecordarSello,
   formatTerminoLabel,
   planYaTermino,

@@ -6,6 +6,7 @@ export {
   resolveVentanaSemanal,
   getJournalDateString,
 } from "./calcularReporteSemanal.ts";
+export { esLunesDeCosecha } from "./ventana.ts";
 export type {
   CalcularReporteSemanalInput,
   ReporteSemanal,

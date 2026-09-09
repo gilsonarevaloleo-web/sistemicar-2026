@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Stamp } from "lucide-react";
 import { J4_COLORS } from "./Jornada4Shell";
 import { buildSelloDraft, emitirSelloOperador } from "@/lib/selloOperadorBuild";
@@ -10,8 +10,8 @@ import {
 } from "@/lib/persistence";
 import { getJournalDateString } from "@/lib/segmentTime";
 import {
+  debeMostrarRelatoSello,
   formatTerminoLabel,
-  planYaTermino,
   resolveTerminoPlanMs,
 } from "@shared/selloOperador";
 
@@ -22,25 +22,47 @@ type Props = {
   segmentos: SegmentoV5[];
   vehicles: Vehicle[];
   todayPs: number;
+  /** Pulso de la isla Métricas — el relato nace al término sin recargar. */
+  tick?: number;
 };
 
-export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Props) {
-  const fecha = getJournalDateString();
+export function SelloOperadorCard({
+  userId,
+  segmentos,
+  vehicles,
+  todayPs,
+  tick = 0,
+}: Props) {
+  void tick;
+  const nowMs = Date.now();
+  const fecha = getJournalDateString(nowMs);
   const [sello, setSello] = useState<CierreJornadaLog | null>(() =>
     readLocalCierreJornadaByFecha(fecha),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setSello(readLocalCierreJornadaByFecha(fecha));
+  }, [fecha]);
+
+  const sellado = sello?.selloEmitido === true && sello.selladoPor === "operador";
+  const terminoMs = resolveTerminoPlanMs(segmentos, nowMs);
+  const terminoLabel = terminoMs != null ? formatTerminoLabel(terminoMs) : null;
+  const relatoVisible = debeMostrarRelatoSello(nowMs, sellado, terminoMs);
+
   const draft = useMemo(() => {
-    if (!userId || sello?.selloEmitido) return null;
+    if (!userId || sello?.selloEmitido || !relatoVisible) return null;
     return buildSelloDraft({
       userId,
       segmentos,
       vehicles,
       totalPS: todayPs,
+      nowMs,
     });
-  }, [userId, segmentos, vehicles, todayPs, sello?.selloEmitido]);
+    // nowMs se ancla al tick de la isla; relatoVisible cambia al término.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, segmentos, vehicles, todayPs, sello?.selloEmitido, relatoVisible]);
 
   const sellar = async () => {
     if (!userId || busy) return;
@@ -61,13 +83,9 @@ export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Prop
     }
   };
 
-  const sellado = sello?.selloEmitido === true && sello.selladoPor === "operador";
   const tension = sellado ? sello?.tension ?? sello?.selloTexto : draft?.tension;
   const hechos = sellado ? sello?.evidenciaHechos : draft?.evidenciaHechos;
   const mandato = sellado ? sello?.mandato : draft?.mandato;
-  const terminoMs = resolveTerminoPlanMs(segmentos, Date.now());
-  const terminoLabel = terminoMs != null ? formatTerminoLabel(terminoMs) : null;
-  const terminoLlego = planYaTermino(segmentos, Date.now());
 
   return (
     <section
@@ -89,25 +107,35 @@ export function SelloOperadorCard({ userId, segmentos, vehicles, todayPs }: Prop
         {terminoLabel
           ? `Término del plan: ${terminoLabel}. Un bloque (costura, estudio) se cierra aparte. Si el trabajo se alarga, mueve la última puerta.`
           : "Sin anillo no hay término. Puedes cosechar evidencia; no hay Puerta del Término que recordar."}
-        {!sellado && terminoLabel && !terminoLlego
+        {!sellado && terminoLabel && !relatoVisible
           ? " El plan aún no termina. Sellar ahora corta la jornada."
           : ""}
       </p>
-      <p className="text-[12px] leading-snug" style={{ color: INK }} data-testid="sello-tension">
-        {tension}
-      </p>
-      <ul className="space-y-1">
-        {(hechos ?? []).map((h) => (
-          <li key={h} className="text-[10px] leading-snug" style={{ color: MUTED }}>
-            {h}
-          </li>
-        ))}
-      </ul>
-      {mandato ? (
-        <p className="text-[10px] leading-snug" style={{ color: GOLD }} data-testid="sello-mandato">
-          {mandato}
+      {relatoVisible ? (
+        <>
+          <p className="text-[12px] leading-snug" style={{ color: INK }} data-testid="sello-tension">
+            {tension}
+          </p>
+          <ul className="space-y-1" data-testid="sello-hechos">
+            {(hechos ?? []).map((h) => (
+              <li key={h} className="text-[10px] leading-snug" style={{ color: MUTED }}>
+                {h}
+              </li>
+            ))}
+          </ul>
+          {mandato ? (
+            <p className="text-[10px] leading-snug" style={{ color: GOLD }} data-testid="sello-mandato">
+              {mandato}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-[11px] leading-snug" style={{ color: INK }} data-testid="sello-espera">
+          {terminoLabel
+            ? `Se sella a las ${terminoLabel}. Ahí verás conquista, puertas y lo ajeno.`
+            : "El relato nace cuando selles. Hoy no hay hora de término que esperar."}
         </p>
-      ) : null}
+      )}
       {sellado ? (
         <p
           className="text-[9px] font-black uppercase tracking-widest"

@@ -105,6 +105,15 @@ export function resolveVentanaSemanal(
   return ventanaFromMonday(addCalendarDays(mondayActual, -7));
 }
 
+/**
+ * Día-jornada del sello semanal: lunes 05:00 Lima → martes 04:59.
+ * El archivo existe; la tarjeta de Jornada no lo exhibe el resto de la semana.
+ */
+export function esLunesDeCosecha(nowMs: number): boolean {
+  const journal = getJournalDateString(nowMs);
+  return mondayOfJournalDate(journal) === journal;
+}
+
 export function fechaEnVentana(fecha: string, ventana: VentanaSemanal): boolean {
   return fecha >= ventana.inicioJournal && fecha <= ventana.finJournal;
 }
