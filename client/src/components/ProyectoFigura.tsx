@@ -24,6 +24,7 @@ function partStyle(
   fill: string;
   fillOpacity: number;
   stroke: string;
+  strokeWidth: number;
   strokeDasharray?: string;
   opacity: number;
   className?: string;
@@ -35,15 +36,17 @@ function partStyle(
       fill: "none",
       fillOpacity: 0,
       stroke: next ? tint : "rgba(255,255,255,0.16)",
+      strokeWidth: next ? 1.6 : 1.4,
       strokeDasharray: "4 5",
-      opacity: next ? 0.9 : 0.28,
+      opacity: next ? 0.45 : 0.22,
       className: next ? "animate-pulse" : undefined,
     };
   }
   return {
     fill: tint,
-    fillOpacity: estado.deformacion === "hueca" ? 0.08 : 0.12 + estado.masaFill * 0.5,
+    fillOpacity: estado.deformacion === "hueca" ? 0.1 : 0.14 + estado.masaFill * 0.5,
     stroke: estado.deformacion === "hinchada" ? "#D4AF37" : tint,
+    strokeWidth: estado.deformacion === "hueca" ? 2.6 : 2.1,
     opacity: 1,
   };
 }
@@ -136,7 +139,7 @@ function ControlSvg({
             fillOpacity={style.fillOpacity}
             stroke={style.stroke}
             strokeDasharray={style.strokeDasharray}
-            strokeWidth="1.8"
+            strokeWidth={style.strokeWidth}
             opacity={style.opacity}
             className={style.className}
           />
