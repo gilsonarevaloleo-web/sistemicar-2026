@@ -64,6 +64,20 @@ describe("previewOps", () => {
     assert.equal(isDeployPreviewHost(), true);
   });
 
+  it("localhost en tests (sin Vite DEV) no es preview host", () => {
+    // @ts-expect-error test stub
+    globalThis.window = {
+      location: {
+        hostname: "localhost",
+        href: "http://localhost:5000/",
+        search: "",
+        replace() {},
+      },
+    };
+    assert.equal(isDeployPreviewHost(), false);
+    assert.equal(setPreviewOpsUnlocked(true), false);
+  });
+
   it("no desbloquea producción", () => {
     // @ts-expect-error test stub
     globalThis.window = {
