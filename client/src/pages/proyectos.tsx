@@ -95,6 +95,8 @@ import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 import { formatDuracionTimon, formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
 import { PROYECTO_PALETTE, resolveProyectoColor } from "@/lib/proyectoColor";
 import { ProyectoColorSwatches } from "@/components/ProyectoColorSwatches";
+import { ProyectoFigura } from "@/components/ProyectoFigura";
+import { computeFiguraDesdeNido } from "@/lib/figuraProyecto";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -628,6 +630,41 @@ export default function ProyectosPage() {
     });
   }, [oleadaPeldano, oleadaPuntoProduccion, detailId, flotaLocal]);
 
+  const figuraDetalle = useMemo(
+    () =>
+      computeFiguraDesdeNido({
+        etiqueta: proyecto?.etiqueta,
+        peldanos,
+        liveTimon: timonHydrated,
+        gasto: proyecto?.gastoTiempo,
+        presenciaEpisodio: proyecto?.presenciaEpisodio,
+      }),
+    [
+      proyecto?.etiqueta,
+      proyecto?.gastoTiempo,
+      proyecto?.presenciaEpisodio,
+      peldanos,
+      timonHydrated,
+    ]
+  );
+
+  const figurasListado = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeFiguraDesdeNido>>();
+    if (!user || detailId) return map;
+    for (const p of proyectos) {
+      map.set(
+        p.id,
+        computeFiguraDesdeNido({
+          etiqueta: p.etiqueta,
+          peldanos: getPeldanosByProyectoLocal(user.uid, p.id),
+          gasto: p.gastoTiempo,
+          presenciaEpisodio: p.presenciaEpisodio,
+        })
+      );
+    }
+    return map;
+  }, [user, proyectos, detailId]);
+
   const refreshOleadaPeldanoLocal = useCallback(
     (updated: ProyectoPeldano | null) => {
       if (!updated) return;
@@ -973,6 +1010,10 @@ export default function ProyectosPage() {
           />
         </div>
 
+        <div className="mb-3">
+          <ProyectoFigura estado={figuraDetalle} tint={tint} />
+        </div>
+
         <div className="flex gap-2 mb-3">
           <button
             type="button"
@@ -1095,7 +1136,12 @@ export default function ProyectosPage() {
                 </li>
                 <li>
                   <span className="text-slate-300">Presencia</span> — vehículos sin rumbo;
-                  enumeración infinita, no sube peldaños.
+                  enumeración infinita, no sube peldaños. No toca la figura.
+                </li>
+                <li>
+                  <span className="text-slate-300">Figura</span> — lo ya enviado al timón.
+                  Diez envíos de enfoque revelan un miembro. La conquista da masa,
+                  no contorno. El hueco es el siguiente trozo, no una mascota.
                 </li>
               </ul>
             </div>
@@ -1813,6 +1859,16 @@ export default function ProyectosPage() {
                       </span>
                     )}
                   </div>
+                  {figurasListado.get(p.id) ? (
+                    <div className="mt-3">
+                      <ProyectoFigura
+                        estado={figurasListado.get(p.id)!}
+                        tint={tintCard}
+                        compact
+                        testId={`hub-figura-compact-${p.id}`}
+                      />
+                    </div>
+                  ) : null}
                 </button>
               </div>
             </motion.div>
