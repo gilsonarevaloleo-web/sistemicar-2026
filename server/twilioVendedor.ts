@@ -8,17 +8,25 @@
  * WhatsApp Business (Twilio): fuera de sandbox / ventana 24h exige Content Template
  * (ContentSid HX…). Sin TWILIO_WHATSAPP_CONTENT_SID el fallback falla con
  * "ContentSid Required" — y eso es lo que ve el lead si la voz también falló.
+ *
+ * Error 63007: el From no es un Channel WhatsApp. NUNCA reutilizar
+ * TWILIO_VOICE_FROM como remitente WA (un número Voice PSTN no es canal).
+ * Sender válido: whatsapp:+E164 (sandbox +14155238886 o WA Business ONLINE)
+ * o Messaging Service (MG…) con el sender en el pool.
  */
 
 export type TwilioConfig = {
   accountSid: string;
   authToken: string;
   fromVoice: string;
-  fromWhatsapp: string;
+  /** Sender WhatsApp `whatsapp:+E164`. Null si no hay TWILIO_WHATSAPP_FROM. */
+  fromWhatsapp: string | null;
   /** Plantilla WhatsApp aprobada (HX…). Obligatorio fuera de sandbox libre. */
   whatsappContentSid: string | null;
   smsFrom: string | null;
   messagingServiceSid: string | null;
+  /** Messaging Service con sender WhatsApp en el pool (MG…). */
+  whatsappMessagingServiceSid: string | null;
   publicBaseUrl: string;
 };
 
@@ -34,31 +42,69 @@ export function resolvePublicBaseUrl(): string {
     .replace("://sistemicar.app", "://www.sistemicar.app");
 }
 
+export function isMessagingServiceSid(raw: string | null | undefined): boolean {
+  const s = String(raw || "")
+    .trim()
+    .replace(/^whatsapp:/i, "")
+    .trim();
+  return /^MG[0-9a-fA-F]{32}$/i.test(s);
+}
+
+export function extractMessagingServiceSid(
+  raw: string | null | undefined,
+): string | null {
+  const s = String(raw || "")
+    .trim()
+    .replace(/^whatsapp:/i, "")
+    .trim();
+  return /^MG[0-9a-fA-F]{32}$/i.test(s) ? s : null;
+}
+
+/**
+ * Normaliza un From de WhatsApp a `whatsapp:+E164`.
+ * Un Messaging Service SID (MG…) no es From — devuelve null.
+ */
+export function normalizeWhatsappFromAddress(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw?.trim()) return null;
+  let s = raw.trim();
+  if (/^whatsapp:/i.test(s)) s = s.slice(s.indexOf(":") + 1).trim();
+  if (isMessagingServiceSid(s)) return null;
+  const e164 = s.startsWith("+")
+    ? normalizePhoneE164(s)
+    : normalizePhoneE164(`+${s.replace(/\D/g, "")}`);
+  return e164 ? `whatsapp:${e164}` : null;
+}
+
 export function getTwilioConfig(): TwilioConfig | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
   const fromVoice = process.env.TWILIO_VOICE_FROM?.trim();
-  const fromWhatsappRaw =
-    process.env.TWILIO_WHATSAPP_FROM?.trim() ||
-    process.env.TWILIO_VOICE_FROM?.trim();
   if (!accountSid || !authToken || !fromVoice) return null;
 
+  const whatsappFromRaw = process.env.TWILIO_WHATSAPP_FROM?.trim() || null;
   const whatsappContentSid =
     process.env.TWILIO_WHATSAPP_CONTENT_SID?.trim() || null;
   const smsFrom = process.env.TWILIO_SMS_FROM?.trim() || null;
   const messagingServiceSid =
     process.env.TWILIO_MESSAGING_SERVICE_SID?.trim() || null;
+  const whatsappMessagingServiceSid =
+    extractMessagingServiceSid(
+      process.env.TWILIO_WHATSAPP_MESSAGING_SERVICE_SID,
+    ) ||
+    extractMessagingServiceSid(whatsappFromRaw) ||
+    extractMessagingServiceSid(messagingServiceSid);
 
   return {
     accountSid,
     authToken,
     fromVoice,
-    fromWhatsapp: fromWhatsappRaw!.startsWith("whatsapp:")
-      ? fromWhatsappRaw!
-      : `whatsapp:${fromWhatsappRaw}`,
+    fromWhatsapp: normalizeWhatsappFromAddress(whatsappFromRaw),
     whatsappContentSid,
     smsFrom,
     messagingServiceSid,
+    whatsappMessagingServiceSid,
     publicBaseUrl: resolvePublicBaseUrl(),
   };
 }
@@ -156,10 +202,21 @@ export function humanizeTwilioVoiceError(raw: string): string {
   return s;
 }
 
+export function isWhatsappChannelMissingError(raw: string): boolean {
+  const s = String(raw || "");
+  return (
+    /\b63007\b/.test(s) ||
+    /could not find a Channel with the specified From/i.test(s)
+  );
+}
+
 export function humanizeTwilioWhatsAppError(raw: string): string {
   const s = String(raw || "");
   if (/contentsid\s*required/i.test(s) || (/content.?sid/i.test(s) && /required/i.test(s))) {
     return "WhatsApp exige plantilla (ContentSid). Crea un Content Template en Twilio y define TWILIO_WHATSAPP_CONTENT_SID=HX…";
+  }
+  if (isWhatsappChannelMissingError(s)) {
+    return "[63007] El remitente de WhatsApp no existe en esta cuenta Twilio. TWILIO_WHATSAPP_FROM debe ser un sender WhatsApp (sandbox whatsapp:+14155238886 o número WA Business ONLINE), no el número de voz. Si el sender está en un Messaging Service, define TWILIO_WHATSAPP_MESSAGING_SERVICE_SID=MG…";
   }
   if (/not.?a.?valid.?whatsapp/i.test(s) || /sandbox/i.test(s)) {
     return "WhatsApp no habilitado / sandbox: el destinatario debe unirse al sandbox o el sender debe ser WA Business aprobado.";
@@ -260,6 +317,53 @@ export async function placeVoiceCall(params: {
   return result;
 }
 
+export function normalizeWhatsappTo(to: string): string {
+  return to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+}
+
+export type WhatsappSendAttempt = Record<string, string>;
+
+/**
+ * Intentos de envío WA: primero From dedicado; si no hay (o 63007), Messaging Service.
+ * Nunca usa TWILIO_VOICE_FROM como Channel WhatsApp.
+ */
+export function buildWhatsappSendAttempts(
+  cfg: Pick<
+    TwilioConfig,
+    "fromWhatsapp" | "whatsappMessagingServiceSid" | "whatsappContentSid"
+  >,
+  params: {
+    to: string;
+    body: string;
+    contentSid?: string | null;
+    contentVariables?: Record<string, string>;
+  },
+): WhatsappSendAttempt[] {
+  const to = normalizeWhatsappTo(params.to);
+  const contentSid = (params.contentSid ?? cfg.whatsappContentSid)?.trim() || "";
+  const base: Record<string, string> = { To: to };
+  if (contentSid) {
+    base.ContentSid = contentSid;
+    if (params.contentVariables && Object.keys(params.contentVariables).length > 0) {
+      base.ContentVariables = JSON.stringify(params.contentVariables);
+    }
+  } else {
+    base.Body = params.body.slice(0, 1500);
+  }
+
+  const attempts: WhatsappSendAttempt[] = [];
+  if (cfg.fromWhatsapp) {
+    attempts.push({ ...base, From: cfg.fromWhatsapp });
+  }
+  if (cfg.whatsappMessagingServiceSid) {
+    attempts.push({
+      ...base,
+      MessagingServiceSid: cfg.whatsappMessagingServiceSid,
+    });
+  }
+  return attempts;
+}
+
 export async function sendWhatsappMessage(params: {
   to: string;
   body: string;
@@ -274,31 +378,46 @@ export async function sendWhatsappMessage(params: {
       error: "Twilio no configurado para WhatsApp",
     };
   }
-  const to = params.to.startsWith("whatsapp:")
-    ? params.to
-    : `whatsapp:${params.to}`;
 
-  const contentSid = (params.contentSid ?? cfg.whatsappContentSid)?.trim() || "";
-  const form: Record<string, string> = {
-    To: to,
-    From: cfg.fromWhatsapp,
-  };
-
-  if (contentSid) {
-    form.ContentSid = contentSid;
-    if (params.contentVariables && Object.keys(params.contentVariables).length > 0) {
-      form.ContentVariables = JSON.stringify(params.contentVariables);
-    }
-  } else {
-    // Sin template: Twilio WA Business suele responder "ContentSid Required"
-    form.Body = params.body.slice(0, 1500);
+  const attempts = buildWhatsappSendAttempts(cfg, params);
+  if (attempts.length === 0) {
+    return {
+      ok: false,
+      error:
+        "WhatsApp no configurado: define TWILIO_WHATSAPP_FROM=whatsapp:+E164 (no el número de voz) o TWILIO_WHATSAPP_MESSAGING_SERVICE_SID=MG…",
+    };
   }
 
-  const result = await twilioForm(cfg, "/Messages.json", form);
-  if (!result.ok && result.error) {
-    return { ok: false, error: humanizeTwilioWhatsAppError(result.error) };
+  let lastError: string | undefined;
+  for (let i = 0; i < attempts.length; i++) {
+    const form = attempts[i];
+    const result = await twilioForm(cfg, "/Messages.json", form);
+    if (result.ok) return result;
+    lastError = result.error;
+    const canRetryWithService =
+      i === 0 &&
+      attempts.length > 1 &&
+      isWhatsappChannelMissingError(result.error || "") &&
+      Boolean(form.From) &&
+      Boolean(attempts[i + 1]?.MessagingServiceSid);
+    if (!canRetryWithService) break;
+    console.error("[twilio-vendedor] whatsapp 63007, reintento con Messaging Service", {
+      to: params.to.slice(0, 6) + "…",
+      from: form.From?.slice(0, 18),
+      code: result.code,
+    });
   }
-  return result;
+
+  const error = humanizeTwilioWhatsAppError(
+    lastError || "WhatsApp no enviado",
+  );
+  console.error("[twilio-vendedor] whatsapp failed", {
+    to: params.to.slice(0, 6) + "…",
+    from: cfg.fromWhatsapp?.slice(0, 18),
+    messagingService: cfg.whatsappMessagingServiceSid ? "yes" : "no",
+    error,
+  });
+  return { ok: false, error };
 }
 
 /** SMS último recurso si voz y WA fallan (opcional). */

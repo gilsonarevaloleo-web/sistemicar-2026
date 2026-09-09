@@ -11,7 +11,17 @@ import {
   humanizeTwilioWhatsAppError,
   humanizeTwilioVoiceError,
   buildWhatsAppContentVariables,
+  normalizeWhatsappFromAddress,
+  extractMessagingServiceSid,
+  getTwilioConfig,
+  buildWhatsappSendAttempts,
+  isWhatsappChannelMissingError,
 } from "./twilioVendedor.ts";
+
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}
 
 describe("Twilio vendedor helpers", () => {
   it("normaliza 9 dígitos Perú a +51", () => {
@@ -61,6 +71,112 @@ describe("Twilio vendedor helpers", () => {
       humanizeTwilioWhatsAppError("ContentSid Required"),
       /TWILIO_WHATSAPP_CONTENT_SID/,
     );
+  });
+
+  it("humaniza 63007 Channel From inválido", () => {
+    const msg = humanizeTwilioWhatsAppError(
+      "[63007] Twilio could not find a Channel with the specified From address",
+    );
+    assert.match(msg, /63007/);
+    assert.match(msg, /TWILIO_WHATSAPP_FROM/);
+    assert.doesNotMatch(msg, /could not find a Channel/i);
+    assert.equal(
+      isWhatsappChannelMissingError(
+        "[63007] Twilio could not find a Channel with the specified From address",
+      ),
+      true,
+    );
+  });
+
+  it("WhatsApp From no reutiliza el número de voz", () => {
+    const prev = {
+      sid: process.env.TWILIO_ACCOUNT_SID,
+      token: process.env.TWILIO_AUTH_TOKEN,
+      voice: process.env.TWILIO_VOICE_FROM,
+      wa: process.env.TWILIO_WHATSAPP_FROM,
+      mg: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      waMg: process.env.TWILIO_WHATSAPP_MESSAGING_SERVICE_SID,
+    };
+    process.env.TWILIO_ACCOUNT_SID = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    process.env.TWILIO_AUTH_TOKEN = "token";
+    process.env.TWILIO_VOICE_FROM = "+15551234567";
+    delete process.env.TWILIO_WHATSAPP_FROM;
+    delete process.env.TWILIO_MESSAGING_SERVICE_SID;
+    delete process.env.TWILIO_WHATSAPP_MESSAGING_SERVICE_SID;
+    try {
+      const cfg = getTwilioConfig();
+      assert.ok(cfg);
+      assert.equal(cfg.fromVoice, "+15551234567");
+      assert.equal(cfg.fromWhatsapp, null);
+      assert.equal(cfg.whatsappMessagingServiceSid, null);
+      assert.equal(
+        buildWhatsappSendAttempts(cfg, {
+          to: "+51918260514",
+          body: "hola",
+        }).length,
+        0,
+      );
+    } finally {
+      restoreEnv("TWILIO_ACCOUNT_SID", prev.sid);
+      restoreEnv("TWILIO_AUTH_TOKEN", prev.token);
+      restoreEnv("TWILIO_VOICE_FROM", prev.voice);
+      restoreEnv("TWILIO_WHATSAPP_FROM", prev.wa);
+      restoreEnv("TWILIO_MESSAGING_SERVICE_SID", prev.mg);
+      restoreEnv("TWILIO_WHATSAPP_MESSAGING_SERVICE_SID", prev.waMg);
+    }
+  });
+
+  it("normaliza sandbox y trata MG como Messaging Service", () => {
+    assert.equal(
+      normalizeWhatsappFromAddress("whatsapp:+14155238886"),
+      "whatsapp:+14155238886",
+    );
+    assert.equal(
+      normalizeWhatsappFromAddress("+14155238886"),
+      "whatsapp:+14155238886",
+    );
+    const mg = "MGaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    assert.equal(normalizeWhatsappFromAddress(mg), null);
+    assert.equal(extractMessagingServiceSid(mg), mg);
+    assert.equal(extractMessagingServiceSid(`whatsapp:${mg}`), mg);
+  });
+
+  it("envío WA usa Messaging Service si no hay From dedicado", () => {
+    const attempts = buildWhatsappSendAttempts(
+      {
+        fromWhatsapp: null,
+        whatsappMessagingServiceSid: "MGaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        whatsappContentSid: "HXbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      },
+      {
+        to: "+51918260514",
+        body: "hola",
+        contentVariables: { "1": "JORNADA", "2": "2", "3": "https://x" },
+      },
+    );
+    assert.equal(attempts.length, 1);
+    assert.equal(attempts[0].From, undefined);
+    assert.equal(
+      attempts[0].MessagingServiceSid,
+      "MGaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+    assert.equal(attempts[0].To, "whatsapp:+51918260514");
+    assert.equal(attempts[0].ContentSid, "HXbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  });
+
+  it("envío WA intenta From y luego Messaging Service", () => {
+    const attempts = buildWhatsappSendAttempts(
+      {
+        fromWhatsapp: "whatsapp:+14155238886",
+        whatsappMessagingServiceSid: "MGaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        whatsappContentSid: null,
+      },
+      { to: "whatsapp:+51918260514", body: "hola" },
+    );
+    assert.equal(attempts.length, 2);
+    assert.equal(attempts[0].From, "whatsapp:+14155238886");
+    assert.equal(attempts[1].MessagingServiceSid, "MGaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    assert.equal(attempts[1].From, undefined);
   });
 
   it("humaniza From whatsapp en voz", () => {
