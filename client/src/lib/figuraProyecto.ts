@@ -79,21 +79,21 @@ export type FiguraEstado = {
 };
 
 export const FIGURA_MIEMBROS_CRECIMIENTO: readonly { id: string; label: string }[] = [
-  { id: "torso", label: "torso" },
-  { id: "cabeza", label: "cabeza" },
-  { id: "brazoI", label: "brazo izquierdo" },
-  { id: "brazoD", label: "brazo derecho" },
-  { id: "piernaI", label: "pierna izquierda" },
-  { id: "piernaD", label: "pierna derecha" },
+  { id: "torso", label: "el torso" },
+  { id: "cabeza", label: "la cabeza" },
+  { id: "brazoI", label: "el brazo izquierdo" },
+  { id: "brazoD", label: "el brazo derecho" },
+  { id: "piernaI", label: "la pierna izquierda" },
+  { id: "piernaD", label: "la pierna derecha" },
 ];
 
 export const FIGURA_ANILLOS_CONTROL: readonly { id: string; label: string }[] = [
-  { id: "s1", label: "cimiento" },
-  { id: "s2", label: "segundo anillo" },
-  { id: "s3", label: "tercer anillo" },
-  { id: "s4", label: "cuarto anillo" },
-  { id: "s5", label: "quinto anillo" },
-  { id: "s6", label: "cumbre" },
+  { id: "s1", label: "el cimiento" },
+  { id: "s2", label: "el segundo anillo" },
+  { id: "s3", label: "el tercer anillo" },
+  { id: "s4", label: "el cuarto anillo" },
+  { id: "s5", label: "el quinto anillo" },
+  { id: "s6", label: "la cumbre" },
 ];
 
 export function figuraModoDeEtiqueta(etiqueta?: string | null): FiguraModo {
@@ -216,7 +216,7 @@ function copyFigura(estado: Omit<FiguraEstado, "copy" | "copyHueco">): {
           ? "Todavía no hay sostén. Diez envíos de enfoque revelan un anillo. La conquista da peso, no contorno."
           : "Todavía no hay forma. Diez envíos de enfoque revelan un miembro. La conquista da peso, no contorno.",
       copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar el ${estado.hueco.siguiente.label}.`
+        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
         : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el primer ${pieza}.`,
     };
   }
@@ -225,7 +225,7 @@ function copyFigura(estado: Omit<FiguraEstado, "copy" | "copyHueco">): {
     return {
       copy: "Hay peso sin contorno. La masa no revela figura.",
       copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar el ${estado.hueco.siguiente.label}.`
+        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
         : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el primer ${pieza}.`,
     };
   }
@@ -253,7 +253,7 @@ function copyFigura(estado: Omit<FiguraEstado, "copy" | "copyHueco">): {
     return {
       copy: `El ${estado.hueco.siguiente ? "contorno" : pieza} ya se ve. Sin masa queda hueco.`,
       copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar el ${estado.hueco.siguiente.label}.`
+        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
         : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para dar masa.`,
     };
   }
@@ -265,7 +265,7 @@ function copyFigura(estado: Omit<FiguraEstado, "copy" | "copyHueco">): {
         ? "El sostén aparece por anillos. La conquista lo carga; el enfoque lo dibuja."
         : "La forma aparece por paquetes. La conquista da peso; el enfoque da contorno.",
     copyHueco: next
-      ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar el ${next.label}.`
+      ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${next.label}.`
       : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el siguiente ${pieza}.`,
   };
 }

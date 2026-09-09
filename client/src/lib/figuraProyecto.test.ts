@@ -88,7 +88,7 @@ describe("figuraProyecto — cristalización", () => {
     assert.equal(ok.deformacion, "ninguna");
     assert.equal(ok.masaFill, 1);
     assert.equal(ok.hueco.siguiente?.id, "cabeza");
-    assert.match(ok.copyHueco, /cabeza/);
+    assert.match(ok.copyHueco, /0 de 10 para revelar la cabeza/);
   });
 
   it("60 de forma revelan la figura completa", () => {
@@ -117,7 +117,7 @@ describe("figuraProyecto — cristalización", () => {
     const c = computeFiguraEstado("centro", stamps(10, 0));
     assert.equal(c.modo, "control");
     assert.equal(c.miembros[0]?.id, "s1");
-    assert.equal(c.miembros[0]?.label, "cimiento");
+    assert.equal(c.miembros[0]?.label, "el cimiento");
     assert.match(c.copyHueco, /segundo anillo/);
   });
 
