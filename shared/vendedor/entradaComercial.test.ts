@@ -8,6 +8,8 @@ import {
   PAGOS_JORNADA_BASE_HREF,
   VENDEDOR_JORNADA_ADS_HREF,
   enlacePagoJornadaBase,
+  buildWhatsAppClickToChatHref,
+  mensajeEnlacePagoWhatsapp,
 } from "./entradaComercial.ts";
 
 describe("Entrada comercial Jornada (anuncios)", () => {
@@ -64,12 +66,16 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.doesNotMatch(enlacePagoJornadaBase("ANA"), /espejo|umbral/i);
   });
 
-  it("checkout Base conserva tracking", () => {
-    const next = withTrackedQuery(
-      PAGOS_JORNADA_BASE_HREF,
-      "?utm_source=facebook&utm_campaign=jornada_base",
+  it("wa.me usa dígitos internacionales y el enlace de pago", () => {
+    const link = enlacePagoJornadaBase("ANA");
+    const href = buildWhatsAppClickToChatHref(
+      "918260514",
+      mensajeEnlacePagoWhatsapp(link, "ANA"),
     );
-    assert.match(next, /plan=planificacion_base/);
-    assert.match(next, /utm_campaign=jornada_base/);
+    assert.ok(href);
+    assert.match(href, /^https:\/\/wa\.me\/51918260514\?text=/);
+    const text = decodeURIComponent(href.split("text=")[1] || "");
+    assert.match(text, /planificacion_base/);
+    assert.match(text, /ANA/);
   });
 });

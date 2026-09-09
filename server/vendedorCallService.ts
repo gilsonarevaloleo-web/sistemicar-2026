@@ -1,5 +1,9 @@
 import { construirGuionLlamada } from "../shared/vendedor/callScripts";
-import { enlacePagoJornadaBase } from "../shared/vendedor/entradaComercial";
+import {
+  buildWhatsAppClickToChatHref,
+  enlacePagoJornadaBase,
+  mensajeEnlacePagoWhatsapp,
+} from "../shared/vendedor/entradaComercial";
 import {
   clampCodigoJornadaBase,
   type CodigoJornadaBase,
@@ -459,24 +463,47 @@ export type EnviarEnlacePagoResult =
       call: VendedorCallRecord;
       whatsappOk: boolean;
       detail: string;
+      deepLink: string;
+      shareHref: string | null;
     }
-  | { ok: false; error: string; status?: number };
+  | { ok: false; error: string; status?: number; deepLink?: string; shareHref?: string | null };
+
+function entregaEnlacePayload(opts: {
+  telefono?: string | null;
+  sellerRef?: string | null;
+}): { deepLink: string; shareHref: string | null } {
+  const deepLink = enlacePagoJornadaBase(opts.sellerRef);
+  const shareHref = opts.telefono
+    ? buildWhatsAppClickToChatHref(
+        opts.telefono,
+        mensajeEnlacePagoWhatsapp(deepLink, opts.sellerRef),
+      )
+    : null;
+  return { deepLink, shareHref };
+}
 
 /** Desde la web: la vendedora manda el enlace de pago al WhatsApp. */
 export async function enviarEnlacePagoWhatsapp(
   input: EnviarEnlacePagoInput,
 ): Promise<EnviarEnlacePagoResult> {
+  const sellerRefEarly = input.sellerRef?.trim().toUpperCase() || null;
   const phrase = (input.consentimiento || "").trim().toLowerCase();
   if (phrase !== "enlace-pago" && phrase !== "whatsapp") {
     return {
       ok: false,
       error: "Consentimiento requerido: pide el enlace por WhatsApp.",
       status: 400,
+      ...entregaEnlacePayload({ sellerRef: sellerRefEarly }),
     };
   }
 
   if (!Number.isFinite(input.codigo)) {
-    return { ok: false, error: "Código inválido.", status: 400 };
+    return {
+      ok: false,
+      error: "Código inválido.",
+      status: 400,
+      ...entregaEnlacePayload({ sellerRef: sellerRefEarly }),
+    };
   }
 
   const telefono = normalizePhoneE164(input.telefono);
@@ -485,6 +512,7 @@ export async function enviarEnlacePagoWhatsapp(
       ok: false,
       error: "WhatsApp inválido. Usa 9 dígitos Perú o formato internacional.",
       status: 400,
+      ...entregaEnlacePayload({ sellerRef: sellerRefEarly }),
     };
   }
 
@@ -492,7 +520,11 @@ export async function enviarEnlacePagoWhatsapp(
     (input.whatsapp?.trim()
       ? normalizePhoneE164(input.whatsapp)
       : telefono) || telefono;
-  const sellerRef = input.sellerRef?.trim().toUpperCase() || null;
+  const sellerRef = sellerRefEarly;
+  const entrega = entregaEnlacePayload({
+    telefono: whatsappRaw,
+    sellerRef,
+  });
   const codigo = clampCodigoJornadaBase(input.codigo);
   const planeta: PlanetaId = "JORNADA";
   const guion = construirGuionLlamada(codigo, planeta, sellerRef);
@@ -506,6 +538,7 @@ export async function enviarEnlacePagoWhatsapp(
       ok: false,
       error: `Límite de ${cupo.limit} envíos/día alcanzado. Intenta mañana.`,
       status: 429,
+      ...entrega,
     };
   }
 
@@ -546,6 +579,7 @@ export async function enviarEnlacePagoWhatsapp(
       call: updated ?? record,
       whatsappOk: true,
       detail: "Te mandé el enlace de Jornada Base por WhatsApp.",
+      ...entrega,
     };
   }
 
@@ -561,6 +595,7 @@ export async function enviarEnlacePagoWhatsapp(
       call: updated ?? record,
       whatsappOk: true,
       detail: "WhatsApp no pasó; te lo mandé por SMS.",
+      ...entrega,
     };
   }
 
@@ -575,6 +610,7 @@ export async function enviarEnlacePagoWhatsapp(
     detail:
       msg.error ||
       "No pude enviar el WhatsApp. Revisa la plantilla o el número.",
+    ...entrega,
   };
 }
 

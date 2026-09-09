@@ -5365,7 +5365,11 @@ app.post("/api/vendedor/enviar-enlace-pago", async (req, res) => {
       consentimiento: String(req.body?.consentimiento || ""),
     });
     if (!result.ok) {
-      return res.status(result.status || 400).json({ error: result.error });
+      return res.status(result.status || 400).json({
+        error: result.error,
+        deepLink: result.deepLink,
+        shareHref: result.shareHref,
+      });
     }
     res.json({
       ok: true,
@@ -5374,6 +5378,8 @@ app.post("/api/vendedor/enviar-enlace-pago", async (req, res) => {
       whatsappOk: result.whatsappOk,
       message: result.detail,
       errorDetail: result.call.error,
+      deepLink: result.deepLink,
+      shareHref: result.shareHref,
     });
   } catch (error) {
     console.error("[vendedor/enviar-enlace-pago]", error);

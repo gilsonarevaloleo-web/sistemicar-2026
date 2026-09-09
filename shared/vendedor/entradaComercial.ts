@@ -67,6 +67,30 @@ export function enlacePagoJornadaBase(sellerRef?: string | null): string {
   return `${base}&ref=${encodeURIComponent(sellerRef.trim())}`;
 }
 
+/**
+ * wa.me para que el vendedor mande el enlace desde su WhatsApp
+ * si Twilio no puede (p. ej. error 63007).
+ */
+export function buildWhatsAppClickToChatHref(
+  phone: string,
+  text: string,
+): string | null {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 9 || digits.length > 15) return null;
+  const intl = digits.length === 9 ? `51${digits}` : digits;
+  return `https://wa.me/${intl}?text=${encodeURIComponent(text)}`;
+}
+
+export function mensajeEnlacePagoWhatsapp(
+  deepLink: string,
+  sellerRef?: string | null,
+): string {
+  const ref = sellerRef?.trim()
+    ? ` Al pagar, menciona ${sellerRef.trim()}.`
+    : "";
+  return `Jornada Base — mides lo que cierras hoy. Enlace de pago: ${deepLink}.${ref}`;
+}
+
 /** Copia ?ref= y utm_* de la URL actual a un href interno. */
 export function withTrackedQuery(
   href: string,

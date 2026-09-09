@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, MessageCircle, Phone, RotateCcw } from "lucide-react";
+import { ArrowRight, Copy, ExternalLink, MessageCircle, Phone, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import {
   VENDEDOR_TRIAGE_PREGUNTAS,
@@ -18,6 +18,9 @@ import {
 import {
   fijacionDesdeEntradaComercial,
   parseEntradaComercialSearch,
+  buildWhatsAppClickToChatHref,
+  enlacePagoJornadaBase,
+  mensajeEnlacePagoWhatsapp,
 } from "@shared/vendedor/entradaComercial";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import {
@@ -41,6 +44,10 @@ export default function VendedorTriagePage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkDone, setLinkDone] = useState(false);
   const [linkStatusMsg, setLinkStatusMsg] = useState<string | null>(null);
+  const [fallbackDeepLink, setFallbackDeepLink] = useState<string | null>(null);
+  const [fallbackShareHref, setFallbackShareHref] = useState<string | null>(
+    null,
+  );
   const llamameRef = useRef<HTMLDivElement>(null);
   const callInFlight = useRef(false);
   const linkInFlight = useRef(false);
@@ -110,6 +117,8 @@ export default function VendedorTriagePage() {
     setCallStatusMsg(null);
     setLinkDone(false);
     setLinkStatusMsg(null);
+    setFallbackDeepLink(null);
+    setFallbackShareHref(null);
     entradaAplicada.current = true;
     const keepRef = sellerRef
       ? `?ref=${encodeURIComponent(sellerRef)}`
@@ -195,6 +204,17 @@ export default function VendedorTriagePage() {
         }),
       });
       const data = await res.json();
+      const localDeep = enlacePagoJornadaBase(sellerRef);
+      const deepLink =
+        (typeof data.deepLink === "string" && data.deepLink) || localDeep;
+      const shareHref =
+        (typeof data.shareHref === "string" && data.shareHref) ||
+        buildWhatsAppClickToChatHref(
+          tel,
+          mensajeEnlacePagoWhatsapp(deepLink, sellerRef),
+        );
+      setFallbackDeepLink(deepLink);
+      setFallbackShareHref(shareHref);
       if (!res.ok) throw new Error(data.error || "Error");
       const msg = data.message || "Te mandé el enlace por WhatsApp.";
       setLinkStatusMsg(msg);
@@ -202,15 +222,35 @@ export default function VendedorTriagePage() {
         setLinkDone(true);
         toast.success(msg);
       } else {
-        toast.error(msg);
+        toast.error("Twilio no pudo mandar el WhatsApp. Usa el enlace de abajo.");
       }
     } catch (e: unknown) {
       const err = e instanceof Error ? e.message : "No se pudo enviar";
       setLinkStatusMsg(err);
       toast.error(err);
+      if (!fallbackDeepLink) {
+        const localDeep = enlacePagoJornadaBase(sellerRef);
+        setFallbackDeepLink(localDeep);
+        setFallbackShareHref(
+          buildWhatsAppClickToChatHref(
+            tel,
+            mensajeEnlacePagoWhatsapp(localDeep, sellerRef),
+          ),
+        );
+      }
     } finally {
       linkInFlight.current = false;
       setLinkLoading(false);
+    }
+  }
+
+  async function copiarEnlacePago() {
+    const href = fallbackDeepLink || enlacePagoJornadaBase(sellerRef);
+    try {
+      await navigator.clipboard.writeText(href);
+      toast.success("Enlace copiado.");
+    } catch {
+      toast.error("No se pudo copiar. Ábrelo con el botón.");
     }
   }
 
@@ -491,6 +531,66 @@ export default function VendedorTriagePage() {
                 >
                   {linkStatusMsg}
                 </p>
+              )}
+              {fallbackDeepLink && !linkDone && !linkLoading && (
+                <div
+                  className="space-y-2 border p-3"
+                  style={{
+                    borderColor: `${GOLD}55`,
+                    background: "rgba(0,0,0,0.35)",
+                  }}
+                  data-testid="vendedor-enlace-fallback"
+                >
+                  <p className="text-[11px] leading-relaxed text-white/70">
+                    El enlace de Jornada Base, para entregarlo ahora:
+                  </p>
+                  <p
+                    className="break-all text-[11px] text-white/85"
+                    data-testid="vendedor-enlace-fallback-url"
+                  >
+                    {fallbackDeepLink}
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <a
+                      href={fallbackDeepLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-[11px] font-bold tracking-widest"
+                      style={{ background: GOLD, color: "#0A0A0A" }}
+                      data-testid="vendedor-btn-abrir-pago"
+                    >
+                      <ExternalLink size={14} />
+                      ABRIR PAGO
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => void copiarEnlacePago()}
+                      className="flex flex-1 items-center justify-center gap-2 border px-3 py-2.5 text-[11px] font-bold tracking-widest"
+                      style={{ borderColor: `${GOLD}88`, color: GOLD }}
+                      data-testid="vendedor-btn-copiar-enlace"
+                    >
+                      <Copy size={14} />
+                      COPIAR
+                    </button>
+                  </div>
+                  {fallbackShareHref && (
+                    <a
+                      href={fallbackShareHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex w-full items-center justify-center gap-2 border px-3 py-2.5 text-[11px] font-bold tracking-widest"
+                      style={{
+                        borderColor: `${GOLD}88`,
+                        color: GOLD,
+                        background: "rgba(0,0,0,0.2)",
+                      }}
+                      data-testid="vendedor-btn-wa-manual"
+                    >
+                      <MessageCircle size={14} />
+                      MANDARLO DESDE TU WHATSAPP
+                    </a>
+                  )}
+                </div>
               )}
             </div>
 
