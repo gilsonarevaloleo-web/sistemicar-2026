@@ -6,7 +6,7 @@ import {
   isInvisibleCentinela,
 } from "./calcularReporteSemanal.ts";
 import { TEXTO_INSUFICIENTE, type CalcularReporteSemanalInput, type SegmentoSemanal, type VehiculoSemanal } from "./types.ts";
-import { monday0500LimaMs, resolveVentanaSemanal } from "./ventana.ts";
+import { esLunesDeCosecha, monday0500LimaMs, resolveVentanaSemanal } from "./ventana.ts";
 
 /** Lunes 2026-08-31 05:00 Lima → semana 2026-W36. */
 const LUNES_W36 = "2026-08-31";
@@ -72,6 +72,14 @@ describe("ventana lunes 05:00 Lima", () => {
     assert.equal(actual.semanaId, "2026-W36");
     const cerrada = resolveVentanaSemanal(justBefore, "cerrada");
     assert.equal(cerrada.semanaId, "2026-W35");
+  });
+
+  it("la cosecha de la tarjeta solo se exhibe el lunes-jornada", () => {
+    assert.equal(esLunesDeCosecha(SELLO_W36_MS - 60_000), false);
+    assert.equal(esLunesDeCosecha(SELLO_W36_MS), true);
+    assert.equal(esLunesDeCosecha(limaMs("2026-09-07", 23, 0)), true);
+    assert.equal(esLunesDeCosecha(limaMs("2026-09-08", 5, 0)), false);
+    assert.equal(esLunesDeCosecha(limaMs("2026-09-09", 12, 0)), false);
   });
 
   it("cierre 04:50 del lunes entra en la semana que termina; 05:10 no", () => {

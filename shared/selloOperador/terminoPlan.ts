@@ -54,3 +54,17 @@ export function debeRecordarSello(
   if (planEndMs == null || !Number.isFinite(planEndMs)) return false;
   return nowMs >= planEndMs;
 }
+
+/**
+ * El relato (tensión, hechos, mandato) nace a la misma hora que el aviso.
+ * Antes del término no hay cosecha que mirar: el motor puede correr, la UI no.
+ * Ya sellado: el sello congelado sí se lee.
+ */
+export function debeMostrarRelatoSello(
+  nowMs: number,
+  yaSellado: boolean,
+  planEndMs: number | null,
+): boolean {
+  if (yaSellado) return true;
+  return debeRecordarSello(nowMs, false, planEndMs);
+}

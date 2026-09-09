@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  debeMostrarRelatoSello,
   debeRecordarSello,
   formatTerminoLabel,
   resolveTerminoPlanMs,
@@ -55,5 +56,22 @@ describe("debeRecordarSello", () => {
     assert.equal(debeRecordarSello(FIN_23, false, FIN_23), true);
     assert.equal(debeRecordarSello(FIN_17, false, FIN_17), true);
     assert.equal(debeRecordarSello(FIN_17 - 1, false, FIN_17), false);
+  });
+});
+
+describe("debeMostrarRelatoSello", () => {
+  it("antes del término no hay relato, aunque el motor pueda calcularlo", () => {
+    assert.equal(debeMostrarRelatoSello(FIN_23 - 1, false, FIN_23), false);
+    assert.equal(debeMostrarRelatoSello(FIN_17 - 1, false, FIN_17), false);
+  });
+
+  it("al término nace el relato; si ya selló, el sello congelado se lee", () => {
+    assert.equal(debeMostrarRelatoSello(FIN_23, false, FIN_23), true);
+    assert.equal(debeMostrarRelatoSello(FIN_23 - 1, true, FIN_23), true);
+  });
+
+  it("sin anillo no inventa hora: no hay relato hasta que selles", () => {
+    assert.equal(debeMostrarRelatoSello(FIN_23, false, null), false);
+    assert.equal(debeMostrarRelatoSello(FIN_23, true, null), true);
   });
 });

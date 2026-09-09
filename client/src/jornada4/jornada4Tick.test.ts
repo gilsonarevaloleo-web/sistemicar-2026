@@ -38,6 +38,23 @@ describe("anti-freeze Dual Kernel session", () => {
     assert.match(metricas, /useJornada4Tick\(Boolean\(userId\)\)/);
     assert.match(metricas, /Jornada4DailyDisciplinaBar/);
     assert.match(metricas, /Jornada4Boveda/);
+    assert.match(metricas, /tick=\{disciplinaTick\}/);
+  });
+
+  it("el relato de sello y espejo no se pinta hasta la hora", () => {
+    const sello = readFileSync(
+      join(dir, "../components/jornada4/SelloOperadorCard.tsx"),
+      "utf8"
+    );
+    const espejo = readFileSync(
+      join(dir, "../components/jornada4/EspejoSemanalCard.tsx"),
+      "utf8"
+    );
+    assert.match(sello, /debeMostrarRelatoSello/);
+    assert.match(sello, /sello-espera/);
+    assert.equal(sello.includes("useJornada4Tick"), false);
+    assert.match(espejo, /esLunesDeCosecha/);
+    assert.match(espejo, /mostrarCosecha/);
   });
 
   it("Pulso solo monta en PlanTab", () => {
