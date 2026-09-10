@@ -38,7 +38,7 @@ import {
 } from "@/lib/desglosadorClock";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import {
-  conquistaActiveSub,
+  conquistaFocusSub,
   conquistaProgressLabel,
 } from "@/jornada4/conquistaKernel";
 import {
@@ -92,21 +92,24 @@ export function ConquistaCard({
   onResumeDesglosador,
   onReorderSubs,
 }: Props) {
-  const active = conquistaActiveSub(vehicle);
+  const active = conquistaFocusSub(vehicle);
   const paused = isDesglosadorClockPaused(vehicle);
-  const tick = useJornada4Tick(Boolean(active?.aperturaAt) && !paused);
+  const tick = useJornada4Tick(Boolean(active?.aperturaAt) || paused);
   const clocks = useMemo(
     () => computeDesglosadorClocks(Date.now(), vehicle),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick; pausa congela
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wall-clock via tick; elapsed se congela en pausa
     [
       tick,
       active?.id,
       active?.aperturaAt,
       vehicle.id,
+      vehicle.aperturaAt,
+      vehicle.criterioDetalle,
       vehicle.subVehiculos,
       vehicle.interrupcionActiva,
       vehicle.desglosadorPausa?.subActivoId,
       vehicle.desglosadorPausa?.elapsedSecSnapshot,
+      vehicle.desglosadorPausa?.pausadoAt,
     ]
   );
 
@@ -126,8 +129,8 @@ export function ConquistaCard({
   const reachUntilMeta = useMemo(() => {
     if (!metaHora || unitCycle.stepsCounted <= 0) return null;
     void tick; // refrescar alcance con el wall-clock
-    return projectProductsUntilMeta(subs, metaHora, Date.now());
-  }, [metaHora, subs, unitCycle.stepsCounted, unitCycle.totalSec, tick]);
+    return projectProductsUntilMeta(subs, metaHora, Date.now(), vehicle.aperturaAt);
+  }, [metaHora, subs, unitCycle.stepsCounted, unitCycle.totalSec, tick, vehicle.aperturaAt]);
 
   const pendientes = subs.filter(s => s.status === "pendiente");
   const cycleReady = subs.every(s => s.status === "cumplido" || s.status === "fallado");
@@ -489,7 +492,7 @@ export function ConquistaCard({
                       className="text-[7px] font-black uppercase tracking-widest"
                       style={{ color: "rgba(255,255,255,0.72)" }}
                     >
-                      Ciclo global
+                    {paused ? "Ciclo global · pausa" : "Ciclo global"}
                     </p>
                     <p
                       className="text-[11px] font-black tabular-nums"

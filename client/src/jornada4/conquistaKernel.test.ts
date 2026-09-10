@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   applyConquistaSubClose,
   applyConquistaCycleClose,
+  conquistaActiveSub,
+  conquistaFocusSub,
 } from "./conquistaKernel.ts";
 import type { SubVehiculo, Vehicle } from "../lib/persistence.ts";
 
@@ -97,5 +99,26 @@ describe("conquistaKernel", () => {
       patch!.subVehiculos.find(s => s.id === "b")?.seccionTitulo,
       "Armado de bolsillos"
     );
+  });
+
+  it("focus sub sigue visible en pausa; active solo es el vivo", () => {
+    const now = 1_700_000_000_000;
+    const v = vehicle([
+      sub({
+        id: "a",
+        titulo: "A",
+        status: "nested_paused",
+        aperturaAt: now - 10_000,
+      }),
+      sub({ id: "b", titulo: "B", status: "pendiente" }),
+    ]);
+    v.interrupcionActiva = true;
+    v.desglosadorPausa = {
+      subActivoId: "a",
+      elapsedSecSnapshot: 10,
+      pausadoAt: now,
+    };
+    assert.equal(conquistaActiveSub(v)?.id, undefined);
+    assert.equal(conquistaFocusSub(v)?.id, "a");
   });
 });

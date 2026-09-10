@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SubVehiculo, Vehicle } from "./persistence.ts";
 import {
+  applyDesglosadorClockOps,
   computeActiveSubClocks,
   computeDesglosadorClocks,
   computeSubCloseVerdict,
+  desglosadorPauseAccumSec,
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   isDesglosadorClockPaused,
@@ -339,5 +341,197 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
     // Tope original 30 min; quedan 25. C sigue con 10 → B recibe 15, no 10 fijados.
     assert.equal(clocks.subRemainingSec, 900);
     assert.equal(clocks.cycleRemainSec, 1500);
+  });
+});
+
+describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
+  it("resta ganancia del tope, no del trabajo restante", () => {
+    const start = 1_000_000;
+    const ops = applyDesglosadorClockOps({
+      remainActiveSec: 3500,
+      pendingSec: 0,
+      completedDeltaSec: -6000,
+      liveOvertimeSec: 0,
+      pauseAccumSec: 0,
+      baseTopeMs: start + 10_800_000,
+      nowMs: start + 1_300_000,
+      hasActiveSuggested: true,
+    });
+    assert.equal(ops.remainWorkSec, 3500);
+    assert.equal(ops.liveAccumDeltaSec, -6000);
+    assert.equal(ops.topeRemainSec, 9500);
+    assert.equal(ops.slackSec, 6000);
+    assert.equal(ops.cycleRemainSec, 9500);
+  });
+
+  it("suma pérdida y overtime a la ganancia visible, no al trabajo restante", () => {
+    const ops = applyDesglosadorClockOps({
+      remainActiveSec: 120,
+      pendingSec: 600,
+      completedDeltaSec: 300,
+      liveOvertimeSec: 40,
+      pauseAccumSec: 0,
+      baseTopeMs: null,
+      nowMs: 1,
+      hasActiveSuggested: true,
+    });
+    assert.equal(ops.remainWorkSec, 720);
+    assert.equal(ops.liveAccumDeltaSec, 340);
+    assert.equal(ops.cycleRemainSec, 720);
+  });
+
+  it("suma pausa al tope y congela el restante vs tope", () => {
+    const baseTope = 1_000_000 + 3600_000;
+    const now0 = 1_000_000 + 1800_000;
+    const withoutPause = applyDesglosadorClockOps({
+      remainActiveSec: 600,
+      pendingSec: 600,
+      completedDeltaSec: 0,
+      liveOvertimeSec: 0,
+      pauseAccumSec: 0,
+      baseTopeMs: baseTope,
+      nowMs: now0,
+      hasActiveSuggested: true,
+    });
+    const withPause = applyDesglosadorClockOps({
+      remainActiveSec: 600,
+      pendingSec: 600,
+      completedDeltaSec: 0,
+      liveOvertimeSec: 0,
+      pauseAccumSec: 900,
+      baseTopeMs: baseTope,
+      nowMs: now0 + 900_000,
+      hasActiveSuggested: true,
+    });
+    assert.equal(withPause.effectiveTopeMs, baseTope + 900_000);
+    assert.equal(withPause.topeRemainSec, withoutPause.topeRemainSec);
+    assert.equal(withPause.cycleRemainSec, withoutPause.cycleRemainSec);
+  });
+});
+
+describe("reloj global — operaciones finales de todo el día", () => {
+  it("no cuenta el sugerido del sub activo como ganancia al arrancar", () => {
+    const start = 1_700_000_000_000;
+    const now = start + 300_000;
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 300,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+      ],
+    } as Vehicle);
+    // Ganancia real = −300 s. No −300 − 600 del sub que recién abre.
+    assert.equal(clocks.liveAccumDeltaSec, -300);
+  });
+
+  it("en la última unidad, ganancia grande no pone el ciclo en 0", () => {
+    const start = 1_700_000_000_000;
+    const now = start + 1300_000; // 10+10 min de trabajo + ~1.7 min del último
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 3600,
+          status: "cumplido",
+          duracionFinal: 600,
+        }),
+        sub({
+          id: "b",
+          tiempoSugeridoSeg: 3600,
+          status: "cumplido",
+          duracionFinal: 600,
+        }),
+        sub({
+          id: "c",
+          tiempoSugeridoSeg: 3600,
+          status: "activo",
+          aperturaAt: now - 100_000,
+        }),
+      ],
+    } as Vehicle);
+    assert.equal(clocks.subElapsedSec, 100);
+    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
+    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.liveAccumDeltaSec, -6000);
+  });
+
+  it("pausa de horas corre el tope: el restante vs global no se quema", () => {
+    const start = 1_700_000_000_000;
+    const pauseAt = start + 1300_000; // A 10m + B 10m + C 1.7m
+    const now = pauseAt + 7200_000; // 2 h de pausa
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        subActivoId: "c",
+        elapsedSecSnapshot: 100,
+        pausadoAt: pauseAt,
+      },
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 3600,
+          status: "cumplido",
+          duracionFinal: 600,
+        }),
+        sub({
+          id: "b",
+          tiempoSugeridoSeg: 3600,
+          status: "cumplido",
+          duracionFinal: 600,
+        }),
+        sub({
+          id: "c",
+          tiempoSugeridoSeg: 3600,
+          status: "nested_paused",
+          aperturaAt: pauseAt - 100_000,
+        }),
+      ],
+    } as Vehicle);
+    const workSec = 600 + 600 + 100;
+    const pauseAccum = desglosadorPauseAccumSec({ aperturaAt: start }, now, workSec);
+    assert.equal(pauseAccum, 7200);
+    assert.equal(clocks.subElapsedSec, 100);
+    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
+    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.pauseAccumSec, pauseAccum);
+  });
+
+  it("pérdida empuja el fin proyectado = trabajo restante, sin sumar el delta otra vez", () => {
+    const start = 1_700_000_000_000;
+    const now = start + 900_000; // A tardó 15 min de 10
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 900,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+        sub({ id: "c", tiempoSugeridoSeg: 600, status: "pendiente" }),
+      ],
+    } as Vehicle);
+    // Trabajo restante 10+10; no 10+10+5 de la pérdida ya realizada.
+    assert.equal(clocks.liveAccumDeltaSec, 300);
+    assert.equal(clocks.cycleRemainSec, 1200);
+  });
+
+  it("meta HH:mm no salta +24 h al pasar la hora durante la sesión", () => {
+    const start = new Date(2026, 8, 10, 8, 0, 0).getTime();
+    const now = new Date(2026, 8, 10, 21, 0, 0).getTime();
+    const tope = resolveConquistaTopeMs(
+      { aperturaAt: start, criterioDetalle: "20:00" },
+      [sub({ id: "a", tiempoSugeridoSeg: 3600, status: "activo", aperturaAt: start })],
+      now
+    );
+    assert.equal(tope, new Date(2026, 8, 10, 20, 0, 0).getTime());
   });
 });
