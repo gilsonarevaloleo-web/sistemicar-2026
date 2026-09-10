@@ -1,5 +1,5 @@
 /**
- * Desbloqueo operativo solo en Deploy Preview de Netlify.
+ * Desbloqueo operativo en Deploy Preview de Netlify y en Vite local (DEV).
  * El preview no comparte la sesión/cookies de sistemicar.app; sin esto el menú
  * queda sin Jornada y ModuleRoute redirige a /pagos.
  *
@@ -10,10 +10,25 @@
 
 const STORAGE_KEY = "sistemicar_preview_ops_v1";
 
-export function isDeployPreviewHost(): boolean {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname.toLowerCase();
+function hostname(): string {
+  if (typeof window === "undefined") return "";
+  return window.location.hostname.toLowerCase();
+}
+
+export function isNetlifyDeployPreviewHost(): boolean {
+  const host = hostname();
   return host.endsWith(".netlify.app") && host.includes("deploy-preview");
+}
+
+/** Vite `npm run dev`: localhost puede usar el mismo atajo ?preview_ops=1. */
+export function isLocalDevPreviewHost(): boolean {
+  const host = hostname();
+  if (host !== "localhost" && host !== "127.0.0.1") return false;
+  return Boolean(import.meta.env?.DEV);
+}
+
+export function isDeployPreviewHost(): boolean {
+  return isNetlifyDeployPreviewHost() || isLocalDevPreviewHost();
 }
 
 function readUnlockFlag(): boolean {
@@ -88,7 +103,7 @@ export function consumePreviewOpsQueryUnlock(): boolean {
  */
 export function hideNetlifyDrawerIfNeeded(): boolean {
   if (typeof window === "undefined") return false;
-  if (!isDeployPreviewHost()) return false;
+  if (!isNetlifyDeployPreviewHost()) return false;
   try {
     const url = new URL(window.location.href);
     if (url.searchParams.get("ntl-drawer-state") === "hidden") return false;
