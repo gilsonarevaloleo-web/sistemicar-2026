@@ -82,17 +82,26 @@ export function projectUnitEndLabel(
 
 /**
  * HH:mm (criterioDetalle / meta del ciclo) → timestamp absoluto.
- * Si la hora ya pasó hoy, ancla al día siguiente.
+ * Con sesión abierta, ancla al día de apertura y no salta +24 h al pasar la hora.
+ * Sin sesión, si la hora ya pasó hoy ancla al día siguiente (proyección de lanzamiento).
  */
 export function resolveMetaDeadlineMs(
   metaHora: string,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  sessionStartMs?: number | null
 ): number | null {
   const parsed = parseSegmentTime((metaHora || "").trim());
   if (!parsed) return null;
-  const dayStart = getLocalDayStartMs(nowMs);
+  const start =
+    sessionStartMs != null && Number.isFinite(sessionStartMs) ? sessionStartMs : null;
+  const anchorMs = start ?? nowMs;
+  const dayStart = getLocalDayStartMs(anchorMs);
   let deadline = dayStart + (parsed.h * 60 + parsed.m) * 60_000;
-  if (deadline <= nowMs) deadline += 86_400_000;
+  if (start != null) {
+    if (deadline <= start) deadline += 86_400_000;
+  } else if (deadline <= nowMs) {
+    deadline += 86_400_000;
+  }
   return deadline;
 }
 
@@ -128,11 +137,12 @@ export function projectProductsUntilDeadline(params: {
 export function projectProductsUntilMeta(
   subs: SubVehiculo[],
   metaHora: string,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  sessionStartMs?: number | null
 ): ProductsUntilMeta | null {
   const cycle = sumDesglosadorUnitCycle(subs);
   if (cycle.stepsCounted <= 0 || cycle.totalSec <= 0) return null;
-  const deadlineMs = resolveMetaDeadlineMs(metaHora, nowMs);
+  const deadlineMs = resolveMetaDeadlineMs(metaHora, nowMs, sessionStartMs);
   if (deadlineMs == null) return null;
   return projectProductsUntilDeadline({
     unitCycleSec: cycle.totalSec,

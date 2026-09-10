@@ -91,4 +91,12 @@ describe("projectProductsUntilMeta (1 unidad completa)", () => {
     assert.equal(reach!.hasMeasured, true);
     assert.equal(reach!.allRef, false);
   });
+
+  it("con sesión abierta, meta ya pasada no salta al día siguiente", () => {
+    const start = new Date(2026, 6, 24, 8, 0, 0).getTime();
+    const now = new Date(2026, 6, 24, 21, 0, 0).getTime();
+    const deadline = resolveMetaDeadlineMs("20:00", now, start);
+    assert.ok(deadline);
+    assert.equal(deadline, new Date(2026, 6, 24, 20, 0, 0).getTime());
+  });
 });

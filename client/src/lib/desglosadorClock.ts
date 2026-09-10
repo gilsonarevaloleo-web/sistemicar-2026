@@ -24,9 +24,17 @@ export function resolveConquistaTopeMs(
   const meta = (vehicle.criterioDetalle ?? "").trim();
   const parsed = parseSegmentTime(meta);
   if (parsed) {
-    const dayStart = getLocalDayStartMs(nowMs);
+    const start = vehicle.aperturaAt;
+    const anchorMs = start != null && Number.isFinite(start) ? start : nowMs;
+    const dayStart = getLocalDayStartMs(anchorMs);
     let deadline = dayStart + (parsed.h * 60 + parsed.m) * 60_000;
-    if (deadline <= nowMs) deadline += 86_400_000;
+    if (start != null && Number.isFinite(start)) {
+      // Meta anterior a la apertura → día siguiente. No saltar +24 h
+      // solo porque ahora ya pasó la hora (desglosador de todo el día).
+      if (deadline <= start) deadline += 86_400_000;
+    } else if (deadline <= nowMs) {
+      deadline += 86_400_000;
+    }
     return deadline;
   }
   const allSuggested = subs.reduce((acc, s) => acc + (suggestedSec(s) ?? 0), 0);
@@ -34,6 +42,102 @@ export function resolveConquistaTopeMs(
   const start = vehicle.aperturaAt;
   if (start == null || !Number.isFinite(start)) return null;
   return start + allSuggested * 1000;
+}
+
+/** Σ (real − sugerido) de subs cerrados. Negativo = ganancia; positivo = pérdida. */
+export function desglosadorClosedDeltaSec(subs: SubVehiculo[]): number {
+  return subs.reduce((acc, s) => {
+    if (s.status !== "cumplido" && s.status !== "fallado") return acc;
+    const sug = suggestedSec(s);
+    if (s.duracionFinal == null || sug == null) return acc;
+    return acc + (s.duracionFinal - sug);
+  }, 0);
+}
+
+/** Σ sugeridos de pendientes (trabajo aún no abierto). */
+export function desglosadorPendingSuggestedSec(subs: SubVehiculo[]): number {
+  return subs.reduce((acc, s) => {
+    if (s.status !== "pendiente") return acc;
+    return acc + (suggestedSec(s) ?? 0);
+  }, 0);
+}
+
+/** Trabajo medido: duraciones cerradas + elapsed del sub en foco. */
+export function desglosadorWorkSec(subs: SubVehiculo[], subElapsedSec: number): number {
+  let closed = 0;
+  for (const s of subs) {
+    if (s.status !== "cumplido" && s.status !== "fallado") continue;
+    if (s.duracionFinal == null || !Number.isFinite(s.duracionFinal)) continue;
+    closed += Math.max(0, Math.floor(s.duracionFinal));
+  }
+  return Math.max(0, closed + Math.max(0, Math.floor(subElapsedSec)));
+}
+
+/**
+ * Pausa acumulada = pared de sesión − trabajo.
+ * Incluye la pausa en curso (now avanza; el trabajo no).
+ */
+export function desglosadorPauseAccumSec(
+  vehicle: Pick<Vehicle, "aperturaAt">,
+  nowMs: number,
+  workSec: number
+): number {
+  const start = vehicle.aperturaAt;
+  if (start == null || !Number.isFinite(start) || start <= 0) return 0;
+  const wallSec = Math.max(0, Math.floor((nowMs - start) / 1000));
+  return Math.max(0, wallSec - Math.max(0, workSec));
+}
+
+export type DesglosadorClockOpsInput = {
+  remainActiveSec: number;
+  pendingSec: number;
+  completedDeltaSec: number;
+  liveOvertimeSec: number;
+  pauseAccumSec: number;
+  baseTopeMs: number | null;
+  nowMs: number;
+  hasActiveSuggested: boolean;
+};
+
+export type DesglosadorClockOps = {
+  /** Ganancia/pérdida visible: cerrados + overtime del sub activo. */
+  liveAccumDeltaSec: number;
+  /** Trabajo restante si se cumple el plan (no incluye delta ni pausa). */
+  remainWorkSec: number;
+  /** Tope corrido por pausas (suma). */
+  effectiveTopeMs: number | null;
+  topeRemainSec: number | null;
+  /** Holgura vs tope: positivo = ganancia absorbible; negativo = vamos tarde. */
+  slackSec: number;
+  cycleRemainSec: number;
+  absorbSlackIntoActive: boolean;
+};
+
+/**
+ * Motor aritmético del reloj global.
+ * Suma: pérdida, overtime, pausa (estiran el tope).
+ * Resta: ganancia (holgura contra el tope, no contra el trabajo restante).
+ */
+export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): DesglosadorClockOps {
+  const liveAccumDeltaSec = input.completedDeltaSec + Math.max(0, input.liveOvertimeSec);
+  const remainWorkSec = Math.max(0, input.remainActiveSec + input.pendingSec);
+  const pauseSec = Math.max(0, input.pauseAccumSec);
+  const effectiveTopeMs =
+    input.baseTopeMs != null ? input.baseTopeMs + pauseSec * 1000 : null;
+  const topeRemainSec =
+    effectiveTopeMs != null ? Math.floor((effectiveTopeMs - input.nowMs) / 1000) : null;
+  const slackSec = topeRemainSec != null ? topeRemainSec - remainWorkSec : 0;
+  const keepGlobalClock = topeRemainSec != null && slackSec > 0;
+  const cycleRemainSec = keepGlobalClock ? Math.max(0, topeRemainSec) : remainWorkSec;
+  return {
+    liveAccumDeltaSec,
+    remainWorkSec,
+    effectiveTopeMs,
+    topeRemainSec,
+    slackSec,
+    cycleRemainSec,
+    absorbSlackIntoActive: keepGlobalClock && input.hasActiveSuggested,
+  };
 }
 
 export interface DesglosadorClockResult {
@@ -45,6 +149,10 @@ export interface DesglosadorClockResult {
   liveAccumDeltaSec: number;
   unitsRemaining: number | null;
   hasProjection: boolean;
+  /** Pausa acumulada (pared − trabajo), incluye la pausa en curso. */
+  pauseAccumSec: number;
+  /** Holgura vs tope efectivo. Positivo = ganancia; negativo = retraso. */
+  slackSec: number;
 }
 
 /** Firma única del reloj de un sub — invalida UI al transicionar. */
@@ -130,17 +238,11 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     unitsRemaining = Math.max(0, activeSub.cantidadObjetivo - done);
   }
 
-  const terminados = subs.filter(s => s.status === "cumplido" || s.status === "fallado");
-  const pendientes = subs.filter(s => s.status === "pendiente");
-
-  const completedDelta = terminados.reduce((acc, s) => {
-    const sug = suggestedSec(s);
-    if (s.duracionFinal == null || sug == null) return acc;
-    return acc + (s.duracionFinal - sug);
-  }, 0);
-
-  const pendingSec = pendientes.reduce((acc, s) => acc + (suggestedSec(s) ?? 0), 0);
+  const completedDelta = desglosadorClosedDeltaSec(subs);
+  const pendingSec = desglosadorPendingSuggestedSec(subs);
   const anySuggested = subs.some(s => suggestedSec(s) != null);
+  const workSec = desglosadorWorkSec(subs, subElapsedSec);
+  const pauseAccumSec = desglosadorPauseAccumSec(vehicle, now, workSec);
 
   if (!anySuggested) {
     return {
@@ -152,27 +254,31 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
       liveAccumDeltaSec: 0,
       unitsRemaining,
       hasProjection: false,
+      pauseAccumSec,
+      slackSec: 0,
     };
   }
 
   const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
-  let cycleRemainSec = Math.max(0, remainActive + pendingSec + completedDelta);
-  let cycleEndAt = now + cycleRemainSec * 1000;
-  const liveAccumDeltaSec =
-    objSecs != null ? completedDelta + (subElapsedSec - objSecs) : completedDelta;
+  const liveOvertimeSec = objSecs != null ? Math.max(0, subElapsedSec - objSecs) : 0;
+  const ops = applyDesglosadorClockOps({
+    remainActiveSec: remainActive,
+    pendingSec,
+    completedDeltaSec: completedDelta,
+    liveOvertimeSec,
+    pauseAccumSec,
+    baseTopeMs: resolveConquistaTopeMs(vehicle, subs, now),
+    nowMs: now,
+    hasActiveSuggested: objSecs != null,
+  });
 
-  // Ganancia previa vs tope: el sub activo (siguiente vehículo) absorbe la holgura.
-  const topeMs = resolveConquistaTopeMs(vehicle, subs, now);
-  if (topeMs != null && objSecs != null) {
-    const topeRemainSec = Math.max(0, Math.floor((topeMs - now) / 1000));
-    const slackSec = topeRemainSec - pendingSec - remainActive;
-    if (slackSec > 0) {
-      subRemainingSec = remainActive + slackSec;
-      subEndAt = now + subRemainingSec * 1000;
-      cycleRemainSec = subRemainingSec + pendingSec;
-      cycleEndAt = now + cycleRemainSec * 1000;
-    }
+  if (ops.absorbSlackIntoActive) {
+    subRemainingSec = remainActive + ops.slackSec;
+    subEndAt = now + subRemainingSec * 1000;
   }
+
+  const cycleRemainSec = ops.cycleRemainSec;
+  const cycleEndAt = now + cycleRemainSec * 1000;
 
   return {
     subElapsedSec,
@@ -180,9 +286,11 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     subEndAt,
     cycleRemainSec,
     cycleEndAt,
-    liveAccumDeltaSec,
+    liveAccumDeltaSec: ops.liveAccumDeltaSec,
     unitsRemaining,
     hasProjection: true,
+    pauseAccumSec,
+    slackSec: ops.slackSec,
   };
 }
 

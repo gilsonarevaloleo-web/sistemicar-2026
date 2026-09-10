@@ -6,6 +6,7 @@ import {
   buildDesglosadorSubClose,
   desglosadorSubsProgressScore,
 } from "@/lib/desglosadorSubClose";
+import { isDesglosadorClockPaused } from "@/lib/desglosadorClock";
 import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import { isConquistaDesglosador } from "./filters";
 
@@ -104,6 +105,20 @@ export function applyConquistaCycleClose(
 
 export function conquistaActiveSub(vehicle: Vehicle): SubVehiculo | undefined {
   return (vehicle.subVehiculos ?? []).find(s => s.status === "activo");
+}
+
+/** Sub en foco: activo, o el que quedó congelado en pausa (reloj global visible). */
+export function conquistaFocusSub(vehicle: Vehicle): SubVehiculo | undefined {
+  const active = conquistaActiveSub(vehicle);
+  if (active) return active;
+  if (!isDesglosadorClockPaused(vehicle)) return undefined;
+  const subs = vehicle.subVehiculos ?? [];
+  const pausedId = vehicle.desglosadorPausa?.subActivoId;
+  if (pausedId) {
+    const found = subs.find(s => s.id === pausedId);
+    if (found) return found;
+  }
+  return subs.find(s => s.status === "nested_paused");
 }
 
 export function conquistaProgressLabel(vehicle: Vehicle): string {
