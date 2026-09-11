@@ -54,10 +54,12 @@ import {
   hydratePresenciaEpisodio,
   hydrateTimonEpisodio,
   resumenTimonDesdeEpisodio,
+  stampsHistoriaDesdeVehiculo,
   trabajoMinutosReales,
   yaEstaEnTimon,
   type TimonEpisodio,
   type TimonResumenPeldano,
+  type TimonVehiculoFuente,
 } from "./timonHoras";
 
 export type {
@@ -92,6 +94,8 @@ export {
   hydrateTimonEpisodio,
   hydratePresenciaEpisodio,
   ledgerVehiculosTimon,
+  ledgerPausasTimon,
+  formatRangoProduccion,
   trabajoMinutosReales,
 } from "./timonHoras";
 
@@ -1582,19 +1586,7 @@ function ensureTimonEpisodio(pel: ProyectoPeldano): TimonEpisodio {
  */
 export async function acreditarTimonAlCerrarVehiculo(
   userId: string,
-  vehicle: Pick<
-    Vehicle,
-    | "id"
-    | "titulo"
-    | "proyectoId"
-    | "proyectoPeldanoId"
-    | "oleadaPuntoId"
-    | "aperturaAt"
-    | "cierreAt"
-    | "duracionFinal"
-    | "status"
-    | "tipoFlota"
-  >,
+  vehicle: TimonVehiculoFuente & Pick<Vehicle, "id" | "titulo" | "proyectoId">,
   opts: { tipoOrigen: "tiempo" | "situacion"; duracionMin: number }
 ): Promise<boolean> {
   const proyectoId = vehicle.proyectoId;
@@ -1615,19 +1607,24 @@ export async function acreditarTimonAlCerrarVehiculo(
   if (stamped && stamped !== pin.id) return false;
   if (yaEstaEnTimon(pel.timonEpisodio, vehicle.id)) return true;
 
-  const minutos = trabajoMinutosReales({
+  const historias = stampsHistoriaDesdeVehiculo({
     ...vehicle,
     duracionFinal:
       opts.duracionMin > 0 ? opts.duracionMin : vehicle.duracionFinal,
-  });
-  if (minutos <= 0) return true;
+  }).filter(s => s.kind !== "pausa");
+  if (historias.length === 0) return true;
 
-  const next = accrueVehiculoAlTimon(ensureTimonEpisodio(pel), {
-    vehicleId: vehicle.id,
-    titulo: vehicle.titulo,
-    minutos,
-    tipoOrigen: opts.tipoOrigen,
-  });
+  let next = ensureTimonEpisodio(pel);
+  for (const h of historias) {
+    next = accrueVehiculoAlTimon(next, {
+      vehicleId: h.vehicleId,
+      titulo: h.titulo,
+      minutos: h.minutos,
+      tipoOrigen: h.tipoOrigen,
+      closedAt: h.closedAt,
+      openedAt: h.openedAt,
+    });
+  }
   await updatePeldano(userId, pel.id, { timonEpisodio: next });
   return true;
 }

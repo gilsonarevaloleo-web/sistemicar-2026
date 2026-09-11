@@ -178,8 +178,9 @@ export function ProyectoGastoConcienciaCard({
         La barra es del día-jornada (24 h). Abajo, este proyecto suma
         minutos de vehículo: cada fila, unidad o interrupción con su nombre.
         30 min mañana + 15 noche = 45. El hueco del desglosador sin vehículo
-        no entra aquí (idle). La interrupción de Conquista es otro vehículo,
-        no se suma al padre. Un desglosador combinado parte el tiempo entre
+        no entra aquí (idle). La pausa del proyecto (desayuno, intercepción)
+        se registra como presencia: cuánto duró y a qué hora empezó, sin
+        restar el trabajo. Un desglosador combinado parte el tiempo entre
         proyectos; no se copia un vehículo ajeno al timón.
       </p>
 

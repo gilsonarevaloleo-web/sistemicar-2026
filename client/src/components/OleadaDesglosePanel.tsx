@@ -13,8 +13,10 @@ import {
   formatCuandoProduccion,
   formatDuracionTimon,
   formatHoraLabel,
+  formatRangoProduccion,
   horaEnCurso,
   horasDeEpisodio,
+  ledgerPausasTimon,
   ledgerVehiculosTimon,
   type TimonEpisodio,
 } from "@/lib/timonHoras";
@@ -30,6 +32,7 @@ type Props = {
   puntos: OleadaPunto[];
   puntoProduccionId?: string;
   timonEpisodio?: TimonEpisodio | null;
+  presenciaEpisodio?: TimonEpisodio | null;
   tint: string;
   disabled?: boolean;
   /** Capítulo cerrado: se consulta, no se edita. */
@@ -89,6 +92,7 @@ export function OleadaDesglosePanel({
   puntos,
   puntoProduccionId,
   timonEpisodio = null,
+  presenciaEpisodio = null,
   tint,
   disabled = false,
   modo = "vivo",
@@ -111,6 +115,7 @@ export function OleadaDesglosePanel({
   const horaN = horaEnCurso(timonEpisodio?.minutosAcumulados ?? 0);
   const vehiculosEnTimón = timonEpisodio?.vehiculos.length ?? 0;
   const ledger = ledgerVehiculosTimon(timonEpisodio);
+  const pausas = ledgerPausasTimon(presenciaEpisodio);
   const readOnly = disabled || modo === "capitulo";
   const desgloseCumplido =
     summary.total > 0 && summary.cumplido + summary.fallado === summary.total;
@@ -144,7 +149,7 @@ export function OleadaDesglosePanel({
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
             {modo === "capitulo"
               ? "Oleada ya caminada. Se consulta, no estorba el escritorio."
-              : "Timón de la oleada. Suma el trabajo de cada vehículo de este punto: 30 min en la mañana + 15 en la noche = 45 min. Cumplir sella un peldaño. Los vehículos de otro enfoque no se copian aquí."}
+              : "Timón de la oleada. Cada sub cuenta su historia: nombre, lanzamiento y fin. 30 min en la mañana + 15 en la noche = 45 min. La pausa del proyecto se registra como presencia, no resta trabajo. Cumplir sella un peldaño."}
           </p>
         </div>
         {summary.total > 0 ? (
@@ -216,10 +221,36 @@ export function OleadaDesglosePanel({
                   <span className="min-w-0 leading-snug">
                     <span className="truncate block">{v.titulo}</span>
                     <span className="text-[8px] text-slate-500 tabular-nums">
-                      {formatCuandoProduccion(v.closedAt)}
+                      {formatRangoProduccion(v.openedAt, v.closedAt)}
                     </span>
                   </span>
                   <span className="tabular-nums shrink-0" style={{ color: tint }}>
+                    {formatDuracionTimon(v.minutos)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {pausas.length > 0 ? (
+            <ul
+              className="mt-2 space-y-0.5"
+              data-testid="hub-oleada-timon-pausas"
+            >
+              {pausas.map(v => (
+                <li
+                  key={v.vehicleId}
+                  className="flex items-baseline justify-between gap-2 text-[9px] text-slate-400"
+                  data-testid={`hub-oleada-timon-pausa-${v.vehicleId}`}
+                >
+                  <span className="min-w-0 leading-snug">
+                    <span className="truncate block">
+                      Pausa · {v.titulo}
+                    </span>
+                    <span className="text-[8px] text-slate-500 tabular-nums">
+                      {formatRangoProduccion(v.openedAt, v.closedAt)}
+                    </span>
+                  </span>
+                  <span className="tabular-nums shrink-0 text-slate-500">
                     {formatDuracionTimon(v.minutos)}
                   </span>
                 </li>

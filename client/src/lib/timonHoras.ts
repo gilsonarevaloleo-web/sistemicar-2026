@@ -9,11 +9,19 @@
 
 import {
   isContenedorDesglose,
+  roundMinFromSec,
   trabajoMinutosDeVehiculo,
   type VehiculoMinutosFuente,
 } from "./vehiculoMinutos";
+import {
+  minutosPausa,
+  nombrePausa,
+  type VehiculoPausaStamp,
+} from "./vehiculoPausa";
 
 export const MINUTOS_POR_HORA = 60;
+
+export type TimonHistoriaKind = "trabajo" | "pausa";
 
 export interface TimonVehiculoStamp {
   vehicleId: string;
@@ -21,6 +29,10 @@ export interface TimonVehiculoStamp {
   minutos: number;
   tipoOrigen: "tiempo" | "situacion";
   closedAt: number;
+  /** Cuándo se activó el sub/vehículo — verdad de reloj, no el plan. */
+  openedAt?: number;
+  /** trabajo = unidad/fila; pausa = presencia del proyecto. */
+  kind?: TimonHistoriaKind;
   /** Hora 1-based en la que empieza a contar este vehículo. */
   horaInicio: number;
   /** Hora 1-based en la que termina (puede ser la misma). */
@@ -112,7 +124,9 @@ export function yaEstaEnTimon(
 ): boolean {
   const id = vehicleId.trim();
   if (!id || !episodio) return false;
-  return episodio.vehiculos.some(v => v.vehicleId === id);
+  return episodio.vehiculos.some(
+    v => v.vehicleId === id || v.vehicleId.startsWith(`${id}:`)
+  );
 }
 
 export function accrueVehiculoAlTimon(
@@ -123,6 +137,8 @@ export function accrueVehiculoAlTimon(
     minutos: number;
     tipoOrigen: "tiempo" | "situacion";
     closedAt?: number;
+    openedAt?: number;
+    kind?: TimonHistoriaKind;
   }
 ): TimonEpisodio {
   const vehicleId = input.vehicleId.trim();
@@ -140,11 +156,19 @@ export function accrueVehiculoAlTimon(
     minutos,
     tipoOrigen: input.tipoOrigen,
     closedAt: input.closedAt ?? Date.now(),
+    ...(input.openedAt != null ? { openedAt: input.openedAt } : {}),
+    kind: input.kind ?? "trabajo",
     horaInicio,
     horaFin,
   };
+  const opened = stamp.openedAt;
+  const startedAt =
+    opened != null && opened > 0
+      ? Math.min(episodio.startedAt, opened)
+      : episodio.startedAt;
   return {
     ...episodio,
+    startedAt,
     minutosAcumulados: start + minutos,
     minutosTiempo:
       input.tipoOrigen === "tiempo"
@@ -189,15 +213,16 @@ export function horasDeEpisodio(episodio: TimonEpisodio): TimonHoraVista[] {
       },
     ];
   }
+  const trabajo = episodio.vehiculos.filter(v => v.kind !== "pausa");
   const n = horaEnCurso(episodio.minutosAcumulados);
-  const offsets = offsetsDeVehiculos(episodio.vehiculos);
+  const offsets = offsetsDeVehiculos(trabajo);
   const horas: TimonHoraVista[] = [];
   for (let i = 1; i <= n; i++) {
     const isLast = i === n;
     const minutos = isLast
       ? episodio.minutosAcumulados - (i - 1) * MINUTOS_POR_HORA
       : MINUTOS_POR_HORA;
-    const vehiculos = episodio.vehiculos.filter(
+    const vehiculos = trabajo.filter(
       v => v.horaInicio <= i && i <= v.horaFin
     );
     const cortes: TimonHoraCorte[] = [];
@@ -227,21 +252,42 @@ export type TimonLedgerRow = {
   titulo: string;
   minutos: number;
   closedAt: number;
+  openedAt?: number;
+  kind?: TimonHistoriaKind;
   tipoOrigen: "tiempo" | "situacion";
 };
 
-/** Historia del timón: cada vehículo una vez, con su duración real y cuándo se hizo. */
+/** Historia del timón: cada sub/vehículo una vez, con su duración real y cuándo se activó. */
 export function ledgerVehiculosTimon(
   episodio: TimonEpisodio | null | undefined
 ): TimonLedgerRow[] {
   if (!episodio) return [];
   return episodio.vehiculos
-    .filter(v => v.minutos > 0)
+    .filter(v => v.minutos > 0 && v.kind !== "pausa")
     .map(v => ({
       vehicleId: v.vehicleId,
       titulo: v.titulo,
       minutos: v.minutos,
       closedAt: v.closedAt,
+      openedAt: v.openedAt,
+      kind: v.kind ?? "trabajo",
+      tipoOrigen: v.tipoOrigen,
+    }));
+}
+
+export function ledgerPausasTimon(
+  episodio: TimonEpisodio | null | undefined
+): TimonLedgerRow[] {
+  if (!episodio) return [];
+  return episodio.vehiculos
+    .filter(v => v.minutos > 0 && v.kind === "pausa")
+    .map(v => ({
+      vehicleId: v.vehicleId,
+      titulo: v.titulo,
+      minutos: v.minutos,
+      closedAt: v.closedAt,
+      openedAt: v.openedAt,
+      kind: "pausa" as const,
       tipoOrigen: v.tipoOrigen,
     }));
 }
@@ -257,6 +303,23 @@ export function formatCuandoProduccion(ts?: number | null): string {
     minute: "2-digit",
     hour12: false,
   });
+}
+
+/** Lanzamiento → fin (o en curso). Verdad del vehículo, no del plan. */
+export function formatRangoProduccion(
+  openedAt?: number | null,
+  closedAt?: number | null,
+  live = false
+): string {
+  if (openedAt && closedAt && !live && openedAt !== closedAt) {
+    return `${formatCuandoProduccion(openedAt)} → ${formatCuandoProduccion(closedAt)}`;
+  }
+  if (openedAt && live) {
+    return `${formatCuandoProduccion(openedAt)} → en curso`;
+  }
+  if (openedAt) return formatCuandoProduccion(openedAt);
+  if (closedAt) return formatCuandoProduccion(closedAt);
+  return "—";
 }
 
 export function formatHoraLabel(numero: number): string {
@@ -389,20 +452,27 @@ export type TimonVehiculoFuente = {
   subVehiculos?: Array<{
     id?: string;
     titulo?: string;
+    seccionTitulo?: string;
     proyectoId?: string;
     duracionFinal?: number;
     status?: string;
     aperturaAt?: number;
+    cierreAt?: number;
   }> | null;
   subTareas?: Array<{
     id?: string;
     titulo?: string;
+    texto?: string;
+    seccionTitulo?: string;
     proyectoId?: string;
     duracionRealSec?: number;
     duracionFinal?: number;
     enDesgloseCronometro?: boolean;
     resultadoSituacion?: string;
+    cerradaAt?: number;
+    creadaAt?: number;
   }> | null;
+  pausas?: VehiculoPausaStamp[] | null;
 };
 
 function skipsTimonCoverage(v: TimonVehiculoFuente): boolean {
@@ -428,7 +498,8 @@ export type TimonPertenenciaOpts = {
  * Un vehículo entra al timón solo si apunta a ESTE punto.
  * Sin sello de punto, un cierre viejo no se copia al enfoque nuevo
  * (el bug de "Previo a la producción" en busos negros XL).
- * Vivo sin sello: solo si se abrió en esta estancia.
+ * Vivo sin sello: cuenta si apunta a este proyecto — la verdad es el vehículo,
+ * no cuándo se pinchó el punto ni el horario del plan.
  */
 export function vehiculoPerteneceAlTimon(
   v: TimonVehiculoFuente,
@@ -455,11 +526,7 @@ export function vehiculoPerteneceAlTimon(
     }
     return false;
   }
-  if (typeof started === "number" && started > 0) {
-    const opened =
-      typeof v.aperturaAt === "number" && v.aperturaAt > 0 ? v.aperturaAt : 0;
-    if (opened > 0 && opened + 60_000 < started) return false;
-  }
+  // Vivo: la verdad es la activación del vehículo, no cuándo se pinchó el punto.
   return true;
 }
 
@@ -475,49 +542,336 @@ export function vehiculoPerteneceAPresencia(
   return wallMinutosReales(v) > 0 || v.status === "activo";
 }
 
-function stampFromVehicle(
-  v: TimonVehiculoFuente,
-  startOffset: number,
-  now: number
+function tipoOrigenDe(v: TimonVehiculoFuente): "tiempo" | "situacion" {
+  return v.tipoFlota === "situacion" ? "situacion" : "tiempo";
+}
+
+function fallbackTituloVehiculo(v: TimonVehiculoFuente): string {
+  return (v.titulo ?? "").trim() || "Vehículo";
+}
+
+/** Nombre de la historia: el sub, no el desglosador. */
+export function tituloHistoriaSub(
+  sub: {
+    titulo?: string;
+    texto?: string;
+    seccionTitulo?: string;
+  },
+  fallback: string
+): string {
+  return (
+    (sub.titulo ?? "").trim() ||
+    (sub.texto ?? "").trim() ||
+    (sub.seccionTitulo ?? "").trim() ||
+    fallback
+  );
+}
+
+function stampShell(
+  vehicleId: string,
+  titulo: string,
+  minutos: number,
+  tipoOrigen: "tiempo" | "situacion",
+  openedAt: number | undefined,
+  closedAt: number,
+  kind: TimonHistoriaKind = "trabajo"
 ): TimonVehiculoStamp | null {
-  const minutos = trabajoMinutosReales(v, now);
   if (minutos <= 0) return null;
-  const horaInicio = horaNumeroDeMinuto(startOffset);
-  const horaFin = horaNumeroDeMinuto(startOffset + minutos - 1);
-  const tipoOrigen: "tiempo" | "situacion" =
-    v.tipoFlota === "situacion" ? "situacion" : "tiempo";
+  const horaInicio = horaNumeroDeMinuto(0);
+  const horaFin = horaNumeroDeMinuto(minutos - 1);
   return {
-    vehicleId: v.id,
-    titulo: (v.titulo ?? "").trim() || "Vehículo",
+    vehicleId,
+    titulo: titulo.trim() || "Vehículo",
     minutos,
     tipoOrigen,
-    closedAt:
-      typeof v.cierreAt === "number" && v.cierreAt > 0 ? v.cierreAt : now,
+    openedAt,
+    closedAt,
+    kind,
     horaInicio,
     horaFin,
   };
+}
+
+function minutosSubConquista(
+  sub: NonNullable<TimonVehiculoFuente["subVehiculos"]>[number],
+  v: TimonVehiculoFuente,
+  now: number
+): number {
+  const closed = sub.duracionFinal;
+  if (
+    sub.status !== "activo" &&
+    sub.status !== "nested_paused" &&
+    typeof closed === "number" &&
+    closed > 0
+  ) {
+    return roundMinFromSec(closed);
+  }
+  if (sub.status === "nested_paused") {
+    const pausa = v.desglosadorPausa;
+    if (pausa?.elapsedSecSnapshot != null && pausa.elapsedSecSnapshot >= 0) {
+      return roundMinFromSec(pausa.elapsedSecSnapshot);
+    }
+    if (sub.aperturaAt && pausa?.pausadoAt && pausa.pausadoAt > sub.aperturaAt) {
+      return roundMinFromSec((pausa.pausadoAt - sub.aperturaAt) / 1000);
+    }
+  }
+  if (sub.status === "activo" && sub.aperturaAt && sub.aperturaAt > 0) {
+    if (v.interrupcionActiva && v.desglosadorPausa?.pausadoAt) {
+      const z = v.desglosadorPausa.pausadoAt;
+      if (z > sub.aperturaAt) return roundMinFromSec((z - sub.aperturaAt) / 1000);
+      return 0;
+    }
+    return roundMinFromSec((now - sub.aperturaAt) / 1000);
+  }
+  if (typeof closed === "number" && closed > 0) return roundMinFromSec(closed);
+  return 0;
+}
+
+function minutosFilaEnfoque(
+  fila: NonNullable<TimonVehiculoFuente["subTareas"]>[number],
+  v: TimonVehiculoFuente,
+  now: number
+): number {
+  const sec =
+    typeof fila.duracionRealSec === "number" && fila.duracionRealSec > 0
+      ? fila.duracionRealSec
+      : typeof fila.duracionFinal === "number" && fila.duracionFinal > 0
+        ? fila.duracionFinal
+        : 0;
+  if (sec > 0) return roundMinFromSec(sec);
+  const anchor = v.situacionNestedPause?.situacionCupoAnchor ?? v.situacionCupoAnchor;
+  if (!anchor || !fila.id || anchor.subTareaId !== fila.id) return 0;
+  const started = anchor.startedAt;
+  if (typeof started !== "number" || started <= 0) return 0;
+  const pendiente =
+    (fila.resultadoSituacion ?? "pendiente") === "pendiente" &&
+    !!fila.enDesgloseCronometro;
+  if (!pendiente) return 0;
+  const z = v.situacionNestedPause?.pausedAt ?? now;
+  if (z <= started) return 0;
+  return roundMinFromSec((z - started) / 1000);
+}
+
+function openedClosedFila(
+  fila: NonNullable<TimonVehiculoFuente["subTareas"]>[number],
+  v: TimonVehiculoFuente,
+  now: number,
+  minutos: number
+): { openedAt?: number; closedAt: number } {
+  const anchor = v.situacionNestedPause?.situacionCupoAnchor ?? v.situacionCupoAnchor;
+  const liveStart =
+    anchor &&
+    fila.id &&
+    anchor.subTareaId === fila.id &&
+    typeof anchor.startedAt === "number"
+      ? anchor.startedAt
+      : undefined;
+  const closedAt =
+    typeof fila.cerradaAt === "number" && fila.cerradaAt > 0
+      ? fila.cerradaAt
+      : v.status === "activo"
+        ? now
+        : typeof v.cierreAt === "number" && v.cierreAt > 0
+          ? v.cierreAt
+          : now;
+  const openedAt =
+    liveStart ??
+    (typeof fila.cerradaAt === "number" && fila.cerradaAt > 0 && minutos > 0
+      ? fila.cerradaAt - minutos * 60_000
+      : typeof fila.creadaAt === "number" && fila.creadaAt > 0
+        ? fila.creadaAt
+        : typeof v.aperturaAt === "number" && v.aperturaAt > 0
+          ? v.aperturaAt
+          : undefined);
+  return { openedAt, closedAt };
+}
+
+/**
+ * Cada sub/fila es una historia. El contenedor (desglosador/ring) no se pinta.
+ */
+export function stampsHistoriaDesdeVehiculo(
+  v: TimonVehiculoFuente,
+  now = Date.now()
+): TimonVehiculoStamp[] {
+  const tipo = tipoOrigenDe(v);
+  const fallback = fallbackTituloVehiculo(v);
+  const out: TimonVehiculoStamp[] = [];
+
+  if (isContenedorDesglose(v)) {
+    const unidades = v.subVehiculos ?? [];
+    const filas = v.subTareas ?? [];
+    if (v.tipoReloj === "desglosador" || unidades.length > 0) {
+      unidades.forEach((sub, idx) => {
+        const id = (sub.id ?? "").trim() || `u${idx}`;
+        const minutos = minutosSubConquista(sub, v, now);
+        if (minutos <= 0) return;
+        const openedAt =
+          typeof sub.aperturaAt === "number" && sub.aperturaAt > 0
+            ? sub.aperturaAt
+            : typeof v.aperturaAt === "number" && v.aperturaAt > 0
+              ? v.aperturaAt
+              : undefined;
+        const live = sub.status === "activo" || sub.status === "nested_paused";
+        const closedAt =
+          typeof sub.cierreAt === "number" && sub.cierreAt > 0
+            ? sub.cierreAt
+            : live
+              ? now
+              : typeof v.cierreAt === "number" && v.cierreAt > 0
+                ? v.cierreAt
+                : now;
+        const stamp = stampShell(
+          `${v.id}:${id}`,
+          tituloHistoriaSub(sub, fallback),
+          minutos,
+          tipo,
+          openedAt,
+          closedAt
+        );
+        if (stamp) out.push(stamp);
+      });
+    }
+    if (filas.length > 0 && (v.tipoFlota === "situacion" || v.tipoReloj !== "desglosador")) {
+      filas.forEach((fila, idx) => {
+        const id = (fila.id ?? "").trim() || `f${idx}`;
+        const minutos = minutosFilaEnfoque(fila, v, now);
+        if (minutos <= 0) return;
+        const { openedAt, closedAt } = openedClosedFila(fila, v, now, minutos);
+        const stamp = stampShell(
+          `${v.id}:${id}`,
+          tituloHistoriaSub(fila, fallback),
+          minutos,
+          tipo,
+          openedAt,
+          closedAt
+        );
+        if (stamp) out.push(stamp);
+      });
+    }
+    return out;
+  }
+
+  const minutos = trabajoMinutosReales(v, now);
+  const openedAt =
+    typeof v.aperturaAt === "number" && v.aperturaAt > 0 ? v.aperturaAt : undefined;
+  const closedAt =
+    v.status === "activo"
+      ? now
+      : typeof v.cierreAt === "number" && v.cierreAt > 0
+        ? v.cierreAt
+        : now;
+  const stamp = stampShell(v.id, fallback, minutos, tipo, openedAt, closedAt);
+  return stamp ? [stamp] : [];
+}
+
+function titulosDuranteIntervalo(
+  parentId: string,
+  start: number,
+  end: number,
+  vehicles: TimonVehiculoFuente[]
+): string {
+  const names: string[] = [];
+  for (const c of vehicles) {
+    if (!c || c.id === parentId) continue;
+    if (skipsTimonCoverage(c)) continue;
+    const a = typeof c.aperturaAt === "number" && c.aperturaAt > 0 ? c.aperturaAt : 0;
+    if (!a) continue;
+    const z =
+      typeof c.cierreAt === "number" && c.cierreAt > a
+        ? c.cierreAt
+        : c.status === "activo"
+          ? end
+          : 0;
+    if (!z) continue;
+    if (a < end && z > start) {
+      const t = (c.titulo ?? "").trim();
+      if (t && !names.includes(t)) names.push(t);
+    }
+  }
+  return names.join(" · ");
+}
+
+function pausasEfectivasDe(
+  v: TimonVehiculoFuente,
+  now: number
+): VehiculoPausaStamp[] {
+  const list: VehiculoPausaStamp[] = (v.pausas ?? []).map(p => ({ ...p }));
+  const liveAt = v.desglosadorPausa?.pausadoAt ?? v.situacionNestedPause?.pausedAt;
+  if (typeof liveAt === "number" && liveAt > 0) {
+    const already = list.some(p => p.pausadoAt === liveAt && p.reanudadoAt == null);
+    if (!already) list.push({ pausadoAt: liveAt });
+  }
+  return list.filter(p => minutosPausa(p, now) > 0);
+}
+
+export function stampsPausaDesdeVehiculo(
+  v: TimonVehiculoFuente,
+  vehicles: TimonVehiculoFuente[],
+  now = Date.now()
+): TimonVehiculoStamp[] {
+  const pid = (v.proyectoId ?? "").trim();
+  if (!pid) return [];
+  const out: TimonVehiculoStamp[] = [];
+  for (const p of pausasEfectivasDe(v, now)) {
+    const z = p.reanudadoAt != null && p.reanudadoAt > p.pausadoAt ? p.reanudadoAt : now;
+    const minutos = minutosPausa(p, now);
+    const overlap = titulosDuranteIntervalo(v.id, p.pausadoAt, z, vehicles);
+    const titulo = nombrePausa({ titulo: p.titulo || overlap || undefined });
+    const stamp = stampShell(
+      `${v.id}:pausa:${p.pausadoAt}`,
+      titulo,
+      minutos,
+      "situacion",
+      p.pausadoAt,
+      z,
+      "pausa"
+    );
+    if (stamp) out.push(stamp);
+  }
+  return out;
 }
 
 function rebuildEpisodioDesdeStamps(
   base: Pick<TimonEpisodio, "id" | "puntoId" | "puntoTitulo" | "startedAt">,
   stamps: TimonVehiculoStamp[]
 ): TimonEpisodio {
+  const trabajo = stamps.filter(s => s.kind !== "pausa");
   let minutosAcumulados = 0;
   let minutosTiempo = 0;
   const vehiculos: TimonVehiculoStamp[] = [];
-  for (const raw of stamps) {
+  for (const raw of trabajo) {
     const horaInicio = horaNumeroDeMinuto(minutosAcumulados);
     const horaFin = horaNumeroDeMinuto(minutosAcumulados + raw.minutos - 1);
     vehiculos.push({ ...raw, horaInicio, horaFin });
     minutosAcumulados += raw.minutos;
     if (raw.tipoOrigen === "tiempo") minutosTiempo += raw.minutos;
   }
+  for (const pause of stamps.filter(s => s.kind === "pausa")) {
+    vehiculos.push({ ...pause, horaInicio: 0, horaFin: 0 });
+  }
+  const opened = trabajo
+    .map(s => s.openedAt)
+    .filter((n): n is number => typeof n === "number" && n > 0);
+  const startedAt = opened.length > 0 ? Math.min(...opened) : base.startedAt;
   return {
     ...base,
+    startedAt,
     minutosAcumulados,
     minutosTiempo,
     vehiculos,
   };
+}
+
+function parentIdDeStamp(vehicleId: string): string {
+  const cut = vehicleId.indexOf(":");
+  return cut > 0 ? vehicleId.slice(0, cut) : vehicleId;
+}
+
+function liveForStamp(
+  stampId: string,
+  liveById: Map<string, TimonVehiculoFuente>
+): TimonVehiculoFuente | undefined {
+  return liveById.get(stampId) ?? liveById.get(parentIdDeStamp(stampId));
 }
 
 function stampSigueEnEpisodio(
@@ -525,6 +879,7 @@ function stampSigueEnEpisodio(
   live: TimonVehiculoFuente | undefined,
   opts: TimonPertenenciaOpts
 ): boolean {
+  if (stamp.kind === "pausa") return false;
   if (!live) return true;
   if (vehiculoPerteneceAlTimon(live, opts)) return true;
   const stamped = live.oleadaPuntoId?.trim();
@@ -539,9 +894,32 @@ function stampSigueEnEpisodio(
   return false;
 }
 
+function mergeHistoriaStamps(
+  previous: TimonVehiculoStamp[],
+  fresh: TimonVehiculoStamp[]
+): TimonVehiculoStamp[] {
+  const byId = new Map<string, TimonVehiculoStamp>();
+  for (const s of previous) byId.set(s.vehicleId, s);
+  const expandedParents = new Set<string>();
+  for (const s of fresh) {
+    byId.set(s.vehicleId, s);
+    const parent = parentIdDeStamp(s.vehicleId);
+    if (parent !== s.vehicleId) expandedParents.add(parent);
+  }
+  for (const parent of expandedParents) byId.delete(parent);
+  const ordered = [...byId.values()].filter(s => s.kind !== "pausa");
+  ordered.sort((a, b) => {
+    const ao = a.openedAt ?? a.closedAt;
+    const bo = b.openedAt ?? b.closedAt;
+    return ao - bo;
+  });
+  return ordered;
+}
+
 /**
- * Historia real del timón: solo vehículos de ESTE punto, minutos de trabajo
+ * Historia real del timón: cada sub de ESTE punto, minutos de trabajo
  * (no pared inflada). Un sello viejo de otro enfoque se descarta.
+ * El inicio es la activación del primer sub, no el plan ni el pin.
  */
 export function hydrateTimonEpisodio(params: {
   episodio?: TimonEpisodio | null;
@@ -566,56 +944,26 @@ export function hydrateTimonEpisodio(params: {
   const liveById = new Map<string, TimonVehiculoFuente>();
   for (const v of params.vehicles) liveById.set(v.id, v);
 
-  const byId = new Map<string, TimonVehiculoStamp>();
+  const kept: TimonVehiculoStamp[] = [];
   for (const s of base.vehiculos) {
-    if (!stampSigueEnEpisodio(s, liveById.get(s.vehicleId), belongOpts)) continue;
-    byId.set(s.vehicleId, s);
+    if (!stampSigueEnEpisodio(s, liveForStamp(s.vehicleId, liveById), belongOpts)) {
+      continue;
+    }
+    kept.push(s);
   }
 
   const matching = params.vehicles.filter(v =>
     vehiculoPerteneceAlTimon(v, belongOpts)
   );
-  matching.sort((a, b) => (a.aperturaAt ?? 0) - (b.aperturaAt ?? 0));
-
+  const fresh: TimonVehiculoStamp[] = [];
   for (const v of matching) {
-    const trabajo = trabajoMinutosReales(v, now);
-    if (trabajo <= 0) continue;
-    const prev = byId.get(v.id);
-    if (prev) {
-      const nextMin =
-        v.status === "activo" ? Math.max(prev.minutos, trabajo) : trabajo;
-      if (nextMin !== prev.minutos || (!prev.titulo && v.titulo)) {
-        byId.set(v.id, {
-          ...prev,
-          minutos: nextMin,
-          titulo: prev.titulo || v.titulo || prev.titulo,
-        });
-      }
-    } else {
-      const stamp = stampFromVehicle(v, 0, now);
-      if (stamp) byId.set(v.id, stamp);
-    }
+    fresh.push(...stampsHistoriaDesdeVehiculo(v, now));
   }
 
-  const ordered: TimonVehiculoStamp[] = [];
-  const seen = new Set<string>();
-  for (const s of base.vehiculos) {
-    const next = byId.get(s.vehicleId);
-    if (next) {
-      ordered.push(next);
-      seen.add(s.vehicleId);
-    }
-  }
-  for (const v of matching) {
-    if (seen.has(v.id)) continue;
-    const next = byId.get(v.id);
-    if (next) ordered.push(next);
-  }
-
-  return rebuildEpisodioDesdeStamps(base, ordered);
+  return rebuildEpisodioDesdeStamps(base, mergeHistoriaStamps(kept, fresh));
 }
 
-/** Presencia: enumeración infinita, nunca sella peldaño. */
+/** Presencia: enumeración infinita, nunca sella peldaño. Incluye pausas del proyecto. */
 export function hydratePresenciaEpisodio(params: {
   episodio?: TimonEpisodio | null;
   proyectoId?: string;
@@ -629,39 +977,33 @@ export function hydratePresenciaEpisodio(params: {
   const matching = params.vehicles.filter(v =>
     vehiculoPerteneceAPresencia(v, { proyectoId: params.proyectoId })
   );
-  matching.sort((a, b) => (a.aperturaAt ?? 0) - (b.aperturaAt ?? 0));
 
   const byId = new Map<string, TimonVehiculoStamp>();
-  for (const s of base.vehiculos) byId.set(s.vehicleId, s);
-
-  for (const v of matching) {
-    const trabajo = trabajoMinutosReales(v, now);
-    if (trabajo <= 0) continue;
-    const prev = byId.get(v.id);
-    if (prev) {
-      if (trabajo > prev.minutos) byId.set(v.id, { ...prev, minutos: trabajo });
-    } else {
-      const stamp = stampFromVehicle(v, 0, now);
-      if (stamp) byId.set(v.id, stamp);
-    }
-  }
-
-  const ordered: TimonVehiculoStamp[] = [];
-  const seen = new Set<string>();
   for (const s of base.vehiculos) {
-    const next = byId.get(s.vehicleId);
-    if (next) {
-      ordered.push(next);
-      seen.add(s.vehicleId);
-    }
+    if (s.kind === "pausa") continue;
+    byId.set(s.vehicleId, s);
   }
+
+  const fresh: TimonVehiculoStamp[] = [];
   for (const v of matching) {
-    if (seen.has(v.id)) continue;
-    const next = byId.get(v.id);
-    if (next) ordered.push(next);
+    fresh.push(...stampsHistoriaDesdeVehiculo(v, now));
   }
+  const mergedTrabajo = mergeHistoriaStamps([...byId.values()], fresh);
+
+  const pausas: TimonVehiculoStamp[] = [];
+  for (const v of params.vehicles) {
+    const pid = (v.proyectoId ?? "").trim();
+    if (params.proyectoId) {
+      if (pid !== params.proyectoId) continue;
+    } else if (pid) {
+      continue;
+    }
+    pausas.push(...stampsPausaDesdeVehiculo(v, params.vehicles, now));
+  }
+  pausas.sort((a, b) => (a.openedAt ?? a.closedAt) - (b.openedAt ?? b.closedAt));
+
   return rebuildEpisodioDesdeStamps(
     { ...base, puntoId: "presencia", puntoTitulo: "Presencia" },
-    ordered
+    [...mergedTrabajo, ...pausas]
   );
 }

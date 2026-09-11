@@ -1694,6 +1694,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             ...nestedPause.desglosadorPausa,
             restanteUnidades,
           },
+          pausas: nestedPause.pausas.map((p, i, arr) =>
+            i === arr.length - 1 && !p.reanudadoAt && !p.titulo
+              ? { ...p, titulo: tituloInterrupcion.trim() }
+              : p
+          ),
         };
 
         void closeCentinelasBeforeConsciousLaunch(userId, vehiclesRef.current);
@@ -2023,23 +2028,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           if (parentId) {
             const parent = vehiclesRef.current.find(v => v.id === parentId);
             if (parent && (parent.desglosadorPausa || parent.interrupcionActiva)) {
-              const resume =
-                resumeDesglosadorFromNestedPause(parent) ?? {
-                  desglosadorPausa: undefined,
-                  interrupcionActiva: false,
-                };
-              paintVehicle(parentId, resume);
-              scheduleSaveLocalVehicles(vehiclesRef.current);
-              toast.info("Desglosador reanudado", {
-                description: "Tras cerrar la interrupción.",
+              toast.info("El proyecto sigue en pausa", {
+                description: "Cerrar la interrupción no reanuda. Reanuda cuando vuelvas a esa historia.",
                 style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
-                duration: 2800,
+                duration: 3200,
               });
-              try {
-                await updateVehicle(userId, parentId, resume, { skipLocalSync: true });
-              } catch (e) {
-                console.error("[jornada4.closeExpressVehicle] resume parent", e);
-              }
             }
           }
         });
