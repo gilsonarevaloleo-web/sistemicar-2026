@@ -114,9 +114,16 @@ export type DesglosadorClockOps = {
 };
 
 /**
- * Motor aritmético del reloj global.
- * Suma: pérdida, overtime, pausa (estiran el tope).
- * Resta: ganancia (holgura contra el tope, no contra el trabajo restante).
+ * Motor del reloj global y del sub.
+ *
+ * Ciclo global = Σ sugeridos que faltan (activo restante + pendientes).
+ * Al lanzar: ahora + suma de todos los subs.
+ * Ganancia: el operador cerró antes → `now` ya adelantó el fin (resta).
+ * Pausa: el trabajo se congela y `now` avanza → el fin suma la pausa.
+ * Pérdida: `now` ya atrasó el fin (suma).
+ *
+ * El sub proyectivo es solo SU sugerido: lanzamiento + duración.
+ * Nunca absorbe holgura de ganancias previas.
  */
 export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): DesglosadorClockOps {
   const liveAccumDeltaSec = input.completedDeltaSec + Math.max(0, input.liveOvertimeSec);
@@ -127,16 +134,14 @@ export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): Desgl
   const topeRemainSec =
     effectiveTopeMs != null ? Math.floor((effectiveTopeMs - input.nowMs) / 1000) : null;
   const slackSec = topeRemainSec != null ? topeRemainSec - remainWorkSec : 0;
-  const keepGlobalClock = topeRemainSec != null && slackSec > 0;
-  const cycleRemainSec = keepGlobalClock ? Math.max(0, topeRemainSec) : remainWorkSec;
   return {
     liveAccumDeltaSec,
     remainWorkSec,
     effectiveTopeMs,
     topeRemainSec,
     slackSec,
-    cycleRemainSec,
-    absorbSlackIntoActive: keepGlobalClock && input.hasActiveSuggested,
+    cycleRemainSec: remainWorkSec,
+    absorbSlackIntoActive: false,
   };
 }
 
@@ -220,12 +225,18 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
-  let subRemainingSec =
-    objSecs != null ? Math.max(0, objSecs - subElapsedSec) : null;
-  let subEndAt =
-    activeSub?.aperturaAt && objSecs != null
-      ? activeSub.aperturaAt + objSecs * 1000
-      : null;
+  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
+  let subRemainingSec = objSecs != null ? remainActive : null;
+  // Proyección del sub = su duración, no la holgura del ciclo.
+  // En pausa, now + restante suma la pausa; en marcha, equivale a apertura + sugerido.
+  let subEndAt: number | null = null;
+  if (objSecs != null && activeSub) {
+    if (frozen) {
+      subEndAt = now + remainActive * 1000;
+    } else if (activeSub.aperturaAt) {
+      subEndAt = activeSub.aperturaAt + objSecs * 1000;
+    }
+  }
 
   let unitsRemaining: number | null = null;
   if (
@@ -259,7 +270,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     };
   }
 
-  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
   const liveOvertimeSec = objSecs != null ? Math.max(0, subElapsedSec - objSecs) : 0;
   const ops = applyDesglosadorClockOps({
     remainActiveSec: remainActive,
@@ -271,11 +281,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     nowMs: now,
     hasActiveSuggested: objSecs != null,
   });
-
-  if (ops.absorbSlackIntoActive) {
-    subRemainingSec = remainActive + ops.slackSec;
-    subEndAt = now + subRemainingSec * 1000;
-  }
 
   const cycleRemainSec = ops.cycleRemainSec;
   const cycleEndAt = now + cycleRemainSec * 1000;

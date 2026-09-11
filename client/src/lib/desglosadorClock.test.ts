@@ -9,6 +9,7 @@ import {
   desglosadorPauseAccumSec,
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
+  formatHHMM,
   isDesglosadorClockPaused,
   resolveConquistaTopeMs,
   suggestedSec,
@@ -319,7 +320,7 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
     assert.equal(tope, start + 1800_000);
   });
 
-  it("tras cerrar con ganancia, el siguiente sub absorbe holgura hasta el tope", () => {
+  it("tras cerrar con ganancia, el sub activo no absorbe holgura y el global resta", () => {
     const start = 1_700_000_000_000;
     const now = start + 300_000; // A cerró 5 min antes de su cupo de 10
     const subs: SubVehiculo[] = [
@@ -338,14 +339,18 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
       criterioDetalle: "",
       subVehiculos: subs,
     } as Vehicle);
-    // Tope original 30 min; quedan 25. C sigue con 10 → B recibe 15, no 10 fijados.
-    assert.equal(clocks.subRemainingSec, 900);
-    assert.equal(clocks.cycleRemainSec, 1500);
+    // B dura 10 min → termina a las now+10, no now+15 por holgura.
+    assert.equal(clocks.subRemainingSec, 600);
+    assert.equal(clocks.subEndAt, now + 600_000);
+    // Global = B+C = 20 min (5 min más temprano que el tope original de 30).
+    assert.equal(clocks.cycleRemainSec, 1200);
+    assert.equal(clocks.cycleEndAt, now + 1200_000);
+    assert.equal(clocks.liveAccumDeltaSec, -300);
   });
 });
 
 describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
-  it("resta ganancia del tope, no del trabajo restante", () => {
+  it("ciclo global = trabajo restante; la ganancia no lo infla hasta el tope", () => {
     const start = 1_000_000;
     const ops = applyDesglosadorClockOps({
       remainActiveSec: 3500,
@@ -359,9 +364,8 @@ describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
     });
     assert.equal(ops.remainWorkSec, 3500);
     assert.equal(ops.liveAccumDeltaSec, -6000);
-    assert.equal(ops.topeRemainSec, 9500);
-    assert.equal(ops.slackSec, 6000);
-    assert.equal(ops.cycleRemainSec, 9500);
+    assert.equal(ops.cycleRemainSec, 3500);
+    assert.equal(ops.absorbSlackIntoActive, false);
   });
 
   it("suma pérdida y overtime a la ganancia visible, no al trabajo restante", () => {
@@ -380,17 +384,15 @@ describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
     assert.equal(ops.cycleRemainSec, 720);
   });
 
-  it("suma pausa al tope y congela el restante vs tope", () => {
-    const baseTope = 1_000_000 + 3600_000;
-    const now0 = 1_000_000 + 1800_000;
+  it("pausa no cambia el trabajo restante; el fin se corre porque now avanza", () => {
     const withoutPause = applyDesglosadorClockOps({
       remainActiveSec: 600,
       pendingSec: 600,
       completedDeltaSec: 0,
       liveOvertimeSec: 0,
       pauseAccumSec: 0,
-      baseTopeMs: baseTope,
-      nowMs: now0,
+      baseTopeMs: null,
+      nowMs: 1_000_000,
       hasActiveSuggested: true,
     });
     const withPause = applyDesglosadorClockOps({
@@ -399,13 +401,12 @@ describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
       completedDeltaSec: 0,
       liveOvertimeSec: 0,
       pauseAccumSec: 900,
-      baseTopeMs: baseTope,
-      nowMs: now0 + 900_000,
+      baseTopeMs: null,
+      nowMs: 1_000_000 + 900_000,
       hasActiveSuggested: true,
     });
-    assert.equal(withPause.effectiveTopeMs, baseTope + 900_000);
-    assert.equal(withPause.topeRemainSec, withoutPause.topeRemainSec);
-    assert.equal(withPause.cycleRemainSec, withoutPause.cycleRemainSec);
+    assert.equal(withoutPause.cycleRemainSec, 1200);
+    assert.equal(withPause.cycleRemainSec, 1200);
   });
 });
 
@@ -456,8 +457,8 @@ describe("reloj global — operaciones finales de todo el día", () => {
       ],
     } as Vehicle);
     assert.equal(clocks.subElapsedSec, 100);
-    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
-    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.subRemainingSec, 3500);
+    assert.equal(clocks.cycleRemainSec, 3500);
     assert.equal(clocks.liveAccumDeltaSec, -6000);
   });
 
@@ -498,8 +499,11 @@ describe("reloj global — operaciones finales de todo el día", () => {
     const pauseAccum = desglosadorPauseAccumSec({ aperturaAt: start }, now, workSec);
     assert.equal(pauseAccum, 7200);
     assert.equal(clocks.subElapsedSec, 100);
-    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
-    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.subRemainingSec, 3500);
+    assert.equal(clocks.cycleRemainSec, 3500);
+    // Pausa 2 h: el fin proyectado suma esas 2 h (now + restante).
+    assert.equal(clocks.cycleEndAt, now + 3500 * 1000);
+    assert.equal(clocks.subEndAt, now + 3500 * 1000);
     assert.equal(clocks.pauseAccumSec, pauseAccum);
   });
 
@@ -533,5 +537,64 @@ describe("reloj global — operaciones finales de todo el día", () => {
       now
     );
     assert.equal(tope, new Date(2026, 8, 10, 20, 0, 0).getTime());
+  });
+
+  it("sub de 21 min lanzado a las 15:04 termina a las 15:25, no absorbe 48 min de ganancia", () => {
+    const now = new Date(2026, 8, 11, 15, 4, 0).getTime();
+    const objSec = 21 * 60;
+    const pending = Array.from({ length: 8 }, (_, i) =>
+      sub({ id: `p${i}`, tiempoSugeridoSeg: objSec, status: "pendiente" })
+    );
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: now - 12 * 60 * 60_000,
+      subVehiculos: [
+        sub({
+          id: "cerrado",
+          tiempoSugeridoSeg: 3600,
+          status: "cumplido",
+          duracionFinal: 3600 - (47 * 60 + 55),
+        }),
+        sub({
+          id: "pegado",
+          tiempoSugeridoSeg: objSec,
+          status: "activo",
+          aperturaAt: now,
+        }),
+        ...pending,
+      ],
+    } as Vehicle);
+    assert.equal(clocks.subRemainingSec, objSec);
+    assert.equal(clocks.subEndAt, now + objSec * 1000);
+    assert.equal(formatHHMM(clocks.subEndAt!), "15:25");
+    assert.equal(clocks.cycleRemainSec, objSec * 9);
+  });
+
+  it("pausa de 30 min suma 30 min al ciclo global", () => {
+    const start = 1_700_000_000_000;
+    const pauseAt = start + 600_000;
+    const resumeNow = pauseAt + 30 * 60_000;
+    const vehicle = {
+      aperturaAt: start,
+      interrupcionActiva: true,
+      desglosadorPausa: {
+        subActivoId: "a",
+        elapsedSecSnapshot: 120,
+        pausadoAt: pauseAt,
+      },
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "nested_paused",
+          aperturaAt: start,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "pendiente" }),
+      ],
+    } as Vehicle;
+    const atPause = computeDesglosadorClocks(pauseAt, vehicle);
+    const duringPause = computeDesglosadorClocks(resumeNow, vehicle);
+    assert.equal(atPause.cycleRemainSec, 480 + 600);
+    assert.equal(duringPause.cycleRemainSec, atPause.cycleRemainSec);
+    assert.equal(duringPause.cycleEndAt, (atPause.cycleEndAt ?? 0) + 30 * 60_000);
   });
 });
