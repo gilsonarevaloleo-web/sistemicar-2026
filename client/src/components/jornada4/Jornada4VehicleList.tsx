@@ -58,6 +58,15 @@ type Ops = {
       seccionTitulo?: string;
     }
   ) => Promise<void>;
+  addConquistaSubs: (
+    vehicleId: string,
+    forms: Array<{
+      titulo: string;
+      cantidadObjetivo: string;
+      tiempoRecordMinPerUnit?: number;
+      seccionTitulo?: string;
+    }>
+  ) => Promise<void>;
   addSituacionFila: (
     vehicleId: string,
     texto: string,
@@ -173,6 +182,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                       ops.setDestinoCierre(v.id, destino, proyectoId)
                     }
                     onAddSub={form => void ops.addConquistaSub(v.id, form)}
+                    onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
                     onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
                     onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
                     onReorderSubs={(movedId, direction) =>

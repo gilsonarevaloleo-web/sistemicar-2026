@@ -78,106 +78,11 @@ export const getHistoricalVehicleData = (missionTitle: string): { lastMinPerUnit
   } catch { return { count: 0 }; }
 };
 
-export const getDesglosadorHistorico = (misionTitulo: string): string[] => {
-  try {
-    const data = localStorage.getItem("sistemicar_vehicle_history");
-    if (!data) return [];
-    const history: Array<{ titulo: string; minPerUnit: number; totalMin: number; tipoReloj: string; fecha: number; excluirDeHistorial?: boolean }> = JSON.parse(data);
-    const prefix = `${misionTitulo.trim()} → `;
-    const matching = history.filter(h =>
-      h.tipoReloj === "desglosador" &&
-      h.titulo.startsWith(prefix) &&
-      !h.excluirDeHistorial
-    );
-    if (matching.length === 0) return [];
-    // Agrupa por sesión (≤1h entre entradas consecutivas)
-    const sorted = [...matching].sort((a, b) => a.fecha - b.fecha);
-    const sessions: Array<typeof sorted> = [];
-    let current: typeof sorted = [];
-    for (const entry of sorted) {
-      if (current.length === 0) { current.push(entry); continue; }
-      if (entry.fecha - current[current.length - 1].fecha <= 3600000) {
-        current.push(entry);
-      } else {
-        sessions.push(current);
-        current = [entry];
-      }
-    }
-    if (current.length > 0) sessions.push(current);
-    if (sessions.length === 0) return [];
-    // Tomar la sesión más reciente
-    const lastSession = sessions[sessions.length - 1];
-    // Extraer subtítulos en orden ascendente de fecha
-    return lastSession.map(e => e.titulo.slice(prefix.length).trim()).filter(Boolean);
-  } catch { return []; }
-};
-
-export const getDesglosadorMisionTitles = (query: string, limit = 6): string[] => {
-  try {
-    const data = localStorage.getItem("sistemicar_vehicle_history");
-    if (!data) return [];
-    const history: Array<{ titulo: string; tipoReloj: string; fecha: number }> = JSON.parse(data);
-    const q = query.toLowerCase().trim();
-    const seen = new Set<string>();
-    return history
-      .filter(h => h.tipoReloj === "desglosador" && h.titulo.includes(" → "))
-      .sort((a, b) => b.fecha - a.fecha)
-      .map(h => h.titulo.split(" → ")[0].trim())
-      .filter(t => {
-        if (!t || !t.toLowerCase().includes(q)) return false;
-        const key = t.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, limit);
-  } catch { return []; }
-};
-
-export const getDesglosadorMisionData = (query: string, limit = 6): Array<{ titulo: string; subs: Array<{ nombre: string; duracionMin: number | null }> }> => {
-  try {
-    const data = localStorage.getItem("sistemicar_vehicle_history");
-    if (!data) return [];
-    const history: Array<{ titulo: string; tipoReloj: string; fecha: number; totalMin?: number }> = JSON.parse(data);
-    const q = query.toLowerCase().trim();
-    const seen = new Set<string>();
-    const parentTitles: string[] = [];
-    history
-      .filter(h => h.tipoReloj === "desglosador" && h.titulo.includes(" → "))
-      .sort((a, b) => b.fecha - a.fecha)
-      .forEach(h => {
-        const parent = h.titulo.split(" → ")[0].trim();
-        if (!parent || !parent.toLowerCase().includes(q)) return;
-        const key = parent.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        if (parentTitles.length < limit) parentTitles.push(parent);
-      });
-    return parentTitles.map(titulo => {
-      const prefix = `${titulo} → `;
-      const matching = history.filter(h => h.tipoReloj === "desglosador" && h.titulo.startsWith(prefix));
-      const sorted = [...matching].sort((a, b) => a.fecha - b.fecha);
-      const sessions: Array<typeof sorted> = [];
-      let current: typeof sorted = [];
-      for (const entry of sorted) {
-        if (current.length === 0) { current.push(entry); continue; }
-        if (entry.fecha - current[current.length - 1].fecha <= 3600000) {
-          current.push(entry);
-        } else {
-          sessions.push(current);
-          current = [entry];
-        }
-      }
-      if (current.length > 0) sessions.push(current);
-      const lastSession = sessions[sessions.length - 1] ?? [];
-      const subs = lastSession.map(e => ({
-        nombre: e.titulo.slice(prefix.length).trim(),
-        duracionMin: e.totalMin != null ? e.totalMin : null
-      }));
-      return { titulo, subs };
-    });
-  } catch { return []; }
-};
+export {
+  getDesglosadorHistorico,
+  getDesglosadorMisionTitles,
+  getDesglosadorMisionData,
+} from "@/lib/desglosadorBuscador";
 
 export const getRecordSuggestions = (query: string, limit = 5): Array<{ titulo: string; minPerUnit: number }> => {
   if (!query.trim() || query.trim().length < 2) return [];
