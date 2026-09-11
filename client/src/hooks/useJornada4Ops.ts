@@ -10,6 +10,7 @@ import {
   updateVehicle,
   wasVehicleRecentlyClosed,
   type SegmentoV5,
+  type SubVehiculo,
   type Vehicle,
 } from "@/lib/persistence";
 import { scheduleSaveLocalVehicles } from "@/lib/deferredVehicleSave";
@@ -957,9 +958,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
   );
 
-  const addConquistaSub = useCallback(
-    async (vehicleId: string, form: SharedSubForm) => {
+  const addConquistaSubs = useCallback(
+    async (vehicleId: string, forms: SharedSubForm[]) => {
       if (!userId) return;
+      const named = forms.filter(f => f.titulo.trim());
+      if (named.length === 0) return;
       const key = `add:${vehicleId}`;
       if (inFlightRef.current.has(key)) return;
       inFlightRef.current.add(key);
@@ -967,11 +970,16 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || vehicle.status !== "activo") return;
         const existing = vehicle.subVehiculos ?? [];
-        const hasActive = existing.some(s => s.status === "activo");
-        const newSub = buildDesglosadorSubFromRuntime(form, existing, {
-          activate: !hasActive,
-        });
-        const nextSubs = [...existing, newSub];
+        let hasActive = existing.some(s => s.status === "activo");
+        const built: SubVehiculo[] = [];
+        for (let i = 0; i < named.length; i++) {
+          const newSub = buildDesglosadorSubFromRuntime(named[i]!, [...existing, ...built], {
+            activate: !hasActive,
+          });
+          if (newSub.status === "activo") hasActive = true;
+          built.push(newSub);
+        }
+        const nextSubs = [...existing, ...built];
         paintVehicle(vehicleId, { subVehiculos: nextSubs });
         await yieldAfterPaint();
         void runShadowTaskAsync(async () => {
@@ -983,14 +991,17 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
               { subVehiculos: nextSubs },
               { skipLocalSync: true }
             );
+            const activated = built.some(s => s.status === "activo");
             toast.message(
-              newSub.status === "activo"
-                ? "Unidad activa"
-                : "Unidad añadida a la cola",
+              named.length === 1
+                ? activated
+                  ? "Unidad activa"
+                  : "Unidad añadida a la cola"
+                : `${named.length} unidades añadidas a la cola`,
               { duration: 1800 }
             );
           } catch (e) {
-            console.error("[jornada4.addConquistaSub]", e);
+            console.error("[jornada4.addConquistaSubs]", e);
           }
         });
       } finally {
@@ -998,6 +1009,13 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       }
     },
     [userId, vehiclesRef, paintVehicle]
+  );
+
+  const addConquistaSub = useCallback(
+    async (vehicleId: string, form: SharedSubForm) => {
+      await addConquistaSubs(vehicleId, [form]);
+    },
+    [addConquistaSubs]
   );
 
   const addSituacionFila = useCallback(
@@ -2060,6 +2078,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     closeSituacionLibreBloque,
     addSituacionLibreFila,
     addConquistaSub,
+    addConquistaSubs,
     addSituacionFila,
     setSituacionCupo,
     setDestinoCierre,

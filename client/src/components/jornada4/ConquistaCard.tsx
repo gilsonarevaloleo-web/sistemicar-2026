@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  BookmarkPlus,
   Check,
   ChevronDown,
   ChevronUp,
@@ -53,6 +54,19 @@ import {
   lastSeccionTitulo,
 } from "@/lib/desglosadorSecciones";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
+import {
+  DesglosadorListaPicker,
+  ListaGuardadaBadge,
+} from "./DesglosadorListaPicker";
+import {
+  defaultSelection,
+  pickSequenceItems,
+} from "@/lib/desglosadorSequence";
+import {
+  readDesglosadorListas,
+  searchDesglosadorListas,
+  type DesglosadorListaGuardada,
+} from "@/lib/desglosadorListasStore";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -76,6 +90,7 @@ type Props = {
   onCerrarCiclo: () => void;
   onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
   onAddSub?: (form: AddSubForm) => void;
+  onAddSubs?: (forms: AddSubForm[]) => void;
   onPausaInterrupcion?: (titulo: string) => void;
   onResumeDesglosador?: () => void;
   onReorderSubs?: (movedId: string, direction: ReorderDirection) => void;
@@ -88,6 +103,7 @@ export function ConquistaCard({
   onCerrarCiclo,
   onDestinoChange,
   onAddSub,
+  onAddSubs,
   onPausaInterrupcion,
   onResumeDesglosador,
   onReorderSubs,
@@ -151,6 +167,9 @@ export function ConquistaCard({
   const [addRecord, setAddRecord] = useState<number | undefined>();
   const [addSeccion, setAddSeccion] = useState("");
   const [showAddSugs, setShowAddSugs] = useState(false);
+  const [showAddLista, setShowAddLista] = useState(false);
+  const [listaPick, setListaPick] = useState<DesglosadorListaGuardada | null>(null);
+  const [listaPickSelected, setListaPickSelected] = useState<boolean[]>([]);
   const seccionGroups = useMemo(() => groupSubsBySeccion(subs), [subs]);
   const familiaActiva = lastSeccionTitulo(subs);
   const [showPausaForm, setShowPausaForm] = useState(false);
@@ -164,6 +183,12 @@ export function ConquistaCard({
     setCierreEnviando(null);
   }, [active?.id]);
 
+  const listasParaAnadir = useMemo(() => {
+    if (!showAddLista) return [];
+    const byMission = searchDesglosadorListas(vehicle.titulo);
+    return byMission.length > 0 ? byMission : readDesglosadorListas();
+  }, [showAddLista, vehicle.titulo]);
+
   const addSuggestions =
     addTitulo.trim().length >= 2
       ? getSubVehicleRecordSuggestions(addTitulo, 5)
@@ -176,10 +201,15 @@ export function ConquistaCard({
     setAddSeccion("");
     setShowAdd(false);
     setShowAddSugs(false);
+    setShowAddLista(false);
+    setListaPick(null);
+    setListaPickSelected([]);
   };
 
   const openAdd = (opts?: { nuevaFamilia?: boolean }) => {
     setAddSeccion(opts?.nuevaFamilia ? "" : familiaActiva ?? "");
+    setShowAddLista(false);
+    setListaPick(null);
     setShowAdd(true);
   };
 
@@ -1082,9 +1112,10 @@ export function ConquistaCard({
           </div>
         ) : null}
 
-        {onAddSub && vehicle.status === "activo" && !cycleReady && !paused ? (
+        {(onAddSub || onAddSubs) && vehicle.status === "activo" && !cycleReady && !paused ? (
           <div className="pt-1" data-testid="j4-conquista-add-sub">
-            {!showAdd ? (
+            {!showAdd && !showAddLista ? (
+              <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1112,6 +1143,132 @@ export function ConquistaCard({
                 >
                   <ListPlus size={12} /> Título propio
                 </button>
+              </div>
+              {onAddSubs && readDesglosadorListas().length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdd(false);
+                    setShowAddLista(true);
+                    setListaPick(null);
+                  }}
+                  className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: "rgba(212,175,55,0.08)",
+                    color: GOLD,
+                    border: `1px dashed ${GOLD}45`,
+                  }}
+                  data-testid="j4-conquista-add-lista-open"
+                >
+                  <BookmarkPlus size={12} /> Añadir lista guardada
+                </button>
+              ) : null}
+              </div>
+            ) : showAddLista && onAddSubs ? (
+              <div
+                className="rounded-2xl border-2 p-3.5 space-y-3"
+                style={{
+                  borderColor: `${GOLD}40`,
+                  backgroundColor: "rgba(212,175,55,0.07)",
+                }}
+                data-testid="j4-conquista-add-lista"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p
+                    className="text-[11px] font-black uppercase tracking-widest"
+                    style={{ color: GOLD }}
+                  >
+                    Lista guardada
+                  </p>
+                  <ListaGuardadaBadge label="A la cola" />
+                </div>
+                <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                  Elige cuáles ops entran ahora. Si el recorrido quedó a medias, deja
+                  fuera las que ya cerraste.
+                </p>
+                {listasParaAnadir.map(lista => {
+                  const open = listaPick?.id === lista.id;
+                  return (
+                    <div key={lista.id} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (open) {
+                            setListaPick(null);
+                            return;
+                          }
+                          setListaPick(lista);
+                          setListaPickSelected(defaultSelection(lista.items.length));
+                        }}
+                        className="w-full flex items-center justify-between px-2 py-2 rounded-lg text-left"
+                        style={{
+                          backgroundColor: open ? "rgba(212,175,55,0.14)" : "transparent",
+                        }}
+                        data-testid={`j4-add-lista-${lista.id}`}
+                      >
+                        <span className="text-[12px] truncate" style={{ color: INK }}>
+                          {lista.nombre}
+                        </span>
+                        <span
+                          className="text-[8px] font-mono font-black ml-2 shrink-0"
+                          style={{ color: GOLD }}
+                        >
+                          {lista.items.length} ops
+                        </span>
+                      </button>
+                      {open ? (
+                        <div className="space-y-2">
+                          <DesglosadorListaPicker
+                            items={lista.items}
+                            selected={listaPickSelected}
+                            onChange={setListaPickSelected}
+                            testIdPrefix={`j4-add-lista-${lista.id}`}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const picked = pickSequenceItems(
+                                  lista.items,
+                                  listaPickSelected
+                                );
+                                if (picked.length === 0 || !onAddSubs) return;
+                                onAddSubs(
+                                  picked.map(it => ({
+                                    titulo: it.titulo,
+                                    cantidadObjetivo: it.cantidadObjetivo ?? "",
+                                    tiempoRecordMinPerUnit: it.tiempoRecordMinPerUnit,
+                                    ...(it.seccionTitulo
+                                      ? { seccionTitulo: it.seccionTitulo }
+                                      : {}),
+                                  }))
+                                );
+                                resetAdd();
+                              }}
+                              className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                              style={{
+                                backgroundColor: `${GOLD}22`,
+                                color: GOLD,
+                                border: `1px solid ${GOLD}40`,
+                              }}
+                              data-testid="j4-add-lista-submit"
+                            >
+                              Añadir seleccionadas
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetAdd}
+                              className="px-3 py-3 rounded-xl text-[10px] font-black uppercase"
+                              style={{ color: MUTED }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div

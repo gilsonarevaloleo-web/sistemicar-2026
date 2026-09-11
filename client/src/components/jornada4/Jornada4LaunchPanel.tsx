@@ -1,15 +1,31 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
+import { BookmarkPlus, Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
   getDesglosadorMisionData,
-  getDesglosadorHistorico,
   getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
+import {
+  getDesglosadorHabitualResolved,
+} from "@/lib/desglosadorBuscador";
+import {
+  defaultSelection,
+  pickSequenceItems,
+  type DesglosadorSequenceItem,
+  type DesglosadorSequenceSource,
+} from "@/lib/desglosadorSequence";
+import {
+  readDesglosadorListas,
+  saveDesglosadorLista,
+} from "@/lib/desglosadorListasStore";
+import {
+  DesglosadorListaPicker,
+  ListaGuardadaBadge,
+} from "@/components/jornada4/DesglosadorListaPicker";
 import type { Jornada4LaunchForm } from "@/jornada4/executeJornada4Launch";
 import {
   projectDesglosadorEndFromSubs,
@@ -74,6 +90,27 @@ function makeSub(seccionTitulo?: string): DesglosadorSubFormRow {
     cantidadObjetivo: "",
     ...(seccionTitulo ? { seccionTitulo } : {}),
   };
+}
+
+function sequenceItemsToRows(items: DesglosadorSequenceItem[]): DesglosadorSubFormRow[] {
+  return items.map((it, i) => {
+    const sug =
+      it.tiempoRecordMinPerUnit ??
+      getSubVehicleRecordSuggestions(it.titulo, 1)[0]?.minPerUnit;
+    return {
+      tempId: `sub_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 5)}`,
+      titulo: it.titulo,
+      cantidadObjetivo: it.cantidadObjetivo ?? "",
+      tiempoRecordMinPerUnit: sug,
+      ...(it.seccionTitulo ? { seccionTitulo: it.seccionTitulo } : {}),
+    };
+  });
+}
+
+function sourceLabel(source: DesglosadorSequenceSource): string {
+  if (source === "lista") return "Lista guardada";
+  if (source === "ciclo") return "Último ciclo completo";
+  return "Todas las tandas del historial";
 }
 
 function defaultHoraPlus(minutes: number): string {
@@ -141,7 +178,14 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   );
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
   const [showMissionSugs, setShowMissionSugs] = useState(false);
-  const [historialSubs, setHistorialSubs] = useState<string[]>([]);
+  const [historialItems, setHistorialItems] = useState<DesglosadorSequenceItem[]>([]);
+  const [historialSelected, setHistorialSelected] = useState<boolean[]>([]);
+  const [historialSource, setHistorialSource] =
+    useState<DesglosadorSequenceSource>("historial");
+  const [listasTick, setListasTick] = useState(0);
+  const [showListasPanel, setShowListasPanel] = useState(false);
+  const [listaPickerId, setListaPickerId] = useState<string | null>(null);
+  const [listaPickerSelected, setListaPickerSelected] = useState<boolean[]>([]);
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const [modoEntrenamientoRing, setModoEntrenamientoRing] = useState(false);
   const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
@@ -215,11 +259,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
 
   useEffect(() => {
     if (tipo !== "tiempo" || modo !== "desglose" || titulo.trim().length < 3) {
-      setHistorialSubs([]);
+      setHistorialItems([]);
+      setHistorialSelected([]);
       return;
     }
-    setHistorialSubs(getDesglosadorHistorico(titulo.trim()));
-  }, [titulo, tipo, modo]);
+    const resolved = getDesglosadorHabitualResolved(titulo.trim());
+    setHistorialItems(resolved.items);
+    setHistorialSelected(defaultSelection(resolved.items.length));
+    setHistorialSource(resolved.source);
+  }, [titulo, tipo, modo, listasTick]);
 
   const missionSuggestions =
     tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
@@ -269,12 +317,59 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     );
     setTerminoDetalle("Al cerrar este bloque");
     setShowMissionSugs(false);
-    setHistorialSubs([]);
+    setHistorialItems([]);
+    setHistorialSelected([]);
+    setShowListasPanel(false);
+    setListaPickerId(null);
+    setListaPickerSelected([]);
     setActiveSubSugIdx(null);
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
     setOpen(false);
   }, [segmentoHoraFin, hubPeldanoId, hubOleadaPuntoId]);
+
+  const allListas = useMemo(() => readDesglosadorListas(), [listasTick]);
+
+  const applySequenceItems = useCallback(
+    (items: DesglosadorSequenceItem[], mode: "replace" | "append") => {
+      const rows = sequenceItemsToRows(items);
+      if (rows.length === 0) return;
+      if (mode === "replace") {
+        setSubs(rows);
+      } else {
+        const kept = subs.filter(s => s.titulo.trim());
+        setSubs(kept.length > 0 ? [...kept, ...rows] : rows);
+      }
+      setConquistaMultiModo("secuencia");
+    },
+    [subs]
+  );
+
+  const handleGuardarLista = useCallback(() => {
+    const named = subs.filter(s => s.titulo.trim());
+    const result = saveDesglosadorLista({
+      nombre: titulo.trim(),
+      items: named.map(s => ({
+        titulo: s.titulo.trim(),
+        ...(s.cantidadObjetivo.trim() ? { cantidadObjetivo: s.cantidadObjetivo.trim() } : {}),
+        ...(s.tiempoRecordMinPerUnit != null
+          ? { tiempoRecordMinPerUnit: s.tiempoRecordMinPerUnit }
+          : {}),
+        ...(s.seccionTitulo?.trim() ? { seccionTitulo: s.seccionTitulo.trim() } : {}),
+      })),
+    });
+    if (!result.ok) {
+      toast.message(result.error);
+      return;
+    }
+    setListasTick(n => n + 1);
+    toast.message(
+      result.overwritten
+        ? `Lista actualizada · ${result.lista.items.length} ops`
+        : `Guardada en el buscador · ${result.lista.items.length} ops`,
+      { duration: 2200 }
+    );
+  }, [subs, titulo]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     if (isJ4GpsClipsEnabled()) unlockJ4GpsClips();
@@ -865,10 +960,17 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 <span className="text-sm truncate" style={{ color: INK }}>
                                   {s.titulo}
                                 </span>
+                                {s.source === "lista" ? <ListaGuardadaBadge /> : null}
+                                <span
+                                  className="text-[8px] font-mono font-black ml-auto shrink-0"
+                                  style={{ color: GOLD }}
+                                >
+                                  {s.subs.length} ops
+                                </span>
                               </div>
                               {s.subs.length > 0 ? (
                                 <div className="pl-4 flex flex-wrap gap-x-1 items-center">
-                                  {s.subs.map((sub, j) => (
+                                  {s.subs.slice(0, 8).map((sub, j) => (
                                     <span
                                       key={j}
                                       className="text-[8px] font-mono whitespace-nowrap"
@@ -878,11 +980,13 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                         <span style={{ color: "rgba(255,255,255,0.2)" }}>→ </span>
                                       ) : null}
                                       {sub.nombre}
-                                      {sub.duracionMin != null
-                                        ? ` · ${Math.round(sub.duracionMin)}m`
-                                        : ""}
                                     </span>
                                   ))}
+                                  {s.subs.length > 8 ? (
+                                    <span className="text-[8px] font-mono" style={{ color: MUTED }}>
+                                      +{s.subs.length - 8}
+                                    </span>
+                                  ) : null}
                                 </div>
                               ) : null}
                             </button>
@@ -1011,7 +1115,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     </div>
                   ) : null}
 
-                  {tipo === "tiempo" && historialSubs.length > 0 ? (
+                  {tipo === "tiempo" && historialItems.length > 0 ? (
                     <div
                       className="rounded-xl border p-3 space-y-2"
                       style={{
@@ -1020,49 +1124,180 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       }}
                       data-testid="jornada4-secuencia-habitual"
                     >
-                      <p
-                        className="text-[9px] font-black uppercase tracking-widest"
-                        style={{ color: GOLD }}
-                      >
-                        Tu secuencia habitual
+                      <div className="flex items-center justify-between gap-2">
+                        <p
+                          className="text-[9px] font-black uppercase tracking-widest"
+                          style={{ color: GOLD }}
+                        >
+                          {historialSource === "lista"
+                            ? "Lista del buscador"
+                            : "Secuencia del armado"}
+                        </p>
+                        {historialSource === "lista" ? <ListaGuardadaBadge /> : null}
+                      </div>
+                      <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
+                        {sourceLabel(historialSource)} · {historialItems.length} ops.
+                        Marca las que van ahora (si quedaste a medias, deja fuera las ya hechas).
                       </p>
-                      <ol className="space-y-1">
-                        {historialSubs.map((name, i) => (
-                          <li
-                            key={`${name}-${i}`}
-                            className="text-[11px] font-mono flex gap-2"
-                            style={{ color: INK }}
-                          >
-                            <span style={{ color: GOLD }}>{i + 1}.</span>
-                            <span className="truncate">{name}</span>
-                          </li>
-                        ))}
-                      </ol>
+                      <DesglosadorListaPicker
+                        items={historialItems}
+                        selected={historialSelected}
+                        onChange={setHistorialSelected}
+                        testIdPrefix="jornada4-habitual"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applySequenceItems(
+                              pickSequenceItems(historialItems, historialSelected),
+                              "replace"
+                            );
+                          }}
+                          className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
+                          style={{
+                            backgroundColor: `${GOLD}22`,
+                            color: GOLD,
+                            border: `1px solid ${GOLD}45`,
+                          }}
+                          data-testid="jornada4-usar-secuencia"
+                        >
+                          Usar seleccionadas
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            applySequenceItems(
+                              pickSequenceItems(historialItems, historialSelected),
+                              "append"
+                            );
+                          }}
+                          className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
+                          style={{
+                            backgroundColor: `${ORANGE}18`,
+                            color: ORANGE,
+                            border: `1px solid ${ORANGE}40`,
+                          }}
+                          data-testid="jornada4-anadir-secuencia"
+                        >
+                          Añadir a la lista
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {tipo === "tiempo" && allListas.length > 0 ? (
+                    <div className="space-y-2" data-testid="jornada4-listas-guardadas">
                       <button
                         type="button"
-                        onClick={() => {
-                          setSubs(
-                            historialSubs.map((t, i) => {
-                              const sug = getSubVehicleRecordSuggestions(t, 1)[0];
-                              return {
-                                tempId: `sub_${Date.now()}_${i}`,
-                                titulo: t,
-                                cantidadObjetivo: "",
-                                tiempoRecordMinPerUnit: sug?.minPerUnit,
-                              };
-                            })
-                          );
-                        }}
-                        className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider"
+                        onClick={() => setShowListasPanel(v => !v)}
+                        className="w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
-                          backgroundColor: `${GOLD}22`,
+                          backgroundColor: "rgba(212,175,55,0.08)",
                           color: GOLD,
-                          border: `1px solid ${GOLD}45`,
+                          border: `1px dashed ${GOLD}40`,
                         }}
-                        data-testid="jornada4-usar-secuencia"
+                        data-testid="jornada4-listas-toggle"
                       >
-                        Usar esta secuencia
+                        <ListTodo size={12} />{" "}
+                        {showListasPanel ? "Cerrar listas" : "Elegir lista guardada"}
                       </button>
+                      {showListasPanel ? (
+                        <div
+                          className="rounded-xl border p-3 space-y-2"
+                          style={{
+                            borderColor: `${GOLD}28`,
+                            backgroundColor: "rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          {allListas.map(
+                            lista => {
+                              const open = listaPickerId === lista.id;
+                              return (
+                                <div key={lista.id} className="space-y-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (open) {
+                                        setListaPickerId(null);
+                                        return;
+                                      }
+                                      setListaPickerId(lista.id);
+                                      setListaPickerSelected(
+                                        defaultSelection(lista.items.length)
+                                      );
+                                      if (!titulo.trim()) setTitulo(lista.nombre);
+                                    }}
+                                    className="w-full flex items-center justify-between px-2 py-2 rounded-lg text-left"
+                                    style={{
+                                      backgroundColor: open
+                                        ? "rgba(212,175,55,0.12)"
+                                        : "transparent",
+                                    }}
+                                    data-testid={`jornada4-lista-${lista.id}`}
+                                  >
+                                    <span className="text-[12px] truncate" style={{ color: INK }}>
+                                      {lista.nombre}
+                                    </span>
+                                    <span
+                                      className="text-[8px] font-mono font-black shrink-0 ml-2"
+                                      style={{ color: GOLD }}
+                                    >
+                                      {lista.items.length} ops
+                                    </span>
+                                  </button>
+                                  {open ? (
+                                    <div className="space-y-2 pl-1">
+                                      <DesglosadorListaPicker
+                                        items={lista.items}
+                                        selected={listaPickerSelected}
+                                        onChange={setListaPickerSelected}
+                                        testIdPrefix={`jornada4-lista-${lista.id}`}
+                                      />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            applySequenceItems(
+                                              pickSequenceItems(
+                                                lista.items,
+                                                listaPickerSelected
+                                              ),
+                                              "replace"
+                                            );
+                                            setTitulo(lista.nombre);
+                                          }}
+                                          className="py-2 rounded-xl text-[8px] font-black uppercase"
+                                          style={{ color: GOLD, border: `1px solid ${GOLD}40` }}
+                                        >
+                                          Usar seleccionadas
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            applySequenceItems(
+                                              pickSequenceItems(
+                                                lista.items,
+                                                listaPickerSelected
+                                              ),
+                                              "append"
+                                            );
+                                            if (!titulo.trim()) setTitulo(lista.nombre);
+                                          }}
+                                          className="py-2 rounded-xl text-[8px] font-black uppercase"
+                                          style={{ color: ORANGE, border: `1px solid ${ORANGE}40` }}
+                                        >
+                                          Añadir a la lista
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 
@@ -1547,6 +1782,23 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           Título propio = lote con nombre (armado de bolsillos) dentro de
                           esta misión. El rumbo del proyecto se ordena en Dirección.
                         </p>
+                      ) : null}
+                      {conquistaMultiModo === "secuencia" &&
+                      subs.filter(s => s.titulo.trim()).length >= 2 &&
+                      titulo.trim().length >= 2 ? (
+                        <button
+                          type="button"
+                          onClick={handleGuardarLista}
+                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                          style={{
+                            backgroundColor: `${GOLD}18`,
+                            color: GOLD,
+                            border: `1px solid ${GOLD}45`,
+                          }}
+                          data-testid="jornada4-guardar-lista"
+                        >
+                          <BookmarkPlus size={13} /> Guardar en el buscador
+                        </button>
                       ) : null}
                     </div>
                   ) : tipo === "situacion" && modo === "desglose" ? (
