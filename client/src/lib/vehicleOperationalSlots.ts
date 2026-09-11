@@ -17,8 +17,9 @@ export function getOperationalActives(vehicles: Vehicle[]): Vehicle[] {
       v.status === "activo" &&
       !v.autoVerdad &&
       v.tipoFlota !== "descanso" &&
-      // Postergado: cupo congelado; libera slot para el siguiente vehículo.
-      !v.situacionNestedPause
+      // Postergado / conquista en pausa: presencia del proyecto, no ocupa slot.
+      !v.situacionNestedPause &&
+      !v.interrupcionActiva
   );
 }
 

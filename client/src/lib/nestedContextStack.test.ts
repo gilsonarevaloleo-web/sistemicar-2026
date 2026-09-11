@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Vehicle } from "./persistence.ts";
 import {
+  buildDesglosadorNestedPausePatch,
   buildSituacionNestedPausePatch,
+  resumeDesglosadorFromNestedPause,
   resumeSituacionFromNestedPause,
 } from "./nestedContextStack.ts";
 
@@ -54,6 +56,8 @@ describe("situacion nested pause / postergación", () => {
     assert.equal(patch!.situacionNestedPause?.kind, "postergacion");
     assert.equal(patch!.situacionNestedPause?.minutosRestantesAlPausar, 25);
     assert.equal(patch!.situacionNestedPause?.situacionCronometro.activo, true);
+    assert.equal(patch!.pausas?.length, 1);
+    assert.equal(patch!.pausas?.[0]?.pausadoAt, now);
   });
 
   it("reanudar desplaza la meta y conserva el cupo de pared", () => {
@@ -72,6 +76,7 @@ describe("situacion nested pause / postergación", () => {
     assert.ok(resume);
     assert.equal(resume!.situacionNestedPause, null);
     assert.equal(resume!.situacionCronometro?.activo, true);
+    assert.equal(resume!.pausas?.[0]?.reanudadoAt, resumeAt);
 
     const pauseMs = 12 * 60_000;
     assert.equal(
@@ -99,5 +104,32 @@ describe("situacion nested pause / postergación", () => {
       }),
     } as Vehicle;
     assert.equal(buildSituacionNestedPausePatch(vehicle, "postergacion"), null);
+  });
+});
+
+describe("desglosador nested pause — historia de presencia", () => {
+  it("al pausar guarda el sello; al reanudar cierra la duración", () => {
+    const now = Date.now();
+    const vehicle = {
+      id: "c1",
+      titulo: "Conquista",
+      status: "activo",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      subVehiculos: [
+        { id: "s1", titulo: "Casaca 1", status: "activo", aperturaAt: now - 10 * 60_000 },
+      ],
+    } as Vehicle;
+    const paused = buildDesglosadorNestedPausePatch(vehicle, "interrupcion_situacion");
+    assert.ok(paused);
+    assert.equal(paused!.interrupcionActiva, true);
+    assert.equal(paused!.pausas.length, 1);
+    const resumed = resumeDesglosadorFromNestedPause({
+      ...vehicle,
+      ...paused,
+    } as Vehicle);
+    assert.ok(resumed);
+    assert.equal(resumed!.interrupcionActiva, false);
+    assert.ok(resumed!.pausas?.[0]?.reanudadoAt);
   });
 });

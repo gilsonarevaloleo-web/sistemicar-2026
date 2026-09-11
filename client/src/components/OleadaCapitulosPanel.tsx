@@ -7,6 +7,7 @@ import type { ProyectoPeldano } from "@/lib/proyectos";
 import {
   formatCuandoProduccion,
   formatDuracionTimon,
+  formatRangoProduccion,
   ledgerVehiculosTimon,
   type TimonEpisodio,
 } from "@/lib/timonHoras";
@@ -116,7 +117,7 @@ export function OleadaCapitulosPanel({ oleadas, tint, onReabrir }: Props) {
                                 <span className="min-w-0">
                                   <span className="truncate block">{v.titulo}</span>
                                   <span className="text-[8px] text-slate-500">
-                                    {formatCuandoProduccion(v.closedAt)}
+                                    {formatRangoProduccion(v.openedAt, v.closedAt)}
                                   </span>
                                 </span>
                                 <span className="tabular-nums shrink-0" style={{ color: tint }}>

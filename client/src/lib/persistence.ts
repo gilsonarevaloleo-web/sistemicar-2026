@@ -738,6 +738,15 @@ export interface Vehicle {
   };
   /** Hay una interrupción activa fuera del flujo normal de subs. */
   interrupcionActiva?: boolean;
+  /**
+   * Pausas cerradas o abiertas del desglosador/ring.
+   * Presencia del proyecto (cuánto duró, cuándo empezó), no trabajo negativo.
+   */
+  pausas?: Array<{
+    pausadoAt: number;
+    reanudadoAt?: number;
+    titulo?: string;
+  }>;
   /** Ring situacional pausado (Punto Cero anidado, interrupción o postergación manual). */
   situacionNestedPause?: {
     pausedAt: number;
@@ -1733,7 +1742,7 @@ export type UpdateVehicleOptions = {
 export async function updateVehicle(
   userId: string,
   vehicleId: string,
-  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "situacionNestedPause" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId" | "ancladoAlSegmento" | "proyectoId" | "proyectoPeldanoId" | "oleadaPuntoId" | "destinoCierre">>,
+  updates: Partial<Pick<Vehicle, "titulo" | "criterioFin" | "criterioDetalle" | "ejes" | "tipoFlota" | "aperturaAt" | "cierreAt" | "duracionFinal" | "parentesisRecarga" | "bonoTemple" | "cierreManual" | "energiaOscura" | "justificacion" | "subTareas" | "subVehiculos" | "autoVerdad" | "status" | "tipoReloj" | "cantidadObjetivo" | "resultadoPorUnidad" | "mejorTiempoPorUnidad" | "segmentoOrigen" | "segmentoId" | "segmentoMontadoId" | "segmentoMontadoNombre" | "segmentosCruzados" | "cruceEntropiaVozAt" | "rendimientoConsciente" | "recordSugerido" | "tiempoElegido" | "datoConfiable" | "intensidadEnergetica" | "intensidadEnergeticaFin" | "tipoDescanso" | "microPasos" | "etapasPuntoCero" | "puntoCero" | "primerAccionAt" | "etiquetaSalida" | "notaSalida" | "situacionCupoAnchor" | "situacionCronometro" | "situacionNestedPause" | "desglosadorBloqueDepthPsGranted" | "desglosadorPausa" | "interrupcionActiva" | "pausas" | "excluirDeHistorial" | "vehiculoPadreDesglosadorId" | "ancladoAlSegmento" | "proyectoId" | "proyectoPeldanoId" | "oleadaPuntoId" | "destinoCierre">>,
   opts?: UpdateVehicleOptions
 ): Promise<void> {
   const updateLocally = () => {

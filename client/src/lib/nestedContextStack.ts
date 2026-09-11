@@ -1,6 +1,7 @@
 import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { hardwareClockNow } from "@/lib/hardwareClock";
+import { appendVehiculoPausa, closeVehiculoPausaAbierta } from "@/lib/vehiculoPausa";
 
 export type DesglosadorNestedPauseKind = "punto_cero" | "interrupcion_situacion";
 export type NestedPauseKind = DesglosadorNestedPauseKind | "postergacion";
@@ -39,7 +40,12 @@ export function findActiveSituacionRingForNestedStack(vehicles: Vehicle[]): Vehi
 export function buildDesglosadorNestedPausePatch(
   vehicle: Vehicle,
   kind: DesglosadorNestedPauseKind
-): { subVehiculos: SubVehiculo[]; desglosadorPausa: NonNullable<Vehicle["desglosadorPausa"]>; interrupcionActiva: true } | null {
+): {
+  subVehiculos: SubVehiculo[];
+  desglosadorPausa: NonNullable<Vehicle["desglosadorPausa"]>;
+  interrupcionActiva: true;
+  pausas: NonNullable<Vehicle["pausas"]>;
+} | null {
   const activeSub = (vehicle.subVehiculos ?? []).find(s => s.status === "activo");
   if (!activeSub?.aperturaAt) return null;
   const now = hardwareClockNow();
@@ -56,6 +62,7 @@ export function buildDesglosadorNestedPausePatch(
       nestedKind: kind,
     },
     interrupcionActiva: true,
+    pausas: appendVehiculoPausa(vehicle.pausas, now),
   };
 }
 
@@ -78,6 +85,7 @@ export function buildSituacionNestedPausePatch(
         : {}),
     },
     situacionCronometro: { ...vehicle.situacionCronometro, activo: false },
+    pausas: appendVehiculoPausa(vehicle.pausas, now),
   };
 }
 
@@ -87,18 +95,24 @@ export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehic
   if (!pausa?.subActivoId) return null;
   const subs = [...(parent.subVehiculos ?? [])];
   const idx = subs.findIndex(s => s.id === pausa.subActivoId);
+  const now = hardwareClockNow();
   if (idx === -1) {
-    return { desglosadorPausa: undefined, interrupcionActiva: false };
+    return {
+      desglosadorPausa: undefined,
+      interrupcionActiva: false,
+      pausas: closeVehiculoPausaAbierta(parent.pausas, now),
+    };
   }
   const resumedApertura =
     pausa.elapsedSecSnapshot != null
-      ? hardwareClockNow() - pausa.elapsedSecSnapshot * 1000
-      : hardwareClockNow();
+      ? now - pausa.elapsedSecSnapshot * 1000
+      : now;
   subs[idx] = { ...subs[idx], status: "activo", aperturaAt: resumedApertura };
   return {
     subVehiculos: subs,
     desglosadorPausa: undefined,
     interrupcionActiva: false,
+    pausas: closeVehiculoPausaAbierta(parent.pausas, now),
   };
 }
 
@@ -149,6 +163,7 @@ export function resumeSituacionFromNestedPause(
     situacionCronometro,
     situacionCupoAnchor,
     situacionNestedPause: null,
+    pausas: closeVehiculoPausaAbierta(parent.pausas, now),
   };
 }
 

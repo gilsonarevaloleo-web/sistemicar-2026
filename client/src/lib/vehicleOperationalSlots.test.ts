@@ -151,4 +151,20 @@ describe("vehicleOperationalSlots", () => {
     assert.equal(getOperationalActives(list).length, 1);
     assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
   });
+
+  it("conquista en pausa no consume slot operativo", () => {
+    const list = [
+      v({
+        id: "conquista",
+        titulo: "Costura",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: Date.now(), subActivoId: "s1" },
+        subVehiculos: [{ id: "s1", titulo: "Casaca 1", status: "nested_paused" }],
+      }),
+    ];
+    assert.equal(getOperationalActives(list).length, 0);
+    assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
+  });
 });

@@ -1,15 +1,17 @@
 /**
  * Clasificación de minutos de un vehículo hacia proyecto(s).
  *
- * Dedicado: el desglosador (o misión) apunta a un solo proyecto — el sello
- * entero viaja al timón / ledger de ese proyecto.
+ * Dedicado: las unidades/filas (subs) viajan al timón con SU nombre.
  * Combinado: filas o unidades con proyecto distinto — se parte por minutos
  * medidos. Lo que no tiene proyecto no ensucia un timón ajeno.
  *
  * 30 min en la mañana + 15 min en la noche = 45 min en el mismo proyecto.
- * La suma es de vehículos (nombres + minutos), no de horas repetidas.
+ * La suma es de subs (nombres + minutos), no de horas repetidas ni del
+ * título del desglosador.
  */
 import {
+  stampsHistoriaDesdeVehiculo,
+  tituloHistoriaSub,
   trabajoMinutosReales,
   type TimonVehiculoFuente,
 } from "./timonHoras";
@@ -20,6 +22,7 @@ export type ParteTiempoProyecto = {
   proyectoId: string;
   minutos: number;
   titulo: string;
+  vehicleId?: string;
 };
 
 export type TiempoClasificado = {
@@ -33,10 +36,16 @@ export type TiempoClasificado = {
 };
 
 export type SubTiempoFuente = {
+  id?: string;
   titulo?: string;
+  texto?: string;
+  seccionTitulo?: string;
   proyectoId?: string;
   duracionRealSec?: number;
   duracionFinal?: number;
+  aperturaAt?: number;
+  cierreAt?: number;
+  cerradaAt?: number;
 };
 
 function roundMinFromSec(sec: number): number {
@@ -58,9 +67,10 @@ function distinctProyectoIds(subs: SubTiempoFuente[]): string[] {
 
 function partesDesdeSubs(
   subs: SubTiempoFuente[],
-  fallbackTitulo: string
+  fallbackTitulo: string,
+  parentId?: string
 ): ParteTiempoProyecto[] {
-  const byId = new Map<string, ParteTiempoProyecto>();
+  const out: ParteTiempoProyecto[] = [];
   for (const s of subs) {
     const pid = (s.proyectoId ?? "").trim();
     if (!pid) continue;
@@ -72,15 +82,16 @@ function partesDesdeSubs(
           : 0;
     const minutos = roundMinFromSec(sec);
     if (minutos <= 0) continue;
-    const prev = byId.get(pid);
-    const titulo = (s.titulo ?? "").trim() || fallbackTitulo;
-    if (prev) {
-      prev.minutos += minutos;
-    } else {
-      byId.set(pid, { proyectoId: pid, minutos, titulo });
-    }
+    const titulo = tituloHistoriaSub(s, fallbackTitulo);
+    const sid = (s.id ?? "").trim();
+    out.push({
+      proyectoId: pid,
+      minutos,
+      titulo,
+      vehicleId: parentId && sid ? `${parentId}:${sid}` : parentId,
+    });
   }
-  return [...byId.values()];
+  return out;
 }
 
 /**
@@ -117,7 +128,7 @@ export function clasificarTiempoVehiculo(
   const combinado = vehiculoEsCombinado(v);
 
   if (combinado) {
-    const partes = partesDesdeSubs([...filas, ...unidades], titulo);
+    const partes = partesDesdeSubs([...filas, ...unidades], titulo, vehicleId);
     const sumPartes = partes.reduce((n, p) => n + p.minutos, 0);
     return {
       vehicleId,
@@ -141,14 +152,26 @@ export function clasificarTiempoVehiculo(
     };
   }
 
+  const historias = stampsHistoriaDesdeVehiculo(v).filter(s => s.kind !== "pausa");
+  const partes: ParteTiempoProyecto[] =
+    historias.length > 0
+      ? historias.map(h => ({
+          proyectoId,
+          minutos: h.minutos,
+          titulo: h.titulo,
+          vehicleId: h.vehicleId,
+        }))
+      : minutos > 0
+        ? [{ proyectoId, minutos, titulo, vehicleId }]
+        : [];
   return {
     vehicleId,
     titulo,
     modo: "dedicado",
-    minutos,
+    minutos: partes.reduce((n, p) => n + p.minutos, 0) || minutos,
     proyectoId,
     oleadaPuntoId,
-    partes: minutos > 0 ? [{ proyectoId, minutos, titulo }] : [],
+    partes,
   };
 }
 
@@ -184,9 +207,14 @@ export function ledgerNombresMinutos(
   for (const c of clasificados) {
     const partes = c.partes.filter(p => p.proyectoId === pid);
     if (partes.length === 0) continue;
-    const minutos = partes.reduce((n, p) => n + p.minutos, 0);
-    if (minutos <= 0) continue;
-    out.push({ titulo: c.titulo, minutos, vehicleId: c.vehicleId });
+    for (const p of partes) {
+      if (p.minutos <= 0) continue;
+      out.push({
+        titulo: p.titulo,
+        minutos: p.minutos,
+        vehicleId: p.vehicleId || c.vehicleId,
+      });
+    }
   }
   return out;
 }

@@ -92,7 +92,7 @@ import {
 } from "@/lib/nidoNaturaleza";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
-import { formatDuracionTimon, formatHorasCerradas, hydrateTimonEpisodio } from "@/lib/timonHoras";
+import { formatDuracionTimon, formatHorasCerradas, hydratePresenciaEpisodio, hydrateTimonEpisodio } from "@/lib/timonHoras";
 import { PROYECTO_PALETTE, resolveProyectoColor } from "@/lib/proyectoColor";
 import { ProyectoColorSwatches } from "@/components/ProyectoColorSwatches";
 import { ProyectoFigura } from "@/components/ProyectoFigura";
@@ -630,6 +630,15 @@ export default function ProyectosPage() {
     });
   }, [oleadaPeldano, oleadaPuntoProduccion, detailId, flotaLocal]);
 
+  const presenciaHydrated = useMemo(() => {
+    if (!detailId) return proyecto?.presenciaEpisodio ?? null;
+    return hydratePresenciaEpisodio({
+      episodio: proyecto?.presenciaEpisodio,
+      proyectoId: detailId,
+      vehicles: flotaLocal,
+    });
+  }, [detailId, proyecto?.presenciaEpisodio, flotaLocal]);
+
   const figuraDetalle = useMemo(
     () =>
       computeFiguraDesdeNido({
@@ -637,12 +646,12 @@ export default function ProyectosPage() {
         peldanos,
         liveTimon: timonHydrated,
         gasto: proyecto?.gastoTiempo,
-        presenciaEpisodio: proyecto?.presenciaEpisodio,
+        presenciaEpisodio: presenciaHydrated,
       }),
     [
       proyecto?.etiqueta,
       proyecto?.gastoTiempo,
-      proyecto?.presenciaEpisodio,
+      presenciaHydrated,
       peldanos,
       timonHydrated,
     ]
@@ -1177,6 +1186,7 @@ export default function ProyectosPage() {
                 puntos={oleadaPuntos}
                 puntoProduccionId={oleadaPeldano.puntoProduccionId}
                 timonEpisodio={timonHydrated}
+                presenciaEpisodio={presenciaHydrated}
                 tint={tint}
                 pulseId={ordenPulse?.id}
                 pulseDir={ordenPulse?.dir}
@@ -1205,7 +1215,7 @@ export default function ProyectosPage() {
               <ProyectoGastoConcienciaCard
                 proyectoId={detailId}
                 vehicles={flotaLocal}
-                presenciaEpisodio={proyecto?.presenciaEpisodio}
+                presenciaEpisodio={presenciaHydrated}
               />
             ) : null}
 

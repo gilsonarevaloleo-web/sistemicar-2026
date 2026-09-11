@@ -12,8 +12,10 @@ import {
   horasCompletasDeMinutos,
   horasDeEpisodio,
   hydrateTimonEpisodio,
+  hydratePresenciaEpisodio,
   ledgerVehiculosTimon,
   formatCuandoProduccion,
+  formatRangoProduccion,
   minutosCruceHora,
   resumenTimonDesdeEpisodio,
   formatDuracionTimon,
@@ -371,5 +373,129 @@ describe("timonHoras — historia verdadera del timón", () => {
     assert.equal(minutosCruceHora(0, 131, 2), 60);
     assert.equal(minutosCruceHora(0, 131, 3), 11);
     assert.equal(minutosCruceHora(0, 131, 4), 0);
+  });
+});
+
+describe("timonHoras — historia de cada sub", () => {
+  it("el nombre y el inicio salen del sub activado, no del desglosador ni del plan", () => {
+    const opened = Date.parse("2026-09-10T05:30:00-05:00");
+    const pinAt = Date.parse("2026-09-10T20:24:00-05:00");
+    const now = Date.parse("2026-09-10T16:33:00-05:00");
+    const ep = hydrateTimonEpisodio({
+      episodio: crearTimonEpisodio("pt_hueso", "Hacer 20 casacas hueso", pinAt),
+      puntoId: "pt_hueso",
+      puntoTitulo: "Hacer 20 casacas hueso",
+      proyectoId: "costura",
+      vehicles: [
+        {
+          id: "desg",
+          titulo: "Armado de casaca leñadora",
+          status: "activo",
+          tipoReloj: "desglosador",
+          destinoCierre: "peldano",
+          proyectoId: "costura",
+          oleadaPuntoId: "pt_hueso",
+          aperturaAt: opened,
+          subVehiculos: [
+            {
+              id: "s1",
+              titulo: "Casaca 1",
+              status: "cumplido",
+              duracionFinal: 2 * 3600,
+              aperturaAt: opened,
+              cierreAt: opened + 2 * 3600_000,
+            },
+            {
+              id: "s2",
+              titulo: "Casaca 2",
+              status: "activo",
+              aperturaAt: opened + 2 * 3600_000,
+            },
+          ],
+        },
+      ],
+      now,
+    });
+    assert.equal(ep.startedAt, opened);
+    assert.equal(ep.vehiculos.length, 2);
+    assert.equal(ep.vehiculos[0]?.titulo, "Casaca 1");
+    assert.equal(ep.vehiculos[0]?.openedAt, opened);
+    assert.ok(!ep.vehiculos.some(v => v.titulo === "Armado de casaca leñadora"));
+    const ledger = ledgerVehiculosTimon(ep);
+    assert.match(formatRangoProduccion(ledger[0]?.openedAt, ledger[0]?.closedAt), /05:30/);
+    assert.ok(!formatRangoProduccion(ledger[0]?.openedAt, ledger[0]?.closedAt).includes("20:24"));
+  });
+});
+
+describe("timonHoras — pausa como presencia", () => {
+  it("la pausa de 1 h desde 7:30 queda en presencia, no resta el trabajo", () => {
+    const t530 = Date.parse("2026-09-10T05:30:00-05:00");
+    const t730 = Date.parse("2026-09-10T07:30:00-05:00");
+    const t830 = Date.parse("2026-09-10T08:30:00-05:00");
+    const vehicles = [
+      {
+        id: "conquista",
+        titulo: "Armado de casaca leñadora",
+        status: "activo",
+        tipoReloj: "desglosador",
+        destinoCierre: "peldano",
+        proyectoId: "costura",
+        oleadaPuntoId: "pt_hueso",
+        aperturaAt: t530,
+        interrupcionActiva: true,
+        desglosadorPausa: {
+          pausadoAt: t730,
+          subActivoId: "s1",
+          elapsedSecSnapshot: 2 * 3600,
+        },
+        pausas: [{ pausadoAt: t730, titulo: "desayuno" }],
+        subVehiculos: [
+          {
+            id: "s1",
+            titulo: "Casaca 1",
+            status: "nested_paused",
+            aperturaAt: t530,
+          },
+        ],
+      },
+      {
+        id: "desayuno",
+        titulo: "desayuno",
+        status: "archivado",
+        destinoCierre: "presencia",
+        vehiculoPadreDesglosadorId: "conquista",
+        aperturaAt: t730,
+        cierreAt: t730 + 60_000,
+      },
+      {
+        id: "ring",
+        titulo: "primera intercepción del dia",
+        status: "activo",
+        tipoFlota: "situacion",
+        destinoCierre: "presencia",
+        aperturaAt: t730 + 60_000,
+      },
+    ];
+    const timon = hydrateTimonEpisodio({
+      puntoId: "pt_hueso",
+      puntoTitulo: "Hacer 20 casacas hueso",
+      proyectoId: "costura",
+      vehicles,
+      now: t830,
+    });
+    assert.equal(timon.minutosAcumulados, 120);
+    assert.equal(timon.vehiculos[0]?.titulo, "Casaca 1");
+    assert.ok(!timon.vehiculos.some(v => v.kind === "pausa"));
+
+    const presencia = hydratePresenciaEpisodio({
+      proyectoId: "costura",
+      vehicles,
+      now: t830,
+    });
+    const pausas = presencia.vehiculos.filter(v => v.kind === "pausa");
+    assert.equal(pausas.length, 1);
+    assert.equal(pausas[0]?.openedAt, t730);
+    assert.equal(pausas[0]?.minutos, 60);
+    assert.match(pausas[0]?.titulo ?? "", /desayuno|intercepción|Pausa/i);
   });
 });

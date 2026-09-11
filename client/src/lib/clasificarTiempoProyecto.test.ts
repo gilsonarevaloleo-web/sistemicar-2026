@@ -119,5 +119,46 @@ describe("clasificarTiempoProyecto", () => {
     );
     assert.equal(c.modo, "dedicado");
     assert.equal(c.minutos, 60);
+    assert.equal(c.partes.map(p => p.titulo).join("|"), "Corte|Costura");
+  });
+
+  it("desglosador dedicado usa el nombre del sub, no el del contenedor", () => {
+    const c = clasificarTiempoVehiculo(
+      v({
+        id: "desg",
+        titulo: "Armado de casaca leñadora",
+        status: "archivado",
+        tipoReloj: "desglosador",
+        destinoCierre: "peldano",
+        proyectoId: "costura",
+        oleadaPuntoId: "pt_hueso",
+        aperturaAt: 1_000,
+        cierreAt: 1_000 + 4 * 60 * 60_000,
+        duracionFinal: 240,
+        subVehiculos: [
+          {
+            id: "s1",
+            titulo: "Casaca 1",
+            duracionFinal: 50 * 60,
+            status: "cumplido",
+            aperturaAt: 1_000,
+            cierreAt: 1_000 + 50 * 60_000,
+          },
+          {
+            id: "s2",
+            titulo: "Casaca 2",
+            duracionFinal: 40 * 60,
+            status: "cumplido",
+            aperturaAt: 1_000 + 50 * 60_000,
+            cierreAt: 1_000 + 90 * 60_000,
+          },
+        ],
+      })
+    );
+    assert.equal(c.modo, "dedicado");
+    assert.equal(c.minutos, 90);
+    const ledger = ledgerNombresMinutos([c], "costura");
+    assert.equal(ledger.map(r => r.titulo).join("|"), "Casaca 1|Casaca 2");
+    assert.ok(!ledger.some(r => r.titulo === "Armado de casaca leñadora"));
   });
 });
