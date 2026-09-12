@@ -1,3 +1,4 @@
+import React from "react";
 import { Compass } from "lucide-react";
 import type { CodigoNumero, ModoUmbral } from "@shared/umbral/engineConfig";
 import {
