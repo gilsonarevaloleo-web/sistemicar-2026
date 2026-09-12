@@ -11,6 +11,11 @@
  * Spec: umbral v2. primera parte (WPS)
  */
 
+import {
+  armarBloqueMaestro,
+  feedbackMaestroLocal,
+} from "./maestroConfig.ts";
+
 export type ModoUmbral = "INTERNO_HABILIDAD" | "EXTERNO_VENTAS";
 
 export type CodigoNumero = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
@@ -471,6 +476,9 @@ export function resolverCodigoSiguiente(
  * Arma el prompt de evaluación para Gemini.
  * La respuesta del modelo DEBE ser JSON estricto:
  * { aprobado: boolean, feedbackConfrontativo: string, codigoSiguiente: number | null }
+ *
+ * El Maestro se inyecta como kernel + ficha del código activo
+ * (`armarBloqueMaestro`). No pegar las 10 voces en un solo prompt.
  */
 export function obtenerPromptEvaluacion(
   input: PromptEvaluacionInput,
@@ -479,6 +487,7 @@ export function obtenerPromptEvaluacion(
   const cfg = obtenerCodigo(codigo);
   const modoMeta = MODOS_UMBRAL[modo];
   const next = siguienteCodigo(codigo);
+  const bloqueMaestro = armarBloqueMaestro(codigo, modo);
 
   const bloqueModo =
     modo === "INTERNO_HABILIDAD"
@@ -510,9 +519,8 @@ export function obtenerPromptEvaluacion(
           .join("\n");
 
   const system = [
-    "Eres el Evaluador Confrontativo del Umbral v2 (Sistemicar).",
-    "Tu trabajo es aprobar o rechazar con criterio clínico-técnico, sin New Age y sin floritura.",
-    "Lenguaje: tracción, caudal, territorio, soberanía, fricción, estándar, intercambio.",
+    bloqueMaestro,
+    "",
     "Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto fuera del JSON) con esta forma exacta:",
     '{"aprobado": boolean, "feedbackConfrontativo": string, "codigoSiguiente": number | null}',
     "",
@@ -521,7 +529,7 @@ export function obtenerPromptEvaluacion(
     `- Si aprobado === true y codigo === 10: codigoSiguiente = null (módulo completado).`,
     `- Si aprobado === false: codigoSiguiente = ${codigo} (el operador no avanza).`,
     "",
-    "feedbackConfrontativo: 2–5 frases. Directo, densificado, sin consuelo vacío. Si rechazas, nombra el fallo exacto y qué faltó.",
+    "feedbackConfrontativo: 2–5 frases en la voz de la ficha. Tres tiempos: espejo → segunda resistencia → corte o cruce. Si rechazas, el corte es un rewrite de HOY, no un sermón.",
     "",
     `CÓDIGO EN EVALUACIÓN: ${cfg.nombre}`,
     `Concepto clave: ${cfg.conceptoClave}`,
@@ -657,12 +665,16 @@ export function evaluarUmbralLocal(
   const hasSignal = signals.some((re) => re.test(texto));
   const aprobado = denseEnough && hasSignal;
 
-  const feedbackConfrontativo = aprobado
-    ? `APROBADO (evaluador local de respaldo). Cumples densidad mínima y señales del ${cfg.nombre}. El criterio clave: ${cfg.conceptoClave}`
-    : `RECHAZADO (evaluador local de respaldo). Tu respuesta es demasiado vaga o no toca el criterio del ${cfg.nombre}. ` +
-      (input.modo === "INTERNO_HABILIDAD"
-        ? `Reescribe nombrando el hecho puntual y la acción concreta. Criterio: ${cfg.modoInterno.criterioAprobacion}`
-        : `Reescribe con utilidad/evidencia concreta ante la objeción. Criterio: ${cfg.modoExterno.criterioAprobacionVendedor}`);
+  const criterio =
+    input.modo === "INTERNO_HABILIDAD"
+      ? cfg.modoInterno.criterioAprobacion
+      : cfg.modoExterno.criterioAprobacionVendedor;
+  const feedbackConfrontativo = feedbackMaestroLocal({
+    codigo: input.codigo,
+    modo: input.modo,
+    aprobado,
+    criterio,
+  });
 
   return {
     aprobado,

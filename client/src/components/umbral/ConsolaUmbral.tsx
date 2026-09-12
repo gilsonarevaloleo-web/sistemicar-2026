@@ -49,6 +49,7 @@ import {
 } from "@/lib/umbral/logrosStore";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
+import { CardMaestroCodigo } from "./CardMaestroCodigo";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 
 const GOLD = "#D4AF37";
@@ -591,8 +592,8 @@ export function ConsolaUmbral({
               PROC-UMBRAL // SISTEMICAR V2
             </p>
             <p className="mt-1 text-[11px] text-white/40">
-              Práctica de 10 Códigos · el pendiente abre solo; los superados se
-              pueden repasar
+              10 Códigos · cada uno habla su idioma · el Maestro enseña la 2ª
+              resistencia para que termines el cruce
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -809,6 +810,10 @@ export function ConsolaUmbral({
             />
           )}
 
+          {!mostrarPaywall && !codigoBloqueadoPorPago && (
+            <CardMaestroCodigo codigo={cfg.numero} modo={modo} />
+          )}
+
           {!mostrarPaywall && !codigoBloqueadoPorPago && modo === "EXTERNO_VENTAS" && (
             <CardPerfilCliente
               codigoNumero={cfg.numero}
@@ -921,8 +926,8 @@ export function ConsolaUmbral({
                     disabled={loading}
                     placeholder={
                       modo === "INTERNO_HABILIDAD"
-                        ? "Escribe tu respuesta confrontativa al límite..."
-                        : "Escribe tu respuesta de vendedor ante la objeción..."
+                        ? "Habla en el idioma de este código: el crack y el corte de hoy..."
+                        : "Responde al cliente en el idioma de este código — una frase que sostenga la 2ª resistencia..."
                     }
                     className="w-full resize-y border border-white/15 bg-black/50 px-4 py-3 text-[15px] leading-relaxed text-white/90 outline-none placeholder:text-white/25 focus:border-[#00FFC3]/50"
                     style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif" }}
@@ -945,10 +950,10 @@ export function ConsolaUmbral({
                   {loading ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      EVALUANDO…
+                      EL MAESTRO LEE…
                     </>
                   ) : (
-                    "SOMETER A EVALUACIÓN"
+                    "SOMETER AL MAESTRO"
                   )}
                 </button>
               </div>
@@ -978,9 +983,9 @@ export function ConsolaUmbral({
             data-testid="umbral-v2-veredicto-ok"
           >
             <p className="text-[10px] tracking-[0.2em]" style={{ color: GOLD }}>
-              APROBADO
+              CRUCE
               {veredicto.siguiente
-                ? ` · SIGUE EN CÓDIGO ${veredicto.siguiente}`
+                ? ` · EL CÓDIGO ${veredicto.siguiente} YA TE ESPERA`
                 : " · MÓDULO CERRADO"}
               {veredicto.psTotal > 0 ? ` · +${veredicto.psTotal} PS` : ""}
             </p>
@@ -1014,7 +1019,7 @@ export function ConsolaUmbral({
               className="text-[10px] font-bold tracking-[0.2em]"
               style={{ color: WARN }}
             >
-              RECHAZADO · PERMANECES EN CÓDIGO {codigoActual}
+              EL CÓDIGO AÚN HABLA · SEGUÍS EN {codigoActual}
               {veredicto.psTotal > 0 ? ` · +${veredicto.psTotal} PS` : ""}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-white/90">
@@ -1033,8 +1038,8 @@ export function ConsolaUmbral({
               </ul>
             )}
             <p className="mt-3 text-[11px] text-white/45">
-              Reescribe con más densidad y vuelve a someter. El intento
-              consciente del día ya está contado; el pase se paga al aprobar.
+              Esto no es un fallo: es la 2ª resistencia de este código. Tomá el
+              corte, reescribí y volvé a entrar. El pase se paga al cruzar.
             </p>
           </motion.div>
         )}
