@@ -1139,9 +1139,10 @@ export default function ProyectosPage() {
                   enumeración infinita, no sube peldaños. No toca la figura.
                 </li>
                 <li>
-                  <span className="text-slate-300">Figura</span> — lo ya enviado al timón.
-                  Diez envíos de enfoque revelan un miembro. La conquista da masa,
-                  no contorno. El hueco es el siguiente trozo, no una mascota.
+                  <span className="text-slate-300">Red</span> — cada envío de Dirección
+                  (conquista o enfoque) es una conexión. Diez hacen un haz: aparece un
+                  ganglio. El cuerpo es el primer núcleo; después la red busca casa y
+                  otros. Presencia no toca la red.
                 </li>
               </ul>
             </div>

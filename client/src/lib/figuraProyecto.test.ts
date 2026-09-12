@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  FIGURA_MIEMBROS_MAX,
+  FIGURA_CUERPO_MAX,
   FIGURA_PAQUETE,
   collectFiguraStamps,
   computeFiguraEstado,
   computeFiguraDesdeNido,
+  figuraCapaDeHaces,
   figuraProgresoLabel,
   type FiguraStamp,
 } from "./figuraProyecto.ts";
@@ -21,8 +22,8 @@ function stamps(nForma: number, nMasa: number, prefix = "v"): FiguraStamp[] {
   return out;
 }
 
-describe("figuraProyecto — cristalización", () => {
-  it("presencia no entra a la figura aunque haya episodio", () => {
+describe("figuraProyecto — red neuronal", () => {
+  it("presencia no entra a la red aunque haya episodio", () => {
     const collected = collectFiguraStamps({
       presenciaEpisodio: {
         vehiculos: [
@@ -58,66 +59,76 @@ describe("figuraProyecto — cristalización", () => {
     assert.ok(collected.some(s => s.vehicleId === "solo-gasto"));
   });
 
-  it("9 envíos de enfoque no revelan miembro; 10 revelan el torso", () => {
+  it("toda la producción cuenta: 10 de conquista revelan el torso", () => {
+    const masa = computeFiguraEstado("proyecto", stamps(0, 10));
+    assert.equal(masa.conexiones, 10);
+    assert.equal(masa.haces, 1);
+    assert.equal(masa.miembrosRevelados, 1);
+    assert.equal(masa.miembros[0]?.id, "torso");
+    assert.equal(masa.capa, "cuerpo");
+    assert.match(masa.copyHueco, /cabeza/);
+  });
+
+  it("Costura: 21 ejecución + 8 enfoque cablean dos ganglios, no se quedan hinchados", () => {
+    const costura = computeFiguraEstado("proyecto", stamps(8, 21));
+    assert.equal(costura.conexiones, 29);
+    assert.equal(costura.haces, 2);
+    assert.equal(costura.miembrosRevelados, 2);
+    assert.equal(costura.miembros[0]?.revelado, true);
+    assert.equal(costura.miembros[1]?.revelado, true);
+    assert.equal(costura.hueco.enPaquete, 9);
+    assert.equal(costura.hueco.siguiente?.id, "brazoI");
+    assert.match(costura.copyHueco, /9 de 10 para revelar el brazo izquierdo/);
+    assert.equal(figuraProgresoLabel(costura), "29 conexiones · 2 haces");
+  });
+
+  it("9 conexiones no revelan ganglio; 10 sí", () => {
     const nine = computeFiguraEstado("proyecto", stamps(9, 0));
     assert.equal(nine.miembrosRevelados, 0);
     assert.equal(nine.hueco.enPaquete, 9);
     assert.equal(nine.hueco.siguiente?.id, "torso");
-    assert.match(nine.copyHueco, /9 de 10 para revelar el torso/);
 
     const ten = computeFiguraEstado("proyecto", stamps(10, 0));
     assert.equal(ten.miembrosRevelados, 1);
-    assert.equal(ten.miembros[0]?.revelado, true);
-    assert.equal(ten.miembros[1]?.esSiguiente, true);
-    assert.equal(ten.deformacion, "hueca");
+    assert.equal(ten.deformacion, "ramas");
   });
 
-  it("10 de conquista sin forma: masa hinchada, cero miembros", () => {
-    const masa = computeFiguraEstado("proyecto", stamps(0, 10));
-    assert.equal(masa.miembrosRevelados, 0);
-    assert.equal(masa.paquetesMasa, 1);
-    assert.equal(masa.deformacion, "hinchada");
-    assert.equal(masa.masaFill, 0);
-    assert.match(masa.copy, /peso sin contorno/i);
-    assert.equal(masa.hueco.tejido, "forma");
-  });
-
-  it("10 forma + 10 masa: torso revelado y lleno, equilibrado", () => {
+  it("10 forma + 10 masa: torso revelado, equilibrado", () => {
     const ok = computeFiguraEstado("proyecto", stamps(10, 10));
-    assert.equal(ok.miembrosRevelados, 1);
+    assert.equal(ok.miembrosRevelados, 2);
     assert.equal(ok.deformacion, "ninguna");
-    assert.equal(ok.masaFill, 1);
-    assert.equal(ok.hueco.siguiente?.id, "cabeza");
-    assert.match(ok.copyHueco, /0 de 10 para revelar la cabeza/);
+    assert.equal(ok.hueco.siguiente?.id, "brazoI");
   });
 
-  it("60 de forma revelan la figura completa", () => {
+  it("60 conexiones cablean el cuerpo y pasan a malla", () => {
     const full = computeFiguraEstado(
       "proyecto",
-      stamps(FIGURA_MIEMBROS_MAX * FIGURA_PAQUETE, FIGURA_MIEMBROS_MAX * FIGURA_PAQUETE)
+      stamps(0, FIGURA_CUERPO_MAX * FIGURA_PAQUETE)
     );
-    assert.equal(full.miembrosRevelados, FIGURA_MIEMBROS_MAX);
-    assert.equal(full.figuraCompleta, true);
-    assert.equal(full.deformacion, "ninguna");
-    assert.match(full.copy, /ya se ve/);
+    assert.equal(full.miembrosRevelados, FIGURA_CUERPO_MAX);
+    assert.equal(full.cuerpoCableado, true);
+    assert.equal(full.capa, "red");
+    assert.equal(full.casaRevelada, false);
+    assert.match(full.copy, /mieliniza|malla|ganglios/i);
   });
 
-  it("figura completa hueca pide masa, no otro miembro", () => {
-    const hueca = computeFiguraEstado(
-      "proyecto",
-      stamps(FIGURA_MIEMBROS_MAX * FIGURA_PAQUETE, 0)
-    );
-    assert.equal(hueca.figuraCompleta, true);
-    assert.equal(hueca.deformacion, "hueca");
-    assert.equal(hueca.hueco.tejido, "masa");
-    assert.equal(hueca.hueco.siguiente, null);
+  it("120 conexiones revelan la casa; 180 abren linaje", () => {
+    const casa = computeFiguraEstado("proyecto", stamps(0, 120));
+    assert.equal(figuraCapaDeHaces(casa.haces), "casa");
+    assert.equal(casa.casaRevelada, true);
+    assert.match(casa.copy, /casa/i);
+
+    const linaje = computeFiguraEstado("proyecto", stamps(20, 160));
+    assert.equal(linaje.capa, "linaje");
+    assert.ok(linaje.linajeRevelados >= 0);
+    assert.match(linaje.copy, /otros|casa/i);
   });
 
-  it("control revela anillos, no miembros de cuerpo", () => {
-    const c = computeFiguraEstado("centro", stamps(10, 0));
+  it("control revela anillos con producción total", () => {
+    const c = computeFiguraEstado("centro", stamps(0, 10));
     assert.equal(c.modo, "control");
     assert.equal(c.miembros[0]?.id, "s1");
-    assert.equal(c.miembros[0]?.label, "el cimiento");
+    assert.equal(c.miembrosRevelados, 1);
     assert.match(c.copyHueco, /segundo anillo/);
   });
 
@@ -127,7 +138,6 @@ describe("figuraProyecto — cristalización", () => {
     assert.equal(v.miembrosRevelados, 0);
     assert.equal(v.miembros.length, 0);
     assert.equal(v.enviosRegistro, 15);
-    assert.equal(v.deformacion, "ninguna");
     assert.equal(v.hueco.tejido, "registro");
     assert.match(v.copy, /no trepa|Información/i);
   });
@@ -172,9 +182,9 @@ describe("figuraProyecto — cristalización", () => {
     const estado = computeFiguraDesdeNido({
       etiqueta: "proyecto",
       liveTimon: {
-        vehiculos: Array.from({ length: 10 }, (_, i) => ({
-          vehicleId: `s${i}`,
-          tipoOrigen: "situacion" as const,
+        vehiculos: Array.from({ length: 21 }, (_, i) => ({
+          vehicleId: `t${i}`,
+          tipoOrigen: "tiempo" as const,
         })),
       },
       presenciaEpisodio: {
@@ -184,13 +194,14 @@ describe("figuraProyecto — cristalización", () => {
         })),
       },
     });
-    assert.equal(estado.miembrosRevelados, 1);
-    assert.equal(estado.enviosMasa, 0);
+    assert.equal(estado.conexiones, 21);
+    assert.equal(estado.miembrosRevelados, 2);
+    assert.equal(estado.enviosMasa, 21);
   });
 
   it("etiqueta desconocida se lee como crecimiento", () => {
     const e = computeFiguraEstado("otra", stamps(0, 0));
     assert.equal(e.modo, "crecimiento");
-    assert.equal(figuraProgresoLabel(e), "forma 0 · masa 0");
+    assert.equal(figuraProgresoLabel(e), "0 conexiones · 0 haces");
   });
 });

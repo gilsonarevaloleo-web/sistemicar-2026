@@ -1,19 +1,24 @@
 /**
- * Figura del nido (Norte).
+ * Red del nido (Norte).
  *
- * Conquista da masa. Enfoque-situacional da forma. Presencia no toca el cuerpo.
- * Un paquete de 10 envíos de forma revela un miembro. La figura no pide comida:
- * muestra lo ya enviado al timón. El hueco es del operador.
+ * Cada envío de Dirección es una conexión. Diez hacen un haz: aparece un
+ * ganglio. Conquista mieliniza (grosor). Enfoque abre ramas (topología).
+ * Presencia no toca la red. El cuerpo es el primer núcleo; después la red
+ * sale hacia casa y hacia otros. La figura no pide comida: muestra lo ya
+ * enviado al timón.
  */
 import { resolveProyectoEtiqueta, type ProyectoEtiqueta } from "./nidoNaturaleza";
 import type { DestinoGasto } from "./gastoTiempo";
 
 export const FIGURA_PAQUETE = 10;
-export const FIGURA_MIEMBROS_MAX = 6;
+export const FIGURA_CUERPO_MAX = 6;
+export const FIGURA_HAZ_RED = 12;
+export const FIGURA_HAZ_CASA = 18;
 
-export type FiguraTejido = "forma" | "masa" | "registro";
-export type FiguraDeformacion = "ninguna" | "hinchada" | "hueca";
+export type FiguraTejido = "conexion" | "registro";
+export type FiguraDeformacion = "ninguna" | "mielina" | "ramas";
 export type FiguraModo = "crecimiento" | "control" | "consciencia";
+export type FiguraCapa = "semilla" | "cuerpo" | "red" | "casa" | "linaje";
 
 export type FiguraMiembro = {
   id: string;
@@ -63,15 +68,21 @@ export type FiguraGastoLike = {
 
 export type FiguraEstado = {
   modo: FiguraModo;
+  capa: FiguraCapa;
   enviosForma: number;
   enviosMasa: number;
   enviosRegistro: number;
+  conexiones: number;
+  haces: number;
   paquetesForma: number;
   paquetesMasa: number;
   miembrosRevelados: number;
   masaFill: number;
+  mielina: number;
+  casaRevelada: boolean;
+  linajeRevelados: number;
   deformacion: FiguraDeformacion;
-  figuraCompleta: boolean;
+  cuerpoCableado: boolean;
   hueco: FiguraHueco;
   miembros: FiguraMiembro[];
   copy: string;
@@ -96,6 +107,12 @@ export const FIGURA_ANILLOS_CONTROL: readonly { id: string; label: string }[] = 
   { id: "s6", label: "la cumbre" },
 ];
 
+export const FIGURA_MAS_ALLA: readonly { id: string; label: string }[] = [
+  { id: "malla", label: "la malla" },
+  { id: "casa", label: "la casa" },
+  { id: "otro", label: "otro" },
+];
+
 export function figuraModoDeEtiqueta(etiqueta?: string | null): FiguraModo {
   const kind = resolveProyectoEtiqueta(etiqueta);
   if (kind === "centro") return "control";
@@ -106,6 +123,14 @@ export function figuraModoDeEtiqueta(etiqueta?: string | null): FiguraModo {
 export function catalogoMiembros(modo: FiguraModo): readonly { id: string; label: string }[] {
   if (modo === "control") return FIGURA_ANILLOS_CONTROL;
   return FIGURA_MIEMBROS_CRECIMIENTO;
+}
+
+export function figuraCapaDeHaces(haces: number): FiguraCapa {
+  if (haces <= 0) return "semilla";
+  if (haces < FIGURA_CUERPO_MAX) return "cuerpo";
+  if (haces < FIGURA_HAZ_RED) return "red";
+  if (haces < FIGURA_HAZ_CASA) return "casa";
+  return "linaje";
 }
 
 function pushTimonStamps(
@@ -123,7 +148,7 @@ function pushTimonStamps(
 
 /**
  * Recoge envíos de Dirección. Presencia se ignora a propósito:
- * cubre el día y no toca la figura.
+ * cubre el día y no toca la red.
  */
 export function collectFiguraStamps(input: {
   peldanos?: FiguraPeldanoLike[] | null;
@@ -162,7 +187,7 @@ function buildMiembros(
   catalogo: readonly { id: string; label: string }[],
   revelados: number
 ): FiguraMiembro[] {
-  const cap = Math.min(FIGURA_MIEMBROS_MAX, catalogo.length);
+  const cap = Math.min(FIGURA_CUERPO_MAX, catalogo.length);
   const n = Math.max(0, Math.min(cap, revelados));
   return catalogo.slice(0, cap).map((m, i) => ({
     id: m.id,
@@ -172,9 +197,10 @@ function buildMiembros(
   }));
 }
 
-function deformacionDe(paquetesForma: number, paquetesMasa: number): FiguraDeformacion {
-  if (paquetesMasa > paquetesForma) return "hinchada";
-  if (paquetesForma > paquetesMasa && paquetesForma > 0) return "hueca";
+function deformacionDe(enviosForma: number, enviosMasa: number, conexiones: number): FiguraDeformacion {
+  if (conexiones < FIGURA_PAQUETE) return "ninguna";
+  if (enviosMasa > enviosForma * 2 && enviosMasa >= FIGURA_PAQUETE) return "mielina";
+  if (enviosForma > enviosMasa * 2 && enviosForma >= FIGURA_PAQUETE) return "ramas";
   return "ninguna";
 }
 
@@ -184,89 +210,94 @@ function masaFillDe(enviosMasa: number, miembrosRevelados: number): number {
   return Math.max(0, Math.min(1, enviosMasa / cupo));
 }
 
+function siguienteMasAlla(capa: FiguraCapa): FiguraMiembro | null {
+  if (capa === "cuerpo" || capa === "semilla") return null;
+  if (capa === "red") {
+    return { id: "malla", label: FIGURA_MAS_ALLA[0]!.label, revelado: true, esSiguiente: true };
+  }
+  if (capa === "casa") {
+    return { id: "casa", label: FIGURA_MAS_ALLA[1]!.label, revelado: false, esSiguiente: true };
+  }
+  return { id: "otro", label: FIGURA_MAS_ALLA[2]!.label, revelado: false, esSiguiente: true };
+}
+
 function copyFigura(estado: Omit<FiguraEstado, "copy" | "copyHueco">): {
   copy: string;
   copyHueco: string;
 } {
+  const pack = `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE}`;
   if (estado.modo === "consciencia") {
     if (estado.enviosRegistro <= 0) {
       return {
         copy: "Se registra. No trepa. Diez envíos de rumbo encienden el brillo.",
-        copyHueco: `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el primer brillo.`,
-      };
-    }
-    const nivel = Math.min(FIGURA_MIEMBROS_MAX, estado.paquetesForma);
-    if (nivel >= FIGURA_MIEMBROS_MAX) {
-      return {
-        copy: "El registro ya se ve. No pide miembros ni escalera.",
-        copyHueco: "Se registra. No trepa.",
+        copyHueco: `${pack} para el primer brillo.`,
       };
     }
     return {
-      copy: "Información, no figura. El brillo crece sin trepar.",
-      copyHueco: `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para más brillo.`,
+      copy: "Información, no red. El brillo crece sin trepar.",
+      copyHueco: `${pack} para más brillo.`,
     };
   }
 
-  const pieza = estado.modo === "control" ? "anillo" : "miembro";
-  if (estado.enviosForma <= 0 && estado.enviosMasa <= 0) {
+  const pieza = estado.modo === "control" ? "anillo" : "ganglio";
+  if (estado.conexiones <= 0) {
     return {
       copy:
         estado.modo === "control"
-          ? "Todavía no hay sostén. Diez envíos de enfoque revelan un anillo. La conquista da peso, no contorno."
-          : "Todavía no hay forma. Diez envíos de enfoque revelan un miembro. La conquista da peso, no contorno.",
+          ? "Cada envío de Dirección es una conexión. Diez hacen un haz: aparece un anillo."
+          : "Cada envío de Dirección es una conexión. Diez hacen un haz: aparece un ganglio. El cuerpo es el primer núcleo.",
       copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
-        : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el primer ${pieza}.`,
+        ? `${pack} para revelar ${estado.hueco.siguiente.label}.`
+        : `${pack} para el primer ${pieza}.`,
     };
   }
 
-  if (estado.deformacion === "hinchada" && estado.miembrosRevelados === 0) {
+  if (estado.capa === "linaje") {
     return {
-      copy: "Hay peso sin contorno. La masa no revela figura.",
-      copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
-        : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el primer ${pieza}.`,
+      copy: "De la casa salen otros. Cada haz nuevo es alguien — o algo — que la red sostiene.",
+      copyHueco: `${pack} para revelar otro.`,
     };
   }
-
-  if (estado.figuraCompleta) {
-    if (estado.deformacion === "hueca") {
-      return {
-        copy: "La figura ya tiene cara, pero sigue hueca. La conquista da el peso que falta.",
-        copyHueco: `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para dar masa.`,
-      };
-    }
-    if (estado.deformacion === "hinchada") {
-      return {
-        copy: "La figura ya se ve. El exceso de masa la hincha: el contorno no crece con el peso.",
-        copyHueco: "La forma ya está. El peso extra no abre otro miembro.",
-      };
-    }
+  if (estado.capa === "casa") {
     return {
-      copy: "La figura ya se ve. El propósito puede nacer de lo que ya tiene cara.",
-      copyHueco: "Sin hueco de forma. La masa puede seguir dando peso.",
+      copy: "El cuerpo ya está cableado. La red busca casa: un lugar que el proyecto resguarda.",
+      copyHueco: estado.casaRevelada
+        ? `${pack} para densificar la casa.`
+        : `${pack} para revelar la casa.`,
     };
   }
-
-  if (estado.deformacion === "hueca") {
+  if (estado.capa === "red") {
     return {
-      copy: `El ${estado.hueco.siguiente ? "contorno" : pieza} ya se ve. Sin masa queda hueco.`,
-      copyHueco: estado.hueco.siguiente
-        ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${estado.hueco.siguiente.label}.`
-        : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para dar masa.`,
+      copy: "Los ganglios ya se tocan. La repetición mieliniza; el enfoque abre ramas entre ellos.",
+      copyHueco: `${pack} para densificar la malla.`,
     };
   }
 
   const next = estado.hueco.siguiente;
+  if (estado.deformacion === "mielina") {
+    return {
+      copy: "La ejecución ya cableó ganglios. La mielina los hace más gruesos; el enfoque les dará ramas.",
+      copyHueco: next
+        ? `${pack} para revelar ${next.label}.`
+        : `${pack} para el siguiente ${pieza}.`,
+    };
+  }
+  if (estado.deformacion === "ramas") {
+    return {
+      copy: "Hay ramas nuevas. Sin repetición quedan finas: la conquista las mieliniza.",
+      copyHueco: next
+        ? `${pack} para revelar ${next.label}.`
+        : `${pack} para el siguiente ${pieza}.`,
+    };
+  }
   return {
     copy:
       estado.modo === "control"
-        ? "El sostén aparece por anillos. La conquista lo carga; el enfoque lo dibuja."
-        : "La forma aparece por paquetes. La conquista da peso; el enfoque da contorno.",
+        ? "El sostén aparece por haces. Toda la producción cuenta: conquista y enfoque."
+        : "La red crece por haces. Toda la producción cuenta: conquista y enfoque.",
     copyHueco: next
-      ? `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para revelar ${next.label}.`
-      : `${estado.hueco.enPaquete} de ${FIGURA_PAQUETE} para el siguiente ${pieza}.`,
+      ? `${pack} para revelar ${next.label}.`
+      : `${pack} para el siguiente ${pieza}.`,
   };
 }
 
@@ -277,19 +308,24 @@ export function computeFiguraEstado(
   const modo = figuraModoDeEtiqueta(etiqueta);
   const enviosForma = stamps.filter(s => s.tipoOrigen === "situacion").length;
   const enviosMasa = stamps.filter(s => s.tipoOrigen === "tiempo").length;
-  const enviosRegistro = modo === "consciencia" ? stamps.length : enviosForma + enviosMasa;
-  const formaParaPaquetes = modo === "consciencia" ? enviosRegistro : enviosForma;
-  const paquetesForma = Math.floor(formaParaPaquetes / FIGURA_PAQUETE);
+  const conexiones = enviosForma + enviosMasa;
+  const enviosRegistro = modo === "consciencia" ? stamps.length : conexiones;
+  const paraHaces = modo === "consciencia" ? enviosRegistro : conexiones;
+  const haces = Math.floor(paraHaces / FIGURA_PAQUETE);
+  const paquetesForma = Math.floor(enviosForma / FIGURA_PAQUETE);
   const paquetesMasa = Math.floor(enviosMasa / FIGURA_PAQUETE);
+  const capa = modo === "consciencia" ? "semilla" : figuraCapaDeHaces(haces);
   const catalogo = catalogoMiembros(modo);
   const miembrosRevelados =
-    modo === "consciencia" ? 0 : Math.min(FIGURA_MIEMBROS_MAX, paquetesForma);
+    modo === "consciencia" ? 0 : Math.min(FIGURA_CUERPO_MAX, haces);
   const miembros =
     modo === "consciencia" ? [] : buildMiembros(catalogo, miembrosRevelados);
-  const figuraCompleta =
-    modo !== "consciencia" && miembrosRevelados >= FIGURA_MIEMBROS_MAX;
+  const cuerpoCableado = modo !== "consciencia" && miembrosRevelados >= FIGURA_CUERPO_MAX;
+  const casaRevelada = modo !== "consciencia" && haces >= FIGURA_HAZ_RED;
+  const linajeRevelados =
+    modo === "consciencia" ? 0 : Math.max(0, haces - FIGURA_HAZ_CASA);
   const deformacion =
-    modo === "consciencia" ? "ninguna" : deformacionDe(paquetesForma, paquetesMasa);
+    modo === "consciencia" ? "ninguna" : deformacionDe(enviosForma, enviosMasa, conexiones);
 
   let hueco: FiguraHueco;
   if (modo === "consciencia") {
@@ -299,36 +335,45 @@ export function computeFiguraEstado(
       paquete: FIGURA_PAQUETE,
       siguiente: null,
     };
-  } else if (!figuraCompleta) {
+  } else if (!cuerpoCableado) {
     hueco = {
-      tejido: "forma",
-      enPaquete: restoPaquete(enviosForma),
+      tejido: "conexion",
+      enPaquete: restoPaquete(conexiones),
       paquete: FIGURA_PAQUETE,
       siguiente: miembros.find(m => m.esSiguiente) ?? null,
     };
   } else {
     hueco = {
-      tejido: "masa",
-      enPaquete: restoPaquete(enviosMasa),
+      tejido: "conexion",
+      enPaquete: restoPaquete(conexiones),
       paquete: FIGURA_PAQUETE,
-      siguiente: null,
+      siguiente: siguienteMasAlla(capa),
     };
   }
 
   const base: Omit<FiguraEstado, "copy" | "copyHueco"> = {
     modo,
+    capa,
     enviosForma,
     enviosMasa,
     enviosRegistro,
+    conexiones,
+    haces,
     paquetesForma,
     paquetesMasa,
     miembrosRevelados,
-    masaFill: masaFillDe(enviosMasa, miembrosRevelados),
+    masaFill: masaFillDe(enviosMasa, Math.max(miembrosRevelados, 1)),
+    mielina: conexiones <= 0 ? 0 : Math.max(0, Math.min(1, enviosMasa / conexiones)),
+    casaRevelada,
+    linajeRevelados,
     deformacion,
-    figuraCompleta,
+    cuerpoCableado,
     hueco,
     miembros,
   };
+  if (modo !== "consciencia" && miembrosRevelados === 0) {
+    base.masaFill = 0;
+  }
   const texts = copyFigura(base);
   return { ...base, ...texts };
 }
@@ -348,5 +393,13 @@ export function figuraProgresoLabel(estado: FiguraEstado): string {
   if (estado.modo === "consciencia") {
     return `registro ${estado.enviosRegistro}`;
   }
-  return `forma ${estado.enviosForma} · masa ${estado.enviosMasa}`;
+  return `${estado.conexiones} conexiones · ${estado.haces} haces`;
+}
+
+export function figuraCapaLabel(capa: FiguraCapa): string {
+  if (capa === "linaje") return "Linaje";
+  if (capa === "casa") return "Casa";
+  if (capa === "red") return "Malla";
+  if (capa === "cuerpo") return "Cuerpo";
+  return "Red";
 }
