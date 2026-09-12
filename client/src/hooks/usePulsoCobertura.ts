@@ -82,7 +82,10 @@ export function usePulsoCobertura({
             prev.coberturaPct === next.coberturaPct &&
             prev.needsLaunch === next.needsLaunch &&
             prev.consciousNow === next.consciousNow &&
-            prev.segmentoActivoNombre === next.segmentoActivoNombre
+            prev.segmentoActivoNombre === next.segmentoActivoNombre &&
+            prev.coveringVehicleId === next.coveringVehicleId &&
+            prev.coveringVehicleTitulo === next.coveringVehicleTitulo &&
+            prev.coveringSubTitulo === next.coveringSubTitulo
               ? prev
               : next
           );

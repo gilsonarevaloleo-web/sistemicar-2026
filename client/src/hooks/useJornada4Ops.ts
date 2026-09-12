@@ -39,6 +39,7 @@ import {
   awardSituacionBlockPs,
 } from "@/jornada4/psBridge";
 import { burstJornada4Tick } from "@/jornada4/jornada4Tick";
+import { invalidatePulsoCoberturaCache } from "@/lib/pulsoCoberturaCache";
 import { desglosadorProfundidadGanadaPs } from "@/jornada4/desglosadorProfundidad";
 import {
   recordDesglosadorCycleHistory,
@@ -196,6 +197,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         list.map(v => (v.id === vehicleId ? { ...v, ...patch } : v));
       vehiclesRef.current = map(vehiclesRef.current);
       setVehicles(map);
+      invalidatePulsoCoberturaCache();
       burstJornada4Tick();
     },
     [setVehicles, vehiclesRef]

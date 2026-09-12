@@ -29,6 +29,7 @@ import {
 import {
   computeDesglosadorClocks,
   desglosadorSubTimerUiFromClocks,
+  formatDesglosadorDurationHuman,
   formatHHMM,
   formatMMSS,
   isDesglosadorClockPaused,
@@ -196,6 +197,9 @@ export function ConquistaCard({
   const gananciaKind = gananciaKindFromDelta(clocks.liveAccumDeltaSec);
   const gananciaColor =
     gananciaKind === "ganando" ? OK : gananciaKind === "perdiendo" ? "#FF3131" : MUTED;
+  const subGananciaKind = gananciaKindFromDelta(clocks.subLiveDeltaSec);
+  const subGananciaColor =
+    subGananciaKind === "ganando" ? OK : subGananciaKind === "perdiendo" ? "#FF3131" : MUTED;
 
   const refLabel = objSecs != null ? formatMMSS(objSecs) : null;
   const futuroSub = clocks.subEndAt != null ? formatHHMM(clocks.subEndAt) : "—";
@@ -394,50 +398,79 @@ export function ConquistaCard({
                 ) : null}
 
                 {clocks.hasProjection ? (
-                  <div
-                    className="flex items-center justify-center gap-2 py-1.5 rounded-lg min-h-[36px]"
-                    style={{
-                      backgroundColor:
-                        gananciaKind === "ganando"
-                          ? "rgba(0,200,81,0.08)"
-                          : gananciaKind === "perdiendo"
-                            ? "rgba(255,49,49,0.08)"
-                            : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${
-                        gananciaKind === "ganando"
-                          ? "rgba(0,200,81,0.25)"
-                          : gananciaKind === "perdiendo"
-                            ? "rgba(255,49,49,0.25)"
-                            : "rgba(255,255,255,0.08)"
-                      }`,
-                    }}
-                    data-testid="j4-conquista-ganancia"
-                  >
-                    <span
-                      className="text-[9px] font-black uppercase tracking-widest"
-                      style={{ color: gananciaColor }}
-                    >
-                      {gananciaKind === "ganando" ? "↓" : gananciaKind === "perdiendo" ? "↑" : "·"}
-                    </span>
-                    <span
-                      className="text-[13px] font-black tabular-nums"
+                  <div className="grid grid-cols-2 gap-1.5" data-testid="j4-conquista-ganancias">
+                    <div
+                      className="flex flex-col items-center justify-center py-1.5 rounded-lg min-h-[44px]"
                       style={{
-                        color: gananciaColor,
-                        fontFamily: "ui-monospace, monospace",
+                        backgroundColor:
+                          subGananciaKind === "ganando"
+                            ? "rgba(0,200,81,0.08)"
+                            : subGananciaKind === "perdiendo"
+                              ? "rgba(255,49,49,0.08)"
+                              : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${
+                          subGananciaKind === "ganando"
+                            ? "rgba(0,200,81,0.25)"
+                            : subGananciaKind === "perdiendo"
+                              ? "rgba(255,49,49,0.25)"
+                              : "rgba(255,255,255,0.08)"
+                        }`,
                       }}
+                      data-testid="j4-conquista-ganancia-sub"
                     >
-                      {formatGananciaDelta(clocks.liveAccumDeltaSec)}
-                    </span>
-                    <span
-                      className="text-[9px] font-black uppercase tracking-widest"
-                      style={{ color: gananciaColor }}
+                      <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
+                        Este sub
+                      </p>
+                      <p
+                        className="text-[12px] font-black tabular-nums leading-tight"
+                        style={{ color: subGananciaColor, fontFamily: "ui-monospace, monospace" }}
+                      >
+                        {formatGananciaDelta(clocks.subLiveDeltaSec)}
+                      </p>
+                      <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: subGananciaColor }}>
+                        {subGananciaKind === "ganando"
+                          ? "ganando"
+                          : subGananciaKind === "perdiendo"
+                            ? "perdiendo"
+                            : "en ritmo"}
+                      </p>
+                    </div>
+                    <div
+                      className="flex flex-col items-center justify-center py-1.5 rounded-lg min-h-[44px]"
+                      style={{
+                        backgroundColor:
+                          gananciaKind === "ganando"
+                            ? "rgba(0,200,81,0.08)"
+                            : gananciaKind === "perdiendo"
+                              ? "rgba(255,49,49,0.08)"
+                              : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${
+                          gananciaKind === "ganando"
+                            ? "rgba(0,200,81,0.25)"
+                            : gananciaKind === "perdiendo"
+                              ? "rgba(255,49,49,0.25)"
+                              : "rgba(255,255,255,0.08)"
+                        }`,
+                      }}
+                      data-testid="j4-conquista-ganancia"
                     >
-                      {gananciaKind === "ganando"
-                        ? "ganando"
-                        : gananciaKind === "perdiendo"
-                          ? "perdiendo"
-                          : "en ritmo"}
-                    </span>
+                      <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
+                        Ciclo
+                      </p>
+                      <p
+                        className="text-[12px] font-black tabular-nums leading-tight"
+                        style={{ color: gananciaColor, fontFamily: "ui-monospace, monospace" }}
+                      >
+                        {formatGananciaDelta(clocks.liveAccumDeltaSec)}
+                      </p>
+                      <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: gananciaColor }}>
+                        {gananciaKind === "ganando"
+                          ? "ganando"
+                          : gananciaKind === "perdiendo"
+                            ? "perdiendo"
+                            : "en ritmo"}
+                      </p>
+                    </div>
                   </div>
                 ) : null}
 
@@ -459,6 +492,15 @@ export function ConquistaCard({
                     >
                       {futuroSub}
                     </p>
+                    {clocks.subPlannedSec != null ? (
+                      <p
+                        className="text-[7px] font-mono"
+                        style={{ color: "rgba(255,255,255,0.5)" }}
+                        data-testid="j4-conquista-termina-suma"
+                      >
+                        +{formatMMSS(clocks.subPlannedSec)} este sub
+                      </p>
+                    ) : null}
                   </div>
                   <div className="text-center min-w-0">
                     <p
@@ -505,6 +547,15 @@ export function ConquistaCard({
                     >
                       {futuroCiclo}
                     </p>
+                    {clocks.cycleRemainSec != null ? (
+                      <p
+                        className="text-[7px] font-mono"
+                        style={{ color: "rgba(255,255,255,0.5)" }}
+                        data-testid="j4-conquista-ciclo-suma"
+                      >
+                        Σ {formatDesglosadorDurationHuman(clocks.cycleRemainSec)} faltan
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 {metaHora ? (

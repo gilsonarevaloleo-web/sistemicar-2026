@@ -261,4 +261,68 @@ describe("pulsoCoberturaCompute", () => {
     assert.equal(model.needsLaunch, true);
     assert.equal(model.consciousNow, false);
   });
+
+  it("firma cambia al pasar de un sub a otro del mismo vehículo", () => {
+    const segs = [
+      { id: "s1", estado: "activo", horaInicio: "08:00", horaFin: "12:00" },
+    ];
+    const a = buildPulsoInputSig(
+      segs,
+      [
+        baseVehicle({
+          id: "v1",
+          status: "activo",
+          subVehiculos: [{ id: "u1", titulo: "Pegado", status: "activo" }],
+        }),
+      ],
+      "s1"
+    );
+    const b = buildPulsoInputSig(
+      segs,
+      [
+        baseVehicle({
+          id: "v1",
+          status: "activo",
+          subVehiculos: [
+            { id: "u1", titulo: "Pegado", status: "cumplido" },
+            { id: "u2", titulo: "Corte", status: "activo" },
+          ],
+        }),
+      ],
+      "s1"
+    );
+    assert.notEqual(a, b);
+  });
+
+  it("desglosador en ejecución cubre y nombra el vehículo; pausa huérfana no lo apaga", () => {
+    resetLiveEntropyMonotonic();
+    const now = limaAt(2026, 6, 26, 10, 30);
+    const segs = [
+      {
+        id: "s1",
+        nombre: "Bloque",
+        horaInicio: "08:00",
+        horaFin: "12:00",
+        estado: "activo",
+      },
+    ];
+    const running = baseVehicle({
+      id: "v1",
+      titulo: "Armado de casaca",
+      aperturaAt: limaAt(2026, 6, 26, 10, 0),
+      status: "activo",
+      interrupcionActiva: true,
+      subVehiculos: [{ id: "u1", titulo: "Pegado de sisa", status: "activo" }],
+    });
+    const model = computePulsoCobertura({
+      segmentos: segs,
+      vehicles: [running],
+      segmentoActivoId: "s1",
+      now,
+    });
+    assert.equal(model.consciousNow, true);
+    assert.equal(model.coveringVehicleTitulo, "Armado de casaca");
+    assert.equal(model.coveringSubTitulo, "Pegado de sisa");
+    assert.equal(model.needsLaunch, false);
+  });
 });

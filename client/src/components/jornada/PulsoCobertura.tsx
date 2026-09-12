@@ -44,11 +44,16 @@ export const PulsoCobertura = memo(function PulsoCobertura({
   const conquistaW = Math.max(0, Math.min(100, model.coberturaPct));
   const entropiaW = Math.max(0, 100 - conquistaW);
 
+  const execLabel = [model.coveringVehicleTitulo, model.coveringSubTitulo]
+    .filter(Boolean)
+    .join(" · ");
   const hint = model.consciousNow
-    ? "Hay vehículo cubriendo conciencia ahora."
+    ? execLabel
+      ? `Cubriendo ahora: ${execLabel}`
+      : "Hay vehículo cubriendo conciencia ahora."
     : model.needsLaunch
-      ? "Sin vehículo ahora. El inconsciente son los cortes de cobertura, no el resto del plan."
-      : "Sin cobertura consciente en este instante.";
+    ? "Sin vehículo ahora. El inconsciente son los cortes de cobertura, no el resto del plan."
+    : "Sin cobertura consciente en este instante.";
 
   return (
     <section

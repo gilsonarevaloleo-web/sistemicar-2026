@@ -526,7 +526,8 @@ describe("computeAnilloEstado", () => {
       status: "activo",
       aperturaAt: journalStart,
       interrupcionActiva: true,
-      desglosadorPausa: { motivo: "test" },
+      desglosadorPausa: { subActivoId: "u1", elapsedSecSnapshot: 120 },
+      subVehiculos: [{ id: "u1", status: "nested_paused" }],
     };
     const centinela = sesionCentinela(limaAt(2026, 4, 18, 8, 2));
     const stats = computeTimelineDayStats({ segmentos, vehiculos: [paused, centinela], now });

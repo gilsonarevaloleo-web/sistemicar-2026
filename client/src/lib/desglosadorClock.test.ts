@@ -597,4 +597,75 @@ describe("reloj global — operaciones finales de todo el día", () => {
     assert.equal(duringPause.cycleRemainSec, atPause.cycleRemainSec);
     assert.equal(duringPause.cycleEndAt, (atPause.cycleEndAt ?? 0) + 30 * 60_000);
   });
+
+  it("reloj de este sub y reloj de ciclo son independientes", () => {
+    const start = 1_700_000_000_000;
+    const now = start + 300_000;
+    const clocks = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 300,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+      ],
+    } as Vehicle);
+    assert.equal(clocks.liveAccumDeltaSec, -300, "ciclo = ganancia cerrada");
+    assert.equal(clocks.subLiveDeltaSec, -600, "este sub acaba de abrir: −sugerido");
+    assert.equal(clocks.subPlannedSec, 600);
+  });
+
+  it("añadir un vehículo pendiente suma su tiempo al ciclo global", () => {
+    const start = 1_700_000_000_000;
+    const now = start;
+    const before = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+      ],
+    } as Vehicle);
+    const after = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+        sub({ id: "b", tiempoSugeridoSeg: 2640, status: "pendiente" }),
+      ],
+    } as Vehicle);
+    assert.equal(before.cycleRemainSec, 600);
+    assert.equal(after.cycleRemainSec, 600 + 2640);
+    assert.equal(after.subEndAt, before.subEndAt);
+  });
+
+  it("cerrar con ganancia adelanta el ciclo global esa holgura", () => {
+    const start = 1_700_000_000_000;
+    const closeAt = start + 300_000;
+    const beforeClose = computeDesglosadorClocks(closeAt, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: start }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "pendiente" }),
+      ],
+    } as Vehicle);
+    const afterClose = computeDesglosadorClocks(closeAt, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 300,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: closeAt }),
+      ],
+    } as Vehicle);
+    assert.equal(beforeClose.cycleEndAt, closeAt + 900_000);
+    assert.equal(afterClose.cycleEndAt, closeAt + 600_000);
+    assert.equal(
+      (beforeClose.cycleEndAt ?? 0) - (afterClose.cycleEndAt ?? 0),
+      300_000
+    );
+  });
 });

@@ -151,7 +151,12 @@ export interface DesglosadorClockResult {
   subEndAt: number | null;
   cycleRemainSec: number | null;
   cycleEndAt: number | null;
+  /** Ganancia del ciclo (subs cerrados + overtime). */
   liveAccumDeltaSec: number;
+  /** Ganancia de ESTE sub: elapsed − sugerido. Negativo = va adelantado. */
+  subLiveDeltaSec: number;
+  /** Duración sugerida del sub en foco (la que se suma a Termina a las). */
+  subPlannedSec: number | null;
   unitsRemaining: number | null;
   hasProjection: boolean;
   /** Pausa acumulada (pared − trabajo), incluye la pausa en curso. */
@@ -255,6 +260,8 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   const workSec = desglosadorWorkSec(subs, subElapsedSec);
   const pauseAccumSec = desglosadorPauseAccumSec(vehicle, now, workSec);
 
+  const subLiveDeltaSec = objSecs != null ? subElapsedSec - objSecs : 0;
+
   if (!anySuggested) {
     return {
       subElapsedSec,
@@ -263,6 +270,8 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
       cycleRemainSec: null,
       cycleEndAt: null,
       liveAccumDeltaSec: 0,
+      subLiveDeltaSec,
+      subPlannedSec: objSecs,
       unitsRemaining,
       hasProjection: false,
       pauseAccumSec,
@@ -292,6 +301,8 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     cycleRemainSec,
     cycleEndAt,
     liveAccumDeltaSec: ops.liveAccumDeltaSec,
+    subLiveDeltaSec,
+    subPlannedSec: objSecs,
     unitsRemaining,
     hasProjection: true,
     pauseAccumSec,

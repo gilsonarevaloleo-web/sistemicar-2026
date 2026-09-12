@@ -32,6 +32,10 @@ export type PulsoCoberturaModel = {
   needsLaunch: boolean;
   segmentoActivoId: string | null;
   segmentoActivoNombre: string | null;
+  /** Vehículo que cubre ahora — el pulso se ancla a la ejecución, no a un cascarón. */
+  coveringVehicleId: string | null;
+  coveringVehicleTitulo: string | null;
+  coveringSubTitulo: string | null;
   conquistaLabel: string;
   entropiaLabel: string;
   computedAt: number;
@@ -50,14 +54,24 @@ export function buildPulsoInputSig(
     .join("|");
   let active = 0;
   let coverBits = 0;
+  const execParts: string[] = [];
   for (let i = 0; i < vehicles.length; i++) {
     const v = vehicles[i];
     if (v.status === "activo") {
       active += 1;
       if (!v.autoVerdad) coverBits |= 1 << (i % 30);
+      const sub =
+        (v.subVehiculos ?? []).find(s => s.status === "activo") ??
+        (v.subVehiculos ?? []).find(s => s.status === "nested_paused");
+      const paused =
+        (v.subVehiculos ?? []).some(s => s.status === "nested_paused") ||
+        (v.interrupcionActiva === true &&
+          v.desglosadorPausa?.subActivoId != null &&
+          v.desglosadorPausa.elapsedSecSnapshot != null);
+      execParts.push(`${v.id}:${sub?.id ?? ""}:${paused ? 1 : 0}:${v.aperturaAt ?? 0}`);
     }
   }
-  return `${segPart}::${vehicles.length}:${active}:${coverBits}::${segmentoActivoId ?? ""}`;
+  return `${segPart}::${vehicles.length}:${active}:${coverBits}::${segmentoActivoId ?? ""}::${execParts.join(",")}`;
 }
 
 function resolveActiveSegment(
@@ -150,7 +164,11 @@ export function computePulsoCobertura(params: {
     fought > 0 ? Math.min(100, Math.round((conquistaMin / fought) * 100)) : 0;
 
   const filtered = resolveCoverageVehicles(vehicles, now);
-  const consciousNow = filtered.some(v => vehicleCoversConsciousnessAt(v, now));
+  const covering = filtered.find(v => vehicleCoversConsciousnessAt(v, now)) ?? null;
+  const consciousNow = covering != null;
+  const coveringSub =
+    covering?.subVehiculos?.find(s => s.status === "activo") ??
+    covering?.subVehiculos?.find(s => s.status === "nested_paused");
 
   const active = resolveActiveSegment(segmentos, segmentoActivoId);
   const needsLaunch = Boolean(active && !consciousNow);
@@ -164,6 +182,9 @@ export function computePulsoCobertura(params: {
     needsLaunch,
     segmentoActivoId: active?.id ?? segmentoActivoId,
     segmentoActivoNombre: active?.nombre ?? null,
+    coveringVehicleId: covering?.id ?? null,
+    coveringVehicleTitulo: covering?.titulo ?? null,
+    coveringSubTitulo: coveringSub?.titulo ?? null,
     conquistaLabel: formatMinutosJornada(conquistaMin),
     entropiaLabel: formatMinutosJornada(entropiaMin),
     computedAt: now,
@@ -179,6 +200,9 @@ export const EMPTY_PULSO_MODEL: PulsoCoberturaModel = {
   needsLaunch: false,
   segmentoActivoId: null,
   segmentoActivoNombre: null,
+  coveringVehicleId: null,
+  coveringVehicleTitulo: null,
+  coveringSubTitulo: null,
   conquistaLabel: "0 min",
   entropiaLabel: "0 min",
   computedAt: 0,

@@ -85,7 +85,11 @@ export interface VehiculoAnilloLite {
   tipoReloj?: string;
   tipoDescanso?: string;
   interrupcionActiva?: boolean;
-  desglosadorPausa?: unknown;
+  desglosadorPausa?: {
+    subActivoId?: string;
+    elapsedSecSnapshot?: number;
+  } | unknown;
+  subVehiculos?: Array<{ id?: string; status?: string }>;
   puntoCero?: { fase?: string };
   aperturaAt?: number;
   createdAt?: number | Date;
@@ -567,7 +571,19 @@ function isPuntoCeroNonCoverPhase(v: VehiculoAnilloLite): boolean {
 }
 
 function isVehiclePausedForAnillo(v: VehiculoAnilloLite): boolean {
-  return !!(v.interrupcionActiva || v.desglosadorPausa);
+  const subs = v.subVehiculos ?? [];
+  if (subs.some(s => s.status === "nested_paused")) return true;
+  const pausa = v.desglosadorPausa as
+    | { subActivoId?: string; elapsedSecSnapshot?: number }
+    | undefined
+    | null;
+  return (
+    v.interrupcionActiva === true &&
+    pausa != null &&
+    typeof pausa === "object" &&
+    pausa.subActivoId != null &&
+    pausa.elapsedSecSnapshot != null
+  );
 }
 
 function isGapCoverVehicle(v: VehiculoAnilloLite): boolean {
