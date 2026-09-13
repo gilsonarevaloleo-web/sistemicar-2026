@@ -56,7 +56,7 @@ export function CardMaestroCodigo({ codigo, modo }: CardMaestroCodigoProps) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] tracking-[0.22em] text-white/40">
-            MAESTRO · {sala.toUpperCase()} · CÓDIGO {codigo}
+            CARÁCTER-CÓDIGO · {sala.toUpperCase()} · CÓDIGO {codigo}
           </p>
           <h3
             className="mt-1 text-lg font-black text-white"

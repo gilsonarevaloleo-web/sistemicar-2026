@@ -49,6 +49,7 @@ import {
 } from "@/lib/umbral/logrosStore";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
+import { CardLeyCaracterCodigo } from "./CardLeyCaracterCodigo";
 import { CardMaestroCodigo } from "./CardMaestroCodigo";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 
@@ -589,11 +590,11 @@ export function ConsolaUmbral({
               style={{ color: GOLD }}
               data-testid="umbral-v2-header"
             >
-              PROC-UMBRAL // SISTEMICAR V2
+              UMBRAL · CARÁCTER-CÓDIGO
             </p>
             <p className="mt-1 text-[11px] text-white/40">
-              10 Códigos · cada uno habla su idioma · el Maestro enseña la 2ª
-              resistencia para que termines el cruce
+              Ley del Carácter del Código · el Maestro se vuelve la voz del
+              obstáculo para que termines los diez
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
@@ -811,7 +812,10 @@ export function ConsolaUmbral({
           )}
 
           {!mostrarPaywall && !codigoBloqueadoPorPago && (
-            <CardMaestroCodigo codigo={cfg.numero} modo={modo} />
+            <>
+              <CardLeyCaracterCodigo />
+              <CardMaestroCodigo codigo={cfg.numero} modo={modo} />
+            </>
           )}
 
           {!mostrarPaywall && !codigoBloqueadoPorPago && modo === "EXTERNO_VENTAS" && (

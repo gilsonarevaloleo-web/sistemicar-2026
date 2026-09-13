@@ -65,8 +65,9 @@ export default function UmbralEntrada() {
           ¿En qué Código te trabas?
         </h1>
         <p className="mt-2 text-sm text-white/55">
-          Diagnóstico de 30 segundos. Luego pruebas el Código 1 con evaluador
-          real — no un tour de features.
+          Diagnóstico de 30 segundos. Luego entras a la Ley del Carácter del
+          Código: el Maestro se vuelve la voz del obstáculo — no un tour de
+          features.
         </p>
 
         {!resultado && pregunta && (

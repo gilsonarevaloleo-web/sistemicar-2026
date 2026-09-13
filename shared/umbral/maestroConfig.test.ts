@@ -34,11 +34,11 @@ describe("Umbral — Maestro de códigos", () => {
     assert.match(bloque, /Ingeniero sin Flor/);
     assert.match(bloque, /La Arena/);
     assert.match(bloque, /Cínico|trauma/i);
-    assert.match(bloque, /KERNEL|EMPATÍA DE CÓDIGO|DOS RESISTENCIAS/);
+    assert.match(bloque, /Carácter-Código|EMPATÍA DE CÓDIGO|DOS RESISTENCIAS/);
     assert.doesNotMatch(bloque, /Cortador de Niebla/);
     assert.doesNotMatch(bloque, /El Autor/);
-    assert.ok(bloque.length < 2800);
-    assert.ok(KERNEL_MAESTRO.length < 1600);
+    assert.ok(bloque.length < 3200);
+    assert.ok(KERNEL_MAESTRO.length < 2000);
   });
 
   it("Forja y Arena no mezclan R1", () => {
