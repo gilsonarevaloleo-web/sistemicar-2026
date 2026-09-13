@@ -86,7 +86,7 @@ export function CardPerfilCliente({
           data-testid="umbral-v2-frase-tipica"
         >
           <p className="text-[10px] tracking-widest text-[#FF6B35]/85">
-            RESISTENCIA DEL CLIENTE
+            1ª RESISTENCIA · EL CLIENTE
           </p>
           <p className="mt-1 text-[15px] leading-relaxed text-white/90 italic">
             «{perfil.fraseTipica}»

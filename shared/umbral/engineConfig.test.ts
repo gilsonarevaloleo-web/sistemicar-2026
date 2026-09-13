@@ -79,7 +79,7 @@ describe("Umbral v2 — engineConfig", () => {
     assert.equal(resolverCodigoSiguiente(true, 10), null);
   });
 
-  it("obtenerPromptEvaluacion (interno) incluye criterio y schema JSON", () => {
+  it("obtenerPromptEvaluacion (interno) incluye criterio, schema y Maestro", () => {
     const prompt = obtenerPromptEvaluacion({
       codigo: 4,
       modo: "INTERNO_HABILIDAD",
@@ -91,12 +91,15 @@ describe("Umbral v2 — engineConfig", () => {
     assert.match(prompt.system, /INTERNO_HABILIDAD/);
     assert.match(prompt.system, /feedbackConfrontativo/);
     assert.match(prompt.system, /accion mínima|acción mínima|Seriedad/i);
+    assert.match(prompt.system, /Ingeniero sin Flor/);
+    assert.match(prompt.system, /segunda resistencia/i);
+    assert.doesNotMatch(prompt.system, /Evaluador Confrontativo/);
     assert.match(prompt.user, /acción mínima: una llamada/i);
     assert.match(prompt.user, /intento previo vago/);
     assert.equal(prompt.responseSchema.codigoSiguiente, 4);
   });
 
-  it("obtenerPromptEvaluacion (externo) usa objecionCliente", () => {
+  it("obtenerPromptEvaluacion (externo) usa objecionCliente y ficha de Arena", () => {
     const prompt = obtenerPromptEvaluacion({
       codigo: 1 as CodigoNumero,
       modo: "EXTERNO_VENTAS" as ModoUmbral,
@@ -105,6 +108,8 @@ describe("Umbral v2 — engineConfig", () => {
     assert.match(prompt.system, /EXTERNO_VENTAS/);
     assert.match(prompt.system, /Objeción típica/);
     assert.match(prompt.system, /utilidad/i);
+    assert.match(prompt.system, /Cortador de Niebla/);
+    assert.match(prompt.system, /La Arena/);
   });
 
   it("en código 10 el prompt indica codigoSiguiente null al aprobar", () => {
@@ -144,5 +149,6 @@ describe("Umbral v2 — engineConfig", () => {
     });
     assert.equal(ok.aprobado, true);
     assert.equal(ok.codigoSiguiente, 2);
+    assert.match(ok.feedbackConfrontativo, /crack|Cortador|niebla/i);
   });
 });
