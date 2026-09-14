@@ -7,7 +7,8 @@
  * - Carácter-Código dice CÓMO se enseña a cruzarlo.
  *
  * Autor del ensamble: Gilson Arévalo Pezo (el Maestro) · SISTEMICAR
- * Uso: Umbral (Forja / Arena). No diluir en coaching empático ni en DISC.
+ * Uso: Umbral (Forja / Arena). Planeta 8 · Puerta (salto 3→8).
+ * No diluir en coaching empático ni en DISC.
  */
 
 export const LEY_CARACTER_CODIGO_NOMBRE = "Ley del Carácter del Código";
@@ -127,12 +128,14 @@ No es New Age ni ánimo.
 
 Si alguien la archiva en esas cajas, la ley se diluyó. Recupera la firma.
 
-═══ RELACIÓN CON LA CASCADA ═══
+═══ RELACIÓN CON LAS HERMANAS ═══
 
 Cascada (Doctor / editorial): QUÉ falla si saltas el código N.
 Carácter-Código (Umbral / Maestro): CÓMO se enseña a cruzar el código N.
+Óptica-Código (Depósito): CON QUÉ se ve el mismo hecho.
+Casa-Umbral: EN QUÉ MUNDO estás parado (2 = casa; 8 = puerta).
 
-Las dos leyes no compiten. Una es arquitectura. La otra es pedagogía.
+Arquitectura, pedagogía, óptica y mapa de mundos.
 
 ═══ PROMESA AL OPERADOR ═══
 

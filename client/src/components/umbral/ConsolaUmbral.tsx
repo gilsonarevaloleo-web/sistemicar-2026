@@ -52,6 +52,8 @@ import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { CardLeyCaracterCodigo } from "./CardLeyCaracterCodigo";
 import { CardMaestroCodigo } from "./CardMaestroCodigo";
 import { CardPerfilCliente } from "./CardPerfilCliente";
+import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
+import { PLANETA_UMBRAL } from "@shared/planetas/leyCasasUmbral";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -813,6 +815,7 @@ export function ConsolaUmbral({
 
           {!mostrarPaywall && !codigoBloqueadoPorPago && (
             <>
+              <CardLeyCasasUmbral planetaActivo={PLANETA_UMBRAL} />
               <CardLeyCaracterCodigo />
               <CardMaestroCodigo codigo={cfg.numero} modo={modo} />
             </>
