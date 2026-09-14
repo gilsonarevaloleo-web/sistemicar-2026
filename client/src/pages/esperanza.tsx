@@ -31,6 +31,7 @@ import {
 } from "@/lib/persistence";
 import { SeductionMessage } from "@/components/seduction-message";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
+import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
@@ -517,13 +518,15 @@ export default function Esperanza() {
                   DEPÓSITO
                 </h1>
                 <p className="text-xs uppercase tracking-widest" style={{ color: AZURE }}>
-                  Batería de Certeza · Auditoría Racional
+                  Óptica-Código · ¿Qué aprendí hoy?
                 </p>
               </div>
             </div>
             <ManualTriggerButton manualType="deposito" />
           </div>
         </header>
+
+        <CardLeyOpticaCodigo />
 
         <SeductionMessage 
           progression={progression} 

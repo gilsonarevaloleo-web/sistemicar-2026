@@ -25,6 +25,7 @@ describe("Ley del Carácter del Código", () => {
     assert.ok(LEY_CARACTER_CODIGO_KERNEL.length < 420);
     assert.match(LEY_CARACTER_CODIGO_KERNEL, /Carácter-Código/);
     assert.match(LEY_CARACTER_CODIGO_CANON, /Resistencia en Cascada/);
+    assert.match(LEY_CARACTER_CODIGO_CANON, /Óptica-Código/);
     assert.match(LEY_CARACTER_CODIGO_CANON, /segunda resistencia/i);
     assert.match(resumenLeyCaracterCodigo(), /Ley del Carácter del Código/);
   });

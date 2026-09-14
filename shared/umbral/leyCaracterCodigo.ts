@@ -127,12 +127,13 @@ No es New Age ni ánimo.
 
 Si alguien la archiva en esas cajas, la ley se diluyó. Recupera la firma.
 
-═══ RELACIÓN CON LA CASCADA ═══
+═══ RELACIÓN CON LAS HERMANAS ═══
 
 Cascada (Doctor / editorial): QUÉ falla si saltas el código N.
 Carácter-Código (Umbral / Maestro): CÓMO se enseña a cruzar el código N.
+Óptica-Código (Depósito): CON QUÉ se ve el mismo hecho.
 
-Las dos leyes no compiten. Una es arquitectura. La otra es pedagogía.
+Las tres leyes no compiten. Arquitectura, pedagogía y óptica.
 
 ═══ PROMESA AL OPERADOR ═══
 
