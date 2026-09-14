@@ -49,12 +49,21 @@ export function subscribeToVolcados(
   onData: (entries: VolcadoEntry[]) => void,
   onError: (error: Error) => void
 ): () => void {
+  const local = () => parseLocal().filter((e) => e.userId === userId);
   if (isFirebaseConfigured() && db) {
     const path = getPrivatePath(userId, "volcados");
     const q = query(collection(db, path), where("userId", "==", userId));
-    return onSnapshot(
+    let settled = false;
+    const failSafe = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      onData(local());
+    }, 2500);
+    const unsub = onSnapshot(
       q,
       (snapshot) => {
+        settled = true;
+        clearTimeout(failSafe);
         const data = snapshot.docs.map((d) => {
           const raw = d.data() as Omit<VolcadoEntry, "id" | "createdAt"> & {
             createdAt?: { toDate?: () => Date };
@@ -71,14 +80,20 @@ export function subscribeToVolcados(
         onData(data);
       },
       (err) => {
+        settled = true;
+        clearTimeout(failSafe);
         console.error("Error listening to volcados:", err);
         onError(err);
-        onData(parseLocal().filter((e) => e.userId === userId));
+        onData(local());
       }
     );
+    return () => {
+      clearTimeout(failSafe);
+      unsub();
+    };
   }
 
-  onData(parseLocal().filter((e) => e.userId === userId));
+  onData(local());
   return () => {};
 }
 

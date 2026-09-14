@@ -139,6 +139,14 @@ function buildMenuItems(
       route: "/umbral/v2",
       color: "#D4AF37",
     },
+    {
+      id: "deposito-v2",
+      title: "DEPÓSITO V2",
+      subtitle: "Óptica-Código · volcado y diez ojos",
+      icon: Sunrise,
+      route: "/esperanza",
+      color: SPECTRUM.NARANJA,
+    },
   ];
 
   if (previewOps || hasPlanificacionBaseAccess(...accessArgs)) {

@@ -134,7 +134,7 @@ export function Sidebar() {
     { path: "/radar", icon: Radio, label: "Radar" },
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
     { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
-    { path: "/esperanza", icon: Sparkles, label: "Esperanza" },
+    { path: "/esperanza", icon: Sparkles, label: "Depósito V2" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
     { path: "/rewards", icon: Trophy, label: "Beneficios" },
     { path: "/camara", icon: Camera, label: "Cámara" },

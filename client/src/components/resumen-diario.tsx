@@ -19,7 +19,7 @@ const VIOLET = "#9B59B6";
 const EMERALD = "#50C878";
 
 const AREA_CONFIG = {
-  deposito: { label: "DEPÓSITO", icon: Shield, color: EMERALD, route: "/deposito" },
+  deposito: { label: "DEPÓSITO", icon: Shield, color: EMERALD, route: "/esperanza" },
   alquimia: { label: "ALQUIMIA", icon: Sparkles, color: GOLD, route: "/alquimia" },
   planificacion: { label: "PLANIFICACIÓN", icon: Target, color: AZURE, route: "/jornada-v4" },
   espejo: { label: "ESPEJO", icon: Zap, color: VIOLET, route: "/espejo" }
