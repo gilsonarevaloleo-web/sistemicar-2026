@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
+import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import {
   addVolcadoEntry,
@@ -15,6 +16,7 @@ import {
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
 import { LEY_OPTICA_CODIGO_RITUAL } from "@shared/deposito/leyOpticaCodigo";
+import { PLANETA_DEPOSITO, etiquetaMundo } from "@shared/planetas/leyCasasUmbral";
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
@@ -111,6 +113,12 @@ export default function Esperanza() {
           >
             UNIVERSIDAD · DEPÓSITO
           </p>
+          <p
+            className="text-[10px] tracking-[0.22em] mb-3 text-white/40"
+            data-testid="deposito-planeta"
+          >
+            {etiquetaMundo(PLANETA_DEPOSITO).toUpperCase()}
+          </p>
           <h1
             className="text-3xl md:text-4xl font-light tracking-tight text-white"
             data-testid="deposito-ritual"
@@ -192,6 +200,7 @@ export default function Esperanza() {
           </section>
         )}
 
+        <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
         <CardLeyOpticaCodigo />
       </div>
     </div>

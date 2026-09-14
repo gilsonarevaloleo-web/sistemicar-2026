@@ -8,7 +8,8 @@
  * - Óptica-Código dice CON QUÉ se ve el mismo hecho.
  *
  * Autor del ensamble: Gilson Arévalo Pezo (el Maestro) · SISTEMICAR
- * Uso: Depósito (Universidad / volcado). No diluir en tercer ojo, chakras ni DISC.
+ * Uso: Depósito (Universidad / volcado). Planeta 2 · Casa.
+ * No diluir en tercer ojo, chakras ni DISC.
  */
 
 export const LEY_OPTICA_CODIGO_NOMBRE = "Ley de los Diez Ojos";
@@ -238,9 +239,10 @@ Si alguien la archiva en esas cajas, la ley se diluyó. Recupera la firma.
 Cascada (Doctor / editorial): QUÉ falla si saltas el código N.
 Carácter-Código (Umbral / Maestro): CÓMO se enseña a cruzar el código N.
 Óptica-Código (Depósito): CON QUÉ se ve el mismo hecho.
+Casa-Umbral: EN QUÉ MUNDO estás parado. El Depósito es planeta 2 (casa).
 
-Las tres leyes no compiten.
-Una es arquitectura. La otra es pedagogía. Esta es óptica.
+Las cuatro no compiten.
+Arquitectura, pedagogía, óptica y mapa de mundos.
 
 El maestro usa el ojo; no define que existan diez.
 El alumno de Depósito no viene a que le hablen como el obstáculo:
