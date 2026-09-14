@@ -108,14 +108,13 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
   5: [
     /decision/,
     /decidi/,
-    /\bcorte\b/,
-    /corte/,
     /elegi/,
     /disparo/,
     /vertice/,
     /evite/,
     /elijo/,
     /donde se elige/,
+    /tome la decision/,
   ],
   6: [
     /juntura/,

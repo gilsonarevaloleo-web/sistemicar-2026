@@ -20,6 +20,7 @@ describe("analizarVolcado — frente de observación", () => {
     assert.deepEqual(d.yaVistos, [1, 2]);
     assert.equal(d.siguiente, 4);
     assert.equal(d.calidad, "tecnico");
+    assert.ok(!d.asomados.includes(5), "corte de tela no es C5");
     assert.match(d.mecanica, /C4/);
   });
 

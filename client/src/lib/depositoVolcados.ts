@@ -82,22 +82,11 @@ export function subscribeToVolcados(
   return () => {};
 }
 
-export async function addVolcadoEntry(
+function saveVolcadoLocal(
   userId: string,
   texto: string,
   dictamen: DictamenOptico
-): Promise<string> {
-  if (isFirebaseConfigured() && db) {
-    const path = getPrivatePath(userId, "volcados");
-    const docRef = await addDoc(collection(db, path), {
-      texto,
-      dictamen,
-      userId,
-      createdAt: serverTimestamp(),
-    });
-    return docRef.id;
-  }
-
+): string {
   const entries = parseLocal();
   const id = `local_${Date.now()}`;
   entries.unshift({
@@ -110,6 +99,49 @@ export async function addVolcadoEntry(
   saveLocal(entries);
   window.dispatchEvent(new CustomEvent("volcados-updated"));
   return id;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("volcado-timeout")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+export async function addVolcadoEntry(
+  userId: string,
+  texto: string,
+  dictamen: DictamenOptico
+): Promise<string> {
+  if (isFirebaseConfigured() && db) {
+    try {
+      const path = getPrivatePath(userId, "volcados");
+      const docRef = await withTimeout(
+        addDoc(collection(db, path), {
+          texto,
+          dictamen,
+          userId,
+          createdAt: serverTimestamp(),
+        }),
+        4000
+      );
+      return docRef.id;
+    } catch (err) {
+      console.error("Volcado remoto falló; se guarda en local:", err);
+      return saveVolcadoLocal(userId, texto, dictamen);
+    }
+  }
+
+  return saveVolcadoLocal(userId, texto, dictamen);
 }
 
 export async function deleteVolcadoEntry(userId: string, entryId: string): Promise<void> {
