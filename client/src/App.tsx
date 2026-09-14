@@ -391,6 +391,9 @@ function Router() {
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />
         </Route>
+        <Route path="/deposito">
+          <Redirect to="/esperanza" />
+        </Route>
         <Route path="/esperanza">
           <ProtectedRoute component={Esperanza} />
         </Route>
@@ -518,6 +521,7 @@ function VoiceBootstrap() {
       // (el unlock robaba el hilo y las tarjetas no abrían).
       // /vendedor y entradas comerciales: mismo problema en Android.
       // /umbral/*: misma robada en consola V2 (modos, códigos, links).
+      // /esperanza y /deposito: el unlock TTS congelaba el recinto al entrar.
       return (
         p === "/proyectos" ||
         p.startsWith("/proyectos/") ||
@@ -529,6 +533,10 @@ function VoiceBootstrap() {
         p.startsWith("/ventas-jornada") ||
         p === "/umbral" ||
         p.startsWith("/umbral/") ||
+        p === "/esperanza" ||
+        p.startsWith("/esperanza/") ||
+        p === "/deposito" ||
+        p.startsWith("/deposito/") ||
         p === "/pagos" ||
         p.startsWith("/pagos")
       );

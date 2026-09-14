@@ -5,6 +5,8 @@ import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
+import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
+import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import {
   addVolcadoEntry,
   listVolcadosLocal,
@@ -23,26 +25,31 @@ const AZURE = "#1E90FF";
 
 export default function Esperanza() {
   const { user } = useAuthContext();
+  useViewTransitionShield();
+  // Soft-start al venir de Dual Kernel: no clavar el hilo con Firestore.
+  const motorsQuiet = useDualKernelMotorsQuiet();
   const [texto, setTexto] = useState("");
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const dictamenRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) {
       setHistorial([]);
-      setLoading(false);
       return;
     }
+    // Local ya: el recinto no espera a Firebase (spinner = congelado).
+    setHistorial(listVolcadosLocal(user.uid));
+    if (motorsQuiet) return;
     const unsub = subscribeToVolcados(
       user.uid,
       (data) => {
         setHistorial(data);
-        setLoading(false);
       },
-      () => setLoading(false)
+      () => {
+        setHistorial(listVolcadosLocal(user.uid));
+      }
     );
     const onLocal = () => {
       setHistorial(listVolcadosLocal(user.uid));
@@ -52,7 +59,7 @@ export default function Esperanza() {
       unsub();
       window.removeEventListener("volcados-updated", onLocal);
     };
-  }, [user]);
+  }, [user, motorsQuiet]);
 
   const guardar = async () => {
     const crudo = texto.trim();
@@ -88,19 +95,12 @@ export default function Esperanza() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>
-        <div
-          className="w-10 h-10 border-2 rounded-full animate-spin"
-          style={{ borderColor: GOLD, borderTopColor: "transparent" }}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen px-4 pt-8 pb-32" style={{ backgroundColor: "#020202" }}>
+    <div
+      className="min-h-screen px-4 pt-8 pb-32"
+      style={{ backgroundColor: "#020202" }}
+      data-testid="deposito-v2-page"
+    >
       <div className="max-w-xl mx-auto">
         <div className="flex justify-end mb-8">
           <ManualTriggerButton manualType="deposito" />
@@ -110,8 +110,9 @@ export default function Esperanza() {
           <p
             className="text-[10px] tracking-[0.28em] mb-3"
             style={{ color: GOLD }}
+            data-testid="deposito-v2-badge"
           >
-            UNIVERSIDAD · DEPÓSITO
+            UNIVERSIDAD · DEPÓSITO V2
           </p>
           <p
             className="text-[10px] tracking-[0.22em] mb-3 text-white/40"
