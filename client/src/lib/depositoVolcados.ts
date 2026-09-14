@@ -1,0 +1,123 @@
+import {
+  db,
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  serverTimestamp,
+  onSnapshot,
+  getPrivatePath,
+  isFirebaseConfigured,
+} from "./firebase";
+import type { DictamenOptico } from "@shared/deposito/analizarVolcado";
+
+export interface VolcadoEntry {
+  id: string;
+  texto: string;
+  userId: string;
+  createdAt: Date;
+  dictamen: DictamenOptico;
+}
+
+const STORAGE_KEY = "sistemicar_volcados";
+
+function parseLocal(): VolcadoEntry[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return [];
+    const entries = JSON.parse(data) as VolcadoEntry[];
+    return entries
+      .map((e) => ({ ...e, createdAt: new Date(e.createdAt) }))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  } catch {
+    return [];
+  }
+}
+
+function saveLocal(entries: VolcadoEntry[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+export function listVolcadosLocal(userId: string): VolcadoEntry[] {
+  return parseLocal().filter((e) => e.userId === userId);
+}
+
+export function subscribeToVolcados(
+  userId: string,
+  onData: (entries: VolcadoEntry[]) => void,
+  onError: (error: Error) => void
+): () => void {
+  if (isFirebaseConfigured() && db) {
+    const path = getPrivatePath(userId, "volcados");
+    const q = query(collection(db, path), where("userId", "==", userId));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => {
+          const raw = d.data() as Omit<VolcadoEntry, "id" | "createdAt"> & {
+            createdAt?: { toDate?: () => Date };
+          };
+          return {
+            id: d.id,
+            texto: raw.texto,
+            userId: raw.userId,
+            dictamen: raw.dictamen,
+            createdAt: raw.createdAt?.toDate?.() || new Date(),
+          } satisfies VolcadoEntry;
+        });
+        data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        onData(data);
+      },
+      (err) => {
+        console.error("Error listening to volcados:", err);
+        onError(err);
+        onData(parseLocal().filter((e) => e.userId === userId));
+      }
+    );
+  }
+
+  onData(parseLocal().filter((e) => e.userId === userId));
+  return () => {};
+}
+
+export async function addVolcadoEntry(
+  userId: string,
+  texto: string,
+  dictamen: DictamenOptico
+): Promise<string> {
+  if (isFirebaseConfigured() && db) {
+    const path = getPrivatePath(userId, "volcados");
+    const docRef = await addDoc(collection(db, path), {
+      texto,
+      dictamen,
+      userId,
+      createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+  }
+
+  const entries = parseLocal();
+  const id = `local_${Date.now()}`;
+  entries.unshift({
+    id,
+    texto,
+    dictamen,
+    userId,
+    createdAt: new Date(),
+  });
+  saveLocal(entries);
+  window.dispatchEvent(new CustomEvent("volcados-updated"));
+  return id;
+}
+
+export async function deleteVolcadoEntry(userId: string, entryId: string): Promise<void> {
+  if (isFirebaseConfigured() && db && !entryId.startsWith("local_")) {
+    const path = getPrivatePath(userId, "volcados");
+    await deleteDoc(doc(db, path, entryId));
+    return;
+  }
+  saveLocal(parseLocal().filter((e) => e.id !== entryId));
+  window.dispatchEvent(new CustomEvent("volcados-updated"));
+}
