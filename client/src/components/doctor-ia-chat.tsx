@@ -45,7 +45,8 @@ const MODULE_NAMES: Record<string, string> = {
   "/espejo": "Espejo",
   "/jornada-v4": "Jornada",
   "/alquimia": "Alquimia",
-  "/esperanza": "Depósito V2",
+  "/esperanza": "Depósito",
+  "/esperanza/v2": "Depósito V2",
   "/historial": "Historial",
   "/analytics": "Analíticas",
   "/rewards": "Recompensas",
@@ -452,16 +453,16 @@ export function DoctorIAChat() {
     "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos
     "/umbral/entrada",
     "/umbral/metricas",
-    "/esperanza", // Depósito V2: sin FAB sobre el volcado
-    "/deposito",
+    "/esperanza/v2", // Depósito V2: sin FAB sobre el volcado
+    "/deposito/v2",
   ];
   if (
     !user ||
     hiddenPages.includes(location) ||
     location.startsWith("/jornada-v4?") ||
     location.startsWith("/umbral/") ||
-    location.startsWith("/esperanza") ||
-    location.startsWith("/deposito")
+    location.startsWith("/esperanza/") ||
+    location.startsWith("/deposito/")
   ) {
     return null;
   }

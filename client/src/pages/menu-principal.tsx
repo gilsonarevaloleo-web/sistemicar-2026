@@ -140,12 +140,20 @@ function buildMenuItems(
       color: "#D4AF37",
     },
     {
+      id: "deposito",
+      title: "DEPÓSITO",
+      subtitle: "Batería de Certeza · acervo",
+      icon: Sunrise,
+      route: "/esperanza",
+      color: SPECTRUM.NARANJA,
+    },
+    {
       id: "deposito-v2",
       title: "DEPÓSITO V2",
       subtitle: "Óptica-Código · volcado y diez ojos",
       icon: Sunrise,
-      route: "/esperanza",
-      color: SPECTRUM.NARANJA,
+      route: "/esperanza/v2",
+      color: "#FB923C",
     },
   ];
 
