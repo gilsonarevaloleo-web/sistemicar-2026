@@ -69,8 +69,11 @@ export default function Esperanza() {
     }
     const d = analizarVolcado(crudo);
     setDictamen(d);
-    if (d.calidad === "ruido") {
+    if (d.calidad === "ruido" && (!user || d.palabras < 18)) {
       toast.message("Todavía es ruido. Reescribí el volcado.");
+      requestAnimationFrame(() =>
+        dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      );
       return;
     }
     if (!user) {

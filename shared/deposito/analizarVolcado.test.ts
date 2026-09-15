@@ -10,6 +10,23 @@ describe("analizarVolcado — frente de observación", () => {
     assert.equal(d.siguiente, 1);
   });
 
+  it("un volcado de padre e hijo no es ruido: nombra familia y abre ojos", () => {
+    const d = analizarVolcado(
+      "Hoy aprendí que uno sabe por repetición, no por madures. Por ejemplo: yo cuando le hablo a mí hijo temas de moral comportamiento, actitudes; q el lo siento que no entiende y me hace pensar que tengo la mente más rápida: pero sin embargo cuando el me esplicada que es lo que va ser en su preparatoria."
+    );
+    assert.notEqual(d.calidad, "ruido");
+    assert.equal(d.tema, "familia");
+    assert.ok(d.palabras > 40);
+    assert.ok(d.frente >= 1);
+    assert.ok(d.siguiente >= 2);
+    assert.match(d.dictamen, /C\d/);
+  });
+
+  it("un suspiro corto sigue siendo ruido", () => {
+    const d = analizarVolcado("estoy cansado y triste");
+    assert.equal(d.calidad, "ruido");
+  });
+
   it("secuencia técnica de costura abre C3, implica C1–C2 y ofrece C4", () => {
     const d = analizarVolcado(
       "En la costura aprendí la secuencia: primero el corte de la tela, después el orden de ejecución, luego cómo se hace el armado paso a paso en la mesa del taller."

@@ -35,17 +35,37 @@ export interface DictamenOptico {
 }
 
 const MIN_PALABRAS = 6;
+/** Palabras de un volcado con materia: ya no es emoción suelta. */
+const MIN_MATERIA = 18;
 const UMBRAL_ABIERTO = 2;
 /** Un ojo 2–4 abierto implica los inmediatamente inferiores de este tema. */
 const IMPLICA_HASTA = 4;
 
 const TEMAS: { id: string; pats: RegExp[] }[] = [
   { id: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /maquina/] },
+  { id: "familia", pats: [/hijo/, /hija/, /familia/, /\bpapa\b/, /\bmama\b/, /padre/, /madre/, /nino/, /esposa/, /esposo/] },
+  { id: "escuela", pats: [/preparator/, /escuela/, /colegio/, /\bclase\b/, /tarea/, /profesor/] },
   { id: "dinero", pats: [/dinero/, /\bplata\b/, /cobr/, /deuda/, /ingreso/, /sueldo/] },
   { id: "casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
   { id: "trabajo", pats: [/trabajo/, /oficina/, /cliente/, /empleo/, /taller/] },
   { id: "pareja", pats: [/pareja/, /espos/, /novi/, /relacion con/] },
   { id: "cuerpo", pats: [/cuerpo/, /dolor/, /salud/, /enfermedad/, /energia/] },
+];
+
+/** Marcas de que el alumno contestó el ritual — no es un suspiro. */
+const MARCAS_MATERIA: RegExp[] = [
+  /aprend/,
+  /me di cuenta/,
+  /entend/,
+  /me ensen/,
+  /por ejemplo/,
+  /me hace pensar/,
+  /vi que/,
+  /note que/,
+  /hoy cuando/,
+  /le habl/,
+  /me explic/,
+  /me esplic/,
 ];
 
 const PATRONES: Record<CodigoOjo, RegExp[]> = {
@@ -63,6 +83,14 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /\bsitio\b/,
     /donde ocurre/,
     /ordenar/,
+    /hijo/,
+    /hija/,
+    /familia/,
+    /preparator/,
+    /escuela/,
+    /colegio/,
+    /cuando le/,
+    /con mi /,
   ],
   2: [
     /flujo/,
@@ -78,6 +106,12 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /se traba/,
     /lo que entra/,
     /lo que sale/,
+    /le habl/,
+    /no entiende/,
+    /me explic/,
+    /me esplic/,
+    /escuch/,
+    /se pierde/,
   ],
   3: [
     /secuencia/,
@@ -92,6 +126,10 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /como se hace/,
     /orden de/,
     /hice esto/,
+    /cuando /,
+    /por ejemplo/,
+    /pero cuando/,
+    /al hablar/,
   ],
   4: [
     /estructura/,
@@ -104,6 +142,11 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /soporta/,
     /forma que/,
     /lo que sostiene/,
+    /moral/,
+    /comport/,
+    /actitud/,
+    /madurez/,
+    /madures/,
   ],
   5: [
     /decision/,
@@ -115,6 +158,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /elijo/,
     /donde se elige/,
     /tome la decision/,
+    /sin embargo/,
+    /en cambio/,
   ],
   6: [
     /juntura/,
@@ -127,6 +172,13 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /el otro/,
     /se encuentran/,
     /junto con/,
+    /hijo/,
+    /hija/,
+    /le habl/,
+    /me explic/,
+    /me esplic/,
+    /familia/,
+    /con mi /,
   ],
   7: [
     /patron/,
@@ -138,6 +190,14 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /observo/,
     /veo que/,
     /lo que se distingue/,
+    /por ejemplo/,
+    /me hace pensar/,
+    /no entiende/,
+    /aprendi/,
+    /me di cuenta/,
+    /sin embargo/,
+    /mas rapida/,
+    /no por /,
   ],
   8: [
     /se repite/,
@@ -149,6 +209,10 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /siempre pasa/,
     /retorno/,
     /cada vez/,
+    /repetic/,
+    /siempre /,
+    /de nuevo/,
+    /sabe por/,
   ],
   9: [
     /sistema/,
@@ -167,6 +231,9 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /la causa/,
     /el sentido/,
     /eje que lo causa/,
+    /sabe por/,
+    /no por /,
+    /porque /,
   ],
 };
 
@@ -199,6 +266,11 @@ export function detectarTema(norm: string): string {
   return "este día";
 }
 
+export function tieneMateriaDeAprendizaje(norm: string, palabras: number): boolean {
+  if (palabras < MIN_MATERIA) return false;
+  return MARCAS_MATERIA.some((p) => p.test(norm));
+}
+
 function ojoNombre(codigo: number): string {
   return LEY_OPTICA_CODIGO_OJOS[codigo - 1]?.nombre ?? `C${codigo}`;
 }
@@ -221,7 +293,7 @@ function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pi
   if (d.calidad === "ruido") {
     return {
       dictamen:
-        "Esto todavía es ruido. Reescribilo como lo que el día te enseñó a operar — una frase técnica, no emoción suelta.",
+        "Esto todavía es ruido: muy corto o sin escena. Volcá el día crudo — qué pasó, con quién, qué aprendiste a operar.",
       mecanica:
         "El ritual sigue siendo el mismo: ¿qué aprendí hoy? El volcado tiene que poder nombrarse en un código.",
     };
@@ -283,12 +355,29 @@ export function analizarVolcado(texto: string): DictamenOptico {
   }
 
   const asomados = abiertos.filter((n) => n > frente) as CodigoOjo[];
-  const yaVistos = (frente >= 2 ? range(1, frente - 1) : []) as CodigoOjo[];
-  const siguiente = (frente === 0 ? 1 : Math.min(frente + 1, 10)) as CodigoOjo;
+  let yaVistos = (frente >= 2 ? range(1, frente - 1) : []) as CodigoOjo[];
+  let siguiente = (frente === 0 ? 1 : Math.min(frente + 1, 10)) as CodigoOjo;
 
   let calidad: CalidadVolcado = "tecnico";
   if (palabras < MIN_PALABRAS) calidad = "ruido";
   else if (frente === 0) calidad = asomados.length > 0 ? "pose" : "ruido";
+
+  // Volcado con materia (aprendí, escena, ejemplo) no es ruido:
+  // el territorio del día ya está; el siguiente ojo se nombra.
+  if (calidad === "ruido" && tieneMateriaDeAprendizaje(norm, palabras)) {
+    implied.add(1);
+    const c1 = puntajes.find((p) => p.codigo === 1);
+    if (c1) c1.abierto = true;
+    if (!abiertos.includes(1)) abiertos.unshift(1);
+    frente = 1;
+    yaVistos = [];
+    siguiente = 2;
+    calidad = "tecnico";
+    for (const extra of abiertos) {
+      if (extra > 1 && !asomados.includes(extra)) asomados.push(extra);
+    }
+    asomados.sort((a, b) => a - b);
+  }
 
   const base = {
     calidad,
