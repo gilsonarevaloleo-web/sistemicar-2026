@@ -37,12 +37,12 @@ export const LEY_OPTICA_CODIGO_OJOS = [
   {
     codigo: 3,
     nombre: "Trabajo",
-    ve: "La secuencia: pistón, orden de ejecución, el hacer en el tiempo.",
+    ve: "La secuencia: el orden de ejecución, el hacer en el tiempo — en cualquier oficio.",
   },
   {
     codigo: 4,
     nombre: "Estructura",
-    ve: "La ley del armado: lo que sostiene, los retenes, la forma que no se cae.",
+    ve: "La ley del armado: lo que sostiene el trabajo, la norma que no se cae.",
   },
   {
     codigo: 5,
@@ -52,7 +52,7 @@ export const LEY_OPTICA_CODIGO_OJOS = [
   {
     codigo: 6,
     nombre: "Convivencia",
-    ve: "Las junturas: relaciones, conjugaciones, posibles encuentros entre piezas.",
+    ve: "Las junturas: relaciones con cliente, equipo, familia u otras piezas.",
   },
   {
     codigo: 7,
@@ -87,7 +87,7 @@ export const LEY_OPTICA_CODIGO_AXIOMAS = [
     id: "diez-lecturas",
     titulo: "Un hecho, diez lecturas",
     texto:
-      "No hay diez mundos. Hay diez observaciones del mismo volcado. La costura, el colectivo y la pelea no cambian: cambia el ojo que los mira.",
+      "No hay diez mundos. Hay diez observaciones del mismo volcado. La costura, la cocina, la ruta y la pelea no cambian: cambia el ojo que los mira.",
   },
   {
     id: "observacion-dormida",
@@ -164,7 +164,7 @@ y el operador sigue dormido de observación.
 
 ═══ LA BASE MATEMÁTICA ═══
 
-Un hecho E (la tela, el colectivo, la pelea).
+Un hecho E (la tela, el pedido, la ruta, la pelea).
 Diez proyectores P1…P10.
 Cada Pi(E) es una observación distinta del MISMO fenómeno.
 
@@ -181,7 +181,7 @@ Cada código es un canal. El volcado es la prueba de cuáles se prendieron.
 
 C1  Cimiento     — territorio, suelo, base, apariencia del espacio.
 C2  Flujo        — caudal, rutina, qué entra y qué se estanca.
-C3  Trabajo      — secuencia, pistón, orden de ejecución.
+C3  Trabajo      — secuencia, orden de ejecución, en cualquier oficio.
 C4  Estructura   — ley del armado, retenes, lo que sostiene.
 C5  Decisión     — corte, vértice, disparo.
 C6  Convivencia  — junturas, relaciones, conjugaciones.

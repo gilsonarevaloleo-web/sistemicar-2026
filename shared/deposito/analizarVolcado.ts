@@ -1,16 +1,33 @@
 /**
- * Motor del Depósito v2 — frente de observación por tema.
+ * Motor del Depósito v2 — posición, mando y orden de planeta.
  *
  * El alumno no entra por C1. Entra por el volcado.
- * Un ojo técnico del 2–4 implica los inferiores de ESE tema.
- * El hueco no se salta. Un C6 sin C4 es asomo, no conquista.
+ * El prediseño es para público general: costura, cocina, ruta, ventas,
+ * cuidado, oficina u otro oficio.
+ *
+ * Presencia: varios ojos pueden abrirse a la vez. Eso no es error.
+ * La mezcla se analiza con la Cascada: el más alto es la posición.
+ * Un código que no se menciona puede ser orden de planeta, no hueco:
+ * en reflexión (casa 2) el subconsciente no prioriza el corte (C5);
+ * la urgencia es requisito de Espejo (casa 1).
  */
 
 import { LEY_OPTICA_CODIGO_OJOS } from "./leyOpticaCodigo.ts";
+import {
+  PLANETA_DEPOSITO,
+  PLANETA_ESPEJO,
+  PLANETA_JORNADA,
+  mundoPorNumero,
+} from "../planetas/leyCasasUmbral.ts";
 
 export type CodigoOjo = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type CalidadVolcado = "tecnico" | "pose" | "ruido";
+
+/** Acto del volcado: qué planeta está hablando, no qué ojo. */
+export type SituacionVolcado = "reflexion" | "urgencia" | "cierre" | "mixta";
+
+export type PlanetaVolcado = 1 | 2 | 3;
 
 export interface PuntajeOjo {
   codigo: CodigoOjo;
@@ -24,28 +41,113 @@ export interface DictamenOptico {
   tema: string;
   palabras: number;
   puntajes: PuntajeOjo[];
+  /** Ojos que este volcado encendió. Varios a la vez no es error. */
   abiertos: CodigoOjo[];
+  /** Mencionado (1 hit) pero aún no abierto. */
   asomados: CodigoOjo[];
-  /** 0 = aún no hay frente. */
+  /** Cadena de mando de este dump: abiertos en orden de Cascada. */
+  mando: CodigoOjo[];
+  /** Huecos de mando reales: códigos de esta casa que debían hablar y no hablaron. */
+  huecos: CodigoOjo[];
+  /**
+   * Códigos callados por condición de planeta, no por salto.
+   * En reflexión, C5 no se prioriza: la urgencia es de Espejo.
+   */
+  ausencias: CodigoOjo[];
+  /** Casa-Umbral: 1 Espejo, 2 Depósito, 3 Jornada. */
+  planeta: PlanetaVolcado;
+  situacion: SituacionVolcado;
+  /**
+   * Posición: el ojo más alto abierto.
+   * 0 = ruido. Alias de `frente`.
+   */
+  viendoCon: number;
+  /** Cadena cerrada hasta la posición (sin hueco debajo). */
+  tomaLugar: boolean;
+  /** 0 = ruido. Igual a `viendoCon`: el ojo abierto / la posición. */
   frente: number;
+  /** Ojos de mando debajo de la posición, más los ya habitados. */
   yaVistos: CodigoOjo[];
   siguiente: CodigoOjo;
   dictamen: string;
   mecanica: string;
 }
 
-const MIN_PALABRAS = 6;
-const UMBRAL_ABIERTO = 2;
-/** Un ojo 2–4 abierto implica los inmediatamente inferiores de este tema. */
-const IMPLICA_HASTA = 4;
+export interface OpcionesAnalisis {
+  /** Ojos ya habitados en volcados anteriores. Cierran huecos de la Cascada. */
+  ojosConLugar?: readonly number[];
+}
 
-const TEMAS: { id: string; pats: RegExp[] }[] = [
-  { id: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /maquina/] },
-  { id: "dinero", pats: [/dinero/, /\bplata\b/, /cobr/, /deuda/, /ingreso/, /sueldo/] },
-  { id: "casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
-  { id: "trabajo", pats: [/trabajo/, /oficina/, /cliente/, /empleo/, /taller/] },
-  { id: "pareja", pats: [/pareja/, /espos/, /novi/, /relacion con/] },
-  { id: "cuerpo", pats: [/cuerpo/, /dolor/, /salud/, /enfermedad/, /energia/] },
+const MIN_PALABRAS = 6;
+/** Palabras de un volcado con materia: ya no es emoción suelta. */
+const MIN_MATERIA = 18;
+const UMBRAL_ABIERTO = 2;
+
+/** Corte / disparo: el subconsciente lo prioriza con urgencia, no con aula. */
+const OJOS_DE_URGENCIA: readonly CodigoOjo[] = [5];
+
+const MARCAS_URGENCIA: RegExp[] = [
+  /urgenc/,
+  /preocup/,
+  /ansied/,
+  /angust/,
+  /emergenc/,
+  /apuro/,
+  /ya mismo/,
+  /tengo que ya/,
+  /no se que hacer/,
+  /me ahoga/,
+  /\bmancha\b/,
+  / exploto/,
+  / explote/,
+];
+
+const MARCAS_CIERRE: RegExp[] = [
+  /cierre del dia/,
+  /cerre el dia/,
+  /hoy termino/,
+  /hoy cerr/,
+];
+
+const TEMAS: { id: string; etiqueta: string; pats: RegExp[] }[] = [
+  { id: "costura", etiqueta: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /costurero/] },
+  { id: "cocina", etiqueta: "cocina", pats: [/cocina/, /receta/, /sarten/, /fogon/, /platillo/, /restaurante/, /\bmozo\b/, /\bchef\b/, /hornear/, /salsa/] },
+  { id: "ventas", etiqueta: "ventas", pats: [/vend/, /mostrador/, /tienda/, /pedido/, /promo/, /\bstock\b/, /cobrar/, /\bcliente/] },
+  { id: "transporte", etiqueta: "la ruta", pats: [/manejar/, /condu/, /chofer/, /\bruta\b/, /pasajero/, /\btaxi\b/, /colectivo/, /\bcombi\b/, /trafico/, /paradero/] },
+  { id: "salud", etiqueta: "el cuidado", pats: [/paciente/, /enfermer/, /\bdoctor\b/, /consulta/, /hospital/, /clinica/, /herida/, /cuidar/] },
+  { id: "construccion", etiqueta: "la obra", pats: [/\bobra\b/, /ladrillo/, /cemento/, /andamio/, /albanil/, /construc/] },
+  { id: "campo", etiqueta: "el campo", pats: [/chacra/, /siembra/, /cosecha/, /ganado/, /\bfinca\b/, /cultivo/, /parcela/] },
+  { id: "oficina", etiqueta: "la oficina", pats: [/oficina/, /reunion/, /informe/, /\bjefe\b/, /escritorio/, /computadora/, /correo/] },
+  { id: "familia", etiqueta: "familia", pats: [/hijo/, /hija/, /familia/, /\bpapa\b/, /\bmama\b/, /padre/, /madre/, /nino/, /esposa/, /esposo/] },
+  { id: "escuela", etiqueta: "escuela", pats: [/preparator/, /escuela/, /colegio/, /\bclase\b/, /tarea/, /profesor/, /alumno/] },
+  { id: "dinero", etiqueta: "el dinero", pats: [/dinero/, /\bplata\b/, /deuda/, /ingreso/, /sueldo/, /cobr/] },
+  { id: "casa", etiqueta: "la casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
+  { id: "pareja", etiqueta: "la pareja", pats: [/pareja/, /novi/, /relacion con/] },
+  { id: "cuerpo", etiqueta: "el cuerpo", pats: [/cuerpo/, /dolor/, /salud/, /enfermedad/, /energia/] },
+  { id: "oficio", etiqueta: "el oficio", pats: [/trabajo/, /empleo/, /oficio/, /\blabor\b/, /taller/] },
+];
+
+/** Marcas de que el alumno contestó el ritual — no es un suspiro. */
+const MARCAS_MATERIA: RegExp[] = [
+  /aprend/,
+  /me di cuenta/,
+  /entend/,
+  /me ensen/,
+  /por ejemplo/,
+  /me hace pensar/,
+  /vi que/,
+  /note que/,
+  /hoy cuando/,
+  /le habl/,
+  /me explic/,
+  /me esplic/,
+  /atendi/,
+  /el cliente/,
+  /el pedido/,
+  /en la ruta/,
+  /en la cocina/,
+  /hoy en /,
+  /trabaje/,
 ];
 
 const PATRONES: Record<CodigoOjo, RegExp[]> = {
@@ -63,6 +165,25 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /\bsitio\b/,
     /donde ocurre/,
     /ordenar/,
+    /\bpuesto\b/,
+    /\blocal\b/,
+    /\bruta\b/,
+    /cocina/,
+    /\bobra\b/,
+    /oficina/,
+    /\bcalle\b/,
+    /mostrador/,
+    /consultorio/,
+    /paradero/,
+    /escritorio/,
+    /hijo/,
+    /hija/,
+    /familia/,
+    /preparator/,
+    /escuela/,
+    /colegio/,
+    /cuando le/,
+    /con mi /,
   ],
   2: [
     /flujo/,
@@ -78,6 +199,22 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /se traba/,
     /lo que entra/,
     /lo que sale/,
+    /le habl/,
+    /no entiende/,
+    /me explic/,
+    /me esplic/,
+    /escuch/,
+    /se pierde/,
+    /\bcola\b/,
+    /espera/,
+    /\bturno\b/,
+    /pedido/,
+    /\bstock\b/,
+    /se atrasa/,
+    /se acumula/,
+    /trafico/,
+    /no llega/,
+    /se quema/,
   ],
   3: [
     /secuencia/,
@@ -92,6 +229,15 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /como se hace/,
     /orden de/,
     /hice esto/,
+    /cuando /,
+    /por ejemplo/,
+    /pero cuando/,
+    /al hablar/,
+    /receta/,
+    /protocolo/,
+    /itinerario/,
+    /hice /,
+    /hago /,
   ],
   4: [
     /estructura/,
@@ -104,6 +250,16 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /soporta/,
     /forma que/,
     /lo que sostiene/,
+    /moral/,
+    /comport/,
+    /actitud/,
+    /madurez/,
+    /madures/,
+    /\bnorma\b/,
+    /horario/,
+    /precio/,
+    /contrato/,
+    /no se puede saltar/,
   ],
   5: [
     /decision/,
@@ -115,6 +271,11 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /elijo/,
     /donde se elige/,
     /tome la decision/,
+    /sin embargo/,
+    /en cambio/,
+    /dije que no/,
+    /acepte/,
+    /deje pasar/,
   ],
   6: [
     /juntura/,
@@ -127,6 +288,22 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /el otro/,
     /se encuentran/,
     /junto con/,
+    /hijo/,
+    /hija/,
+    /le habl/,
+    /me explic/,
+    /me esplic/,
+    /familia/,
+    /con mi /,
+    /cliente/,
+    /\bjefe\b/,
+    /companero/,
+    /equipo/,
+    /paciente/,
+    /alumno/,
+    /pasajero/,
+    /proveedor/,
+    /atendi/,
   ],
   7: [
     /patron/,
@@ -138,6 +315,16 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /observo/,
     /veo que/,
     /lo que se distingue/,
+    /por ejemplo/,
+    /me hace pensar/,
+    /no entiende/,
+    /aprendi/,
+    /me di cuenta/,
+    /sin embargo/,
+    /mas rapida/,
+    /no por /,
+    /se nota/,
+    /distinto/,
   ],
   8: [
     /se repite/,
@@ -149,6 +336,12 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /siempre pasa/,
     /retorno/,
     /cada vez/,
+    /repetic/,
+    /siempre /,
+    /de nuevo/,
+    /sabe por/,
+    /todos los dias/,
+    /el mismo error/,
   ],
   9: [
     /sistema/,
@@ -158,6 +351,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /arquitectura/,
     /si una parte/,
     /el todo/,
+    /todo el local/,
+    /el equipo entero/,
   ],
   10: [
     /origen/,
@@ -193,10 +388,17 @@ function hitsDe(norm: string, pats: RegExp[]): number {
 }
 
 export function detectarTema(norm: string): string {
+  let mejor = { etiqueta: "este hecho", hits: 0 };
   for (const t of TEMAS) {
-    if (t.pats.some((p) => p.test(norm))) return t.id;
+    const hits = t.pats.reduce((n, p) => n + (p.test(norm) ? 1 : 0), 0);
+    if (hits > mejor.hits) mejor = { etiqueta: t.etiqueta, hits };
   }
-  return "este día";
+  return mejor.hits > 0 ? mejor.etiqueta : "este hecho";
+}
+
+export function tieneMateriaDeAprendizaje(norm: string, palabras: number): boolean {
+  if (palabras < MIN_MATERIA) return false;
+  return MARCAS_MATERIA.some((p) => p.test(norm));
 }
 
 function ojoNombre(codigo: number): string {
@@ -207,60 +409,184 @@ function etiqueta(codigo: number): string {
   return `C${codigo} ${ojoNombre(codigo)}`;
 }
 
-function mecanicaDe(codigo: CodigoOjo, tema: string): string {
-  const ojo = LEY_OPTICA_CODIGO_OJOS[codigo - 1];
-  return `En ${tema}, no repitas el ojo que ya viste. Mira con ${etiqueta(codigo)}: ${ojo.ve} Volcá eso.`;
+function mecanicaDe(d: Omit<DictamenOptico, "dictamen" | "mecanica">): string {
+  const ojo = LEY_OPTICA_CODIGO_OJOS[d.siguiente - 1];
+  if (d.ausencias.length > 0 && d.huecos.length === 0) {
+    const callados = d.ausencias.map(etiqueta).join(" · ");
+    return `Estás en planeta ${d.planeta} (${mundoPorNumero(d.planeta).nombre}): reflexión, no urgencia. ${callados} no se prioriza sin corte. Eso es acto de Espejo (planeta 1). Aquí el acto es volcar. Seguí mirando con ${etiqueta(d.siguiente)}: ${ojo.ve}`;
+  }
+  return `En ${d.tema}, la Cascada manda. Mira el hueco con ${etiqueta(d.siguiente)}: ${ojo.ve} Volcá eso.`;
 }
 
 function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pick<
   DictamenOptico,
   "dictamen" | "mecanica"
 > {
-  const mecanica = mecanicaDe(d.siguiente, d.tema);
+  const mecanica = mecanicaDe(d);
 
   if (d.calidad === "ruido") {
     return {
       dictamen:
-        "Esto todavía es ruido. Reescribilo como lo que el día te enseñó a operar — una frase técnica, no emoción suelta.",
+        "Esto todavía es ruido: muy corto o sin escena. Volcá el día crudo — qué pasó, con quién, qué aprendiste a operar.",
       mecanica:
         "El ritual sigue siendo el mismo: ¿qué aprendí hoy? El volcado tiene que poder nombrarse en un código.",
     };
   }
 
+  const pos = etiqueta(d.frente as CodigoOjo);
+  const sig = etiqueta(d.siguiente);
+  const mundo = mundoPorNumero(d.planeta);
+  const sit =
+    d.situacion === "urgencia"
+      ? "urgencia / preocupación"
+      : d.situacion === "mixta"
+        ? "reflexión con corte"
+        : d.situacion === "cierre"
+          ? "cierre del día"
+          : "reflexión (sin urgencia)";
+  const orden = ` Orden de planeta: ${d.planeta} ${mundo.nombre} · ${sit}.`;
+  const mando =
+    d.mando.length > 1
+      ? ` Jerarquía de mando: ${d.mando.map(etiqueta).join(" → ")}.`
+      : "";
+  const ausenciaTxt =
+    d.ausencias.length > 0
+      ? ` Ausencia de condición: ${d.ausencias.map(etiqueta).join(" · ")} no se mencionó — el subconsciente no lo prioriza sin urgencia. Eso es Espejo (planeta 1), no hueco de esta casa.`
+      : "";
+  const huecoTxt =
+    d.huecos.length > 0
+      ? ` Hueco de mando: ${d.huecos.map(etiqueta).join(" · ")}.`
+      : d.ausencias.length > 0
+        ? " Cadena de mando cerrada en esta casa."
+        : " Cadena de mando cerrada hasta esa posición.";
+
   if (d.calidad === "pose") {
-    const asomo = d.asomados.map(etiqueta).join(" · ") || "un ojo alto";
     return {
-      dictamen: `Asomó ${asomo}, pero el frente de este tema no está. No se entra por el ojo más glamuroso. El siguiente es ${etiqueta(d.siguiente)}.`,
+      dictamen: `Asomó ${pos}, pero aún no hay ojo abierto.${orden} La Cascada no se entra por el canal más alto. Siguiente: ${sig}.`,
       mecanica,
     };
   }
 
-  const vistos =
-    d.yaVistos.length > 0
-      ? ` Ya vistos en este tema: ${d.yaVistos.map(etiqueta).join(" · ")}.`
-      : "";
-  const hueco =
-    d.asomados.length > 0
-      ? ` Asomó ${d.asomados.map(etiqueta).join(" · ")}; no se salta el hueco.`
-      : "";
-  const abierto =
-    d.frente > 0 ? etiqueta(d.frente as CodigoOjo) : etiqueta(d.siguiente);
-
   return {
-    dictamen: `En ${d.tema} el ojo abierto es ${abierto}.${vistos}${hueco} Siguiente observación: ${etiqueta(d.siguiente)}.`,
+    dictamen: `Ojo abierto: ${pos} — esa es tu posición en ${d.tema}.${orden}${mando}${ausenciaTxt}${huecoTxt} Siguiente observación: ${sig}.`,
     mecanica,
   };
 }
 
-export function analizarVolcado(texto: string): DictamenOptico {
+function sanitizarLugar(raw: readonly number[] | undefined): CodigoOjo[] {
+  const set = new Set<CodigoOjo>();
+  for (const n of raw ?? []) {
+    if (n >= 1 && n <= 10 && Number.isInteger(n)) set.add(n as CodigoOjo);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+function huecosHasta(posicion: number, conocidos: ReadonlySet<number>): CodigoOjo[] {
+  const out: CodigoOjo[] = [];
+  for (let i = 1; i < posicion; i++) {
+    if (!conocidos.has(i)) out.push(i as CodigoOjo);
+  }
+  return out;
+}
+
+function siguienteDe(
+  posicion: number,
+  huecos: readonly CodigoOjo[]
+): CodigoOjo {
+  if (huecos.length > 0) return huecos[0];
+  if (posicion >= 1) return posicion as CodigoOjo;
+  return 1;
+}
+
+export function detectarOrdenPlaneta(norm: string): {
+  planeta: PlanetaVolcado;
+  situacion: SituacionVolcado;
+} {
+  const urgencia = MARCAS_URGENCIA.some((p) => p.test(norm));
+  const cierre = MARCAS_CIERRE.some((p) => p.test(norm));
+  const reflexion =
+    /aprend/.test(norm) ||
+    /alternativ/.test(norm) ||
+    /me di cuenta/.test(norm) ||
+    /me hace pensar/.test(norm) ||
+    /por ejemplo/.test(norm);
+
+  if (cierre && !urgencia && !reflexion) {
+    return { planeta: PLANETA_JORNADA, situacion: "cierre" };
+  }
+  if (urgencia && reflexion) {
+    return { planeta: PLANETA_DEPOSITO, situacion: "mixta" };
+  }
+  if (urgencia) {
+    return { planeta: PLANETA_ESPEJO, situacion: "urgencia" };
+  }
+  return { planeta: PLANETA_DEPOSITO, situacion: "reflexion" };
+}
+
+function ausenciasDeCondicion(
+  faltantes: readonly CodigoOjo[],
+  situacion: SituacionVolcado
+): CodigoOjo[] {
+  if (situacion === "urgencia" || situacion === "mixta") return [];
+  return faltantes.filter((n) => OJOS_DE_URGENCIA.includes(n));
+}
+
+/** Tesis del día: refuerza el canal que se distingue, no apaga los demás. */
+function boostTesis(norm: string): Record<CodigoOjo, number> {
+  const b = Object.fromEntries(
+    LEY_OPTICA_CODIGO_OJOS.map((o) => [o.codigo, 0])
+  ) as Record<CodigoOjo, number>;
+  if (/sabe por repet/.test(norm) || /por repetic/.test(norm)) b[8] += 3;
+  if (/no por madur/.test(norm)) b[7] += 3;
+  if (/patron|se distingue|se nota que|diferencia de/.test(norm)) b[7] += 2;
+  if (/se repite|cada vez|siempre pasa|el mismo error/.test(norm)) b[8] += 2;
+  if (/secuencia|paso a paso|orden de ejecuc/.test(norm)) b[3] += 2;
+  if (/primero.{0,80}despues/.test(norm)) b[3] += 2;
+  return b;
+}
+
+/**
+ * Ojos ya habitados. Cada dump puede encender varios; se acumulan.
+ * Un dictamen viejo sin `abiertos` aporta al menos su posición.
+ */
+export function ojosConLugarDe(
+  historial: Array<{
+    dictamen?: Pick<
+      DictamenOptico,
+      "calidad" | "viendoCon" | "frente" | "abiertos"
+    > | null;
+  }>
+): CodigoOjo[] {
+  const set = new Set<CodigoOjo>();
+  for (const v of historial) {
+    const d = v.dictamen;
+    if (!d || d.calidad === "ruido") continue;
+    if (Array.isArray(d.abiertos)) {
+      for (const n of d.abiertos) {
+        if (n >= 1 && n <= 10) set.add(n as CodigoOjo);
+      }
+    }
+    const pos = d.viendoCon || d.frente;
+    if (typeof pos === "number" && pos >= 1 && pos <= 10) set.add(pos as CodigoOjo);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+export function analizarVolcado(
+  texto: string,
+  opts?: OpcionesAnalisis
+): DictamenOptico {
   const norm = normalizarVolcado(texto);
   const palabras = contarPalabras(norm);
   const tema = detectarTema(norm);
+  const yaHabitados = sanitizarLugar(opts?.ojosConLugar);
+  const boosts = boostTesis(norm);
 
   const puntajes: PuntajeOjo[] = LEY_OPTICA_CODIGO_OJOS.map((ojo) => {
-    const hits = hitsDe(norm, PATRONES[ojo.codigo as CodigoOjo]);
+    const codigo = ojo.codigo as CodigoOjo;
+    const hits = hitsDe(norm, PATRONES[codigo]) + (boosts[codigo] ?? 0);
     return {
-      codigo: ojo.codigo as CodigoOjo,
+      codigo,
       nombre: ojo.nombre,
       hits,
       abierto: hits >= UMBRAL_ABIERTO,
@@ -268,47 +594,71 @@ export function analizarVolcado(texto: string): DictamenOptico {
   });
 
   const abiertos = puntajes.filter((p) => p.abierto).map((p) => p.codigo);
-  const implied = new Set<number>(abiertos);
-
-  for (const k of abiertos) {
-    if (k >= 2 && k <= IMPLICA_HASTA) {
-      for (let i = 1; i < k; i++) implied.add(i);
-    }
-  }
-
-  let frente = 0;
-  for (let i = 1; i <= 10; i++) {
-    if (implied.has(i)) frente = i;
-    else break;
-  }
-
-  const asomados = abiertos.filter((n) => n > frente) as CodigoOjo[];
-  const yaVistos = (frente >= 2 ? range(1, frente - 1) : []) as CodigoOjo[];
-  const siguiente = (frente === 0 ? 1 : Math.min(frente + 1, 10)) as CodigoOjo;
+  const asomados = puntajes
+    .filter((p) => !p.abierto && p.hits > 0)
+    .map((p) => p.codigo);
 
   let calidad: CalidadVolcado = "tecnico";
-  if (palabras < MIN_PALABRAS) calidad = "ruido";
-  else if (frente === 0) calidad = asomados.length > 0 ? "pose" : "ruido";
+  let posicion = 0;
+
+  if (palabras < MIN_PALABRAS) {
+    calidad = "ruido";
+  } else if (abiertos.length > 0) {
+    posicion = abiertos[abiertos.length - 1];
+    calidad = "tecnico";
+  } else if (tieneMateriaDeAprendizaje(norm, palabras)) {
+    posicion = 1;
+    if (!abiertos.includes(1)) abiertos.push(1);
+    abiertos.sort((a, b) => a - b);
+    const c1 = puntajes.find((p) => p.codigo === 1);
+    if (c1) c1.abierto = true;
+    calidad = "tecnico";
+  } else if (asomados.length > 0) {
+    posicion = asomados[asomados.length - 1];
+    calidad = "pose";
+  } else {
+    calidad = "ruido";
+  }
+
+  const mando = (calidad === "ruido" ? [] : abiertos.length > 0 ? abiertos : []) as CodigoOjo[];
+  const conocidos = new Set<number>([...yaHabitados, ...mando]);
+  const faltantes = posicion > 0 ? huecosHasta(posicion, conocidos) : [];
+  const { planeta, situacion } =
+    calidad === "ruido"
+      ? { planeta: PLANETA_DEPOSITO as PlanetaVolcado, situacion: "reflexion" as SituacionVolcado }
+      : detectarOrdenPlaneta(norm);
+  const ausencias =
+    calidad === "ruido" ? [] : ausenciasDeCondicion(faltantes, situacion);
+  const huecos = faltantes.filter((n) => !ausencias.includes(n));
+  const siguiente =
+    calidad === "ruido" ? (1 as CodigoOjo) : siguienteDe(posicion, huecos);
+  const tomaLugar = calidad === "tecnico" && posicion > 0 && huecos.length === 0;
+  const yaVistos = [
+    ...new Set<CodigoOjo>([
+      ...yaHabitados,
+      ...mando.filter((n) => n < posicion),
+    ]),
+  ].sort((a, b) => a - b);
 
   const base = {
     calidad,
     tema,
     palabras,
     puntajes,
-    abiertos,
-    asomados,
-    frente,
+    abiertos: calidad === "ruido" ? [] : mando,
+    asomados: calidad === "ruido" ? [] : asomados,
+    mando,
+    huecos,
+    ausencias,
+    planeta,
+    situacion,
+    viendoCon: calidad === "ruido" ? 0 : posicion,
+    tomaLugar,
+    frente: calidad === "ruido" ? 0 : posicion,
     yaVistos,
     siguiente,
   };
   const textos = construirDictamen(base);
 
   return { ...base, ...textos };
-}
-
-function range(from: number, to: number): number[] {
-  if (to < from) return [];
-  const out: number[] = [];
-  for (let i = from; i <= to; i++) out.push(i);
-  return out;
 }
