@@ -8,7 +8,7 @@ const PADRE_HIJO =
 const COSTURA_SECUENCIA =
   "En la costura aprendí la secuencia: primero el corte de la tela, después el orden de ejecución, luego cómo se hace el armado paso a paso en la mesa del taller.";
 
-describe("analizarVolcado — un volcado, un ojo", () => {
+describe("analizarVolcado — posición y jerarquía de mando", () => {
   it("un volcado corto es ruido y ofrece C1", () => {
     const d = analizarVolcado("hoy fue feo");
     assert.equal(d.calidad, "ruido");
@@ -18,24 +18,34 @@ describe("analizarVolcado — un volcado, un ojo", () => {
     assert.equal(d.tomaLugar, false);
   });
 
-  it("el volcado de padre e hijo ve con un solo ojo y no mezcla la escala", () => {
+  it("varios ojos abiertos no es error: el más alto es la posición", () => {
     const d = analizarVolcado(PADRE_HIJO);
     assert.notEqual(d.calidad, "ruido");
     assert.equal(d.tema, "familia");
     assert.ok(d.palabras > 40);
-    assert.equal(d.viendoCon, 7);
-    assert.equal(d.abiertos.length, 1);
-    assert.deepEqual(d.abiertos, [7]);
-    assert.deepEqual(d.asomados, []);
-    assert.deepEqual(d.yaVistos, []);
-    assert.equal(d.calidad, "pose");
-    assert.equal(d.tomaLugar, false);
-    assert.equal(d.siguiente, 1);
-    assert.match(d.dictamen, /Estás viendo con C7 Visión/);
-    assert.doesNotMatch(d.dictamen, /Ya vistos/);
-    assert.doesNotMatch(d.dictamen, /Asomó/);
-    assert.doesNotMatch(d.dictamen, /C4 Estructura/);
-    assert.doesNotMatch(d.dictamen, /C5 Decisión/);
+    assert.ok(d.abiertos.length >= 2, "la mezcla del volcado enciende varios canales");
+    assert.equal(d.frente, Math.max(...d.abiertos));
+    assert.equal(d.viendoCon, d.frente);
+    assert.deepEqual(d.mando, d.abiertos);
+    assert.equal(d.calidad, "tecnico");
+    assert.match(d.dictamen, /Ojo abierto: C\d+/);
+    assert.match(d.dictamen, /Jerarquía de mando/);
+    assert.doesNotMatch(d.dictamen, /el ojo abierto es C4 Estructura/);
+    assert.ok(
+      d.frente > 4,
+      "la posición no se aplasta al prefijo C4 cuando hay ojos más altos"
+    );
+  });
+
+  it("la mezcla se ordena como jerarquía y el hueco de mando es el siguiente", () => {
+    const d = analizarVolcado(PADRE_HIJO);
+    for (let i = 1; i < d.abiertos.length; i++) {
+      assert.ok(d.abiertos[i] > d.abiertos[i - 1], "mando en orden de Cascada");
+    }
+    assert.ok(d.huecos.length > 0);
+    assert.equal(d.siguiente, d.huecos[0]);
+    assert.match(d.dictamen, /Hueco de mando/);
+    assert.match(d.dictamen, new RegExp(`Siguiente observación: C${d.siguiente}`));
   });
 
   it("un suspiro corto sigue siendo ruido", () => {
@@ -50,8 +60,8 @@ describe("analizarVolcado — un volcado, un ojo", () => {
     assert.notEqual(d.calidad, "ruido");
     assert.equal(d.tema, "ventas");
     assert.ok(d.viendoCon >= 1);
-    assert.equal(d.abiertos.length, 1);
-    assert.match(d.dictamen, /Estás viendo con C/);
+    assert.equal(d.frente, Math.max(...d.abiertos));
+    assert.match(d.dictamen, /Ojo abierto: C/);
   });
 
   it("un chofer en la ruta abre oficio de transporte, no costura", () => {
@@ -61,7 +71,6 @@ describe("analizarVolcado — un volcado, un ojo", () => {
     assert.notEqual(d.calidad, "ruido");
     assert.equal(d.tema, "la ruta");
     assert.ok(d.viendoCon >= 1);
-    assert.equal(d.abiertos.length, 1);
   });
 
   it("una cocina con receta y fuego se nombra cocina", () => {
@@ -73,96 +82,59 @@ describe("analizarVolcado — un volcado, un ojo", () => {
     assert.ok(d.viendoCon >= 1);
   });
 
-  it("secuencia de costura sin historial nombra C3 y no implica C1–C2", () => {
+  it("secuencia de costura nombra el más alto abierto, no implica inferiores fantasma", () => {
     const d = analizarVolcado(COSTURA_SECUENCIA);
     assert.equal(d.tema, "costura");
-    assert.equal(d.viendoCon, 3);
-    assert.deepEqual(d.abiertos, [3]);
-    assert.deepEqual(d.yaVistos, []);
-    assert.equal(d.calidad, "pose");
-    assert.equal(d.tomaLugar, false);
-    assert.equal(d.siguiente, 1);
-    assert.match(d.dictamen, /Estás viendo con C3 Trabajo/);
-    assert.match(d.mecanica, /C1/);
-  });
-
-  it("con C1 y C2 ya habitados, el mismo dump de costura le da lugar a C3", () => {
-    const d = analizarVolcado(COSTURA_SECUENCIA, { ojosConLugar: [1, 2] });
-    assert.equal(d.viendoCon, 3);
+    assert.ok(d.abiertos.includes(3));
+    assert.equal(d.frente, Math.max(...d.abiertos));
     assert.equal(d.calidad, "tecnico");
-    assert.equal(d.tomaLugar, true);
-    assert.deepEqual(d.yaVistos, [1, 2]);
-    assert.equal(d.siguiente, 4);
-    assert.match(d.mecanica, /C4/);
-    assert.doesNotMatch(d.dictamen, /Asomó/);
+    assert.match(d.dictamen, /Ojo abierto: C/);
+    if (d.huecos.length > 0) {
+      assert.equal(d.siguiente, d.huecos[0]);
+    }
   });
 
-  it("un C6/C7 sin hueco habitado es pose: nombra el ojo y manda a C1", () => {
+  it("ojos ya habitados cierran huecos: costura con C1–C2 ofrece el siguiente real", () => {
+    const d = analizarVolcado(COSTURA_SECUENCIA, { ojosConLugar: [1, 2] });
+    assert.ok(d.abiertos.includes(3));
+    assert.equal(d.frente, Math.max(...d.abiertos));
+    assert.equal(d.calidad, "tecnico");
+    assert.ok(!d.huecos.includes(1));
+    assert.ok(!d.huecos.includes(2));
+    assert.match(d.dictamen, /Ojo abierto: C/);
+  });
+
+  it("C6 y C7 abiertos: la posición es el más alto, no se esconde como asomo", () => {
     const d = analizarVolcado(
       "Hoy vi el patrón y las diferencias de apariencia. También las junturas, la relación entre piezas y cómo se encuentran en convivencia con el otro."
     );
-    assert.ok(d.viendoCon === 6 || d.viendoCon === 7);
-    assert.equal(d.calidad, "pose");
-    assert.equal(d.siguiente, 1);
-    assert.equal(d.abiertos.length, 1);
-    assert.deepEqual(d.asomados, []);
+    assert.ok(d.abiertos.includes(6) || d.abiertos.includes(7));
+    assert.equal(d.frente, Math.max(...d.abiertos));
+    assert.equal(d.calidad, "tecnico");
+    assert.ok(!d.asomados.includes(d.frente as 1));
+    assert.match(d.dictamen, /Ojo abierto: C/);
+    assert.equal(d.siguiente, d.huecos[0] ?? ((d.frente + 1) as 1));
   });
 
-  it("C3 más escena de C6 no mezcla: un ojo, y el hueco sigue siendo el vacío", () => {
+  it("C3 más C6: ambos entran al mando; la posición es el más alto", () => {
     const d = analizarVolcado(
       "En la costura vi la secuencia y el orden de ejecución paso a paso, primero y después. También las junturas entre piezas y la relación de convivencia cuando se encuentran."
     );
-    assert.equal(d.viendoCon, 3);
-    assert.equal(d.abiertos.length, 1);
-    assert.equal(d.siguiente, 1);
-    assert.doesNotMatch(d.dictamen, /C6/);
-    assert.match(d.dictamen, /C3 Trabajo/);
+    assert.ok(d.abiertos.includes(3));
+    assert.ok(d.abiertos.includes(6));
+    assert.equal(d.frente, Math.max(...d.abiertos));
+    assert.ok(d.frente >= 6);
+    assert.match(d.dictamen, /Jerarquía de mando/);
+    assert.match(d.dictamen, /C3/);
+    assert.match(d.dictamen, /C6/);
   });
 
-  it("volcados sucesivos dan lugar a cada ojo sin mezclarlos", () => {
-    const c1 = analizarVolcado(
-      "Hoy aprendí el territorio del taller: el suelo, la mesa, el espacio y el lugar donde ocurre el corte."
-    );
-    assert.equal(c1.viendoCon, 1);
-    assert.equal(c1.calidad, "tecnico");
-    assert.equal(c1.tomaLugar, true);
-    assert.equal(c1.siguiente, 2);
-
-    const lugar1 = ojosConLugarDe([{ dictamen: c1 }]);
-    assert.deepEqual(lugar1, [1]);
-
-    const c3temprano = analizarVolcado(COSTURA_SECUENCIA, { ojosConLugar: lugar1 });
-    assert.equal(c3temprano.viendoCon, 3);
-    assert.equal(c3temprano.calidad, "pose");
-    assert.equal(c3temprano.tomaLugar, false);
-    assert.equal(c3temprano.siguiente, 2);
-
-    const c2 = analizarVolcado(
-      "Hoy aprendí el caudal de la rutina: lo que entra y lo que sale se estanca, el flujo se traba y hay atasco en el pedido.",
-      { ojosConLugar: lugar1 }
-    );
-    assert.equal(c2.viendoCon, 2);
-    assert.equal(c2.tomaLugar, true);
-
-    const lugar2 = ojosConLugarDe([{ dictamen: c1 }, { dictamen: c2 }]);
-    assert.deepEqual(lugar2, [1, 2]);
-
-    const c3 = analizarVolcado(COSTURA_SECUENCIA, { ojosConLugar: lugar2 });
-    assert.equal(c3.viendoCon, 3);
-    assert.equal(c3.tomaLugar, true);
-    assert.equal(c3.siguiente, 4);
-  });
-
-  it("un dictamen viejo mezclado no conquista siete ojos", () => {
-    const lugar = ojosConLugarDe([
-      {
-        dictamen: {
-          calidad: "tecnico",
-          viendoCon: undefined as unknown as number,
-          tomaLugar: undefined as unknown as boolean,
-        },
-      },
-    ]);
-    assert.deepEqual(lugar, []);
+  it("el historial acumula todos los ojos que un dump encendió", () => {
+    const d = analizarVolcado(PADRE_HIJO);
+    const lugar = ojosConLugarDe([{ dictamen: d }]);
+    for (const n of d.abiertos) {
+      assert.ok(lugar.includes(n));
+    }
+    assert.ok(lugar.includes(d.frente as 1));
   });
 });

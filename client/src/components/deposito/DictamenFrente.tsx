@@ -13,8 +13,8 @@ export function EscalaDiezOjos({
 }: {
   dictamen: DictamenOptico;
 }) {
-  const viendo = dictamen.viendoCon || dictamen.frente;
-  const vistos = new Set<number>(dictamen.yaVistos);
+  const posicion = dictamen.viendoCon || dictamen.frente;
+  const abiertos = new Set<number>(dictamen.abiertos ?? dictamen.mando ?? []);
 
   return (
     <ol
@@ -24,9 +24,9 @@ export function EscalaDiezOjos({
     >
       {LEY_OPTICA_CODIGO_OJOS.map((ojo) => {
         const n = ojo.codigo;
-        const esFrente = viendo === n;
+        const esPosicion = posicion === n;
         const esSiguiente = dictamen.siguiente === n && dictamen.calidad !== "ruido";
-        const visto = vistos.has(n);
+        const abierto = abiertos.has(n);
         return (
           <li key={n} className="text-center">
             <span
@@ -34,9 +34,9 @@ export function EscalaDiezOjos({
               style={{
                 backgroundColor: esSiguiente
                   ? AZURE
-                  : esFrente
+                  : esPosicion
                     ? GOLD
-                    : visto
+                    : abierto
                       ? `${GOLD}88`
                       : "rgba(255,255,255,0.08)",
                 boxShadow: esSiguiente ? `0 0 8px ${AZURE}80` : undefined,
@@ -58,6 +58,7 @@ export function DictamenFrente({
 }) {
   const [verMecanica, setVerMecanica] = useState(dictamen.calidad === "tecnico");
   const siguiente = LEY_OPTICA_CODIGO_OJOS[dictamen.siguiente - 1];
+  const mando = dictamen.mando?.length ? dictamen.mando : dictamen.abiertos;
 
   return (
     <section
@@ -72,6 +73,14 @@ export function DictamenFrente({
         DICTAMEN · {dictamen.tema.toUpperCase()}
       </p>
       <p className="text-sm leading-relaxed text-white/80">{dictamen.dictamen}</p>
+      {dictamen.calidad !== "ruido" && mando.length > 1 && (
+        <p
+          className="text-[10px] tracking-[0.14em] text-white/50"
+          data-testid="deposito-mando"
+        >
+          MANDO · {mando.map((n) => `C${n}`).join(" → ")}
+        </p>
+      )}
       <EscalaDiezOjos dictamen={dictamen} />
       {dictamen.calidad !== "ruido" && (
         <div className="pt-1">

@@ -1,14 +1,14 @@
 /**
- * Motor del Depósito v2 — un volcado, un ojo.
+ * Motor del Depósito v2 — posición y jerarquía de mando.
  *
  * El alumno no entra por C1. Entra por el volcado.
  * El prediseño es para público general: costura, cocina, ruta, ventas,
  * cuidado, oficina u otro oficio.
  *
- * Autarquía: no se mezclan canales en un dictamen. Cada dump nombra
- * el ojo con el que se está viendo. El lugar en la escala lo da el
- * historial (ojos ya habitados), no una implicación del mismo texto.
- * El hueco no se salta.
+ * Presencia: varios ojos pueden abrirse a la vez. Eso no es error.
+ * La mezcla se analiza, no se aplasta: se ordena con la Cascada.
+ * El ojo más alto mencionado es la posición (ojo abierto).
+ * Los huecos de mando no se saltan.
  */
 
 import { LEY_OPTICA_CODIGO_OJOS } from "./leyOpticaCodigo.ts";
@@ -29,20 +29,24 @@ export interface DictamenOptico {
   tema: string;
   palabras: number;
   puntajes: PuntajeOjo[];
-  /** Solo el ojo de este volcado. Nunca una lista mezclada. */
+  /** Ojos que este volcado encendió. Varios a la vez no es error. */
   abiertos: CodigoOjo[];
-  /** Vacío: un dump no “asoma” otros canales. */
+  /** Mencionado (1 hit) pero aún no abierto. */
   asomados: CodigoOjo[];
+  /** Cadena de mando de este dump: abiertos en orden de Cascada. */
+  mando: CodigoOjo[];
+  /** Huecos de mando entre C1 y la posición. */
+  huecos: CodigoOjo[];
   /**
-   * Ojo con el que se está viendo este volcado.
-   * 0 = ruido. Alias de `frente` para lecturas viejas.
+   * Posición: el ojo más alto abierto.
+   * 0 = ruido. Alias de `frente`.
    */
   viendoCon: number;
-  /** Este dump habita el hueco (el siguiente ojo vacío de la escala). */
+  /** Cadena cerrada hasta la posición (sin hueco debajo). */
   tomaLugar: boolean;
-  /** 0 = ruido. Igual a `viendoCon` para no romper JSON guardado. */
+  /** 0 = ruido. Igual a `viendoCon`: el ojo abierto / la posición. */
   frente: number;
-  /** Ojos que ya tenían lugar en el historial — no los de este dump. */
+  /** Ojos de mando debajo de la posición, más los ya habitados. */
   yaVistos: CodigoOjo[];
   siguiente: CodigoOjo;
   dictamen: string;
@@ -50,7 +54,7 @@ export interface DictamenOptico {
 }
 
 export interface OpcionesAnalisis {
-  /** Ojos que ya tienen lugar por volcados anteriores. Uno por dump. */
+  /** Ojos ya habitados en volcados anteriores. Cierran huecos de la Cascada. */
   ojosConLugar?: readonly number[];
 }
 
@@ -312,9 +316,6 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /la causa/,
     /el sentido/,
     /eje que lo causa/,
-    /sabe por/,
-    /no por /,
-    /porque /,
   ],
 };
 
@@ -364,7 +365,7 @@ function etiqueta(codigo: number): string {
 
 function mecanicaDe(codigo: CodigoOjo, tema: string): string {
   const ojo = LEY_OPTICA_CODIGO_OJOS[codigo - 1];
-  return `En ${tema}, no repitas el ojo que ya viste. Mira con ${etiqueta(codigo)}: ${ojo.ve} Volcá eso.`;
+  return `En ${tema}, la Cascada manda. Mira el hueco con ${etiqueta(codigo)}: ${ojo.ve} Volcá eso.`;
 }
 
 function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pick<
@@ -382,22 +383,26 @@ function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pi
     };
   }
 
-  const ojo = etiqueta(d.viendoCon as CodigoOjo);
+  const pos = etiqueta(d.frente as CodigoOjo);
   const sig = etiqueta(d.siguiente);
+  const mando =
+    d.mando.length > 1
+      ? ` Jerarquía de mando: ${d.mando.map(etiqueta).join(" → ")}.`
+      : "";
+  const huecoTxt =
+    d.huecos.length > 0
+      ? ` Hueco de mando: ${d.huecos.map(etiqueta).join(" · ")}.`
+      : " Cadena de mando cerrada hasta esa posición.";
 
   if (d.calidad === "pose") {
     return {
-      dictamen: `Estás viendo con ${ojo}. No se mezcla con otro canal ni se salta el hueco. Este volcado aún no le da lugar: el siguiente habita ${sig}.`,
+      dictamen: `Asomó ${pos}, pero aún no hay ojo abierto. La Cascada no se entra por el canal más alto. Siguiente: ${sig}.`,
       mecanica,
     };
   }
 
-  const lugar = d.tomaLugar
-    ? "Este volcado le da su lugar."
-    : "Ese ojo ya tenía lugar; no se mezcla con otro.";
-
   return {
-    dictamen: `Estás viendo con ${ojo}. ${lugar} En ${d.tema}, un volcado es un canal. Siguiente: ${sig}.`,
+    dictamen: `Ojo abierto: ${pos} — esa es tu posición en ${d.tema}.${mando}${huecoTxt} Siguiente observación: ${sig}.`,
     mecanica,
   };
 }
@@ -410,14 +415,21 @@ function sanitizarLugar(raw: readonly number[] | undefined): CodigoOjo[] {
   return [...set].sort((a, b) => a - b);
 }
 
-function huecoDe(lugar: ReadonlySet<number>): CodigoOjo {
-  for (let i = 1; i <= 10; i++) {
-    if (!lugar.has(i)) return i as CodigoOjo;
+function huecosHasta(posicion: number, conocidos: ReadonlySet<number>): CodigoOjo[] {
+  const out: CodigoOjo[] = [];
+  for (let i = 1; i < posicion; i++) {
+    if (!conocidos.has(i)) out.push(i as CodigoOjo);
   }
+  return out;
+}
+
+function siguienteDe(posicion: number, huecos: readonly CodigoOjo[]): CodigoOjo {
+  if (huecos.length > 0) return huecos[0];
+  if (posicion < 10) return (posicion + 1) as CodigoOjo;
   return 10;
 }
 
-/** Tesis del día: el canal que se distingue, no cada palabra de la escena. */
+/** Tesis del día: refuerza el canal que se distingue, no apaga los demás. */
 function boostTesis(norm: string): Record<CodigoOjo, number> {
   const b = Object.fromEntries(
     LEY_OPTICA_CODIGO_OJOS.map((o) => [o.codigo, 0])
@@ -431,36 +443,29 @@ function boostTesis(norm: string): Record<CodigoOjo, number> {
   return b;
 }
 
-function ojoDominante(puntajes: PuntajeOjo[]): CodigoOjo | 0 {
-  let mejor: { codigo: CodigoOjo | 0; score: number } = { codigo: 0, score: 0 };
-  for (const p of puntajes) {
-    if (
-      p.hits > mejor.score ||
-      (p.hits === mejor.score && p.hits > 0 && p.codigo < (mejor.codigo || 11))
-    ) {
-      mejor = { codigo: p.codigo, score: p.hits };
-    }
-  }
-  return mejor.score > 0 ? mejor.codigo : 0;
-}
-
 /**
- * Ojos que ya tienen lugar. Solo cuenta un dump que habitó el hueco.
- * Dictámenes viejos mezclados (sin `viendoCon` / `tomaLugar`) no cuentan
- * como siete ojos conquistados.
+ * Ojos ya habitados. Cada dump puede encender varios; se acumulan.
+ * Un dictamen viejo sin `abiertos` aporta al menos su posición.
  */
 export function ojosConLugarDe(
   historial: Array<{
-    dictamen?: Pick<DictamenOptico, "calidad" | "viendoCon" | "tomaLugar"> | null;
+    dictamen?: Pick<
+      DictamenOptico,
+      "calidad" | "viendoCon" | "frente" | "abiertos"
+    > | null;
   }>
 ): CodigoOjo[] {
   const set = new Set<CodigoOjo>();
   for (const v of historial) {
     const d = v.dictamen;
     if (!d || d.calidad === "ruido") continue;
-    if (d.tomaLugar !== true) continue;
-    const n = d.viendoCon;
-    if (typeof n === "number" && n >= 1 && n <= 10) set.add(n as CodigoOjo);
+    if (Array.isArray(d.abiertos)) {
+      for (const n of d.abiertos) {
+        if (n >= 1 && n <= 10) set.add(n as CodigoOjo);
+      }
+    }
+    const pos = d.viendoCon || d.frente;
+    if (typeof pos === "number" && pos >= 1 && pos <= 10) set.add(pos as CodigoOjo);
   }
   return [...set].sort((a, b) => a - b);
 }
@@ -472,9 +477,7 @@ export function analizarVolcado(
   const norm = normalizarVolcado(texto);
   const palabras = contarPalabras(norm);
   const tema = detectarTema(norm);
-  const yaVistos = sanitizarLugar(opts?.ojosConLugar);
-  const lugar = new Set<number>(yaVistos);
-  const hueco = huecoDe(lugar);
+  const yaHabitados = sanitizarLugar(opts?.ojosConLugar);
   const boosts = boostTesis(norm);
 
   const puntajes: PuntajeOjo[] = LEY_OPTICA_CODIGO_OJOS.map((ojo) => {
@@ -488,43 +491,58 @@ export function analizarVolcado(
     };
   });
 
-  let viendoCon = ojoDominante(puntajes);
+  const abiertos = puntajes.filter((p) => p.abierto).map((p) => p.codigo);
+  const asomados = puntajes
+    .filter((p) => !p.abierto && p.hits > 0)
+    .map((p) => p.codigo);
 
   let calidad: CalidadVolcado = "tecnico";
+  let posicion = 0;
+
   if (palabras < MIN_PALABRAS) {
     calidad = "ruido";
-    viendoCon = 0;
-  } else if (viendoCon === 0) {
-    if (tieneMateriaDeAprendizaje(norm, palabras)) {
-      viendoCon = 1;
-      calidad = "tecnico";
-    } else {
-      calidad = "ruido";
-    }
-  } else if (viendoCon > hueco) {
+  } else if (abiertos.length > 0) {
+    posicion = abiertos[abiertos.length - 1];
+    calidad = "tecnico";
+  } else if (tieneMateriaDeAprendizaje(norm, palabras)) {
+    posicion = 1;
+    if (!abiertos.includes(1)) abiertos.push(1);
+    abiertos.sort((a, b) => a - b);
+    const c1 = puntajes.find((p) => p.codigo === 1);
+    if (c1) c1.abierto = true;
+    calidad = "tecnico";
+  } else if (asomados.length > 0) {
+    posicion = asomados[asomados.length - 1];
     calidad = "pose";
   } else {
-    calidad = "tecnico";
+    calidad = "ruido";
   }
 
-  const tomaLugar = calidad === "tecnico" && viendoCon === hueco && viendoCon > 0;
-  const siguiente = tomaLugar
-    ? huecoDe(new Set([...lugar, viendoCon]))
-    : hueco;
-  const frente = viendoCon;
-  const abiertos = (viendoCon > 0 ? [viendoCon as CodigoOjo] : []) as CodigoOjo[];
-  const asomados: CodigoOjo[] = [];
+  const mando = (calidad === "ruido" ? [] : abiertos.length > 0 ? abiertos : []) as CodigoOjo[];
+  const conocidos = new Set<number>([...yaHabitados, ...mando]);
+  const huecos = posicion > 0 ? huecosHasta(posicion, conocidos) : [];
+  const siguiente =
+    calidad === "ruido" ? (1 as CodigoOjo) : siguienteDe(posicion, huecos);
+  const tomaLugar = calidad === "tecnico" && posicion > 0 && huecos.length === 0;
+  const yaVistos = [
+    ...new Set<CodigoOjo>([
+      ...yaHabitados,
+      ...mando.filter((n) => n < posicion),
+    ]),
+  ].sort((a, b) => a - b);
 
   const base = {
     calidad,
     tema,
     palabras,
     puntajes,
-    abiertos,
-    asomados,
-    viendoCon,
+    abiertos: calidad === "ruido" ? [] : mando,
+    asomados: calidad === "ruido" ? [] : asomados,
+    mando,
+    huecos,
+    viendoCon: calidad === "ruido" ? 0 : posicion,
     tomaLugar,
-    frente,
+    frente: calidad === "ruido" ? 0 : posicion,
     yaVistos,
     siguiente,
   };

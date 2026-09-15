@@ -141,7 +141,7 @@ export default function Esperanza() {
             {LEY_OPTICA_CODIGO_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            Un volcado, un ojo. El sistema nombra cuál. No se mezclan.
+            El más alto es la posición. La mezcla se lee en cascada.
           </p>
         </header>
 
