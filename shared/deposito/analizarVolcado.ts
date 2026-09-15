@@ -41,15 +41,22 @@ const UMBRAL_ABIERTO = 2;
 /** Un ojo 2–4 abierto implica los inmediatamente inferiores de este tema. */
 const IMPLICA_HASTA = 4;
 
-const TEMAS: { id: string; pats: RegExp[] }[] = [
-  { id: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /maquina/] },
-  { id: "familia", pats: [/hijo/, /hija/, /familia/, /\bpapa\b/, /\bmama\b/, /padre/, /madre/, /nino/, /esposa/, /esposo/] },
-  { id: "escuela", pats: [/preparator/, /escuela/, /colegio/, /\bclase\b/, /tarea/, /profesor/] },
-  { id: "dinero", pats: [/dinero/, /\bplata\b/, /cobr/, /deuda/, /ingreso/, /sueldo/] },
-  { id: "casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
-  { id: "trabajo", pats: [/trabajo/, /oficina/, /cliente/, /empleo/, /taller/] },
-  { id: "pareja", pats: [/pareja/, /espos/, /novi/, /relacion con/] },
-  { id: "cuerpo", pats: [/cuerpo/, /dolor/, /salud/, /enfermedad/, /energia/] },
+const TEMAS: { id: string; etiqueta: string; pats: RegExp[] }[] = [
+  { id: "costura", etiqueta: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /costurero/] },
+  { id: "cocina", etiqueta: "cocina", pats: [/cocina/, /receta/, /sarten/, /fogon/, /platillo/, /restaurante/, /\bmozo\b/, /\bchef\b/, /hornear/, /salsa/] },
+  { id: "ventas", etiqueta: "ventas", pats: [/vend/, /mostrador/, /tienda/, /pedido/, /promo/, /\bstock\b/, /cobrar/, /\bcliente/] },
+  { id: "transporte", etiqueta: "la ruta", pats: [/manejar/, /condu/, /chofer/, /\bruta\b/, /pasajero/, /\btaxi\b/, /colectivo/, /\bcombi\b/, /trafico/, /paradero/] },
+  { id: "salud", etiqueta: "el cuidado", pats: [/paciente/, /enfermer/, /\bdoctor\b/, /consulta/, /hospital/, /clinica/, /herida/, /cuidar/] },
+  { id: "construccion", etiqueta: "la obra", pats: [/\bobra\b/, /ladrillo/, /cemento/, /andamio/, /albanil/, /construc/] },
+  { id: "campo", etiqueta: "el campo", pats: [/chacra/, /siembra/, /cosecha/, /ganado/, /\bfinca\b/, /cultivo/, /parcela/] },
+  { id: "oficina", etiqueta: "la oficina", pats: [/oficina/, /reunion/, /informe/, /\bjefe\b/, /escritorio/, /computadora/, /correo/] },
+  { id: "familia", etiqueta: "familia", pats: [/hijo/, /hija/, /familia/, /\bpapa\b/, /\bmama\b/, /padre/, /madre/, /nino/, /esposa/, /esposo/] },
+  { id: "escuela", etiqueta: "escuela", pats: [/preparator/, /escuela/, /colegio/, /\bclase\b/, /tarea/, /profesor/, /alumno/] },
+  { id: "dinero", etiqueta: "el dinero", pats: [/dinero/, /\bplata\b/, /deuda/, /ingreso/, /sueldo/, /cobr/] },
+  { id: "casa", etiqueta: "la casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
+  { id: "pareja", etiqueta: "la pareja", pats: [/pareja/, /novi/, /relacion con/] },
+  { id: "cuerpo", etiqueta: "el cuerpo", pats: [/cuerpo/, /dolor/, /salud/, /enfermedad/, /energia/] },
+  { id: "oficio", etiqueta: "el oficio", pats: [/trabajo/, /empleo/, /oficio/, /\blabor\b/, /taller/] },
 ];
 
 /** Marcas de que el alumno contestó el ritual — no es un suspiro. */
@@ -66,6 +73,13 @@ const MARCAS_MATERIA: RegExp[] = [
   /le habl/,
   /me explic/,
   /me esplic/,
+  /atendi/,
+  /el cliente/,
+  /el pedido/,
+  /en la ruta/,
+  /en la cocina/,
+  /hoy en /,
+  /trabaje/,
 ];
 
 const PATRONES: Record<CodigoOjo, RegExp[]> = {
@@ -83,6 +97,17 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /\bsitio\b/,
     /donde ocurre/,
     /ordenar/,
+    /\bpuesto\b/,
+    /\blocal\b/,
+    /\bruta\b/,
+    /cocina/,
+    /\bobra\b/,
+    /oficina/,
+    /\bcalle\b/,
+    /mostrador/,
+    /consultorio/,
+    /paradero/,
+    /escritorio/,
     /hijo/,
     /hija/,
     /familia/,
@@ -112,6 +137,16 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /me esplic/,
     /escuch/,
     /se pierde/,
+    /\bcola\b/,
+    /espera/,
+    /\bturno\b/,
+    /pedido/,
+    /\bstock\b/,
+    /se atrasa/,
+    /se acumula/,
+    /trafico/,
+    /no llega/,
+    /se quema/,
   ],
   3: [
     /secuencia/,
@@ -130,6 +165,11 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /por ejemplo/,
     /pero cuando/,
     /al hablar/,
+    /receta/,
+    /protocolo/,
+    /itinerario/,
+    /hice /,
+    /hago /,
   ],
   4: [
     /estructura/,
@@ -147,6 +187,11 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /actitud/,
     /madurez/,
     /madures/,
+    /\bnorma\b/,
+    /horario/,
+    /precio/,
+    /contrato/,
+    /no se puede saltar/,
   ],
   5: [
     /decision/,
@@ -160,6 +205,9 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /tome la decision/,
     /sin embargo/,
     /en cambio/,
+    /dije que no/,
+    /acepte/,
+    /deje pasar/,
   ],
   6: [
     /juntura/,
@@ -179,6 +227,15 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /me esplic/,
     /familia/,
     /con mi /,
+    /cliente/,
+    /\bjefe\b/,
+    /companero/,
+    /equipo/,
+    /paciente/,
+    /alumno/,
+    /pasajero/,
+    /proveedor/,
+    /atendi/,
   ],
   7: [
     /patron/,
@@ -198,6 +255,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /sin embargo/,
     /mas rapida/,
     /no por /,
+    /se nota/,
+    /distinto/,
   ],
   8: [
     /se repite/,
@@ -213,6 +272,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /siempre /,
     /de nuevo/,
     /sabe por/,
+    /todos los dias/,
+    /el mismo error/,
   ],
   9: [
     /sistema/,
@@ -222,6 +283,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /arquitectura/,
     /si una parte/,
     /el todo/,
+    /todo el local/,
+    /el equipo entero/,
   ],
   10: [
     /origen/,
@@ -260,10 +323,12 @@ function hitsDe(norm: string, pats: RegExp[]): number {
 }
 
 export function detectarTema(norm: string): string {
+  let mejor = { etiqueta: "este hecho", hits: 0 };
   for (const t of TEMAS) {
-    if (t.pats.some((p) => p.test(norm))) return t.id;
+    const hits = t.pats.reduce((n, p) => n + (p.test(norm) ? 1 : 0), 0);
+    if (hits > mejor.hits) mejor = { etiqueta: t.etiqueta, hits };
   }
-  return "este día";
+  return mejor.hits > 0 ? mejor.etiqueta : "este hecho";
 }
 
 export function tieneMateriaDeAprendizaje(norm: string, palabras: number): boolean {

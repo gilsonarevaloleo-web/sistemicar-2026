@@ -27,6 +27,33 @@ describe("analizarVolcado — frente de observación", () => {
     assert.equal(d.calidad, "ruido");
   });
 
+  it("un vendedor en el mostrador no es ruido ni se lee como costura", () => {
+    const d = analizarVolcado(
+      "Hoy aprendí que si tardo en el mostrador el cliente se va. Primero saludo, después cobro el pedido; el orden importa y se nota cuando la cola se acumula."
+    );
+    assert.notEqual(d.calidad, "ruido");
+    assert.equal(d.tema, "ventas");
+    assert.ok(d.frente >= 1);
+    assert.match(d.dictamen, /C\d/);
+  });
+
+  it("un chofer en la ruta abre oficio de transporte, no costura", () => {
+    const d = analizarVolcado(
+      "Hoy en la ruta aprendí que si salgo tarde el tráfico me come y el pasajero se queja. Primero reviso el paradero, después arranco; cada vez se repite si no salgo a tiempo."
+    );
+    assert.notEqual(d.calidad, "ruido");
+    assert.equal(d.tema, "la ruta");
+    assert.ok(d.frente >= 1);
+  });
+
+  it("una cocina con receta y fuego se nombra cocina", () => {
+    const d = analizarVolcado(
+      "Hoy en la cocina aprendí que si no miro el fuego la salsa se quema. Primero pongo el aceite, después la cebolla: el orden no se puede saltar."
+    );
+    assert.notEqual(d.calidad, "ruido");
+    assert.equal(d.tema, "cocina");
+    assert.ok(d.frente >= 1);
+  });
   it("secuencia técnica de costura abre C3, implica C1–C2 y ofrece C4", () => {
     const d = analizarVolcado(
       "En la costura aprendí la secuencia: primero el corte de la tela, después el orden de ejecución, luego cómo se hace el armado paso a paso en la mesa del taller."
