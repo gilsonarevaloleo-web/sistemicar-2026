@@ -15,6 +15,7 @@ import {
 } from "@/lib/depositoVolcados";
 import {
   analizarVolcado,
+  ojosConLugarDe,
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
 import { LEY_OPTICA_CODIGO_RITUAL } from "@shared/deposito/leyOpticaCodigo";
@@ -22,6 +23,14 @@ import { PLANETA_DEPOSITO, etiquetaMundo } from "@shared/planetas/leyCasasUmbral
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
+
+function etiquetaVolcado(v: VolcadoEntry): string {
+  const d = v.dictamen;
+  if (d.calidad === "ruido") return `RUIDO · ${d.tema}`;
+  const ojo = d.viendoCon || d.frente;
+  if (!ojo) return d.calidad.toUpperCase();
+  return `C${ojo} · ${d.tema}`;
+}
 
 export default function Esperanza() {
   const { user } = useAuthContext();
@@ -67,7 +76,9 @@ export default function Esperanza() {
       toast.error("El volcado está vacío.");
       return;
     }
-    const d = analizarVolcado(crudo);
+    const d = analizarVolcado(crudo, {
+      ojosConLugar: ojosConLugarDe(historial),
+    });
     setDictamen(d);
     if (d.calidad === "ruido" && (!user || d.palabras < 18)) {
       toast.message("Todavía es ruido. Reescribí el volcado.");
@@ -130,7 +141,7 @@ export default function Esperanza() {
             {LEY_OPTICA_CODIGO_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            Volcá el día. Crudo. El sistema nombra el ojo.
+            Un volcado, un ojo. El sistema nombra cuál. No se mezclan.
           </p>
         </header>
 
@@ -193,9 +204,7 @@ export default function Esperanza() {
                   style={{ borderColor: "rgba(255,255,255,0.08)" }}
                 >
                   <p className="text-[10px] text-white/40 mb-1">
-                    {v.dictamen.calidad === "tecnico"
-                      ? `C${v.dictamen.frente} → C${v.dictamen.siguiente} · ${v.dictamen.tema}`
-                      : v.dictamen.calidad.toUpperCase()}
+                    {etiquetaVolcado(v)}
                   </p>
                   <p className="text-sm text-white/70 line-clamp-3">{v.texto}</p>
                 </li>

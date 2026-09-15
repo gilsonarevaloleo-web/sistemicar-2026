@@ -13,11 +13,8 @@ export function EscalaDiezOjos({
 }: {
   dictamen: DictamenOptico;
 }) {
-  const vistos = new Set<number>([
-    ...dictamen.yaVistos,
-    ...(dictamen.frente > 0 ? [dictamen.frente] : []),
-  ]);
-  const asomos = new Set<number>(dictamen.asomados);
+  const viendo = dictamen.viendoCon || dictamen.frente;
+  const vistos = new Set<number>(dictamen.yaVistos);
 
   return (
     <ol
@@ -27,10 +24,9 @@ export function EscalaDiezOjos({
     >
       {LEY_OPTICA_CODIGO_OJOS.map((ojo) => {
         const n = ojo.codigo;
-        const esFrente = dictamen.frente === n;
+        const esFrente = viendo === n;
         const esSiguiente = dictamen.siguiente === n && dictamen.calidad !== "ruido";
         const visto = vistos.has(n);
-        const asomo = asomos.has(n);
         return (
           <li key={n} className="text-center">
             <span
@@ -42,9 +38,7 @@ export function EscalaDiezOjos({
                     ? GOLD
                     : visto
                       ? `${GOLD}88`
-                      : asomo
-                        ? `${AZURE}55`
-                        : "rgba(255,255,255,0.08)",
+                      : "rgba(255,255,255,0.08)",
                 boxShadow: esSiguiente ? `0 0 8px ${AZURE}80` : undefined,
               }}
               title={`C${n} ${ojo.nombre}`}
