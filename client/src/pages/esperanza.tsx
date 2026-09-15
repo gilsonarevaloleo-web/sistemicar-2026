@@ -29,7 +29,8 @@ function etiquetaVolcado(v: VolcadoEntry): string {
   if (d.calidad === "ruido") return `RUIDO · ${d.tema}`;
   const ojo = d.viendoCon || d.frente;
   if (!ojo) return d.calidad.toUpperCase();
-  return `C${ojo} · ${d.tema}`;
+  const p = d.planeta ? ` · P${d.planeta}` : "";
+  return `C${ojo} · ${d.tema}${p}`;
 }
 
 export default function Esperanza() {
@@ -141,7 +142,7 @@ export default function Esperanza() {
             {LEY_OPTICA_CODIGO_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El más alto es la posición. La mezcla se lee en cascada.
+            El más alto es la posición. Lo que no se menciona puede ser orden de planeta.
           </p>
         </header>
 

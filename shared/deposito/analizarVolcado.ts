@@ -1,21 +1,33 @@
 /**
- * Motor del Depósito v2 — posición y jerarquía de mando.
+ * Motor del Depósito v2 — posición, mando y orden de planeta.
  *
  * El alumno no entra por C1. Entra por el volcado.
  * El prediseño es para público general: costura, cocina, ruta, ventas,
  * cuidado, oficina u otro oficio.
  *
  * Presencia: varios ojos pueden abrirse a la vez. Eso no es error.
- * La mezcla se analiza, no se aplasta: se ordena con la Cascada.
- * El ojo más alto mencionado es la posición (ojo abierto).
- * Los huecos de mando no se saltan.
+ * La mezcla se analiza con la Cascada: el más alto es la posición.
+ * Un código que no se menciona puede ser orden de planeta, no hueco:
+ * en reflexión (casa 2) el subconsciente no prioriza el corte (C5);
+ * la urgencia es requisito de Espejo (casa 1).
  */
 
 import { LEY_OPTICA_CODIGO_OJOS } from "./leyOpticaCodigo.ts";
+import {
+  PLANETA_DEPOSITO,
+  PLANETA_ESPEJO,
+  PLANETA_JORNADA,
+  mundoPorNumero,
+} from "../planetas/leyCasasUmbral.ts";
 
 export type CodigoOjo = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type CalidadVolcado = "tecnico" | "pose" | "ruido";
+
+/** Acto del volcado: qué planeta está hablando, no qué ojo. */
+export type SituacionVolcado = "reflexion" | "urgencia" | "cierre" | "mixta";
+
+export type PlanetaVolcado = 1 | 2 | 3;
 
 export interface PuntajeOjo {
   codigo: CodigoOjo;
@@ -35,8 +47,16 @@ export interface DictamenOptico {
   asomados: CodigoOjo[];
   /** Cadena de mando de este dump: abiertos en orden de Cascada. */
   mando: CodigoOjo[];
-  /** Huecos de mando entre C1 y la posición. */
+  /** Huecos de mando reales: códigos de esta casa que debían hablar y no hablaron. */
   huecos: CodigoOjo[];
+  /**
+   * Códigos callados por condición de planeta, no por salto.
+   * En reflexión, C5 no se prioriza: la urgencia es de Espejo.
+   */
+  ausencias: CodigoOjo[];
+  /** Casa-Umbral: 1 Espejo, 2 Depósito, 3 Jornada. */
+  planeta: PlanetaVolcado;
+  situacion: SituacionVolcado;
   /**
    * Posición: el ojo más alto abierto.
    * 0 = ruido. Alias de `frente`.
@@ -62,6 +82,32 @@ const MIN_PALABRAS = 6;
 /** Palabras de un volcado con materia: ya no es emoción suelta. */
 const MIN_MATERIA = 18;
 const UMBRAL_ABIERTO = 2;
+
+/** Corte / disparo: el subconsciente lo prioriza con urgencia, no con aula. */
+const OJOS_DE_URGENCIA: readonly CodigoOjo[] = [5];
+
+const MARCAS_URGENCIA: RegExp[] = [
+  /urgenc/,
+  /preocup/,
+  /ansied/,
+  /angust/,
+  /emergenc/,
+  /apuro/,
+  /ya mismo/,
+  /tengo que ya/,
+  /no se que hacer/,
+  /me ahoga/,
+  /\bmancha\b/,
+  / exploto/,
+  / explote/,
+];
+
+const MARCAS_CIERRE: RegExp[] = [
+  /cierre del dia/,
+  /cerre el dia/,
+  /hoy termino/,
+  /hoy cerr/,
+];
 
 const TEMAS: { id: string; etiqueta: string; pats: RegExp[] }[] = [
   { id: "costura", etiqueta: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /costurero/] },
@@ -363,16 +409,20 @@ function etiqueta(codigo: number): string {
   return `C${codigo} ${ojoNombre(codigo)}`;
 }
 
-function mecanicaDe(codigo: CodigoOjo, tema: string): string {
-  const ojo = LEY_OPTICA_CODIGO_OJOS[codigo - 1];
-  return `En ${tema}, la Cascada manda. Mira el hueco con ${etiqueta(codigo)}: ${ojo.ve} Volcá eso.`;
+function mecanicaDe(d: Omit<DictamenOptico, "dictamen" | "mecanica">): string {
+  const ojo = LEY_OPTICA_CODIGO_OJOS[d.siguiente - 1];
+  if (d.ausencias.length > 0 && d.huecos.length === 0) {
+    const callados = d.ausencias.map(etiqueta).join(" · ");
+    return `Estás en planeta ${d.planeta} (${mundoPorNumero(d.planeta).nombre}): reflexión, no urgencia. ${callados} no se prioriza sin corte. Eso es acto de Espejo (planeta 1). Aquí el acto es volcar. Seguí mirando con ${etiqueta(d.siguiente)}: ${ojo.ve}`;
+  }
+  return `En ${d.tema}, la Cascada manda. Mira el hueco con ${etiqueta(d.siguiente)}: ${ojo.ve} Volcá eso.`;
 }
 
 function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pick<
   DictamenOptico,
   "dictamen" | "mecanica"
 > {
-  const mecanica = mecanicaDe(d.siguiente, d.tema);
+  const mecanica = mecanicaDe(d);
 
   if (d.calidad === "ruido") {
     return {
@@ -385,24 +435,40 @@ function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pi
 
   const pos = etiqueta(d.frente as CodigoOjo);
   const sig = etiqueta(d.siguiente);
+  const mundo = mundoPorNumero(d.planeta);
+  const sit =
+    d.situacion === "urgencia"
+      ? "urgencia / preocupación"
+      : d.situacion === "mixta"
+        ? "reflexión con corte"
+        : d.situacion === "cierre"
+          ? "cierre del día"
+          : "reflexión (sin urgencia)";
+  const orden = ` Orden de planeta: ${d.planeta} ${mundo.nombre} · ${sit}.`;
   const mando =
     d.mando.length > 1
       ? ` Jerarquía de mando: ${d.mando.map(etiqueta).join(" → ")}.`
       : "";
+  const ausenciaTxt =
+    d.ausencias.length > 0
+      ? ` Ausencia de condición: ${d.ausencias.map(etiqueta).join(" · ")} no se mencionó — el subconsciente no lo prioriza sin urgencia. Eso es Espejo (planeta 1), no hueco de esta casa.`
+      : "";
   const huecoTxt =
     d.huecos.length > 0
       ? ` Hueco de mando: ${d.huecos.map(etiqueta).join(" · ")}.`
-      : " Cadena de mando cerrada hasta esa posición.";
+      : d.ausencias.length > 0
+        ? " Cadena de mando cerrada en esta casa."
+        : " Cadena de mando cerrada hasta esa posición.";
 
   if (d.calidad === "pose") {
     return {
-      dictamen: `Asomó ${pos}, pero aún no hay ojo abierto. La Cascada no se entra por el canal más alto. Siguiente: ${sig}.`,
+      dictamen: `Asomó ${pos}, pero aún no hay ojo abierto.${orden} La Cascada no se entra por el canal más alto. Siguiente: ${sig}.`,
       mecanica,
     };
   }
 
   return {
-    dictamen: `Ojo abierto: ${pos} — esa es tu posición en ${d.tema}.${mando}${huecoTxt} Siguiente observación: ${sig}.`,
+    dictamen: `Ojo abierto: ${pos} — esa es tu posición en ${d.tema}.${orden}${mando}${ausenciaTxt}${huecoTxt} Siguiente observación: ${sig}.`,
     mecanica,
   };
 }
@@ -423,10 +489,46 @@ function huecosHasta(posicion: number, conocidos: ReadonlySet<number>): CodigoOj
   return out;
 }
 
-function siguienteDe(posicion: number, huecos: readonly CodigoOjo[]): CodigoOjo {
+function siguienteDe(
+  posicion: number,
+  huecos: readonly CodigoOjo[]
+): CodigoOjo {
   if (huecos.length > 0) return huecos[0];
-  if (posicion < 10) return (posicion + 1) as CodigoOjo;
-  return 10;
+  if (posicion >= 1) return posicion as CodigoOjo;
+  return 1;
+}
+
+export function detectarOrdenPlaneta(norm: string): {
+  planeta: PlanetaVolcado;
+  situacion: SituacionVolcado;
+} {
+  const urgencia = MARCAS_URGENCIA.some((p) => p.test(norm));
+  const cierre = MARCAS_CIERRE.some((p) => p.test(norm));
+  const reflexion =
+    /aprend/.test(norm) ||
+    /alternativ/.test(norm) ||
+    /me di cuenta/.test(norm) ||
+    /me hace pensar/.test(norm) ||
+    /por ejemplo/.test(norm);
+
+  if (cierre && !urgencia && !reflexion) {
+    return { planeta: PLANETA_JORNADA, situacion: "cierre" };
+  }
+  if (urgencia && reflexion) {
+    return { planeta: PLANETA_DEPOSITO, situacion: "mixta" };
+  }
+  if (urgencia) {
+    return { planeta: PLANETA_ESPEJO, situacion: "urgencia" };
+  }
+  return { planeta: PLANETA_DEPOSITO, situacion: "reflexion" };
+}
+
+function ausenciasDeCondicion(
+  faltantes: readonly CodigoOjo[],
+  situacion: SituacionVolcado
+): CodigoOjo[] {
+  if (situacion === "urgencia" || situacion === "mixta") return [];
+  return faltantes.filter((n) => OJOS_DE_URGENCIA.includes(n));
 }
 
 /** Tesis del día: refuerza el canal que se distingue, no apaga los demás. */
@@ -520,7 +622,14 @@ export function analizarVolcado(
 
   const mando = (calidad === "ruido" ? [] : abiertos.length > 0 ? abiertos : []) as CodigoOjo[];
   const conocidos = new Set<number>([...yaHabitados, ...mando]);
-  const huecos = posicion > 0 ? huecosHasta(posicion, conocidos) : [];
+  const faltantes = posicion > 0 ? huecosHasta(posicion, conocidos) : [];
+  const { planeta, situacion } =
+    calidad === "ruido"
+      ? { planeta: PLANETA_DEPOSITO as PlanetaVolcado, situacion: "reflexion" as SituacionVolcado }
+      : detectarOrdenPlaneta(norm);
+  const ausencias =
+    calidad === "ruido" ? [] : ausenciasDeCondicion(faltantes, situacion);
+  const huecos = faltantes.filter((n) => !ausencias.includes(n));
   const siguiente =
     calidad === "ruido" ? (1 as CodigoOjo) : siguienteDe(posicion, huecos);
   const tomaLugar = calidad === "tecnico" && posicion > 0 && huecos.length === 0;
@@ -540,6 +649,9 @@ export function analizarVolcado(
     asomados: calidad === "ruido" ? [] : asomados,
     mando,
     huecos,
+    ausencias,
+    planeta,
+    situacion,
     viendoCon: calidad === "ruido" ? 0 : posicion,
     tomaLugar,
     frente: calidad === "ruido" ? 0 : posicion,

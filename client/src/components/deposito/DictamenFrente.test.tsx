@@ -14,6 +14,7 @@ describe("DictamenFrente", () => {
     const html = renderToStaticMarkup(createElement(DictamenFrente, { dictamen }));
     assert.match(html, /DICTAMEN/);
     assert.match(html, /Ojo abierto: C/);
-    assert.match(html, /Observar con C/);
+    assert.match(html, /PLANETA/);
+    assert.match(html, /Observar con C|Seguir con C/);
   });
 });

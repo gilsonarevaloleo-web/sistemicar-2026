@@ -37,15 +37,20 @@ describe("analizarVolcado — posición y jerarquía de mando", () => {
     );
   });
 
-  it("la mezcla se ordena como jerarquía y el hueco de mando es el siguiente", () => {
+  it("la mezcla se ordena como mando; C5 callado en reflexión es orden de planeta", () => {
     const d = analizarVolcado(PADRE_HIJO);
     for (let i = 1; i < d.abiertos.length; i++) {
       assert.ok(d.abiertos[i] > d.abiertos[i - 1], "mando en orden de Cascada");
     }
-    assert.ok(d.huecos.length > 0);
-    assert.equal(d.siguiente, d.huecos[0]);
-    assert.match(d.dictamen, /Hueco de mando/);
-    assert.match(d.dictamen, new RegExp(`Siguiente observación: C${d.siguiente}`));
+    assert.equal(d.planeta, 2);
+    assert.equal(d.situacion, "reflexion");
+    assert.ok(d.ausencias.includes(5), "C5 no se prioriza sin urgencia");
+    assert.ok(!d.huecos.includes(5), "C5 no es hueco de esta casa");
+    assert.ok(!d.dictamen.includes("Hueco de mando: C5"));
+    assert.match(d.dictamen, /Orden de planeta: 2 Depósito/);
+    assert.match(d.dictamen, /Ausencia de condición: C5 Decisión/);
+    assert.match(d.dictamen, /Espejo \(planeta 1\)/);
+    assert.equal(d.siguiente, d.frente);
   });
 
   it("un suspiro corto sigue siendo ruido", () => {
@@ -113,7 +118,7 @@ describe("analizarVolcado — posición y jerarquía de mando", () => {
     assert.equal(d.calidad, "tecnico");
     assert.ok(!d.asomados.includes(d.frente as 1));
     assert.match(d.dictamen, /Ojo abierto: C/);
-    assert.equal(d.siguiente, d.huecos[0] ?? ((d.frente + 1) as 1));
+    assert.equal(d.siguiente, d.huecos[0] ?? d.frente);
   });
 
   it("C3 más C6: ambos entran al mando; la posición es el más alto", () => {
@@ -136,5 +141,17 @@ describe("analizarVolcado — posición y jerarquía de mando", () => {
       assert.ok(lugar.includes(n));
     }
     assert.ok(lugar.includes(d.frente as 1));
+  });
+
+  it("con urgencia, C5 sí puede ser hueco o ojo abierto", () => {
+    const d = analizarVolcado(
+      "Hoy aprendí que tuve que decidir ya: el cliente me apuraba con urgencia y dije que no. Evité el corte hasta el final y después elegí. Me preocupaba perder el pedido."
+    );
+    assert.ok(d.situacion === "urgencia" || d.situacion === "mixta");
+    assert.ok(!d.ausencias.includes(5));
+    assert.ok(
+      d.abiertos.includes(5) || d.huecos.includes(5),
+      "el corte habla cuando hay urgencia"
+    );
   });
 });

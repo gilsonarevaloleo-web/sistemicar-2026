@@ -15,6 +15,7 @@ export function EscalaDiezOjos({
 }) {
   const posicion = dictamen.viendoCon || dictamen.frente;
   const abiertos = new Set<number>(dictamen.abiertos ?? dictamen.mando ?? []);
+  const ausencias = new Set<number>(dictamen.ausencias ?? []);
 
   return (
     <ol
@@ -25,23 +26,30 @@ export function EscalaDiezOjos({
       {LEY_OPTICA_CODIGO_OJOS.map((ojo) => {
         const n = ojo.codigo;
         const esPosicion = posicion === n;
-        const esSiguiente = dictamen.siguiente === n && dictamen.calidad !== "ruido";
+        const esHueco = (dictamen.huecos ?? []).some((h) => h === n);
         const abierto = abiertos.has(n);
+        const ausencia = ausencias.has(n);
         return (
           <li key={n} className="text-center">
             <span
               className="mx-auto mb-1 block h-1.5 w-full rounded-full"
+              title={
+                ausencia
+                  ? `C${n} ${ojo.nombre} · ausencia de planeta`
+                  : `C${n} ${ojo.nombre}`
+              }
               style={{
-                backgroundColor: esSiguiente
+                backgroundColor: esHueco
                   ? AZURE
                   : esPosicion
                     ? GOLD
                     : abierto
                       ? `${GOLD}88`
-                      : "rgba(255,255,255,0.08)",
-                boxShadow: esSiguiente ? `0 0 8px ${AZURE}80` : undefined,
+                      : ausencia
+                        ? "rgba(255,255,255,0.18)"
+                        : "rgba(255,255,255,0.08)",
+                boxShadow: esHueco ? `0 0 8px ${AZURE}80` : undefined,
               }}
-              title={`C${n} ${ojo.nombre}`}
             />
             <span className="text-[8px] text-white/35">{n}</span>
           </li>
@@ -59,6 +67,9 @@ export function DictamenFrente({
   const [verMecanica, setVerMecanica] = useState(dictamen.calidad === "tecnico");
   const siguiente = LEY_OPTICA_CODIGO_OJOS[dictamen.siguiente - 1];
   const mando = dictamen.mando?.length ? dictamen.mando : dictamen.abiertos;
+  const sinHueco = (dictamen.huecos ?? []).length === 0;
+  const planeta = dictamen.planeta ?? 2;
+  const situacion = dictamen.situacion ?? "reflexion";
 
   return (
     <section
@@ -70,7 +81,19 @@ export function DictamenFrente({
         className="text-[10px] tracking-[0.22em]"
         style={{ color: GOLD }}
       >
-        DICTAMEN · {dictamen.tema.toUpperCase()}
+        DICTAMEN · {dictamen.tema.toUpperCase()} · PLANETA {planeta}
+      </p>
+      <p
+        className="text-[10px] tracking-[0.14em] text-white/40"
+        data-testid="deposito-orden-planeta"
+      >
+        {planeta === 1
+          ? "CASA · ESPEJO · URGENCIA"
+          : planeta === 3
+            ? "CASA · JORNADA · CIERRE"
+            : situacion === "mixta"
+              ? "CASA · DEPÓSITO · REFLEXIÓN CON CORTE"
+              : "CASA · DEPÓSITO · REFLEXIÓN"}
       </p>
       <p className="text-sm leading-relaxed text-white/80">{dictamen.dictamen}</p>
       {dictamen.calidad !== "ruido" && mando.length > 1 && (
@@ -95,7 +118,9 @@ export function DictamenFrente({
             }}
             data-testid="deposito-entrar-siguiente"
           >
-            Observar con C{dictamen.siguiente} {siguiente.nombre}
+            {sinHueco
+              ? `Seguir con C${dictamen.siguiente} ${siguiente.nombre}`
+              : `Observar con C${dictamen.siguiente} ${siguiente.nombre}`}
           </button>
           {verMecanica && (
             <p
