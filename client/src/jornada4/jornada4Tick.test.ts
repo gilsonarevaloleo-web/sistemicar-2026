@@ -52,6 +52,9 @@ describe("anti-freeze Dual Kernel session", () => {
     );
     assert.match(sello, /debeMostrarRelatoSello/);
     assert.match(sello, /sello-espera/);
+    assert.match(sello, /sello-apunte-form/);
+    assert.match(sello, /Esto ocurrió/);
+    assert.match(sello, /cierreDesdeApunte/);
     assert.equal(sello.includes("useJornada4Tick"), false);
     assert.match(espejo, /esLunesDeCosecha/);
     assert.match(espejo, /mostrarCosecha/);

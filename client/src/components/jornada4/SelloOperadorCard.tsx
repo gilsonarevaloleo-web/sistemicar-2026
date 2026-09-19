@@ -14,6 +14,13 @@ import {
   formatTerminoLabel,
   resolveTerminoPlanMs,
 } from "@shared/selloOperador";
+import {
+  APUNTE_MAX_LEN,
+  cierreDesdeApunte,
+  fraseValida,
+} from "@shared/jornadaApunte";
+import { apuntarJornada, cerrarApunteJornada } from "@/lib/jornadaApunteStore";
+import { useJornadaApunte } from "@/hooks/useJornadaApunte";
 
 const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
 
@@ -26,6 +33,39 @@ type Props = {
   tick?: number;
 };
 
+function FraseField({
+  label,
+  value,
+  onChange,
+  testId,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  testId: string;
+  placeholder: string;
+}) {
+  return (
+    <label className="block space-y-1">
+      <span
+        className="text-[9px] font-black uppercase tracking-widest"
+        style={{ color: GOLD }}
+      >
+        {label}
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value.slice(0, APUNTE_MAX_LEN))}
+        placeholder={placeholder}
+        rows={2}
+        className="w-full rounded-lg px-2.5 py-2 text-[13px] bg-black/40 border border-white/10 text-slate-100 resize-none"
+        data-testid={testId}
+      />
+    </label>
+  );
+}
+
 export function SelloOperadorCard({
   userId,
   segmentos,
@@ -36,20 +76,34 @@ export function SelloOperadorCard({
   void tick;
   const nowMs = Date.now();
   const fecha = getJournalDateString(nowMs);
+  const { record, apuntado } = useJornadaApunte(nowMs);
   const [sello, setSello] = useState<CierreJornadaLog | null>(() =>
     readLocalCierreJornadaByFecha(fecha),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blanco, setBlanco] = useState(record?.blanco ?? "");
+  const [ocurrio, setOcurrio] = useState(record?.ocurrio ?? "");
+  const [noOcurrio, setNoOcurrio] = useState(record?.noOcurrio ?? "");
 
   useEffect(() => {
     setSello(readLocalCierreJornadaByFecha(fecha));
   }, [fecha]);
 
+  useEffect(() => {
+    if (record?.blanco) setBlanco(record.blanco);
+    if (record?.ocurrio) setOcurrio(record.ocurrio);
+    if (record?.noOcurrio) setNoOcurrio(record.noOcurrio);
+  }, [record]);
+
   const sellado = sello?.selloEmitido === true && sello.selladoPor === "operador";
   const terminoMs = resolveTerminoPlanMs(segmentos, nowMs);
   const terminoLabel = terminoMs != null ? formatTerminoLabel(terminoMs) : null;
   const relatoVisible = debeMostrarRelatoSello(nowMs, sellado, terminoMs);
+  const puedeSellar =
+    fraseValida(apuntado ? record?.blanco ?? blanco : blanco) &&
+    fraseValida(ocurrio) &&
+    fraseValida(noOcurrio);
 
   const draft = useMemo(() => {
     if (!userId || sello?.selloEmitido || !relatoVisible) return null;
@@ -65,15 +119,18 @@ export function SelloOperadorCard({
   }, [userId, segmentos, vehicles, todayPs, sello?.selloEmitido, relatoVisible]);
 
   const sellar = async () => {
-    if (!userId || busy) return;
+    if (!userId || busy || !puedeSellar) return;
     setBusy(true);
     setError(null);
     try {
+      if (!apuntado) apuntarJornada(blanco);
+      const cerrado = cerrarApunteJornada(ocurrio, noOcurrio);
       const log = await emitirSelloOperador({
         userId,
         segmentos,
         vehicles,
         totalPS: todayPs,
+        cierre: cierreDesdeApunte(cerrado),
       });
       setSello(log);
     } catch (e) {
@@ -137,24 +194,68 @@ export function SelloOperadorCard({
         </p>
       )}
       {sellado ? (
-        <p
-          className="text-[9px] font-black uppercase tracking-widest"
-          style={{ color: GOLD }}
-          data-testid="sello-cerrado"
-        >
-          Día sellado · tú firmaste
-        </p>
+        <div className="space-y-1" data-testid="sello-apunte-cerrado">
+          <p className="text-[11px] leading-snug" style={{ color: INK }}>
+            <span style={{ color: GOLD }}>Hoy apunté. </span>
+            {sello?.apunteBlanco}
+          </p>
+          <p className="text-[11px] leading-snug" style={{ color: INK }}>
+            <span style={{ color: GOLD }}>Esto ocurrió. </span>
+            {sello?.apunteOcurrio}
+          </p>
+          <p className="text-[11px] leading-snug" style={{ color: INK }}>
+            <span style={{ color: MUTED }}>Esto no. </span>
+            {sello?.apunteNoOcurrio}
+          </p>
+          <p
+            className="text-[9px] font-black uppercase tracking-widest pt-1"
+            style={{ color: GOLD }}
+            data-testid="sello-cerrado"
+          >
+            Día sellado · tú firmaste
+          </p>
+        </div>
       ) : (
-        <button
-          type="button"
-          disabled={!userId || busy}
-          onClick={() => void sellar()}
-          className="w-full py-2.5 rounded-lg text-[11px] font-black uppercase tracking-wider"
-          style={{ backgroundColor: `${GOLD}22`, color: GOLD }}
-          data-testid="sello-operador-firmar"
-        >
-          {busy ? "Sellando…" : "Yo sello la jornada"}
-        </button>
+        <div className="space-y-2" data-testid="sello-apunte-form">
+          {apuntado ? (
+            <p className="text-[12px] leading-snug" style={{ color: INK }} data-testid="sello-apunte-blanco">
+              <span style={{ color: GOLD }}>Hoy apunté a esto. </span>
+              {record?.blanco}
+            </p>
+          ) : (
+            <FraseField
+              label="Hoy apunto a esto"
+              value={blanco}
+              onChange={setBlanco}
+              testId="sello-apunte-blanco-input"
+              placeholder="Hoy apunto a esto"
+            />
+          )}
+          <FraseField
+            label="Esto ocurrió"
+            value={ocurrio}
+            onChange={setOcurrio}
+            testId="sello-apunte-ocurrio"
+            placeholder="Esto ocurrió"
+          />
+          <FraseField
+            label="Esto no"
+            value={noOcurrio}
+            onChange={setNoOcurrio}
+            testId="sello-apunte-no"
+            placeholder="Esto no"
+          />
+          <button
+            type="button"
+            disabled={!userId || busy || !puedeSellar}
+            onClick={() => void sellar()}
+            className="w-full py-2.5 rounded-lg text-[11px] font-black uppercase tracking-wider disabled:opacity-40"
+            style={{ backgroundColor: `${GOLD}22`, color: GOLD }}
+            data-testid="sello-operador-firmar"
+          >
+            {busy ? "Sellando…" : "Yo sello la jornada"}
+          </button>
+        </div>
       )}
       {error ? (
         <p className="text-[10px] text-red-400" data-testid="sello-error">
