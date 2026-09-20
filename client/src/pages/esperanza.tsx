@@ -137,8 +137,15 @@ export default function Esperanza() {
       .map((v) => v.diagnostico?.codigoDominante)
       .filter((n): n is CodigoObservador => typeof n === "number");
     if (diagnostico) dominantes.unshift(diagnostico.codigoDominante);
-    return calcularExpedienteOjos(dominantes);
-  }, [historial, diagnostico]);
+    const lecturas = historial
+      .filter((v) => v.texto)
+      .slice(0, 20)
+      .map((v) => calcularGradoVolcado(v.texto, v.diagnostico));
+    if (diagnostico && ultimoVolcado) {
+      lecturas.unshift(calcularGradoVolcado(ultimoVolcado, diagnostico));
+    }
+    return calcularExpedienteOjos(dominantes, lecturas);
+  }, [historial, diagnostico, ultimoVolcado]);
 
   return (
     <div

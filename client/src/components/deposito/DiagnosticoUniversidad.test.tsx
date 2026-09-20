@@ -28,7 +28,7 @@ describe("DiagnosticoUniversidad", () => {
     assert.match(html, /MECÁNICA DE ABSORCIÓN/);
     assert.match(html, /El Ojo del Ritmo/);
     assert.match(html, /G\d/);
-    assert.match(html, /EXPEDIENTE/);
+    assert.match(html, /MAPA DE CALOR/);
     assert.doesNotMatch(html, /C1 y C2/);
   });
 });

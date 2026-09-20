@@ -55,6 +55,11 @@ export function DiagnosticoUniversidad({
               {etiquetaGrado(lectura.grado)}
             </span>
           )}
+          {expediente && (
+            <span className="block mt-1 text-white/45">
+              {etiquetaGrado(expediente.gradoOperador)}
+            </span>
+          )}
         </span>
       </div>
 
@@ -81,11 +86,19 @@ export function DiagnosticoUniversidad({
           className="text-[10px] tracking-[0.22em] mb-2"
           style={{ color: AZURE }}
         >
-          2 · PUNTO CIEGO / CEGUERA ACTIVA
+          2 · PUNTO CIEGO / LO NO DICHO
         </p>
         <p className="text-sm leading-relaxed text-white/80">
           {diagnostico.puntoCiego}
         </p>
+        {lectura && (
+          <p
+            className="mt-2 text-[11px] leading-relaxed text-white/40"
+            data-testid="deposito-capas"
+          >
+            Señal: {lectura.capas.senal} · {lectura.capas.ruido}
+          </p>
+        )}
       </div>
 
       <div data-testid="deposito-devolucion-maestro">
@@ -119,22 +132,26 @@ export function DiagnosticoUniversidad({
             className="text-[10px] tracking-[0.22em] mb-2"
             style={{ color: GOLD }}
           >
-            EXPEDIENTE · TECHO {expediente.rango}/{expediente.techo}
+            MAPA DE CALOR · {expediente.rango}/{expediente.techo} ·{" "}
+            {etiquetaGrado(expediente.gradoOperador)}
           </p>
           <ol className="grid grid-cols-10 gap-1 mb-2" aria-label="Ojos nombrados">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
               const nombrado = expediente.ojosNombrados.includes(n as CodigoObservador);
               const hueco = expediente.hueco === n;
+              const atasco = expediente.atasco === n;
               return (
                 <li key={n} className="text-center">
                   <span
                     className="mx-auto mb-1 block h-1.5 w-full rounded-full"
                     style={{
-                      backgroundColor: hueco
-                        ? AZURE
-                        : nombrado
-                          ? GOLD
-                          : "rgba(255,255,255,0.08)",
+                      backgroundColor: atasco
+                        ? "#F97316"
+                        : hueco
+                          ? AZURE
+                          : nombrado
+                            ? GOLD
+                            : "rgba(255,255,255,0.08)",
                     }}
                   />
                   <span className="text-[8px] text-white/35">{n}</span>
