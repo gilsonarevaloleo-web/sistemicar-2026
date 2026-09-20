@@ -193,15 +193,12 @@ export const DICCIONARIO_OJOS: Record<CodigoObservador, FichaOjoCodigo> = {
 const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
   1: [
     /utilidad/,
-    /sirve/,
-    /ruido/,
     /clarid/,
     /esencial/,
-    /pura?/,
-    /sin flor/,
+    /sin ruido/,
     /una frase/,
-    /para que/,
-    /para qué/,
+    /para que sirve/,
+    /para qué sirve/,
   ],
   2: [
     /combin/,
@@ -210,9 +207,8 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /coincid/,
     /confusion/,
     /confusión/,
-    /junto/,
     /apalanc/,
-    /suma/,
+    /\bsuma\b/,
     /mezcl/,
   ],
   3: [
@@ -220,13 +216,6 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /frecuencia/,
     /secuencia/,
     /velocidad/,
-    /minuto/,
-    /repet/,
-    /tiempo/,
-    /primero/,
-    /despues/,
-    /después/,
-    /\bluego\b/,
     /paso a paso/,
   ],
   4: [
@@ -243,8 +232,6 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /riesgo/,
   ],
   5: [
-    /numero/,
-    /número/,
     /metric/,
     /métric/,
     /cifra/,
@@ -254,7 +241,6 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /proporción/,
     /porcentaje/,
     /\b\d+\s*%/,
-    /cantidad/,
   ],
   6: [
     /rechazo/,
@@ -275,7 +261,6 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /justo/,
     /justicia/,
     /culpa/,
-    /\bvalor\b/,
     /barato/,
     /caro/,
     /intercambio/,
@@ -292,33 +277,35 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /persist/,
     /marco/,
     /constancia/,
-    /otra vez/,
     /siempre pasa/,
   ],
   9: [
     /sistema/,
     /circuito/,
-    /\bred\b/,
+    /proceso/,
+    /alrededor/,
+    /carga cognitiva/,
+    /como se llama/,
+    /cómo se llama/,
+    /leccion/,
+    /lección/,
+    /observ/,
     /causa/,
     /efecto/,
-    /escala/,
-    /rutina/,
-    /arquitectura/,
-    /el todo/,
-    /leyes?/,
+    /patron/,
+    /patrón/,
+    /entiende/,
   ],
   10: [
-    /autor/,
+    /\bautor/,
     /\brol\b/,
     /soberan/,
     /identidad/,
     /dueño/,
     /dueno/,
     /dominio/,
-    /presencia/,
     /asumo/,
-    /estandar/,
-    /estándar/,
+    /se defend/,
   ],
 };
 
@@ -381,11 +368,21 @@ devolucionMaestro se redacta desde el CARÁCTER del Código dominante:
 2) REVELACIÓN DE 2ª RESISTENCIA: lo que hace cuando el código le pega (freeze, flor, chase, huida, pose).
 3) VEREDICTO: un corte limpio. No sermón.
 
-puntoCiego = lo que el relato revela que el alumno NO está observando.
-mecanicaAbsorcion = UNA sola tarea práctica, ejecutable mañana en la vida real.
+puntoCiego = lo que ESTE relato revela que el alumno NO está observando.
+mecanicaAbsorcion = UNA sola tarea práctica, ejecutable mañana en LA ESCENA de este volcado.
 nivelCargaSugerido = BASICO | INTERMEDIO | SUPERIOR según densidad y alcance del volcado.
 
+═══ ANCLAJE AL VOLCADO (INQUEBRANTABLE) ═══
+justificacionDominante, puntoCiego, devolucionMaestro y mecanicaAbsorcion
+DEBEN citar un hecho de ESTE texto (una frase dicha, una pregunta, un nombre, una prueba).
+Prohibido copiar las cegueras típicas del diccionario si no calzan.
+Prohibido un espejo que sea el párrafo pegado o recortado a 140 caracteres.
+Prohibido Carga BASICO si el volcado trae hipótesis + escena + prueba.
+El centro de gravedad es lo que el alumno APRENDIÓ, no la palabra más repetida.
+«no sirve», «después» o «minutos» no eligen código por sí solos.
+
 Cero New Age, cero flor, cero «ánimo», cero listas de códigos.
+Cero plantilla. Si no podés nombrar el hecho, el JSON es inválido.
 `.trim();
 
 const JSON_SCHEMA_EJEMPLO = `{
@@ -604,6 +601,48 @@ function normalizar(texto: string): string {
     .trim();
 }
 
+interface HechosVolcado {
+  tesis: string;
+  cita: string;
+  pregunta: string;
+}
+
+function limpiarPieza(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim();
+}
+
+function extraerHechos(texto: string): HechosVolcado {
+  const tesisMatch = texto.match(
+    /aprend[ií](?:\s+\w+){0,4}\s+que\s+([^?.!]{10,220})/i,
+  );
+  const tesis = limpiarPieza(tesisMatch?.[1] ?? "");
+
+  const marcadas = [...texto.matchAll(/¿([^?]{8,160})\?/g)].map((m) =>
+    limpiarPieza(m[1]),
+  );
+  const sueltas = [...texto.matchAll(/([^?.!\n]{10,120}\?)/g)].map((m) =>
+    limpiarPieza(m[1].replace(/^¿/, "")),
+  );
+  const preguntas = marcadas.length > 0 ? marcadas : sueltas;
+  const pregunta =
+    preguntas.find((p) =>
+      /c[oó]mo se llama|qu[eé] es eso|qu[eé] hace/i.test(p),
+    ) ||
+    preguntas.find((p) => !/por\s*qu[eé]\s+digo/i.test(p)) ||
+    "";
+
+  const citas = [
+    ...texto.matchAll(/[«"“]([^»"”]{8,160})[»"”]/g),
+  ].map((m) => limpiarPieza(m[1]));
+  const cita = citas.find((c) => c.length >= 12) ?? "";
+
+  return { tesis, cita, pregunta };
+}
+
+function anclaDe(h: HechosVolcado): string {
+  return h.pregunta || h.cita || h.tesis;
+}
+
 function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
   const norm = normalizar(textoVolcado);
   let mejor: CodigoObservador = 1;
@@ -622,47 +661,100 @@ function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
 function nivelCargaLocal(
   palabras: number,
   codigo: CodigoObservador,
+  hechos: HechosVolcado,
 ): NivelCargaSugerido {
   if (palabras < 12) return "BASICO";
-  if (palabras >= 80 || codigo >= 8) return "SUPERIOR";
+  const tienePrueba = Boolean(hechos.cita || hechos.pregunta);
+  if (palabras >= 80 || codigo >= 8 || (tienePrueba && palabras >= 40)) {
+    return "SUPERIOR";
+  }
   return "INTERMEDIO";
+}
+
+function puntoCiegoAnclado(
+  codigo: CodigoObservador,
+  ojo: FichaOjoCodigo,
+  h: HechosVolcado,
+): string {
+  if (codigo === 9 && h.pregunta) {
+    return `Ella ya pidió el nombre del patrón («${h.pregunta}»). El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
+  }
+  const ancla = anclaDe(h);
+  if (ancla) {
+    return `${ojo.cegueraActiva} Quedó suelto en este volcado: «${clamp(ancla, 160)}».`;
+  }
+  return ojo.cegueraActiva;
+}
+
+function mecanicaAnclada(
+  codigo: CodigoObservador,
+  ojo: FichaOjoCodigo,
+  h: HechosVolcado,
+): string {
+  const pieza = anclaDe(h);
+  if (!pieza) return ojo.gestoAbsorcion;
+  const corto = clamp(pieza, 120);
+  if (codigo === 9) {
+    return `Mañana, en UNA tarea de casa (juntar, guardar o vestir), al cierre nombrá en voz alta la ley. Si aparece «${corto}», contestá con un nombre, no con un sermón. Una frase. Sin comparaciones ni castigo.`;
+  }
+  if (codigo === 3) {
+    return `Mañana, UNA secuencia de tres pasos con hora de inicio y de corte, anclada a «${corto}». El reloj manda, no el apuro.`;
+  }
+  return `Mañana, un solo gesto de ${ojo.focoAtencion} en la escena de este volcado. Ancla: «${corto}». ${ojo.gestoAbsorcion}`;
+}
+
+function devolucionAnclada(
+  ojo: FichaOjoCodigo,
+  h: HechosVolcado,
+): string {
+  const espejo = h.tesis
+    ? `Espejo: el aprendizaje que nombraste es que ${clamp(h.tesis, 180)}.`
+    : `Espejo: trajiste «${clamp(anclaDe(h) || "el día crudo", 160)}».`;
+  const prueba = h.cita
+    ? ` La prueba que quedó en la mesa: «${clamp(h.cita, 140)}».`
+    : "";
+  const r2 = `2ª resistencia: convertir el hallazgo en victoria de método, en vez de instalar ${ojo.focoAtencion}.`;
+  const veredicto = `Veredicto: ${ojo.voz} corta a un solo gesto. Mañana el circuito tiene nombre, no héroe.`;
+  return `${espejo}${prueba} ${r2} ${veredicto}`;
 }
 
 /**
  * Diagnóstico local de respaldo cuando Gemini falla/timeout/parsea mal.
  * Aplica el Muro: un solo código (el de más señales; empate → el más bajo).
+ * La devolución se ancla a tesis / pregunta / cita de ESTE volcado.
  */
 export function diagnosticarVolcadoLocal(
   textoVolcado: string,
 ): DiagnosticoVolcado {
   const texto = textoVolcado.trim();
   const palabras = contarPalabras(texto);
+  const hechos = extraerHechos(texto);
   const codigo = elegirCodigoDominanteLocal(texto);
   const ojo = DICCIONARIO_OJOS[codigo];
-  const recorte = texto.slice(0, 140) || "(vacío)";
 
-  const justificacionDominante =
-    palabras < 6
-      ? `El volcado todavía es ruido. El centro de gravedad por defecto es ${ojo.nombreOjo}: hace falta nombrar utilidad, no clima.`
-      : `El relato gravita en ${ojo.nombreOjo}. Lo que se observa con más peso es ${ojo.focoAtencion}, no un inventario de códigos.`;
+  if (palabras < 6) {
+    return hidratarDiagnostico(1, {
+      justificacionDominante:
+        "El volcado todavía es ruido. El centro de gravedad por defecto es El Ojo de la Claridad: hace falta nombrar utilidad, no clima.",
+      puntoCiego:
+        "El relato no observa nada operable: hay emoción suelta y cero utilidad nombrada.",
+      devolucionMaestro:
+        "Espejo: trajiste clima. 2ª resistencia: la niebla se hace pasar por aprendizaje. Veredicto: El Cortador de Niebla pide una frase útil de hoy.",
+      mecanicaAbsorcion: DICCIONARIO_OJOS[1].gestoAbsorcion,
+      nivelCargaSugerido: "BASICO",
+    });
+  }
 
-  const puntoCiego =
-    palabras < 6
-      ? "El relato no observa nada operable: hay emoción suelta y cero utilidad nombrada."
-      : ojo.cegueraActiva;
-
-  const devolucionMaestro = [
-    `Espejo: «${recorte}${texto.length > 140 ? "…" : ""}» — eso es lo que trajiste a la mesa.`,
-    `2ª resistencia: ${ojo.cegueraActiva}`,
-    `Veredicto: ${ojo.voz} corta a un solo gesto. Mañana absorbés ${ojo.focoAtencion}, no el resto del mapa.`,
-  ].join(" ");
+  const tesis = hechos.tesis
+    ? `El aprendizaje («${clamp(hechos.tesis, 180)}») gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
+    : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
   return hidratarDiagnostico(codigo, {
-    justificacionDominante,
-    puntoCiego,
-    devolucionMaestro,
-    mecanicaAbsorcion: ojo.gestoAbsorcion,
-    nivelCargaSugerido: nivelCargaLocal(palabras, codigo),
+    justificacionDominante: tesis,
+    puntoCiego: puntoCiegoAnclado(codigo, ojo, hechos),
+    devolucionMaestro: devolucionAnclada(ojo, hechos),
+    mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos),
+    nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
   });
 }
 
