@@ -21,6 +21,7 @@ import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4PlanEnd } from "@/hooks/useJornada4PlanEnd";
 import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
+import { Jornada4ApunteCard } from "@/components/jornada4/Jornada4ApunteCard";
 import {
   buildRevelacionPlanDia,
   isPlanTerminado,
@@ -354,6 +355,7 @@ export default function JornadaV4Session() {
       />
       <Jornada4MobileNav value={mobileTab} onChange={setMobileTab} />
       <div className="max-w-lg mx-auto pt-2">
+        <Jornada4ApunteCard />
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">
             <Jornada4RevelacionCard

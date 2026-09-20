@@ -143,6 +143,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
     assert.match(session, /useJornada4PlanEnd/);
     assert.match(session, /Jornada4RevelacionCard/);
+    assert.match(session, /Jornada4ApunteCard/);
     assert.equal(session.includes("useJornada4Tick"), false);
     assert.equal(session.includes("HubRendicionTiempo"), false);
   });

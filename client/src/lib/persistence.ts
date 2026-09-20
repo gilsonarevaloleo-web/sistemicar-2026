@@ -624,6 +624,10 @@ export interface CierreJornadaLog {
   recintosAbiertos?: number;
   vehiculosCerradosManual?: number;
   vehiculosCerradosSistema?: number;
+  /** Frases del operador: hoy apunto / esto ocurrió / esto no. */
+  apunteBlanco?: string;
+  apunteOcurrio?: string;
+  apunteNoOcurrio?: string;
 }
 
 export interface Vehicle {

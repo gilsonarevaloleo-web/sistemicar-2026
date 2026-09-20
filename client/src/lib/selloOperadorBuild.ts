@@ -1,4 +1,8 @@
 import { construirSelloOperador, type SelloOperadorDraft } from "@shared/selloOperador";
+import {
+  adjuntarApunteAlCierre,
+  type JornadaApunteCierre,
+} from "@shared/jornadaApunte";
 import { calcularBalanceConquistaJornada } from "@/engines/ConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
 import {
@@ -94,9 +98,10 @@ export async function emitirSelloOperador(params: {
   vehicles: Vehicle[];
   totalPS: number;
   nowMs?: number;
+  cierre: JornadaApunteCierre;
 }): Promise<CierreJornadaLog> {
   const draft = buildSelloDraft(params);
-  const log = draftToCierreLog(draft);
+  const log = adjuntarApunteAlCierre(draftToCierreLog(draft), params.cierre);
   await saveCierreJornada(params.userId, log);
   return log;
 }
