@@ -26,6 +26,7 @@ import Tutorial from "@/pages/tutorial";
 import Console from "@/pages/console";
 const JornadaV4 = lazyWithRetry(() => import("@/pages/jornadaV4"));
 import Esperanza from "@/pages/esperanza";
+import DepositoV2 from "@/pages/deposito-v2";
 import Rewards from "@/pages/rewards";
 import Analytics from "@/pages/analytics";
 import Acerca from "@/pages/acerca";
@@ -390,6 +391,12 @@ function Router() {
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />
+        </Route>
+        <Route path="/deposito/v2">
+          <Redirect to="/esperanza/v2" />
+        </Route>
+        <Route path="/esperanza/v2">
+          <ProtectedRoute component={DepositoV2} />
         </Route>
         <Route path="/deposito">
           <Redirect to="/esperanza" />
