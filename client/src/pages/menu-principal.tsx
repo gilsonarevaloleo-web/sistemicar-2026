@@ -142,7 +142,7 @@ function buildMenuItems(
     {
       id: "deposito-v2",
       title: "DEPÓSITO V2",
-      subtitle: "Óptica-Código · volcado y diez ojos",
+      subtitle: "Universidad · ¿Qué aprendí hoy?",
       icon: Sunrise,
       route: "/esperanza",
       color: SPECTRUM.NARANJA,

@@ -46,6 +46,8 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /listVolcadosLocal/);
     assert.match(src, /data-testid="deposito-v2-page"/);
     assert.match(src, /DEPÓSITO V2/);
+    assert.match(src, /DiagnosticoUniversidad/);
+    assert.match(src, /procesarVolcadoRemoto/);
     assert.doesNotMatch(src, /setLoading\(true\)/);
     assert.doesNotMatch(src, /if \(loading\)/);
   });
