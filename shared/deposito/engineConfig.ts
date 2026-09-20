@@ -598,7 +598,7 @@ function hitsDe(norm: string, pats: RegExp[]): number {
 function normalizar(texto: string): string {
   return texto
     .normalize("NFD")
-    .replace(/\p{M}/gu, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
@@ -711,7 +711,7 @@ export async function procesarVolcadoAprendizajeConFuente(
       } catch (err2) {
         console.warn(
           "[deposito/volcado] Gemini falló → fallback local:",
-          err2 ?? err,
+          err2 instanceof Error ? err2.message : String(err2 ?? err),
         );
       }
     }
