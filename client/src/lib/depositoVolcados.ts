@@ -12,6 +12,7 @@ import {
   isFirebaseConfigured,
 } from "./firebase";
 import type { DictamenOptico } from "@shared/deposito/analizarVolcado";
+import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
 
 export interface VolcadoEntry {
   id: string;
@@ -19,6 +20,7 @@ export interface VolcadoEntry {
   userId: string;
   createdAt: Date;
   dictamen: DictamenOptico;
+  diagnostico?: DiagnosticoVolcado;
 }
 
 const STORAGE_KEY = "sistemicar_volcados";
@@ -73,6 +75,7 @@ export function subscribeToVolcados(
             texto: raw.texto,
             userId: raw.userId,
             dictamen: raw.dictamen,
+            diagnostico: raw.diagnostico,
             createdAt: raw.createdAt?.toDate?.() || new Date(),
           } satisfies VolcadoEntry;
         });
@@ -100,7 +103,8 @@ export function subscribeToVolcados(
 function saveVolcadoLocal(
   userId: string,
   texto: string,
-  dictamen: DictamenOptico
+  dictamen: DictamenOptico,
+  diagnostico?: DiagnosticoVolcado,
 ): string {
   const entries = parseLocal();
   const id = `local_${Date.now()}`;
@@ -108,6 +112,7 @@ function saveVolcadoLocal(
     id,
     texto,
     dictamen,
+    diagnostico,
     userId,
     createdAt: new Date(),
   });
@@ -135,7 +140,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function addVolcadoEntry(
   userId: string,
   texto: string,
-  dictamen: DictamenOptico
+  dictamen: DictamenOptico,
+  diagnostico?: DiagnosticoVolcado,
 ): Promise<string> {
   if (isFirebaseConfigured() && db) {
     try {
@@ -144,6 +150,7 @@ export async function addVolcadoEntry(
         addDoc(collection(db, path), {
           texto,
           dictamen,
+          diagnostico: diagnostico ?? null,
           userId,
           createdAt: serverTimestamp(),
         }),
@@ -152,11 +159,11 @@ export async function addVolcadoEntry(
       return docRef.id;
     } catch (err) {
       console.error("Volcado remoto falló; se guarda en local:", err);
-      return saveVolcadoLocal(userId, texto, dictamen);
+      return saveVolcadoLocal(userId, texto, dictamen, diagnostico);
     }
   }
 
-  return saveVolcadoLocal(userId, texto, dictamen);
+  return saveVolcadoLocal(userId, texto, dictamen, diagnostico);
 }
 
 export async function deleteVolcadoEntry(userId: string, entryId: string): Promise<void> {

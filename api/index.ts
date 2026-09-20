@@ -7,6 +7,7 @@ import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "../server/mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
+import { registerDepositoV2Routes } from "../server/depositoV2Routes";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -57,6 +58,9 @@ initUmbralSessionsTable().catch((err) =>
 registerUmbralV2Routes(app, {
   callGemini: callGeminiUmbral,
   sessionStore: createDefaultUmbralSessionStore(),
+});
+registerDepositoV2Routes(app, {
+  callGemini: callGeminiUmbral,
 });
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {

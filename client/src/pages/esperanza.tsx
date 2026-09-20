@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
+import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import { procesarVolcadoRemoto } from "@/lib/deposito/api";
 import {
   addVolcadoEntry,
   listVolcadosLocal,
@@ -17,6 +19,10 @@ import {
   analizarVolcado,
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
+import {
+  diagnosticarVolcadoLocal,
+  type DiagnosticoVolcado,
+} from "@shared/deposito/engineConfig";
 import { LEY_OPTICA_CODIGO_RITUAL } from "@shared/deposito/leyOpticaCodigo";
 import { PLANETA_DEPOSITO, etiquetaMundo } from "@shared/planetas/leyCasasUmbral";
 
@@ -31,6 +37,7 @@ export default function Esperanza() {
   const [texto, setTexto] = useState("");
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoVolcado | null>(null);
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
   const dictamenRef = useRef<HTMLDivElement>(null);
 
@@ -69,20 +76,40 @@ export default function Esperanza() {
     }
     const d = analizarVolcado(crudo);
     setDictamen(d);
+    const localDiag = diagnosticarVolcadoLocal(crudo);
+    setDiagnostico(localDiag);
+    requestAnimationFrame(() =>
+      dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+
+    setSaving(true);
+    let diag: DiagnosticoVolcado = localDiag;
+    try {
+      const remoto = await procesarVolcadoRemoto(crudo);
+      diag = remoto.diagnostico;
+      setDiagnostico(diag);
+    } catch {
+      diag = localDiag;
+    }
+
     if (d.calidad === "ruido") {
       toast.message("Todavía es ruido. Reescribí el volcado.");
-      return;
-    }
-    if (!user) {
-      toast.error("Entrá para guardar el volcado.");
+      setSaving(false);
       requestAnimationFrame(() =>
         dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
       );
       return;
     }
-    setSaving(true);
+    if (!user) {
+      toast.error("Entrá para guardar el volcado.");
+      setSaving(false);
+      requestAnimationFrame(() =>
+        dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      );
+      return;
+    }
     try {
-      await addVolcadoEntry(user.uid, crudo, d);
+      await addVolcadoEntry(user.uid, crudo, d, diag);
       setTexto("");
       toast.success("Volcado guardado.");
       requestAnimationFrame(() =>
@@ -127,7 +154,7 @@ export default function Esperanza() {
             {LEY_OPTICA_CODIGO_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            Volcá el día. Crudo. El sistema nombra el ojo.
+            Volcá el día. Crudo. La Universidad nombra un solo ojo.
           </p>
         </header>
 
@@ -163,14 +190,15 @@ export default function Esperanza() {
               }}
               data-testid="deposito-guardar"
             >
-              {saving ? "Guardando…" : "Guardar volcado"}
+              {saving ? "Leyendo el volcado…" : "Guardar volcado"}
             </button>
           </div>
         </section>
 
-        {dictamen && (
-          <div ref={dictamenRef} className="mb-10">
-            <DictamenFrente dictamen={dictamen} />
+        {(diagnostico || dictamen) && (
+          <div ref={dictamenRef} className="mb-10 space-y-4">
+            {diagnostico && <DiagnosticoUniversidad diagnostico={diagnostico} />}
+            {dictamen && <DictamenFrente dictamen={dictamen} />}
           </div>
         )}
 
@@ -190,9 +218,11 @@ export default function Esperanza() {
                   style={{ borderColor: "rgba(255,255,255,0.08)" }}
                 >
                   <p className="text-[10px] text-white/40 mb-1">
-                    {v.dictamen.calidad === "tecnico"
-                      ? `C${v.dictamen.frente} → C${v.dictamen.siguiente} · ${v.dictamen.tema}`
-                      : v.dictamen.calidad.toUpperCase()}
+                    {v.diagnostico
+                      ? `C${v.diagnostico.codigoDominante} ${v.diagnostico.nombreOjoDominante}`
+                      : v.dictamen.calidad === "tecnico"
+                        ? `C${v.dictamen.frente} → C${v.dictamen.siguiente} · ${v.dictamen.tema}`
+                        : v.dictamen.calidad.toUpperCase()}
                   </p>
                   <p className="text-sm text-white/70 line-clamp-3">{v.texto}</p>
                 </li>
