@@ -601,7 +601,7 @@ function normalizar(texto: string): string {
     .trim();
 }
 
-interface HechosVolcado {
+export interface HechosVolcado {
   tesis: string;
   cita: string;
   pregunta: string;
@@ -611,7 +611,7 @@ function limpiarPieza(raw: string): string {
   return raw.replace(/\s+/g, " ").trim();
 }
 
-function extraerHechos(texto: string): HechosVolcado {
+export function extraerHechos(texto: string): HechosVolcado {
   const tesisMatch = texto.match(
     /aprend[ií](?:\s+\w+){0,4}\s+que\s+([^?.!]{10,220})/i,
   );
