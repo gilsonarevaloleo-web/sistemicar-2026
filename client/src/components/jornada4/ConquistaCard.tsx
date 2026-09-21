@@ -67,6 +67,7 @@ import {
   searchDesglosadorListas,
   type DesglosadorListaGuardada,
 } from "@/lib/desglosadorListasStore";
+import { tituloPausaInterrupcion } from "@/lib/vehiculoPausa";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -91,7 +92,7 @@ type Props = {
   onDestinoChange?: (destino: DestinoCierre, proyectoId?: string) => void;
   onAddSub?: (form: AddSubForm) => void;
   onAddSubs?: (forms: AddSubForm[]) => void;
-  onPausaInterrupcion?: (titulo: string) => void;
+  onPausaInterrupcion?: (titulo?: string) => void;
   onResumeDesglosador?: () => void;
   onReorderSubs?: (movedId: string, direction: ReorderDirection) => void;
 };
@@ -172,8 +173,6 @@ export function ConquistaCard({
   const [listaPickSelected, setListaPickSelected] = useState<boolean[]>([]);
   const seccionGroups = useMemo(() => groupSubsBySeccion(subs), [subs]);
   const familiaActiva = lastSeccionTitulo(subs);
-  const [showPausaForm, setShowPausaForm] = useState(false);
-  const [pausaTitulo, setPausaTitulo] = useState("");
   const [pausaEnviando, setPausaEnviando] = useState(false);
   const [reorderMode, setReorderMode] = useState(false);
   const [cierreEnviando, setCierreEnviando] = useState<"cumplido" | "fallado" | "ciclo" | null>(null);
@@ -684,62 +683,31 @@ export function ConquistaCard({
 
               {!paused && onPausaInterrupcion ? (
                 <div className="mb-1">
-                  {!showPausaForm ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowPausaForm(true)}
-                      className="w-full py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider"
-                      style={{
-                        backgroundColor: "rgba(0,255,195,0.08)",
-                        color: CYAN,
-                        border: "1px solid rgba(0,255,195,0.25)",
-                      }}
-                      data-testid="j4-conquista-pausa"
-                    >
-                      Pausar e interrumpir
-                    </button>
-                  ) : (
-                    <div className="flex gap-1.5">
-                      <input
-                        value={pausaTitulo}
-                        onChange={e => setPausaTitulo(e.target.value)}
-                        placeholder="Tarea que interrumpe..."
-                        className="flex-1 px-2 py-1.5 rounded bg-black/40 border text-white text-[10px] focus:outline-none"
-                        style={{ borderColor: "rgba(0,255,195,0.25)" }}
-                        data-testid="j4-conquista-pausa-input"
-                      />
-                      <button
-                        type="button"
-                        disabled={pausaEnviando || !pausaTitulo.trim()}
-                        onClick={() => {
-                          if (pausaEnviando || !pausaTitulo.trim()) return;
-                          setPausaEnviando(true);
-                          void Promise.resolve(onPausaInterrupcion(pausaTitulo.trim())).finally(
-                            () => {
-                              setPausaEnviando(false);
-                              setPausaTitulo("");
-                              setShowPausaForm(false);
-                            }
-                          );
-                        }}
-                        className="px-2 py-1.5 rounded text-[9px] font-bold disabled:opacity-40"
-                        style={{ backgroundColor: "rgba(0,255,195,0.2)", color: CYAN }}
-                        data-testid="j4-conquista-pausa-go"
-                      >
-                        {pausaEnviando ? "…" : "Ir"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowPausaForm(false);
-                          setPausaTitulo("");
-                        }}
-                        className="px-2 text-slate-500 text-[9px]"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    disabled={pausaEnviando}
+                    onClick={() => {
+                      if (pausaEnviando) return;
+                      setPausaEnviando(true);
+                      try {
+                        navigator.vibrate?.(14);
+                      } catch {
+                        /* no haptic */
+                      }
+                      void Promise.resolve(
+                        onPausaInterrupcion(tituloPausaInterrupcion())
+                      ).finally(() => setPausaEnviando(false));
+                    }}
+                    className="w-full py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider touch-manipulation disabled:opacity-60"
+                    style={{
+                      backgroundColor: "rgba(0,255,195,0.08)",
+                      color: CYAN,
+                      border: "1px solid rgba(0,255,195,0.25)",
+                    }}
+                    data-testid="j4-conquista-pausa"
+                  >
+                    {pausaEnviando ? "…" : "Pausar e interrumpir"}
+                  </button>
                 </div>
               ) : null}
 

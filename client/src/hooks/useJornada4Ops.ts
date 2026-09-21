@@ -95,6 +95,7 @@ import {
   buildDesglosadorNestedPausePatch,
   resumeDesglosadorFromNestedPause,
 } from "@/lib/nestedContextStack";
+import { tituloPausaInterrupcion } from "@/lib/vehiculoPausa";
 import {
   firstPendingCronometroTexto,
   firstPendingSubVehiculoTitulo,
@@ -1657,8 +1658,9 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
   );
 
   const pausaInterrupcion = useCallback(
-    async (vehicleId: string, tituloInterrupcion: string) => {
-      if (!userId || !tituloInterrupcion.trim()) return;
+    async (vehicleId: string, tituloInterrupcion?: string) => {
+      if (!userId) return;
+      const titulo = tituloPausaInterrupcion(tituloInterrupcion);
       const key = `pause:${vehicleId}`;
       if (inFlightRef.current.has(key)) return;
       const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
@@ -1714,7 +1716,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           },
           pausas: nestedPause.pausas.map((p, i, arr) =>
             i === arr.length - 1 && !p.reanudadoAt && !p.titulo
-              ? { ...p, titulo: tituloInterrupcion.trim() }
+              ? { ...p, titulo }
               : p
           ),
         };
@@ -1725,7 +1727,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const clientRequestId = `crq_${generateStableUuid()}`;
         const interruptVehicle: Vehicle = {
           id: provisionalInterruptId,
-          titulo: tituloInterrupcion.trim(),
+          titulo,
           criterioFin: "circunstancia",
           criterioDetalle: "Interrupción",
           tiempoInicio: new Date(),
@@ -1763,7 +1765,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           const { id: realId } = await addVehicle(
             userId,
             {
-              titulo: tituloInterrupcion.trim(),
+              titulo,
               criterioFin: "circunstancia",
               criterioDetalle: "Interrupción",
               tiempoInicio: new Date(),

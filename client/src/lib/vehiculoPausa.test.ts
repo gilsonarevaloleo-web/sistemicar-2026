@@ -5,6 +5,8 @@ import {
   closeVehiculoPausaAbierta,
   minutosPausa,
   nombrePausa,
+  PAUSA_INTERRUPCION_TITULO,
+  tituloPausaInterrupcion,
 } from "./vehiculoPausa.ts";
 
 describe("vehiculoPausa — historia de presencia", () => {
@@ -29,5 +31,14 @@ describe("vehiculoPausa — historia de presencia", () => {
     assert.equal(minutosPausa(open, 1000 + 60 * 60_000), 60);
     assert.equal(nombrePausa(open), "primera intercepción del dia");
     assert.equal(nombrePausa({}), "Pausa");
+  });
+
+  it("un toque sin letras usa el título Pausa", () => {
+    assert.equal(tituloPausaInterrupcion(), PAUSA_INTERRUPCION_TITULO);
+    assert.equal(tituloPausaInterrupcion(""), PAUSA_INTERRUPCION_TITULO);
+    assert.equal(tituloPausaInterrupcion("   "), PAUSA_INTERRUPCION_TITULO);
+    assert.equal(tituloPausaInterrupcion(null), PAUSA_INTERRUPCION_TITULO);
+    assert.equal(tituloPausaInterrupcion("llamada"), "llamada");
+    assert.equal(tituloPausaInterrupcion("  costura  "), "costura");
   });
 });

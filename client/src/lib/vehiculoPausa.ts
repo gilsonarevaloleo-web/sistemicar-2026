@@ -44,12 +44,21 @@ export function closeVehiculoPausaAbierta(
   return changed ? next : existing;
 }
 
+/** Título por defecto: un toque pausa sin abrir teclado de letras. */
+export const PAUSA_INTERRUPCION_TITULO = "Pausa";
+
 export function nombrePausa(
   stamp: Pick<VehiculoPausaStamp, "titulo">,
-  fallback = "Pausa"
+  fallback = PAUSA_INTERRUPCION_TITULO
 ): string {
   const t = stamp.titulo?.trim();
   return t || fallback;
+}
+
+/** Título de la interrupción. Vacío o solo espacios → Pausa (sin pedir letras). */
+export function tituloPausaInterrupcion(raw?: string | null): string {
+  const t = raw?.trim();
+  return t || PAUSA_INTERRUPCION_TITULO;
 }
 
 export function minutosPausa(
