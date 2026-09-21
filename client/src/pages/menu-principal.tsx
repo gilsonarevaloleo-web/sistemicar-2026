@@ -71,7 +71,12 @@ import logoSistemicar from "@/assets/logo-sistemicar.png";
 import { PageContainer } from "@/components/page-container";
 import { isOwner } from "@/lib/owner";
 import { JORNADA_MODULE, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
-import { prefetchJornadaChunk } from "@/lib/lazyWithRetry";
+import {
+  prefetchDepositoChunk,
+  prefetchEspejoChunk,
+  prefetchJornadaChunk,
+  prefetchUmbralV2Chunk,
+} from "@/lib/lazyWithRetry";
 import { resetVoicePlaybackCache } from "@/lib/voicePlaybackCacheReset";
 
 // ESPECTRO CROMÁTICO DE CONCIENCIA
@@ -290,6 +295,18 @@ export default function MenuPrincipal() {
     const t = window.setTimeout(run, 400);
     return () => clearTimeout(t);
   }, [user?.uid, userEmail, progression?.subscriptionPlan, progression?.rank, progression?.activeModules, previewUnlocked]);
+
+  useEffect(() => {
+    const run = () => {
+      void prefetchDepositoChunk();
+    };
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(run, { timeout: 3500 });
+      return () => cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(run, 700);
+    return () => clearTimeout(t);
+  }, []);
 
   // Preview: precargar chunk apenas se ve el banner — el gesto de unlock no debe
   // esperar el parse de ~planeacion en el mismo frame del navigate.
@@ -833,6 +850,21 @@ export default function MenuPrincipal() {
                         item.route === JORNADA_V4_PATH
                       ) {
                         prefetchJornadaChunk();
+                      } else if (
+                        item.id === "deposito-v2" ||
+                        item.route === "/esperanza"
+                      ) {
+                        prefetchDepositoChunk();
+                      } else if (
+                        item.id === "espejo" ||
+                        item.route === "/espejo"
+                      ) {
+                        prefetchEspejoChunk();
+                      } else if (
+                        item.id === "umbral-v2" ||
+                        item.route === "/umbral/v2"
+                      ) {
+                        prefetchUmbralV2Chunk();
                       }
                     }}
                     className={`group relative p-4 rounded-xl border text-center transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] ${item.enCamino ? "opacity-80" : ""}`}

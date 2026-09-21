@@ -3,7 +3,8 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Moon, X } from "lucide-react";
 import { useAuthContext } from "@/App";
-import { isCommercialEntryPath, isJornada4Path, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
+import { isJornada4Path, JORNADA_V4_PATH } from "@/lib/jornadaBrand";
+import { useAppShellMotorsQuiet } from "@/lib/dualKernelQuiet";
 import {
   getLocalVehicles,
   readLocalCierreJornadaByFecha,
@@ -46,11 +47,11 @@ export function CierreJornadaModal() {
   const { user } = useAuthContext();
   const [location, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const dualKernelQuiet = useAppShellMotorsQuiet();
 
   const fecha = getJournalDateString();
   const yaSellado = readLocalCierreJornadaByFecha(fecha)?.selloEmitido === true;
-  const silencioRuta =
-    isJornada4Path(location) || isCommercialEntryPath(location);
+  const silencioRuta = dualKernelQuiet || isJornada4Path(location);
 
   const vehicles = useMemo(() => getLocalVehicles(), [isOpen]);
   const planEndMs = useMemo(() => {

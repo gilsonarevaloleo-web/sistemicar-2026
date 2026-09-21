@@ -2,7 +2,9 @@ import { Switch, Route, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout";
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode, Suspense } from "react";
-import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { lazyWithRetry, lazyJornadaWithRetry } from "@/lib/lazyWithRetry";
+import { HouseRouteFallback } from "@/components/HouseRouteFallback";
+import { SellerRefCapture } from "./components/seller-ref-capture";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
@@ -21,56 +23,55 @@ interface AppUser {
   photoURL: string | null;
 }
 
-import MenuPrincipal from "@/pages/menu-principal";
-import Tutorial from "@/pages/tutorial";
-import Console from "@/pages/console";
-const JornadaV4 = lazyWithRetry(() => import("@/pages/jornadaV4"));
-import Esperanza from "@/pages/esperanza";
-import Rewards from "@/pages/rewards";
-import Analytics from "@/pages/analytics";
-import Acerca from "@/pages/acerca";
-import Pagos from "@/pages/pagos";
-import Socios from "@/pages/socios";
-import AdminGilson from "@/pages/admin-gilson";
-import Historial from "@/pages/historial";
-import Alquimia from "@/pages/alquimia";
-import Bienvenida from "@/pages/bienvenida";
-import Radar from "@/pages/radar";
-import Historia from "@/pages/historia";
-import Codice from "@/pages/codice";
-import Escaner from "@/pages/escaner";
-import CamaraInmunidad from "@/pages/camara-inmunidad";
-import ComoFunciona from "@/pages/como-funciona";
-import Umbral from "@/pages/umbral";
-import UmbralV2 from "@/pages/umbral-v2";
-import UmbralMetricas from "@/pages/umbral-metricas";
-import UmbralEntrada from "@/pages/umbral-entrada";
-import Proyector from "@/pages/proyector";
-import Proyectos from "@/pages/proyectos";
-import TerminosCondiciones from "@/pages/terminos-condiciones";
-import LibroReclamaciones from "@/pages/libro-reclamaciones";
-import EmbudoSistemicar from "@/pages/embudo-sistemicar";
-import Acceso from "@/pages/acceso";
-import Documentos from "@/pages/documentos";
-import Espejo from "@/pages/espejo";
-import EspejoV2 from "@/pages/espejo-v2";
-import EspejoExpedientes from "@/pages/espejo-expedientes";
-import EspejoExpedienteDetalle from "@/pages/espejo-expediente-detalle";
-import GraciasCompra from "@/pages/gracias-compra";
-import UmbralLeads from "@/pages/umbral-leads";
-import VentasEspejo from "@/pages/ventas-espejo";
-import VentasJornada from "@/pages/ventas-jornada";
-import MetricasDocumento from "@/pages/metricas-documento";
-import MapaSistemicar from "@/pages/mapa-sistemicar";
-import VendedoresPlanificacion from "@/pages/vendedores-planificacion";
-import VendedorTriagePage from "@/pages/vendedor";
-import { SellerRefCapture } from "./components/seller-ref-capture";
-import Manuales from "@/pages/manuales";
-import AdminSemillas from "@/pages/admin-semillas";
-import Registros from "@/pages/registros";
-import ApiCheckout from "@/pages/api-checkout";
-import ApiDocs from "@/pages/api-docs";
-import NotFound from "@/pages/not-found";
+const MenuPrincipal = lazyWithRetry(() => import("@/pages/menu-principal"));
+const Tutorial = lazyWithRetry(() => import("@/pages/tutorial"));
+const Console = lazyWithRetry(() => import("@/pages/console"));
+const JornadaV4 = lazyJornadaWithRetry(() => import("@/pages/jornadaV4"));
+const Esperanza = lazyWithRetry(() => import("@/pages/esperanza"));
+const Rewards = lazyWithRetry(() => import("@/pages/rewards"));
+const Analytics = lazyWithRetry(() => import("@/pages/analytics"));
+const Acerca = lazyWithRetry(() => import("@/pages/acerca"));
+const Pagos = lazyWithRetry(() => import("@/pages/pagos"));
+const Socios = lazyWithRetry(() => import("@/pages/socios"));
+const AdminGilson = lazyWithRetry(() => import("@/pages/admin-gilson"));
+const Historial = lazyWithRetry(() => import("@/pages/historial"));
+const Alquimia = lazyWithRetry(() => import("@/pages/alquimia"));
+const Bienvenida = lazyWithRetry(() => import("@/pages/bienvenida"));
+const Radar = lazyWithRetry(() => import("@/pages/radar"));
+const Historia = lazyWithRetry(() => import("@/pages/historia"));
+const Codice = lazyWithRetry(() => import("@/pages/codice"));
+const Escaner = lazyWithRetry(() => import("@/pages/escaner"));
+const CamaraInmunidad = lazyWithRetry(() => import("@/pages/camara-inmunidad"));
+const ComoFunciona = lazyWithRetry(() => import("@/pages/como-funciona"));
+const Umbral = lazyWithRetry(() => import("@/pages/umbral"));
+const UmbralV2 = lazyWithRetry(() => import("@/pages/umbral-v2"));
+const UmbralMetricas = lazyWithRetry(() => import("@/pages/umbral-metricas"));
+const UmbralEntrada = lazyWithRetry(() => import("@/pages/umbral-entrada"));
+const Proyector = lazyWithRetry(() => import("@/pages/proyector"));
+const Proyectos = lazyWithRetry(() => import("@/pages/proyectos"));
+const TerminosCondiciones = lazyWithRetry(() => import("@/pages/terminos-condiciones"));
+const LibroReclamaciones = lazyWithRetry(() => import("@/pages/libro-reclamaciones"));
+const EmbudoSistemicar = lazyWithRetry(() => import("@/pages/embudo-sistemicar"));
+const Acceso = lazyWithRetry(() => import("@/pages/acceso"));
+const Documentos = lazyWithRetry(() => import("@/pages/documentos"));
+const Espejo = lazyWithRetry(() => import("@/pages/espejo"));
+const EspejoV2 = lazyWithRetry(() => import("@/pages/espejo-v2"));
+const EspejoExpedientes = lazyWithRetry(() => import("@/pages/espejo-expedientes"));
+const EspejoExpedienteDetalle = lazyWithRetry(() => import("@/pages/espejo-expediente-detalle"));
+const GraciasCompra = lazyWithRetry(() => import("@/pages/gracias-compra"));
+const UmbralLeads = lazyWithRetry(() => import("@/pages/umbral-leads"));
+const VentasEspejo = lazyWithRetry(() => import("@/pages/ventas-espejo"));
+const VentasJornada = lazyWithRetry(() => import("@/pages/ventas-jornada"));
+const MetricasDocumento = lazyWithRetry(() => import("@/pages/metricas-documento"));
+const MapaSistemicar = lazyWithRetry(() => import("@/pages/mapa-sistemicar"));
+const VendedoresPlanificacion = lazyWithRetry(() => import("@/pages/vendedores-planificacion"));
+const VendedorTriagePage = lazyWithRetry(() => import("@/pages/vendedor"));
+const Manuales = lazyWithRetry(() => import("@/pages/manuales"));
+const AdminSemillas = lazyWithRetry(() => import("@/pages/admin-semillas"));
+const Registros = lazyWithRetry(() => import("@/pages/registros"));
+const ApiCheckout = lazyWithRetry(() => import("@/pages/api-checkout"));
+const ApiDocs = lazyWithRetry(() => import("@/pages/api-docs"));
+const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 import { CierreJornadaModal } from "@/components/cierre-jornada-modal";
 import { SegmentAttentionBackground } from "@/components/SegmentAttentionBackground";
 import { ViewTransitionBootstrap } from "@/components/ViewTransitionBootstrap";
@@ -347,18 +348,18 @@ function Router() {
   // Embudos comerciales sin chrome de app (sidebar / bottom nav).
   if (location === "/vendedor" || location.startsWith("/vendedor/")) {
     return (
-      <>
+      <Suspense fallback={<HouseRouteFallback />}>
         <SellerRefCapture />
         <VendedorTriagePage />
-      </>
+      </Suspense>
     );
   }
   if (location === "/ventas-jornada" || location.startsWith("/ventas-jornada")) {
     return (
-      <>
+      <Suspense fallback={<HouseRouteFallback />}>
         <SellerRefCapture />
         <VentasJornada />
-      </>
+      </Suspense>
     );
   }
 
@@ -366,6 +367,7 @@ function Router() {
     <Layout>
       <ViewTransitionBootstrap />
       <SellerRefCapture />
+      <Suspense fallback={<HouseRouteFallback />}>
       <Switch>
         <Route path="/menu">
           <ProtectedRoute component={MenuPrincipal} />
@@ -487,6 +489,7 @@ function Router() {
         </Route>
         <Route component={NotFound} />
       </Switch>
+      </Suspense>
     </Layout>
   );
 }
