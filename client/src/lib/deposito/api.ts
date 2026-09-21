@@ -1,10 +1,15 @@
-import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
+import type {
+  CapturaVolcadoInput,
+  DiagnosticoVolcado,
+  GradoMaestria,
+} from "@shared/deposito/engineConfig";
 
 export interface DepositoVolcadoSuccess {
   success: true;
   diagnostico: DiagnosticoVolcado;
   source: "gemini" | "local_fallback";
   ritual: string;
+  gradoMaestria?: GradoMaestria;
 }
 
 export interface DepositoVolcadoError {
@@ -51,6 +56,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  */
 export async function procesarVolcadoRemoto(
   textoVolcado: string,
+  captura?: CapturaVolcadoInput,
 ): Promise<DepositoVolcadoSuccess> {
   let res: Response;
   try {
@@ -58,7 +64,11 @@ export async function procesarVolcadoRemoto(
       fetch("/api/deposito/volcado", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ textoVolcado }),
+        body: JSON.stringify({
+          textoVolcado,
+          ...captura,
+          volcadoCrudo: captura?.volcadoCrudo ?? textoVolcado,
+        }),
       }),
       12000,
     );

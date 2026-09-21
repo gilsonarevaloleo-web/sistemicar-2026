@@ -12,7 +12,11 @@ import {
   isFirebaseConfigured,
 } from "./firebase";
 import type { DictamenOptico } from "@shared/deposito/analizarVolcado";
-import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
+import type {
+  CapturaVolcadoExpansiva,
+  DiagnosticoVolcado,
+  GradoMaestria,
+} from "@shared/deposito/engineConfig";
 
 export interface VolcadoEntry {
   id: string;
@@ -21,6 +25,8 @@ export interface VolcadoEntry {
   createdAt: Date;
   dictamen: DictamenOptico;
   diagnostico?: DiagnosticoVolcado;
+  captura?: CapturaVolcadoExpansiva;
+  gradoMaestria?: GradoMaestria;
 }
 
 const STORAGE_KEY = "sistemicar_volcados";
@@ -76,6 +82,8 @@ export function subscribeToVolcados(
             userId: raw.userId,
             dictamen: raw.dictamen,
             diagnostico: raw.diagnostico,
+            captura: raw.captura,
+            gradoMaestria: raw.gradoMaestria,
             createdAt: raw.createdAt?.toDate?.() || new Date(),
           } satisfies VolcadoEntry;
         });
@@ -105,6 +113,7 @@ function saveVolcadoLocal(
   texto: string,
   dictamen: DictamenOptico,
   diagnostico?: DiagnosticoVolcado,
+  captura?: CapturaVolcadoExpansiva,
 ): string {
   const entries = parseLocal();
   const id = `local_${Date.now()}`;
@@ -113,6 +122,8 @@ function saveVolcadoLocal(
     texto,
     dictamen,
     diagnostico,
+    captura,
+    gradoMaestria: captura?.gradoMaestria,
     userId,
     createdAt: new Date(),
   });
@@ -142,6 +153,7 @@ export async function addVolcadoEntry(
   texto: string,
   dictamen: DictamenOptico,
   diagnostico?: DiagnosticoVolcado,
+  captura?: CapturaVolcadoExpansiva,
 ): Promise<string> {
   if (isFirebaseConfigured() && db) {
     try {
@@ -151,6 +163,8 @@ export async function addVolcadoEntry(
           texto,
           dictamen,
           diagnostico: diagnostico ?? null,
+          captura: captura ?? null,
+          gradoMaestria: captura?.gradoMaestria ?? null,
           userId,
           createdAt: serverTimestamp(),
         }),
@@ -159,11 +173,11 @@ export async function addVolcadoEntry(
       return docRef.id;
     } catch (err) {
       console.error("Volcado remoto falló; se guarda en local:", err);
-      return saveVolcadoLocal(userId, texto, dictamen, diagnostico);
+      return saveVolcadoLocal(userId, texto, dictamen, diagnostico, captura);
     }
   }
 
-  return saveVolcadoLocal(userId, texto, dictamen, diagnostico);
+  return saveVolcadoLocal(userId, texto, dictamen, diagnostico, captura);
 }
 
 export async function deleteVolcadoEntry(userId: string, entryId: string): Promise<void> {

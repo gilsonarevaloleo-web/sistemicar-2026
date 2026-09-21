@@ -37,6 +37,8 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       const body = await res.json();
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.ojos.length, 10);
+      assert.equal(body.grados.length, 4);
+      assert.equal(body.grados[0].nombre, "Aprendiz de Ojo");
       assert.match(body.muroDeDominancia, /UN solo Código Dominante/);
       assert.equal(body.fallbackLocal, true);
       assert.equal(body.gemini, false);
@@ -85,6 +87,7 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
         assert.equal(body.diagnostico.codigoDominante, 5);
         assert.equal(body.diagnostico.nombreOjoDominante, "El Ojo del Cálculo");
         assert.equal(typeof body.diagnostico.mecanicaAbsorcion, "string");
+        assert.equal(body.gradoMaestria, 1);
       },
     );
   });
@@ -105,5 +108,64 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(body.source, "local_fallback");
       assert.equal(body.diagnostico.codigoDominante, 6);
     });
+  });
+
+  it("rechaza Grado 2 sin friccionDetectada", async () => {
+    await withServer(undefined, async (base) => {
+      const res = await fetch(`${base}/api/deposito/volcado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          textoVolcado: "Hoy aprendí una utilidad concreta.",
+          gradoMaestria: 2,
+        }),
+      });
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.equal(body.success, false);
+      assert.match(body.error, /friccionDetectada/);
+    });
+  });
+
+  it("acepta captura de Grado 2 y devuelve validacionGrado", async () => {
+    await withServer(
+      async (prompt) => {
+        assert.match(String(prompt), /DETECTOR DE RUIDO/);
+        return JSON.stringify({
+          codigoDominante: 4,
+          nombreOjoDominante: "El Ojo de la Seriedad",
+          justificacionDominante: "Hay flor cubriendo el quiebre.",
+          puntoCiego: "No nombra la interrupción.",
+          devolucionMaestro: "Espejo. R2. Veredicto.",
+          mecanicaAbsorcion: "Mañana nombrá el quiebre.",
+          nivelCargaSugerido: "INTERMEDIO",
+          validacionGrado: {
+            gradoEvaluado: 2,
+            ruidoDetectadoCorrectamente: true,
+            comentarioMaestro: "Aisló la flor.",
+          },
+        });
+      },
+      async (base) => {
+        const res = await fetch(`${base}/api/deposito/volcado`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            textoVolcado: "Hoy cubrí el quiebre con «ya veré».",
+            gradoMaestria: 2,
+            friccionDetectada: "La flor fue «ya veré».",
+          }),
+        });
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.success, true);
+        assert.equal(body.gradoMaestria, 2);
+        assert.equal(body.diagnostico.validacionGrado.gradoEvaluado, 2);
+        assert.equal(
+          body.diagnostico.validacionGrado.ruidoDetectadoCorrectamente,
+          true,
+        );
+      },
+    );
   });
 });
