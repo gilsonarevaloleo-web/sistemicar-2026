@@ -1,7 +1,12 @@
 import React from "react";
 import { Eye } from "lucide-react";
-import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
+import type { CodigoObservador, DiagnosticoVolcado } from "@shared/deposito/engineConfig";
 import { DICCIONARIO_OJOS } from "@shared/deposito/engineConfig";
+import {
+  etiquetaGrado,
+  type ExpedienteOjos,
+  type LecturaGradoVolcado,
+} from "@shared/deposito/grados";
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
@@ -14,8 +19,12 @@ const NIVEL_LABEL: Record<DiagnosticoVolcado["nivelCargaSugerido"], string> = {
 
 export function DiagnosticoUniversidad({
   diagnostico,
+  lectura,
+  expediente,
 }: {
   diagnostico: DiagnosticoVolcado;
+  lectura?: LecturaGradoVolcado;
+  expediente?: ExpedienteOjos;
 }) {
   const ojo = DICCIONARIO_OJOS[diagnostico.codigoDominante];
 
@@ -33,11 +42,24 @@ export function DiagnosticoUniversidad({
           UNIVERSIDAD · MURO DE DOMINANCIA
         </p>
         <span
-          className="text-[9px] tracking-[0.18em] uppercase"
+          className="text-[9px] tracking-[0.18em] uppercase text-right"
           style={{ color: AZURE }}
           data-testid="deposito-nivel-carga"
         >
           Carga {NIVEL_LABEL[diagnostico.nivelCargaSugerido]}
+          {lectura && (
+            <span
+              className="block mt-1"
+              data-testid="deposito-grado"
+            >
+              {etiquetaGrado(lectura.grado)}
+            </span>
+          )}
+          {expediente && (
+            <span className="block mt-1 text-white/45">
+              {etiquetaGrado(expediente.gradoOperador)}
+            </span>
+          )}
         </span>
       </div>
 
@@ -64,11 +86,19 @@ export function DiagnosticoUniversidad({
           className="text-[10px] tracking-[0.22em] mb-2"
           style={{ color: AZURE }}
         >
-          2 · PUNTO CIEGO / CEGUERA ACTIVA
+          2 · PUNTO CIEGO / LO NO DICHO
         </p>
         <p className="text-sm leading-relaxed text-white/80">
           {diagnostico.puntoCiego}
         </p>
+        {lectura && (
+          <p
+            className="mt-2 text-[11px] leading-relaxed text-white/40"
+            data-testid="deposito-capas"
+          >
+            Señal: {lectura.capas.senal} · {lectura.capas.ruido}
+          </p>
+        )}
       </div>
 
       <div data-testid="deposito-devolucion-maestro">
@@ -106,6 +136,45 @@ export function DiagnosticoUniversidad({
           </p>
           <p className="text-sm leading-relaxed text-white/80">
             {diagnostico.validacionGrado.comentarioMaestro}
+          </p>
+        </div>
+      )}
+
+      {expediente && (
+        <div data-testid="deposito-expediente">
+          <p
+            className="text-[10px] tracking-[0.22em] mb-2"
+            style={{ color: GOLD }}
+          >
+            MAPA DE CALOR · {expediente.rango}/{expediente.techo} ·{" "}
+            {etiquetaGrado(expediente.gradoOperador)}
+          </p>
+          <ol className="grid grid-cols-10 gap-1 mb-2" aria-label="Ojos nombrados">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const nombrado = expediente.ojosNombrados.includes(n as CodigoObservador);
+              const hueco = expediente.hueco === n;
+              const atasco = expediente.atasco === n;
+              return (
+                <li key={n} className="text-center">
+                  <span
+                    className="mx-auto mb-1 block h-1.5 w-full rounded-full"
+                    style={{
+                      backgroundColor: atasco
+                        ? "#F97316"
+                        : hueco
+                          ? AZURE
+                          : nombrado
+                            ? GOLD
+                            : "rgba(255,255,255,0.08)",
+                    }}
+                  />
+                  <span className="text-[8px] text-white/35">{n}</span>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="text-xs leading-relaxed text-white/55">
+            {expediente.haciaDonde}
           </p>
         </div>
       )}

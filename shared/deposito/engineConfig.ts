@@ -628,6 +628,12 @@ Prohibido Carga BASICO si el volcado trae hipótesis + escena + prueba.
 El centro de gravedad es lo que el alumno APRENDIÓ, no la palabra más repetida.
 «no sirve», «después» o «minutos» no eligen código por sí solos.
 
+═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
+El lenguaje humano tiene tres capas. Analizá en este orden:
+A) LIMPIEZA DE RUIDO: descartá flor (excusas, adornos, victimización, comparaciones, prisa). Quedate con la mecánica de los hechos. El ruido no se tira: informa el punto ciego.
+B) OMISIÓN: ¿qué está evitando nombrar? ¿dónde está la fuga de la que no se hace cargo?
+C) OJO ÚNICO: si lo dicho habla de un discurso (moral, pedagogía, prisa) pero lo no dicho revela la falla real, elegí el código de la FALLA, no el del discurso superficial.
+
 Cero New Age, cero flor, cero «ánimo», cero listas de códigos.
 Cero plantilla. Si no podés nombrar el hecho, el JSON es inválido.
 `.trim();
@@ -1116,7 +1122,7 @@ function normalizar(texto: string): string {
     .trim();
 }
 
-interface HechosVolcado {
+export interface HechosVolcado {
   tesis: string;
   cita: string;
   pregunta: string;
@@ -1126,7 +1132,7 @@ function limpiarPieza(raw: string): string {
   return raw.replace(/\s+/g, " ").trim();
 }
 
-function extraerHechos(texto: string): HechosVolcado {
+export function extraerHechos(texto: string): HechosVolcado {
   const tesisMatch = texto.match(
     /aprend[ií](?:\s+\w+){0,4}\s+que\s+([^?.!]{10,220})/i,
   );

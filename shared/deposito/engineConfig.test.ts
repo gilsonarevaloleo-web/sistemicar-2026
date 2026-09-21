@@ -72,6 +72,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.user, /¿Qué aprendí hoy\?/);
     assert.match(prompt.user, /no repetí ninguna secuencia/);
     assert.match(prompt.system, /ANCLAJE AL VOLCADO/);
+    assert.match(prompt.system, /FILTRO DE DESCOMPOSICIÓN/);
+    assert.match(prompt.system, /lo no dicho revela la falla real/);
     assert.match(prompt.system, /lo que el alumno APRENDIÓ/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
     const serial = serializarPromptVolcado(prompt);
