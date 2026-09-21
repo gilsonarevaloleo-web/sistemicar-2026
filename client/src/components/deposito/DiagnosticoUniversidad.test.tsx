@@ -27,6 +27,7 @@ describe("DiagnosticoUniversidad", () => {
     assert.match(html, /PUNTO CIEGO/);
     assert.match(html, /MECÁNICA DE ABSORCIÓN/);
     assert.match(html, /El Ojo del Ritmo/);
+    assert.match(html, /VALIDACIÓN DE GRADO/);
     assert.match(html, /G\d/);
     assert.match(html, /MAPA DE CALOR/);
     assert.doesNotMatch(html, /C1 y C2/);

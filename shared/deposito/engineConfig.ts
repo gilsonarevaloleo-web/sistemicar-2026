@@ -5,6 +5,7 @@
  * El alumno no elige código. Volca el día al ritual «¿Qué aprendí hoy?».
  * Los 10 Ojos diagnostican el centro de gravedad.
  * El Muro de Dominancia obliga a UN solo Código Dominante.
+ * Los 4 Grados de Maestría Perceptiva expanden la captura, no la ruta.
  *
  * Encaje con el tronco:
  * - Misma numeración 1–10 que Umbral (`DICCIONARIO_CODIGOS`).
@@ -21,6 +22,15 @@ import { LEY_OPTICA_CODIGO_KERNEL } from "./leyOpticaCodigo.ts";
 export type CodigoObservador = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type NivelCargaSugerido = "BASICO" | "INTERMEDIO" | "SUPERIOR";
+
+/** Escala de Maestría Perceptiva — Universidad de Sistemicar. */
+export type GradoMaestria = 1 | 2 | 3 | 4;
+
+export type CampoCapturaVolcado =
+  | "volcadoCrudo"
+  | "friccionDetectada"
+  | "sombraOmision"
+  | "codigoHipotesis";
 
 export interface FichaOjoCodigo {
   numero: CodigoObservador;
@@ -46,6 +56,80 @@ export interface DiagnosticoVolcado {
   /** Acción concreta para mañana. */
   mecanicaAbsorcion: string;
   nivelCargaSugerido: NivelCargaSugerido;
+  /** Validación del grado activo. Opcional para no romper diagnósticos previos. */
+  validacionGrado?: ValidacionGradoVolcado;
+}
+
+export interface FichaGradoMaestria {
+  grado: GradoMaestria;
+  /** Ej. "Aprendiz de Ojo". */
+  nombre: string;
+  titulo: string;
+  descripcion: string;
+  camposVisibles: readonly CampoCapturaVolcado[];
+  preguntaVolcado: string;
+  preguntaFriccion?: string;
+  preguntaSombra?: string;
+  preguntaHipotesis?: string;
+}
+
+/** Captura canónica de la interfaz expansiva (una sola ruta: /esperanza). */
+export interface CapturaVolcadoExpansiva {
+  gradoMaestria: GradoMaestria;
+  volcadoCrudo: string;
+  friccionDetectada?: string;
+  sombraOmision?: string;
+  codigoHipotesis?: CodigoObservador;
+}
+
+/** Input laxo (API, UI, persistencia) — se normaliza a CapturaVolcadoExpansiva. */
+export interface CapturaVolcadoInput {
+  volcadoCrudo?: string;
+  textoVolcado?: string;
+  texto?: string;
+  gradoMaestria?: unknown;
+  friccionDetectada?: string;
+  sombraOmision?: string;
+  codigoHipotesis?: unknown;
+}
+
+export interface ValidacionGradoVolcado {
+  gradoEvaluado: GradoMaestria;
+  /** G2+: ¿aisló flor/excusa sin justificarse? */
+  ruidoDetectadoCorrectamente?: boolean;
+  /** G3+: ¿la omisión construye el punto ciego? */
+  sombraIntegrada?: boolean;
+  /** G4: ¿la hipótesis coincide con el Código Dominante? */
+  hipotesisOjoAcierta?: boolean;
+  comentarioMaestro: string;
+}
+
+export const VOLCADOS_REQUERIDOS_RITUAL_PASO = 3;
+
+export interface VolcadoHistoricoRitual {
+  texto?: string;
+  volcadoCrudo?: string;
+  captura?: CapturaVolcadoExpansiva;
+  diagnostico?: DiagnosticoVolcado;
+  createdAt?: Date | string | number;
+}
+
+export interface AnalisisUsuarioRitual {
+  gradoActual: GradoMaestria;
+  /** Auto-observación del alumno al pedir el paso de grado. */
+  respuesta?: string;
+  diagnosticoActual?: DiagnosticoVolcado;
+}
+
+export interface ResultadoRitualPasoGrado {
+  autorizado: boolean;
+  gradoActual: GradoMaestria;
+  gradoSiguiente: GradoMaestria | null;
+  /** 0–1. Placeholder hasta cablear densidad real. */
+  densidadAbsorcion: number;
+  volcadosEvaluados: number;
+  motivo: string;
+  pendienteImplementacion: boolean;
 }
 
 export interface PromptVolcadoAprendizaje {
@@ -53,6 +137,7 @@ export interface PromptVolcadoAprendizaje {
   user: string;
   responseSchema: DiagnosticoVolcado;
   ritual: string;
+  gradoMaestria: GradoMaestria;
 }
 
 export type GeminiVolcadoCaller = (
@@ -63,6 +148,8 @@ export type GeminiVolcadoCaller = (
 
 export interface ProcesarVolcadoDeps {
   callGemini?: GeminiVolcadoCaller;
+  gradoMaestria?: GradoMaestria;
+  captura?: CapturaVolcadoInput;
 }
 
 export interface ResultadoVolcadoAprendizaje {
@@ -81,6 +168,10 @@ export const NIVELES_CARGA: readonly NivelCargaSugerido[] = [
   "INTERMEDIO",
   "SUPERIOR",
 ];
+
+export const GRADOS_MAESTRIA: readonly GradoMaestria[] = [1, 2, 3, 4];
+
+export const GRADO_MAESTRIA_INICIAL: GradoMaestria = 1;
 
 /**
  * Los 10 Ojos — lentes de observación activa.
@@ -187,6 +278,61 @@ export const DICCIONARIO_OJOS: Record<CodigoObservador, FichaOjoCodigo> = {
       "Sabe el mapa y se presenta como aprendiz eterno. No observa la soberanía: evita asumir el rol de autor.",
     gestoAbsorcion:
       "Mañana, actuá UNA vez como dueño del estándar: una decisión que no pida permiso y una conducta coherente con ese rol.",
+  },
+};
+
+/**
+ * Los 4 Grados de Maestría Perceptiva.
+ * Una sola entrada (`/esperanza`); la captura se expande, no se ramifica.
+ */
+export const DICCIONARIO_GRADOS: Record<GradoMaestria, FichaGradoMaestria> = {
+  1: {
+    grado: 1,
+    nombre: "Aprendiz de Ojo",
+    titulo: "Grado 1 — Aprendiz de Ojo",
+    descripcion:
+      "Entrada estándar. Diagnóstico directo de Ojo Dominante, Punto Ciego básico y Mecánica de Absorción.",
+    camposVisibles: ["volcadoCrudo"],
+    preguntaVolcado: "¿Qué aprendí hoy?",
+  },
+  2: {
+    grado: 2,
+    nombre: "Detector de Ruido",
+    titulo: "Grado 2 — Detector de Ruido",
+    descripcion:
+      "Requerimiento de filtro activo. Identifica «flor», excusas y justificaciones en el relato.",
+    camposVisibles: ["volcadoCrudo", "friccionDetectada"],
+    preguntaVolcado: "¿Qué aprendí hoy?",
+    preguntaFriccion: "¿Dónde detectas 'flor' o excusa hoy?",
+  },
+  3: {
+    grado: 3,
+    nombre: "Arquitecto de Punto Ciego",
+    titulo: "Grado 3 — Arquitecto de Punto Ciego",
+    descripcion:
+      "Identificación de «lo no dicho», la sombra, la omisión y las intenciones ocultas.",
+    camposVisibles: ["volcadoCrudo", "friccionDetectada", "sombraOmision"],
+    preguntaVolcado: "¿Qué aprendí hoy?",
+    preguntaFriccion: "¿Dónde detectas 'flor' o excusa hoy?",
+    preguntaSombra: "¿Qué es lo que NO dijiste en este relato?",
+  },
+  4: {
+    grado: 4,
+    nombre: "Operador de Soberanía",
+    titulo: "Grado 4 — Operador de Soberanía",
+    descripcion:
+      "Diagnóstico integrado de rotación de los 10 Ojos y balance del mapa de calor de percepción.",
+    camposVisibles: [
+      "volcadoCrudo",
+      "friccionDetectada",
+      "sombraOmision",
+      "codigoHipotesis",
+    ],
+    preguntaVolcado: "¿Qué aprendí hoy?",
+    preguntaFriccion: "¿Dónde detectas 'flor' o excusa hoy?",
+    preguntaSombra: "¿Qué es lo que NO dijiste en este relato?",
+    preguntaHipotesis:
+      "¿Cuál ojo creés que es el dominante de este volcado?",
   },
 };
 
@@ -330,6 +476,107 @@ export function isNivelCargaSugerido(
   );
 }
 
+export function isGradoMaestria(value: unknown): value is GradoMaestria {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 4
+  );
+}
+
+export function normalizarGradoMaestria(value: unknown): GradoMaestria {
+  if (isGradoMaestria(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value.trim());
+    if (isGradoMaestria(n)) return n;
+  }
+  return GRADO_MAESTRIA_INICIAL;
+}
+
+export function obtenerGrado(grado: GradoMaestria): FichaGradoMaestria {
+  return DICCIONARIO_GRADOS[grado];
+}
+
+export function camposVisiblesPorGrado(
+  grado: GradoMaestria,
+): readonly CampoCapturaVolcado[] {
+  return DICCIONARIO_GRADOS[normalizarGradoMaestria(grado)].camposVisibles;
+}
+
+export function gradoSiguienteDe(
+  grado: GradoMaestria,
+): GradoMaestria | null {
+  const actual = normalizarGradoMaestria(grado);
+  return actual < 4 ? ((actual + 1) as GradoMaestria) : null;
+}
+
+export function campoVisibleEnGrado(
+  campo: CampoCapturaVolcado,
+  grado: GradoMaestria,
+): boolean {
+  return camposVisiblesPorGrado(grado).includes(campo);
+}
+
+export function normalizarCapturaVolcado(
+  input: CapturaVolcadoInput | string,
+  gradoFallback: GradoMaestria = GRADO_MAESTRIA_INICIAL,
+): CapturaVolcadoExpansiva {
+  if (typeof input === "string") {
+    return {
+      gradoMaestria: normalizarGradoMaestria(gradoFallback),
+      volcadoCrudo: input.trim(),
+    };
+  }
+
+  const grado = normalizarGradoMaestria(
+    input.gradoMaestria ?? gradoFallback,
+  );
+  const volcadoCrudo = String(
+    input.volcadoCrudo ?? input.textoVolcado ?? input.texto ?? "",
+  ).trim();
+  const captura: CapturaVolcadoExpansiva = {
+    gradoMaestria: grado,
+    volcadoCrudo,
+  };
+
+  if (grado >= 2) {
+    const friccion = String(input.friccionDetectada ?? "").trim();
+    if (friccion) captura.friccionDetectada = friccion;
+  }
+  if (grado >= 3) {
+    const sombra = String(input.sombraOmision ?? "").trim();
+    if (sombra) captura.sombraOmision = sombra;
+  }
+  if (grado >= 4) {
+    const hipotesis = coerceCodigoObservador(input.codigoHipotesis);
+    if (hipotesis) captura.codigoHipotesis = hipotesis;
+  }
+
+  return captura;
+}
+
+/**
+ * Devuelve el primer error de captura para el grado activo, o null si está lista.
+ */
+export function validarCapturaParaGrado(
+  captura: CapturaVolcadoExpansiva | CapturaVolcadoInput | string,
+  gradoFallback: GradoMaestria = GRADO_MAESTRIA_INICIAL,
+): string | null {
+  const c = normalizarCapturaVolcado(captura, gradoFallback);
+  if (!c.volcadoCrudo) return "volcadoCrudo es requerido";
+  if (c.gradoMaestria >= 2 && !c.friccionDetectada) {
+    return "friccionDetectada es requerido en Grado 2+";
+  }
+  if (c.gradoMaestria >= 3 && !c.sombraOmision) {
+    return "sombraOmision es requerido en Grado 3+";
+  }
+  if (c.gradoMaestria >= 4 && !c.codigoHipotesis) {
+    return "codigoHipotesis es requerido en Grado 4";
+  }
+  return null;
+}
+
 function coerceCodigoObservador(value: unknown): CodigoObservador | null {
   if (isCodigoObservador(value)) return value;
   if (typeof value === "string") {
@@ -391,43 +638,143 @@ Cero New Age, cero flor, cero «ánimo», cero listas de códigos.
 Cero plantilla. Si no podés nombrar el hecho, el JSON es inválido.
 `.trim();
 
-const JSON_SCHEMA_EJEMPLO = `{
+function jsonSchemaEjemplo(grado: GradoMaestria): string {
+  const validacion: Record<string, unknown> = {
+    gradoEvaluado: grado,
+    comentarioMaestro:
+      "Veredicto corto de si el alumno operó a la altura de su grado.",
+  };
+  if (grado >= 2) validacion.ruidoDetectadoCorrectamente = true;
+  if (grado >= 3) validacion.sombraIntegrada = true;
+  if (grado >= 4) validacion.hipotesisOjoAcierta = false;
+
+  return `{
   "codigoDominante": 3,
   "nombreOjoDominante": "El Ojo del Ritmo y la Repetición",
   "justificacionDominante": "Explicación de por qué este volcado pertenece a este centro de gravedad.",
   "puntoCiego": "Lo que el relato del usuario revela que él no está viendo (ej. confundir velocidad con absorción).",
   "devolucionMaestro": "Mensaje en 3 tiempos: Espejo -> Revelación de 2ª resistencia -> Veredicto.",
   "mecanicaAbsorcion": "Instrucción exacta y única para que el alumno aplique mañana en su vida real.",
-  "nivelCargaSugerido": "INTERMEDIO"
+  "nivelCargaSugerido": "INTERMEDIO",
+  "validacionGrado": ${JSON.stringify(validacion, null, 2).replace(/\n/g, "\n  ")}
 }`;
+}
+
+function bloqueInstruccionGrado(grado: GradoMaestria): string {
+  const ficha = DICCIONARIO_GRADOS[grado];
+  const lines = [
+    `═══ GRADO DE MAESTRÍA ACTIVO: ${grado} — ${ficha.nombre} ═══`,
+    ficha.descripcion,
+    "La Triada de Valor (Ojo Dominante, Punto Ciego, Mecánica de Absorción) sigue siendo obligatoria.",
+    "validacionGrado enriquece esa triada; no la reemplaza. El Muro de Dominancia no se rompe.",
+  ];
+
+  if (grado >= 2) {
+    lines.push(
+      "",
+      "REGLA G2+ (DETECTOR DE RUIDO):",
+      "Analizá ACTIVAMENTE si el alumno detectó correctamente su propio ruido, flor o excusa.",
+      "Compará el campo friccionDetectada con el volcado crudo.",
+      "Si se justifica, se cubre o adorna la grieta, nombralo: sigue en pose.",
+      "validacionGrado.ruidoDetectadoCorrectamente = true SOLO si aisló la flor/excusa sin justificarse.",
+    );
+  }
+  if (grado >= 3) {
+    lines.push(
+      "",
+      "REGLA G3+ (ARQUITECTO DE PUNTO CIEGO):",
+      "Profundizá en la sombra/omisión (campo sombraOmision + lo no dicho del relato).",
+      "El puntoCiego de la Devolución del Maestro DEBE construirse desde esa omisión, no desde un adorno.",
+      "validacionGrado.sombraIntegrada = true si nombra un no-dicho operable.",
+    );
+  }
+  if (grado >= 4) {
+    lines.push(
+      "",
+      "REGLA G4 (OPERADOR DE SOBERANÍA):",
+      "El alumno hipotetizó su propio ojo (codigoHipotesis) ANTES de tu diagnóstico.",
+      "Diagnosticá el centro de gravedad con el Muro: UN solo Código Dominante.",
+      "Observá la rotación de los 10 Ojos y el balance del mapa de calor de percepción,",
+      "pero la SALIDA sigue siendo UN código. Prohibido listar múltiples códigos.",
+      "validacionGrado.hipotesisOjoAcierta = true si codigoHipotesis coincide con codigoDominante.",
+    );
+  }
+
+  lines.push(
+    "",
+    "validacionGrado.gradoEvaluado = el grado activo.",
+    "validacionGrado.comentarioMaestro = veredicto corto de si el alumno operó a la altura de su grado.",
+  );
+  return lines.join("\n");
+}
+
+function bloqueUserCaptura(captura: CapturaVolcadoExpansiva): string {
+  const ficha = DICCIONARIO_GRADOS[captura.gradoMaestria];
+  const lines = [
+    `Ritual: ${RITUAL_VOLCADO}`,
+    `Grado de Maestría: ${captura.gradoMaestria} — ${ficha.nombre}`,
+    "Volcado de aprendizaje del alumno:",
+    "---",
+    captura.volcadoCrudo || "(vacío)",
+    "---",
+  ];
+  if (captura.gradoMaestria >= 2) {
+    lines.push(
+      "Fricción detectada (flor / excusa / justificación):",
+      "---",
+      captura.friccionDetectada || "(no declarada)",
+      "---",
+    );
+  }
+  if (captura.gradoMaestria >= 3) {
+    lines.push(
+      "Sombra / omisión (lo no dicho):",
+      "---",
+      captura.sombraOmision || "(no declarada)",
+      "---",
+    );
+  }
+  if (captura.gradoMaestria >= 4) {
+    const h = captura.codigoHipotesis;
+    const nombre = h ? DICCIONARIO_OJOS[h].nombreOjo : "sin hipótesis";
+    lines.push(
+      `Hipótesis del alumno (ojo autodiagnosticado): ${h ? `C${h} ${nombre}` : "(no declarada)"}`,
+    );
+  }
+  lines.push(
+    "Diagnosticá el centro de gravedad. UN solo código. Respondé solo el JSON.",
+  );
+  return lines.join("\n");
+}
 
 export function obtenerPromptVolcado(
   textoVolcado: string,
+  capturaInput?: CapturaVolcadoInput,
 ): PromptVolcadoAprendizaje {
+  const captura = normalizarCapturaVolcado(
+    capturaInput
+      ? { ...capturaInput, volcadoCrudo: capturaInput.volcadoCrudo ?? textoVolcado }
+      : textoVolcado,
+  );
+  const grado = captura.gradoMaestria;
+
   const system = [
     KERNEL_UNIVERSIDAD,
+    "",
+    bloqueInstruccionGrado(grado),
     "",
     "LOS 10 OJOS (elegí uno; no los listes en la respuesta):",
     diccionarioCompacto(),
     "",
     "Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto fuera del JSON) con esta forma exacta:",
-    JSON_SCHEMA_EJEMPLO,
+    jsonSchemaEjemplo(grado),
     "",
     "codigoDominante DEBE ser un entero 1–10. nombreOjoDominante DEBE coincidir con el diccionario del código elegido.",
   ].join("\n");
 
-  const user = [
-    `Ritual: ${RITUAL_VOLCADO}`,
-    "Volcado de aprendizaje del alumno:",
-    "---",
-    textoVolcado.trim() || "(vacío)",
-    "---",
-    "Diagnosticá el centro de gravedad. UN solo código. Respondé solo el JSON.",
-  ].join("\n");
-
   return {
     system,
-    user,
+    user: bloqueUserCaptura(captura),
     responseSchema: {
       codigoDominante: 1,
       nombreOjoDominante: DICCIONARIO_OJOS[1].nombreOjo,
@@ -436,8 +783,13 @@ export function obtenerPromptVolcado(
       devolucionMaestro: "",
       mecanicaAbsorcion: "",
       nivelCargaSugerido: "BASICO",
+      validacionGrado: {
+        gradoEvaluado: grado,
+        comentarioMaestro: "",
+      },
     },
     ritual: RITUAL_VOLCADO,
+    gradoMaestria: grado,
   };
 }
 
@@ -510,7 +862,7 @@ function hidratarDiagnostico(
     ? campos.nivelCargaSugerido
     : "INTERMEDIO";
 
-  return {
+  const diagnostico: DiagnosticoVolcado = {
     codigoDominante: codigo,
     nombreOjoDominante: ojo.nombreOjo,
     justificacionDominante,
@@ -519,6 +871,168 @@ function hidratarDiagnostico(
     mecanicaAbsorcion,
     nivelCargaSugerido,
   };
+  if (campos.validacionGrado) {
+    diagnostico.validacionGrado = campos.validacionGrado;
+  }
+  return diagnostico;
+}
+
+function parseBooleanLoose(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === "string") {
+    const n = value.trim().toLowerCase();
+    if (n === "true" || n === "si" || n === "sí" || n === "1") return true;
+    if (n === "false" || n === "no" || n === "0") return false;
+  }
+  return undefined;
+}
+
+function extraerValidacionGrado(
+  obj: Record<string, unknown>,
+  grado: GradoMaestria,
+): ValidacionGradoVolcado | undefined {
+  const raw = obj.validacionGrado ?? obj.validacion_grado;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const v = raw as Record<string, unknown>;
+  const comentario = pickString(v, [
+    "comentarioMaestro",
+    "comentario_maestro",
+    "comentario",
+    "veredicto",
+  ]);
+  const gradoEvaluado = normalizarGradoMaestria(
+    v.gradoEvaluado ?? v.grado_evaluado ?? grado,
+  );
+  const validacion: ValidacionGradoVolcado = {
+    gradoEvaluado,
+    comentarioMaestro: comentario,
+  };
+  if (gradoEvaluado >= 2) {
+    validacion.ruidoDetectadoCorrectamente = parseBooleanLoose(
+      v.ruidoDetectadoCorrectamente ?? v.ruido_detectado_correctamente,
+    );
+  }
+  if (gradoEvaluado >= 3) {
+    validacion.sombraIntegrada = parseBooleanLoose(
+      v.sombraIntegrada ?? v.sombra_integrada,
+    );
+  }
+  if (gradoEvaluado >= 4) {
+    validacion.hipotesisOjoAcierta = parseBooleanLoose(
+      v.hipotesisOjoAcierta ?? v.hipotesis_ojo_acierta,
+    );
+  }
+  return validacion;
+}
+
+function validacionGradoLocal(
+  captura: CapturaVolcadoExpansiva,
+  codigo: CodigoObservador,
+): ValidacionGradoVolcado {
+  const grado = captura.gradoMaestria;
+  const partes: string[] = [];
+  const validacion: ValidacionGradoVolcado = {
+    gradoEvaluado: grado,
+    comentarioMaestro: "",
+  };
+
+  if (grado === 1) {
+    partes.push(
+      "G1: diagnóstico directo de ojo, punto ciego y mecánica. Aún no se exige detector de ruido.",
+    );
+  }
+  if (grado >= 2) {
+    const friccion = captura.friccionDetectada ?? "";
+    const haySenal =
+      friccion.length >= 12 ||
+      /flor|excusa|justific|ruido|adorno/i.test(friccion);
+    validacion.ruidoDetectadoCorrectamente = haySenal;
+    partes.push(
+      haySenal
+        ? "G2: aisló una fricción nombrable."
+        : "G2: la fricción sigue siendo clima. No hay flor/excusa aislada.",
+    );
+  }
+  if (grado >= 3) {
+    const sombra = captura.sombraOmision ?? "";
+    const integrada = sombra.length >= 12;
+    validacion.sombraIntegrada = integrada;
+    partes.push(
+      integrada
+        ? "G3: la omisión tiene peso para construir el punto ciego."
+        : "G3: lo no dicho sigue vacío; el punto ciego no tiene sombra.",
+    );
+  }
+  if (grado >= 4) {
+    const acierta =
+      captura.codigoHipotesis != null && captura.codigoHipotesis === codigo;
+    validacion.hipotesisOjoAcierta = acierta;
+    partes.push(
+      acierta
+        ? "G4: la hipótesis del ojo coincide con el centro de gravedad."
+        : `G4: hipotetizó C${captura.codigoHipotesis ?? "?"} y el muro nombra C${codigo}.`,
+    );
+  }
+
+  validacion.comentarioMaestro = partes.join(" ");
+  return validacion;
+}
+
+function anexarValidacion(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+): DiagnosticoVolcado {
+  const local = validacionGradoLocal(captura, diagnostico.codigoDominante);
+  const gemini = diagnostico.validacionGrado;
+  if (!gemini) {
+    return { ...diagnostico, validacionGrado: local };
+  }
+  return {
+    ...diagnostico,
+    validacionGrado: {
+      gradoEvaluado: captura.gradoMaestria,
+      ruidoDetectadoCorrectamente:
+        gemini.ruidoDetectadoCorrectamente ??
+        local.ruidoDetectadoCorrectamente,
+      sombraIntegrada: gemini.sombraIntegrada ?? local.sombraIntegrada,
+      hipotesisOjoAcierta:
+        gemini.hipotesisOjoAcierta ?? local.hipotesisOjoAcierta,
+      comentarioMaestro:
+        gemini.comentarioMaestro.trim() || local.comentarioMaestro,
+    },
+  };
+}
+
+function resolverCaptura(
+  textoVolcado: string,
+  deps: ProcesarVolcadoDeps = {},
+): CapturaVolcadoExpansiva {
+  return normalizarCapturaVolcado(
+    deps.captura
+      ? {
+          ...deps.captura,
+          volcadoCrudo: deps.captura.volcadoCrudo ?? textoVolcado,
+          gradoMaestria:
+            deps.captura.gradoMaestria ?? deps.gradoMaestria,
+        }
+      : textoVolcado,
+    deps.gradoMaestria ?? GRADO_MAESTRIA_INICIAL,
+  );
+}
+
+function componerTextoDiagnostico(captura: CapturaVolcadoExpansiva): string {
+  const partes = [captura.volcadoCrudo];
+  if (captura.friccionDetectada) {
+    partes.push(`Fricción/flor detectada: ${captura.friccionDetectada}`);
+  }
+  if (captura.sombraOmision) {
+    partes.push(`Sombra/omisión: ${captura.sombraOmision}`);
+  }
+  return partes.join("\n");
 }
 
 /**
@@ -581,6 +1095,7 @@ export function parseDiagnosticoVolcado(raw: string): DiagnosticoVolcado {
     nivelCargaSugerido: isNivelCargaSugerido(nivelNorm)
       ? nivelNorm
       : undefined,
+    validacionGrado: extraerValidacionGrado(obj, GRADO_MAESTRIA_INICIAL),
   });
 }
 
@@ -731,37 +1246,54 @@ function devolucionAnclada(
  */
 export function diagnosticarVolcadoLocal(
   textoVolcado: string,
+  capturaInput?: CapturaVolcadoInput,
 ): DiagnosticoVolcado {
-  const texto = textoVolcado.trim();
-  const palabras = contarPalabras(texto);
-  const hechos = extraerHechos(texto);
+  const captura = normalizarCapturaVolcado(
+    capturaInput
+      ? { ...capturaInput, volcadoCrudo: capturaInput.volcadoCrudo ?? textoVolcado }
+      : textoVolcado,
+  );
+  const texto = componerTextoDiagnostico(captura) || textoVolcado.trim();
+  const palabras = contarPalabras(captura.volcadoCrudo || texto);
+  const hechos = extraerHechos(captura.volcadoCrudo || texto);
   const codigo = elegirCodigoDominanteLocal(texto);
   const ojo = DICCIONARIO_OJOS[codigo];
 
   if (palabras < 6) {
-    return hidratarDiagnostico(1, {
-      justificacionDominante:
-        "El volcado todavía es ruido. El centro de gravedad por defecto es El Ojo de la Claridad: hace falta nombrar utilidad, no clima.",
-      puntoCiego:
-        "El relato no observa nada operable: hay emoción suelta y cero utilidad nombrada.",
-      devolucionMaestro:
-        "Espejo: trajiste clima. 2ª resistencia: la niebla se hace pasar por aprendizaje. Veredicto: El Cortador de Niebla pide una frase útil de hoy.",
-      mecanicaAbsorcion: DICCIONARIO_OJOS[1].gestoAbsorcion,
-      nivelCargaSugerido: "BASICO",
-    });
+    return anexarValidacion(
+      hidratarDiagnostico(1, {
+        justificacionDominante:
+          "El volcado todavía es ruido. El centro de gravedad por defecto es El Ojo de la Claridad: hace falta nombrar utilidad, no clima.",
+        puntoCiego:
+          "El relato no observa nada operable: hay emoción suelta y cero utilidad nombrada.",
+        devolucionMaestro:
+          "Espejo: trajiste clima. 2ª resistencia: la niebla se hace pasar por aprendizaje. Veredicto: El Cortador de Niebla pide una frase útil de hoy.",
+        mecanicaAbsorcion: DICCIONARIO_OJOS[1].gestoAbsorcion,
+        nivelCargaSugerido: "BASICO",
+      }),
+      captura,
+    );
   }
 
   const tesis = hechos.tesis
     ? `El aprendizaje («${clamp(hechos.tesis, 180)}») gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
     : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
-  return hidratarDiagnostico(codigo, {
-    justificacionDominante: tesis,
-    puntoCiego: puntoCiegoAnclado(codigo, ojo, hechos),
-    devolucionMaestro: devolucionAnclada(ojo, hechos),
-    mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos),
-    nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
-  });
+  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos);
+  if (captura.gradoMaestria >= 3 && captura.sombraOmision) {
+    puntoCiego = `Sombra declarada: «${clamp(captura.sombraOmision, 180)}». ${puntoCiego}`;
+  }
+
+  return anexarValidacion(
+    hidratarDiagnostico(codigo, {
+      justificacionDominante: tesis,
+      puntoCiego,
+      devolucionMaestro: devolucionAnclada(ojo, hechos),
+      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos),
+      nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
+    }),
+    captura,
+  );
 }
 
 /**
@@ -784,7 +1316,8 @@ export async function procesarVolcadoAprendizajeConFuente(
   textoVolcado: string,
   deps: ProcesarVolcadoDeps = {},
 ): Promise<ResultadoVolcadoAprendizaje> {
-  const prompt = obtenerPromptVolcado(textoVolcado);
+  const captura = resolverCaptura(textoVolcado, deps);
+  const prompt = obtenerPromptVolcado(captura.volcadoCrudo, captura);
   const serialized = serializarPromptVolcado(prompt);
   const caller = deps.callGemini;
 
@@ -792,18 +1325,18 @@ export async function procesarVolcadoAprendizajeConFuente(
     try {
       const raw = await caller(serialized, 2048, true);
       return {
-        diagnostico: parseDiagnosticoVolcado(raw),
+        diagnostico: anexarValidacion(parseDiagnosticoVolcado(raw), captura),
         source: "gemini",
       };
     } catch (err) {
       try {
         const raw2 = await caller(
-          `${serialized}\n\nIMPORTANTE: responde SOLO un objeto JSON con las claves codigoDominante, nombreOjoDominante, justificacionDominante, puntoCiego, devolucionMaestro, mecanicaAbsorcion, nivelCargaSugerido.`,
+          `${serialized}\n\nIMPORTANTE: responde SOLO un objeto JSON con las claves codigoDominante, nombreOjoDominante, justificacionDominante, puntoCiego, devolucionMaestro, mecanicaAbsorcion, nivelCargaSugerido, validacionGrado.`,
           2048,
           false,
         );
         return {
-          diagnostico: parseDiagnosticoVolcado(raw2),
+          diagnostico: anexarValidacion(parseDiagnosticoVolcado(raw2), captura),
           source: "gemini",
         };
       } catch (err2) {
@@ -816,7 +1349,85 @@ export async function procesarVolcadoAprendizajeConFuente(
   }
 
   return {
-    diagnostico: diagnosticarVolcadoLocal(textoVolcado),
+    diagnostico: diagnosticarVolcadoLocal(captura.volcadoCrudo, captura),
     source: "local_fallback",
+  };
+}
+
+function densidadPlaceholder(
+  volcados: readonly VolcadoHistoricoRitual[],
+  analisis: AnalisisUsuarioRitual,
+): number {
+  if (volcados.length === 0) return 0;
+  let suma = 0;
+  for (const v of volcados) {
+    const texto = String(
+      v.captura?.volcadoCrudo ?? v.volcadoCrudo ?? v.texto ?? "",
+    ).trim();
+    const palabras = texto ? texto.split(/\s+/).filter(Boolean).length : 0;
+    const tieneTriada = Boolean(
+      v.diagnostico?.puntoCiego && v.diagnostico?.mecanicaAbsorcion,
+    );
+    const pieza = Math.min(1, palabras / 80) * 0.6 + (tieneTriada ? 0.4 : 0);
+    suma += pieza;
+  }
+  const respuesta = String(analisis.respuesta ?? "").trim();
+  const bonusRespuesta = respuesta.length >= 40 ? 0.1 : 0;
+  return Math.max(
+    0,
+    Math.min(1, suma / volcados.length + bonusRespuesta),
+  );
+}
+
+/**
+ * Ritual de Paso de Grado — firma lista; densidad real pendiente.
+ *
+ * Toma hasta 3 volcados históricos y evalúa si hay materia suficiente
+ * para autorizar el ascenso. El veredicto de densidad aún no asciende:
+ * `pendienteImplementacion` queda en true hasta cablear el motor.
+ */
+export function evaluarRitualPasoGrado(
+  volcadosHistoricos: readonly VolcadoHistoricoRitual[],
+  analisisUsuario: AnalisisUsuarioRitual,
+): ResultadoRitualPasoGrado {
+  const gradoActual = normalizarGradoMaestria(analisisUsuario.gradoActual);
+  const gradoSiguiente = gradoSiguienteDe(gradoActual);
+  const recientes = volcadosHistoricos.slice(0, VOLCADOS_REQUERIDOS_RITUAL_PASO);
+  const densidadAbsorcion = densidadPlaceholder(recientes, analisisUsuario);
+
+  if (gradoActual >= 4) {
+    return {
+      autorizado: false,
+      gradoActual,
+      gradoSiguiente: null,
+      densidadAbsorcion,
+      volcadosEvaluados: recientes.length,
+      motivo:
+        "Grado 4 es el techo de la Universidad. No hay ascenso posterior.",
+      pendienteImplementacion: true,
+    };
+  }
+
+  if (recientes.length < VOLCADOS_REQUERIDOS_RITUAL_PASO) {
+    return {
+      autorizado: false,
+      gradoActual,
+      gradoSiguiente,
+      densidadAbsorcion,
+      volcadosEvaluados: recientes.length,
+      motivo: `Se requieren ${VOLCADOS_REQUERIDOS_RITUAL_PASO} volcados históricos para el Ritual de Paso.`,
+      pendienteImplementacion: true,
+    };
+  }
+
+  return {
+    autorizado: false,
+    gradoActual,
+    gradoSiguiente,
+    densidadAbsorcion,
+    volcadosEvaluados: recientes.length,
+    motivo:
+      "Ritual de Paso: evaluación de densidad de absorción pendiente de implementación. La firma queda lista; el veredicto aún no autoriza el ascenso.",
+    pendienteImplementacion: true,
   };
 }

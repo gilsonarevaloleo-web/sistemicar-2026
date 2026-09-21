@@ -126,6 +126,20 @@ export function DiagnosticoUniversidad({
         </p>
       </div>
 
+      {diagnostico.validacionGrado && (
+        <div data-testid="deposito-validacion-grado">
+          <p
+            className="text-[10px] tracking-[0.22em] mb-2"
+            style={{ color: GOLD }}
+          >
+            VALIDACIÓN DE GRADO {diagnostico.validacionGrado.gradoEvaluado}
+          </p>
+          <p className="text-sm leading-relaxed text-white/80">
+            {diagnostico.validacionGrado.comentarioMaestro}
+          </p>
+        </div>
+      )}
+
       {expediente && (
         <div data-testid="deposito-expediente">
           <p

@@ -4,11 +4,13 @@ import { useAuthContext } from "@/App";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
+import { FormularioVolcadoExpansivo } from "@/components/deposito/FormularioVolcadoExpansivo";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
+import { leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
   listVolcadosLocal,
@@ -20,8 +22,16 @@ import {
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
 import {
+  DICCIONARIO_GRADOS,
+  GRADO_MAESTRIA_INICIAL,
   diagnosticarVolcadoLocal,
+  evaluarRitualPasoGrado,
+  isGradoMaestria,
+  normalizarCapturaVolcado,
+  validarCapturaParaGrado,
+  type CapturaVolcadoExpansiva,
   type DiagnosticoVolcado,
+  type GradoMaestria,
 } from "@shared/deposito/engineConfig";
 import {
   calcularExpedienteOjos,
@@ -34,18 +44,36 @@ import { PLANETA_DEPOSITO, etiquetaMundo } from "@shared/planetas/leyCasasUmbral
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
 
+function capturaVacia(grado: GradoMaestria): CapturaVolcadoExpansiva {
+  return normalizarCapturaVolcado({ gradoMaestria: grado, volcadoCrudo: "" });
+}
+
 export default function Esperanza() {
   const { user } = useAuthContext();
   useViewTransitionShield();
   // Soft-start al venir de Dual Kernel: no clavar el hilo con Firestore.
   const motorsQuiet = useDualKernelMotorsQuiet();
-  const [texto, setTexto] = useState("");
+  const [grado, setGrado] = useState<GradoMaestria>(GRADO_MAESTRIA_INICIAL);
+  const [captura, setCaptura] = useState<CapturaVolcadoExpansiva>(() =>
+    capturaVacia(GRADO_MAESTRIA_INICIAL),
+  );
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoVolcado | null>(null);
   const [ultimoVolcado, setUltimoVolcado] = useState("");
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
   const dictamenRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const desdeQuery = Number(params.get("grado"));
+    // ?grado=2|3|4 inspecciona la captura expansiva sin persistir (el ritual aún no asciende).
+    const activo = isGradoMaestria(desdeQuery)
+      ? desdeQuery
+      : leerGradoMaestria(user?.uid);
+    setGrado(activo);
+    setCaptura((prev) => ({ ...prev, gradoMaestria: activo }));
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -74,16 +102,42 @@ export default function Esperanza() {
     };
   }, [user, motorsQuiet]);
 
+  const ritualPaso = useMemo(
+    () =>
+      evaluarRitualPasoGrado(
+        historial.map((v) => ({
+          texto: v.texto,
+          captura: v.captura,
+          diagnostico: v.diagnostico,
+          createdAt: v.createdAt,
+        })),
+        { gradoActual: grado },
+      ),
+    [historial, grado],
+  );
+
   const guardar = async () => {
-    const crudo = texto.trim();
-    if (!crudo) {
-      toast.error("El volcado está vacío.");
+    const lista = { ...captura, gradoMaestria: grado };
+    const error = validarCapturaParaGrado(lista, grado);
+    if (error) {
+      if (error.startsWith("volcadoCrudo")) {
+        toast.error("El volcado está vacío.");
+      } else if (error.includes("friccionDetectada")) {
+        toast.error("En Grado 2+ el filtro de flor/excusa es obligatorio.");
+      } else if (error.includes("sombraOmision")) {
+        toast.error("En Grado 3+ tenés que nombrar lo que NO dijiste.");
+      } else if (error.includes("codigoHipotesis")) {
+        toast.error("En Grado 4 diagnosticá tu ojo antes de enviar.");
+      } else {
+        toast.error(error);
+      }
       return;
     }
+    const crudo = lista.volcadoCrudo;
     const d = analizarVolcado(crudo);
     setDictamen(d);
     setUltimoVolcado(crudo);
-    const localDiag = diagnosticarVolcadoLocal(crudo);
+    const localDiag = diagnosticarVolcadoLocal(crudo, lista);
     setDiagnostico(localDiag);
     requestAnimationFrame(() =>
       dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -92,7 +146,7 @@ export default function Esperanza() {
     setSaving(true);
     let diag: DiagnosticoVolcado = localDiag;
     try {
-      const remoto = await procesarVolcadoRemoto(crudo);
+      const remoto = await procesarVolcadoRemoto(crudo, lista);
       diag = remoto.diagnostico;
       setDiagnostico(diag);
     } catch {
@@ -108,8 +162,8 @@ export default function Esperanza() {
       return;
     }
     try {
-      await addVolcadoEntry(user.uid, crudo, d, diag);
-      setTexto("");
+      await addVolcadoEntry(user.uid, crudo, d, diag, lista);
+      setCaptura(capturaVacia(grado));
       toast.success(
         d.calidad === "ruido"
           ? "Ruido guardado. El no-dicho ya es el ojo."
@@ -125,6 +179,7 @@ export default function Esperanza() {
     }
   };
 
+  const ficha = DICCIONARIO_GRADOS[grado];
   const lectura = useMemo(
     () =>
       diagnostico && ultimoVolcado
@@ -181,28 +236,30 @@ export default function Esperanza() {
           <p className="mt-3 text-sm text-white/45">
             Volcá el día. Crudo. El ruido también es ojo. El Muro nombra uno.
           </p>
+          <p
+            className="mt-2 text-[10px] tracking-[0.22em]"
+            style={{ color: GOLD }}
+            data-testid="deposito-grado-activo"
+          >
+            {ficha.titulo}
+          </p>
         </header>
 
         <section
           className="mb-8"
           data-testid="deposito-volcado"
         >
-          <label htmlFor="volcado-dia" className="sr-only">
-            Volcado de aprendizaje
-          </label>
-          <textarea
-            id="volcado-dia"
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Hoy aprendí…"
-            rows={8}
-            className="w-full resize-y bg-black/50 text-white/90 text-base leading-relaxed p-5 outline-none placeholder:text-white/25"
-            style={{ border: `1px solid ${GOLD}33`, minHeight: "180px" }}
-            data-testid="deposito-volcado-input"
+          <FormularioVolcadoExpansivo
+            gradoMaestria={grado}
+            captura={captura}
+            onChange={setCaptura}
+            disabled={saving}
           />
           <div className="mt-4 flex items-center justify-between gap-3">
             <p className="text-[10px] text-white/30 uppercase tracking-widest">
-              No elijas eje. No elijas código. Volcá.
+              {grado === 1
+                ? "No elijas eje. No elijas código. Volcá."
+                : "Filtro activo. La captura se expande; la ruta no."}
             </p>
             <button
               type="button"
@@ -218,6 +275,16 @@ export default function Esperanza() {
               {saving ? "Leyendo el volcado…" : "Guardar volcado"}
             </button>
           </div>
+          {ritualPaso.volcadosEvaluados >= 3 && (
+            <p
+              className="mt-3 text-[10px] leading-relaxed text-white/35"
+              data-testid="deposito-ritual-paso"
+            >
+              Ritual de Paso · G{ritualPaso.gradoActual}
+              {ritualPaso.gradoSiguiente ? ` → G${ritualPaso.gradoSiguiente}` : ""}
+              : {ritualPaso.motivo}
+            </p>
+          )}
         </section>
 
         {(diagnostico || dictamen) && (
@@ -254,6 +321,7 @@ export default function Esperanza() {
                       : v.dictamen.calidad === "tecnico"
                         ? `C${v.dictamen.frente} → C${v.dictamen.siguiente} · ${v.dictamen.tema}`
                         : v.dictamen.calidad.toUpperCase()}
+                    {v.gradoMaestria ? ` · G${v.gradoMaestria}` : ""}
                   </p>
                   <p className="text-sm text-white/70 line-clamp-3">{v.texto}</p>
                 </li>
