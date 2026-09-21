@@ -10,6 +10,8 @@ import {
 import { useAuthContext } from "@/App";
 import { useJornadaFlotaCore, type JornadaFlotaCore } from "@/hooks/useJornadaFlotaCore";
 import { filterJornada4Vehicles } from "@/jornada4/filters";
+import { MAX_LIVE_DESGLOSADOR_SESSIONS } from "@/lib/ghostVehicleEngine";
+import { requestGhostReconcileForced } from "@/lib/ghostReconcileScheduler";
 
 export type Jornada4Core = JornadaFlotaCore & {
   dualVehicles: ReturnType<typeof filterJornada4Vehicles>;
@@ -52,6 +54,14 @@ export function useJornada4Core(): Jornada4Core {
     () => filterJornada4Vehicles(core.vehicles),
     [core.vehicles]
   );
+
+  // Avalancha: Firebase/local devolvió decenas de `activo`. Archivar fantasmas.
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (core.activeCount > MAX_LIVE_DESGLOSADOR_SESSIONS) {
+      requestGhostReconcileForced(user.uid);
+    }
+  }, [user?.uid, core.activeCount]);
 
   return {
     ...core,
