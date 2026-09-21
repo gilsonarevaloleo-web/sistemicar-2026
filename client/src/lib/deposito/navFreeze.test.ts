@@ -50,6 +50,7 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /procesarVolcadoRemoto/);
     assert.match(src, /FormularioVolcadoExpansivo/);
     assert.match(src, /evaluarRitualPasoGrado/);
+    assert.match(src, /params.get\("grado"\)/);
     assert.doesNotMatch(src, /setLoading\(true\)/);
     assert.doesNotMatch(src, /if \(loading\)/);
     assert.doesNotMatch(src, /path="\/esperanza\/grado/);

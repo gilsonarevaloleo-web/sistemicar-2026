@@ -26,6 +26,7 @@ import {
   GRADO_MAESTRIA_INICIAL,
   diagnosticarVolcadoLocal,
   evaluarRitualPasoGrado,
+  isGradoMaestria,
   normalizarCapturaVolcado,
   validarCapturaParaGrado,
   type CapturaVolcadoExpansiva,
@@ -58,7 +59,12 @@ export default function Esperanza() {
   const dictamenRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const activo = leerGradoMaestria(user?.uid);
+    const params = new URLSearchParams(window.location.search);
+    const desdeQuery = Number(params.get("grado"));
+    // ?grado=2|3|4 inspecciona la captura expansiva sin persistir (el ritual aún no asciende).
+    const activo = isGradoMaestria(desdeQuery)
+      ? desdeQuery
+      : leerGradoMaestria(user?.uid);
     setGrado(activo);
     setCaptura((prev) => ({ ...prev, gradoMaestria: activo }));
   }, [user]);
