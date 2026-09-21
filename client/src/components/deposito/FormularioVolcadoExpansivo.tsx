@@ -135,7 +135,6 @@ export function FormularioVolcadoExpansivo({
             className="w-full resize-y bg-black/50 p-4 text-sm leading-relaxed text-white/90 outline-none placeholder:text-white/25"
             style={fieldStyle}
             data-testid="deposito-friccion-input"
-            required
           />
         </div>
       )}
@@ -159,7 +158,6 @@ export function FormularioVolcadoExpansivo({
             className="w-full resize-y bg-black/50 p-4 text-sm leading-relaxed text-white/90 outline-none placeholder:text-white/25"
             style={fieldStyle}
             data-testid="deposito-sombra-input"
-            required
           />
         </div>
       )}
@@ -188,7 +186,6 @@ export function FormularioVolcadoExpansivo({
             className="w-full bg-black/50 px-4 py-3 text-sm text-white/90 outline-none"
             style={{ border: `1px solid ${GOLD}33` }}
             data-testid="deposito-hipotesis-select"
-            required
           >
             <option value="">Elegí un ojo antes de enviar</option>
             {CODIGOS_OBSERVADOR.map((n) => (
