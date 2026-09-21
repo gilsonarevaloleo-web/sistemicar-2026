@@ -63,6 +63,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /El Ojo de la Claridad/);
     assert.match(prompt.user, /¿Qué aprendí hoy\?/);
     assert.match(prompt.user, /no repetí ninguna secuencia/);
+    assert.match(prompt.system, /ANCLAJE AL VOLCADO/);
+    assert.match(prompt.system, /lo que el alumno APRENDIÓ/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
     const serial = serializarPromptVolcado(prompt);
     assert.ok(serial.includes(prompt.system));
@@ -125,10 +127,32 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     );
     assert.match(ritmo.mecanicaAbsorcion, /Mañana/);
     assert.doesNotMatch(ritmo.justificacionDominante, /C1 y C2/);
+    assert.doesNotMatch(
+      ritmo.devolucionMaestro,
+      /Ayer aprendí que mí hija/,
+    );
 
     const ruido = diagnosticarVolcadoLocal("feo");
     assert.equal(ruido.codigoDominante, 1);
     assert.equal(ruido.nivelCargaSugerido, "BASICO");
+  });
+
+  it("el volcado de la hija no se etiqueta Ritmo por «después» o «minutos»", () => {
+    const texto = `Ayer aprendí que mí hija de 4 años entiende de una manera sorpréndete. Sobre lo que los mayores hablan a su alrededor. Yo creí los niños de 4 años son cero comprension sobre procesos supuestamente complejo ¿Porque digo eso? Ayer mí esposa estaba mandándole a juntar sus cosas a mí hija diciendole:  tienes que juntar tus cosas, una niña que no es ordenada, haciada no sirve u le hacía comparaciones con otras niñas además le adicionada promesa de castigo y entonces mí hija empezó a llorar. Yo viendo eso inmediatamente le dije: un deber no se enseña a si, tienes que estarlo moviéndolo emocionalmente, haciéndole ver qué la tarea es divertida, haciendo la tarea pero jugando.  Le estás amontonando carga cognitiva a una niña de 4 años.  Después de unos 5 minutos mí hija vino a mí pr guntandome ¿Cómo se llama eso lo  que mí mamá hace papí? Despues más tardé me tocaba demostrarle a mí esposa como se lo hace disfrutar en la tarea a mí hija, en el momento último del juego- tarea, mí hija me dijo una frace que me demostró a un más su capacidad de aprendisaje de la lección que habia observado y dijo a si:  "papá yo soy una niña, no puedo hacer eso" ya se defendía con seguridad`;
+    const d = diagnosticarVolcadoLocal(texto);
+    assert.equal(d.codigoDominante, 9);
+    assert.equal(d.nombreOjoDominante, "El Ojo del Sistema");
+    assert.equal(d.nivelCargaSugerido, "SUPERIOR");
+    assert.match(d.puntoCiego, /c[oó]mo se llama/i);
+    assert.match(d.devolucionMaestro, /niña|alrededor|aprend/i);
+    assert.match(d.mecanicaAbsorcion, /nombre|ley/i);
+    assert.doesNotMatch(d.nombreOjoDominante, /Ritmo/);
+    assert.doesNotMatch(d.puntoCiego, /velocidad con absorción/);
+    assert.doesNotMatch(d.mecanicaAbsorcion, /hora de inicio y de corte/);
+    assert.doesNotMatch(
+      d.devolucionMaestro,
+      /Ayer aprendí que mí hija de 4 años entiende de una manera sorpréndete\. Sobre lo que los mayores/,
+    );
   });
 
   it("procesarVolcadoAprendizaje usa Gemini cuando hay caller", async () => {
