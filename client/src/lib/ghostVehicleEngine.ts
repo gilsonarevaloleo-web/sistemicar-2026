@@ -1,4 +1,5 @@
 import type { Vehicle } from "./persistence";
+import { ringSessionOperable, ringTieneFilasPendientes } from "./ringEnfoqueReal";
 import { getJournalDayStartMs } from "./segmentTime";
 import { isOrphanDesglosadorInterrupt } from "./situacionSessionMerge";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
@@ -19,6 +20,12 @@ export const JOURNAL_PRESTART_WINDOW_MS = 3600_000;
 export const JOURNAL_CARRYOVER_MAX_MS = 6 * 3600_000;
 
 /**
+ * Dual Kernel = 2 slots operativos + pausadas que no ocupan slot.
+ * Más de esto en `activo` es avalancha (Firebase/local resucitando historial).
+ */
+export const MAX_LIVE_DESGLOSADOR_SESSIONS = 4;
+
+/**
  * Vehículo abierto en un journal anterior (p. ej. 21:00–23:00) que sigue `activo` tras las 05:00.
  * No cubre segmentos del día nuevo y puede inundar el anillo de rojo si no se cierra.
  */
@@ -36,12 +43,51 @@ export function isJournalStaleActiveVehicle(
   return true;
 }
 
+/** Último gesto real sobre el vehículo (sub, pausa, fila o apertura). */
+export function lastLiveActivityMs(v: Vehicle): number {
+  let last = v.aperturaAt || (v.createdAt instanceof Date ? v.createdAt.getTime() : 0);
+  for (const s of v.subVehiculos ?? []) {
+    if (s.aperturaAt) last = Math.max(last, s.aperturaAt);
+    if (s.cierreAt) last = Math.max(last, s.cierreAt);
+  }
+  const pausaAt = v.desglosadorPausa?.pausadoAt;
+  if (pausaAt) last = Math.max(last, pausaAt);
+  const bloqueAt = v.situacionCronometro?.bloqueInicioAt;
+  if (bloqueAt) last = Math.max(last, bloqueAt);
+  for (const st of v.subTareas ?? []) {
+    if (st.creadaAt) last = Math.max(last, st.creadaAt);
+    if (st.cerradaAt) last = Math.max(last, st.cerradaAt);
+  }
+  return last;
+}
+
+/**
+ * Cascarón consciente: ya no hay faena y sigue `activo`.
+ * Ring 3/3 sin filas, lista libre cerrada, desglosador con todos los subs sellados.
+ */
+export function isZombieConsciousVehicle(v: Vehicle): boolean {
+  if (v.status !== "activo" || v.autoVerdad) return false;
+  if (isZombieDesglosadorShell(v)) return true;
+  if (v.tipoFlota !== "situacion") return false;
+  if (v.vehiculoPadreDesglosadorId) return false;
+  const subs = v.subTareas ?? [];
+  if (v.situacionCronometro && ringSessionOperable(v.situacionCronometro, subs)) {
+    return !ringTieneFilasPendientes(subs);
+  }
+  if (subs.length === 0) return false;
+  return !subs.some(
+    st => !st.completada && (st.resultadoSituacion ?? "pendiente") === "pendiente"
+  );
+}
+
 /**
  * Desglosador con trabajo real aún abierto (conquista o ring).
  * Debe resistir ausencias largas: no es «fantasma» solo por edad.
+ * Un cascarón (ring vacío, ciclo sellado) no cuenta como vivo.
  */
 export function hasLiveDesglosadorWork(v: Vehicle): boolean {
   if (v.status !== "activo" || v.autoVerdad) return false;
+  if (isZombieConsciousVehicle(v)) return false;
 
   if (v.tipoFlota === "tiempo" && v.tipoReloj === "desglosador") {
     const subs = v.subVehiculos ?? [];
@@ -56,9 +102,8 @@ export function hasLiveDesglosadorWork(v: Vehicle): boolean {
   }
 
   if (v.tipoFlota === "situacion") {
-    const sc = v.situacionCronometro;
-    if (sc?.activo === true) return true;
     const subs = v.subTareas ?? [];
+    if (ringTieneFilasPendientes(subs)) return true;
     return subs.some(
       st =>
         !!st.enDesgloseCronometro &&
@@ -67,6 +112,21 @@ export function hasLiveDesglosadorWork(v: Vehicle): boolean {
   }
 
   return false;
+}
+
+/** Sesiones vivas por encima del tope Dual Kernel — las más viejas son avalancha. */
+export function excessLiveSessionIds(
+  vehicles: Vehicle[],
+  max = MAX_LIVE_DESGLOSADOR_SESSIONS
+): Set<string> {
+  const live = vehicles
+    .filter(v => v.status === "activo" && !v.autoVerdad && hasLiveDesglosadorWork(v))
+    .sort((a, b) => {
+      const delta = lastLiveActivityMs(b) - lastLiveActivityMs(a);
+      return delta !== 0 ? delta : b.id.localeCompare(a.id);
+    });
+  if (live.length <= max) return new Set();
+  return new Set(live.slice(max).map(v => v.id));
 }
 
 /**
@@ -92,8 +152,17 @@ export function isGhostActiveVehicle(
 
   if (vehiclesById && isOrphanDesglosadorInterrupt(v, vehiclesById)) return true;
 
+  // Ring vacío / ciclo sellado: no es trabajo, es cascarón. Archivar.
+  if (isZombieConsciousVehicle(v)) return true;
+
   // Conquista/ring con trabajo vivo: no cortar por 12h ni por cruce 05:00.
-  if (hasLiveDesglosadorWork(v)) return false;
+  // Si hay avalancha (118 "vivos"), solo las N sesiones más recientes siguen vivas.
+  if (hasLiveDesglosadorWork(v)) {
+    if (vehiclesById && vehiclesById.size > MAX_LIVE_DESGLOSADOR_SESSIONS) {
+      if (excessLiveSessionIds([...vehiclesById.values()]).has(v.id)) return true;
+    }
+    return false;
+  }
 
   if (nowMs - apertura > GHOST_MAX_SESSION_MS) return true;
   if (isJournalStaleActiveVehicle(apertura, nowMs, dayStartMs)) return true;
@@ -201,7 +270,8 @@ export function recoverMissingJournalDayActives(
     return shouldPreserveLocalActivo(v, nowMs, dayStart);
   });
   if (missing.length === 0) return merged;
-  return [...missing, ...merged];
+  const combined = [...missing, ...merged];
+  return excludeGhostActivesFromReconcile(combined, nowMs);
 }
 
 /** Excluye fantasmas del cálculo de cobertura / entropía del anillo. */

@@ -21,6 +21,7 @@ function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
     tipoFlota: "situacion",
     tiempoInicio: new Date(1),
     createdAt: new Date(1),
+    aperturaAt: 1,
     ...partial,
   } as Vehicle;
 }

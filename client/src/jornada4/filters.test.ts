@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import {
   filterJornada4Vehicles,
   isJornada4Vehicle,
@@ -10,24 +10,42 @@ import {
   isSituacionRing,
 } from "./filters.ts";
 import type { Vehicle } from "../lib/persistence.ts";
+import { resetGhostSessionCache } from "../lib/ghostVehicleEngine.ts";
+
+const NOW = Date.now();
 
 function v(partial: Partial<Vehicle> & { id: string }): Vehicle {
   return {
     titulo: "x",
     status: "activo",
     userId: "u",
+    aperturaAt: NOW,
     ...partial,
   } as Vehicle;
 }
 
 describe("jornada4 filters", () => {
+  beforeEach(() => {
+    resetGhostSessionCache();
+  });
+
   it("acepta desglosador, ring, independientes y lista libre", () => {
     const list = [
       v({ id: "1", tipoFlota: "tiempo", tipoReloj: "desglosador" }),
       v({
         id: "2",
         tipoFlota: "situacion",
-        situacionCronometro: { activo: true, bloqueInicioAt: 1 },
+        situacionCronometro: { activo: true, bloqueInicioAt: NOW },
+        subTareas: [
+          {
+            id: "f1",
+            texto: "Fila",
+            completada: false,
+            creadaAt: NOW,
+            enDesgloseCronometro: true,
+            resultadoSituacion: "pendiente",
+          },
+        ],
       }),
       v({ id: "3", tipoFlota: "tiempo", tipoReloj: "manual" }),
       v({ id: "4", tipoFlota: "descanso" }),
@@ -129,5 +147,48 @@ describe("jornada4 filters", () => {
     assert.equal(isSituacionDesglosador(paused), true);
     assert.equal(isSituacionListaLibre(paused), false);
     assert.equal(isExpressSituacion(paused), false);
+  });
+
+  it("no lista un ring sin filas ni una avalancha de conquistas viejas", () => {
+    const zombieRing = v({
+      id: "zombie",
+      tipoFlota: "situacion",
+      situacionCronometro: { activo: true, bloqueInicioAt: NOW },
+      subTareas: [
+        {
+          id: "f1",
+          texto: "Hecha",
+          completada: true,
+          creadaAt: NOW,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "cumplido",
+        },
+      ],
+    });
+    const live = v({
+      id: "live",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [{ id: "s1", titulo: "Ahora", status: "activo", aperturaAt: NOW }],
+    });
+    const flood = Array.from({ length: 20 }, (_, i) =>
+      v({
+        id: `old-${i}`,
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        aperturaAt: NOW - (i + 1) * 60_000,
+        subVehiculos: [
+          {
+            id: `s-${i}`,
+            titulo: "Pendiente",
+            status: "pendiente",
+          },
+        ],
+      })
+    );
+    const dual = filterJornada4Vehicles([zombieRing, live, ...flood]);
+    assert.equal(dual.some(x => x.id === "zombie"), false);
+    assert.equal(dual.some(x => x.id === "live"), true);
+    assert.ok(dual.length <= 5);
   });
 });

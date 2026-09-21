@@ -1,3 +1,4 @@
+import { excludeGhostActivesFromReconcile } from "../lib/ghostVehicleEngine";
 import type { Vehicle } from "../lib/persistence";
 import { ringSessionOperable } from "../lib/ringEnfoqueReal";
 import { isSituacionListaLibre } from "./situacionLibreSeed";
@@ -15,8 +16,12 @@ export function isJornada4Vehicle(v: Vehicle): boolean {
   return false;
 }
 
-export function filterJornada4Vehicles(vehicles: Vehicle[]): Vehicle[] {
-  return vehicles.filter(isJornada4Vehicle);
+/** Dual Kernel: solo faena viva. Cascarones y avalancha histórica no se listan. */
+export function filterJornada4Vehicles(
+  vehicles: Vehicle[],
+  nowMs = Date.now()
+): Vehicle[] {
+  return excludeGhostActivesFromReconcile(vehicles, nowMs).filter(isJornada4Vehicle);
 }
 
 export function isConquistaDesglosador(v: Vehicle): boolean {

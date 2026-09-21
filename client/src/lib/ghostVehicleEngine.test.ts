@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import type { Vehicle } from "./persistence";
 import {
+  excludeGhostActivesFromReconcile,
   filterVehiclesForAnilloCoverage,
   filterVehiclesForEntropy,
   GHOST_MAX_SESSION_MS,
+  hasLiveDesglosadorWork,
   hasRealActiveConsciousVehicle,
   isGhostActiveVehicle,
   isJournalStaleActiveVehicle,
+  isZombieConsciousVehicle,
+  MAX_LIVE_DESGLOSADOR_SESSIONS,
   recoverMissingJournalDayActives,
   resetGhostSessionCache,
   shouldPreserveLocalActivo,
@@ -156,6 +160,72 @@ describe("ghostVehicleEngine", () => {
     const parkedActivo = v({ id: "loc1", aperturaAt: DAY_START + 3600_000 });
     const recovered = recoverMissingJournalDayActives([], [parkedActivo], NOW);
     assert.equal(recovered.length, 0);
+  });
+
+  it("ring 3/3 sin filas pendientes es cascarón fantasma", () => {
+    const zombie = v({
+      id: "empty-ring",
+      tipoFlota: "situacion",
+      aperturaAt: NOW - 10 * 60_000,
+      situacionCronometro: { activo: true, bloqueInicioAt: NOW - 10 * 60_000 },
+      subTareas: [
+        {
+          id: "st1",
+          texto: "Hecha",
+          completada: true,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "cumplido",
+        },
+      ],
+    });
+    assert.equal(isZombieConsciousVehicle(zombie), true);
+    assert.equal(hasLiveDesglosadorWork(zombie), false);
+    assert.equal(isGhostActiveVehicle(zombie, NOW, DAY_START), true);
+    assert.equal(shouldPreserveLocalActivo(zombie, NOW, DAY_START), false);
+  });
+
+  it("avalancha de conquistas activas deja solo las N más recientes", () => {
+    const flood = Array.from({ length: 20 }, (_, i) =>
+      v({
+        id: `c-${String(i).padStart(2, "0")}`,
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        aperturaAt: NOW - (20 - i) * 60_000,
+        subVehiculos: [
+          { id: `s-${i}`, titulo: "Unidad", status: "pendiente" },
+        ],
+      })
+    );
+    const byId = new Map(flood.map(x => [x.id, x]));
+    const ghosts = flood.filter(x => isGhostActiveVehicle(x, NOW, DAY_START, byId));
+    const alive = flood.filter(x => !isGhostActiveVehicle(x, NOW, DAY_START, byId));
+    assert.equal(alive.length, MAX_LIVE_DESGLOSADOR_SESSIONS);
+    assert.equal(ghosts.length, 20 - MAX_LIVE_DESGLOSADOR_SESSIONS);
+    assert.deepEqual(
+      alive.map(x => x.id).sort(),
+      ["c-16", "c-17", "c-18", "c-19"]
+    );
+
+    const pruned = excludeGhostActivesFromReconcile(flood, NOW);
+    assert.equal(
+      pruned.filter(x => x.status === "activo").length,
+      MAX_LIVE_DESGLOSADOR_SESSIONS
+    );
+  });
+
+  it("una sola conquista larga no se corta por la avalancha", () => {
+    const longConquista = v({
+      id: "only",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000,
+      subVehiculos: [
+        { id: "s1", titulo: "Pegar", status: "cumplido" },
+        { id: "s2", titulo: "Cortar", status: "activo" },
+      ],
+    });
+    const byId = new Map([[longConquista.id, longConquista]]);
+    assert.equal(isGhostActiveVehicle(longConquista, NOW, DAY_START, byId), false);
   });
 
   it("preserva activo reciente en ventana de sync", () => {

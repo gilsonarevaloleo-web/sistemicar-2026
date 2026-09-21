@@ -5,7 +5,10 @@
  * Objetivo: no perder ring/conquista por shell lean en memoria o snapshot remoto.
  */
 import type { Vehicle } from "./persistence";
-import { shouldPreserveLocalActivo } from "./ghostVehicleEngine";
+import {
+  excludeGhostActivesFromReconcile,
+  shouldPreserveLocalActivo,
+} from "./ghostVehicleEngine";
 import { getJournalDayStartMs } from "./segmentTime";
 import { ringSessionOperable } from "./ringEnfoqueReal";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge";
@@ -217,7 +220,18 @@ export function rehydrateFlotaFromDiskSources(input: RehydrateFlotaInput): Rehyd
     next.unshift(v);
   }
 
+  const pruned = excludeGhostActivesFromReconcile(next, nowMs);
+  const prunedIds = new Set(pruned.map(v => v.id));
+  const addedKept = addedIds.filter(id => prunedIds.has(id));
+  const upgradedKept = upgradedIds.filter(id => prunedIds.has(id));
   const sealedChanged = memory.some((v, i) => v !== input.memory[i]);
-  const changed = upgradedIds.length > 0 || addedIds.length > 0 || sealedChanged;
-  return { next: changed ? [...next] : input.memory, changed, upgradedIds, addedIds };
+  const prunedChanged = pruned.length !== next.length;
+  const changed =
+    upgradedKept.length > 0 || addedKept.length > 0 || sealedChanged || prunedChanged;
+  return {
+    next: changed ? pruned : input.memory,
+    changed,
+    upgradedIds: upgradedKept,
+    addedIds: addedKept,
+  };
 }
