@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   isAppShellQuietPath,
   isCommercialEntryPath,
+  isHouseRecintoPath,
   isJornada4Path,
   JORNADA_V4_PATH,
 } from "./jornadaBrand.ts";
@@ -28,6 +29,20 @@ describe("jornadaBrand", () => {
     assert.equal(isCommercialEntryPath("/pagos"), false);
     assert.equal(isAppShellQuietPath("/ventas-jornada"), true);
     assert.equal(isAppShellQuietPath("/menu"), true);
+  });
+
+  it("casas de escritura/consola callan el shell (no 10 webs: 10 recintos quietos)", () => {
+    assert.equal(isAppShellQuietPath("/esperanza"), true);
+    assert.equal(isAppShellQuietPath("/deposito"), true);
+    assert.equal(isAppShellQuietPath("/espejo"), true);
+    assert.equal(isAppShellQuietPath("/espejo/v2"), true);
+    assert.equal(isAppShellQuietPath("/umbral/v2"), true);
+    assert.equal(isAppShellQuietPath("/alquimia"), true);
+    assert.equal(isAppShellQuietPath("/proyector"), true);
+    assert.equal(isHouseRecintoPath("/esperanza"), true);
+    assert.equal(isHouseRecintoPath("/menu"), false);
+    assert.equal(isAppShellQuietPath("/analytics"), false);
+    assert.equal(isAppShellQuietPath("/historial"), false);
   });
 
   it("CTAs de /ventas-jornada son <a href> nativos, no Link de SPA", () => {

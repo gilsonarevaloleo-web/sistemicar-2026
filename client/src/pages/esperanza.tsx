@@ -4,7 +4,10 @@ import { useAuthContext } from "@/App";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
-import { FormularioVolcadoExpansivo } from "@/components/deposito/FormularioVolcadoExpansivo";
+import {
+  FormularioVolcadoExpansivo,
+  type FormularioVolcadoHandle,
+} from "@/components/deposito/FormularioVolcadoExpansivo";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
@@ -54,9 +57,9 @@ export default function Esperanza() {
   // Soft-start al venir de Dual Kernel: no clavar el hilo con Firestore.
   const motorsQuiet = useDualKernelMotorsQuiet();
   const [grado, setGrado] = useState<GradoMaestria>(GRADO_MAESTRIA_INICIAL);
-  const [captura, setCaptura] = useState<CapturaVolcadoExpansiva>(() =>
-    capturaVacia(GRADO_MAESTRIA_INICIAL),
-  );
+  const [formKey, setFormKey] = useState(0);
+  const [anexoReady, setAnexoReady] = useState(false);
+  const formRef = useRef<FormularioVolcadoHandle>(null);
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoVolcado | null>(null);
@@ -72,8 +75,17 @@ export default function Esperanza() {
       ? desdeQuery
       : leerGradoMaestria(user?.uid);
     setGrado(activo);
-    setCaptura((prev) => ({ ...prev, gradoMaestria: activo }));
   }, [user]);
+
+  useEffect(() => {
+    const arm = () => setAnexoReady(true);
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(arm, { timeout: 1200 });
+      return () => cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(arm, 400);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -117,7 +129,8 @@ export default function Esperanza() {
   );
 
   const guardar = async () => {
-    const lista = { ...captura, gradoMaestria: grado };
+    const lista =
+      formRef.current?.getCaptura() ?? capturaVacia(grado);
     const error = validarCapturaParaGrado(lista, grado);
     if (error) {
       if (error.startsWith("volcadoCrudo")) {
@@ -163,7 +176,7 @@ export default function Esperanza() {
     }
     try {
       await addVolcadoEntry(user.uid, crudo, d, diag, lista);
-      setCaptura(capturaVacia(grado));
+      setFormKey((k) => k + 1);
       toast.success(
         d.calidad === "ruido"
           ? "Ruido guardado. El no-dicho ya es el ojo."
@@ -250,9 +263,10 @@ export default function Esperanza() {
           data-testid="deposito-volcado"
         >
           <FormularioVolcadoExpansivo
+            key={formKey}
+            ref={formRef}
             gradoMaestria={grado}
-            captura={captura}
-            onChange={setCaptura}
+            captura={capturaVacia(grado)}
             disabled={saving}
           />
           <div className="mt-4 flex items-center justify-between gap-3">
@@ -330,8 +344,12 @@ export default function Esperanza() {
           </section>
         )}
 
-        <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
-        <CardLeyOpticaCodigo />
+        {anexoReady && (
+          <>
+            <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
+            <CardLeyOpticaCodigo />
+          </>
+        )}
       </div>
     </div>
   );

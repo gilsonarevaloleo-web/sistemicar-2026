@@ -51,9 +51,31 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /FormularioVolcadoExpansivo/);
     assert.match(src, /evaluarRitualPasoGrado/);
     assert.match(src, /params.get\("grado"\)/);
+    assert.match(src, /formRef/);
+    assert.match(src, /getCaptura/);
+    assert.match(src, /requestIdleCallback/);
     assert.doesNotMatch(src, /setLoading\(true\)/);
     assert.doesNotMatch(src, /if \(loading\)/);
     assert.doesNotMatch(src, /path="\/esperanza\/grado/);
+    assert.doesNotMatch(src, /onChange=\{setCaptura\}/);
+  });
+
+  it("App carga Depósito (y las otras casas) en chunk lazy, no en el bundle inicial", () => {
+    const src = readFromClient("App.tsx");
+    assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/esperanza"\)\)/);
+    assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/espejo"\)\)/);
+    assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/umbral-v2"\)\)/);
+    assert.match(src, /HouseRouteFallback/);
+    assert.doesNotMatch(src, /import Esperanza from/);
+  });
+
+  it("el volcado escribe en estado local: cada tecla no re-renderiza Esperanza", () => {
+    const src = readFromClient("components/deposito/FormularioVolcadoExpansivo.tsx");
+    assert.match(src, /useState<CapturaVolcadoExpansiva>/);
+    assert.match(src, /useImperativeHandle/);
+    assert.match(src, /getCaptura/);
+    assert.doesNotMatch(src, /onChange\?\.\(/);
+    assert.doesNotMatch(src, /onChange\(/);
   });
 
   it("Doctor IA no monta FAB en Depósito", () => {

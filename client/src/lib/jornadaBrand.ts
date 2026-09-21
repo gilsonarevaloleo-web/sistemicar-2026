@@ -30,6 +30,29 @@ export function isMenuPrincipalPath(pathname: string | null | undefined): boolea
 }
 
 /**
+ * Casas / recintos de escritura y consola.
+ * Una sola web: cada recinto es un chunk, no un sitio. El hilo es para el gesto
+ * (escribir, elegir código), no para el reloj 1s de Jornada.
+ * 10 componentes ≠ 10 webs — 10 chunks lazy + motores callados.
+ */
+const HOUSE_RECINTO_PREFIXES = [
+  "/esperanza",
+  "/deposito",
+  "/espejo",
+  "/umbral",
+  "/alquimia",
+  "/proyector",
+] as const;
+
+export function isHouseRecintoPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return HOUSE_RECINTO_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
+/**
  * Rutas donde el App shell debe callar motores (Centinela / SegmentAttention / Cierre)
  * durante toda la visita — no solo en soft-start.
  */
@@ -37,7 +60,8 @@ export function isAppShellQuietPath(pathname: string | null | undefined): boolea
   return (
     isProyectosHubPath(pathname) ||
     isMenuPrincipalPath(pathname) ||
-    isCommercialEntryPath(pathname)
+    isCommercialEntryPath(pathname) ||
+    isHouseRecintoPath(pathname)
   );
 }
 

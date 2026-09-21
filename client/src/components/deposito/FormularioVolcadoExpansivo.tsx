@@ -1,4 +1,10 @@
-import React from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
   CODIGOS_OBSERVADOR,
   DICCIONARIO_GRADOS,
@@ -16,8 +22,13 @@ const AZURE = "#1E90FF";
 export interface FormularioVolcadoExpansivoProps {
   gradoMaestria: GradoMaestria;
   captura: CapturaVolcadoExpansiva;
-  onChange: (captura: CapturaVolcadoExpansiva) => void;
+  /** Opcional: el padre no debe suscribirse a cada tecla (congela el recinto). */
+  onChange?: (captura: CapturaVolcadoExpansiva) => void;
   disabled?: boolean;
+}
+
+export interface FormularioVolcadoHandle {
+  getCaptura: () => CapturaVolcadoExpansiva;
 }
 
 function visible(
@@ -72,15 +83,39 @@ export function EscalaGradosMaestria({
   );
 }
 
-export function FormularioVolcadoExpansivo({
-  gradoMaestria,
-  captura,
-  onChange,
-  disabled,
-}: FormularioVolcadoExpansivoProps) {
+export const FormularioVolcadoExpansivo = forwardRef<
+  FormularioVolcadoHandle,
+  FormularioVolcadoExpansivoProps
+>(function FormularioVolcadoExpansivo(
+  { gradoMaestria, captura, disabled },
+  ref,
+) {
+  const [draft, setDraft] = useState<CapturaVolcadoExpansiva>(captura);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  useEffect(() => {
+    setDraft((prev) => {
+      if (prev.gradoMaestria !== gradoMaestria) {
+        return { ...prev, gradoMaestria };
+      }
+      return prev;
+    });
+  }, [gradoMaestria]);
+
+  useImperativeHandle(ref, () => ({
+    getCaptura: () => ({ ...draftRef.current, gradoMaestria }),
+  }));
+
+  const patch = (partial: Partial<CapturaVolcadoExpansiva>) => {
+    setDraft((prev) => {
+      const next = { ...prev, gradoMaestria, ...partial };
+      draftRef.current = next;
+      return next;
+    });
+  };
+
   const ficha = DICCIONARIO_GRADOS[gradoMaestria];
-  const patch = (partial: Partial<CapturaVolcadoExpansiva>) =>
-    onChange({ ...captura, gradoMaestria, ...partial });
 
   const fieldStyle = {
     border: `1px solid ${GOLD}33`,
@@ -106,7 +141,7 @@ export function FormularioVolcadoExpansivo({
       </label>
       <textarea
         id="volcado-dia"
-        value={captura.volcadoCrudo}
+        value={draft.volcadoCrudo}
         onChange={(e) => patch({ volcadoCrudo: e.target.value })}
         placeholder="Hoy aprendí…"
         rows={8}
@@ -127,7 +162,7 @@ export function FormularioVolcadoExpansivo({
           </label>
           <textarea
             id="volcado-friccion"
-            value={captura.friccionDetectada ?? ""}
+            value={draft.friccionDetectada ?? ""}
             onChange={(e) => patch({ friccionDetectada: e.target.value })}
             placeholder="La flor / excusa de hoy fue…"
             rows={4}
@@ -150,7 +185,7 @@ export function FormularioVolcadoExpansivo({
           </label>
           <textarea
             id="volcado-sombra"
-            value={captura.sombraOmision ?? ""}
+            value={draft.sombraOmision ?? ""}
             onChange={(e) => patch({ sombraOmision: e.target.value })}
             placeholder="Lo que no dije…"
             rows={4}
@@ -173,7 +208,7 @@ export function FormularioVolcadoExpansivo({
           </label>
           <select
             id="volcado-hipotesis"
-            value={captura.codigoHipotesis ?? ""}
+            value={draft.codigoHipotesis ?? ""}
             onChange={(e) => {
               const n = Number(e.target.value);
               patch({
@@ -198,6 +233,6 @@ export function FormularioVolcadoExpansivo({
       )}
     </div>
   );
-}
+});
 
 export default FormularioVolcadoExpansivo;
