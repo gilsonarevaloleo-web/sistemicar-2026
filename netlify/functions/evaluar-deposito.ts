@@ -9,19 +9,14 @@
 
 import type { Handler } from "@netlify/functions";
 import { GoogleGenerativeAI, type GenerationConfig } from "@google/generative-ai";
-import { GEMINI_MODELS } from "../../shared/geminiConfig.ts";
+import { GEMINI_MODELS, collectGeminiApiKeys } from "../../shared/geminiConfig.ts";
 import { evaluarDepositoVolcado } from "../../shared/deposito/evaluarVolcado.ts";
 import type { GeminiVolcadoCaller } from "../../shared/deposito/engineConfig.ts";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 function geminiKeys(): string[] {
-  return [
-    process.env.GEMINI_API_KEY,
-    process.env.GOOGLE_API_KEY,
-    process.env.VITE_GEMINI_API_KEY,
-    process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  ].filter((k) => k && k.length > 10 && !k.startsWith("_DUMMY")) as string[];
+  return collectGeminiApiKeys();
 }
 
 const callGemini: GeminiVolcadoCaller = async (

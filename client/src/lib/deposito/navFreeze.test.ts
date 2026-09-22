@@ -54,6 +54,11 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /formRef/);
     assert.match(src, /getCaptura/);
     assert.match(src, /requestIdleCallback/);
+    assert.match(src, /BannerMeritoDetectado/);
+    assert.match(src, /deposito-header-mapa-calor/);
+    assert.match(src, /planGuardadoVolcado/);
+    assert.match(src, /waitForRemote: plan.esperarFirebase/);
+    assert.match(src, /disabled=\{saving && grado !== 1\}/);
     assert.doesNotMatch(src, /setLoading\(true\)/);
     assert.doesNotMatch(src, /if \(loading\)/);
     assert.doesNotMatch(src, /path="\/esperanza\/grado/);

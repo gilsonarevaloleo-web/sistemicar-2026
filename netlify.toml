@@ -17,6 +17,8 @@
   node_bundler = "esbuild"
   # Solo handlers. Los *.test.ts viven fuera de este directorio
   # (Netlify empaqueta cada .ts de functions/ como Lambda).
+  # Runtime: GEMINI_API_KEY se lee de process.env (Site settings).
+  # collectGeminiApiKeys() la toma primero; no hace falta VITE_GEMINI_API_KEY.
 
 [functions.api]
   included_files = ["dist/netlify-api.cjs"]

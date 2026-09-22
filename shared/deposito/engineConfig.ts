@@ -37,6 +37,7 @@ export {
   detectarGradoPorMerito,
   etiquetaCodigoOjo,
   evaluarMeritoVolcado,
+  mensajeMeritoDetectado,
   obtenerTemperamento,
   parseCodigoOjo,
   toDepositoEngineResponse,

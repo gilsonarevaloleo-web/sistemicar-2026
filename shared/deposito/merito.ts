@@ -365,6 +365,11 @@ export function detectarGradoPorMerito(
   return grado;
 }
 
+export function mensajeMeritoDetectado(gradoDetectado: GradoMaestria): string {
+  const ficha = DICCIONARIO_GRADOS[normalizarGradoMaestria(gradoDetectado)];
+  return `¡Mérito Detectado! Tu precisión perceptiva ha elevado tu perfil a GRADO ${ficha.grado}: ${ficha.nombre}`;
+}
+
 export function mensajeEncuadreMerito(
   gradoActual: GradoMaestria,
   gradoDetectado: GradoMaestria,

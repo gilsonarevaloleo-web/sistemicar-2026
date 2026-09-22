@@ -8,6 +8,7 @@ import {
   calcularDensidadEstructural,
   detectarFlorMerito,
   evaluarMeritoVolcado,
+  mensajeMeritoDetectado,
   sugerirRotacionCodigo,
   toDepositoEngineResponse,
 } from "./merito.ts";
@@ -123,5 +124,16 @@ describe("Depósito v2 — mérito, placement y temperamento", () => {
       detectarFlorMerito("hoy fue feo"),
     );
     assert.ok(seca > clima);
+  });
+
+  it("mensajeMeritoDetectado usa el copy canónico de felicitación", () => {
+    assert.equal(
+      mensajeMeritoDetectado(3),
+      "¡Mérito Detectado! Tu precisión perceptiva ha elevado tu perfil a GRADO 3: Arquitecto de Punto Ciego",
+    );
+    assert.equal(
+      mensajeMeritoDetectado(2),
+      "¡Mérito Detectado! Tu precisión perceptiva ha elevado tu perfil a GRADO 2: Detector de Ruido",
+    );
   });
 });

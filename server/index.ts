@@ -63,7 +63,7 @@ import {
 } from "./editorialKnowledgeRouter";
 import { initPublicApiTables, createApiKey, listApiKeys, revokeApiKey, validateApiKey, logApiUsage, getMonthlyUsageCount, getApiKeyByPaymentId, updateApiKeyDeliveryStatus, supersedePreviousKey, isPendingStuck, initSubVehicleRecordsTable, bulkSaveVehicleHistory, getVehicleHistory } from "./publicApiDb";
 import { SUBSCRIPTION_PLANS } from "../shared/mercadopagoPlans";
-import { GEMINI_MODELS } from "../shared/geminiConfig";
+import { GEMINI_MODELS, collectGeminiApiKeys } from "../shared/geminiConfig";
 import {
   initEspejoCreditDeliveriesTable,
   grantPendingDeliveriesForEmail,
@@ -460,12 +460,7 @@ function cleanupTmpFiles(...paths: string[]) {
   }
 }
 
-const GEMINI_KEYS = [
-  process.env.GEMINI_API_KEY,
-  process.env.GOOGLE_API_KEY,
-  process.env.VITE_GEMINI_API_KEY,
-  process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-].filter((k) => k && k.length > 10 && !k.startsWith("_DUMMY")) as string[];
+const GEMINI_KEYS = collectGeminiApiKeys();
 
 async function callGemini(prompt: string, maxTokens: number = 500, jsonMode: boolean = false): Promise<string> {
   if (GEMINI_KEYS.length === 0) {
