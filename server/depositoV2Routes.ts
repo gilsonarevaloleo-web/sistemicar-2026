@@ -7,10 +7,15 @@ import type { Express, Request, Response } from "express";
 import {
   DICCIONARIO_GRADOS,
   DICCIONARIO_OJOS,
+  MATRIZ_TEMPERAMENTO,
   RITUAL_VOLCADO,
+  isCodigoObservador,
   normalizarCapturaVolcado,
   procesarVolcadoAprendizajeConFuente,
+  toDepositoEngineResponse,
   validarCapturaParaGrado,
+  type CodigoObservador,
+  type DepositoEngineResponse,
   type DiagnosticoVolcado,
   type GradoMaestria,
 } from "../shared/deposito/engineConfig";
@@ -28,15 +33,25 @@ export interface DepositoV2RouteDeps {
 export interface DepositoVolcadoSuccess {
   success: true;
   diagnostico: DiagnosticoVolcado;
+  engine: DepositoEngineResponse;
   source: "gemini" | "local_fallback";
   ritual: string;
   gradoMaestria: GradoMaestria;
+  gradoDetectado: GradoMaestria;
+  meritoReconocido: boolean;
 }
 
 export interface DepositoVolcadoErrorBody {
   success: false;
   error: string;
   diagnostico: DiagnosticoVolcado | null;
+}
+
+function parseOjosHistoricos(raw: unknown): CodigoObservador[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((n) => (typeof n === "string" ? Number(n.replace(/^C/i, "")) : n))
+    .filter(isCodigoObservador);
 }
 
 /**
@@ -59,6 +74,19 @@ export function registerDepositoV2Routes(
         nombre: g.nombre,
         titulo: g.titulo,
         camposVisibles: g.camposVisibles,
+        temperamento: MATRIZ_TEMPERAMENTO[g.grado].nombre,
+      })),
+      placementTest: true,
+      metricasMerito: [
+        "densidadEstructural",
+        "variedadRotacionCodigo",
+        "metacognicionDetectada",
+      ],
+      temperamentos: Object.values(MATRIZ_TEMPERAMENTO).map((t) => ({
+        grado: t.grado,
+        codigo: t.codigo,
+        nombre: t.nombre,
+        friccion: t.friccion,
       })),
       ojos: Object.values(DICCIONARIO_OJOS).map((o) => ({
         numero: o.numero,
@@ -92,16 +120,28 @@ export function registerDepositoV2Routes(
     }
 
     try {
+      const ojosHistoricos = parseOjosHistoricos(
+        req.body?.ojosHistoricos ?? req.body?.historialCodigos,
+      );
       const resultado = await procesarVolcadoAprendizajeConFuente(
         captura.volcadoCrudo,
-        { callGemini, captura, gradoMaestria: captura.gradoMaestria },
+        {
+          callGemini,
+          captura,
+          gradoMaestria: captura.gradoMaestria,
+          ojosHistoricos,
+        },
       );
+      const engine = toDepositoEngineResponse(resultado.diagnostico);
       const body: DepositoVolcadoSuccess = {
         success: true,
         diagnostico: resultado.diagnostico,
+        engine,
         source: resultado.source,
         ritual: RITUAL_VOLCADO,
         gradoMaestria: captura.gradoMaestria,
+        gradoDetectado: engine.evaluacionGrado.gradoDetectado,
+        meritoReconocido: engine.evaluacionGrado.meritoReconocido,
       };
       return res.status(200).json(body);
     } catch (error) {

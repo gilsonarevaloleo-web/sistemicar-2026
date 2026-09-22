@@ -65,6 +65,11 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /UN SOLO Código Dominante/i);
     assert.match(prompt.system, /prohibido listar múltiples códigos/i);
     assert.match(prompt.system, /codigoDominante/);
+    assert.match(prompt.system, /ojoDominante/);
+    assert.match(prompt.system, /evaluacionGrado/);
+    assert.match(prompt.system, /metricasMerito/);
+    assert.match(prompt.system, /NUTRITIVO/);
+    assert.match(prompt.system, /PLACEMENT TEST/);
     assert.match(prompt.system, /puntoCiego/);
     assert.match(prompt.system, /mecanicaAbsorcion/);
     assert.match(prompt.system, /nivelCargaSugerido/);
@@ -262,8 +267,10 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
   it("el prompt de G2+ obliga a analizar ruido y el de G3+ profundiza la sombra", () => {
     const g1 = obtenerPromptVolcado("Hoy aprendí una utilidad.");
     assert.equal(g1.gradoMaestria, 1);
+    assert.equal(g1.temperamento, "NUTRITIVO_INERCIA");
     assert.match(g1.system, /Aprendiz de Ojo/);
     assert.match(g1.system, /validacionGrado/);
+    assert.match(g1.system, /NUTRITIVO \/ INERCIA/);
     assert.doesNotMatch(g1.system, /REGLA G2\+/);
     assert.doesNotMatch(g1.user, /Fricción detectada/);
 
@@ -272,6 +279,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       friccionDetectada: "La flor fue «estuve ocupado».",
     });
     assert.equal(g2.gradoMaestria, 2);
+    assert.equal(g2.temperamento, "FRICCION_MODERADA");
     assert.match(g2.system, /DETECTOR DE RUIDO/);
     assert.match(g2.system, /Analizá ACTIVAMENTE/);
     assert.match(g2.system, /ruidoDetectadoCorrectamente/);
@@ -284,6 +292,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       sombraOmision: "No dije que le temí a la puerta.",
     });
     assert.match(g3.system, /ARQUITECTO DE PUNTO CIEGO/);
+    assert.match(g3.system, /RIGOR QUIRÚRGICO/);
     assert.match(g3.system, /sombra\/omisión/i);
     assert.match(g3.system, /sombraIntegrada/);
     assert.match(g3.user, /le temí a la puerta/);
@@ -295,9 +304,47 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       codigoHipotesis: 1,
     });
     assert.match(g4.system, /OPERADOR DE SOBERANÍA/);
+    assert.match(g4.system, /MATEMÁTICA PURA/);
     assert.match(g4.system, /hipotesisOjoAcierta/);
     assert.match(g4.system, /UN solo Código Dominante/);
     assert.match(g4.user, /C1 El Ojo de la Claridad/);
+  });
+
+  it("parseDiagnosticoVolcado acepta el contrato V2 (ojoDominante C9)", () => {
+    const d = parseDiagnosticoVolcado(
+      JSON.stringify({
+        ojoDominante: {
+          codigo: "C9",
+          nombre: "alias",
+          explicacion: "El relato pide el nombre del patrón, no el evento.",
+        },
+        puntoCiego: {
+          loNoDicho: "Cuenta el episodio y no el circuito.",
+          florDetectada: ["comparacion", "castigo"],
+        },
+        mecanicaAbsorcion: {
+          instruccionUnica: "Mañana nombrá la ley en una tarea de casa.",
+        },
+        evaluacionGrado: {
+          gradoDetectado: 3,
+          meritoReconocido: true,
+          mensajeEncuadre: "Mérito: opera en G3.",
+        },
+        metricasMerito: {
+          densidadEstructural: 72,
+          variedadRotacionCodigo: "C1",
+          metacognicionDetectada: true,
+        },
+        nivelCargaSugerido: "SUPERIOR",
+      }),
+    );
+    assert.equal(d.codigoDominante, 9);
+    assert.equal(d.nombreOjoDominante, "El Ojo del Sistema");
+    assert.match(d.puntoCiego, /circuito/);
+    assert.match(d.mecanicaAbsorcion, /ley/);
+    assert.deepEqual(d.florDetectada, ["comparacion", "castigo"]);
+    assert.equal(d.evaluacionGrado?.gradoDetectado, 3);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
   });
 
   it("parseDiagnosticoVolcado conserva validacionGrado y la Triada", () => {
@@ -353,6 +400,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.equal(d.codigoDominante, 7);
     assert.equal(d.validacionGrado?.gradoEvaluado, 2);
     assert.equal(d.validacionGrado?.ruidoDetectadoCorrectamente, true);
+    assert.ok(d.evaluacionGrado);
+    assert.ok(d.metricasMerito);
   });
 
   it("evaluarRitualPasoGrado exige 3 volcados y no autoriza aún", () => {

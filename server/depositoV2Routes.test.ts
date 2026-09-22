@@ -39,6 +39,9 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(body.ojos.length, 10);
       assert.equal(body.grados.length, 4);
       assert.equal(body.grados[0].nombre, "Aprendiz de Ojo");
+      assert.equal(body.placementTest, true);
+      assert.equal(body.temperamentos.length, 4);
+      assert.equal(body.grados[0].temperamento, "Nutritivo / Inercia");
       assert.match(body.muroDeDominancia, /UN solo Código Dominante/);
       assert.equal(body.fallbackLocal, true);
       assert.equal(body.gemini, false);
@@ -88,6 +91,11 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
         assert.equal(body.diagnostico.nombreOjoDominante, "El Ojo del Cálculo");
         assert.equal(typeof body.diagnostico.mecanicaAbsorcion, "string");
         assert.equal(body.gradoMaestria, 1);
+        assert.equal(body.engine.ojoDominante.codigo, "C5");
+        assert.equal(typeof body.gradoDetectado, "number");
+        assert.equal(typeof body.meritoReconocido, "boolean");
+        assert.ok(body.engine.evaluacionGrado);
+        assert.ok(body.engine.metricasMerito);
       },
     );
   });
@@ -167,5 +175,29 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
         );
       },
     );
+  });
+
+  it("placement: lectura seca desde G1 devuelve gradoDetectado 3 y mérito", async () => {
+    await withServer(undefined, async (base) => {
+      const res = await fetch(`${base}/api/deposito/volcado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          textoVolcado:
+            "Hoy a las 9:10 llamé al cliente. Pedí 40 mil. Dijo que no. Anoté el rechazo. El sesgo: yo suelo disculparme. No lo hice. No dije «después veo». Cerré a las 9:14.",
+          gradoMaestria: 1,
+        }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.success, true);
+      assert.equal(body.source, "local_fallback");
+      assert.equal(body.gradoMaestria, 1);
+      assert.equal(body.gradoDetectado, 3);
+      assert.equal(body.meritoReconocido, true);
+      assert.equal(body.engine.evaluacionGrado.gradoDetectado, 3);
+      assert.equal(body.diagnostico.evaluacionGrado.meritoReconocido, true);
+      assert.equal(body.engine.metricasMerito.metacognicionDetectada, true);
+    });
   });
 });

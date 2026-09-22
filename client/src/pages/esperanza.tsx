@@ -13,7 +13,7 @@ import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
-import { leerGradoMaestria } from "@/lib/depositoPerfil";
+import { guardarGradoMaestria, leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
   listVolcadosLocal,
@@ -60,6 +60,7 @@ export default function Esperanza() {
   const [formKey, setFormKey] = useState(0);
   const [anexoReady, setAnexoReady] = useState(false);
   const formRef = useRef<FormularioVolcadoHandle>(null);
+  const gradoDesdeQueryRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoVolcado | null>(null);
@@ -74,6 +75,7 @@ export default function Esperanza() {
     const activo = isGradoMaestria(desdeQuery)
       ? desdeQuery
       : leerGradoMaestria(user?.uid);
+    gradoDesdeQueryRef.current = isGradoMaestria(desdeQuery);
     setGrado(activo);
   }, [user]);
 
@@ -150,7 +152,10 @@ export default function Esperanza() {
     const d = analizarVolcado(crudo);
     setDictamen(d);
     setUltimoVolcado(crudo);
-    const localDiag = diagnosticarVolcadoLocal(crudo, lista);
+    const ojosHistoricos = historial
+      .map((v) => v.diagnostico?.codigoDominante)
+      .filter((n): n is CodigoObservador => typeof n === "number");
+    const localDiag = diagnosticarVolcadoLocal(crudo, lista, ojosHistoricos);
     setDiagnostico(localDiag);
     requestAnimationFrame(() =>
       dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -159,11 +164,23 @@ export default function Esperanza() {
     setSaving(true);
     let diag: DiagnosticoVolcado = localDiag;
     try {
-      const remoto = await procesarVolcadoRemoto(crudo, lista);
+      const remoto = await procesarVolcadoRemoto(crudo, lista, {
+        ojosHistoricos,
+      });
       diag = remoto.diagnostico;
       setDiagnostico(diag);
     } catch {
       diag = localDiag;
+    }
+
+    const ev = diag.evaluacionGrado;
+    if (
+      ev?.meritoReconocido &&
+      !gradoDesdeQueryRef.current &&
+      ev.gradoDetectado > grado
+    ) {
+      setGrado(ev.gradoDetectado);
+      if (user) guardarGradoMaestria(user.uid, ev.gradoDetectado);
     }
 
     if (!user) {
@@ -178,9 +195,11 @@ export default function Esperanza() {
       await addVolcadoEntry(user.uid, crudo, d, diag, lista);
       setFormKey((k) => k + 1);
       toast.success(
-        d.calidad === "ruido"
-          ? "Ruido guardado. El no-dicho ya es el ojo."
-          : "Volcado guardado.",
+        diag.evaluacionGrado?.meritoReconocido
+          ? diag.evaluacionGrado.mensajeEncuadre
+          : d.calidad === "ruido"
+            ? "Ruido guardado. El no-dicho ya es el ojo."
+            : "Volcado guardado.",
       );
       requestAnimationFrame(() =>
         dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })

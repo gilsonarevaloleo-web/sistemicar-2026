@@ -140,6 +140,57 @@ export function DiagnosticoUniversidad({
         </div>
       )}
 
+      {diagnostico.evaluacionGrado && (
+        <div data-testid="deposito-evaluacion-grado">
+          <p
+            className="text-[10px] tracking-[0.22em] mb-2"
+            style={{ color: diagnostico.evaluacionGrado.meritoReconocido ? GOLD : AZURE }}
+          >
+            {diagnostico.evaluacionGrado.meritoReconocido
+              ? `PLACEMENT · MÉRITO G${diagnostico.evaluacionGrado.gradoDetectado}`
+              : `PLACEMENT · G${diagnostico.evaluacionGrado.gradoDetectado}`}
+          </p>
+          <p
+            className="text-sm leading-relaxed text-white/80"
+            data-testid="deposito-mensaje-encuadre"
+          >
+            {diagnostico.evaluacionGrado.mensajeEncuadre}
+          </p>
+        </div>
+      )}
+
+      {diagnostico.metricasMerito && (
+        <div data-testid="deposito-metricas-merito">
+          <p
+            className="text-[10px] tracking-[0.22em] mb-2"
+            style={{ color: AZURE }}
+          >
+            MÉRITO · 3 EJES
+          </p>
+          <ul className="space-y-1 text-xs text-white/70">
+            <li data-testid="deposito-densidad">
+              Estructura {diagnostico.metricasMerito.densidadEstructural}/100
+            </li>
+            <li data-testid="deposito-rotacion">
+              Rotación {diagnostico.metricasMerito.variedadRotacionCodigo}
+            </li>
+            <li data-testid="deposito-metacognicion">
+              Metacognición{" "}
+              {diagnostico.metricasMerito.metacognicionDetectada ? "sí" : "no"}
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {diagnostico.florDetectada && diagnostico.florDetectada.length > 0 && (
+        <p
+          className="text-[11px] leading-relaxed text-white/40"
+          data-testid="deposito-flor-detectada"
+        >
+          Flor: {diagnostico.florDetectada.join(", ")}
+        </p>
+      )}
+
       {expediente && (
         <div data-testid="deposito-expediente">
           <p
