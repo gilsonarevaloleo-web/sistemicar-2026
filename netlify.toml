@@ -19,6 +19,13 @@
 [functions.api]
   included_files = ["dist/netlify-api.cjs"]
 
+# Depósito V2 — evaluación perceptiva (función dedicada)
+[[redirects]]
+  from = "/api/deposito/evaluar"
+  to = "/.netlify/functions/evaluar-deposito"
+  status = 200
+  force = true
+
 # API Express → función serverless
 [[redirects]]
   from = "/api/*"

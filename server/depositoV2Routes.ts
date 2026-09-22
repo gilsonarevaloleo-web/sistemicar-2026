@@ -9,16 +9,11 @@ import {
   DICCIONARIO_OJOS,
   MATRIZ_TEMPERAMENTO,
   RITUAL_VOLCADO,
-  isCodigoObservador,
-  normalizarCapturaVolcado,
-  procesarVolcadoAprendizajeConFuente,
-  toDepositoEngineResponse,
-  validarCapturaParaGrado,
-  type CodigoObservador,
   type DepositoEngineResponse,
   type DiagnosticoVolcado,
   type GradoMaestria,
 } from "../shared/deposito/engineConfig";
+import { evaluarDepositoVolcado } from "../shared/deposito/evaluarVolcado";
 
 export type GeminiCaller = (
   prompt: string,
@@ -28,6 +23,24 @@ export type GeminiCaller = (
 
 export interface DepositoV2RouteDeps {
   callGemini?: GeminiCaller;
+}
+
+function jsonDeposito(
+  resultado: Awaited<ReturnType<typeof evaluarDepositoVolcado>>,
+): DepositoVolcadoSuccess | DepositoVolcadoErrorBody {
+  if (!resultado.ok) {
+    return { success: false, error: resultado.error, diagnostico: null };
+  }
+  return {
+    success: true,
+    diagnostico: resultado.diagnostico,
+    engine: resultado.engine,
+    source: resultado.source,
+    ritual: RITUAL_VOLCADO,
+    gradoMaestria: resultado.gradoUsuarioActual,
+    gradoDetectado: resultado.engine.evaluacionGrado.gradoDetectado,
+    meritoReconocido: resultado.engine.evaluacionGrado.meritoReconocido,
+  };
 }
 
 export interface DepositoVolcadoSuccess {
@@ -47,15 +60,8 @@ export interface DepositoVolcadoErrorBody {
   diagnostico: DiagnosticoVolcado | null;
 }
 
-function parseOjosHistoricos(raw: unknown): CodigoObservador[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((n) => (typeof n === "string" ? Number(n.replace(/^C/i, "")) : n))
-    .filter(isCodigoObservador);
-}
-
 /**
- * Depósito v2 — POST /api/deposito/volcado + GET meta
+ * Depósito v2 — POST /api/deposito/volcado + POST /api/deposito/evaluar + GET meta
  */
 export function registerDepositoV2Routes(
   app: Express,
@@ -67,6 +73,7 @@ export function registerDepositoV2Routes(
     res.json({
       version: "2.0.0-universidad",
       endpoint: "POST /api/deposito/volcado",
+      evaluar: "POST /api/deposito/evaluar",
       ritual: RITUAL_VOLCADO,
       muroDeDominancia: "UN solo Código Dominante. Prohibido listar múltiples códigos.",
       grados: Object.values(DICCIONARIO_GRADOS).map((g) => ({
@@ -98,52 +105,29 @@ export function registerDepositoV2Routes(
     });
   });
 
+  const leerBody = (req: Request) => ({
+    textoVolcado: req.body?.textoVolcado ?? req.body?.texto,
+    volcadoCrudo: req.body?.volcadoCrudo,
+    gradoUsuarioActual:
+      req.body?.gradoUsuarioActual ?? req.body?.gradoMaestria ?? req.body?.grado,
+    friccionDetectada: req.body?.friccionDetectada,
+    sombraOmision: req.body?.sombraOmision,
+    codigoHipotesis: req.body?.codigoHipotesis,
+    ojosHistoricos: req.body?.ojosHistoricos ?? req.body?.historialCodigos,
+    callGemini,
+  });
+
   app.post("/api/deposito/volcado", async (req: Request, res: Response) => {
-    const captura = normalizarCapturaVolcado({
-      textoVolcado: req.body?.textoVolcado ?? req.body?.texto,
-      volcadoCrudo: req.body?.volcadoCrudo,
-      gradoMaestria: req.body?.gradoMaestria ?? req.body?.grado,
-      friccionDetectada: req.body?.friccionDetectada,
-      sombraOmision: req.body?.sombraOmision,
-      codigoHipotesis: req.body?.codigoHipotesis,
-    });
-    const errorCaptura = validarCapturaParaGrado(captura);
-
-    if (errorCaptura) {
-      const esVacio = errorCaptura.startsWith("volcadoCrudo");
-      const body: DepositoVolcadoErrorBody = {
-        success: false,
-        error: esVacio ? "textoVolcado es requerido" : errorCaptura,
-        diagnostico: null,
-      };
-      return res.status(400).json(body);
-    }
-
     try {
-      const ojosHistoricos = parseOjosHistoricos(
-        req.body?.ojosHistoricos ?? req.body?.historialCodigos,
-      );
-      const resultado = await procesarVolcadoAprendizajeConFuente(
-        captura.volcadoCrudo,
-        {
-          callGemini,
-          captura,
-          gradoMaestria: captura.gradoMaestria,
-          ojosHistoricos,
-        },
-      );
-      const engine = toDepositoEngineResponse(resultado.diagnostico);
-      const body: DepositoVolcadoSuccess = {
-        success: true,
-        diagnostico: resultado.diagnostico,
-        engine,
-        source: resultado.source,
-        ritual: RITUAL_VOLCADO,
-        gradoMaestria: captura.gradoMaestria,
-        gradoDetectado: engine.evaluacionGrado.gradoDetectado,
-        meritoReconocido: engine.evaluacionGrado.meritoReconocido,
-      };
-      return res.status(200).json(body);
+      const resultado = await evaluarDepositoVolcado(leerBody(req));
+      if (!resultado.ok) {
+        return res.status(resultado.status).json({
+          success: false,
+          error: resultado.error,
+          diagnostico: null,
+        } satisfies DepositoVolcadoErrorBody);
+      }
+      return res.status(200).json(jsonDeposito(resultado));
     } catch (error) {
       console.error("[deposito/volcado]", error);
       const body: DepositoVolcadoErrorBody = {
@@ -152,6 +136,26 @@ export function registerDepositoV2Routes(
         diagnostico: null,
       };
       return res.status(500).json(body);
+    }
+  });
+
+  app.post("/api/deposito/evaluar", async (req: Request, res: Response) => {
+    try {
+      const resultado = await evaluarDepositoVolcado(leerBody(req));
+      if (!resultado.ok) {
+        return res.status(resultado.status).json({ error: resultado.error });
+      }
+      return res.status(200).json({
+        ...resultado.engine,
+        perfilPromovido: resultado.perfilPromovido,
+        gradoUsuarioActual: resultado.gradoUsuarioActual,
+        source: resultado.source,
+      });
+    } catch (error) {
+      console.error("[deposito/evaluar]", error);
+      return res.status(500).json({
+        error: "Error procesando el volcado perceptivo.",
+      });
     }
   });
 }

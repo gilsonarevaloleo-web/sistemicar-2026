@@ -58,7 +58,7 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(res.status, 400);
       const body = await res.json();
       assert.equal(body.success, false);
-      assert.match(body.error, /textoVolcado/);
+      assert.match(body.error, /vacío|textoVolcado/);
     });
   });
 
@@ -198,6 +198,44 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(body.engine.evaluacionGrado.gradoDetectado, 3);
       assert.equal(body.diagnostico.evaluacionGrado.meritoReconocido, true);
       assert.equal(body.engine.metricasMerito.metacognicionDetectada, true);
+    });
+  });
+});
+
+describe("Depósito v2 — POST /api/deposito/evaluar", () => {
+  it("devuelve DepositoEngineResponse y promociona G1→G3 en lectura seca", async () => {
+    await withServer(undefined, async (base) => {
+      const res = await fetch(`${base}/api/deposito/evaluar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          textoVolcado:
+            "Hoy a las 9:10 llamé al cliente. Pedí 40 mil. Dijo que no. Anoté el rechazo. El sesgo: yo suelo disculparme. No lo hice. No dije «después veo». Cerré a las 9:14.",
+          gradoUsuarioActual: 1,
+        }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.match(body.ojoDominante.codigo, /^C\d+$/);
+      assert.ok(Array.isArray(body.puntoCiego.florDetectada));
+      assert.equal(typeof body.mecanicaAbsorcion.instruccionUnica, "string");
+      assert.equal(body.evaluacionGrado.gradoDetectado, 3);
+      assert.equal(body.evaluacionGrado.meritoReconocido, true);
+      assert.equal(body.perfilPromovido, true);
+      assert.equal(body.gradoUsuarioActual, 1);
+    });
+  });
+
+  it("rechaza volcado vacío", async () => {
+    await withServer(undefined, async (base) => {
+      const res = await fetch(`${base}/api/deposito/evaluar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gradoUsuarioActual: 1 }),
+      });
+      assert.equal(res.status, 400);
+      const body = await res.json();
+      assert.match(body.error, /vacío/);
     });
   });
 });
