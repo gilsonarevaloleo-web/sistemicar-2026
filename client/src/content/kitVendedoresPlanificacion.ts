@@ -182,6 +182,10 @@ export const OBJECIONES = [
     a: "Porque aquí pagas por cierre medido (unidades y bloques), no por almacenar notas.",
   },
   {
+    q: "¿Por qué lanzar vehículos si de frente es más rápido?",
+    a: "De frente es reactividad: ahí nacen las emociones automáticas. Lanzar es el freno. Nombrar el desglosador y las unidades instala la imagen detallada; la pereza es ausencia de esa imagen. No es burocracia: es el programa.",
+  },
+  {
     q: "¿Es muy complicado?",
     a: "Empieza con Base: solo Conquista. Ritmo y Norte se activan cuando el usuario ya cierra.",
   },
@@ -237,6 +241,10 @@ export const IMAN_OBJECIONES = [
   {
     q: "Prefiero anotar directo donde trabajo",
     a: "Directo = foco bajo si no acotas tiempo. Situacional + cronómetro sube el foco ~60%.",
+  },
+  {
+    q: "¿Por qué no lo hago de frente?",
+    a: "De frente es automatismo. Nombrar el vehículo y el desglosador es el freno: instala imagen antes de ejecutar y corta las emociones automáticas.",
   },
   {
     q: "Es otra bandeja de notas",

@@ -1,5 +1,7 @@
 /** Prompt del Doctor IA en modo tutor cuando el usuario está en Planificación. */
 
+import { LEY_FRENO_VEHICULO_KERNEL, LEY_FRENO_VEHICULO_OBJECION } from "./jornada/leyFrenoVehiculo";
+
 export type PlanificacionPlanProfile = "base" | "ritmo" | "norte" | "estudiante" | "produccion";
 
 export function buildPlanificacionTutorSystemPrompt(params: {
@@ -39,6 +41,13 @@ GLOSARIO RÁPIDO:
 - Situacional / Enfoque (Ritmo) = ring, cupos, imprevistos.
 - Crisol + Hub Proyectos (Norte) = ordenar pensamientos → pasos de fe a largo plazo.
 - PS = Puntos de Soberanía por cerrar.
+
+${LEY_FRENO_VEHICULO_KERNEL}
+
+SI PREGUNTA «por qué lanzar / por qué no de frente / es perder tiempo / para qué nombrar»:
+Objeción: ${LEY_FRENO_VEHICULO_OBJECION.q}
+Respuesta canónica: ${LEY_FRENO_VEHICULO_OBJECION.a}
+No uses motivación. Nombra el freno y la imagen. Termina con: "Ahora: nombra la misión y lanza."
 
 FLUJOS QUE DEBES ENSEÑAR:
 1) Base: lanzar Conquista → cerrar subs → ver PS.

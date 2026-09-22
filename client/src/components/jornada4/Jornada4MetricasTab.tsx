@@ -11,6 +11,7 @@ import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4Conc
 import { Jornada4UbicacionConcienciaCard } from "@/components/jornada4/Jornada4UbicacionConcienciaCard";
 import { SelloOperadorCard } from "@/components/jornada4/SelloOperadorCard";
 import { EspejoSemanalCard } from "@/components/jornada4/EspejoSemanalCard";
+import { CardLeyFrenoVehiculo } from "@/components/jornada4/CardLeyFrenoVehiculo";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { useConcienciaTriadaOperador } from "@/hooks/useConcienciaTriadaOperador";
 import { computeDisciplinaPlanDia } from "@/jornada4/disciplinaPlanDia";
@@ -95,6 +96,7 @@ export default function Jornada4MetricasTab({
         todayPs={todayPs}
         tick={disciplinaTick}
       />
+      <CardLeyFrenoVehiculo />
       <EspejoSemanalCard userId={userId} tick={disciplinaTick} />
       <Jornada4UbicacionConcienciaCard
         segmentos={segmentos}
