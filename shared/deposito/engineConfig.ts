@@ -21,14 +21,17 @@ import { LEY_OPTICA_CODIGO_KERNEL } from "./leyOpticaCodigo.ts";
 import {
   bloquePlacementTest,
   bloqueTemperamento,
+  buildDepositoSystemPrompt,
   evaluarMeritoVolcado,
   obtenerTemperamento,
   parseCodigoOjo,
 } from "./merito.ts";
 export {
   MATRIZ_TEMPERAMENTO,
+  TEMPERAMENTO_MODO_OPERATIVO,
   bloquePlacementTest,
   bloqueTemperamento,
+  buildDepositoSystemPrompt,
   calcularDensidadEstructural,
   detectarFlorMerito,
   detectarGradoPorMerito,
@@ -867,6 +870,8 @@ export function obtenerPromptVolcado(
   const temperamento = obtenerTemperamento(grado);
 
   const system = [
+    buildDepositoSystemPrompt(grado),
+    "",
     KERNEL_UNIVERSIDAD,
     "",
     bloqueInstruccionGrado(grado),

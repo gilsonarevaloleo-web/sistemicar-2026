@@ -12,6 +12,7 @@ import {
   DICCIONARIO_OJOS,
   extraerHechos,
   isCodigoObservador,
+  isGradoMaestria,
   normalizarGradoMaestria,
   type CapturaVolcadoExpansiva,
   type CodigoObservador,
@@ -61,56 +62,70 @@ const SESGO_PROPIO =
 const HECHO_CONCRETO =
   /llam[eé]|cobr[eé]|anot[eé]|cort[eé]|mand[eé]|cerr[eé]|marqu[eé]|entr[eé]|sal[ií]|junt[eé]|escrib[ií]|med[ií]|pagu[eé]|ped[ií]|dije no|a las \d/gi;
 
+/** Fricción del Maestro según el grado activo del perfil. */
+export const TEMPERAMENTO_MODO_OPERATIVO: Record<GradoMaestria, string> = {
+  1: "TEMPERAMENTO NUTRITIVO (G1): Tolera el ruido. No bloquees la entrada. Reconoce la inercia del volcado y devuelve la Tríada de Valor sin juzgar la narrativa.",
+  2: "TEMPERAMENTO DE FRICCIÓN MODERADA (G2): Detecta adjetivos y comparaciones. Señala la 'flor' de forma directa pero constructiva.",
+  3: "TEMPERAMENTO DE RIGOR QUIRÚRGICO (G3): Cero tolerancia al autoengaño. Expón la Sombra, desacopla las victorias morales y exige lectura de circuitos.",
+  4: "TEMPERAMENTO DE MATEMÁTICA PURA (G4): Evaluación seca e inflexible. Mide únicamente hechos en la materia, coherencia histórica y rotación de matriz.",
+};
+
+/**
+ * System Prompt de Gemini: temperamento por grado activo + placement por mérito.
+ * El tono sigue al perfil. El gradoDetectado sigue a la densidad del volcado.
+ */
+export function buildDepositoSystemPrompt(gradoUsuario: number): string {
+  const temperamentoMap = TEMPERAMENTO_MODO_OPERATIVO;
+  const modoOperativo =
+    isGradoMaestria(gradoUsuario)
+      ? temperamentoMap[gradoUsuario]
+      : temperamentoMap[1];
+  const grado = isGradoMaestria(gradoUsuario) ? gradoUsuario : 1;
+
+  return `
+ERES EL MOTOR DE INGENIERÍA PERCEPTIVA DE SISTEMICAR (EL DEPÓSITO V2).
+Tu función es procesar el volcado crudo del usuario y diagnosticar su arquitectura bajo la matriz de los 10 Códigos.
+
+GRADO ACTUAL DEL USUARIO EN PERFIL: ${grado}
+MODO OPERATIVO: ${modoOperativo}
+
+REGLAS DE EVALUACIÓN Y MÉRITO (PLACEMENT TEST):
+1. Analiza la densidad del texto: si un usuario con perfil G1 entrega un texto con 0% flor, alta asunción de responsabilidad y lectura clara de circuito, asígnale 'gradoDetectado': 3 o 4 en la respuesta JSON y marca 'meritoReconocido': true.
+2. Si el texto está lleno de justificaciones, victimización o adjetivos, asigna 'gradoDetectado': 1.
+3. En la 'mecanicaAbsorcion', entrega SIEMPRE UNA SOLA INSTRUCCIÓN EJECUTABLE. Cero sermones, cero consejos de autoayuda.
+
+RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
+`.trim();
+}
+
 export const MATRIZ_TEMPERAMENTO: Record<GradoMaestria, FichaTemperamento> = {
   1: {
     grado: 1,
     codigo: "NUTRITIVO_INERCIA",
     nombre: "Nutritivo / Inercia",
     friccion: "baja",
-    instruccionPrompt: [
-      "TEMPERAMENTO G1 — NUTRITIVO / INERCIA:",
-      "Fricción baja. Alimentás al aprendiz. No humillás. No exigís sombra ni detector de ruido.",
-      "Nombrás UN hecho y UNA mecánica. El tono sostiene; no azota.",
-      "devolucionMaestro: espejo paciente, revelación suave, veredicto de un solo gesto.",
-      "Prohibido el rigor quirúrgico. Prohibido el sermón dulce (eso también es flor).",
-    ].join("\n"),
+    instruccionPrompt: TEMPERAMENTO_MODO_OPERATIVO[1],
   },
   2: {
     grado: 2,
     codigo: "FRICCION_MODERADA",
     nombre: "Fricción Moderada",
     friccion: "moderada",
-    instruccionPrompt: [
-      "TEMPERAMENTO G2 — FRICCIÓN MODERADA:",
-      "Empujás el filtro. Señalá la flor sin desprecio. Cortá el adorno.",
-      "El alumno ya debe aislar excusa. Si se justifica, nombralo: sigue en pose.",
-      "Tono: maestro que frota, no que consuela.",
-    ].join("\n"),
+    instruccionPrompt: TEMPERAMENTO_MODO_OPERATIVO[2],
   },
   3: {
     grado: 3,
     codigo: "RIGOR_QUIRURGICO",
     nombre: "Rigor Quirúrgico",
     friccion: "alta",
-    instruccionPrompt: [
-      "TEMPERAMENTO G3 — RIGOR QUIRÚRGICO:",
-      "Cero consuelo. Cero metáfora ornamental. El bisturí es lo no dicho.",
-      "Una omisión, un corte, una mecánica. Prosa seca.",
-      "Si hay flor, es evidencia del punto ciego, no material para suavizar.",
-    ].join("\n"),
+    instruccionPrompt: TEMPERAMENTO_MODO_OPERATIVO[3],
   },
   4: {
     grado: 4,
     codigo: "MATEMATICA_PURA",
     nombre: "Matemática Pura",
     friccion: "pura",
-    instruccionPrompt: [
-      "TEMPERAMENTO G4 — MATEMÁTICA PURA:",
-      "Sin flor, sin metáfora, sin pedagogía. Proporción y rotación.",
-      "El veredicto es ecuación: densidad, lente que falta, ratio hechos/flor.",
-      "Mapa de calor 1/10: sugerí UN código de rotación (metricasMerito.variedadRotacionCodigo).",
-      "No celebres el ojo dominante; medí el hueco.",
-    ].join("\n"),
+    instruccionPrompt: TEMPERAMENTO_MODO_OPERATIVO[4],
   },
 };
 

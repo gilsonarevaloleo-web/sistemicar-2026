@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import { diagnosticarVolcadoLocal } from "./engineConfig.ts";
 import {
   MATRIZ_TEMPERAMENTO,
+  TEMPERAMENTO_MODO_OPERATIVO,
+  buildDepositoSystemPrompt,
   calcularDensidadEstructural,
   detectarFlorMerito,
   evaluarMeritoVolcado,
@@ -21,6 +23,12 @@ describe("Depósito v2 — mérito, placement y temperamento", () => {
     assert.equal(MATRIZ_TEMPERAMENTO[2].codigo, "FRICCION_MODERADA");
     assert.equal(MATRIZ_TEMPERAMENTO[3].codigo, "RIGOR_QUIRURGICO");
     assert.equal(MATRIZ_TEMPERAMENTO[4].codigo, "MATEMATICA_PURA");
+    assert.equal(
+      MATRIZ_TEMPERAMENTO[1].instruccionPrompt,
+      TEMPERAMENTO_MODO_OPERATIVO[1],
+    );
+    assert.match(buildDepositoSystemPrompt(2), /FRICCIÓN MODERADA/);
+    assert.match(buildDepositoSystemPrompt(2), /adjetivos y comparaciones/);
   });
 
   it("clima corto se queda en G1 sin mérito", () => {

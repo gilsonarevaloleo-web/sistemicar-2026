@@ -20,6 +20,7 @@ import {
   procesarVolcadoAprendizajeConFuente,
   serializarPromptVolcado,
   validarCapturaParaGrado,
+  buildDepositoSystemPrompt,
   type CodigoObservador,
 } from "./engineConfig.ts";
 
@@ -69,6 +70,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /evaluacionGrado/);
     assert.match(prompt.system, /metricasMerito/);
     assert.match(prompt.system, /NUTRITIVO/);
+    assert.match(prompt.system, /MOTOR DE INGENIERÍA PERCEPTIVA/);
+    assert.match(prompt.system, /DepositoEngineResponse/);
     assert.match(prompt.system, /PLACEMENT TEST/);
     assert.match(prompt.system, /puntoCiego/);
     assert.match(prompt.system, /mecanicaAbsorcion/);
@@ -264,13 +267,39 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     );
   });
 
+  it("buildDepositoSystemPrompt calibra temperamento y permite placement G3 desde G1", () => {
+    const g1 = buildDepositoSystemPrompt(1);
+    assert.match(g1, /GRADO ACTUAL DEL USUARIO EN PERFIL: 1/);
+    assert.match(g1, /TEMPERAMENTO NUTRITIVO \(G1\)/);
+    assert.match(g1, /Tolera el ruido/);
+    assert.match(g1, /0% flor/);
+    assert.match(g1, /meritoReconocido': true/);
+    assert.match(g1, /UNA SOLA INSTRUCCIÓN EJECUTABLE/);
+    assert.match(g1, /DepositoEngineResponse/);
+
+    const g3 = buildDepositoSystemPrompt(3);
+    assert.match(g3, /GRADO ACTUAL DEL USUARIO EN PERFIL: 3/);
+    assert.match(g3, /RIGOR QUIRÚRGICO/);
+    assert.match(g3, /Cero tolerancia al autoengaño/);
+
+    const g4 = buildDepositoSystemPrompt(4);
+    assert.match(g4, /MATEMÁTICA PURA/);
+    assert.match(g4, /rotación de matriz/);
+
+    const fallback = buildDepositoSystemPrompt(99);
+    assert.match(fallback, /GRADO ACTUAL DEL USUARIO EN PERFIL: 1/);
+    assert.match(fallback, /TEMPERAMENTO NUTRITIVO \(G1\)/);
+  });
+
   it("el prompt de G2+ obliga a analizar ruido y el de G3+ profundiza la sombra", () => {
     const g1 = obtenerPromptVolcado("Hoy aprendí una utilidad.");
     assert.equal(g1.gradoMaestria, 1);
     assert.equal(g1.temperamento, "NUTRITIVO_INERCIA");
     assert.match(g1.system, /Aprendiz de Ojo/);
     assert.match(g1.system, /validacionGrado/);
-    assert.match(g1.system, /NUTRITIVO \/ INERCIA/);
+    assert.match(g1.system, /TEMPERAMENTO NUTRITIVO \(G1\)/);
+    assert.match(g1.system, /GRADO ACTUAL DEL USUARIO EN PERFIL: 1/);
+    assert.match(g1.system, /Nutritivo \/ Inercia/);
     assert.doesNotMatch(g1.system, /REGLA G2\+/);
     assert.doesNotMatch(g1.user, /Fricción detectada/);
 
@@ -279,7 +308,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       friccionDetectada: "La flor fue «estuve ocupado».",
     });
     assert.equal(g2.gradoMaestria, 2);
-    assert.equal(g2.temperamento, "FRICCION_MODERADA");
+    assert.match(g2.system, /TEMPERAMENTO DE FRICCIÓN MODERADA \(G2\)/);
     assert.match(g2.system, /DETECTOR DE RUIDO/);
     assert.match(g2.system, /Analizá ACTIVAMENTE/);
     assert.match(g2.system, /ruidoDetectadoCorrectamente/);
@@ -292,7 +321,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       sombraOmision: "No dije que le temí a la puerta.",
     });
     assert.match(g3.system, /ARQUITECTO DE PUNTO CIEGO/);
-    assert.match(g3.system, /RIGOR QUIRÚRGICO/);
+    assert.match(g3.system, /Cero tolerancia al autoengaño/);
     assert.match(g3.system, /sombra\/omisión/i);
     assert.match(g3.system, /sombraIntegrada/);
     assert.match(g3.user, /le temí a la puerta/);
@@ -304,7 +333,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       codigoHipotesis: 1,
     });
     assert.match(g4.system, /OPERADOR DE SOBERANÍA/);
-    assert.match(g4.system, /MATEMÁTICA PURA/);
+    assert.match(g4.system, /hechos en la materia/);
     assert.match(g4.system, /hipotesisOjoAcierta/);
     assert.match(g4.system, /UN solo Código Dominante/);
     assert.match(g4.user, /C1 El Ojo de la Claridad/);
