@@ -87,9 +87,23 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /instruccionUnica/);
     assert.match(prompt.system, /fallback automático a C1/);
     assert.match(prompt.system, /FILTRO DE DESCOMPOSICIÓN/);
+    assert.match(prompt.system, /CAPA INTERNA DE POLARIDAD/);
+    assert.match(prompt.system, /Eje Masculino/);
+    assert.match(prompt.system, /Eje Femenino/);
+    assert.match(prompt.system, /BALANCE AUTOMÁTICO/);
+    assert.match(prompt.system, /LECTURA DE FASE/);
+    assert.match(prompt.system, /PROHIBIDO añadir al JSON claves polo/);
     assert.match(prompt.system, /lo no dicho revela la falla real/);
     assert.match(prompt.system, /lo que el alumno APRENDIÓ/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
+    assert.doesNotMatch(
+      JSON.stringify(prompt.responseSchema),
+      /polo|genero|género|ejeMasculino/i,
+    );
+    assert.doesNotMatch(
+      JSON.stringify(prompt.engineSchema),
+      /polo|genero|género|ejeMasculino/i,
+    );
     const serial = serializarPromptVolcado(prompt);
     assert.ok(serial.includes(prompt.system));
     assert.ok(serial.includes(prompt.user));
@@ -304,6 +318,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(g1, /meritoReconocido': true/);
     assert.match(g1, /UNA SOLA INSTRUCCIÓN EJECUTABLE/);
     assert.match(g1, /JAMÁS repitas citas textuales largas/);
+    assert.match(g1, /CAPA INTERNA DE POLARIDAD/);
+    assert.match(g1, /F- \(rumiación/);
     assert.match(g1, /DepositoEngineResponse/);
 
     const g3 = buildDepositoSystemPrompt(3);

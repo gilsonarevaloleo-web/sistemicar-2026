@@ -107,7 +107,7 @@ export function DiagnosticoUniversidad({
           className="text-[10px] tracking-[0.22em] mb-2"
           style={{ color: AZURE }}
         >
-          2 · PUNTO CIEGO / LO NO DICHO
+          2 · LECTURA DEL ESTADO
         </p>
         <p className="text-sm leading-relaxed text-white/80">
           {diagnostico.puntoCiego}

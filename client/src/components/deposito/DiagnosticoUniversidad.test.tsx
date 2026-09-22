@@ -33,7 +33,8 @@ describe("DiagnosticoUniversidad", () => {
       }),
     );
     assert.match(html, /OJO DOMINANTE/);
-    assert.match(html, /PUNTO CIEGO/);
+    assert.match(html, /LECTURA DEL ESTADO/);
+    assert.doesNotMatch(html, /género|genero|polo M|ejeMasculino/i);
     assert.match(html, /MECÁNICA DE ABSORCIÓN/);
     assert.match(html, /El Ojo del Ritmo/);
     assert.match(html, /VALIDACIÓN DE GRADO/);
