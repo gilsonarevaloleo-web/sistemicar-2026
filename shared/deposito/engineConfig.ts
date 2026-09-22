@@ -25,6 +25,8 @@ import {
   evaluarMeritoVolcado,
   obtenerTemperamento,
   parseCodigoOjo,
+  resolverRotacionCodigo,
+  sugerirRotacionCodigo,
 } from "./merito.ts";
 export {
   MATRIZ_TEMPERAMENTO,
@@ -40,6 +42,8 @@ export {
   mensajeMeritoDetectado,
   obtenerTemperamento,
   parseCodigoOjo,
+  resolverRotacionCodigo,
+  sugerirRotacionCodigo,
   toDepositoEngineResponse,
 } from "./merito.ts";
 export type { FichaTemperamento, ResultadoMerito } from "./merito.ts";
@@ -416,6 +420,18 @@ export const DICCIONARIO_GRADOS: Record<GradoMaestria, FichaGradoMaestria> = {
   },
 };
 
+export function etiquetaGradoMaestria(grado: GradoMaestria): string {
+  const ficha = DICCIONARIO_GRADOS[grado];
+  return `G${ficha.grado} · ${ficha.nombre}`;
+}
+
+/** UI: mérito reconocido → un solo badge, el grado detectado. */
+export function placementOcultaGradoAnterior(
+  evaluacion?: EvaluacionGrado | null,
+): evaluacion is EvaluacionGrado {
+  return Boolean(evaluacion?.meritoReconocido && evaluacion.gradoDetectado >= 3);
+}
+
 const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
   1: [
     /utilidad/,
@@ -696,12 +712,16 @@ nivelCargaSugerido = BASICO | INTERMEDIO | SUPERIOR según densidad y alcance de
 
 ═══ ANCLAJE AL VOLCADO (INQUEBRANTABLE) ═══
 justificacionDominante, puntoCiego, devolucionMaestro y mecanicaAbsorcion
-DEBEN citar un hecho de ESTE texto (una frase dicha, una pregunta, un nombre, una prueba).
+DEBEN anclarse a un hecho de ESTE texto (un nombre, un número, un verbo, una prueba).
 Prohibido copiar las cegueras típicas del diccionario si no calzan.
 Prohibido un espejo que sea el párrafo pegado o recortado a 140 caracteres.
 Prohibido Carga BASICO si el volcado trae hipótesis + escena + prueba.
 El centro de gravedad es lo que el alumno APRENDIÓ, no la palabra más repetida.
 «no sirve», «después» o «minutos» no eligen código por sí solos.
+
+═══ REGLA ANTI-ECO (INQUEBRANTABLE) ═══
+JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
+Aplica a explicacion, loNoDicho, espejo (devolucionMaestro) e instruccionUnica.
 
 ═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
 El lenguaje humano tiene tres capas. Analizá en este orden:
@@ -713,7 +733,10 @@ Cero New Age, cero flor, cero «ánimo», cero listas de códigos.
 Cero plantilla. Si no podés nombrar el hecho, el JSON es inválido.
 `.trim();
 
-function jsonSchemaEjemplo(grado: GradoMaestria): string {
+function jsonSchemaEjemplo(
+  grado: GradoMaestria,
+  ojosHistoricos: readonly CodigoObservador[] = [],
+): string {
   const validacion: Record<string, unknown> = {
     gradoEvaluado: grado,
     comentarioMaestro:
@@ -722,19 +745,20 @@ function jsonSchemaEjemplo(grado: GradoMaestria): string {
   if (grado >= 2) validacion.ruidoDetectadoCorrectamente = true;
   if (grado >= 3) validacion.sombraIntegrada = true;
   if (grado >= 4) validacion.hipotesisOjoAcierta = false;
+  const rotacionSugerida = sugerirRotacionCodigo(ojosHistoricos);
 
   return `{
   "ojoDominante": {
     "codigo": "C3",
     "nombre": "El Ojo del Ritmo y la Repetición",
-    "explicacion": "Por qué este volcado gravita aquí. Citá un hecho de ESTE texto."
+    "explicacion": "Por qué este volcado gravita aquí. Abstracción técnica de 3–5 palabras. Cero cita larga."
   },
   "puntoCiego": {
-    "loNoDicho": "Lo que el relato revela que el alumno no está observando.",
+    "loNoDicho": "Lo que el relato revela que el alumno no está observando. Sin citar el volcado.",
     "florDetectada": ["excusa", "comparación"]
   },
   "mecanicaAbsorcion": {
-    "instruccionUnica": "UNA tarea práctica ejecutable mañana en UNA frase, sin sermón."
+    "instruccionUnica": "UNA tarea práctica ejecutable mañana en UNA frase, sin sermón ni comillas del usuario."
   },
   "evaluacionGrado": {
     "gradoDetectado": 2,
@@ -743,7 +767,7 @@ function jsonSchemaEjemplo(grado: GradoMaestria): string {
   },
   "metricasMerito": {
     "densidadEstructural": 64,
-    "variedadRotacionCodigo": "C1",
+    "variedadRotacionCodigo": "${rotacionSugerida}",
     "metacognicionDetectada": false
   },
   "devolucionMaestro": "Tres tiempos, temperamento del grado activo: Espejo -> Revelación de 2ª resistencia -> Veredicto.",
@@ -881,12 +905,14 @@ export function obtenerPromptVolcado(
     diccionarioCompacto(),
     "",
     "Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto fuera del JSON) con esta forma exacta:",
-    jsonSchemaEjemplo(grado),
+    jsonSchemaEjemplo(grado, ojosHistoricos),
     "",
     "ojoDominante.codigo DEBE ser C1–C10. codigoDominante (entero 1–10) es alias coherente.",
     "nombreOjoDominante / ojoDominante.nombre DEBE coincidir con el diccionario del código elegido.",
     "puntoCiego.florDetectada lista excusas, comparaciones o adjetivos aislados del volcado.",
-    "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón.",
+    "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón ni comillas del usuario.",
+    "JAMÁS repitas citas textuales largas del volcado en explicacion, loNoDicho, espejo o instruccionUnica.",
+    "metricasMerito.variedadRotacionCodigo = el hueco real del mapa, no un fallback automático a C1.",
   ].join("\n");
 
   const engineSchema: DepositoEngineResponse = {
@@ -904,7 +930,7 @@ export function obtenerPromptVolcado(
     },
     metricasMerito: {
       densidadEstructural: 0,
-      variedadRotacionCodigo: "C1",
+      variedadRotacionCodigo: sugerirRotacionCodigo(ojosHistoricos),
       metacognicionDetectada: false,
     },
   };
@@ -977,27 +1003,83 @@ function clamp(texto: string, max: number): string {
   return texto.length <= max ? texto : texto.slice(0, max).trim();
 }
 
+const RE_CITA = /[«"“]([^»"”]+)[»"”]/g;
+
+function sintetizarPalabras(texto: string, maxPalabras = 5): string {
+  return texto
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, maxPalabras)
+    .join(" ");
+}
+
+/** Citas largas → abstracción de 3–5 palabras. No copy-paste del volcado. */
+function prohibirEcoTextual(texto: string): string {
+  return texto
+    .replace(RE_CITA, (_, inner: string) => {
+      const words = String(inner).trim().split(/\s+/).filter(Boolean);
+      if (words.length <= 5) return words.join(" ");
+      return sintetizarPalabras(inner, 5);
+    })
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** instruccionUnica: acción directa, sin la frase del usuario entre comillas. */
+function prohibirEcoInstruccion(texto: string): string {
+  return texto
+    .replace(/[«"“][^»"”]*[»"”]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
+    .trim();
+}
+
+function recortarEcoDelVolcado(campo: string, volcado: string): string {
+  const v = volcado.replace(/\s+/g, " ").trim();
+  const words = v.split(" ").filter(Boolean);
+  if (words.length < 12) return campo;
+  let out = campo;
+  const tope = Math.min(words.length, 28);
+  for (let n = tope; n >= 12; n--) {
+    for (let i = 0; i <= words.length - n; i++) {
+      const span = words.slice(i, i + n).join(" ");
+      if (span.length >= 40 && out.includes(span)) {
+        out = out.replace(span, sintetizarPalabras(span, 5));
+      }
+    }
+  }
+  return out;
+}
+
 function hidratarDiagnostico(
   codigo: CodigoObservador,
   campos: Partial<DiagnosticoVolcado>,
 ): DiagnosticoVolcado {
   const ojo = DICCIONARIO_OJOS[codigo];
   const justificacionDominante = clamp(
-    campos.justificacionDominante?.trim() ||
-      `El centro de gravedad de este volcado es ${ojo.nombreOjo}: observa ${ojo.focoAtencion}.`,
+    prohibirEcoTextual(
+      campos.justificacionDominante?.trim() ||
+        `El centro de gravedad de este volcado es ${ojo.nombreOjo}: observa ${ojo.focoAtencion}.`,
+    ),
     800,
   );
   const puntoCiego = clamp(
-    campos.puntoCiego?.trim() || ojo.cegueraActiva,
+    prohibirEcoTextual(campos.puntoCiego?.trim() || ojo.cegueraActiva),
     600,
   );
   const devolucionMaestro = clamp(
-    campos.devolucionMaestro?.trim() ||
-      `${ojo.voz} nombra el crack. La 2ª resistencia es no mirar ${ojo.focoAtencion}. Veredicto: un solo gesto, no un inventario.`,
+    prohibirEcoTextual(
+      campos.devolucionMaestro?.trim() ||
+        `${ojo.voz} nombra el crack. La 2ª resistencia es no mirar ${ojo.focoAtencion}. Veredicto: un solo gesto, no un inventario.`,
+    ),
     1200,
   );
   const mecanicaAbsorcion = clamp(
-    campos.mecanicaAbsorcion?.trim() || ojo.gestoAbsorcion,
+    prohibirEcoInstruccion(
+      campos.mecanicaAbsorcion?.trim() || ojo.gestoAbsorcion,
+    ),
     600,
   );
   const nivelCargaSugerido = isNivelCargaSugerido(campos.nivelCargaSugerido)
@@ -1243,6 +1325,7 @@ function extraerEvaluacionGradoGemini(
 
 function extraerMetricasMeritoGemini(
   obj: Record<string, unknown>,
+  ojos: readonly CodigoObservador[] = [],
 ): MetricasMerito | undefined {
   const raw = asRecord(obj.metricasMerito ?? obj.metricas_merito);
   if (!raw) return undefined;
@@ -1265,7 +1348,7 @@ function extraerMetricasMeritoGemini(
     densidadEstructural: Number.isFinite(dens)
       ? Math.max(0, Math.min(100, Math.round(dens)))
       : 0,
-    variedadRotacionCodigo: rot || "C1",
+    variedadRotacionCodigo: resolverRotacionCodigo(rot, ojos),
     metacognicionDetectada: meta === true,
   };
 }
@@ -1294,7 +1377,16 @@ function anexarMerito(
       ...local.evaluacion,
       mensajeEncuadre: mensaje,
     },
-    metricasMerito: local.metricas,
+    metricasMerito: {
+      ...local.metricas,
+      variedadRotacionCodigo: resolverRotacionCodigo(
+        diagnostico.metricasMerito?.variedadRotacionCodigo,
+        [
+          ...ojosHistoricos,
+          diagnostico.codigoDominante,
+        ],
+      ),
+    },
     florDetectada: local.florDetectada,
   };
 }
@@ -1304,8 +1396,22 @@ function sellarDiagnostico(
   captura: CapturaVolcadoExpansiva,
   ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
+  const volcado = captura.volcadoCrudo || "";
+  const limpio: DiagnosticoVolcado = {
+    ...diagnostico,
+    justificacionDominante: recortarEcoDelVolcado(
+      diagnostico.justificacionDominante,
+      volcado,
+    ),
+    puntoCiego: recortarEcoDelVolcado(diagnostico.puntoCiego, volcado),
+    devolucionMaestro: recortarEcoDelVolcado(
+      diagnostico.devolucionMaestro,
+      volcado,
+    ),
+    mecanicaAbsorcion: prohibirEcoInstruccion(diagnostico.mecanicaAbsorcion),
+  };
   return anexarMerito(
-    anexarValidacion(diagnostico, captura),
+    anexarValidacion(limpio, captura),
     captura,
     ojosHistoricos,
   );
@@ -1372,6 +1478,7 @@ function componerTextoDiagnostico(captura: CapturaVolcadoExpansiva): string {
 export function parseDiagnosticoVolcado(
   raw: string,
   gradoActual: GradoMaestria = GRADO_MAESTRIA_INICIAL,
+  ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
   const obj = extraerJsonObject(raw);
   const ojo = extraerOjoDominante(obj);
@@ -1419,7 +1526,10 @@ export function parseDiagnosticoVolcado(
       : undefined,
     validacionGrado: extraerValidacionGrado(obj, gradoActual),
     evaluacionGrado: extraerEvaluacionGradoGemini(obj),
-    metricasMerito: extraerMetricasMeritoGemini(obj),
+    metricasMerito: extraerMetricasMeritoGemini(obj, [
+      ...ojosHistoricos,
+      codigo,
+    ]),
     florDetectada,
   });
 }
@@ -1523,11 +1633,10 @@ function puntoCiegoAnclado(
   h: HechosVolcado,
 ): string {
   if (codigo === 9 && h.pregunta) {
-    return `Ella ya pidió el nombre del patrón («${h.pregunta}»). El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
+    return `Ella ya pidió el nombre del patrón. El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
   }
-  const ancla = anclaDe(h);
-  if (ancla) {
-    return `${ojo.cegueraActiva} Quedó suelto en este volcado: «${clamp(ancla, 160)}».`;
+  if (anclaDe(h)) {
+    return `${ojo.cegueraActiva} El volcado deja suelta la mecánica y no nombra el circuito.`;
   }
   return ojo.cegueraActiva;
 }
@@ -1537,16 +1646,14 @@ function mecanicaAnclada(
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
 ): string {
-  const pieza = anclaDe(h);
-  if (!pieza) return ojo.gestoAbsorcion;
-  const corto = clamp(pieza, 120);
+  if (!anclaDe(h)) return ojo.gestoAbsorcion;
   if (codigo === 9) {
-    return `Mañana, en UNA tarea de casa (juntar, guardar o vestir), al cierre nombrá en voz alta la ley. Si aparece «${corto}», contestá con un nombre, no con un sermón. Una frase. Sin comparaciones ni castigo.`;
+    return `Mañana, en UNA tarea de casa con la hija, al cierre nombrá en voz alta la ley. Contestá con un nombre, no con un sermón. Una frase. Sin comparaciones ni castigo.`;
   }
   if (codigo === 3) {
-    return `Mañana, UNA secuencia de tres pasos con hora de inicio y de corte, anclada a «${corto}». El reloj manda, no el apuro.`;
+    return `Mañana, UNA secuencia de tres pasos con hora de inicio y de corte. El reloj manda, no el apuro.`;
   }
-  return `Mañana, un solo gesto de ${ojo.focoAtencion} en la escena de este volcado. Ancla: «${corto}». ${ojo.gestoAbsorcion}`;
+  return `Mañana, un solo gesto de ${ojo.focoAtencion} en la escena de este volcado. ${ojo.gestoAbsorcion}`;
 }
 
 function devolucionAnclada(
@@ -1554,10 +1661,10 @@ function devolucionAnclada(
   h: HechosVolcado,
 ): string {
   const espejo = h.tesis
-    ? `Espejo: el aprendizaje que nombraste es que ${clamp(h.tesis, 180)}.`
-    : `Espejo: trajiste «${clamp(anclaDe(h) || "el día crudo", 160)}».`;
+    ? `Espejo: el aprendizaje nombra el circuito, no el episodio.`
+    : `Espejo: trajiste el día crudo; falta el circuito.`;
   const prueba = h.cita
-    ? ` La prueba que quedó en la mesa: «${clamp(h.cita, 140)}».`
+    ? ` La prueba quedó en la mesa: un hecho, no un discurso.`
     : "";
   const r2 = `2ª resistencia: convertir el hallazgo en victoria de método, en vez de instalar ${ojo.focoAtencion}.`;
   const veredicto = `Veredicto: ${ojo.voz} corta a un solo gesto. Mañana el circuito tiene nombre, no héroe.`;
@@ -1603,12 +1710,12 @@ export function diagnosticarVolcadoLocal(
   }
 
   const tesis = hechos.tesis
-    ? `El aprendizaje («${clamp(hechos.tesis, 180)}») gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
+    ? `El aprendizaje gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
     : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
   let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos);
   if (captura.gradoMaestria >= 3 && captura.sombraOmision) {
-    puntoCiego = `Sombra declarada: «${clamp(captura.sombraOmision, 180)}». ${puntoCiego}`;
+    puntoCiego = `La sombra declarada confirma la omisión. ${puntoCiego}`;
   }
 
   return sellarDiagnostico(
@@ -1659,7 +1766,7 @@ export async function procesarVolcadoAprendizajeConFuente(
       const raw = await caller(serialized, 2048, true);
       return {
         diagnostico: sellarDiagnostico(
-          parseDiagnosticoVolcado(raw, captura.gradoMaestria),
+          parseDiagnosticoVolcado(raw, captura.gradoMaestria, ojosHistoricos),
           captura,
           ojosHistoricos,
         ),
@@ -1674,7 +1781,7 @@ export async function procesarVolcadoAprendizajeConFuente(
         );
         return {
           diagnostico: sellarDiagnostico(
-            parseDiagnosticoVolcado(raw2, captura.gradoMaestria),
+            parseDiagnosticoVolcado(raw2, captura.gradoMaestria, ojosHistoricos),
             captura,
             ojosHistoricos,
           ),

@@ -94,6 +94,9 @@ REGLAS DE EVALUACIÓN Y MÉRITO (PLACEMENT TEST):
 2. Si el texto está lleno de justificaciones, victimización o adjetivos, asigna 'gradoDetectado': 1.
 3. En la 'mecanicaAbsorcion', entrega SIEMPRE UNA SOLA INSTRUCCIÓN EJECUTABLE. Cero sermones, cero consejos de autoayuda.
 
+REGLA ANTI-ECO (INQUEBRANTABLE):
+JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
+
 RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
 `.trim();
 }
@@ -174,7 +177,7 @@ export function bloquePlacementTest(gradoActual: GradoMaestria): string {
     "Prohibido descender el grado activo. El mérito solo calibra al alza.",
     "G4 exige evidencia de rotación del mapa de calor (1/10), no un solo volcado brillante.",
     "metricasMerito.densidadEstructural = 0–100 (hechos secos vs flor).",
-    "metricasMerito.variedadRotacionCodigo = UN código (C1–C10) para equilibrar el mapa.",
+    "metricasMerito.variedadRotacionCodigo = el código sugerido REAL para equilibrar el mapa (hueco C1–C10). Prohibido fallback automático a C1 si el hueco es otro.",
     "metricasMerito.metacognicionDetectada = true si el alumno vio su propio sesgo.",
   ].join("\n");
 }
@@ -248,6 +251,22 @@ export function sugerirRotacionCodigo(
     }
   }
   return etiquetaCodigoOjo(least);
+}
+
+/**
+ * Código de rotación para el mapa de calor.
+ * Si Gemini/schema omiten el campo o copian el default C1, se usa el hueco real.
+ */
+export function resolverRotacionCodigo(
+  raw: unknown,
+  ojos: readonly CodigoObservador[] = [],
+): string {
+  const sugerido = sugerirRotacionCodigo(ojos);
+  const parsed = parseCodigoOjo(raw);
+  if (!parsed) return sugerido;
+  const etiqueta = etiquetaCodigoOjo(parsed);
+  if (etiqueta === "C1" && sugerido !== "C1") return sugerido;
+  return etiqueta;
 }
 
 function hayAtascoMapa(ojos: readonly CodigoObservador[]): boolean {
@@ -430,10 +449,14 @@ export function toDepositoEngineResponse(
     meritoReconocido: false,
     mensajeEncuadre: "",
   };
-  const metricas: MetricasMerito = diagnostico.metricasMerito ?? {
-    densidadEstructural: 0,
-    variedadRotacionCodigo: etiquetaCodigoOjo(1),
-    metacognicionDetectada: false,
+  const metricas: MetricasMerito = {
+    densidadEstructural: diagnostico.metricasMerito?.densidadEstructural ?? 0,
+    variedadRotacionCodigo: resolverRotacionCodigo(
+      diagnostico.metricasMerito?.variedadRotacionCodigo,
+      [diagnostico.codigoDominante],
+    ),
+    metacognicionDetectada:
+      diagnostico.metricasMerito?.metacognicionDetectada ?? false,
   };
   return {
     ojoDominante: {

@@ -9,6 +9,8 @@ import {
   VOLCADOS_REQUERIDOS_RITUAL_PASO,
   camposVisiblesPorGrado,
   diagnosticarVolcadoLocal,
+  etiquetaGradoMaestria,
+  placementOcultaGradoAnterior,
   evaluarRitualPasoGrado,
   isCodigoObservador,
   isGradoMaestria,
@@ -80,6 +82,10 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.user, /¿Qué aprendí hoy\?/);
     assert.match(prompt.user, /no repetí ninguna secuencia/);
     assert.match(prompt.system, /ANCLAJE AL VOLCADO/);
+    assert.match(prompt.system, /REGLA ANTI-ECO/);
+    assert.match(prompt.system, /JAMÁS repitas citas textuales largas/);
+    assert.match(prompt.system, /instruccionUnica/);
+    assert.match(prompt.system, /fallback automático a C1/);
     assert.match(prompt.system, /FILTRO DE DESCOMPOSICIÓN/);
     assert.match(prompt.system, /lo no dicho revela la falla real/);
     assert.match(prompt.system, /lo que el alumno APRENDIÓ/);
@@ -161,9 +167,14 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.equal(d.codigoDominante, 9);
     assert.equal(d.nombreOjoDominante, "El Ojo del Sistema");
     assert.equal(d.nivelCargaSugerido, "SUPERIOR");
-    assert.match(d.puntoCiego, /c[oó]mo se llama/i);
-    assert.match(d.devolucionMaestro, /niña|alrededor|aprend/i);
+    assert.match(d.puntoCiego, /nombre del patrón|circuito/i);
+    assert.match(d.devolucionMaestro, /Espejo|circuito|gesto/i);
     assert.match(d.mecanicaAbsorcion, /nombre|ley/i);
+    assert.doesNotMatch(d.mecanicaAbsorcion, /[«"“]/);
+    assert.doesNotMatch(
+      d.justificacionDominante,
+      /mí hija de 4 años entiende de una manera/,
+    );
     assert.doesNotMatch(d.nombreOjoDominante, /Ritmo/);
     assert.doesNotMatch(d.puntoCiego, /velocidad con absorción/);
     assert.doesNotMatch(d.mecanicaAbsorcion, /hora de inicio y de corte/);
@@ -213,6 +224,23 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.equal(DICCIONARIO_GRADOS[1].nombre, "Aprendiz de Ojo");
     assert.equal(DICCIONARIO_GRADOS[2].nombre, "Detector de Ruido");
     assert.equal(DICCIONARIO_GRADOS[3].nombre, "Arquitecto de Punto Ciego");
+    assert.equal(etiquetaGradoMaestria(3), "G3 · Arquitecto de Punto Ciego");
+    assert.equal(
+      placementOcultaGradoAnterior({
+        gradoDetectado: 3,
+        meritoReconocido: true,
+        mensajeEncuadre: "Mérito.",
+      }),
+      true,
+    );
+    assert.equal(
+      placementOcultaGradoAnterior({
+        gradoDetectado: 1,
+        meritoReconocido: false,
+        mensajeEncuadre: "G1.",
+      }),
+      false,
+    );
     assert.equal(DICCIONARIO_GRADOS[4].nombre, "Operador de Soberanía");
     assert.deepEqual([...camposVisiblesPorGrado(1)], ["volcadoCrudo"]);
     assert.deepEqual(
@@ -275,6 +303,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(g1, /0% flor/);
     assert.match(g1, /meritoReconocido': true/);
     assert.match(g1, /UNA SOLA INSTRUCCIÓN EJECUTABLE/);
+    assert.match(g1, /JAMÁS repitas citas textuales largas/);
     assert.match(g1, /DepositoEngineResponse/);
 
     const g3 = buildDepositoSystemPrompt(3);
@@ -374,6 +403,41 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.deepEqual(d.florDetectada, ["comparacion", "castigo"]);
     assert.equal(d.evaluacionGrado?.gradoDetectado, 3);
     assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
+  });
+
+  it("variedadRotacionCodigo usa el hueco real y no cae a C1", () => {
+    const raw = JSON.stringify({
+      ojoDominante: {
+        codigo: "C9",
+        nombre: "alias",
+        explicacion: "El relato pide el nombre del patrón.",
+      },
+      puntoCiego: {
+        loNoDicho: "Cuenta el episodio y no el circuito.",
+        florDetectada: [],
+      },
+      mecanicaAbsorcion: {
+        instruccionUnica: "Mañana nombrá la ley en una tarea de casa.",
+      },
+      metricasMerito: {
+        densidadEstructural: 72,
+        variedadRotacionCodigo: "C1",
+        metacognicionDetectada: true,
+      },
+      nivelCargaSugerido: "SUPERIOR",
+    });
+    const d = parseDiagnosticoVolcado(raw, 1, [1, 3, 9]);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C2");
+
+    const sinCampo = parseDiagnosticoVolcado(
+      JSON.stringify({
+        ...JSON.parse(raw),
+        metricasMerito: { densidadEstructural: 72, metacognicionDetectada: true },
+      }),
+      1,
+      [1, 3, 9],
+    );
+    assert.equal(sinCampo.metricasMerito?.variedadRotacionCodigo, "C2");
   });
 
   it("parseDiagnosticoVolcado conserva validacionGrado y la Triada", () => {
