@@ -1,12 +1,13 @@
 import React from "react";
 import { Eye } from "lucide-react";
-import type { CodigoObservador, DiagnosticoVolcado } from "@shared/deposito/engineConfig";
+import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
 import { DICCIONARIO_OJOS } from "@shared/deposito/engineConfig";
 import {
   etiquetaGrado,
   type ExpedienteOjos,
   type LecturaGradoVolcado,
 } from "@shared/deposito/grados";
+import { MapaCalorOjos } from "./MapaCalorOjos";
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
@@ -140,44 +141,58 @@ export function DiagnosticoUniversidad({
         </div>
       )}
 
-      {expediente && (
-        <div data-testid="deposito-expediente">
+      {diagnostico.evaluacionGrado && (
+        <div data-testid="deposito-evaluacion-grado">
           <p
             className="text-[10px] tracking-[0.22em] mb-2"
-            style={{ color: GOLD }}
+            style={{ color: diagnostico.evaluacionGrado.meritoReconocido ? GOLD : AZURE }}
           >
-            MAPA DE CALOR · {expediente.rango}/{expediente.techo} ·{" "}
-            {etiquetaGrado(expediente.gradoOperador)}
+            {diagnostico.evaluacionGrado.meritoReconocido
+              ? `PLACEMENT · MÉRITO G${diagnostico.evaluacionGrado.gradoDetectado}`
+              : `PLACEMENT · G${diagnostico.evaluacionGrado.gradoDetectado}`}
           </p>
-          <ol className="grid grid-cols-10 gap-1 mb-2" aria-label="Ojos nombrados">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-              const nombrado = expediente.ojosNombrados.includes(n as CodigoObservador);
-              const hueco = expediente.hueco === n;
-              const atasco = expediente.atasco === n;
-              return (
-                <li key={n} className="text-center">
-                  <span
-                    className="mx-auto mb-1 block h-1.5 w-full rounded-full"
-                    style={{
-                      backgroundColor: atasco
-                        ? "#F97316"
-                        : hueco
-                          ? AZURE
-                          : nombrado
-                            ? GOLD
-                            : "rgba(255,255,255,0.08)",
-                    }}
-                  />
-                  <span className="text-[8px] text-white/35">{n}</span>
-                </li>
-              );
-            })}
-          </ol>
-          <p className="text-xs leading-relaxed text-white/55">
-            {expediente.haciaDonde}
+          <p
+            className="text-sm leading-relaxed text-white/80"
+            data-testid="deposito-mensaje-encuadre"
+          >
+            {diagnostico.evaluacionGrado.mensajeEncuadre}
           </p>
         </div>
       )}
+
+      {diagnostico.metricasMerito && (
+        <div data-testid="deposito-metricas-merito">
+          <p
+            className="text-[10px] tracking-[0.22em] mb-2"
+            style={{ color: AZURE }}
+          >
+            MÉRITO · 3 EJES
+          </p>
+          <ul className="space-y-1 text-xs text-white/70">
+            <li data-testid="deposito-densidad">
+              Estructura {diagnostico.metricasMerito.densidadEstructural}/100
+            </li>
+            <li data-testid="deposito-rotacion">
+              Rotación {diagnostico.metricasMerito.variedadRotacionCodigo}
+            </li>
+            <li data-testid="deposito-metacognicion">
+              Metacognición{" "}
+              {diagnostico.metricasMerito.metacognicionDetectada ? "sí" : "no"}
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {diagnostico.florDetectada && diagnostico.florDetectada.length > 0 && (
+        <p
+          className="text-[11px] leading-relaxed text-white/40"
+          data-testid="deposito-flor-detectada"
+        >
+          Flor: {diagnostico.florDetectada.join(", ")}
+        </p>
+      )}
+
+      {expediente && <MapaCalorOjos expediente={expediente} />}
     </section>
   );
 }

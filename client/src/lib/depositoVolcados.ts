@@ -154,30 +154,35 @@ export async function addVolcadoEntry(
   dictamen: DictamenOptico,
   diagnostico?: DiagnosticoVolcado,
   captura?: CapturaVolcadoExpansiva,
+  opts?: { waitForRemote?: boolean },
 ): Promise<string> {
-  if (isFirebaseConfigured() && db) {
-    try {
-      const path = getPrivatePath(userId, "volcados");
-      const docRef = await withTimeout(
-        addDoc(collection(db, path), {
-          texto,
-          dictamen,
-          diagnostico: diagnostico ?? null,
-          captura: captura ?? null,
-          gradoMaestria: captura?.gradoMaestria ?? null,
-          userId,
-          createdAt: serverTimestamp(),
-        }),
-        4000
-      );
-      return docRef.id;
-    } catch (err) {
-      console.error("Volcado remoto falló; se guarda en local:", err);
-      return saveVolcadoLocal(userId, texto, dictamen, diagnostico, captura);
-    }
+  const localId = saveVolcadoLocal(userId, texto, dictamen, diagnostico, captura);
+  if (!(isFirebaseConfigured() && db)) return localId;
+
+  const path = getPrivatePath(userId, "volcados");
+  const remoto = withTimeout(
+    addDoc(collection(db, path), {
+      texto,
+      dictamen,
+      diagnostico: diagnostico ?? null,
+      captura: captura ?? null,
+      gradoMaestria: captura?.gradoMaestria ?? null,
+      userId,
+      createdAt: serverTimestamp(),
+    }),
+    4000,
+  ).catch((err) => {
+    console.error("Volcado remoto falló; ya está en local:", err);
+    return null;
+  });
+
+  if (opts?.waitForRemote === false) {
+    void remoto;
+    return localId;
   }
 
-  return saveVolcadoLocal(userId, texto, dictamen, diagnostico, captura);
+  const docRef = await remoto;
+  return docRef?.id ?? localId;
 }
 
 export async function deleteVolcadoEntry(userId: string, entryId: string): Promise<void> {

@@ -18,6 +18,31 @@
  */
 
 import { LEY_OPTICA_CODIGO_KERNEL } from "./leyOpticaCodigo.ts";
+import {
+  bloquePlacementTest,
+  bloqueTemperamento,
+  buildDepositoSystemPrompt,
+  evaluarMeritoVolcado,
+  obtenerTemperamento,
+  parseCodigoOjo,
+} from "./merito.ts";
+export {
+  MATRIZ_TEMPERAMENTO,
+  TEMPERAMENTO_MODO_OPERATIVO,
+  bloquePlacementTest,
+  bloqueTemperamento,
+  buildDepositoSystemPrompt,
+  calcularDensidadEstructural,
+  detectarFlorMerito,
+  detectarGradoPorMerito,
+  etiquetaCodigoOjo,
+  evaluarMeritoVolcado,
+  mensajeMeritoDetectado,
+  obtenerTemperamento,
+  parseCodigoOjo,
+  toDepositoEngineResponse,
+} from "./merito.ts";
+export type { FichaTemperamento, ResultadoMerito } from "./merito.ts";
 
 export type CodigoObservador = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -46,6 +71,51 @@ export interface FichaOjoCodigo {
   gestoAbsorcion: string;
 }
 
+export type TemperamentoGrado =
+  | "NUTRITIVO_INERCIA"
+  | "FRICCION_MODERADA"
+  | "RIGOR_QUIRURGICO"
+  | "MATEMATICA_PURA";
+
+export interface EvaluacionGrado {
+  /** Grado que merece ESTE volcado por densidad perceptiva (placement). */
+  gradoDetectado: GradoMaestria;
+  /** true si gradoDetectado > gradoActualDelUsuario. El mérito solo calibra al alza. */
+  meritoReconocido: boolean;
+  /** Reconocimiento o calibración. No sermón. */
+  mensajeEncuadre: string;
+}
+
+export interface MetricasMerito {
+  /** 0–100. Ratio de hechos secos vs flor. */
+  densidadEstructural: number;
+  /** Código sugerido para equilibrar el mapa de calor (ej. "C1"). */
+  variedadRotacionCodigo: string;
+  /** true si el usuario vio su propio sesgo. */
+  metacognicionDetectada: boolean;
+}
+
+/**
+ * Contrato de respuesta estructurada del Depósito V2
+ * (esquema JSON que le exigimos a Gemini).
+ */
+export interface DepositoEngineResponse {
+  ojoDominante: {
+    codigo: string; // Ej: "C9"
+    nombre: string; // Ej: "El Ojo del Sistema"
+    explicacion: string;
+  };
+  puntoCiego: {
+    loNoDicho: string;
+    florDetectada: string[]; // Listado de excusas, comparaciones o adjetivos
+  };
+  mecanicaAbsorcion: {
+    instruccionUnica: string; // Tarea práctica ejecutable en 1 frase sin sermón
+  };
+  evaluacionGrado: EvaluacionGrado;
+  metricasMerito: MetricasMerito;
+}
+
 export interface DiagnosticoVolcado {
   codigoDominante: CodigoObservador;
   nombreOjoDominante: string;
@@ -58,6 +128,12 @@ export interface DiagnosticoVolcado {
   nivelCargaSugerido: NivelCargaSugerido;
   /** Validación del grado activo. Opcional para no romper diagnósticos previos. */
   validacionGrado?: ValidacionGradoVolcado;
+  /** Placement test: grado que merece el volcado vs grado activo. */
+  evaluacionGrado?: EvaluacionGrado;
+  /** Tres ejes de mérito: estructura, rotación, metacognición. */
+  metricasMerito?: MetricasMerito;
+  /** Flor aislada (excusas, comparaciones, adjetivos). */
+  florDetectada?: string[];
 }
 
 export interface FichaGradoMaestria {
@@ -136,8 +212,10 @@ export interface PromptVolcadoAprendizaje {
   system: string;
   user: string;
   responseSchema: DiagnosticoVolcado;
+  engineSchema: DepositoEngineResponse;
   ritual: string;
   gradoMaestria: GradoMaestria;
+  temperamento: TemperamentoGrado;
 }
 
 export type GeminiVolcadoCaller = (
@@ -150,6 +228,8 @@ export interface ProcesarVolcadoDeps {
   callGemini?: GeminiVolcadoCaller;
   gradoMaestria?: GradoMaestria;
   captura?: CapturaVolcadoInput;
+  /** Dominantes previos para el eje de rotación del mapa de calor 1/10. */
+  ojosHistoricos?: readonly CodigoObservador[];
 }
 
 export interface ResultadoVolcadoAprendizaje {
@@ -578,12 +658,7 @@ export function validarCapturaParaGrado(
 }
 
 function coerceCodigoObservador(value: unknown): CodigoObservador | null {
-  if (isCodigoObservador(value)) return value;
-  if (typeof value === "string") {
-    const n = Number(value.trim());
-    if (isCodigoObservador(n)) return n;
-  }
-  return null;
+  return parseCodigoOjo(value);
 }
 
 function diccionarioCompacto(): string {
@@ -649,13 +724,32 @@ function jsonSchemaEjemplo(grado: GradoMaestria): string {
   if (grado >= 4) validacion.hipotesisOjoAcierta = false;
 
   return `{
-  "codigoDominante": 3,
-  "nombreOjoDominante": "El Ojo del Ritmo y la Repetición",
-  "justificacionDominante": "Explicación de por qué este volcado pertenece a este centro de gravedad.",
-  "puntoCiego": "Lo que el relato del usuario revela que él no está viendo (ej. confundir velocidad con absorción).",
-  "devolucionMaestro": "Mensaje en 3 tiempos: Espejo -> Revelación de 2ª resistencia -> Veredicto.",
-  "mecanicaAbsorcion": "Instrucción exacta y única para que el alumno aplique mañana en su vida real.",
+  "ojoDominante": {
+    "codigo": "C3",
+    "nombre": "El Ojo del Ritmo y la Repetición",
+    "explicacion": "Por qué este volcado gravita aquí. Citá un hecho de ESTE texto."
+  },
+  "puntoCiego": {
+    "loNoDicho": "Lo que el relato revela que el alumno no está observando.",
+    "florDetectada": ["excusa", "comparación"]
+  },
+  "mecanicaAbsorcion": {
+    "instruccionUnica": "UNA tarea práctica ejecutable mañana en UNA frase, sin sermón."
+  },
+  "evaluacionGrado": {
+    "gradoDetectado": 2,
+    "meritoReconocido": false,
+    "mensajeEncuadre": "Reconocimiento de mérito o calibración. Sin sermón."
+  },
+  "metricasMerito": {
+    "densidadEstructural": 64,
+    "variedadRotacionCodigo": "C1",
+    "metacognicionDetectada": false
+  },
+  "devolucionMaestro": "Tres tiempos, temperamento del grado activo: Espejo -> Revelación de 2ª resistencia -> Veredicto.",
   "nivelCargaSugerido": "INTERMEDIO",
+  "codigoDominante": 3,
+  "justificacionDominante": "Alias de ojoDominante.explicacion.",
   "validacionGrado": ${JSON.stringify(validacion, null, 2).replace(/\n/g, "\n  ")}
 }`;
 }
@@ -667,6 +761,10 @@ function bloqueInstruccionGrado(grado: GradoMaestria): string {
     ficha.descripcion,
     "La Triada de Valor (Ojo Dominante, Punto Ciego, Mecánica de Absorción) sigue siendo obligatoria.",
     "validacionGrado enriquece esa triada; no la reemplaza. El Muro de Dominancia no se rompe.",
+    "",
+    bloqueTemperamento(grado),
+    "",
+    bloquePlacementTest(grado),
   ];
 
   if (grado >= 2) {
@@ -708,11 +806,16 @@ function bloqueInstruccionGrado(grado: GradoMaestria): string {
   return lines.join("\n");
 }
 
-function bloqueUserCaptura(captura: CapturaVolcadoExpansiva): string {
+function bloqueUserCaptura(
+  captura: CapturaVolcadoExpansiva,
+  ojosHistoricos: readonly CodigoObservador[] = [],
+): string {
   const ficha = DICCIONARIO_GRADOS[captura.gradoMaestria];
+  const temperamento = obtenerTemperamento(captura.gradoMaestria);
   const lines = [
     `Ritual: ${RITUAL_VOLCADO}`,
-    `Grado de Maestría: ${captura.gradoMaestria} — ${ficha.nombre}`,
+    `Grado activo del alumno (no es el grado que merece el volcado): ${captura.gradoMaestria} — ${ficha.nombre}`,
+    `Temperamento del Maestro: ${temperamento.nombre} (${temperamento.codigo})`,
     "Volcado de aprendizaje del alumno:",
     "---",
     captura.volcadoCrudo || "(vacío)",
@@ -741,8 +844,15 @@ function bloqueUserCaptura(captura: CapturaVolcadoExpansiva): string {
       `Hipótesis del alumno (ojo autodiagnosticado): ${h ? `C${h} ${nombre}` : "(no declarada)"}`,
     );
   }
+  if (ojosHistoricos.length > 0) {
+    lines.push(
+      `Mapa de calor histórico (códigos dominantes previos): ${ojosHistoricos
+        .map((n) => `C${n}`)
+        .join(", ")}`,
+    );
+  }
   lines.push(
-    "Diagnosticá el centro de gravedad. UN solo código. Respondé solo el JSON.",
+    "Diagnosticá el centro de gravedad. UN solo código. Evaluá densidad y placement. Respondé solo el JSON.",
   );
   return lines.join("\n");
 }
@@ -750,6 +860,7 @@ function bloqueUserCaptura(captura: CapturaVolcadoExpansiva): string {
 export function obtenerPromptVolcado(
   textoVolcado: string,
   capturaInput?: CapturaVolcadoInput,
+  ojosHistoricos: readonly CodigoObservador[] = [],
 ): PromptVolcadoAprendizaje {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -757,8 +868,11 @@ export function obtenerPromptVolcado(
       : textoVolcado,
   );
   const grado = captura.gradoMaestria;
+  const temperamento = obtenerTemperamento(grado);
 
   const system = [
+    buildDepositoSystemPrompt(grado),
+    "",
     KERNEL_UNIVERSIDAD,
     "",
     bloqueInstruccionGrado(grado),
@@ -769,12 +883,35 @@ export function obtenerPromptVolcado(
     "Responde ÚNICAMENTE con JSON válido (sin markdown, sin texto fuera del JSON) con esta forma exacta:",
     jsonSchemaEjemplo(grado),
     "",
-    "codigoDominante DEBE ser un entero 1–10. nombreOjoDominante DEBE coincidir con el diccionario del código elegido.",
+    "ojoDominante.codigo DEBE ser C1–C10. codigoDominante (entero 1–10) es alias coherente.",
+    "nombreOjoDominante / ojoDominante.nombre DEBE coincidir con el diccionario del código elegido.",
+    "puntoCiego.florDetectada lista excusas, comparaciones o adjetivos aislados del volcado.",
+    "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón.",
   ].join("\n");
+
+  const engineSchema: DepositoEngineResponse = {
+    ojoDominante: {
+      codigo: "C1",
+      nombre: DICCIONARIO_OJOS[1].nombreOjo,
+      explicacion: "",
+    },
+    puntoCiego: { loNoDicho: "", florDetectada: [] },
+    mecanicaAbsorcion: { instruccionUnica: "" },
+    evaluacionGrado: {
+      gradoDetectado: 1,
+      meritoReconocido: false,
+      mensajeEncuadre: "",
+    },
+    metricasMerito: {
+      densidadEstructural: 0,
+      variedadRotacionCodigo: "C1",
+      metacognicionDetectada: false,
+    },
+  };
 
   return {
     system,
-    user: bloqueUserCaptura(captura),
+    user: bloqueUserCaptura(captura, ojosHistoricos),
     responseSchema: {
       codigoDominante: 1,
       nombreOjoDominante: DICCIONARIO_OJOS[1].nombreOjo,
@@ -787,9 +924,14 @@ export function obtenerPromptVolcado(
         gradoEvaluado: grado,
         comentarioMaestro: "",
       },
+      evaluacionGrado: engineSchema.evaluacionGrado,
+      metricasMerito: engineSchema.metricasMerito,
+      florDetectada: [],
     },
+    engineSchema,
     ritual: RITUAL_VOLCADO,
     gradoMaestria: grado,
+    temperamento: temperamento.codigo,
   };
 }
 
@@ -873,6 +1015,15 @@ function hidratarDiagnostico(
   };
   if (campos.validacionGrado) {
     diagnostico.validacionGrado = campos.validacionGrado;
+  }
+  if (campos.evaluacionGrado) {
+    diagnostico.evaluacionGrado = campos.evaluacionGrado;
+  }
+  if (campos.metricasMerito) {
+    diagnostico.metricasMerito = campos.metricasMerito;
+  }
+  if (campos.florDetectada?.length) {
+    diagnostico.florDetectada = campos.florDetectada;
   }
   return diagnostico;
 }
@@ -982,6 +1133,184 @@ function validacionGradoLocal(
   return validacion;
 }
 
+function extraerStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x).trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function extraerPuntoCiego(obj: Record<string, unknown>): {
+  texto: string;
+  flor: string[];
+} {
+  const raw = obj.puntoCiego ?? obj.punto_ciego;
+  const nested = asRecord(raw);
+  if (nested) {
+    return {
+      texto: pickString(nested, [
+        "loNoDicho",
+        "lo_no_dicho",
+        "texto",
+        "ceguera",
+        "puntoCiego",
+      ]),
+      flor: extraerStringArray(
+        nested.florDetectada ?? nested.flor_detectada ?? nested.flor,
+      ),
+    };
+  }
+  return {
+    texto: pickString(obj, [
+      "puntoCiego",
+      "punto_ciego",
+      "cegueraActiva",
+      "ceguera",
+    ]),
+    flor: extraerStringArray(obj.florDetectada ?? obj.flor_detectada),
+  };
+}
+
+function extraerMecanica(obj: Record<string, unknown>): string {
+  const raw = obj.mecanicaAbsorcion ?? obj.mecanica_absorcion;
+  const nested = asRecord(raw);
+  if (nested) {
+    return pickString(nested, [
+      "instruccionUnica",
+      "instruccion_unica",
+      "instruccion",
+      "tarea",
+    ]);
+  }
+  return pickString(obj, [
+    "mecanicaAbsorcion",
+    "mecanica_absorcion",
+    "mecanica",
+    "tarea",
+  ]);
+}
+
+function extraerOjoDominante(obj: Record<string, unknown>): {
+  codigo: CodigoObservador | null;
+  explicacion: string;
+} {
+  const nested = asRecord(obj.ojoDominante ?? obj.ojo_dominante);
+  const codigo = coerceCodigoObservador(
+    nested ??
+      obj.codigoDominante ??
+      obj.codigo_dominante ??
+      obj.codigo ??
+      obj.ojoDominante,
+  );
+  const explicacion = nested
+    ? pickString(nested, [
+        "explicacion",
+        "justificacion",
+        "justificacionDominante",
+      ])
+    : "";
+  return { codigo, explicacion };
+}
+
+function extraerEvaluacionGradoGemini(
+  obj: Record<string, unknown>,
+): EvaluacionGrado | undefined {
+  const raw = asRecord(obj.evaluacionGrado ?? obj.evaluacion_grado);
+  if (!raw) return undefined;
+  const gradoDetectado = normalizarGradoMaestria(
+    raw.gradoDetectado ?? raw.grado_detectado,
+  );
+  const merito = parseBooleanLoose(
+    raw.meritoReconocido ?? raw.merito_reconocido,
+  );
+  const mensaje = pickString(raw, [
+    "mensajeEncuadre",
+    "mensaje_encuadre",
+    "mensaje",
+  ]);
+  return {
+    gradoDetectado,
+    meritoReconocido: merito === true,
+    mensajeEncuadre: mensaje,
+  };
+}
+
+function extraerMetricasMeritoGemini(
+  obj: Record<string, unknown>,
+): MetricasMerito | undefined {
+  const raw = asRecord(obj.metricasMerito ?? obj.metricas_merito);
+  if (!raw) return undefined;
+  const densRaw = raw.densidadEstructural ?? raw.densidad_estructural;
+  const dens =
+    typeof densRaw === "number"
+      ? densRaw
+      : typeof densRaw === "string"
+        ? Number(densRaw)
+        : NaN;
+  const rot = pickString(raw, [
+    "variedadRotacionCodigo",
+    "variedad_rotacion_codigo",
+    "rotacion",
+  ]);
+  const meta = parseBooleanLoose(
+    raw.metacognicionDetectada ?? raw.metacognicion_detectada,
+  );
+  return {
+    densidadEstructural: Number.isFinite(dens)
+      ? Math.max(0, Math.min(100, Math.round(dens)))
+      : 0,
+    variedadRotacionCodigo: rot || "C1",
+    metacognicionDetectada: meta === true,
+  };
+}
+
+function anexarMerito(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+  ojosHistoricos: readonly CodigoObservador[] = [],
+): DiagnosticoVolcado {
+  const local = evaluarMeritoVolcado({
+    captura,
+    codigoDominante: diagnostico.codigoDominante,
+    ojosHistoricos,
+    florGemini: diagnostico.florDetectada,
+  });
+  const geminiEval = diagnostico.evaluacionGrado;
+  const mensaje =
+    geminiEval &&
+    geminiEval.meritoReconocido === local.evaluacion.meritoReconocido &&
+    geminiEval.mensajeEncuadre.trim()
+      ? geminiEval.mensajeEncuadre.trim()
+      : local.evaluacion.mensajeEncuadre;
+  return {
+    ...diagnostico,
+    evaluacionGrado: {
+      ...local.evaluacion,
+      mensajeEncuadre: mensaje,
+    },
+    metricasMerito: local.metricas,
+    florDetectada: local.florDetectada,
+  };
+}
+
+function sellarDiagnostico(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+  ojosHistoricos: readonly CodigoObservador[] = [],
+): DiagnosticoVolcado {
+  return anexarMerito(
+    anexarValidacion(diagnostico, captura),
+    captura,
+    ojosHistoricos,
+  );
+}
+
 function anexarValidacion(
   diagnostico: DiagnosticoVolcado,
   captura: CapturaVolcadoExpansiva,
@@ -1037,53 +1366,46 @@ function componerTextoDiagnostico(captura: CapturaVolcadoExpansiva): string {
 
 /**
  * Parsea la respuesta cruda de Gemini a DiagnosticoVolcado.
- * Tolera aliases, markdown y codigoDominante como string.
+ * Tolera el contrato V2 (ojoDominante / puntoCiego objeto) y aliases legacy.
  * Fuerza el Muro: un solo código, nombre canónico del diccionario.
  */
-export function parseDiagnosticoVolcado(raw: string): DiagnosticoVolcado {
+export function parseDiagnosticoVolcado(
+  raw: string,
+  gradoActual: GradoMaestria = GRADO_MAESTRIA_INICIAL,
+): DiagnosticoVolcado {
   const obj = extraerJsonObject(raw);
-
-  const codigo = coerceCodigoObservador(
-    obj.codigoDominante ??
-      obj.codigo_dominante ??
-      obj.codigo ??
-      obj.ojoDominante,
-  );
+  const ojo = extraerOjoDominante(obj);
+  const codigo = ojo.codigo;
   if (!codigo) {
     throw new Error("Gemini omitió codigoDominante válido (1–10)");
   }
 
-  const justificacionDominante = pickString(obj, [
-    "justificacionDominante",
-    "justificacion_dominante",
-    "justificacion",
-    "razon",
-  ]);
-  const puntoCiego = pickString(obj, [
-    "puntoCiego",
-    "punto_ciego",
-    "cegueraActiva",
-    "ceguera",
-  ]);
-  const devolucionMaestro = pickString(obj, [
-    "devolucionMaestro",
-    "devolucion_maestro",
-    "devolucion",
-    "mensaje",
-    "feedback",
-  ]);
-  const mecanicaAbsorcion = pickString(obj, [
-    "mecanicaAbsorcion",
-    "mecanica_absorcion",
-    "mecanica",
-    "tarea",
-  ]);
+  const justificacionDominante =
+    ojo.explicacion ||
+    pickString(obj, [
+      "justificacionDominante",
+      "justificacion_dominante",
+      "justificacion",
+      "razon",
+    ]);
+  const punto = extraerPuntoCiego(obj);
+  const puntoCiego = punto.texto;
+  const florDetectada = punto.flor;
+  const mecanicaAbsorcion = extraerMecanica(obj);
+  const devolucionMaestro =
+    pickString(obj, [
+      "devolucionMaestro",
+      "devolucion_maestro",
+      "devolucion",
+      "mensaje",
+      "feedback",
+    ]) || justificacionDominante;
   const nivelRaw =
     obj.nivelCargaSugerido ?? obj.nivel_carga_sugerido ?? obj.nivelCarga;
   const nivelNorm =
     typeof nivelRaw === "string" ? nivelRaw.trim().toUpperCase() : nivelRaw;
 
-  if (!justificacionDominante || !puntoCiego || !devolucionMaestro || !mecanicaAbsorcion) {
+  if (!justificacionDominante || !puntoCiego || !mecanicaAbsorcion) {
     throw new Error("Gemini omitió campos de diagnóstico");
   }
 
@@ -1095,7 +1417,10 @@ export function parseDiagnosticoVolcado(raw: string): DiagnosticoVolcado {
     nivelCargaSugerido: isNivelCargaSugerido(nivelNorm)
       ? nivelNorm
       : undefined,
-    validacionGrado: extraerValidacionGrado(obj, GRADO_MAESTRIA_INICIAL),
+    validacionGrado: extraerValidacionGrado(obj, gradoActual),
+    evaluacionGrado: extraerEvaluacionGradoGemini(obj),
+    metricasMerito: extraerMetricasMeritoGemini(obj),
+    florDetectada,
   });
 }
 
@@ -1247,6 +1572,7 @@ function devolucionAnclada(
 export function diagnosticarVolcadoLocal(
   textoVolcado: string,
   capturaInput?: CapturaVolcadoInput,
+  ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -1260,7 +1586,7 @@ export function diagnosticarVolcadoLocal(
   const ojo = DICCIONARIO_OJOS[codigo];
 
   if (palabras < 6) {
-    return anexarValidacion(
+    return sellarDiagnostico(
       hidratarDiagnostico(1, {
         justificacionDominante:
           "El volcado todavía es ruido. El centro de gravedad por defecto es El Ojo de la Claridad: hace falta nombrar utilidad, no clima.",
@@ -1272,6 +1598,7 @@ export function diagnosticarVolcadoLocal(
         nivelCargaSugerido: "BASICO",
       }),
       captura,
+      ojosHistoricos,
     );
   }
 
@@ -1284,7 +1611,7 @@ export function diagnosticarVolcadoLocal(
     puntoCiego = `Sombra declarada: «${clamp(captura.sombraOmision, 180)}». ${puntoCiego}`;
   }
 
-  return anexarValidacion(
+  return sellarDiagnostico(
     hidratarDiagnostico(codigo, {
       justificacionDominante: tesis,
       puntoCiego,
@@ -1293,6 +1620,7 @@ export function diagnosticarVolcadoLocal(
       nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
     }),
     captura,
+    ojosHistoricos,
   );
 }
 
@@ -1317,7 +1645,12 @@ export async function procesarVolcadoAprendizajeConFuente(
   deps: ProcesarVolcadoDeps = {},
 ): Promise<ResultadoVolcadoAprendizaje> {
   const captura = resolverCaptura(textoVolcado, deps);
-  const prompt = obtenerPromptVolcado(captura.volcadoCrudo, captura);
+  const ojosHistoricos = deps.ojosHistoricos ?? [];
+  const prompt = obtenerPromptVolcado(
+    captura.volcadoCrudo,
+    captura,
+    ojosHistoricos,
+  );
   const serialized = serializarPromptVolcado(prompt);
   const caller = deps.callGemini;
 
@@ -1325,18 +1658,26 @@ export async function procesarVolcadoAprendizajeConFuente(
     try {
       const raw = await caller(serialized, 2048, true);
       return {
-        diagnostico: anexarValidacion(parseDiagnosticoVolcado(raw), captura),
+        diagnostico: sellarDiagnostico(
+          parseDiagnosticoVolcado(raw, captura.gradoMaestria),
+          captura,
+          ojosHistoricos,
+        ),
         source: "gemini",
       };
     } catch (err) {
       try {
         const raw2 = await caller(
-          `${serialized}\n\nIMPORTANTE: responde SOLO un objeto JSON con las claves codigoDominante, nombreOjoDominante, justificacionDominante, puntoCiego, devolucionMaestro, mecanicaAbsorcion, nivelCargaSugerido, validacionGrado.`,
+          `${serialized}\n\nIMPORTANTE: responde SOLO un objeto JSON con las claves ojoDominante, puntoCiego, mecanicaAbsorcion, evaluacionGrado, metricasMerito, devolucionMaestro, nivelCargaSugerido, validacionGrado.`,
           2048,
           false,
         );
         return {
-          diagnostico: anexarValidacion(parseDiagnosticoVolcado(raw2), captura),
+          diagnostico: sellarDiagnostico(
+            parseDiagnosticoVolcado(raw2, captura.gradoMaestria),
+            captura,
+            ojosHistoricos,
+          ),
           source: "gemini",
         };
       } catch (err2) {
@@ -1349,7 +1690,11 @@ export async function procesarVolcadoAprendizajeConFuente(
   }
 
   return {
-    diagnostico: diagnosticarVolcadoLocal(captura.volcadoCrudo, captura),
+    diagnostico: diagnosticarVolcadoLocal(
+      captura.volcadoCrudo,
+      captura,
+      ojosHistoricos,
+    ),
     source: "local_fallback",
   };
 }

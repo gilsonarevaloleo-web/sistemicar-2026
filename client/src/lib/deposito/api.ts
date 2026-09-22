@@ -1,5 +1,7 @@
 import type {
   CapturaVolcadoInput,
+  CodigoObservador,
+  DepositoEngineResponse,
   DiagnosticoVolcado,
   GradoMaestria,
 } from "@shared/deposito/engineConfig";
@@ -7,9 +9,12 @@ import type {
 export interface DepositoVolcadoSuccess {
   success: true;
   diagnostico: DiagnosticoVolcado;
+  engine?: DepositoEngineResponse;
   source: "gemini" | "local_fallback";
   ritual: string;
   gradoMaestria?: GradoMaestria;
+  gradoDetectado?: GradoMaestria;
+  meritoReconocido?: boolean;
 }
 
 export interface DepositoVolcadoError {
@@ -57,6 +62,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function procesarVolcadoRemoto(
   textoVolcado: string,
   captura?: CapturaVolcadoInput,
+  extras?: { ojosHistoricos?: CodigoObservador[] },
 ): Promise<DepositoVolcadoSuccess> {
   let res: Response;
   try {
@@ -68,6 +74,7 @@ export async function procesarVolcadoRemoto(
           textoVolcado,
           ...captura,
           volcadoCrudo: captura?.volcadoCrudo ?? textoVolcado,
+          ojosHistoricos: extras?.ojosHistoricos,
         }),
       }),
       12000,

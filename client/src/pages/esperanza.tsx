@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
+import { BannerMeritoDetectado } from "@/components/deposito/BannerMeritoDetectado";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
@@ -8,12 +9,18 @@ import {
   FormularioVolcadoExpansivo,
   type FormularioVolcadoHandle,
 } from "@/components/deposito/FormularioVolcadoExpansivo";
+import { MapaCalorOjos } from "@/components/deposito/MapaCalorOjos";
+import {
+  diagnosticoPromueve,
+  errorGuardadoVolcado,
+  planGuardadoVolcado,
+} from "@/lib/deposito/flujoVolcado";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
-import { leerGradoMaestria } from "@/lib/depositoPerfil";
+import { guardarGradoMaestria, leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
   listVolcadosLocal,
@@ -31,7 +38,6 @@ import {
   evaluarRitualPasoGrado,
   isGradoMaestria,
   normalizarCapturaVolcado,
-  validarCapturaParaGrado,
   type CapturaVolcadoExpansiva,
   type DiagnosticoVolcado,
   type GradoMaestria,
@@ -60,12 +66,16 @@ export default function Esperanza() {
   const [formKey, setFormKey] = useState(0);
   const [anexoReady, setAnexoReady] = useState(false);
   const formRef = useRef<FormularioVolcadoHandle>(null);
+  const gradoDesdeQueryRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [dictamen, setDictamen] = useState<DictamenOptico | null>(null);
   const [diagnostico, setDiagnostico] = useState<DiagnosticoVolcado | null>(null);
   const [ultimoVolcado, setUltimoVolcado] = useState("");
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
+  const [meritoOverlay, setMeritoOverlay] = useState<GradoMaestria | null>(null);
   const dictamenRef = useRef<HTMLDivElement>(null);
+  const gradoRef = useRef<GradoMaestria>(grado);
+  gradoRef.current = grado;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -74,6 +84,7 @@ export default function Esperanza() {
     const activo = isGradoMaestria(desdeQuery)
       ? desdeQuery
       : leerGradoMaestria(user?.uid);
+    gradoDesdeQueryRef.current = isGradoMaestria(desdeQuery);
     setGrado(activo);
   }, [user]);
 
@@ -128,10 +139,26 @@ export default function Esperanza() {
     [historial, grado],
   );
 
+  const aplicarDiagnostico = (diag: DiagnosticoVolcado) => {
+    setDiagnostico(diag);
+    const promovido = diagnosticoPromueve(
+      diag,
+      gradoRef.current,
+      gradoDesdeQueryRef.current,
+    );
+    if (!promovido) return;
+    gradoRef.current = promovido;
+    setGrado(promovido);
+    guardarGradoMaestria(user?.uid ?? "anon", promovido);
+    setMeritoOverlay(promovido);
+  };
+
   const guardar = async () => {
+    const gradoActivo = gradoRef.current;
+    const plan = planGuardadoVolcado(gradoActivo);
     const lista =
-      formRef.current?.getCaptura() ?? capturaVacia(grado);
-    const error = validarCapturaParaGrado(lista, grado);
+      formRef.current?.getCaptura() ?? capturaVacia(gradoActivo);
+    const error = errorGuardadoVolcado(lista, gradoActivo);
     if (error) {
       if (error.startsWith("volcadoCrudo")) {
         toast.error("El volcado está vacío.");
@@ -148,43 +175,59 @@ export default function Esperanza() {
     }
     const crudo = lista.volcadoCrudo;
     const d = analizarVolcado(crudo);
+    const ojosHistoricos = historial
+      .map((v) => v.diagnostico?.codigoDominante)
+      .filter((n): n is CodigoObservador => typeof n === "number");
+    const localDiag = diagnosticarVolcadoLocal(crudo, lista, ojosHistoricos);
+
     setDictamen(d);
     setUltimoVolcado(crudo);
-    const localDiag = diagnosticarVolcadoLocal(crudo, lista);
-    setDiagnostico(localDiag);
+    aplicarDiagnostico(localDiag);
     requestAnimationFrame(() =>
-      dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
 
-    setSaving(true);
-    let diag: DiagnosticoVolcado = localDiag;
-    try {
-      const remoto = await procesarVolcadoRemoto(crudo, lista);
-      diag = remoto.diagnostico;
-      setDiagnostico(diag);
-    } catch {
-      diag = localDiag;
-    }
-
-    if (!user) {
+    const uid = user?.uid ?? "anon";
+    if (plan.exigirSesion && !user) {
       toast.error("Entrá para guardar el volcado.");
-      setSaving(false);
-      requestAnimationFrame(() =>
-        dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-      );
       return;
     }
-    try {
-      await addVolcadoEntry(user.uid, crudo, d, diag, lista);
-      setFormKey((k) => k + 1);
-      toast.success(
-        d.calidad === "ruido"
+
+    const persistir = addVolcadoEntry(uid, crudo, d, localDiag, lista, {
+      waitForRemote: plan.esperarFirebase,
+    });
+    setFormKey((k) => k + 1);
+    toast.success(
+      localDiag.evaluacionGrado?.meritoReconocido
+        ? "Volcado guardado."
+        : d.calidad === "ruido"
           ? "Ruido guardado. El no-dicho ya es el ojo."
           : "Volcado guardado.",
-      );
-      requestAnimationFrame(() =>
-        dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-      );
+    );
+
+    const hidratarRemoto = async () => {
+      try {
+        const remoto = await procesarVolcadoRemoto(crudo, lista, {
+          ojosHistoricos,
+        });
+        aplicarDiagnostico(remoto.diagnostico);
+      } catch {
+        /* G1 ya tiene feedback local. G2+ también conserva el diagnóstico local. */
+      }
+    };
+
+    if (!plan.bloquearUi) {
+      void persistir.catch(() => {
+        /* El volcado ya está en localStorage. */
+      });
+      void hidratarRemoto();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await persistir;
+      await hidratarRemoto();
     } catch {
       toast.error("No se pudo guardar el volcado.");
     } finally {
@@ -256,6 +299,15 @@ export default function Esperanza() {
           >
             {ficha.titulo}
           </p>
+          {expediente.rango > 0 && (
+            <div className="mt-5 text-left">
+              <MapaCalorOjos
+                expediente={expediente}
+                compact
+                testId="deposito-header-mapa-calor"
+              />
+            </div>
+          )}
         </header>
 
         <section
@@ -267,7 +319,7 @@ export default function Esperanza() {
             ref={formRef}
             gradoMaestria={grado}
             captura={capturaVacia(grado)}
-            disabled={saving}
+            disabled={saving && grado !== 1}
           />
           <div className="mt-4 flex items-center justify-between gap-3">
             <p className="text-[10px] text-white/30 uppercase tracking-widest">
@@ -278,7 +330,7 @@ export default function Esperanza() {
             <button
               type="button"
               onClick={guardar}
-              disabled={saving}
+              disabled={saving && grado !== 1}
               className="text-[11px] font-bold uppercase tracking-widest px-5 py-3 disabled:opacity-40"
               style={{
                 backgroundColor: GOLD,
@@ -286,7 +338,7 @@ export default function Esperanza() {
               }}
               data-testid="deposito-guardar"
             >
-              {saving ? "Leyendo el volcado…" : "Guardar volcado"}
+              {saving && grado !== 1 ? "Leyendo el volcado…" : "Guardar volcado"}
             </button>
           </div>
           {ritualPaso.volcadosEvaluados >= 3 && (
@@ -351,6 +403,12 @@ export default function Esperanza() {
           </>
         )}
       </div>
+      {meritoOverlay && (
+        <BannerMeritoDetectado
+          grado={meritoOverlay}
+          onCerrar={() => setMeritoOverlay(null)}
+        />
+      )}
     </div>
   );
 }
