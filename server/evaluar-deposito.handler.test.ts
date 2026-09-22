@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { HandlerEvent } from "@netlify/functions";
-import { handler } from "./evaluar-deposito.ts";
+import { handler } from "../netlify/functions/evaluar-deposito.ts";
 
 function event(partial: Partial<HandlerEvent>): HandlerEvent {
   return {
