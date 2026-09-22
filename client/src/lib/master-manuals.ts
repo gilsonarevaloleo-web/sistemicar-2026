@@ -263,7 +263,7 @@ export const MASTER_MANUALS: Record<ManualType, MasterManual> = {
       {
         title: "LA FLOTA",
         instruction:
-          "Cuatro tipos: Conquista (unidades y ritmo), Enfoque (decisiones con ring y cupos), Descanso (recarga consciente), Verdad (sinceridad). Eliges tipo, título y criterio de fin. Sin cumplido/archivado no hay PS.",
+          "Eliges tipo, título y criterio de fin. Nombrar el vehículo es el freno: no se va de frente. Conquista (unidades y ritmo) o Enfoque (decisiones con ring y cupos). Sin cumplido/archivado no hay PS.",
         checklist: [
           { key: "plan_flota_1", text: "Lancé un vehículo con título claro y tipo de flota acorde (Conquista o Enfoque para empezar)" },
           { key: "plan_flota_2", text: "Definí criterio de fin (hora, cantidad o situación según el tipo)" },
@@ -273,7 +273,7 @@ export const MASTER_MANUALS: Record<ManualType, MasterManual> = {
       {
         title: "DESGLOSADOR (BLOQUES)",
         instruction:
-          "Requiere add-on: Soberanía del día (Enfoque, bloques 3+3) u Operativo (Conquista, unidades). En termodinámica: 1 bloque = desglosador cerrado; los subs cuentan aparte. Cierra cada sub y luego el desglosador padre.",
+          "Desglosador conquista (unidades) o situacional (ring). Nombrar cada unidad escribe la imagen de lo que se va a hacer — la pereza es ausencia de ese detalle. En termodinámica: 1 bloque = desglosador cerrado; los subs cuentan aparte. Cierra cada sub y luego el desglosador padre.",
         checklist: [
           { key: "plan_desg_1", text: "Abrí un desglosador acorde a mi plan (Enfoque o Conquista)" },
           { key: "plan_desg_2", text: "Creé subs y los fui cerrando (cumplido/fallado)" },

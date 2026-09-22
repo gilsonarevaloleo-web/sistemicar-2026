@@ -154,6 +154,22 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.equal(hub.includes("buildProyectoRendicion"), false);
   });
 
+  it("Ley del Freno: card en Métricas, pista en el lanzador, no en sesión", () => {
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    const metricas = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4MetricasTab.tsx"),
+      "utf8"
+    );
+    const launch = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4LaunchPanel.tsx"),
+      "utf8"
+    );
+    assert.equal(session.includes("CardLeyFrenoVehiculo"), false);
+    assert.match(metricas, /CardLeyFrenoVehiculo/);
+    assert.match(launch, /LeyFrenoHint/);
+    assert.match(launch, /LEY_FRENO_VEHICULO_RITUAL/);
+  });
+
   it("triada de Métricas no arrastra pulso ni reloj 1s", () => {
     const hook = readFileSync(
       join(clientSrc, "hooks/useConcienciaTriadaOperador.ts"),

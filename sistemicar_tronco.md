@@ -17,6 +17,7 @@ La Jornada no es un calendario rápido. Es un **motor de cierre consciente por c
 | Axioma | Regla para el código |
 |--------|----------------------|
 | **Conciencia = darse cuenta** | La UI debe hacer visible lo que el operador no ve solo: entropía, fricción, cobertura del día. |
+| **Nombrar es el freno** | Lanzar (nombre del vehículo y del desglosador) no es burocracia: corta la reactividad y escribe la imagen detallada. No hay atajo “de frente”. Ver `shared/jornada/leyFrenoVehiculo.ts`. |
 | **Coraje (RETO) tiene valor intrínseco** | Archivar un reto difícil sigue siendo cierre válido; PS y feedback no dependen solo de “cumplido perfecto”. |
 | **El tanque se llena al cerrar** | Combustible, PS, celebraciones de bloque y toasts van ligados al **cierre** (sub, bloque, vehículo), no a abrir la app ni a planificar. |
 | **Maestría = dominio fluido** | Termodinámica v2 mide progreso por **↑ dominio fluido** y **↓ fricción**, no por “más bloques al límite”. Ver `termodinamicaAtencional.ts`. |

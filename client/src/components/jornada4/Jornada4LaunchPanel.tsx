@@ -51,6 +51,8 @@ import {
   stopJ4GpsClips,
   unlockJ4GpsClips,
 } from "@/jornada4/gpsClipPlayer";
+import { LeyFrenoHint } from "@/components/jornada4/LeyFrenoHint";
+import { LEY_FRENO_VEHICULO_RITUAL } from "@shared/jornada/leyFrenoVehiculo";
 
 const { PIZARRA, INK, MUTED, ACCENT, GOLD } = J4_COLORS;
 const ORANGE = "#f97316";
@@ -630,6 +632,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       <p className="text-center text-[9px]" style={{ color: MUTED }}>
         Dual Kernel · solo estos 2 vehículos (sin descanso ni verdad)
       </p>
+      <LeyFrenoHint variant="compact" />
 
       {open ? (
         <div
@@ -666,6 +669,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                 <p className="text-sm font-bold" style={{ color: INK }}>
                   Lanzar vehículo
                 </p>
+                <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
+                  {LEY_FRENO_VEHICULO_RITUAL}
+                </p>
               </div>
               <button
                 type="button"
@@ -678,6 +684,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
+              <LeyFrenoHint variant="sheet" />
               {!tipo ? (
                 <div className="grid grid-cols-2 gap-2">
                   {V4_TIPOS.map(t => {
@@ -900,6 +907,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     >
                       Nombre de la misión
                     </label>
+                    <p className="text-[8px] leading-snug -mt-1 mb-1.5" style={{ color: MUTED }}>
+                      Ese nombre es el programa: imagen detallada antes de ejecutar.
+                    </p>
                     <div className="relative">
                       <input
                         value={titulo}
@@ -1314,6 +1324,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           Nombre · Cantidad · Récord
                         </p>
                       </div>
+                      <p className="text-[8px] leading-snug -mt-1" style={{ color: MUTED }}>
+                        Nombrar cada unidad escribe la imagen. La pereza es no ver el detalle.
+                      </p>
 
                       {subs.filter(s => s.titulo.trim()).length > 1 ? (
                         <div

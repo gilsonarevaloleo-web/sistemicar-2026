@@ -52,7 +52,13 @@ const STEPS_BASE: TutorialStep[] = [
   {
     title: `Bienvenido a ${JORNADA_MODULE.title}`,
     description: `${SISTEMICAR_CATEGORY.oneLiner} Empiezas midiendo: lanzas Conquista, cierras unidades y ganas PS.`,
-    action: "Siguiente: lanzar tu primera Conquista.",
+    action: "Siguiente: por qué se lanza, no se va de frente.",
+  },
+  {
+    title: "Por qué se lanza, no se va de frente",
+    description:
+      "Ir de frente es reactividad: ahí nacen las emociones automáticas. Lanzar el vehículo — ponerle nombre al desglosador y a las unidades — es el freno. Instala un programa antiemociones desordenadas y la imagen detallada de lo que vas a hacer. La pereza es ausencia de esa imagen.",
+    action: "Al lanzar, nombra la misión. Ese nombre es el programa.",
   },
   {
     title: "Conquista = unidades con veredicto",
@@ -262,6 +268,7 @@ export function buildPrimerDiaSummaryForDoctor(
 /** Preguntas rápidas para el Doctor en Jornada */
 export const PLANIFICACION_DOCTOR_QUICK_PROMPTS = [
   "¿Por dónde empiezo hoy?",
+  "¿Por qué lanzar si de frente es más rápido?",
   "¿Qué es la Escalera de Conciencia?",
   "¿Qué es un segmento?",
   "¿Conquista o Enfoque en La Flota?",
