@@ -67,6 +67,37 @@ type AdminUserLookup = {
   subscriptionPlan?: string | null;
 };
 
+const ADMIN_TABS = [
+  "users",
+  "payments",
+  "recovery",
+  "laboratorio",
+  "adn",
+  "creditos",
+  "modulos",
+  "vendedores",
+] as const;
+type AdminTab = (typeof ADMIN_TABS)[number];
+
+function tabFromUrl(): AdminTab {
+  if (typeof window === "undefined") return "modulos";
+  const raw = new URLSearchParams(window.location.search).get("tab");
+  return raw && (ADMIN_TABS as readonly string[]).includes(raw)
+    ? (raw as AdminTab)
+    : "modulos";
+}
+
+function unlockAdminTouches(): void {
+  if (typeof document === "undefined") return;
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  document.body.style.pointerEvents = "";
+  document.documentElement.style.pointerEvents = "";
+}
+
+const TAB_BTN =
+  "relative z-20 min-h-11 px-4 py-2 rounded-lg text-sm font-bold transition touch-manipulation";
+
 export default function AdminGilson() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
@@ -78,7 +109,7 @@ export default function AdminGilson() {
   const [users, setUsers] = useState<User[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"users" | "payments" | "recovery" | "laboratorio" | "adn" | "creditos" | "modulos" | "vendedores">("users");
+  const [activeTab, setActiveTab] = useState<AdminTab>(tabFromUrl);
   const [loginLoading, setLoginLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
@@ -492,7 +523,16 @@ export default function AdminGilson() {
       setUsers(DEMO_USERS);
       setPayments(DEMO_PAYMENTS);
     }
+    unlockAdminTouches();
   }, []);
+
+  const goToTab = (tab: AdminTab) => {
+    setActiveTab(tab);
+    const next = `/admin-gilson?tab=${tab}`;
+    if (typeof window !== "undefined" && window.location.search !== `?tab=${tab}`) {
+      window.history.replaceState({}, "", next);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated || !user || motorsQuiet) return;
@@ -729,7 +769,7 @@ export default function AdminGilson() {
   }
 
   return (
-    <div className="min-h-screen p-4" style={{ backgroundColor: "#020202" }}>
+    <div className="min-h-screen p-4 pb-28 relative z-20" style={{ backgroundColor: "#020202" }}>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -737,20 +777,22 @@ export default function AdminGilson() {
             <h1 className="text-xl font-black text-white">Panel Admin</h1>
           </div>
           <button
+            type="button"
             onClick={() => {
               sessionStorage.removeItem("adminAuth");
               setIsAuthenticated(false);
             }}
-            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-bold"
+            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-bold touch-manipulation"
           >
             Salir
           </button>
         </div>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="relative z-20 flex gap-2 mb-6 flex-wrap">
           <button
-            onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("users")}
+            className={`${TAB_BTN} ${
               activeTab === "users" ? "bg-amber-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -758,8 +800,9 @@ export default function AdminGilson() {
             Usuarios ({users.length})
           </button>
           <button
-            onClick={() => setActiveTab("payments")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("payments")}
+            className={`${TAB_BTN} ${
               activeTab === "payments" ? "bg-amber-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -767,8 +810,9 @@ export default function AdminGilson() {
             Pagos ({payments.length})
           </button>
           <button
-            onClick={() => setActiveTab("recovery")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("recovery")}
+            className={`${TAB_BTN} ${
               activeTab === "recovery" ? "bg-green-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -776,8 +820,9 @@ export default function AdminGilson() {
             Recuperar Datos
           </button>
           <button
-            onClick={() => setActiveTab("laboratorio")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("laboratorio")}
+            className={`${TAB_BTN} ${
               activeTab === "laboratorio" ? "bg-purple-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -785,8 +830,9 @@ export default function AdminGilson() {
             Laboratorio
           </button>
             <button
-              onClick={() => setActiveTab("adn")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("adn")}
+              className={`${TAB_BTN} ${
                 activeTab === "adn" ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-adn"
@@ -794,8 +840,9 @@ export default function AdminGilson() {
               ADN Soberano
             </button>
             <button
-              onClick={() => setActiveTab("creditos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("creditos")}
+              className={`${TAB_BTN} ${
                 activeTab === "creditos" ? "bg-cyan-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-creditos"
@@ -804,8 +851,9 @@ export default function AdminGilson() {
               Créditos Espejo
             </button>
             <button
-              onClick={() => setActiveTab("modulos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("modulos")}
+              className={`${TAB_BTN} ${
                 activeTab === "modulos" ? "bg-sky-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-modulos"
@@ -814,8 +862,9 @@ export default function AdminGilson() {
               Módulos
             </button>
             <button
-              onClick={() => setActiveTab("vendedores")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("vendedores")}
+              className={`${TAB_BTN} ${
                 activeTab === "vendedores" ? "bg-emerald-600 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-vendedores"
@@ -824,8 +873,9 @@ export default function AdminGilson() {
               Vendedores
             </button>
             <button
+              type="button"
               onClick={() => navigate("/admin-semillas")}
-              className="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/30"
+              className={`${TAB_BTN} bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/30`}
               data-testid="btn-admin-semillas"
             >
               <Sprout size={14} className="inline mr-1" />

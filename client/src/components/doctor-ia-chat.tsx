@@ -454,10 +454,14 @@ export function DoctorIAChat() {
     "/umbral/metricas",
     "/esperanza", // Depósito V2: sin FAB sobre el volcado
     "/deposito",
+    "/admin-gilson",
+    "/admin-semillas",
   ];
   if (
     !user ||
     hiddenPages.includes(location) ||
+    location.startsWith("/admin-gilson") ||
+    location.startsWith("/admin-semillas") ||
     location.startsWith("/jornada-v4?") ||
     location.startsWith("/umbral/") ||
     location.startsWith("/esperanza") ||

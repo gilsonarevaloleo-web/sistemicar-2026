@@ -56,12 +56,21 @@ export function isHouseRecintoPath(pathname: string | null | undefined): boolean
  * Rutas donde el App shell debe callar motores (Centinela / SegmentAttention / Cierre)
  * durante toda la visita — no solo en soft-start.
  */
+/** Panel admin: sin FAB/Doctor/Centinela robando toques en Android. */
+export function isAdminPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return path === "/admin-gilson" || path.startsWith("/admin-gilson/")
+    || path === "/admin-semillas" || path.startsWith("/admin-semillas/");
+}
+
 export function isAppShellQuietPath(pathname: string | null | undefined): boolean {
   return (
     isProyectosHubPath(pathname) ||
     isMenuPrincipalPath(pathname) ||
     isCommercialEntryPath(pathname) ||
-    isHouseRecintoPath(pathname)
+    isHouseRecintoPath(pathname) ||
+    isAdminPath(pathname)
   );
 }
 

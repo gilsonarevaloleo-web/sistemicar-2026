@@ -88,6 +88,7 @@ import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speech
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
 import {
+  isAdminPath,
   isCommercialEntryPath,
   isJornada4WindowPath,
   JORNADA_V4_PATH,
@@ -601,7 +602,12 @@ function VoiceBootstrap() {
 /** Landings de anuncio: sin voz, Centinela ni cierre — el primer toque debe navegar. */
 function AppShellMotors() {
   const [location] = useLocation();
-  if (isCommercialEntryPath(location) || isCommercialEntryPath(window.location.pathname)) {
+  if (
+    isCommercialEntryPath(location) ||
+    isCommercialEntryPath(window.location.pathname) ||
+    isAdminPath(location) ||
+    isAdminPath(window.location.pathname)
+  ) {
     return null;
   }
   return (
