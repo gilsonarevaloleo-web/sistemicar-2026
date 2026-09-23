@@ -11,6 +11,7 @@
  * Spec: umbral v2. primera parte (WPS)
  */
 
+import { pasaCandadoCodigo } from "./criterioCodigo.ts";
 import {
   armarBloqueMaestro,
   feedbackMaestroLocal,
@@ -189,7 +190,7 @@ export const DICCIONARIO_CODIGOS: Record<CodigoNumero, ConfiguracionCodigo> = {
       criterioAprobacionVendedor:
         "El vendedor demuestra practicidad: un primer paso factible en minutos/horas, con costo temporal explícito y bajo.",
       instruccionEvaluadorGemini:
-        "Evalúa si se venció la objeción de tiempo con factibilidad real. Rechaza minimizar el esfuerzo con frases vacías. Aprueba si hay un camino práctico, acotado y creíble para empezar.",
+        "Evalúa si se venció la objeción de tiempo con factibilidad real. CANDADO: sin número + minutos/horas Y un primer paso ejecutable, rechazá. «Es simple», «revelación», «el día se vuelve medible», «nombrar el tiempo» o «entrar a la jornada» sin costo temporal = ocupación. Rechaza minimizar el esfuerzo con frases vacías o aceptar el «después». Aprueba solo si hay un camino práctico, acotado y creíble: número + unidad de tiempo + acción de empezar.",
       arquetipoNombre: "El Postergador / Perezoso",
       actitudCliente:
         "Aplaza con la agenda como escudo. No rechaza de frente: diluye el momento de decisión hasta que se enfríe.",
@@ -530,6 +531,9 @@ export function obtenerPromptEvaluacion(
     `- Si aprobado === false: codigoSiguiente = ${codigo} (el operador no avanza).`,
     "",
     "feedbackConfrontativo: 2–5 frases en la voz de la ficha. Tres tiempos: espejo → segunda resistencia → corte o cruce. Si rechazas, el corte es un rewrite de HOY, no un sermón.",
+    codigo === 3 && modo === "EXTERNO_VENTAS"
+      ? "CANDADO C3 ARENA: no apruebes sin un número de minutos u horas y un primer paso ejecutable. Filosofía del reloj sin costo temporal es ocupación."
+      : "",
     "",
     `CÓDIGO EN EVALUACIÓN: ${cfg.nombre}`,
     `Concepto clave: ${cfg.conceptoClave}`,
@@ -644,7 +648,8 @@ export function parseEvaluacionGemini(
 
 /**
  * Evaluador local de respaldo cuando Gemini falla/timeout/parsea mal.
- * Criterio mínimo: densidad + señales del código activo.
+ * Densidad + señales del código. C3 Arena usa el candado del Relojero
+ * (minutos + primer paso), no el saco genérico de keywords de venta.
  */
 export function evaluarUmbralLocal(
   input: PromptEvaluacionInput,
@@ -663,7 +668,12 @@ export function evaluarUmbralLocal(
   const signals =
     input.modo === "INTERNO_HABILIDAD" ? signalsInterno : signalsExterno;
   const hasSignal = signals.some((re) => re.test(texto));
-  const aprobado = denseEnough && hasSignal;
+
+  const aprobadoGenerico = denseEnough && hasSignal;
+  const aprobado =
+    input.codigo === 3 && input.modo === "EXTERNO_VENTAS"
+      ? denseEnough && pasaCandadoCodigo(input)
+      : aprobadoGenerico && pasaCandadoCodigo(input);
 
   const criterio =
     input.modo === "INTERNO_HABILIDAD"
@@ -680,5 +690,34 @@ export function evaluarUmbralLocal(
     aprobado,
     feedbackConfrontativo,
     codigoSiguiente: resolverCodigoSiguiente(aprobado, input.codigo),
+  };
+}
+
+/**
+ * Gemini no puede saltar el candado del código activo.
+ * Si aprueba sin la prueba mínima, se baja el veredicto.
+ */
+export function aplicarCandadoEvaluacion(
+  input: PromptEvaluacionInput,
+  ev: EvaluacionGeminiJson,
+): EvaluacionGeminiJson {
+  if (!ev.aprobado) return ev;
+  if (pasaCandadoCodigo(input)) return ev;
+
+  const cfg = obtenerCodigo(input.codigo);
+  const criterio =
+    input.modo === "INTERNO_HABILIDAD"
+      ? cfg.modoInterno.criterioAprobacion
+      : cfg.modoExterno.criterioAprobacionVendedor;
+
+  return {
+    aprobado: false,
+    feedbackConfrontativo: feedbackMaestroLocal({
+      codigo: input.codigo,
+      modo: input.modo,
+      aprobado: false,
+      criterio,
+    }),
+    codigoSiguiente: input.codigo,
   };
 }

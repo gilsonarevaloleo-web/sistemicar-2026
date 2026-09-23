@@ -132,6 +132,17 @@ describe("Umbral v2 — engineConfig", () => {
     assert.equal(ev.codigoSiguiente, 2);
   });
 
+  it("prompt C3 Arena inyecta el candado de minutos + primer paso", () => {
+    const prompt = obtenerPromptEvaluacion({
+      codigo: 3,
+      modo: "EXTERNO_VENTAS",
+      respuestaUsuario: "Entrar a la jornada y nombrar el tiempo.",
+    });
+    assert.match(prompt.system, /CANDADO C3 ARENA/);
+    assert.match(prompt.system, /ocupación/);
+    assert.match(prompt.system, /Relojero Práctico/);
+  });
+
   it("evaluarUmbralLocal rechaza respuestas vacías y aprueba densas", () => {
     const ko = evaluarUmbralLocal({
       codigo: 1,
