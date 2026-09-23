@@ -17,5 +17,7 @@ describe("conquista pausa UI — un toque, sin letras", () => {
     assert.equal(card.includes("pausaTitulo"), false);
     assert.match(card, /data-testid="j4-conquista-pausa"/);
     assert.match(card, /tituloPausaInterrupcion\(\)/);
+    assert.match(card, /data-testid="j4-conquista-cerrar-pausa"/);
+    assert.match(card, /En pausa · no ocupa cupo ni suma PS/);
   });
 });

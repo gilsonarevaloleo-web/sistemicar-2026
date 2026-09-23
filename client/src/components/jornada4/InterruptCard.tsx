@@ -4,7 +4,7 @@
 import { Check, PauseCircle, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG } from "@/components/flota/vehicleCardShared";
-import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
+import { expressCloseAwardPS } from "@/lib/sovereigntyPointsConfig";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -21,8 +21,8 @@ type Props = {
 
 export function InterruptCard({ vehicle, onCumplido, onIncumplido }: Props) {
   const isInterrupt = Boolean(vehicle.vehiculoPadreDesglosadorId);
-  const psCumple = vehicleMissionClosePS("cumplido", vehicle.tipoTerminoRapido ?? "situacion");
-  const psArch = vehicleMissionClosePS("archivado", vehicle.tipoTerminoRapido ?? "situacion");
+  const psCumple = expressCloseAwardPS("cumplido", vehicle);
+  const psArch = expressCloseAwardPS("archivado", vehicle);
 
   return (
     <article
@@ -50,7 +50,7 @@ export function InterruptCard({ vehicle, onCumplido, onIncumplido }: Props) {
             </p>
             <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
               {isInterrupt
-                ? "Interrupción · cierra para reanudar el desglosador"
+                ? "Pausa · no suma PS ni ocupa cupo. Cierra cuando vuelvas."
                 : "Situación express · sin ring"}
             </p>
           </div>
@@ -77,7 +77,7 @@ export function InterruptCard({ vehicle, onCumplido, onIncumplido }: Props) {
             }}
             data-testid={`j4-express-cumplido-${vehicle.id}`}
           >
-            <Check size={12} /> Cumplido · +{psCumple} PS
+            <Check size={12} /> Cumplido{psCumple > 0 ? ` · +${psCumple} PS` : ""}
           </button>
           <button
             type="button"

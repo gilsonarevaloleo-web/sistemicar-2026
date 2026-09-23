@@ -94,6 +94,7 @@ type Props = {
   onAddSubs?: (forms: AddSubForm[]) => void;
   onPausaInterrupcion?: (titulo?: string) => void;
   onResumeDesglosador?: () => void;
+  onArchivarPausa?: () => void;
   onReorderSubs?: (movedId: string, direction: ReorderDirection) => void;
 };
 
@@ -107,6 +108,7 @@ export function ConquistaCard({
   onAddSubs,
   onPausaInterrupcion,
   onResumeDesglosador,
+  onArchivarPausa,
   onReorderSubs,
 }: Props) {
   const active = conquistaFocusSub(vehicle);
@@ -717,7 +719,7 @@ export function ConquistaCard({
                     className="text-[8px] text-center uppercase tracking-wider"
                     style={{ color: CYAN }}
                   >
-                    Desglosador en pausa — cierra la interrupción arriba
+                    En pausa · no ocupa cupo ni suma PS
                   </p>
                   {onResumeDesglosador ? (
                     <button
@@ -732,6 +734,36 @@ export function ConquistaCard({
                       data-testid="j4-conquista-resume"
                     >
                       Reanudar desglosador ahora
+                    </button>
+                  ) : null}
+                  {cycleReady ? (
+                    <button
+                      type="button"
+                      onClick={onCerrarCiclo}
+                      className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: "rgba(212,175,55,0.14)",
+                        color: "#D4AF37",
+                        border: "1px solid rgba(212,175,55,0.35)",
+                      }}
+                      data-testid="j4-conquista-cerrar-ciclo-pausa"
+                    >
+                      Cerrar ciclo
+                    </button>
+                  ) : null}
+                  {onArchivarPausa ? (
+                    <button
+                      type="button"
+                      onClick={onArchivarPausa}
+                      className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: "transparent",
+                        color: BAD,
+                        border: `1px solid ${BAD}50`,
+                      }}
+                      data-testid="j4-conquista-cerrar-pausa"
+                    >
+                      Cerrar vehículo
                     </button>
                   ) : null}
                 </div>
@@ -821,6 +853,36 @@ export function ConquistaCard({
                 data-testid="j4-conquista-resume-empty"
               >
                 Reanudar desglosador ahora
+              </button>
+            ) : null}
+            {cycleReady ? (
+              <button
+                type="button"
+                onClick={onCerrarCiclo}
+                className="w-full py-2 rounded-lg text-[9px] font-bold uppercase"
+                style={{
+                  backgroundColor: "rgba(212,175,55,0.14)",
+                  color: "#D4AF37",
+                  border: "1px solid rgba(212,175,55,0.35)",
+                }}
+                data-testid="j4-conquista-cerrar-ciclo-pausa-empty"
+              >
+                Cerrar ciclo
+              </button>
+            ) : null}
+            {onArchivarPausa ? (
+              <button
+                type="button"
+                onClick={onArchivarPausa}
+                className="w-full py-2 rounded-lg text-[9px] font-bold uppercase"
+                style={{
+                  backgroundColor: "transparent",
+                  color: BAD,
+                  border: `1px solid ${BAD}50`,
+                }}
+                data-testid="j4-conquista-cerrar-pausa-empty"
+              >
+                Cerrar vehículo
               </button>
             ) : null}
           </div>

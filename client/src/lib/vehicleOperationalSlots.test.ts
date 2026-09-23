@@ -167,4 +167,85 @@ describe("vehicleOperationalSlots", () => {
     assert.equal(getOperationalActives(list).length, 0);
     assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
   });
+
+  it("hijo de pausa no consume slot: se pueden tener 2 conquistas", () => {
+    const paused = v({
+      id: "p1",
+      titulo: "Armado casaca 1",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: Date.now(), subActivoId: "s1" },
+      subVehiculos: [{ id: "s1", titulo: "Corte", status: "nested_paused" }],
+    });
+    const interrupt = v({
+      id: "int1",
+      titulo: "Pausa",
+      tipoFlota: "situacion",
+      vehiculoPadreDesglosadorId: "p1",
+    });
+    const running = v({
+      id: "c2",
+      titulo: "Armado casaca 2",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      subVehiculos: [{ id: "s2", titulo: "Costura", status: "activo" }],
+    });
+    const list = [paused, interrupt, running];
+    assert.equal(getOperationalActives(list).length, 1);
+    assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
+    assert.equal(assertCanOpenVehicle(list, "interrupcion", { parentDesglosadorId: "c2" }).allowed, true);
+  });
+
+  it("pausa sin flag interrupcionActiva tampoco ocupa cupo", () => {
+    const list = [
+      v({
+        id: "p1",
+        titulo: "Calce forro",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        desglosadorPausa: { pausadoAt: Date.now(), subActivoId: "s1" },
+        subVehiculos: [{ id: "s1", titulo: "Forro", status: "nested_paused" }],
+      }),
+    ];
+    assert.equal(getOperationalActives(list).length, 0);
+    assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, true);
+  });
+
+  it("cascarón fantasma (ciclo sellado) no bloquea lanzar conquista", () => {
+    const zombie = v({
+      id: "z1",
+      titulo: "Armado cuarta parte",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      subVehiculos: [
+        { id: "s1", titulo: "A", status: "cumplido" },
+        { id: "s2", titulo: "B", status: "fallado" },
+      ],
+    });
+    assert.equal(getOperationalActives([zombie]).length, 0);
+    assert.equal(assertCanOpenVehicle([zombie], "flota_general").allowed, true);
+  });
+
+  it("dos conquistas en curso sí llenan el Dual Kernel", () => {
+    const list = [
+      v({
+        id: "a",
+        titulo: "A",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        subVehiculos: [{ id: "s1", titulo: "Uno", status: "activo" }],
+      }),
+      v({
+        id: "b",
+        titulo: "B",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        subVehiculos: [{ id: "s2", titulo: "Dos", status: "activo" }],
+      }),
+    ];
+    assert.equal(getOperationalActives(list).length, 2);
+    assert.equal(assertCanOpenVehicle(list, "flota_general").allowed, false);
+    assert.equal(assertCanOpenVehicle(list, "interrupcion", { parentDesglosadorId: "a" }).allowed, true);
+  });
 });

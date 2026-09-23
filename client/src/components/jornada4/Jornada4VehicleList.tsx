@@ -97,6 +97,7 @@ type Ops = {
   archiveAncladoPorSegmento?: (vehicleId: string) => Promise<void>;
   pausaInterrupcion: (vehicleId: string, titulo?: string) => Promise<void>;
   resumeDesglosador: (parentId: string) => Promise<void>;
+  archivePausedConquista?: (vehicleId: string) => Promise<void>;
   postergarFilaEnFoco: (vehicleId: string) => void;
   quitarSituacionFila: (vehicleId: string, subTareaId: string) => void;
   closeExpressVehicle: (
@@ -185,6 +186,11 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
                     onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
                     onPausaInterrupcion={() => void ops.pausaInterrupcion(v.id)}
                     onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
+                    onArchivarPausa={
+                      ops.archivePausedConquista
+                        ? () => void ops.archivePausedConquista!(v.id)
+                        : undefined
+                    }
                     onReorderSubs={(movedId, direction) =>
                       ops.reorderConquistaSubs(v.id, movedId, direction)
                     }

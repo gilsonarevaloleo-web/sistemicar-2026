@@ -66,7 +66,10 @@ import {
   readCoberturaHuecosEvents,
   reconcileCoberturaHuecos,
 } from "@/jornada4/coberturaHuecosLog";
-import { vehicleMissionClosePS } from "@/lib/sovereigntyPointsConfig";
+import {
+  expressCloseAwardPS,
+  vehicleMissionClosePS,
+} from "@/lib/sovereigntyPointsConfig";
 import type { SubTarea } from "@/lib/persistence";
 import { syncRingDecisionToProyectoHub } from "@/lib/syncRingDecisionToProyectoHub";
 import { syncDesglosadorSubToProyectoHub } from "@/lib/syncDesglosadorSubToProyectoHub";
@@ -1979,7 +1982,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         void runShadowTaskAsync(async () => {
           scheduleSaveLocalVehicles(vehiclesRef.current);
           try {
-            const amount = vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "situacion");
+            const amount = expressCloseAwardPS(status, vehicle);
             if (amount > 0) {
               const ok = await safeAwardPS(
                 amount,
@@ -2049,7 +2052,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             const parent = vehiclesRef.current.find(v => v.id === parentId);
             if (parent && (parent.desglosadorPausa || parent.interrupcionActiva)) {
               toast.info("El proyecto sigue en pausa", {
-                description: "Cerrar la interrupción no reanuda. Reanuda cuando vuelvas a esa historia.",
+                description: "Cerrar la pausa no reanuda ni suma PS. Reanuda cuando vuelvas a esa historia.",
                 style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
                 duration: 3200,
               });
@@ -2061,6 +2064,89 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       }
     },
     [userId, vehiclesRef, paintVehicle, safeAwardPS, tryPremiarCierreConsciente]
+  );
+
+  /** Cierra un desglosador en pausa (y su hijo de interrupción) sin PS de pausa. */
+  const archivePausedConquista = useCallback(
+    async (vehicleId: string) => {
+      if (!userId) return;
+      const key = `archp:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle || vehicle.status !== "activo" || !isConquistaDesglosador(vehicle)) return;
+      inFlightRef.current.add(key);
+      try {
+        const cierreAt = Date.now();
+        const aperturaAt = vehicle.aperturaAt || vehicle.createdAt?.getTime() || cierreAt;
+        const duracionFinal = Math.max(1, Math.round((cierreAt - aperturaAt) / 60000));
+        const destino = destinoCierreVivo(userId, vehicle);
+        const children = vehiclesRef.current.filter(
+          v =>
+            v.status === "activo" &&
+            !v.autoVerdad &&
+            v.vehiculoPadreDesglosadorId === vehicleId
+        );
+
+        notifyVehicleClosed(vehicleId, vehicle.clientRequestId);
+        paintVehicle(vehicleId, {
+          status: "archivado",
+          cierreAt,
+          duracionFinal,
+          cierreManual: true,
+          interrupcionActiva: false,
+          desglosadorPausa: undefined,
+          destinoCierre: destino,
+        });
+        for (const child of children) {
+          notifyVehicleClosed(child.id, child.clientRequestId);
+          paintVehicle(child.id, {
+            status: "archivado",
+            cierreAt,
+            destinoCierre: destino,
+          });
+        }
+        await yieldAfterPaint();
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current);
+        toast.info("Vehículo cerrado en pausa", {
+          description: "La pausa no suma PS. El cupo queda libre.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
+          duration: 3200,
+        });
+
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(
+              userId,
+              vehicleId,
+              {
+                status: "archivado",
+                cierreAt,
+                duracionFinal,
+                cierreManual: true,
+                interrupcionActiva: false,
+                desglosadorPausa: undefined,
+                destinoCierre: destino,
+              },
+              { skipLocalSync: true }
+            );
+            for (const child of children) {
+              await updateVehicle(
+                userId,
+                child.id,
+                { status: "archivado", cierreAt, destinoCierre: destino },
+                { skipLocalSync: true }
+              );
+            }
+          } catch (e) {
+            console.error("[jornada4.archivePausedConquista]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
   );
 
   return {
@@ -2082,6 +2168,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     sustituirSituacionFoco,
     failSituacionDistraccion,
     archiveAncladoPorSegmento,
+    archivePausedConquista,
     pausaInterrupcion,
     resumeDesglosador,
     postergarFilaEnFoco,

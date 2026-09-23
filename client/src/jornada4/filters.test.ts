@@ -187,8 +187,31 @@ describe("jornada4 filters", () => {
       })
     );
     const dual = filterJornada4Vehicles([zombieRing, live, ...flood]);
-    assert.equal(dual.some(x => x.id === "zombie"), false);
+    assert.equal(dual.some(x => x.id === "zombie"), true, "cascarón visible para poder cerrarlo");
     assert.equal(dual.some(x => x.id === "live"), true);
-    assert.ok(dual.length <= 5);
+    assert.ok(dual.filter(x => x.id.startsWith("old-")).length <= 4);
+    assert.ok(dual.length <= 6);
+  });
+
+  it("desglosador en pausa sigue listado para reanudar o cerrar", () => {
+    const paused = v({
+      id: "paused-conq",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: NOW, subActivoId: "s1" },
+      subVehiculos: [{ id: "s1", titulo: "Corte", status: "nested_paused" }],
+    });
+    const flood = Array.from({ length: 8 }, (_, i) =>
+      v({
+        id: `run-${i}`,
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        aperturaAt: NOW - i * 60_000,
+        subVehiculos: [{ id: `s-${i}`, titulo: "U", status: "activo", aperturaAt: NOW }],
+      })
+    );
+    const dual = filterJornada4Vehicles([paused, ...flood]);
+    assert.equal(dual.some(x => x.id === "paused-conq"), true);
   });
 });
