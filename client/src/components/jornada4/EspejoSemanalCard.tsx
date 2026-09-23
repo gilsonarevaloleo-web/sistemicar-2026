@@ -5,7 +5,7 @@ import type { ReporteSemanal } from "@shared/reporteSemanal";
 import { J4_COLORS } from "./Jornada4Shell";
 import { cargarEspejoSemanal } from "@/lib/reporteSemanalLive";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 
 type Props = {
   userId: string | undefined;
@@ -37,8 +37,7 @@ export function EspejoSemanalCard({ userId, tick = 0 }: Props) {
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3 space-y-2"
-      style={{ backgroundColor: PIZARRA, borderColor: "rgba(212,175,55,0.22)" }}
+      className="mx-3 mb-3 sm:mx-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md p-4 space-y-2"
       data-testid="espejo-semanal-card"
     >
       <p

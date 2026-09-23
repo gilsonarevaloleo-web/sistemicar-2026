@@ -365,7 +365,6 @@ export default function JornadaV4Session() {
               revelacion={revelacionViva}
               planEndLabel={planEnd.planEndLabel}
             />
-            <RecintoMinimoDock />
             <Jornada4LaunchPanel
               onLaunch={handleLaunch}
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
@@ -389,6 +388,7 @@ export default function JornadaV4Session() {
               canModoEntrenamientoRing={canModoEntrenamientoRing}
               canAnclarDesglosadorSegmento={canAnclarDesglosadorSegmento}
             />
+            <RecintoMinimoDock />
             <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
           </div>
         ) : null}
@@ -398,7 +398,7 @@ export default function JornadaV4Session() {
             {!entitlements.hasRitmo ? (
               <div role="tabpanel" data-testid="jornada4-panel-plan">
                 <div
-                  className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10"
+                  className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
                   data-testid="jornada4-ritmo-upsell"
                 >
                   <p className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
@@ -449,7 +449,7 @@ export default function JornadaV4Session() {
             )}
             {!entitlements.hasNorte ? (
               <div
-                className="mx-3 mt-2 sm:mx-4 p-4 rounded-xl border border-sky-500/30 bg-sky-500/10"
+                className="mx-3 mt-2 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
                 data-testid="jornada4-norte-upsell"
               >
                 <p className="text-[11px] font-black uppercase tracking-wider text-sky-400">

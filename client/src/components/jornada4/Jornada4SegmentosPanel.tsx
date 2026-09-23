@@ -65,6 +65,8 @@ type Props = {
   ventanaCerrarIds?: Set<string>;
   onRequestNotifPermission?: () => void;
   notifPermission?: NotificationPermission | "unsupported";
+  /** PLAN ya pinta la secuencia en el timeline vertical. */
+  hidePuertasTimeline?: boolean;
 };
 
 function estadoLabel(seg: SegmentoV5): string | null {
@@ -92,6 +94,7 @@ export function Jornada4SegmentosPanel({
   ventanaCerrarIds,
   onRequestNotifPermission,
   notifPermission = "default",
+  hidePuertasTimeline = false,
 }: Props) {
   const [open, setOpen] = useState(true);
   const [loadingRutinaId, setLoadingRutinaId] = useState<string | null>(null);
@@ -177,13 +180,9 @@ export function Jornada4SegmentosPanel({
         }
       `}</style>
 
-      {segmentos.length > 0 ? (
+      {segmentos.length > 0 && !hidePuertasTimeline ? (
         <div
-          className="mb-3 rounded-xl border px-3 py-2.5"
-          style={{
-            backgroundColor: "rgba(23,23,23,0.55)",
-            borderColor: "rgba(64,64,64,0.95)",
-          }}
+          className="mb-3 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md px-3 py-2.5"
           data-testid="jornada4-puertas-timeline"
         >
           <p
@@ -268,13 +267,7 @@ export function Jornada4SegmentosPanel({
         </div>
       ) : null}
 
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{
-          backgroundColor: "rgba(23,23,23,0.45)",
-          borderColor: "rgba(64,64,64,0.95)",
-        }}
-      >
+      <div className="rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md overflow-hidden">
         <button
           type="button"
           onClick={() => setOpen(o => !o)}

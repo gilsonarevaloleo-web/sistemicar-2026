@@ -21,8 +21,7 @@ export function CardLeyFrenoVehiculo() {
 
   return (
     <section
-      className="mx-1 mb-2 rounded-xl border bg-black/40"
-      style={{ borderColor: `${GOLD}44` }}
+      className="mx-3 mb-2 sm:mx-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
       data-testid="jornada-ley-freno-vehiculo"
     >
       <button

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Stamp } from "lucide-react";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 import { buildSelloDraft, emitirSelloOperador } from "@/lib/selloOperadorBuild";
 import {
   readLocalCierreJornadaByFecha,
@@ -22,7 +23,7 @@ import {
 import { apuntarJornada, cerrarApunteJornada } from "@/lib/jornadaApunteStore";
 import { useJornadaApunte } from "@/hooks/useJornadaApunte";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 
 type Props = {
   userId: string | undefined;
@@ -146,26 +147,24 @@ export function SelloOperadorCard({
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3 space-y-2.5"
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-3`}
       style={{
-        backgroundColor: PIZARRA,
-        borderColor: sellado ? "rgba(212,175,55,0.45)" : "rgba(212,175,55,0.28)",
+        boxShadow: sellado
+          ? "0 0 28px rgba(212,175,55,0.18)"
+          : "0 0 20px rgba(241,245,249,0.06)",
       }}
       data-testid="sello-operador-card"
     >
-      <p
-        className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1"
-        style={{ color: MUTED }}
-      >
-        <Stamp size={10} style={{ color: GOLD }} />
+      <p className={`${J4_UI.label} flex items-center gap-1.5`}>
+        <Stamp size={12} style={{ color: GOLD }} />
         Sello de jornada
       </p>
-      <p className="text-[10px] leading-snug" style={{ color: MUTED }} data-testid="sello-encuadre">
+      <p className={J4_UI.hint} data-testid="sello-encuadre">
         {terminoLabel
-          ? `Término del plan: ${terminoLabel}. Un bloque (costura, estudio) se cierra aparte. Si el trabajo se alarga, mueve la última puerta.`
-          : "Sin anillo no hay término. Puedes cosechar evidencia; no hay Puerta del Término que recordar."}
+          ? `Término · ${terminoLabel}`
+          : "Sin anillo no hay término."}
         {!sellado && terminoLabel && !relatoVisible
-          ? " El plan aún no termina. Sellar ahora corta la jornada."
+          ? " El plan aún no termina."
           : ""}
       </p>
       {relatoVisible ? (
@@ -249,8 +248,8 @@ export function SelloOperadorCard({
             type="button"
             disabled={!userId || busy || !puedeSellar}
             onClick={() => void sellar()}
-            className="w-full py-2.5 rounded-lg text-[11px] font-black uppercase tracking-wider disabled:opacity-40"
-            style={{ backgroundColor: `${GOLD}22`, color: GOLD }}
+            className="w-full py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.18em] disabled:opacity-40"
+            style={{ backgroundColor: "#f8fafc", color: "#0a0a0a" }}
             data-testid="sello-operador-firmar"
           >
             {busy ? "Sellando…" : "Yo sello la jornada"}

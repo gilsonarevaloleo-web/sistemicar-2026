@@ -3,8 +3,9 @@ import { Crosshair } from "lucide-react";
 import { APUNTE_MAX_LEN } from "@shared/jornadaApunte";
 import { useJornadaApunte } from "@/hooks/useJornadaApunte";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 
 export function Jornada4ApunteCard() {
   const { record, apuntado, cerrado, error, apuntar } = useJornadaApunte();
@@ -21,16 +22,11 @@ export function Jornada4ApunteCard() {
 
   return (
     <section
-      className="mx-3 mb-3 sm:mx-4 rounded-xl border p-3 space-y-2"
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: cerrado ? "rgba(212,175,55,0.45)" : "rgba(212,175,55,0.28)",
-      }}
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-2`}
       data-testid="jornada4-apunte-card"
     >
       <p
-        className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1"
-        style={{ color: MUTED }}
+        className={`${J4_UI.label} flex items-center gap-1`}
       >
         <Crosshair size={10} style={{ color: GOLD }} />
         Hoy apunto a esto
