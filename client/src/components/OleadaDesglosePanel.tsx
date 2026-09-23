@@ -109,6 +109,7 @@ export function OleadaDesglosePanel({
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
   const [held, setHeld] = useState<{ id: string; dir: "up" | "down" } | null>(null);
+  const [verTimon, setVerTimon] = useState(false);
   const pin = resolvePuntoProduccion({ puntoProduccionId, oleadaPuntos: puntos });
   const summary = summarizeOleadaPuntos(puntos);
   const horas = timonEpisodio ? horasDeEpisodio(timonEpisodio) : [];
@@ -149,7 +150,7 @@ export function OleadaDesglosePanel({
           <p className="text-[8px] text-slate-500 mt-1 leading-relaxed">
             {modo === "capitulo"
               ? "Oleada ya caminada. Se consulta, no estorba el escritorio."
-              : "Timón de la oleada. Cada sub cuenta su historia: nombre, lanzamiento y fin. 30 min en la mañana + 15 en la noche = 45 min. La pausa del proyecto se registra como presencia, no resta trabajo. Cumplir sella un peldaño."}
+              : "El timón. Aquí se produce. Cumplir sella el peldaño."}
           </p>
         </div>
         {summary.total > 0 ? (
@@ -161,25 +162,29 @@ export function OleadaDesglosePanel({
 
       {pin ? (
         <div
-          className="px-2.5 py-2 rounded-lg"
-          style={{ backgroundColor: `${tint}10`, border: `1px solid ${tint}28` }}
+          className="px-3 py-3 rounded-lg"
+          style={{
+            backgroundColor: `${tint}12`,
+            border: `1px solid ${tint}50`,
+            boxShadow: `0 0 28px ${tint}18`,
+          }}
           data-testid="hub-oleada-foco"
         >
-          <p className="text-[8px] uppercase tracking-widest text-slate-500 mb-0.5">
+          <p className="text-[8px] uppercase tracking-widest text-slate-500 mb-1">
             Produciendo aquí
           </p>
-          <p className="text-[12px] font-semibold text-white leading-snug">
+          <p className="text-[20px] font-black text-white leading-tight tracking-tight">
             <span style={{ color: tint }}>{pin.numero}.</span> {pin.titulo}
           </p>
           <div
-            className="mt-2 flex items-end justify-between gap-2"
+            className="mt-3 flex items-end justify-between gap-2"
             data-testid="hub-oleada-timon-horas"
           >
             <div>
-              <p className="text-[16px] font-black tabular-nums leading-none" style={{ color: tint }}>
+              <p className="text-[28px] font-black tabular-nums leading-none" style={{ color: tint }}>
                 {formatHoraLabel(horaN)}
               </p>
-              <p className="text-[8px] text-slate-500 mt-1">
+              <p className="text-[8px] text-slate-500 mt-1.5">
                 {vehiculosEnTimón === 0
                   ? "Este enfoque acaba de empezar"
                   : `${formatDuracionTimon(timonEpisodio?.minutosAcumulados ?? 0)} en este timón · ${vehiculosEnTimón} vehículo${vehiculosEnTimón === 1 ? "" : "s"}`}
@@ -207,7 +212,17 @@ export function OleadaDesglosePanel({
               </div>
             ) : null}
           </div>
-          {ledger.length > 0 ? (
+          {ledger.length > 0 || pausas.length > 0 || horas.some(h => h.cortes.length > 0 || h.vehiculos.length > 0) ? (
+            <button
+              type="button"
+              onClick={() => setVerTimon(v => !v)}
+              className="mt-2 text-[8px] font-bold uppercase tracking-wider text-slate-500"
+              data-testid="hub-oleada-timon-detalle"
+            >
+              {verTimon ? "Ocultar detalle" : "Ver detalle del timón"}
+            </button>
+          ) : null}
+          {verTimon && ledger.length > 0 ? (
             <ul
               className="mt-2 space-y-0.5"
               data-testid="hub-oleada-timon-ledger"
@@ -231,7 +246,7 @@ export function OleadaDesglosePanel({
               ))}
             </ul>
           ) : null}
-          {pausas.length > 0 ? (
+          {verTimon && pausas.length > 0 ? (
             <ul
               className="mt-2 space-y-0.5"
               data-testid="hub-oleada-timon-pausas"
@@ -257,7 +272,7 @@ export function OleadaDesglosePanel({
               ))}
             </ul>
           ) : null}
-          {horas.some(h => h.cortes.length > 0 || h.vehiculos.length > 0) ? (
+          {verTimon && horas.some(h => h.cortes.length > 0 || h.vehiculos.length > 0) ? (
             <ul className="mt-2 space-y-1" data-testid="hub-oleada-timon-horas-lista">
               {horas.map(h => (
                 <li key={h.numero} className="text-[9px] text-slate-400 leading-snug">
