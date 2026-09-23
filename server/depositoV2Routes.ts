@@ -1,7 +1,6 @@
 /**
  * Depósito v2 — Universidad de Sistemicar
  * POST /api/deposito/volcado — diagnóstico de Volcado de Aprendizaje.
- * Polaridad M/F es capa interna del motor; el JSON no expone polo ni género.
  */
 
 import type { Express, Request, Response } from "express";

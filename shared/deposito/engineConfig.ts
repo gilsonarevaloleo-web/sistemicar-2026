@@ -28,19 +28,6 @@ import {
   resolverRotacionCodigo,
   sugerirRotacionCodigo,
 } from "./merito.ts";
-import {
-  BLOQUE_POLARIDAD_INTERNA,
-  detectarPoloCarga,
-  instruccionContrapeso,
-  lecturaFaseEnergia,
-} from "./polaridad.ts";
-export {
-  BLOQUE_POLARIDAD_INTERNA,
-  detectarPoloCarga,
-  instruccionContrapeso,
-  lecturaFaseEnergia,
-} from "./polaridad.ts";
-export type { PoloCargaInterno } from "./polaridad.ts";
 export {
   MATRIZ_TEMPERAMENTO,
   TEMPERAMENTO_MODO_OPERATIVO,
@@ -719,7 +706,7 @@ devolucionMaestro se redacta desde el CARÁCTER del Código dominante:
 2) REVELACIÓN DE 2ª RESISTENCIA: lo que hace cuando el código le pega (freeze, flor, chase, huida, pose).
 3) VEREDICTO: un corte limpio. No sermón.
 
-puntoCiego / loNoDicho = LECTURA DE FASE: el estado actual de la energía. Nunca juicio moral, nunca regaño.
+puntoCiego = lo que ESTE relato revela que el alumno NO está observando. Sin juicio moral.
 mecanicaAbsorcion = UNA sola tarea práctica, ejecutable mañana en LA ESCENA de este volcado.
 nivelCargaSugerido = BASICO | INTERMEDIO | SUPERIOR según densidad y alcance del volcado.
 
@@ -736,11 +723,9 @@ El centro de gravedad es lo que el alumno APRENDIÓ, no la palabra más repetida
 JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
 Aplica a explicacion, loNoDicho, espejo (devolucionMaestro) e instruccionUnica.
 
-${BLOQUE_POLARIDAD_INTERNA}
-
 ═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
 El lenguaje humano tiene tres capas. Analizá en este orden:
-A) LIMPIEZA DE RUIDO: descartá flor (excusas, adornos, victimización, comparaciones, prisa). Quedate con la mecánica de los hechos. El ruido no se tira: informa la lectura de fase.
+A) LIMPIEZA DE RUIDO: descartá flor (excusas, adornos, victimización, comparaciones, prisa). Quedate con la mecánica de los hechos. El ruido no se tira: informa el punto ciego.
 B) OMISIÓN: ¿qué está evitando nombrar? ¿dónde está la fuga de la que no se hace cargo?
 C) OJO ÚNICO: si lo dicho habla de un discurso (moral, pedagogía, prisa) pero lo no dicho revela la falla real, elegí el código de la FALLA, no el del discurso superficial.
 
@@ -769,7 +754,7 @@ function jsonSchemaEjemplo(
     "explicacion": "Por qué este volcado gravita aquí. Abstracción técnica de 3–5 palabras. Cero cita larga."
   },
   "puntoCiego": {
-    "loNoDicho": "Lectura de fase del estado actual de la energía. Sin juicio moral ni cita del volcado.",
+    "loNoDicho": "Lo que el relato revela que el alumno no está observando. Sin citar el volcado.",
     "florDetectada": ["excusa", "comparación"]
   },
   "mecanicaAbsorcion": {
@@ -821,7 +806,7 @@ function bloqueInstruccionGrado(grado: GradoMaestria): string {
       "",
       "REGLA G3+ (ARQUITECTO DE PUNTO CIEGO):",
       "Profundizá en la sombra/omisión (campo sombraOmision + lo no dicho del relato).",
-      "El puntoCiego (lectura de fase) DEBE construirse desde esa omisión, no desde un adorno ni un juicio moral.",
+      "El puntoCiego de la Devolución del Maestro DEBE construirse desde esa omisión, no desde un adorno.",
       "validacionGrado.sombraIntegrada = true si nombra un no-dicho operable.",
     );
   }
@@ -925,10 +910,8 @@ export function obtenerPromptVolcado(
     "ojoDominante.codigo DEBE ser C1–C10. codigoDominante (entero 1–10) es alias coherente.",
     "nombreOjoDominante / ojoDominante.nombre DEBE coincidir con el diccionario del código elegido.",
     "puntoCiego.florDetectada lista excusas, comparaciones o adjetivos aislados del volcado.",
-    "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable de contrapeso (F-→M+, M-→F+), sin sermón ni comillas del usuario.",
-    "puntoCiego.loNoDicho = lectura de fase (estado de la energía), nunca juicio moral.",
+    "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón ni comillas del usuario.",
     "JAMÁS repitas citas textuales largas del volcado en explicacion, loNoDicho, espejo o instruccionUnica.",
-    "PROHIBIDO añadir al JSON claves polo, genero, género, ejeMasculino, ejeFemenino, M+, F-.",
     "metricasMerito.variedadRotacionCodigo = el hueco real del mapa, no un fallback automático a C1.",
   ].join("\n");
 
@@ -1648,23 +1631,21 @@ function puntoCiegoAnclado(
   codigo: CodigoObservador,
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
-  polo: ReturnType<typeof detectarPoloCarga>,
 ): string {
-  const ancla = anclaDe(h);
   if (codigo === 9 && h.pregunta) {
-    return lecturaFaseEnergia(codigo, ojo, polo, "nombre del patrón");
+    return `Ella ya pidió el nombre del patrón. El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
   }
-  return lecturaFaseEnergia(codigo, ojo, polo, ancla);
+  if (anclaDe(h)) {
+    return `${ojo.cegueraActiva} El volcado deja suelta la mecánica y no nombra el circuito.`;
+  }
+  return ojo.cegueraActiva;
 }
 
 function mecanicaAnclada(
   codigo: CodigoObservador,
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
-  polo: ReturnType<typeof detectarPoloCarga>,
 ): string {
-  const contrapeso = polo ? instruccionContrapeso(polo, codigo, ojo) : null;
-  if (contrapeso) return contrapeso;
   if (!anclaDe(h)) return ojo.gestoAbsorcion;
   if (codigo === 9) {
     return `Mañana, en UNA tarea de casa con la hija, al cierre nombrá en voz alta la ley. Contestá con un nombre, no con un sermón. Una frase. Sin comparaciones ni castigo.`;
@@ -1710,20 +1691,17 @@ export function diagnosticarVolcadoLocal(
   const hechos = extraerHechos(captura.volcadoCrudo || texto);
   const codigo = elegirCodigoDominanteLocal(texto);
   const ojo = DICCIONARIO_OJOS[codigo];
-  const polo = detectarPoloCarga(texto);
 
   if (palabras < 6) {
-    const poloCorto = polo ?? "F-";
     return sellarDiagnostico(
       hidratarDiagnostico(1, {
         justificacionDominante:
           "El volcado todavía es ruido. El centro de gravedad por defecto es El Ojo de la Claridad: hace falta nombrar utilidad, no clima.",
-        puntoCiego: lecturaFaseEnergia(1, DICCIONARIO_OJOS[1], poloCorto, ""),
+        puntoCiego:
+          "El relato no observa nada operable: hay emoción suelta y cero utilidad nombrada.",
         devolucionMaestro:
           "Espejo: trajiste clima. 2ª resistencia: la niebla se hace pasar por aprendizaje. Veredicto: El Cortador de Niebla pide una frase útil de hoy.",
-        mecanicaAbsorcion:
-          instruccionContrapeso(poloCorto, 1, DICCIONARIO_OJOS[1]) ??
-          DICCIONARIO_OJOS[1].gestoAbsorcion,
+        mecanicaAbsorcion: DICCIONARIO_OJOS[1].gestoAbsorcion,
         nivelCargaSugerido: "BASICO",
       }),
       captura,
@@ -1735,9 +1713,9 @@ export function diagnosticarVolcadoLocal(
     ? `El aprendizaje gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
     : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
-  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos, polo);
+  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos);
   if (captura.gradoMaestria >= 3 && captura.sombraOmision) {
-    puntoCiego = `Fase actual: la omisión declara el peso. ${puntoCiego}`;
+    puntoCiego = `La sombra declarada confirma la omisión. ${puntoCiego}`;
   }
 
   return sellarDiagnostico(
@@ -1745,7 +1723,7 @@ export function diagnosticarVolcadoLocal(
       justificacionDominante: tesis,
       puntoCiego,
       devolucionMaestro: devolucionAnclada(ojo, hechos),
-      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos, polo),
+      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos),
       nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
     }),
     captura,

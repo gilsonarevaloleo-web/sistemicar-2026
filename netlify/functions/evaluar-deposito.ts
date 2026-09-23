@@ -3,10 +3,8 @@
  * Alias de producción: POST /api/deposito/evaluar
  *
  * Procesa el volcado crudo con Gemini (JSON DepositoEngineResponse).
- * Polaridad M/F vive solo en el prompt interno del motor; el JSON no
- * expone polo ni género. Si gradoDetectado > gradoUsuarioActual,
- * meritoReconocido/perfilPromovido marcan la promoción del perfil
- * (el cliente o la BD la persisten).
+ * Si gradoDetectado > gradoUsuarioActual, meritoReconocido/perfilPromovido
+ * marcan la promoción del perfil (el cliente o la BD la persisten).
  */
 
 import type { Handler } from "@netlify/functions";
