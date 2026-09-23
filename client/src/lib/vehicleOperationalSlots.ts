@@ -1,4 +1,7 @@
 import type { TipoFlota, Vehicle } from "./persistence";
+import { isGhostActiveVehicle } from "./ghostVehicleEngine";
+import { getJournalDayStartMs } from "./segmentTime";
+import { isPausedPresence } from "./vehiculoPausa";
 
 export const MAX_OPERATIONAL_SLOTS = 2;
 
@@ -10,16 +13,24 @@ export interface OperationalSlotsCheck {
   blockingVehicles?: Vehicle[];
 }
 
-/** Activos conscientes que consumen slot operativo (descanso no cuenta: recarga libre). */
-export function getOperationalActives(vehicles: Vehicle[]): Vehicle[] {
+/**
+ * Activos conscientes que consumen slot operativo.
+ * Pausa / interrupción / cascarón fantasma no cuentan: se pausa horas
+ * y Dual Kernel debe poder lanzar hasta 2 conquistas reales.
+ */
+export function getOperationalActives(
+  vehicles: Vehicle[],
+  nowMs = Date.now()
+): Vehicle[] {
+  const dayStart = getJournalDayStartMs(nowMs);
+  const byId = new Map(vehicles.map(v => [v.id, v]));
   return vehicles.filter(
     v =>
       v.status === "activo" &&
       !v.autoVerdad &&
       v.tipoFlota !== "descanso" &&
-      // Postergado / conquista en pausa: presencia del proyecto, no ocupa slot.
-      !v.situacionNestedPause &&
-      !v.interrupcionActiva
+      !isPausedPresence(v) &&
+      !isGhostActiveVehicle(v, nowMs, dayStart, byId)
   );
 }
 
@@ -70,25 +81,17 @@ function blockResult(
 }
 
 /**
- * Tope de 2 misiones operativas (descanso exento — usable en cualquier momento).
- * Interrupción: padre pausado + hijo = 2 slots (máx. antes de lanzar: 1 activo = el padre).
+ * Tope de 2 misiones operativas (descanso y pausa exentos).
+ * La interrupción no abre un cupo: congela el padre y no es un vehículo activo.
  */
 export function assertCanOpenVehicle(
   vehicles: Vehicle[],
   kind: VehicleLaunchKind,
-  opts?: { parentDesglosadorId?: string }
+  _opts?: { parentDesglosadorId?: string }
 ): OperationalSlotsCheck {
   const actives = getOperationalActives(vehicles);
 
   if (kind === "interrupcion") {
-    const parentId = opts?.parentDesglosadorId;
-    const withoutParent = parentId ? actives.filter(v => v.id !== parentId) : actives;
-    if (actives.length >= MAX_OPERATIONAL_SLOTS && withoutParent.length >= 1) {
-      return blockResult(
-        "Tienes 2 misiones abiertas. Cierra o retoma una antes de lanzar la interrupción.",
-        actives
-      );
-    }
     return { allowed: true };
   }
 

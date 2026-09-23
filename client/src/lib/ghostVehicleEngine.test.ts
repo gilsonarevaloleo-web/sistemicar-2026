@@ -213,6 +213,31 @@ describe("ghostVehicleEngine", () => {
     );
   });
 
+  it("pausadas no empujan faena viva al cajón de avalancha", () => {
+    const paused = Array.from({ length: 6 }, (_, i) =>
+      v({
+        id: `p-${i}`,
+        tipoFlota: "tiempo",
+        tipoReloj: "desglosador",
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: NOW - i * 60_000, subActivoId: "s1" },
+        subVehiculos: [{ id: "s1", titulo: "Unidad", status: "nested_paused" }],
+      })
+    );
+    const running = v({
+      id: "run",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [{ id: "s2", titulo: "Ahora", status: "activo" }],
+    });
+    const list = [...paused, running];
+    const byId = new Map(list.map(x => [x.id, x]));
+    assert.equal(isGhostActiveVehicle(running, NOW, DAY_START, byId), false);
+    for (const p of paused) {
+      assert.equal(isGhostActiveVehicle(p, NOW, DAY_START, byId), false);
+    }
+  });
+
   it("una sola conquista larga no se corta por la avalancha", () => {
     const longConquista = v({
       id: "only",

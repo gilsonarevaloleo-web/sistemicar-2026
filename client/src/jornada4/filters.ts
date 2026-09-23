@@ -1,7 +1,15 @@
-import { excludeGhostActivesFromReconcile } from "../lib/ghostVehicleEngine";
+import {
+  excludeGhostActivesFromReconcile,
+  isZombieConsciousVehicle,
+  lastLiveActivityMs,
+} from "../lib/ghostVehicleEngine";
 import type { Vehicle } from "../lib/persistence";
 import { ringSessionOperable } from "../lib/ringEnfoqueReal";
+import { isPausedPresence } from "../lib/vehiculoPausa";
 import { isSituacionListaLibre } from "./situacionLibreSeed";
+
+/** Cascarones / pausas que Dual Kernel debe mostrar para poder cerrarlos. */
+const MAX_LEFTOVER_CLOSEABLE = 8;
 
 /** Vehículos que Dual Kernel opera en v1. */
 export function isJornada4Vehicle(v: Vehicle): boolean {
@@ -16,12 +24,22 @@ export function isJornada4Vehicle(v: Vehicle): boolean {
   return false;
 }
 
-/** Dual Kernel: solo faena viva. Cascarones y avalancha histórica no se listan. */
+/**
+ * Dual Kernel: faena viva + pausas/cascarones que el operador debe ver para cerrar.
+ * La avalancha histórica (decenas de `activo` resucitados) sigue fuera.
+ */
 export function filterJornada4Vehicles(
   vehicles: Vehicle[],
   nowMs = Date.now()
 ): Vehicle[] {
-  return excludeGhostActivesFromReconcile(vehicles, nowMs).filter(isJornada4Vehicle);
+  const jornada = vehicles.filter(isJornada4Vehicle);
+  const visible = excludeGhostActivesFromReconcile(jornada, nowMs).filter(isJornada4Vehicle);
+  const visibleIds = new Set(visible.map(v => v.id));
+  const leftover = jornada
+    .filter(v => !visibleIds.has(v.id) && (isPausedPresence(v) || isZombieConsciousVehicle(v)))
+    .sort((a, b) => lastLiveActivityMs(b) - lastLiveActivityMs(a))
+    .slice(0, MAX_LEFTOVER_CLOSEABLE);
+  return leftover.length === 0 ? visible : [...leftover, ...visible];
 }
 
 export function isConquistaDesglosador(v: Vehicle): boolean {

@@ -3,6 +3,7 @@ import { ringSessionOperable, ringTieneFilasPendientes } from "./ringEnfoqueReal
 import { getJournalDayStartMs } from "./segmentTime";
 import { isOrphanDesglosadorInterrupt } from "./situacionSessionMerge";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
+import { isPausedPresence } from "./vehiculoPausa";
 
 /** Sesión consciente activa más allá de esto se considera fantasma obsoleta. */
 export const GHOST_MAX_SESSION_MS = 12 * 3600_000;
@@ -120,7 +121,14 @@ export function excessLiveSessionIds(
   max = MAX_LIVE_DESGLOSADOR_SESSIONS
 ): Set<string> {
   const live = vehicles
-    .filter(v => v.status === "activo" && !v.autoVerdad && hasLiveDesglosadorWork(v))
+    .filter(
+      v =>
+        v.status === "activo" &&
+        !v.autoVerdad &&
+        hasLiveDesglosadorWork(v) &&
+        // Pausa = presencia, no faena que empuje a otras al cajón de fantasmas.
+        !isPausedPresence(v)
+    )
     .sort((a, b) => {
       const delta = lastLiveActivityMs(b) - lastLiveActivityMs(a);
       return delta !== 0 ? delta : b.id.localeCompare(a.id);

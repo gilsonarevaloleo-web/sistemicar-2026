@@ -10,6 +10,7 @@ import {
   J4_SITUACION_AVANCE_PS,
   vehicleMissionClosePS,
 } from "./psBridge.ts";
+import { expressCloseAwardPS } from "../lib/sovereigntyPointsConfig.ts";
 import type { SubVehiculo } from "../lib/persistence.ts";
 
 describe("psBridge Dual Kernel", () => {
@@ -98,5 +99,17 @@ describe("psBridge Dual Kernel", () => {
     const awarded = await awardSituacionBlockPs("Lista vacía", "archivado", async () => true);
     assert.equal(awarded, 1);
     assert.equal(vehicleMissionClosePS("archivado", "situacion"), 2);
+  });
+
+  it("cerrar pausa de desglosador no da 5 ni 2 PS", () => {
+    const pausa = { vehiculoPadreDesglosadorId: "conquista-1", tipoTerminoRapido: "situacion" };
+    assert.equal(expressCloseAwardPS("cumplido", pausa), 0);
+    assert.equal(expressCloseAwardPS("archivado", pausa), 0);
+    assert.equal(vehicleMissionClosePS("cumplido", "situacion"), 5);
+    assert.equal(vehicleMissionClosePS("archivado", "situacion"), 2);
+    assert.equal(
+      expressCloseAwardPS("cumplido", { tipoTerminoRapido: "situacion" }),
+      5
+    );
   });
 });

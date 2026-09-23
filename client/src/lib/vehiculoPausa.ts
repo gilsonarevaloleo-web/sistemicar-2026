@@ -61,6 +61,27 @@ export function tituloPausaInterrupcion(raw?: string | null): string {
   return t || PAUSA_INTERRUPCION_TITULO;
 }
 
+/** Presencia en pausa: no es misión operativa ni ocupa cupo Dual Kernel. */
+export type PausedPresenceVehicle = {
+  interrupcionActiva?: boolean;
+  desglosadorPausa?: { subActivoId?: string; pausadoAt?: number } | null;
+  situacionNestedPause?: unknown;
+  vehiculoPadreDesglosadorId?: string;
+  subVehiculos?: Array<{ status?: string }>;
+};
+
+/**
+ * Pausa / interrupción / postergación: el proyecto sigue, pero no es un
+ * vehículo activo. Se pausa horas; no consume slot ni suma PS de cierre.
+ */
+export function isPausedPresence(v: PausedPresenceVehicle): boolean {
+  if (v.vehiculoPadreDesglosadorId) return true;
+  if (v.situacionNestedPause) return true;
+  if (v.interrupcionActiva) return true;
+  if (v.desglosadorPausa?.subActivoId || v.desglosadorPausa?.pausadoAt) return true;
+  return (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
+}
+
 export function minutosPausa(
   stamp: Pick<VehiculoPausaStamp, "pausadoAt" | "reanudadoAt">,
   now = Date.now()

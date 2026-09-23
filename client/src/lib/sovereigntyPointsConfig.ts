@@ -32,6 +32,15 @@ export function vehicleMissionClosePS(
   return status === "cumplido" ? VEHICLE_CUMPLIDO_BASE_PS : VEHICLE_ARCHIVADO_BASE_PS;
 }
 
+/** Cierre express: la pausa (hijo de desglosador) no suma PS. */
+export function expressCloseAwardPS(
+  status: "cumplido" | "archivado",
+  vehicle: { vehiculoPadreDesglosadorId?: string; tipoTerminoRapido?: string | null }
+): number {
+  if (vehicle.vehiculoPadreDesglosadorId) return 0;
+  return vehicleMissionClosePS(status, vehicle.tipoTerminoRapido ?? "situacion");
+}
+
 /** PS al cerrar un sub del desglosador (2 base + privilegio de fluidez si aplica). */
 export function computeDesglosadorSubAwardPS(sub: SubVehiculo): number {
   if (sub.status !== "cumplido") return 0;

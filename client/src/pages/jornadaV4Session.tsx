@@ -321,6 +321,9 @@ export default function JornadaV4Session() {
       closeSituacionLibreFila: wrapClose(ops.closeSituacionLibreFila),
       closeSituacionLibreBloque: wrapClose(ops.closeSituacionLibreBloque),
       closeExpressVehicle: wrapClose(ops.closeExpressVehicle),
+      archivePausedConquista: ops.archivePausedConquista
+        ? wrapClose(ops.archivePausedConquista)
+        : undefined,
     }),
     [ops, wrapClose]
   );

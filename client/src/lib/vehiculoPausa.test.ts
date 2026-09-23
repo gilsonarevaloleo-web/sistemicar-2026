@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   appendVehiculoPausa,
   closeVehiculoPausaAbierta,
+  isPausedPresence,
   minutosPausa,
   nombrePausa,
   PAUSA_INTERRUPCION_TITULO,
@@ -40,5 +41,17 @@ describe("vehiculoPausa — historia de presencia", () => {
     assert.equal(tituloPausaInterrupcion(null), PAUSA_INTERRUPCION_TITULO);
     assert.equal(tituloPausaInterrupcion("llamada"), "llamada");
     assert.equal(tituloPausaInterrupcion("  costura  "), "costura");
+  });
+
+  it("pausa e interrupción son presencia, no misión activa", () => {
+    assert.equal(isPausedPresence({ interrupcionActiva: true }), true);
+    assert.equal(isPausedPresence({ desglosadorPausa: { pausadoAt: 1, subActivoId: "s1" } }), true);
+    assert.equal(isPausedPresence({ vehiculoPadreDesglosadorId: "padre" }), true);
+    assert.equal(isPausedPresence({ situacionNestedPause: { pausedAt: 1 } }), true);
+    assert.equal(
+      isPausedPresence({ subVehiculos: [{ status: "nested_paused" }] }),
+      true
+    );
+    assert.equal(isPausedPresence({ subVehiculos: [{ status: "activo" }] }), false);
   });
 });
