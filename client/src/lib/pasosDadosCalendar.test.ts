@@ -131,4 +131,14 @@ describe("pasosDadosCalendar", () => {
     assert.equal(buckets[0]!.recientes.length, 3);
     assert.equal(buckets[0]!.total, 5);
   });
+
+  it("recientes no repite el mismo título", () => {
+    const muchos = Array.from({ length: 5 }, (_, i) =>
+      paso({ status: "cumplido", ts: D1 + i * 1000, texto: "Bolsillo" })
+    );
+    const buckets = groupPasosDados(muchos, "dia");
+    assert.equal(buckets[0]!.recientes.length, 1);
+    assert.equal(buckets[0]!.recientes[0], "Bolsillo");
+    assert.equal(buckets[0]!.total, 5);
+  });
 });

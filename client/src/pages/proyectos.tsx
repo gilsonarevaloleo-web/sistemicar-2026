@@ -1335,6 +1335,51 @@ export default function ProyectosPage() {
               </div>
             </div>
 
+            {oleadaPeldano && trepa && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_tiempo",
+                        oleadaPuntoProduccion?.id
+                      )
+                    )
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
+                >
+                  <Clock size={12} /> Tiempo sobre oleada
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_situacion",
+                        oleadaPuntoProduccion?.id
+                      )
+                    )
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
+                >
+                  <Flag size={12} /> Situación sobre oleada
+                </button>
+              </div>
+            )}
+
+            <HubCollapsible
+              title="Gasto y dirección"
+              tint="#64748b"
+              defaultOpen={false}
+              testId="hub-enfoque-mas"
+            >
             {detailId ? (
               <ProyectoGastoConcienciaCard
                 proyectoId={detailId}
@@ -1429,45 +1474,7 @@ export default function ProyectosPage() {
             >
               {guardandoClaridad ? "Guardando…" : "Sincronizar dirección"}
             </button>
-
-            {oleadaPeldano && trepa && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      buildLaunchUrl(
-                        proyecto.id,
-                        oleadaPeldano.id,
-                        "desglosador_tiempo",
-                        oleadaPuntoProduccion?.id
-                      )
-                    )
-                  }
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                  style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
-                >
-                  <Clock size={12} /> Tiempo sobre oleada
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      buildLaunchUrl(
-                        proyecto.id,
-                        oleadaPeldano.id,
-                        "desglosador_situacion",
-                        oleadaPuntoProduccion?.id
-                      )
-                    )
-                  }
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                  style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
-                >
-                  <Flag size={12} /> Situación sobre oleada
-                </button>
-              </div>
-            )}
+            </HubCollapsible>
           </TabsContent>
 
           {/* ——— Jornada: accesos compactos a bloques de hoy ——— */}
