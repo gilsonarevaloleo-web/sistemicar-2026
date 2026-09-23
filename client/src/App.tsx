@@ -72,6 +72,7 @@ const Registros = lazyWithRetry(() => import("@/pages/registros"));
 const ApiCheckout = lazyWithRetry(() => import("@/pages/api-checkout"));
 const ApiDocs = lazyWithRetry(() => import("@/pages/api-docs"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+const JornadaV4UiPreview = lazyWithRetry(() => import("@/pages/jornadaV4UiPreview"));
 import { CierreJornadaModal } from "@/components/cierre-jornada-modal";
 import { SegmentAttentionBackground } from "@/components/SegmentAttentionBackground";
 import { ViewTransitionBootstrap } from "@/components/ViewTransitionBootstrap";
@@ -389,6 +390,9 @@ function Router() {
         </Route>
         <Route path="/jornada-v4">
           <JornadaV4ModuleRoute />
+        </Route>
+        <Route path="/jornada-v4-ui">
+          <JornadaV4UiPreview />
         </Route>
         <Route path="/proyectos">
           <ModuleRoute component={Proyectos} requiredModule="soberania_dia" />

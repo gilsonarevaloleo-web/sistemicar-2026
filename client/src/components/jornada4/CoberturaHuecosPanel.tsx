@@ -11,7 +11,7 @@ import {
 } from "@/jornada4/coberturaHuecosLog";
 import { J4_COLORS } from "./Jornada4Shell";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 const BLOOD = "#FF2A2A";
 const EMERALD = "#50C878";
 
@@ -57,13 +57,7 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
 
   return (
     <section className="px-4 pb-3" data-testid="jornada4-huecos">
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{
-          backgroundColor: PIZARRA,
-          borderColor: openCount > 0 ? `${BLOOD}35` : "rgba(255,255,255,0.08)",
-        }}
-      >
+      <div className="rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md overflow-hidden">
         <button
           type="button"
           onClick={() => {

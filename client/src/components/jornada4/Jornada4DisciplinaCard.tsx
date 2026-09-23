@@ -5,8 +5,9 @@ import {
   formatDisciplinaPlanSub,
 } from "@/jornada4/disciplinaPlanDia";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
-const { PIZARRA, INK, MUTED, GOLD } = J4_COLORS;
+const { INK, MUTED, GOLD } = J4_COLORS;
 const EMERALD = "#00C851";
 const BLOOD = "#FF2A2A";
 
@@ -32,25 +33,19 @@ export function Jornada4DisciplinaCard({
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3 space-y-2.5"
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: "rgba(212,175,55,0.28)",
-        boxShadow: "0 0 14px rgba(212,175,55,0.06)",
-      }}
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-2.5`}
       data-testid="jornada4-disciplina"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p
-            className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1"
-            style={{ color: MUTED }}
+            className={`${J4_UI.label} flex items-center gap-1`}
           >
             <Target size={10} style={{ color: GOLD }} />
             Disciplina · plan del día
           </p>
           <p
-            className="text-2xl font-black tabular-nums mt-0.5"
+            className={`${J4_UI.value} mt-0.5`}
             style={{ color: fill >= 70 ? EMERALD : fill > 0 ? GOLD : INK }}
             data-testid="jornada4-disciplina-pct"
           >
@@ -155,10 +150,8 @@ export function Jornada4DisciplinaCard({
         </p>
       ) : null}
 
-      <p className="text-[7px] leading-snug" style={{ color: MUTED }}>
-        100% ÷ {model.segmentosTotales || "N"} entradas. Cada minuto de tardanza resta del
-        100 de esa puerta. Los cortes sin vehículo son huecos de cobertura, no de este marcador.
-        Cerrar a mano en la última hora suma disciplina; el cierre del sistema no.
+      <p className={J4_UI.hint}>
+        100% ÷ {model.segmentosTotales || "N"} entradas. Cada minuto de tardanza resta de esa puerta.
       </p>
     </section>
   );

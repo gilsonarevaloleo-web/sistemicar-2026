@@ -15,8 +15,9 @@ import {
 import { getJournalDateString } from "@/lib/segmentTime";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
-const { PIZARRA, MUTED, INK } = J4_COLORS;
+const { MUTED, INK } = J4_COLORS;
 
 export type Jornada4UbicacionConcienciaCardProps = {
   segmentos: SegmentoV5[];
@@ -55,20 +56,12 @@ export function Jornada4UbicacionConcienciaCard({
 
   return (
     <section
-      className={compact ? "mx-3 mb-2 sm:mx-4 rounded-xl border px-3 py-2.5" : "mx-1 mb-2 rounded-xl border p-3 space-y-2"}
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: `${meta.color}44`,
-        boxShadow: `0 0 14px ${meta.color}14`,
-      }}
+      className={compact ? `mx-3 mb-2 sm:mx-4 ${J4_UI.cardCompact} px-4 py-3` : `mx-3 mb-2 sm:mx-4 ${J4_UI.card} space-y-2`}
       data-testid="jornada4-ubicacion-conciencia"
       data-ubicacion={model.ubicacion}
     >
       <div className="flex items-start justify-between gap-2">
-        <p
-          className="text-[9px] font-black uppercase tracking-widest"
-          style={{ color: MUTED }}
-        >
+        <p className={J4_UI.label}>
           Ubicación de la conciencia
         </p>
         <p

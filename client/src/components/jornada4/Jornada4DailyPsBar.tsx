@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { Zap } from "lucide-react";
 import { computeDailyPsBarModel } from "@/lib/dailyPsBar";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
-const { PIZARRA, MUTED, GOLD } = J4_COLORS;
+const { MUTED, GOLD } = J4_COLORS;
 const CYAN = "#00FFC3";
 
 type Props = {
@@ -27,12 +28,7 @@ export function Jornada4DailyPsBar({ todayPs, yesterdayPs }: Props) {
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3"
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: `${CYAN}28`,
-        boxShadow: `0 0 14px rgba(0,255,195,0.08)`,
-      }}
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card}`}
       data-testid="jornada4-daily-ps-bar"
     >
       <div className="flex items-center justify-between gap-2 mb-1">

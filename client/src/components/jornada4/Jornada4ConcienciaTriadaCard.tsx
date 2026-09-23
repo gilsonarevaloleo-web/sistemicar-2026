@@ -1,8 +1,9 @@
 /**
- * Métricas — evolución de conciencia del operador (triada).
- * 100% = plan del día en tiempo de línea. Interrupt no multiplica.
- * Solo montar en pestaña Métricas (idle).
+ * Métricas — dashboard de conciencia (triada) en Bento 2×2.
+ * Barra de cobertura neón + números mono. El detalle vive colapsado.
  */
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,9 +19,7 @@ import {
   type ConcienciaTriadaModel,
   type TriadaDaySnapshot,
 } from "@/lib/concienciaTriadaOperador";
-import { J4_COLORS } from "./Jornada4Shell";
-
-const { PIZARRA, MUTED, INK } = J4_COLORS;
+import { J4_TRIADA_NEON, J4_UI } from "./jornada4Ui";
 
 function formatPlanMin(min: number): string {
   const m = Math.max(0, Math.round(min));
@@ -30,15 +29,48 @@ function formatPlanMin(min: number): string {
   return r > 0 ? `${h} h ${r} min` : `${h} h`;
 }
 
+function pctOf(part: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.round((part / total) * 100));
+}
+
 export type Jornada4ConcienciaTriadaCardProps = {
   model: ConcienciaTriadaModel;
   series: TriadaDaySnapshot[];
 };
 
+const BLOCKS = [
+  {
+    id: "inconsciente",
+    label: TRIADA_META.inconsciente.label,
+    color: J4_TRIADA_NEON.inconsciente,
+    key: "minutosInconsciente" as const,
+  },
+  {
+    id: "presencia",
+    label: TRIADA_META.presencia.label,
+    color: J4_TRIADA_NEON.presencia,
+    key: "minutosPresencia" as const,
+  },
+  {
+    id: "direccion",
+    label: TRIADA_META.direccion.label,
+    color: J4_TRIADA_NEON.direccion,
+    key: "minutosDireccion" as const,
+  },
+  {
+    id: "no_conquistado",
+    label: NO_CONQUISTADO_META.label,
+    color: J4_TRIADA_NEON.noConquistado,
+    key: "minutosNoConquistado" as const,
+  },
+] as const;
+
 export function Jornada4ConcienciaTriadaCard({
   model,
   series,
 }: Jornada4ConcienciaTriadaCardProps) {
+  const [detailOpen, setDetailOpen] = useState(false);
   const chartData = series
     .filter(s => s.hasPlanificacion)
     .slice(-14)
@@ -49,202 +81,201 @@ export function Jornada4ConcienciaTriadaCard({
       Dirección: s.pctDireccion,
     }));
 
+  const total = Math.max(model.minutosDia || 24 * 60, 1);
+  const barParts = [
+    { w: pctOf(model.minutosInconsciente, total), color: J4_TRIADA_NEON.inconsciente },
+    { w: pctOf(model.minutosPresencia, total), color: J4_TRIADA_NEON.presencia },
+    { w: pctOf(model.minutosDireccion, total), color: J4_TRIADA_NEON.direccion },
+    { w: pctOf(model.minutosNoConquistado, total), color: J4_TRIADA_NEON.noConquistado },
+  ];
+
   return (
-    <div
-      className="mx-1 mb-2 rounded-xl border p-3 space-y-3"
-      style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.08)" }}
-      data-testid="jornada4-conciencia-triada"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[9px] uppercase tracking-widest" style={{ color: MUTED }}>
-            Conciencia del operador
-          </p>
-          <p className="text-[11px] font-semibold mt-0.5" style={{ color: INK }}>
+    <div className="space-y-3" data-testid="jornada4-conciencia-triada">
+      <section className={`mx-3 sm:mx-4 ${J4_UI.card}`} data-testid="jornada4-cobertura-bar">
+        <div className="flex items-baseline justify-between gap-2 mb-3">
+          <p className={J4_UI.label}>Cobertura del día</p>
+          <p className="font-mono text-sm font-bold tabular-nums text-neutral-100">
             {model.hasPlanificacion
-              ? model.headline
-              : "Sin planificación — no hay conciencia que medir."}
+              ? `${Math.max(0, 100 - model.pctNoConquistado)}%`
+              : "—"}
           </p>
         </div>
-        {model.hasPlanificacion && model.minutosPlan > 0 ? (
-          <p className="text-[9px] tabular-nums shrink-0 text-right" style={{ color: MUTED }}>
-            100% = {formatPlanMin(model.minutosDia || 24 * 60)}
-            <span className="block normal-case tracking-normal">día-jornada</span>
-          </p>
-        ) : null}
-      </div>
+        <div
+          className="h-2.5 w-full rounded-full overflow-hidden flex"
+          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+        >
+          {model.hasPlanificacion
+            ? barParts.map((p, i) =>
+                p.w > 0 ? (
+                  <div
+                    key={i}
+                    style={{
+                      width: `${p.w}%`,
+                      backgroundColor: p.color,
+                      boxShadow: `0 0 10px ${p.color}66`,
+                    }}
+                  />
+                ) : null
+              )
+            : null}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          {BLOCKS.map(b => (
+            <span key={b.id} className="flex items-center gap-1.5">
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: b.color, boxShadow: `0 0 6px ${b.color}` }}
+              />
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500">
+                {b.label}
+              </span>
+            </span>
+          ))}
+        </div>
+      </section>
 
       {model.hasPlanificacion ? (
-        <>
-          <div className="h-2.5 w-full rounded-full overflow-hidden flex" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-            {model.minutosInconsciente > 0 && (
-              <div
-                style={{
-                  width: `${Math.max(1, Math.round((model.minutosInconsciente / Math.max(model.minutosDia, 1)) * 100))}%`,
-                  backgroundColor: TRIADA_META.inconsciente.color,
-                }}
-                title={`Inconsciente ${formatPlanMin(model.minutosInconsciente)}`}
-              />
-            )}
-            {model.minutosPresencia > 0 && (
-              <div
-                style={{
-                  width: `${Math.max(1, Math.round((model.minutosPresencia / Math.max(model.minutosDia, 1)) * 100))}%`,
-                  backgroundColor: TRIADA_META.presencia.color,
-                }}
-                title={`Presencia ${formatPlanMin(model.minutosPresencia)}`}
-              />
-            )}
-            {model.minutosDireccion > 0 && (
-              <div
-                style={{
-                  width: `${Math.max(1, Math.round((model.minutosDireccion / Math.max(model.minutosDia, 1)) * 100))}%`,
-                  backgroundColor: TRIADA_META.direccion.color,
-                }}
-                title={`Dirección ${formatPlanMin(model.minutosDireccion)}`}
-              />
-            )}
-            {model.minutosNoConquistado > 0 && (
-              <div
-                style={{
-                  width: `${Math.max(1, Math.round((model.minutosNoConquistado / Math.max(model.minutosDia, 1)) * 100))}%`,
-                  backgroundColor: NO_CONQUISTADO_META.color,
-                }}
-                title={`No conquistado ${formatPlanMin(model.minutosNoConquistado)}`}
-              />
-            )}
-          </div>
-
-          <div className="grid grid-cols-4 gap-1.5">
-            {(["inconsciente", "presencia", "direccion"] as const).map(id => {
-              const meta = TRIADA_META[id];
-              const min =
-                id === "inconsciente"
-                  ? model.minutosInconsciente
-                  : id === "presencia"
-                    ? model.minutosPresencia
-                    : model.minutosDireccion;
-              return (
-                <div key={id} className="text-center">
-                  <p className="text-base font-black tabular-nums" style={{ color: meta.color }}>
-                    {formatPlanMin(min)}
-                  </p>
-                  <p className="text-[7px] uppercase tracking-wider" style={{ color: MUTED }}>
-                    {meta.label}
-                  </p>
-                </div>
-              );
-            })}
-            <div className="text-center" data-testid="jornada4-conciencia-no-conquistado">
-              <p className="text-base font-black tabular-nums" style={{ color: NO_CONQUISTADO_META.color }}>
-                {formatPlanMin(model.minutosNoConquistado)}
-              </p>
-              <p className="text-[7px] uppercase tracking-wider" style={{ color: MUTED }}>
-                {NO_CONQUISTADO_META.label}
-              </p>
-            </div>
-          </div>
-          {model.paraleloMeritorio ? (
-            <div
-              className="rounded-lg px-2 py-1.5"
-              style={{ backgroundColor: "rgba(212,175,55,0.12)", border: "1px solid rgba(212,175,55,0.28)" }}
-              data-testid="jornada4-conciencia-paralelo"
+        <div
+          className="mx-3 sm:mx-4 grid grid-cols-2 gap-2"
+          data-testid="jornada4-conciencia-bento"
+        >
+          {BLOCKS.map(b => (
+            <article
+              key={b.id}
+              className={J4_UI.card}
+              data-testid={
+                b.id === "no_conquistado"
+                  ? "jornada4-conciencia-no-conquistado"
+                  : `jornada4-conciencia-${b.id}`
+              }
             >
-              <p className="text-[8px] uppercase tracking-widest" style={{ color: "#D4AF37" }}>
-                Paralelo meritorio · {model.hilosAvanzando} hilos
+              <p className={J4_UI.label} style={{ color: b.color }}>
+                {b.label}
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: INK }}>
-                {model.minutosParaleloEnJuego > 0
-                  ? `${Math.round(model.minutosParaleloEnJuego)} min extra en juego — cuenta si ambos cumplen.`
-                  : "Dos hilos avanzan de verdad. La dopamina es al cumplir los dos."}
+              <p className={`${J4_UI.value} mt-2`} style={{ color: b.color }}>
+                {formatPlanMin(model[b.key])}
               </p>
-            </div>
-          ) : model.interruptCubreLinea ? (
-            <p className="text-[8px] leading-relaxed" style={{ color: MUTED }} data-testid="jornada4-conciencia-interrupt">
-              Interrupt: el enfoque cubre la línea; la conquista está pausada. No es multiplicar tiempo.
-            </p>
-          ) : model.minutosParaleloGanado > 0 ? (
-            <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-              Paralelo ganado hoy: {Math.round(model.minutosParaleloGanado)} min extra (ambos cumplidos).
-            </p>
-          ) : null}
-          <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-            Inconsciente = sin vehículo. Presencia = voluntad sin rumbo (extraída:
-            el solape no mancha Dirección). Dirección = nido o punto vivo.
-            No conquistado = horario no planificado
-            ({formatPlanMin(model.minutosNoConquistado)}).
-            {model.minutosPlanFuturo > 0
-              ? ` El plan aún tiene ${formatPlanMin(model.minutosPlanFuturo)} por ocurrir — no es inconsciencia.`
-              : ""}{" "}
-            Presencia no es un fallo: es el surco del piloto. Dirección nace de orden.
-          </p>
-        </>
-      ) : null}
-
-      {chartData.length >= 2 ? (
-        <div className="pt-1" data-testid="jornada4-conciencia-triada-chart">
-          <p className="text-[8px] uppercase tracking-widest mb-2" style={{ color: MUTED }}>
-            Evolución · % del plan · {chartData.length} días
-          </p>
-          <div className="h-36 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: MUTED, fontSize: 9 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fill: MUTED, fontSize: 9 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={28}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: PIZARRA,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 8,
-                    fontSize: 11,
-                  }}
-                  formatter={(value: number, name: string) => [`${value}%`, name]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="Inconsciente"
-                  stackId="1"
-                  stroke={TRIADA_META.inconsciente.color}
-                  fill={TRIADA_META.inconsciente.color}
-                  fillOpacity={0.45}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="Presencia"
-                  stackId="1"
-                  stroke={TRIADA_META.presencia.color}
-                  fill={TRIADA_META.presencia.color}
-                  fillOpacity={0.5}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="Dirección"
-                  stackId="1"
-                  stroke={TRIADA_META.direccion.color}
-                  fill={TRIADA_META.direccion.color}
-                  fillOpacity={0.55}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+            </article>
+          ))}
         </div>
-      ) : model.hasPlanificacion ? (
-        <p className="text-[9px] leading-relaxed" style={{ color: MUTED }}>
-          El gráfico compara los tres % día a día. Aparece tras dos jornadas con plan.
+      ) : (
+        <p className={`${J4_UI.hint} mx-3 sm:mx-4`}>
+          {model.headline}
         </p>
-      ) : null}
+      )}
+
+      <div className={`mx-3 sm:mx-4 ${J4_UI.cardCompact}`}>
+        <button
+          type="button"
+          onClick={() => setDetailOpen(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left touch-manipulation"
+          aria-expanded={detailOpen}
+        >
+          <span className={J4_UI.label}>Detalle y evolución</span>
+          {detailOpen ? (
+            <ChevronUp size={14} className="text-neutral-500" />
+          ) : (
+            <ChevronDown size={14} className="text-neutral-500" />
+          )}
+        </button>
+        {detailOpen ? (
+          <div className="px-4 pb-4 space-y-3 border-t border-white/10">
+            {model.hasPlanificacion ? (
+              <>
+                <p className={`${J4_UI.hint} pt-3`}>{model.headline}</p>
+                {model.paraleloMeritorio ? (
+                  <div
+                    className="rounded-lg px-2 py-1.5 border border-white/10"
+                    data-testid="jornada4-conciencia-paralelo"
+                  >
+                    <p className={J4_UI.label}>
+                      Paralelo meritorio · {model.hilosAvanzando} hilos
+                    </p>
+                    <p className={`${J4_UI.hint} mt-0.5`}>
+                      {model.minutosParaleloEnJuego > 0
+                        ? `${Math.round(model.minutosParaleloEnJuego)} min extra en juego — cuenta si ambos cumplen.`
+                        : "Dos hilos avanzan de verdad. La dopamina es al cumplir los dos."}
+                    </p>
+                  </div>
+                ) : model.interruptCubreLinea ? (
+                  <p className={J4_UI.hint} data-testid="jornada4-conciencia-interrupt">
+                    Interrupt: el enfoque cubre la línea; la conquista está pausada.
+                  </p>
+                ) : model.minutosParaleloGanado > 0 ? (
+                  <p className={J4_UI.hint}>
+                    Paralelo ganado hoy: {Math.round(model.minutosParaleloGanado)} min extra.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+
+            {chartData.length >= 2 ? (
+              <div className="pt-1" data-testid="jornada4-conciencia-triada-chart">
+                <p className={`${J4_UI.label} mb-2`}>
+                  Evolución · {chartData.length} días
+                </p>
+                <div className="h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: "#737373", fontSize: 9 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fill: "#737373", fontSize: 9 }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={28}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#0a0a0a",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 8,
+                          fontSize: 11,
+                        }}
+                        formatter={(value: number, name: string) => [`${value}%`, name]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Inconsciente"
+                        stackId="1"
+                        stroke={J4_TRIADA_NEON.inconsciente}
+                        fill={J4_TRIADA_NEON.inconsciente}
+                        fillOpacity={0.45}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Presencia"
+                        stackId="1"
+                        stroke={J4_TRIADA_NEON.presencia}
+                        fill={J4_TRIADA_NEON.presencia}
+                        fillOpacity={0.5}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="Dirección"
+                        stackId="1"
+                        stroke={J4_TRIADA_NEON.direccion}
+                        fill={J4_TRIADA_NEON.direccion}
+                        fillOpacity={0.55}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : model.hasPlanificacion ? (
+              <p className={J4_UI.hint}>
+                El gráfico aparece tras dos jornadas con plan.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

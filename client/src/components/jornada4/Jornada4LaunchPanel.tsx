@@ -44,6 +44,7 @@ import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPicker";
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
 import { isJ4GpsClipsEnabled } from "@/jornada4/gpsClipPref";
 import {
@@ -539,10 +540,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   };
 
   return (
-    <div className="px-4 pb-3 space-y-3" data-testid="jornada4-launch">
+    <div className="px-3 pb-3 sm:px-4 space-y-3" data-testid="jornada4-launch">
       <div className="flex items-end justify-between gap-2">
         <div>
-          <p className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
+          <p className={J4_UI.label}>
             La Flota
           </p>
           <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
@@ -590,10 +591,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               type="button"
               disabled={disabled}
               onClick={() => openTipo(t)}
-              className="p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40 relative"
+              className={`${J4_UI.card} flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40 relative`}
               style={{
-                borderColor: locked ? `${cfg.color}18` : `${cfg.color}30`,
-                backgroundColor: `${cfg.color}08`,
                 opacity: locked ? 0.72 : 1,
               }}
               data-testid={`jornada4-flota-${t}`}

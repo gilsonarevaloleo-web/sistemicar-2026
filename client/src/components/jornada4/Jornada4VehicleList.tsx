@@ -16,6 +16,7 @@ import { SituacionLibreCard } from "./SituacionLibreCard";
 import { RapidoCard } from "./RapidoCard";
 import { InterruptCard } from "./InterruptCard";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
 const { MUTED, INK, GOLD } = J4_COLORS;
 const BLOOD = "#991b1b";
@@ -117,11 +118,10 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
   if (vehicles.length === 0) {
     return (
       <div
-        className="mx-4 p-4 rounded-xl border text-center space-y-1"
-        style={{ backgroundColor: "#0a0a0a", borderColor: "rgba(255,255,255,0.06)" }}
+        className={`mx-3 sm:mx-4 ${J4_UI.card} text-center space-y-1`}
         data-testid="jornada4-empty"
       >
-        <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
+        <p className={J4_UI.label}>
           Sin vehículos activos
         </p>
         <p className="text-[9px]" style={{ color: MUTED }}>
@@ -135,8 +135,7 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
   return (
     <div className="px-4 pb-24" data-testid="jornada4-list">
       <div
-        className="rounded-xl border overflow-hidden"
-        style={{ backgroundColor: "#0a0a0a", borderColor: `${BLOOD}20` }}
+        className={`${J4_UI.cardCompact} overflow-hidden`}
       >
         <button
           type="button"

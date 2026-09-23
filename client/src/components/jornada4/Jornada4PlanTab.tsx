@@ -1,15 +1,12 @@
 /**
- * Pestaña Plan — chunk diferido (Pulso + huecos de cobertura + puntualidad de puertas + segmentos).
- * No montar en Operar: evita arrastrar ConcienciaEngine/recompute al hot path.
- * Badges ±5 min tickean aquí (isla); toasts de puerta siguen en la sesión.
+ * Pestaña Plan — secuencia de la jornada + timeline vertical de cobertura.
+ * Sin métricas duplicadas de conciencia (viven en MÉTRICAS).
  */
 import { useMemo } from "react";
-import { PulsoCobertura } from "@/components/jornada/PulsoCobertura";
 import { CoberturaHuecosPanel } from "@/components/jornada4/CoberturaHuecosPanel";
+import { Jornada4CoberturaTimeline } from "@/components/jornada4/Jornada4CoberturaTimeline";
 import { Jornada4SegmentosPanel } from "@/components/jornada4/Jornada4SegmentosPanel";
-import { Jornada4UbicacionConcienciaCard } from "@/components/jornada4/Jornada4UbicacionConcienciaCard";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
-import { usePulsoCobertura } from "@/hooks/usePulsoCobertura";
 import type { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
 import { collectOpenPuertaWindows } from "@/jornada4/puertaWindowAlerts";
 import type { Proyecto } from "@/lib/proyectos";
@@ -52,16 +49,6 @@ export default function Jornada4PlanTab({
   notifPermission,
   onRequestNotifPermission,
 }: Jornada4PlanTabProps) {
-  // Solo vive mientras la pestaña Plan está montada — sin intervalo en Operar/Métricas.
-  const hasPlan = Boolean(planilla?.segmentos?.length);
-  const pulsoModel = usePulsoCobertura({
-    segmentos: planilla?.segmentos ?? [],
-    vehicles,
-    segmentoActivoId: segmentoActivo?.id ?? null,
-    enabled: hasPlan,
-    huecosRefresh,
-  });
-
   const badgeTick = useJornada4Tick(Boolean(planilla?.segmentos?.length));
   const puertaWindows = useMemo(() => {
     void badgeTick;
@@ -73,17 +60,10 @@ export default function Jornada4PlanTab({
 
   return (
     <div role="tabpanel" data-testid="jornada4-panel-plan">
-      <PulsoCobertura
-        model={pulsoModel}
-        showCta={Boolean(segmentoActivo)}
-      />
-      <Jornada4UbicacionConcienciaCard
+      <Jornada4CoberturaTimeline
         segmentos={planilla?.segmentos ?? []}
         vehicles={vehicles}
-        compact
-        tick={badgeTick}
       />
-      <CoberturaHuecosPanel refreshKey={huecosRefresh} />
       <Jornada4SegmentosPanel
         planilla={planilla}
         plantillasRutina={plantillasRutina}
@@ -100,7 +80,9 @@ export default function Jornada4PlanTab({
         ventanaCerrarIds={puertaWindows.cerrarIds}
         notifPermission={notifPermission}
         onRequestNotifPermission={onRequestNotifPermission}
+        hidePuertasTimeline
       />
+      <CoberturaHuecosPanel refreshKey={huecosRefresh} />
     </div>
   );
 }

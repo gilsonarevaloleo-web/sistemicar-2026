@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { Scale } from "lucide-react";
 import { computeDailyDisciplinaBarModel } from "@/jornada4/dailyDisciplinaBar";
 import { J4_COLORS } from "./Jornada4Shell";
+import { J4_UI } from "./jornada4Ui";
 
-const { PIZARRA, MUTED, GOLD } = J4_COLORS;
+const { MUTED, GOLD } = J4_COLORS;
 const EMERALD = "#00C851";
 
 type Props = {
@@ -26,12 +27,7 @@ export function Jornada4DailyDisciplinaBar({ todayPct, yesterdayPct }: Props) {
 
   return (
     <section
-      className="mx-4 mb-3 rounded-xl border p-3"
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: "rgba(212,175,55,0.28)",
-        boxShadow: "0 0 14px rgba(212,175,55,0.06)",
-      }}
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card}`}
       data-testid="jornada4-daily-disciplina-bar"
     >
       <div className="flex items-center justify-between gap-2 mb-1">

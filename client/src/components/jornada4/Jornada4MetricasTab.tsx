@@ -1,6 +1,6 @@
 /**
- * Pestaña Métricas — chunk diferido (disciplina + PS + Bóveda/recharts).
- * El tick 1s de disciplina vive aquí (isla), no en el root de sesión.
+ * Pestaña Métricas — dashboard de conciencia.
+ * Cabecera: barra de cobertura. Cuerpo: bento 2×2. Cierre: sello ceremonial.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Jornada4DailyDisciplinaBar } from "@/components/jornada4/Jornada4DailyDisciplinaBar";
@@ -83,27 +83,19 @@ export default function Jornada4MetricasTab({
     const t = window.setTimeout(load, 400);
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
+      clearTimeout(t);
     };
   }, [userId]);
 
   return (
     <div role="tabpanel" data-testid="jornada4-panel-metricas" className="space-y-1">
-      <SelloOperadorCard
-        userId={userId}
-        segmentos={segmentos}
-        vehicles={vehicles}
-        todayPs={todayPs}
-        tick={disciplinaTick}
-      />
-      <CardLeyFrenoVehiculo />
-      <EspejoSemanalCard userId={userId} tick={disciplinaTick} />
+      <Jornada4ConcienciaTriadaCard model={triadaModel} series={triadaSeries} />
       <Jornada4UbicacionConcienciaCard
         segmentos={segmentos}
         vehicles={vehicles}
+        compact
         tick={disciplinaTick}
       />
-      <Jornada4ConcienciaTriadaCard model={triadaModel} series={triadaSeries} />
       <Jornada4DisciplinaCard
         model={disciplinaModel}
         bonoCierrePct={bonoCierrePct}
@@ -115,6 +107,15 @@ export default function Jornada4MetricasTab({
       />
       <Jornada4DailyPsBar todayPs={todayPs} yesterdayPs={yesterdayPs} />
       <Jornada4Boveda />
+      <EspejoSemanalCard userId={userId} tick={disciplinaTick} />
+      <CardLeyFrenoVehiculo />
+      <SelloOperadorCard
+        userId={userId}
+        segmentos={segmentos}
+        vehicles={vehicles}
+        todayPs={todayPs}
+        tick={disciplinaTick}
+      />
     </div>
   );
 }

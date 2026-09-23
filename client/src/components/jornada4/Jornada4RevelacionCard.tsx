@@ -1,17 +1,16 @@
 /**
- * Espejo de Operar — revelación GLOBAL del día-jornada al término.
- * 100% = 24 h. Inconsciente = sin vehículo. Presencia = vehículos sin rumbo.
- * Dirección = proyecto/centro. No conquistado = horario no planificado.
+ * Banner superior colapsable — revelación GLOBAL del día-jornada.
+ * Una línea por defecto. El detalle vive expandido.
  */
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { NO_CONQUISTADO_META, TRIADA_META } from "@/lib/concienciaTriadaOperador";
 import { MINUTOS_DIA_JORNADA } from "@/lib/gastoConcienciaEngine";
 import {
   formatMinutosHoras,
   type RevelacionPlanDia,
 } from "@/jornada4/revelacionPlanDia";
-import { J4_COLORS } from "./Jornada4Shell";
-
-const { PIZARRA, MUTED, INK, GOLD } = J4_COLORS;
+import { J4_TRIADA_NEON, J4_UI } from "./jornada4Ui";
 
 export type Jornada4RevelacionCardProps = {
   revelacion: RevelacionPlanDia | null;
@@ -23,97 +22,104 @@ function pct(part: number, total: number): number {
   return Math.max(0, Math.round((part / total) * 100));
 }
 
+const BUCKET_NEON = {
+  inconsciente: J4_TRIADA_NEON.inconsciente,
+  presencia: J4_TRIADA_NEON.presencia,
+  direccion: J4_TRIADA_NEON.direccion,
+  por_conquistar: J4_TRIADA_NEON.noConquistado,
+} as const;
+
 export function Jornada4RevelacionCard({
   revelacion,
   planEndLabel,
 }: Jornada4RevelacionCardProps) {
+  const [open, setOpen] = useState(false);
+
   if (!planEndLabel && !revelacion) return null;
 
-  if (!revelacion) {
-    return (
-      <section
-        className="mx-3 mb-3 sm:mx-4 rounded-xl border px-3 py-2.5"
-        style={{
-          backgroundColor: PIZARRA,
-          borderColor: "rgba(212,175,55,0.22)",
-        }}
-        data-testid="jornada4-revelacion-espera"
-      >
-        <p
-          className="text-[9px] font-black uppercase tracking-widest"
-          style={{ color: GOLD }}
-        >
-          Revelación del día
-        </p>
-        <p className="text-[11px] mt-1 leading-snug" style={{ color: INK }}>
-          Se sella a las {planEndLabel}. Ahí verás en horas el inconsciente (sin
-          vehículo), la presencia, la dirección y lo no conquistado — el horario
-          que no planificaste.
-        </p>
-        <p className="text-[8px] mt-1.5 leading-relaxed" style={{ color: MUTED }}>
-          Si planificas 24 h (incluido dormir), la conquista es el 100% del día.
-        </p>
-      </section>
-    );
-  }
+  const line = revelacion
+    ? revelacion.headline
+    : `Se sella a las ${planEndLabel}`;
 
+  return (
+    <section
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.cardCompact}`}
+      data-testid={revelacion ? "jornada4-revelacion" : "jornada4-revelacion-espera"}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left touch-manipulation"
+        aria-expanded={open}
+        data-testid="jornada4-revelacion-toggle"
+      >
+        <div className="min-w-0 flex-1">
+          <p className={J4_UI.label}>
+            Revelación del día
+            {revelacion?.planEndLabel ? ` · ${revelacion.planEndLabel}` : ""}
+          </p>
+          <p
+            className="text-xs text-neutral-300 truncate mt-0.5"
+            data-testid="jornada4-revelacion-headline"
+          >
+            {line}
+          </p>
+        </div>
+        {open ? (
+          <ChevronUp size={14} className="shrink-0 text-neutral-500" />
+        ) : (
+          <ChevronDown size={14} className="shrink-0 text-neutral-500" />
+        )}
+      </button>
+
+      {open && !revelacion ? (
+        <p className={`${J4_UI.hint} px-4 pb-3`}>
+          Ahí verás en horas el inconsciente, la presencia, la dirección y lo no
+          conquistado. Si planificas 24 h, la conquista es el 100% del día.
+        </p>
+      ) : null}
+
+      {open && revelacion ? (
+        <RevelacionDetalle revelacion={revelacion} />
+      ) : null}
+    </section>
+  );
+}
+
+function RevelacionDetalle({ revelacion }: { revelacion: RevelacionPlanDia }) {
   const total = Math.max(revelacion.minutosDia || MINUTOS_DIA_JORNADA, 1);
   const buckets = [
     {
       id: "inconsciente",
-      label: "Inconsciente",
+      label: TRIADA_META.inconsciente.label,
       min: revelacion.minutosInconsciente,
-      color: TRIADA_META.inconsciente.color,
+      color: BUCKET_NEON.inconsciente,
     },
     {
       id: "presencia",
-      label: "Presencia",
+      label: TRIADA_META.presencia.label,
       min: revelacion.minutosPresencia,
-      color: TRIADA_META.presencia.color,
+      color: BUCKET_NEON.presencia,
     },
     {
       id: "direccion",
-      label: "Dirección",
+      label: TRIADA_META.direccion.label,
       min: revelacion.minutosDireccion,
-      color: TRIADA_META.direccion.color,
+      color: BUCKET_NEON.direccion,
     },
     {
       id: "por_conquistar",
-      label: "No conquistado",
+      label: NO_CONQUISTADO_META.label,
       min: revelacion.minutosPorConquistar,
-      color: NO_CONQUISTADO_META.color,
+      color: BUCKET_NEON.por_conquistar,
     },
   ] as const;
   const widths = buckets.map(b => pct(b.min, total));
 
   return (
-    <section
-      className="mx-3 mb-3 sm:mx-4 rounded-xl border p-3 space-y-3"
-      style={{
-        backgroundColor: PIZARRA,
-        borderColor: "rgba(212,175,55,0.35)",
-        boxShadow: "0 0 16px rgba(212,175,55,0.08)",
-      }}
-      data-testid="jornada4-revelacion"
-    >
-      <div>
-        <p
-          className="text-[9px] font-black uppercase tracking-widest"
-          style={{ color: GOLD }}
-        >
-          Revelación del día · {revelacion.planEndLabel}
-        </p>
-        <p
-          className="text-[12px] font-semibold mt-1 leading-snug"
-          style={{ color: INK }}
-          data-testid="jornada4-revelacion-headline"
-        >
-          {revelacion.headline}
-        </p>
-      </div>
-
+    <div className="px-4 pb-4 space-y-3 border-t border-white/10">
       <div
-        className="h-2.5 w-full rounded-full overflow-hidden flex"
+        className="h-2 w-full rounded-full overflow-hidden flex mt-3"
         style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
         data-testid="jornada4-revelacion-bar"
       >
@@ -131,25 +137,25 @@ export function Jornada4RevelacionCard({
       <div className="grid grid-cols-4 gap-1.5">
         {buckets.map(b => (
           <div key={b.id} className="text-center" data-testid={`jornada4-revelacion-${b.id}`}>
-            <p className="text-[12px] font-black tabular-nums leading-tight" style={{ color: b.color }}>
+            <p className="font-mono text-sm font-bold tabular-nums" style={{ color: b.color }}>
               {formatMinutosHoras(b.min)}
             </p>
-            <p className="text-[7px] uppercase tracking-wider mt-0.5" style={{ color: MUTED }}>
+            <p className="text-[9px] uppercase tracking-wider mt-0.5 text-neutral-500">
               {b.label}
             </p>
           </div>
         ))}
       </div>
 
-      <p className="text-[8px] leading-relaxed" style={{ color: MUTED }}>
-        100% = 24 h del día-jornada. Plan = {formatMinutosHoras(revelacion.minutosPlan)}.
+      <p className={J4_UI.hint}>
+        100% = 24 h. Plan = {formatMinutosHoras(revelacion.minutosPlan)}.
         Inconsciente = sin vehículo. Presencia = voluntad sin rumbo. Dirección =
-        proyecto o centro con casa. No conquistado = lo no planificado
+        proyecto o centro. No conquistado = lo no planificado
         {revelacion.minutosPorConquistar > 0
           ? ` (${formatMinutosHoras(revelacion.minutosPorConquistar)})`
           : " — si cubres las 24 h, queda en cero"}
         .
       </p>
-    </section>
+    </div>
   );
 }
