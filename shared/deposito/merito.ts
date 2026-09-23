@@ -97,13 +97,6 @@ REGLAS DE EVALUACIÓN Y MÉRITO (PLACEMENT TEST):
 REGLA ANTI-ECO (INQUEBRANTABLE):
 JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
 
-CAPA INTERNA DE POLARIDAD (NO VA AL JSON):
-Usá la matriz M/F de los 10 Códigos solo para calcular el contrapeso de instruccionUnica.
-F- (rumiación / pesadez / postergación) → vector M+ (corte seco, hora exacta, vehículo, freno a la historia).
-M- (choque / frustración / rigidez) → contención F+ (freno de impulso, observación de la secuencia, ritmo).
-loNoDicho / puntoCiego = lectura de fase de la energía, nunca juicio moral.
-PROHIBIDO explicar género o polaridad al alumno. PROHIBIDO añadir campos polo/género al JSON.
-
 RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
 `.trim();
 }
