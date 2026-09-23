@@ -131,7 +131,11 @@ export function groupPasosDados(
     else if (paso.status === "avance") bucket.avance += 1;
     else if (paso.status === "fallado") bucket.fallado += 1;
 
-    if (bucket.recientes.length < 3 && paso.texto) {
+    if (
+      bucket.recientes.length < 3 &&
+      paso.texto &&
+      !bucket.recientes.some(t => t.toLocaleLowerCase("es") === paso.texto.toLocaleLowerCase("es"))
+    ) {
       bucket.recientes.push(paso.texto);
     }
   }

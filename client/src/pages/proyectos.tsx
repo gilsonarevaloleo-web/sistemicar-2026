@@ -26,7 +26,6 @@ import {
   Link2,
   Pencil,
   Target,
-  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -79,6 +78,8 @@ import { ProyectoGastoConcienciaCard } from "@/components/ProyectoGastoConcienci
 import { PeldanoSituacionArbol } from "@/components/PeldanoSituacionArbol";
 import { PeldanoDecisionesEnumeradas } from "@/components/PeldanoDecisionesEnumeradas";
 import { PasosDadosCalendar } from "@/components/PasosDadosCalendar";
+import { PasosCrisolSintesis } from "@/components/PasosCrisolSintesis";
+import { sintetizarPasosCrisol } from "@/lib/sintetizarPasosCrisol";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { getLocalVehicles } from "@/lib/persistence";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
@@ -995,58 +996,65 @@ export default function ProyectosPage() {
           <ProyectoIcono etiqueta={proyecto.etiqueta} color={tint} size={24} />
         </div>
 
-        <div className="mb-3">
-          <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
-            Naturaleza del nido
-          </p>
-          <NidoNaturalezaPicker
-            value={proyecto.etiqueta}
-            onChange={e => void handleSetEtiqueta(e)}
-            disabled={focoBusy !== null}
-            testId="hub-naturaleza"
-          />
-        </div>
+        <HubCollapsible
+          title="Nido"
+          tint="#64748b"
+          defaultOpen={false}
+          testId="hub-nido-ajustes"
+        >
+          <div className="mb-3">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+              Naturaleza del nido
+            </p>
+            <NidoNaturalezaPicker
+              value={proyecto.etiqueta}
+              onChange={e => void handleSetEtiqueta(e)}
+              disabled={focoBusy !== null}
+              testId="hub-naturaleza"
+            />
+          </div>
 
-        <div className="mb-3">
-          <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
-            Color del proyecto
-          </p>
-          <ProyectoColorSwatches
-            proyectoId={proyecto.id}
-            value={proyecto.color}
-            onChange={color => void handleSetColor(color)}
-            disabled={focoBusy !== null}
-          />
-        </div>
+          <div className="mb-3">
+            <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+              Color del proyecto
+            </p>
+            <ProyectoColorSwatches
+              proyectoId={proyecto.id}
+              value={proyecto.color}
+              onChange={color => void handleSetColor(color)}
+              disabled={focoBusy !== null}
+            />
+          </div>
 
-        <div className="mb-3">
-          <ProyectoFigura estado={figuraDetalle} tint={tint} />
-        </div>
+          <div className="mb-3">
+            <ProyectoFigura estado={figuraDetalle} tint={tint} />
+          </div>
 
-        <div className="flex gap-2 mb-3">
-          <button
-            type="button"
-            disabled={focoBusy !== null}
-            onClick={() => void handleResetProyecto()}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50"
-            style={{ color: tint, border: `1px solid ${tint}40`, backgroundColor: `${tint}10` }}
-            data-testid="hub-reiniciar-proyecto"
-          >
-            <RotateCcw size={12} />
-            {focoBusy === "reset" ? "Reiniciando…" : "Reiniciar"}
-          </button>
-          <button
-            type="button"
-            disabled={focoBusy !== null}
-            onClick={() => void handleDeleteProyecto()}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50 text-red-400"
-            style={{ border: "1px solid rgba(248,113,113,0.35)", backgroundColor: "rgba(248,113,113,0.08)" }}
-            data-testid="hub-borrar-proyecto"
-          >
-            <Trash2 size={12} />
-            {focoBusy === "delete" ? "Borrando…" : "Borrar"}
-          </button>
-        </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={focoBusy !== null}
+              onClick={() => void handleResetProyecto()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50"
+              style={{ color: tint, border: `1px solid ${tint}40`, backgroundColor: `${tint}10` }}
+              data-testid="hub-reiniciar-proyecto"
+            >
+              <RotateCcw size={12} />
+              {focoBusy === "reset" ? "Reiniciando…" : "Reiniciar"}
+            </button>
+            <button
+              type="button"
+              disabled={focoBusy !== null}
+              onClick={() => void handleDeleteProyecto()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider disabled:opacity-50 text-red-400"
+              style={{ border: "1px solid rgba(248,113,113,0.35)", backgroundColor: "rgba(248,113,113,0.08)" }}
+              data-testid="hub-borrar-proyecto"
+            >
+              <Trash2 size={12} />
+              {focoBusy === "delete" ? "Borrando…" : "Borrar"}
+            </button>
+          </div>
+        </HubCollapsible>
 
         <Tabs
           value={detailTab}
@@ -1094,14 +1102,12 @@ export default function ProyectosPage() {
 
           {/* ——— Enfoque: objetivo + dirección + sync ——— */}
           <TabsContent value="enfoque" className="mt-0 space-y-3 focus-visible:ring-0">
-            <div
-              className="p-3 rounded-xl border"
-              style={{ backgroundColor: PIZARRA, borderColor: "rgba(255,255,255,0.08)" }}
-              data-testid="hub-enfoque-glosario"
+            <HubCollapsible
+              title="Orden de la conciencia"
+              tint="#64748b"
+              defaultOpen={false}
+              testId="hub-enfoque-glosario"
             >
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
-                Orden de la conciencia
-              </p>
               <ul className="text-[9px] text-slate-500 leading-relaxed space-y-0.5">
                 {trepa ? (
                   <>
@@ -1153,7 +1159,7 @@ export default function ProyectosPage() {
                   no contorno. El hueco es el siguiente trozo, no una mascota.
                 </li>
               </ul>
-            </div>
+            </HubCollapsible>
 
             <div
               className="p-3 rounded-xl border"
@@ -1205,12 +1211,175 @@ export default function ProyectosPage() {
               >
                 <p className="text-[10px] text-slate-500 leading-relaxed">
                   {trepa
-                    ? "Activa una oleada en Escalera y marca un punto de producción. Hasta entonces los vehículos no pueden llegar a Dirección: presencia cubre el día sin ensuciar el nido."
+                    ? "Activa una idea como oleada y marca un punto de producción. Hasta entonces los vehículos no pueden llegar a Dirección: presencia cubre el día sin ensuciar el nido."
                     : "Este nido ya recibe Dirección: el envío se registra como darse cuenta. No hace falta oleada ni punto de producción."}
                 </p>
               </div>
             )}
 
+            <div
+              className="p-3 rounded-xl border space-y-3"
+              style={{ backgroundColor: PIZARRA, borderColor: "rgba(0,255,195,0.22)" }}
+              data-testid="hub-ideas"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p
+                  className="text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+                  style={{ color: CYAN }}
+                >
+                  <Layers size={12} /> Desglosar ideas
+                </p>
+                {ideas.length > 0 ? (
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[8px] font-black"
+                    style={{ backgroundColor: `${CYAN}18`, color: CYAN }}
+                  >
+                    {ideas.length}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-[8px] text-slate-500 leading-relaxed">
+                Próximas oleadas. No son el timón ni el bloque del día. Actívalas
+                para que la conciencia tome rumbo.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={newIdeaTitulo}
+                  onChange={e => setNewIdeaTitulo(e.target.value)}
+                  placeholder="Nueva idea / oleada…"
+                  className="flex-1 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none"
+                  onKeyDown={e => e.key === "Enter" && void handleAddIdea()}
+                />
+                <button
+                  onClick={() => void handleAddIdea()}
+                  className="px-3 py-2 rounded-lg font-bold"
+                  style={{ backgroundColor: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}40` }}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {ideas.length === 0 && (
+                  <p className="text-[10px] text-slate-600 text-center py-2">
+                    Una idea aquí es el siguiente camino. El timón de arriba es el actual.
+                  </p>
+                )}
+                {ideas.map((pel, ideaIdx) => (
+                  <div
+                    key={pel.id}
+                    className="p-3 rounded-xl border border-white/10 transition-[border-color,box-shadow] duration-200"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.03)",
+                      borderColor:
+                        ordenPulse?.id === pel.id ? `${CYAN}55` : "rgba(255,255,255,0.1)",
+                      boxShadow:
+                        ordenPulse?.id === pel.id ? `0 0 16px ${CYAN}28` : undefined,
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-bold text-white">{pel.titulo}</span>
+                      <div className="flex items-center gap-1">
+                        <BotonesDireccion
+                          tint={CYAN}
+                          pulseDir={ordenPulse?.id === pel.id ? ordenPulse.dir : null}
+                          disabledUp={ideaIdx === 0}
+                          disabledDown={ideaIdx === ideas.length - 1}
+                          onUp={() => handleReorderIdea(pel.id, "up")}
+                          onDown={() => handleReorderIdea(pel.id, "down")}
+                          testIdUp={`idea-up-${pel.id}`}
+                          testIdDown={`idea-down-${pel.id}`}
+                          labelUp="Subir idea"
+                          labelDown="Bajar idea"
+                          orientation="horizontal"
+                        />
+                        <button
+                          onClick={() => void deletePeldanoIdea(user!.uid, pel.id).then(() => reloadDetail())}
+                          className="p-1 text-slate-600 hover:text-red-400"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {pel.plantillaSubTareas && pel.plantillaSubTareas.length > 0 && (
+                      <p className="text-[8px] text-slate-500 mb-2 leading-relaxed">
+                        {pel.plantillaSubTareas.length} detalle
+                        {pel.plantillaSubTareas.length !== 1 ? "s" : ""} pendiente
+                        {pel.plantillaSubTareas.length !== 1 ? "s" : ""} de profundidad
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleUsarIdeaComoOleada(pel.id)}
+                      className="w-full mb-2 py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider text-slate-400 border border-white/10 hover:border-white/20"
+                    >
+                      Usar como oleada activa
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_tiempo"))}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                        style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
+                      >
+                        <Clock size={12} /> Tiempo
+                      </button>
+                      <button
+                        onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_situacion"))}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                        style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
+                      >
+                        <Flag size={12} /> Situación
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {oleadaPeldano && trepa && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_tiempo",
+                        oleadaPuntoProduccion?.id
+                      )
+                    )
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
+                >
+                  <Clock size={12} /> Tiempo sobre oleada
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      buildLaunchUrl(
+                        proyecto.id,
+                        oleadaPeldano.id,
+                        "desglosador_situacion",
+                        oleadaPuntoProduccion?.id
+                      )
+                    )
+                  }
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
+                  style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
+                >
+                  <Flag size={12} /> Situación sobre oleada
+                </button>
+              </div>
+            )}
+
+            <HubCollapsible
+              title="Gasto y dirección"
+              tint="#64748b"
+              defaultOpen={false}
+              testId="hub-enfoque-mas"
+            >
             {detailId ? (
               <ProyectoGastoConcienciaCard
                 proyectoId={detailId}
@@ -1305,45 +1474,7 @@ export default function ProyectosPage() {
             >
               {guardandoClaridad ? "Guardando…" : "Sincronizar dirección"}
             </button>
-
-            {oleadaPeldano && trepa && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      buildLaunchUrl(
-                        proyecto.id,
-                        oleadaPeldano.id,
-                        "desglosador_tiempo",
-                        oleadaPuntoProduccion?.id
-                      )
-                    )
-                  }
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                  style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
-                >
-                  <Clock size={12} /> Tiempo sobre oleada
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      buildLaunchUrl(
-                        proyecto.id,
-                        oleadaPeldano.id,
-                        "desglosador_situacion",
-                        oleadaPuntoProduccion?.id
-                      )
-                    )
-                  }
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                  style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
-                >
-                  <Flag size={12} /> Situación sobre oleada
-                </button>
-              </div>
-            )}
+            </HubCollapsible>
           </TabsContent>
 
           {/* ——— Jornada: accesos compactos a bloques de hoy ——— */}
@@ -1399,7 +1530,7 @@ export default function ProyectosPage() {
             )}
           </TabsContent>
 
-          {/* ——— Escalera: peldaños, ideas e historial ——— */}
+          {/* ——— Escalera: masa ya caminada, sintetizada ——— */}
           <TabsContent value="escalera" className="mt-0 space-y-3 focus-visible:ring-0">
             <div className="grid grid-cols-3 gap-2">
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
@@ -1417,173 +1548,45 @@ export default function ProyectosPage() {
                 <p className="text-[7px] uppercase text-slate-500 tracking-wider">Horas norte</p>
               </div>
             </div>
+            <p className="text-[8px] text-slate-500 leading-relaxed">
+              Esto ya se caminó. El timón y las ideas viven en Enfoque — aquí solo la masa.
+            </p>
 
             <HubCollapsible
-              title="Por qué te emociona"
+              title="Memoria"
               tint={GOLD}
-              icon={<Sparkles size={12} />}
-              defaultOpen={false}
-              testId="hub-nota-emocion"
-            >
-              <textarea
-                value={notaEdit}
-                onChange={e => setNotaEdit(e.target.value)}
-                onBlur={() => void handleSaveNota()}
-                placeholder="Ej: Cada bloque de costura me deja más tiempo libre al atardecer…"
-                className="w-full bg-transparent text-[11px] text-slate-300 placeholder:text-slate-600 resize-none min-h-[60px] focus:outline-none"
-              />
-            </HubCollapsible>
-
-            {(proyecto.pasosEjecutadosLog?.length ?? 0) > 0 && (
-              <HubCollapsible
-                title="Pasos desde el Crisol"
-                tint={GOLD}
-                icon={<Sparkles size={12} />}
-                count={proyecto.pasosEjecutadosLog!.length}
-                defaultOpen={false}
-                testId="hub-pasos-crisol"
-              >
-                <div className="max-h-56 overflow-y-auto pr-1">
-                  <PeldanoDecisionesEnumeradas
-                    decisiones={proyecto.pasosEjecutadosLog!}
-                    titulo="Pasos desde el Crisol"
-                  />
-                </div>
-              </HubCollapsible>
-            )}
-
-            <HubCollapsible
-              title="Calendario de pasos dados"
-              tint={CYAN}
               icon={<TrendingUp size={12} />}
+              count={
+                sintetizarPasosCrisol(proyecto.pasosEjecutadosLog ?? []).unicos +
+                conquistados.length +
+                oleadasArchivadas.length
+              }
               defaultOpen={false}
-              testId="hub-calendario-pasos"
-            >
-              <p className="text-[8px] mb-3 leading-relaxed" style={{ color: NARANJA }}>
-                Historial de ejecución — pasos ya realizados. No es un planificador.
-              </p>
-              {detailHeavyReady ? (
-                <PasosDadosCalendar pasos={proyecto.pasosEjecutadosLog ?? []} />
-              ) : (
-                <p className="text-[9px] text-slate-600 py-2">Cargando calendario…</p>
-              )}
-            </HubCollapsible>
-
-            <HubCollapsible
-              title="Desglosar ideas"
-              tint={CYAN}
-              icon={<Layers size={12} />}
-              count={ideas.length}
-              defaultOpen={ideas.length > 0 && ideas.length <= 4}
-              testId="hub-ideas"
+              testId="hub-memoria"
             >
               <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
-                Próximas oleadas — no son el punto de producción ni el bloque del día.
-                Actívalas como oleada para que la conciencia tome el timón. Si la
-                actual ya tiene camino, se cierra sola como capítulo.
+                Lo que se repetía mil veces es una familia. No una lista infinita.
               </p>
-              <div className="flex gap-2 mb-3">
-                <input
-                  value={newIdeaTitulo}
-                  onChange={e => setNewIdeaTitulo(e.target.value)}
-                  placeholder="Nueva idea / oleada…"
-                  className="flex-1 px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none"
-                  onKeyDown={e => e.key === "Enter" && void handleAddIdea()}
-                />
-                <button
-                  onClick={() => void handleAddIdea()}
-                  className="px-3 py-2 rounded-lg font-bold"
-                  style={{ backgroundColor: `${CYAN}20`, color: CYAN, border: `1px solid ${CYAN}40` }}
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
 
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {ideas.length === 0 && (
-                  <p className="text-[10px] text-slate-600 text-center py-4">
-                    Añade ideas de oleada — no son el bloque del día; son el camino a caminar.
-                  </p>
+              {(proyecto.pasosEjecutadosLog?.length ?? 0) > 0 ? (
+                <PasosCrisolSintesis pasos={proyecto.pasosEjecutadosLog ?? []} />
+              ) : null}
+
+              <div className="mt-4" data-testid="hub-calendario-pasos">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                  Calendario
+                </p>
+                {detailHeavyReady ? (
+                  <PasosDadosCalendar pasos={proyecto.pasosEjecutadosLog ?? []} />
+                ) : (
+                  <p className="text-[9px] text-slate-600 py-2">Cargando calendario…</p>
                 )}
-                {ideas.map((pel, ideaIdx) => (
-                  <div
-                    key={pel.id}
-                    className="p-3 rounded-xl border border-white/10 transition-[border-color,box-shadow] duration-200"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.03)",
-                      borderColor:
-                        ordenPulse?.id === pel.id ? `${CYAN}55` : "rgba(255,255,255,0.1)",
-                      boxShadow:
-                        ordenPulse?.id === pel.id ? `0 0 16px ${CYAN}28` : undefined,
-                    }}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-sm font-bold text-white">{pel.titulo}</span>
-                      <div className="flex items-center gap-1">
-                        <BotonesDireccion
-                          tint={CYAN}
-                          pulseDir={ordenPulse?.id === pel.id ? ordenPulse.dir : null}
-                          disabledUp={ideaIdx === 0}
-                          disabledDown={ideaIdx === ideas.length - 1}
-                          onUp={() => handleReorderIdea(pel.id, "up")}
-                          onDown={() => handleReorderIdea(pel.id, "down")}
-                          testIdUp={`idea-up-${pel.id}`}
-                          testIdDown={`idea-down-${pel.id}`}
-                          labelUp="Subir idea"
-                          labelDown="Bajar idea"
-                          orientation="horizontal"
-                        />
-                        <button
-                          onClick={() => void deletePeldanoIdea(user!.uid, pel.id).then(() => reloadDetail())}
-                          className="p-1 text-slate-600 hover:text-red-400"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    {pel.plantillaSubTareas && pel.plantillaSubTareas.length > 0 && (
-                      <p className="text-[8px] text-slate-500 mb-2 leading-relaxed">
-                        {pel.plantillaSubTareas.length} detalle
-                        {pel.plantillaSubTareas.length !== 1 ? "s" : ""} pendiente
-                        {pel.plantillaSubTareas.length !== 1 ? "s" : ""} de profundidad
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void handleUsarIdeaComoOleada(pel.id)}
-                      className="w-full mb-2 py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider text-slate-400 border border-white/10 hover:border-white/20"
-                    >
-                      Usar como oleada activa
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_tiempo"))}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                        style={{ backgroundColor: `${NARANJA}15`, color: NARANJA, border: `1px solid ${NARANJA}35` }}
-                      >
-                        <Clock size={12} /> Tiempo
-                      </button>
-                      <button
-                        onClick={() => navigate(buildLaunchUrl(proyecto.id, pel.id, "desglosador_situacion"))}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[9px] font-bold uppercase"
-                        style={{ backgroundColor: `${PLATA}15`, color: PLATA, border: `1px solid ${PLATA}35` }}
-                      >
-                        <Flag size={12} /> Situación
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
-            </HubCollapsible>
 
-            <HubCollapsible
-              title="Capítulos de oleada"
-              tint={GOLD}
-              icon={<Archive size={12} />}
-              count={oleadasArchivadas.length}
-              defaultOpen={oleadasArchivadas.length > 0 && oleadasArchivadas.length <= 3}
-              testId="hub-oleada-capitulos-wrap"
-            >
+            <div className="mt-4" data-testid="hub-oleada-capitulos-wrap">
+              <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                Capítulos
+              </p>
               <p className="text-[8px] text-slate-500 mb-3 leading-relaxed">
                 Oleadas ya caminadas. No vuelven a Ideas: aquí está la estructura de
                 logro. Reabre una si quieres continuar ese rumbo.
@@ -1593,16 +1596,12 @@ export default function ProyectosPage() {
                 tint={tint}
                 onReabrir={handleReabrirOleada}
               />
-            </HubCollapsible>
+            </div>
 
-            <HubCollapsible
-              title="Tu escalera — conquistados"
-              tint={GOLD}
-              icon={<TrendingUp size={12} />}
-              count={conquistados.length}
-              defaultOpen={conquistados.length > 0}
-              testId="hub-escalera"
-            >
+            <div className="mt-4" data-testid="hub-escalera">
+              <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                Peldaños conquistados
+              </p>
               {conquistados.length === 0 ? (
                 <p className="text-[10px] text-slate-600 text-center py-6 border border-dashed border-white/10 rounded-xl">
                   Cumple el timón (o cámbialo) para sellar un peldaño. Cada estancia en un
@@ -1730,6 +1729,20 @@ export default function ProyectosPage() {
                   ) : null}
                 </div>
               )}
+            </div>
+
+              <div className="mt-4" data-testid="hub-nota-emocion">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                  Por qué te emociona
+                </p>
+                <textarea
+                  value={notaEdit}
+                  onChange={e => setNotaEdit(e.target.value)}
+                  onBlur={() => void handleSaveNota()}
+                  placeholder="Ej: Cada bloque de costura me deja más tiempo libre al atardecer…"
+                  className="w-full bg-transparent text-[11px] text-slate-300 placeholder:text-slate-600 resize-none min-h-[60px] focus:outline-none"
+                />
+              </div>
             </HubCollapsible>
           </TabsContent>
         </Tabs>
