@@ -197,15 +197,15 @@ const paymentConfirmationTemplate = (userName: string, planName: string, amount:
               </div>
               
               <p style="color: #a1a1aa; font-size: 15px; line-height: 1.8; text-align: center; margin: 24px 0;">
-                Tu acceso completo a SISTEMICAR ya está activo. Todas las funciones premium están desbloqueadas.
+                Tu cuenta se crea en <strong style="color:#ffffff">sistemicar.app/acceso</strong> con Google, usando este mismo correo. Si ya pagaste, el plan se enciende al entrar.
               </p>
             </td>
           </tr>
           
           <tr>
             <td align="center" style="padding: 0 40px 40px 40px;">
-              <a href="https://sistemicar.app/menu" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
-                ENTRAR A MI COMANDO
+              <a href="https://sistemicar.app/acceso" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
+                CREAR CUENTA / ENTRAR
               </a>
             </td>
           </tr>
