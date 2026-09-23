@@ -9,6 +9,7 @@ import {
   detectarFlorMerito,
   evaluarMeritoVolcado,
   mensajeMeritoDetectado,
+  resolverRotacionCodigo,
   sugerirRotacionCodigo,
   toDepositoEngineResponse,
 } from "./merito.ts";
@@ -99,6 +100,14 @@ describe("Depósito v2 — mérito, placement y temperamento", () => {
   it("variedadRotacionCodigo sugiere el hueco del mapa", () => {
     assert.equal(sugerirRotacionCodigo([9, 9, 3]), "C1");
     assert.equal(sugerirRotacionCodigo([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), "C1");
+    assert.equal(sugerirRotacionCodigo([1, 3, 9]), "C2");
+  });
+
+  it("resolverRotacionCodigo no hace fallback automático a C1", () => {
+    assert.equal(resolverRotacionCodigo("C1", [1, 3, 9]), "C2");
+    assert.equal(resolverRotacionCodigo("", [1, 3, 9]), "C2");
+    assert.equal(resolverRotacionCodigo("C4", [1, 3, 9]), "C4");
+    assert.equal(resolverRotacionCodigo("C1", [9]), "C1");
   });
 
   it("toDepositoEngineResponse proyecta el contrato V2", () => {

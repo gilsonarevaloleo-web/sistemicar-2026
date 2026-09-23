@@ -1,7 +1,11 @@
 import React from "react";
 import { Eye } from "lucide-react";
 import type { DiagnosticoVolcado } from "@shared/deposito/engineConfig";
-import { DICCIONARIO_OJOS } from "@shared/deposito/engineConfig";
+import {
+  DICCIONARIO_OJOS,
+  etiquetaGradoMaestria,
+  placementOcultaGradoAnterior,
+} from "@shared/deposito/engineConfig";
 import {
   etiquetaGrado,
   type ExpedienteOjos,
@@ -28,6 +32,11 @@ export function DiagnosticoUniversidad({
   expediente?: ExpedienteOjos;
 }) {
   const ojo = DICCIONARIO_OJOS[diagnostico.codigoDominante];
+  const evaluacion = diagnostico.evaluacionGrado;
+  const soloGradoDetectado = placementOcultaGradoAnterior(evaluacion);
+  const badgeGradoActivo = soloGradoDetectado
+    ? etiquetaGradoMaestria(evaluacion.gradoDetectado)
+    : null;
 
   return (
     <section
@@ -48,18 +57,29 @@ export function DiagnosticoUniversidad({
           data-testid="deposito-nivel-carga"
         >
           Carga {NIVEL_LABEL[diagnostico.nivelCargaSugerido]}
-          {lectura && (
+          {badgeGradoActivo ? (
             <span
               className="block mt-1"
               data-testid="deposito-grado"
             >
-              {etiquetaGrado(lectura.grado)}
+              {badgeGradoActivo}
             </span>
-          )}
-          {expediente && (
-            <span className="block mt-1 text-white/45">
-              {etiquetaGrado(expediente.gradoOperador)}
-            </span>
+          ) : (
+            <>
+              {lectura && (
+                <span
+                  className="block mt-1"
+                  data-testid="deposito-grado"
+                >
+                  {etiquetaGrado(lectura.grado)}
+                </span>
+              )}
+              {expediente && (
+                <span className="block mt-1 text-white/45">
+                  {etiquetaGrado(expediente.gradoOperador)}
+                </span>
+              )}
+            </>
           )}
         </span>
       </div>
@@ -87,7 +107,7 @@ export function DiagnosticoUniversidad({
           className="text-[10px] tracking-[0.22em] mb-2"
           style={{ color: AZURE }}
         >
-          2 · PUNTO CIEGO / LO NO DICHO
+          2 · LECTURA DEL ESTADO
         </p>
         <p className="text-sm leading-relaxed text-white/80">
           {diagnostico.puntoCiego}
@@ -127,7 +147,7 @@ export function DiagnosticoUniversidad({
         </p>
       </div>
 
-      {diagnostico.validacionGrado && (
+      {diagnostico.validacionGrado && !soloGradoDetectado && (
         <div data-testid="deposito-validacion-grado">
           <p
             className="text-[10px] tracking-[0.22em] mb-2"
@@ -141,21 +161,23 @@ export function DiagnosticoUniversidad({
         </div>
       )}
 
-      {diagnostico.evaluacionGrado && (
+      {evaluacion && (
         <div data-testid="deposito-evaluacion-grado">
           <p
             className="text-[10px] tracking-[0.22em] mb-2"
-            style={{ color: diagnostico.evaluacionGrado.meritoReconocido ? GOLD : AZURE }}
+            style={{ color: evaluacion.meritoReconocido ? GOLD : AZURE }}
           >
-            {diagnostico.evaluacionGrado.meritoReconocido
-              ? `PLACEMENT · MÉRITO G${diagnostico.evaluacionGrado.gradoDetectado}`
-              : `PLACEMENT · G${diagnostico.evaluacionGrado.gradoDetectado}`}
+            {soloGradoDetectado
+              ? etiquetaGradoMaestria(evaluacion.gradoDetectado)
+              : evaluacion.meritoReconocido
+                ? `PLACEMENT · MÉRITO G${evaluacion.gradoDetectado}`
+                : `PLACEMENT · G${evaluacion.gradoDetectado}`}
           </p>
           <p
             className="text-sm leading-relaxed text-white/80"
             data-testid="deposito-mensaje-encuadre"
           >
-            {diagnostico.evaluacionGrado.mensajeEncuadre}
+            {evaluacion.mensajeEncuadre}
           </p>
         </div>
       )}
@@ -192,7 +214,12 @@ export function DiagnosticoUniversidad({
         </p>
       )}
 
-      {expediente && <MapaCalorOjos expediente={expediente} />}
+      {expediente && (
+        <MapaCalorOjos
+          expediente={expediente}
+          etiquetaGradoOverride={badgeGradoActivo ?? undefined}
+        />
+      )}
     </section>
   );
 }

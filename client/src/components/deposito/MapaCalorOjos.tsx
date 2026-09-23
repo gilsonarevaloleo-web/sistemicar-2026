@@ -12,11 +12,15 @@ export function MapaCalorOjos({
   expediente,
   compact = false,
   testId = "deposito-expediente",
+  etiquetaGradoOverride,
 }: {
   expediente: ExpedienteOjos;
   compact?: boolean;
   testId?: string;
+  etiquetaGradoOverride?: string;
 }) {
+  const etiqueta =
+    etiquetaGradoOverride ?? etiquetaGrado(expediente.gradoOperador);
   return (
     <div data-testid={testId}>
       <p
@@ -24,7 +28,7 @@ export function MapaCalorOjos({
         style={{ color: GOLD }}
       >
         MAPA DE CALOR · {expediente.rango}/{expediente.techo}
-        {compact ? "" : ` · ${etiquetaGrado(expediente.gradoOperador)}`}
+        {compact ? "" : ` · ${etiqueta}`}
       </p>
       <ol className="grid grid-cols-10 gap-1 mb-2" aria-label="Ojos nombrados">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
