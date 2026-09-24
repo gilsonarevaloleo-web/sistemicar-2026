@@ -6,6 +6,7 @@
 import type { Express, Request, Response } from "express";
 import {
   DICCIONARIO_CODIGOS,
+  aplicarCandadoEvaluacion,
   evaluarUmbralLocal,
   isCodigoNumero,
   isModoUmbral,
@@ -314,6 +315,8 @@ export function registerUmbralV2Routes(
         evaluacion = evaluarUmbralLocal(promptInput);
         source = "local_fallback";
       }
+
+      evaluacion = aplicarCandadoEvaluacion(promptInput, evaluacion);
 
       const moduloCompletado =
         evaluacion.aprobado === true && codigoActual === 10;

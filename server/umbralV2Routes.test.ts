@@ -137,6 +137,35 @@ describe("Umbral v2 — POST /api/umbral/evaluar", () => {
     );
   });
 
+  it("candado C3 Arena tumba aprobación de Gemini sin minutos", async () => {
+    await withServer(
+      async () =>
+        JSON.stringify({
+          aprobado: true,
+          feedbackConfrontativo: "Cruce. El reloj ya tiene bloque.",
+          codigoSiguiente: 4,
+        }),
+      async (base) => {
+        const res = await fetch(`${base}/api/umbral/evaluar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: "u-c3",
+            modo: "EXTERNO_VENTAS",
+            codigoActual: 3,
+            respuestaUsuario:
+              "Entrá a la jornada, creá los segmentos del día y dale nombre a tu tiempo. Esa es la revelación para tratar al reloj.",
+          }),
+        });
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.aprobado, false);
+        assert.equal(body.codigoSiguiente, 3);
+        assert.match(body.feedbackConfrontativo, /ocupación|minutos|primer paso/i);
+      },
+    );
+  });
+
   it("si Gemini falla, usa fallback local (200, no rompe UI)", async () => {
     await withServer(
       async () => {

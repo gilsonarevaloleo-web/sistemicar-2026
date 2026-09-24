@@ -866,6 +866,24 @@ export function ConsolaUmbral({
                   </p>
                 </div>
 
+                <div
+                  className="mt-4 border p-3"
+                  style={{ borderColor: `${GOLD}44`, background: `${GOLD}0d` }}
+                  data-testid="umbral-v2-criterio-cruce"
+                >
+                  <p
+                    className="text-[10px] tracking-widest"
+                    style={{ color: GOLD }}
+                  >
+                    CRITERIO DE CRUCE
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+                    {modo === "INTERNO_HABILIDAD"
+                      ? cfg.modoInterno.criterioAprobacion
+                      : cfg.modoExterno.criterioAprobacionVendedor}
+                  </p>
+                </div>
+
                 {logrosCodigo.length > 0 && (
                   <div
                     className="mt-4 border border-[#D4AF37]/25 bg-[#D4AF37]/08"
@@ -934,7 +952,9 @@ export function ConsolaUmbral({
                     placeholder={
                       modo === "INTERNO_HABILIDAD"
                         ? "Habla en el idioma de este código: el crack y el corte de hoy..."
-                        : "Responde al cliente en el idioma de este código — una frase que sostenga la 2ª resistencia..."
+                        : codigoActual === 3
+                          ? "Al Postergador: un primer paso en X minutos. Cero «después» ni revelación."
+                          : "Responde al cliente en el idioma de este código — una frase que sostenga la 2ª resistencia..."
                     }
                     className="w-full resize-y border border-white/15 bg-black/50 px-4 py-3 text-[15px] leading-relaxed text-white/90 outline-none placeholder:text-white/25 focus:border-[#00FFC3]/50"
                     style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif" }}
