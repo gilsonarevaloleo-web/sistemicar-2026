@@ -46,3 +46,28 @@ export function pasaCandadoCodigo(input: PromptEvaluacionInput): boolean {
   }
   return true;
 }
+
+/**
+ * Espejo + rewrite. La plantilla vieja no nombraba lo que trajeron
+ * y el operador no podía distinguir «el Maestro leyó» de un sello.
+ */
+export function feedbackRechazoC3Arena(texto: string): string {
+  const t = normalizar(texto);
+  const traido: string[] = [];
+  if (/\bjornada\b/.test(t)) traido.push("jornada");
+  if (/\bsegmentos?\b/.test(t)) traido.push("segmentos");
+  if (/\brevelaci/.test(t)) traido.push("revelación");
+  if (/\breloj\b/.test(t)) traido.push("el reloj");
+  if (/\bmedible\b/.test(t)) traido.push("día medible");
+  if (/\bsimple\b/.test(t)) traido.push("«es simple»");
+
+  const espejo = traido.length
+    ? `Trajiste ${traido.join(", ")}. Sin número de minutos.`
+    : "Hay discurso del tiempo. Sin número de minutos.";
+
+  return [
+    espejo,
+    "Eso es ocupación. Dame minutos y un primer paso.",
+    "Rewrite de hoy: En 8 minutos entras a Jornada, partes el día en 3 segmentos y le das nombre al primero.",
+  ].join(" ");
+}

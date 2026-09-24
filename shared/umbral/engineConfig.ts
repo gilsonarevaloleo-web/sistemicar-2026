@@ -11,7 +11,10 @@
  * Spec: umbral v2. primera parte (WPS)
  */
 
-import { pasaCandadoCodigo } from "./criterioCodigo.ts";
+import {
+  feedbackRechazoC3Arena,
+  pasaCandadoCodigo,
+} from "./criterioCodigo.ts";
 import {
   armarBloqueMaestro,
   feedbackMaestroLocal,
@@ -679,12 +682,15 @@ export function evaluarUmbralLocal(
     input.modo === "INTERNO_HABILIDAD"
       ? cfg.modoInterno.criterioAprobacion
       : cfg.modoExterno.criterioAprobacionVendedor;
-  const feedbackConfrontativo = feedbackMaestroLocal({
-    codigo: input.codigo,
-    modo: input.modo,
-    aprobado,
-    criterio,
-  });
+  const feedbackConfrontativo =
+    !aprobado && input.codigo === 3 && input.modo === "EXTERNO_VENTAS"
+      ? feedbackRechazoC3Arena(texto)
+      : feedbackMaestroLocal({
+          codigo: input.codigo,
+          modo: input.modo,
+          aprobado,
+          criterio,
+        });
 
   return {
     aprobado,
@@ -703,6 +709,14 @@ export function aplicarCandadoEvaluacion(
 ): EvaluacionGeminiJson {
   if (!ev.aprobado) return ev;
   if (pasaCandadoCodigo(input)) return ev;
+
+  if (input.codigo === 3 && input.modo === "EXTERNO_VENTAS") {
+    return {
+      aprobado: false,
+      feedbackConfrontativo: feedbackRechazoC3Arena(input.respuestaUsuario),
+      codigoSiguiente: input.codigo,
+    };
+  }
 
   const cfg = obtenerCodigo(input.codigo);
   const criterio =

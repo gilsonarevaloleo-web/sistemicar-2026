@@ -161,7 +161,7 @@ describe("Umbral v2 — POST /api/umbral/evaluar", () => {
         const body = await res.json();
         assert.equal(body.aprobado, false);
         assert.equal(body.codigoSiguiente, 3);
-        assert.match(body.feedbackConfrontativo, /ocupación|minutos|primer paso/i);
+        assert.match(body.feedbackConfrontativo, /jornada|8 minutos|ocupación/i);
       },
     );
   });

@@ -68,7 +68,9 @@ describe("Umbral — candado Código 3 Arena", () => {
     });
     assert.equal(ko.aprobado, false);
     assert.equal(ko.codigoSiguiente, 3);
-    assert.match(ko.feedbackConfrontativo, /ocupación|minutos|primer paso/i);
+    assert.match(ko.feedbackConfrontativo, /jornada|segmentos|revelaci/i);
+    assert.match(ko.feedbackConfrontativo, /8 minutos/i);
+    assert.match(ko.feedbackConfrontativo, /ocupación|primer paso/i);
 
     const ok = evaluarUmbralLocal({
       codigo: 3,
@@ -104,7 +106,7 @@ describe("Umbral — candado Código 3 Arena", () => {
     );
     assert.equal(ev.aprobado, false);
     assert.equal(ev.codigoSiguiente, 3);
-    assert.match(ev.feedbackConfrontativo, /ocupación|minutos/i);
+    assert.match(ev.feedbackConfrontativo, /jornada|8 minutos/i);
   });
 
   it("el candado no toca otros códigos", () => {
