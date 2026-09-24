@@ -179,14 +179,15 @@ export function direccionAbiertas(gates: DireccionGate[]): DireccionGate[] {
 
 /**
  * Sellar peldaño al lanzar solo si hay dirección viva.
- * Lista libre y rumbo sin oleada/punto quedan en presencia.
+ * Lista libre ya mide tiempo: con rumbo abierto también sella Dirección.
+ * Rumbo sin oleada/punto queda en presencia.
  */
 export function destinoCierreAlLanzarConGate(opts: {
   esListaLibre: boolean;
   tieneDireccion: boolean;
   direccionAbierta: boolean;
 }): DestinoCierre {
-  if (opts.esListaLibre) return "presencia";
+  void opts.esListaLibre;
   if (opts.tieneDireccion && opts.direccionAbierta) return "peldano";
   return "presencia";
 }

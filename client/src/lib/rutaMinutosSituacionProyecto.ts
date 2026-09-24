@@ -4,8 +4,9 @@
  * - Ring (tarea con tiempo): el clic acredita los segundos reales de la fila.
  *   Norte solo con destino explícito peldaño (Dirección). Un proyectoId
  *   sin ese sello alimenta presencia — no se reclama Dirección de ego.
- * - Lista libre (sin ring): el clic de fila no llena minutos; el cierre del
- *   vehículo sella la pared (`gastoTiempo`) como presencia.
+ * - Lista libre (reloj simple): el clic acredita los segundos reales de la
+ *   fila, igual que el ring — sin cupo ni meta. Norte solo con destino
+ *   peldaño. El cierre del vehículo sella la pared (`gastoTiempo`).
  * - La bolsa/trending NO se recalcula aquí: el kernel del ring ya lo hizo
  *   en applySituacionRowClose. Esta ruta es O(1) y segura para el gesto ms0.
  */
@@ -31,7 +32,7 @@ export type RutaMinutosSituacionInput = {
 export type RutaMinutosSituacion = {
   bucket: BucketMinutosProyecto;
   proyectoId?: string;
-  /** Segundos a acreditar (0 en lista libre). */
+  /** Segundos a acreditar (fila medida: ring o lista libre). */
   segundos: number;
   creditKey: string;
   fuente: FuenteMinutosSituacion;
@@ -71,8 +72,8 @@ export function situacionCreditKey(vehicleId: string, subId: string): string {
 
 /**
  * Clasifica a dónde va el tiempo del clic.
- * Lista libre → presencia (sin minutos).
- * Ring → Norte solo con destino peldaño explícito; el resto es presencia.
+ * Ring y lista libre acreditan segundos reales.
+ * Norte solo con destino peldaño explícito; el resto es presencia.
  */
 export function resolveRutaMinutosSituacion(
   input: RutaMinutosSituacionInput
@@ -92,16 +93,6 @@ export function resolveRutaMinutosSituacion(
     };
   }
 
-  if (input.fuente === "lista-libre") {
-    return {
-      bucket: "presencia",
-      proyectoId,
-      segundos: 0,
-      creditKey,
-      fuente: "lista-libre",
-    };
-  }
-
   const segundos = segundosTrabajadosAlClic(input.duracionRealSec);
   // El segundo del clic cuenta: si el kernel no dejó duración, 1 s de evidencia.
   const segundosAcreditados = segundos > 0 ? segundos : 1;
@@ -112,7 +103,7 @@ export function resolveRutaMinutosSituacion(
       proyectoId,
       segundos: segundosAcreditados,
       creditKey,
-      fuente: "ring-click",
+      fuente: input.fuente,
     };
   }
 
@@ -121,7 +112,7 @@ export function resolveRutaMinutosSituacion(
     proyectoId,
     segundos: segundosAcreditados,
     creditKey,
-    fuente: "ring-click",
+    fuente: input.fuente,
   };
 }
 

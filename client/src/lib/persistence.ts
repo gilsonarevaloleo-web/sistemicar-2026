@@ -510,7 +510,7 @@ export interface SubTarea {
   cupoFijo?: boolean;
   /** Si true, la fila está en el desglose con tiempo madre (2 PS al cumplir, cupo/+5′). */
   enDesgloseCronometro?: boolean;
-  /** Resultado en lista cronometrada; en lista libre suele omitirse (solo `completada`). */
+  /** Resultado de la fila (ring o lista libre cronometrada). */
   resultadoSituacion?: "pendiente" | "cumplido" | "fallado" | "avance";
   /** Motivo de cierre automático (entrenamiento / sistema). */
   motivoCierre?: "distraccion";

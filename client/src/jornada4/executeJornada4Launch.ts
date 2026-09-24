@@ -70,7 +70,7 @@ function resolveDireccionLaunch(
 /**
  * Lanza Conquista/Situacional en modo rápido o desglose.
  * - Conquista rápido: tarea = título + unidades (sin secuencia).
- * - Situacional libre: filas sin ring/meta.
+ * - Situacional libre: filas con reloj de pared (sin desglosador / sin ring).
  * - Situacional ring: filas + meta sellada (atómico en el paint/remote del launch).
  */
 export async function executeJornada4Launch(
@@ -215,11 +215,10 @@ export async function executeJornada4Launch(
     return lastId;
   }
 
+  const firstFila = (situacionFilas ?? []).map(f => f.trim()).find(Boolean);
   const situacionTitulo =
-    baseForm.tipoFlota === "situacion" && modo === "rapido"
-      ? baseForm.titulo.trim() ||
-        (situacionFilas ?? []).map(f => f.trim()).find(Boolean) ||
-        "Lista libre"
+    baseForm.tipoFlota === "situacion"
+      ? baseForm.titulo.trim() || firstFila || (modo === "rapido" ? "Lista libre" : "Ring")
       : baseForm.titulo;
 
   // Ring / lista libre: semilla ANTES del launch para paint + remote atómicos.

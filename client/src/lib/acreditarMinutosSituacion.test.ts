@@ -85,16 +85,15 @@ describe("acreditarMinutosSituacionEnProyecto", () => {
     assert.equal(getProyectosLocal(USER)[0]?.segundosNorteSituacion, 225);
   });
 
-  it("lista libre no acredita segundos aunque tenga dirección", async () => {
+  it("lista libre con Dirección acredita segundos a MIN NORTE", async () => {
     const p = await addProyecto(USER, { titulo: "Costura", etiqueta: "proyecto" });
     const updated = acreditarMinutosSituacionEnProyecto(USER, {
       vehicle: { id: "v_libre", proyectoId: p.id, destinoCierre: "peldano" },
       sub: { id: "fila_l", duracionRealSec: 999 },
       fuente: "lista-libre",
     });
-    assert.equal(updated?.segundosNorteSituacion, undefined);
-    assert.equal(updated?.segundosPresenciaRing, 0);
-    assert.equal(updated?.minutosTotales, 0);
+    assert.equal(updated?.segundosNorteSituacion, 999);
+    assert.equal(updated?.minutosTotales, 17);
   });
 
   it("ring con destino presencia va a segundosPresenciaRing", async () => {

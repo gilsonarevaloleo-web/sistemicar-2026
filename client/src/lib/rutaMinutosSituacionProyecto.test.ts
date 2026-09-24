@@ -75,7 +75,7 @@ describe("rutaMinutosSituacionProyecto", () => {
     assert.equal(r.segundos, 90);
   });
 
-  it("lista libre va a presencia sin minutos (no tiene tiempo)", () => {
+  it("lista libre acredita segundos y con peldaño va a Norte", () => {
     const r = resolveRutaMinutosSituacion({
       vehicleId: "v1",
       subId: "s1",
@@ -84,8 +84,21 @@ describe("rutaMinutosSituacionProyecto", () => {
       fuente: "lista-libre",
       duracionRealSec: 999,
     });
+    assert.equal(r.bucket, "norte");
+    assert.equal(r.segundos, 999);
+    assert.equal(r.fuente, "lista-libre");
+  });
+
+  it("lista libre sin sello Dirección alimenta presencia con minutos", () => {
+    const r = resolveRutaMinutosSituacion({
+      vehicleId: "v1",
+      subId: "s1",
+      vehicleProyectoId: "proy-1",
+      fuente: "lista-libre",
+      duracionRealSec: 80,
+    });
     assert.equal(r.bucket, "presencia");
-    assert.equal(r.segundos, 0);
+    assert.equal(r.segundos, 80);
   });
 
   it("el segundo del clic cuenta aunque duracionRealSec sea 0 — sin sello es presencia", () => {
@@ -101,10 +114,10 @@ describe("rutaMinutosSituacionProyecto", () => {
     assert.equal(segundosTrabajadosAlClic(0), 0);
   });
 
-  it("lanzar ring sella Dirección solo con rumbo abierto; lista libre es presencia", () => {
+  it("lanzar sella Dirección con rumbo abierto; lista libre ya no fuerza presencia", () => {
     assert.equal(
       destinoCierreAlLanzarSituacion({ esListaLibre: true, tieneDireccion: true, direccionAbierta: true }),
-      "presencia"
+      "peldano"
     );
     assert.equal(
       destinoCierreAlLanzarSituacion({ esListaLibre: false, tieneDireccion: true }),

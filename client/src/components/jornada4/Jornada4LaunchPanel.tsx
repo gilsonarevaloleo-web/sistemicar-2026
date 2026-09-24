@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
-  getDesglosadorMisionData,
   getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
 import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
@@ -180,7 +179,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     resolveDefaultObjetivoHoraParaRing(segmentoHoraFin ?? undefined) ?? defaultHoraPlus(30)
   );
   const [terminoDetalle, setTerminoDetalle] = useState("Al cerrar este bloque");
-  const [showMissionSugs, setShowMissionSugs] = useState(false);
   const [historialItems, setHistorialItems] = useState<DesglosadorSequenceItem[]>([]);
   const [historialSelected, setHistorialSelected] = useState<boolean[]>([]);
   const [historialSource, setHistorialSource] =
@@ -272,11 +270,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setHistorialSource(resolved.source);
   }, [titulo, tipo, modo, listasTick]);
 
-  const missionSuggestions =
-    tipo === "tiempo" && modo === "desglose" && titulo.trim().length >= 2
-      ? getDesglosadorMisionData(titulo, 5)
-      : [];
-
   const projection = useMemo(() => {
     void tick;
     if (tipo !== "tiempo") return null;
@@ -319,7 +312,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         defaultHoraPlus(30)
     );
     setTerminoDetalle("Al cerrar este bloque");
-    setShowMissionSugs(false);
     setHistorialItems([]);
     setHistorialSelected([]);
     setShowListasPanel(false);
@@ -351,7 +343,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const handleGuardarLista = useCallback(() => {
     const named = subs.filter(s => s.titulo.trim());
     const result = saveDesglosadorLista({
-      nombre: titulo.trim(),
+      nombre: titulo.trim() || named[0]!.titulo.trim(),
       items: named.map(s => ({
         titulo: s.titulo.trim(),
         ...(s.cantidadObjetivo.trim() ? { cantidadObjetivo: s.cantidadObjetivo.trim() } : {}),
@@ -406,23 +398,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const canLaunch =
     tipo != null &&
     (tipo === "tiempo"
-      ? (() => {
-          const validSubs = subs.filter(
-            s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0
-          );
-          if (validSubs.length === 0) return false;
-          // Independientes: cada unidad es su propia misión.
-          if (validSubs.length > 1 && conquistaMultiModo === "independientes") {
-            return true;
-          }
-          // Desglosador (secuencia): requiere nombre de misión.
-          return titulo.trim().length > 0;
-        })()
+      ? subs.some(s => s.titulo.trim() && Number(s.cantidadObjetivo) > 0)
       : modo === "rapido"
         ? filas.some(f => f.trim())
-        : titulo.trim().length > 0 &&
-          filas.some(f => f.trim()) &&
-          situacionMinHasta != null);
+        : filas.some(f => f.trim()) && situacionMinHasta != null);
 
   const handleLaunch = useCallback(async () => {
     if (!tipo || saving || !canLaunch) return;
@@ -447,7 +426,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         id = await onLaunch({
           titulo: asIndependientes
             ? ""
-            : titulo.trim() || validSubs[0]!.titulo.trim(),
+            : validSubs[0]!.titulo.trim(),
           tipoFlota: "tiempo",
           modo: "desglose",
           desglosadorSubs: asIndependientes ? undefined : validSubs,
@@ -475,7 +454,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         });
       } else {
         id = await onLaunch({
-          titulo,
+          titulo: filas.map(f => f.trim()).find(Boolean) || "",
           tipoFlota: "situacion",
           modo: "desglose",
           situacionFilas: filas,
@@ -744,7 +723,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         {
                           id: "rapido" as const,
                           label: "Lista libre",
-                          hint: "Filas directas · sin meta ni presión",
+                          hint: "Una a la vez · tiempo al proyecto",
                           icon: Zap,
                         },
                         {
@@ -816,9 +795,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         : "Desglosador · secuencia"}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
-                      Misión + unidades con cantidad y récord. Si un lote no sale de la
-                      misión, dale título propio (familia). Al añadir 2+ unidades puedes
-                      elegir secuencia (un desglosador) o independientes.
+                      Unidades con cantidad y récord. El rumbo va al proyecto. Al añadir
+                      2+ unidades puedes elegir secuencia (un desglosador) o independientes.
                     </p>
                   </div>
                   )}
@@ -892,120 +870,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                     onBeforeHubNavigate={closeBeforeHubNavigate}
                   />
 
-                  {/* Nombre de misión: Conquista desglosador + Ring (no lista libre / independientes) */}
-                  {((tipo === "tiempo" &&
-                    !(
-                      subs.filter(s => s.titulo.trim()).length > 1 &&
-                      conquistaMultiModo === "independientes"
-                    )) ||
-                    (tipo === "situacion" && modo === "desglose")) ? (
-                  <div>
-                    <label
-                      className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
-                      style={{ color: GOLD }}
-                    >
-                      Nombre de la misión
-                    </label>
-                    <p className="text-[8px] leading-snug -mt-1 mb-1.5" style={{ color: MUTED }}>
-                      Ese nombre es el programa: imagen detallada antes de ejecutar.
-                    </p>
-                    <div className="relative">
-                      <input
-                        value={titulo}
-                        onChange={e => {
-                          setTitulo(e.target.value);
-                          if (tipo === "tiempo") {
-                            setShowMissionSugs(e.target.value.trim().length >= 2);
-                          }
-                        }}
-                        onFocus={() => {
-                          if (
-                            tipo === "tiempo" &&
-                            titulo.trim().length >= 2
-                          ) {
-                            setShowMissionSugs(true);
-                          }
-                        }}
-                        onBlur={() => setTimeout(() => setShowMissionSugs(false), 150)}
-                        placeholder={
-                          tipo === "tiempo"
-                            ? "Ej: Armado de bolsillo"
-                            : "Ej: Enfoque de la tarde"
-                        }
-                        className="w-full p-3.5 rounded-xl bg-black/50 border-2 text-base focus:outline-none"
-                        style={{
-                          color: INK,
-                          borderColor: titulo
-                            ? FLOTA_CONFIG[tipo].color
-                            : "rgba(255,255,255,0.14)",
-                        }}
-                        autoFocus
-                        data-testid="jornada4-launch-titulo"
-                      />
-                      {tipo === "tiempo" && showMissionSugs && missionSuggestions.length > 0 ? (
-                        <div
-                          className="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border overflow-hidden max-h-48 overflow-y-auto"
-                          style={{
-                            backgroundColor: "#0f0f0f",
-                            borderColor: `${GOLD}40`,
-                            boxShadow: `0 4px 20px ${GOLD}20`,
-                          }}
-                          data-testid="jornada4-mission-suggestions"
-                        >
-                          {missionSuggestions.map((s, i) => (
-                            <button
-                              key={`${s.titulo}-${i}`}
-                              type="button"
-                              onMouseDown={e => {
-                                e.preventDefault();
-                                setTitulo(s.titulo);
-                                setShowMissionSugs(false);
-                              }}
-                              className="w-full flex flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-white/5"
-                              data-testid={`jornada4-mission-sug-${i}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <ListTodo size={10} style={{ color: GOLD }} />
-                                <span className="text-sm truncate" style={{ color: INK }}>
-                                  {s.titulo}
-                                </span>
-                                {s.source === "lista" ? <ListaGuardadaBadge /> : null}
-                                <span
-                                  className="text-[8px] font-mono font-black ml-auto shrink-0"
-                                  style={{ color: GOLD }}
-                                >
-                                  {s.subs.length} ops
-                                </span>
-                              </div>
-                              {s.subs.length > 0 ? (
-                                <div className="pl-4 flex flex-wrap gap-x-1 items-center">
-                                  {s.subs.slice(0, 8).map((sub, j) => (
-                                    <span
-                                      key={j}
-                                      className="text-[8px] font-mono whitespace-nowrap"
-                                      style={{ color: "rgba(212,175,55,0.55)" }}
-                                    >
-                                      {j > 0 ? (
-                                        <span style={{ color: "rgba(255,255,255,0.2)" }}>→ </span>
-                                      ) : null}
-                                      {sub.nombre}
-                                    </span>
-                                  ))}
-                                  {s.subs.length > 8 ? (
-                                    <span className="text-[8px] font-mono" style={{ color: MUTED }}>
-                                      +{s.subs.length - 8}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  ) : null}
-
                   {modo === "rapido" && tipo === "situacion" ? (
                     <div className="space-y-3" data-testid="jornada4-launch-lista-libre">
                       <p
@@ -1016,8 +880,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           backgroundColor: "rgba(255,255,255,0.03)",
                         }}
                       >
-                        Lista libre: vas directo a las tareas. Sin título de misión, sin meta
-                        de ring, sin presión de tiempo. Puedes añadir más filas.
+                        Reloj simple: una tarea a la vez, sin abrir desglosador. El tiempo
+                        corre y se envía al rumbo del proyecto. Añade la siguiente cuando
+                        toque.
                       </p>
                       <p
                         className="text-[10px] font-black uppercase tracking-wider"
@@ -1056,7 +921,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 onClick={() => {
                                   setFilas(filas.filter((_, i) => i !== idx));
                                   setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
-                                  setFilasSeccionTitulos(filasSeccionTitulos.filter((_, i) => i !== idx));
                                 }}
                                 className="p-2 rounded-lg hover:bg-white/5"
                               >
@@ -1064,26 +928,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
-                          <input
-                            value={filasSeccionTitulos[idx] ?? ""}
-                            onChange={e => {
-                              setFilasSeccionTitulos(prev => {
-                                const next = [...prev];
-                                while (next.length <= idx) next.push("");
-                                next[idx] = e.target.value;
-                                return next;
-                              });
-                            }}
-                            placeholder="Familia / título propio (vacío = sin familia)"
-                            className="w-full p-2.5 rounded-xl bg-black/50 border text-sm focus:outline-none"
-                            style={{
-                              color: INK,
-                              borderColor: (filasSeccionTitulos[idx] ?? "").trim()
-                                ? GOLD
-                                : "rgba(255,255,255,0.12)",
-                            }}
-                            data-testid={`jornada4-launch-libre-seccion-${idx}`}
-                          />
                           <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
@@ -1107,10 +951,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          const last = [...filasSeccionTitulos].reverse().find(s => s.trim());
                           setFilas([...filas, ""]);
                           setFilasProyectoIds([...filasProyectoIds, ""]);
-                          setFilasSeccionTitulos([...filasSeccionTitulos, last ?? ""]);
                         }}
                         className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
                         style={{
@@ -1119,7 +961,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
                         }}
                       >
-                        <Plus size={12} /> Añadir tarea
+                        <Plus size={12} /> Siguiente tarea
                       </button>
                     </div>
                   ) : null}
@@ -1401,37 +1243,15 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           sub.tiempoRecordMinPerUnit
                         );
                         const showSug = activeSubSugIdx === idx && suggestions.length > 0;
-                        const seccion = sub.seccionTitulo?.trim() || "";
-                        const prevSeccion = idx > 0 ? (subs[idx - 1]?.seccionTitulo?.trim() || "") : "";
-                        const showFamiliaHeader =
-                          conquistaMultiModo === "secuencia" &&
-                          seccion.length > 0 &&
-                          seccion !== prevSeccion;
                         return (
                           <div key={sub.tempId} className="space-y-1.5">
-                        {showFamiliaHeader ? (
-                          <p
-                            className="text-[8px] font-black uppercase tracking-widest px-1"
-                            style={{ color: GOLD }}
-                            data-testid={`jornada4-launch-familia-${idx}`}
-                          >
-                            {seccion}
-                            <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
-                              · título propio
-                            </span>
-                          </p>
-                        ) : null}
                           <div
                             className="rounded-2xl border-2 p-3.5 space-y-3"
                             style={{
-                              borderColor: seccion
-                                ? `${GOLD}45`
-                                : sub.titulo.trim()
-                                  ? `${ORANGE}45`
-                                  : "rgba(255,255,255,0.12)",
-                              backgroundColor: seccion
-                                ? "rgba(212,175,55,0.06)"
-                                : "rgba(249,115,22,0.06)",
+                              borderColor: sub.titulo.trim()
+                                ? `${ORANGE}45`
+                                : "rgba(255,255,255,0.12)",
+                              backgroundColor: "rgba(249,115,22,0.06)",
                               boxShadow: sub.titulo.trim()
                                 ? `0 0 18px rgba(249,115,22,0.08)`
                                 : undefined,
@@ -1656,44 +1476,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 Sin récord = primer ciclo (se mide al Cumplido)
                               </p>
                             )}
-                            {conquistaMultiModo === "secuencia" ? (
-                              <div>
-                                <label
-                                  className="text-[10px] font-black uppercase tracking-wider block mb-1.5"
-                                  style={{ color: GOLD }}
-                                >
-                                  Familia / título propio
-                                </label>
-                                <input
-                                  value={sub.seccionTitulo ?? ""}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setSubs(prev =>
-                                      prev.map((s, i) =>
-                                        i === idx
-                                          ? {
-                                              ...s,
-                                              seccionTitulo: val.trim() ? val : undefined,
-                                            }
-                                          : s
-                                      )
-                                    );
-                                  }}
-                                  placeholder={
-                                    titulo.trim()
-                                      ? `Vacío = sale de «${titulo.trim()}»`
-                                      : "Vacío = sale de la misión"
-                                  }
-                                  className="w-full p-3 rounded-xl bg-black/60 border-2 text-sm focus:outline-none"
-                                  style={{
-                                    color: INK,
-                                    borderColor: seccion ? GOLD : "rgba(255,255,255,0.14)",
-                                  }}
-                                  data-testid={`jornada4-launch-sub-seccion-${idx}`}
-                                />
-                              </div>
-                            ) : null}
-
                             <DireccionDestinoPicker
                               value={sub.proyectoId ?? ""}
                               onChange={id => {
@@ -1743,61 +1525,21 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         </p>
                       )}
 
-                      <div
-                        className={
-                          conquistaMultiModo === "secuencia"
-                            ? "grid grid-cols-2 gap-2"
-                            : undefined
-                        }
+                      <button
+                        type="button"
+                        onClick={() => setSubs([...subs, makeSub()])}
+                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        style={{
+                          backgroundColor: `${ORANGE}12`,
+                          color: ORANGE,
+                          border: `1px dashed ${ORANGE}45`,
+                        }}
+                        data-testid="jornada4-launch-add-unidad"
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const last = [...subs].reverse().find(s => s.seccionTitulo?.trim());
-                            setSubs([
-                              ...subs,
-                              makeSub(
-                                conquistaMultiModo === "secuencia"
-                                  ? last?.seccionTitulo?.trim()
-                                  : undefined
-                              ),
-                            ]);
-                          }}
-                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                          style={{
-                            backgroundColor: `${ORANGE}12`,
-                            color: ORANGE,
-                            border: `1px dashed ${ORANGE}45`,
-                          }}
-                          data-testid="jornada4-launch-add-unidad"
-                        >
-                          <Plus size={12} /> Añadir unidad
-                        </button>
-                        {conquistaMultiModo === "secuencia" ? (
-                          <button
-                            type="button"
-                            onClick={() => setSubs([...subs, makeSub()])}
-                            className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                            style={{
-                              backgroundColor: `${GOLD}12`,
-                              color: GOLD,
-                              border: `1px dashed ${GOLD}45`,
-                            }}
-                            data-testid="jornada4-launch-add-familia"
-                          >
-                            <Plus size={12} /> Título propio
-                          </button>
-                        ) : null}
-                      </div>
-                      {conquistaMultiModo === "secuencia" ? (
-                        <p className="text-[8px] leading-snug text-center" style={{ color: MUTED }}>
-                          Título propio = lote con nombre (armado de bolsillos) dentro de
-                          esta misión. El rumbo del proyecto se ordena en Dirección.
-                        </p>
-                      ) : null}
+                        <Plus size={12} /> Añadir unidad
+                      </button>
                       {conquistaMultiModo === "secuencia" &&
-                      subs.filter(s => s.titulo.trim()).length >= 2 &&
-                      titulo.trim().length >= 2 ? (
+                      subs.filter(s => s.titulo.trim()).length >= 2 ? (
                         <button
                           type="button"
                           onClick={handleGuardarLista}
@@ -1900,7 +1642,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                                 onClick={() => {
                                   setFilas(filas.filter((_, i) => i !== idx));
                                   setFilasProyectoIds(filasProyectoIds.filter((_, i) => i !== idx));
-                                  setFilasSeccionTitulos(filasSeccionTitulos.filter((_, i) => i !== idx));
                                 }}
                                 className="p-2 rounded-lg hover:bg-white/5"
                               >
@@ -1908,30 +1649,6 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               </button>
                             ) : null}
                           </div>
-                          <input
-                            value={filasSeccionTitulos[idx] ?? ""}
-                            onChange={e => {
-                              setFilasSeccionTitulos(prev => {
-                                const next = [...prev];
-                                while (next.length <= idx) next.push("");
-                                next[idx] = e.target.value;
-                                return next;
-                              });
-                            }}
-                            placeholder={
-                              titulo.trim()
-                                ? `Familia · vacío = sale de «${titulo.trim()}»`
-                                : "Familia / título propio"
-                            }
-                            className="w-full p-2.5 rounded-xl bg-black/50 border text-sm focus:outline-none"
-                            style={{
-                              color: INK,
-                              borderColor: (filasSeccionTitulos[idx] ?? "").trim()
-                                ? GOLD
-                                : "rgba(255,255,255,0.12)",
-                            }}
-                            data-testid={`jornada4-launch-ring-seccion-${idx}`}
-                          />
                           <DireccionDestinoPicker
                             value={filasProyectoIds[idx] ?? ""}
                             onChange={id => {
@@ -1952,48 +1669,22 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           />
                         </div>
                       ))}
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const last = [...filasSeccionTitulos].reverse().find(s => s.trim());
-                            setFilas([...filas, ""]);
-                            setFilasProyectoIds([...filasProyectoIds, ""]);
-                            setFilasSeccionTitulos([...filasSeccionTitulos, last ?? ""]);
-                          }}
-                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                          style={{
-                            backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
-                            color: FLOTA_CONFIG.situacion.color,
-                            border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
-                          }}
-                          data-testid="jornada4-launch-ring-add-fila"
-                        >
-                          <Plus size={12} /> Añadir fila
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilas([...filas, ""]);
-                            setFilasProyectoIds([...filasProyectoIds, ""]);
-                            setFilasSeccionTitulos([...filasSeccionTitulos, ""]);
-                          }}
-                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                          style={{
-                            backgroundColor: `${GOLD}12`,
-                            color: GOLD,
-                            border: `1px dashed ${GOLD}45`,
-                          }}
-                          data-testid="jornada4-launch-ring-add-familia"
-                        >
-                          <Plus size={12} /> Título propio
-                        </button>
-                      </div>
-                      <p className="text-[8px] leading-snug text-center" style={{ color: MUTED }}>
-                        Título propio agrupa filas que no salen del bloque. El cupo sigue
-                        por fila — no se anida otro ring. Divisiones de una sola fila
-                        siguen en detalles.
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilas([...filas, ""]);
+                          setFilasProyectoIds([...filasProyectoIds, ""]);
+                        }}
+                        className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        style={{
+                          backgroundColor: `${FLOTA_CONFIG.situacion.color}12`,
+                          color: FLOTA_CONFIG.situacion.color,
+                          border: `1px dashed ${FLOTA_CONFIG.situacion.color}45`,
+                        }}
+                        data-testid="jornada4-launch-ring-add-fila"
+                      >
+                        <Plus size={12} /> Añadir fila
+                      </button>
                     </div>
                   ) : null}
                 </>
@@ -2033,10 +1724,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       ? conquistaMultiModo === "independientes" &&
                         subs.filter(s => s.titulo.trim()).length > 1
                         ? "Cada unidad necesita nombre + cantidad"
-                        : "Misión + unidades (nombre y cantidad)"
+                        : "Unidades (nombre y cantidad)"
                       : modo === "rapido"
-                        ? "Escribe al menos una tarea de la lista"
-                        : "Escribe misión + filas + hora de término"}
+                        ? "Escribe al menos una tarea"
+                        : "Escribe filas + hora de término"}
                   </p>
                 ) : null}
                 <button
