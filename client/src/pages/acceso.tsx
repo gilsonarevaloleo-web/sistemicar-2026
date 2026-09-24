@@ -5,26 +5,34 @@ import { Sparkles, Shield, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
-import { signInWithGoogle, isFirebaseConfigured, getGoogleAuthErrorMessage } from "@/lib/firebase";
+import { signInWithGoogle, isFirebaseConfigured, getGoogleAuthErrorMessage, isUserAnonymous } from "@/lib/firebase";
 import { sendWelcomeEmail } from "@/lib/emailApi";
 import { clearMigrationPending } from "@/lib/persistence";
+import { claimPendingPurchases } from "@/lib/claimPurchases";
+import { safePostLoginPath } from "@shared/clientAccount";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 
 const GOLD = "#D4AF37";
 const COBALT = "#0047AB";
 
+function resolveAccesoNext(): string {
+  if (typeof window === "undefined") return "/menu";
+  return safePostLoginPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 export default function Acceso() {
   const [, navigate] = useLocation();
   const { user, loading } = useAuthContext();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const googleReady = Boolean(user?.email) && !isUserAnonymous();
 
   useEffect(() => {
-    if (user) {
-      navigate("/menu");
-    }
-  }, [user, navigate]);
+    if (!googleReady) return;
+    void claimPendingPurchases();
+    navigate(resolveAccesoNext());
+  }, [googleReady, navigate]);
 
-  if (user) {
+  if (googleReady) {
     return null;
   }
 
@@ -48,11 +56,12 @@ export default function Acceso() {
       const isNewUser = result?.user?.metadata?.creationTime === result?.user?.metadata?.lastSignInTime;
       if (isNewUser && result?.user?.email) {
         sendWelcomeEmail(result.user.email, result.user.displayName || undefined);
-        toast.success("¡Bienvenido al Umbral! Revisa tu correo.");
+        toast.success("Cuenta creada. Si ya pagaste, tu plan se activa ahora.");
       } else {
         toast.success("¡Bienvenido de vuelta!");
       }
-      navigate("/menu");
+      void claimPendingPurchases();
+      navigate(resolveAccesoNext());
     } catch (error: unknown) {
       console.error("Error en login con Google:", error);
       localStorage.removeItem("sistemicar_google_redirect_pending");
@@ -128,7 +137,10 @@ export default function Acceso() {
             Accede a tu Comando
           </h1>
           <p className="text-gray-400 text-lg">
-            Tus puntos y progreso te esperan
+            Aquí se crea tu cuenta: Continuar con Google
+          </p>
+          <p className="text-gray-500 text-sm mt-2">
+            Usa el mismo Gmail del pago (Yape / PayPal). No hay usuario y contraseña.
           </p>
         </motion.div>
 

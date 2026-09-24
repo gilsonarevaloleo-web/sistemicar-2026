@@ -9,6 +9,10 @@ import { isOwner } from "@/lib/owner";
 import { auth, getUserEmail } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
+import {
+  buildClientAccountWhatsapp,
+  displayNameForPlan,
+} from "@shared/clientAccount";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -63,6 +67,37 @@ type AdminUserLookup = {
   subscriptionPlan?: string | null;
 };
 
+const ADMIN_TABS = [
+  "users",
+  "payments",
+  "recovery",
+  "laboratorio",
+  "adn",
+  "creditos",
+  "modulos",
+  "vendedores",
+] as const;
+type AdminTab = (typeof ADMIN_TABS)[number];
+
+function tabFromUrl(): AdminTab {
+  if (typeof window === "undefined") return "modulos";
+  const raw = new URLSearchParams(window.location.search).get("tab");
+  return raw && (ADMIN_TABS as readonly string[]).includes(raw)
+    ? (raw as AdminTab)
+    : "modulos";
+}
+
+function unlockAdminTouches(): void {
+  if (typeof document === "undefined") return;
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  document.body.style.pointerEvents = "";
+  document.documentElement.style.pointerEvents = "";
+}
+
+const TAB_BTN =
+  "relative z-20 min-h-11 px-4 py-2 rounded-lg text-sm font-bold transition touch-manipulation";
+
 export default function AdminGilson() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
@@ -74,7 +109,7 @@ export default function AdminGilson() {
   const [users, setUsers] = useState<User[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"users" | "payments" | "recovery" | "laboratorio" | "adn" | "creditos" | "modulos" | "vendedores">("users");
+  const [activeTab, setActiveTab] = useState<AdminTab>(tabFromUrl);
   const [loginLoading, setLoginLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
@@ -120,6 +155,17 @@ export default function AdminGilson() {
   const [moduleSaving, setModuleSaving] = useState(false);
   const [moduleSearchResult, setModuleSearchResult] = useState<AdminUserLookup | null>(null);
   const [moduleSearching, setModuleSearching] = useState(false);
+  const [moduleNotFound, setModuleNotFound] = useState(false);
+  const [moduleClientWhatsapp, setModuleClientWhatsapp] = useState("");
+  const [moduleGrants, setModuleGrants] = useState<Array<{
+    id: number;
+    buyerEmail: string;
+    planId: string;
+    status: string;
+    source: string;
+    createdAt: string;
+  }>>([]);
+  const [moduleGrantsLoading, setModuleGrantsLoading] = useState(false);
   const [sellerSales, setSellerSales] = useState<Array<{
     id: string;
     sellerRef: string;
@@ -270,6 +316,22 @@ export default function AdminGilson() {
     }
   };
 
+  const loadModuleGrants = async () => {
+    setModuleGrantsLoading(true);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch("/api/admin/modules/grants?limit=30", { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error cargando activaciones");
+      setModuleGrants(data.grants || []);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error cargando historial";
+      toast.error(msg);
+    } finally {
+      setModuleGrantsLoading(false);
+    }
+  };
+
   const grantModuleAdmin = async (targetEmail: string) => {
     if (!targetEmail.trim()) {
       toast.error("Ingresa el email del comprador");
@@ -289,9 +351,26 @@ export default function AdminGilson() {
         }),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        toast.warning(data.error || "Esta referencia ya fue activada");
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Error activando módulo");
-      toast.success(data.message || "Módulo activado");
+      const whatsapp =
+        typeof data.clientWhatsapp === "string" && data.clientWhatsapp
+          ? data.clientWhatsapp
+          : buildClientAccountWhatsapp(
+              targetEmail.trim(),
+              displayNameForPlan(modulePlanId),
+            );
+      setModuleClientWhatsapp(whatsapp);
+      if (data.pending) {
+        toast.success("Pago registrado. El cliente aún debe crear su cuenta en /acceso.");
+      } else {
+        toast.success(data.message || "Módulo activado");
+      }
       setModuleNote("");
+      void loadModuleGrants();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Error activando módulo");
     } finally {
@@ -354,6 +433,9 @@ export default function AdminGilson() {
   useEffect(() => {
     if (activeTab === "creditos" && isAuthenticated) {
       void loadCreditDeliveries();
+    }
+    if (activeTab === "modulos" && isAuthenticated) {
+      void loadModuleGrants();
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
@@ -441,7 +523,16 @@ export default function AdminGilson() {
       setUsers(DEMO_USERS);
       setPayments(DEMO_PAYMENTS);
     }
+    unlockAdminTouches();
   }, []);
+
+  const goToTab = (tab: AdminTab) => {
+    setActiveTab(tab);
+    const next = `/admin-gilson?tab=${tab}`;
+    if (typeof window !== "undefined" && window.location.search !== `?tab=${tab}`) {
+      window.history.replaceState({}, "", next);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated || !user || motorsQuiet) return;
@@ -678,7 +769,7 @@ export default function AdminGilson() {
   }
 
   return (
-    <div className="min-h-screen p-4" style={{ backgroundColor: "#020202" }}>
+    <div className="min-h-screen p-4 pb-28 relative z-20" style={{ backgroundColor: "#020202" }}>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -686,20 +777,22 @@ export default function AdminGilson() {
             <h1 className="text-xl font-black text-white">Panel Admin</h1>
           </div>
           <button
+            type="button"
             onClick={() => {
               sessionStorage.removeItem("adminAuth");
               setIsAuthenticated(false);
             }}
-            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-bold"
+            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 text-sm font-bold touch-manipulation"
           >
             Salir
           </button>
         </div>
 
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="relative z-20 flex gap-2 mb-6 flex-wrap">
           <button
-            onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("users")}
+            className={`${TAB_BTN} ${
               activeTab === "users" ? "bg-amber-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -707,8 +800,9 @@ export default function AdminGilson() {
             Usuarios ({users.length})
           </button>
           <button
-            onClick={() => setActiveTab("payments")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("payments")}
+            className={`${TAB_BTN} ${
               activeTab === "payments" ? "bg-amber-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -716,8 +810,9 @@ export default function AdminGilson() {
             Pagos ({payments.length})
           </button>
           <button
-            onClick={() => setActiveTab("recovery")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("recovery")}
+            className={`${TAB_BTN} ${
               activeTab === "recovery" ? "bg-green-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -725,8 +820,9 @@ export default function AdminGilson() {
             Recuperar Datos
           </button>
           <button
-            onClick={() => setActiveTab("laboratorio")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
+            type="button"
+            onClick={() => goToTab("laboratorio")}
+            className={`${TAB_BTN} ${
               activeTab === "laboratorio" ? "bg-purple-500 text-white" : "bg-white/5 text-slate-400"
             }`}
           >
@@ -734,8 +830,9 @@ export default function AdminGilson() {
             Laboratorio
           </button>
             <button
-              onClick={() => setActiveTab("adn")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("adn")}
+              className={`${TAB_BTN} ${
                 activeTab === "adn" ? "bg-emerald-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-adn"
@@ -743,8 +840,9 @@ export default function AdminGilson() {
               ADN Soberano
             </button>
             <button
-              onClick={() => setActiveTab("creditos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("creditos")}
+              className={`${TAB_BTN} ${
                 activeTab === "creditos" ? "bg-cyan-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-creditos"
@@ -753,8 +851,9 @@ export default function AdminGilson() {
               Créditos Espejo
             </button>
             <button
-              onClick={() => setActiveTab("modulos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("modulos")}
+              className={`${TAB_BTN} ${
                 activeTab === "modulos" ? "bg-sky-500 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-modulos"
@@ -763,8 +862,9 @@ export default function AdminGilson() {
               Módulos
             </button>
             <button
-              onClick={() => setActiveTab("vendedores")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              type="button"
+              onClick={() => goToTab("vendedores")}
+              className={`${TAB_BTN} ${
                 activeTab === "vendedores" ? "bg-emerald-600 text-white" : "bg-white/5 text-slate-400"
               }`}
               data-testid="tab-vendedores"
@@ -773,8 +873,9 @@ export default function AdminGilson() {
               Vendedores
             </button>
             <button
+              type="button"
               onClick={() => navigate("/admin-semillas")}
-              className="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/30"
+              className={`${TAB_BTN} bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 hover:bg-[#D4AF37]/30`}
               data-testid="btn-admin-semillas"
             >
               <Sprout size={14} className="inline mr-1" />
@@ -1473,7 +1574,7 @@ export default function AdminGilson() {
             <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20">
               <h3 className="text-sky-400 font-bold mb-3">Activar Planificación (Yape / manual)</h3>
               <p className="text-xs text-slate-400 mb-4">
-                Activa módulos en Firebase Auth + Firestore. El comprador debe haber iniciado sesión con Google usando el mismo correo que pagó por Yape.
+                La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Si aún no entró, registra la activación pendiente y mándale el mensaje de WhatsApp: al entrar con ese mismo Gmail el plan se enciende solo.
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
@@ -1512,7 +1613,10 @@ export default function AdminGilson() {
                 <input
                   type="email"
                   value={moduleEmail}
-                  onChange={(e) => setModuleEmail(e.target.value)}
+                  onChange={(e) => {
+                    setModuleEmail(e.target.value);
+                    setModuleNotFound(false);
+                  }}
                   placeholder="Email del comprador"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
                   data-testid="input-module-email"
@@ -1527,13 +1631,21 @@ export default function AdminGilson() {
                       const result = await lookupUserAdmin(moduleEmail.trim());
                       if (result?.found && result.uid) {
                         setModuleSearchResult(result);
+                        setModuleNotFound(false);
                         toast.success("Usuario encontrado en Firebase Auth");
                       } else {
                         setModuleSearchResult(null);
+                        setModuleNotFound(true);
+                        setModuleClientWhatsapp(
+                          buildClientAccountWhatsapp(
+                            moduleEmail.trim(),
+                            displayNameForPlan(modulePlanId),
+                          ),
+                        );
                         toast.info(
                           result?.adminReady === false
                             ? "No encontrado. Configura FIREBASE_SERVICE_ACCOUNT_JSON en el servidor para activar módulos."
-                            : "No hay cuenta con ese correo en Firebase Auth. Debe iniciar sesión con Google al menos una vez."
+                            : "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
                         );
                       }
                     } catch {
@@ -1567,6 +1679,16 @@ export default function AdminGilson() {
                   )}
                 </div>
               )}
+              {moduleNotFound && (
+                <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
+                  <p className="font-bold">No está en Firebase Auth todavía.</p>
+                  <p>
+                    La cuenta se crea cuando el cliente abre{" "}
+                    <span className="text-white">sistemicar.app/acceso</span> y pulsa Continuar con Google
+                    con este correo. Puedes registrar el pago ahora; se activa al entrar.
+                  </p>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => void grantModuleAdmin(moduleEmail)}
@@ -1574,8 +1696,72 @@ export default function AdminGilson() {
                 className="w-full px-4 py-3 rounded-lg bg-sky-500 text-white font-bold text-sm hover:bg-sky-600 disabled:opacity-50"
                 data-testid="button-grant-module"
               >
-                {moduleSaving ? "Activando..." : `Activar ${modulePlanId}`}
+                {moduleSaving
+                  ? "Activando..."
+                  : moduleNotFound
+                    ? `Registrar ${displayNameForPlan(modulePlanId)} (pendiente)`
+                    : `Activar ${displayNameForPlan(modulePlanId)}`}
               </button>
+              {moduleClientWhatsapp && (
+                <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">
+                    Mensaje para el cliente (WhatsApp)
+                  </p>
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans mb-2">
+                    {moduleClientWhatsapp}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(moduleClientWhatsapp);
+                        toast.success("Mensaje copiado");
+                      } catch {
+                        toast.error("No se pudo copiar");
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-bold"
+                    data-testid="button-copy-client-acceso"
+                  >
+                    Copiar para WhatsApp
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-bold text-sm">Activaciones (Yape / MP)</h3>
+                <button
+                  type="button"
+                  onClick={() => void loadModuleGrants()}
+                  className="text-xs text-sky-400"
+                  disabled={moduleGrantsLoading}
+                >
+                  Actualizar
+                </button>
+              </div>
+              {moduleGrantsLoading ? (
+                <p className="text-xs text-slate-500">Cargando...</p>
+              ) : moduleGrants.length === 0 ? (
+                <p className="text-xs text-slate-500">Sin activaciones registradas aún.</p>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {moduleGrants.map((g) => (
+                    <div key={g.id} className="p-3 rounded-lg bg-black/30 border border-white/5 text-xs">
+                      <div className="flex justify-between gap-2 mb-1">
+                        <span className="font-black text-sky-400">{displayNameForPlan(g.planId)}</span>
+                        <span className={g.status === "granted" ? "text-emerald-400" : "text-amber-400"}>
+                          {g.status === "granted" ? "activado" : "pendiente de /acceso"}
+                        </span>
+                      </div>
+                      <p className="text-white">{g.buyerEmail}</p>
+                      <p className="text-slate-500">
+                        {g.source} · {new Date(g.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

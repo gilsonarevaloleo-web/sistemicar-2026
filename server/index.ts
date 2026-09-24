@@ -71,10 +71,22 @@ import {
   adminGrantEspejoCredits,
   listEspejoDeliveries,
 } from "./espejoCreditDeliveries";
+import {
+  initPlanificacionModuleGrantsTable,
+  grantPendingModulesForEmail,
+  listPendingModuleGrantsForEmail,
+  adminGrantPlanificacionModule,
+  processPlanificacionModulePayment,
+  listModuleGrants,
+} from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { activateModulesForEmail, activateModulesForUserById, adminLookupUserByEmail, isFirebaseAdminReady } from "./firebaseAdmin";
+import { adminLookupUserByEmail } from "./firebaseAdmin";
 import { modulesGrantedByPlan } from "../shared/moduleAccess";
+import {
+  buildClientAccountWhatsapp,
+  displayNameForPlan,
+} from "../shared/clientAccount";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
 import {
   solicitarLlamadaVendedor,
@@ -124,6 +136,7 @@ if (isServerless) {
 initPublicApiTables().catch(err => console.warn("[publicApiDb] Table init failed (non-fatal):", err?.message));
 initSubVehicleRecordsTable().catch(err => console.warn("[vehicleHistory] Table init failed (non-fatal):", err?.message));
 initEspejoCreditDeliveriesTable().catch(err => console.warn("[espejoCredits] Table init failed (non-fatal):", err?.message));
+initPlanificacionModuleGrantsTable().catch(err => console.warn("[planificacionGrants] Table init failed (non-fatal):", err?.message));
 initUmbralSessionsTable().catch(err => console.warn("[umbralSessions] Table init failed (non-fatal):", err?.message));
 
 const umbralSessionStore = createDefaultUmbralSessionStore();
@@ -2114,12 +2127,16 @@ app.post("/api/mercadopago/webhook", async (req, res) => {
           externalRef.email &&
           modulesGrantedByPlan(externalRef.planId ?? "").length > 0
         ) {
-          const activated = await activateModulesForEmail(
-            externalRef.email,
-            externalRef.planId!
-          );
-          if (activated) {
+          const moduleResult = await processPlanificacionModulePayment({
+            deliveryId: `mp:${paymentIdStr}`,
+            buyerEmail: externalRef.email,
+            planId: externalRef.planId!,
+            source: "mp",
+          });
+          if (moduleResult.granted) {
             console.log(`[MP] Módulos activados para ${externalRef.email} plan ${externalRef.planId}`);
+          } else if (moduleResult.pending) {
+            console.log(`[MP] Módulos pendientes de /acceso para ${externalRef.email} plan ${externalRef.planId}`);
           }
         }
 
@@ -5080,29 +5097,42 @@ async function verifyFirebaseIdToken(authHeader: string): Promise<string | null>
   return verified?.email ?? null;
 }
 
-app.post("/api/planificacion/claim-module", async (req, res) => {
+async function claimPlanificacionPurchasesHandler(req: any, res: any) {
   try {
     const verified = await verifyFirebaseJwt(req.headers.authorization);
-    if (!verified?.uid) {
-      return res.status(401).json({ error: "Inicia sesión para activar tu módulo." });
+    if (!verified?.uid || !verified.email) {
+      return res.status(401).json({ error: "Inicia sesión con Google para activar tu módulo." });
     }
-    const planId = typeof req.body?.planId === "string" ? req.body.planId : "";
-    if (!planId || modulesGrantedByPlan(planId).length === 0) {
-      return res.status(400).json({ error: "Plan no válido para activación modular." });
+    const pendingBefore = await listPendingModuleGrantsForEmail(verified.email);
+    if (pendingBefore.length === 0) {
+      return res.json({
+        grantedPlans: [],
+        activated: false,
+        message: "No hay compras pendientes. Si acabas de pagar, entra con el mismo Gmail del pago.",
+      });
     }
-    const ok = await activateModulesForUserById(verified.uid, planId);
+    const { grantedPlans, deliveryIds } = await grantPendingModulesForEmail(
+      verified.email,
+      verified.uid,
+    );
     res.json({
-      activated: ok,
-      planId,
-      message: ok
-        ? "Módulo activado en tu cuenta."
-        : "No se pudo activar; verifica FIREBASE_SERVICE_ACCOUNT_JSON en el servidor.",
+      grantedPlans,
+      deliveryIds,
+      activated: grantedPlans.length > 0,
+      message:
+        grantedPlans.length > 0
+          ? `Se activó ${grantedPlans.map(displayNameForPlan).join(", ")} en tu cuenta.`
+          : "Tu pago está registrado; configura FIREBASE_SERVICE_ACCOUNT_JSON en el servidor para activar automáticamente.",
     });
   } catch (error) {
-    console.error("[planificacion/claim-module]", error);
+    console.error("[planificacion/claim-purchases]", error);
     res.status(500).json({ error: "No se pudo activar el módulo." });
   }
-});
+}
+
+app.post("/api/planificacion/claim-purchases", claimPlanificacionPurchasesHandler);
+/** Compat: ya no activa un planId arbitrario — solo compras pendientes de ese correo. */
+app.post("/api/planificacion/claim-module", claimPlanificacionPurchasesHandler);
 
 app.post("/api/espejo/claim-purchase-credits", async (req, res) => {
   try {
@@ -5250,8 +5280,9 @@ app.get("/api/admin/users/lookup", requireAdminToken, async (req, res) => {
       return res.status(404).json({
         found: false,
         adminReady: result.adminReady,
+        accesoUrl: "https://sistemicar.app/acceso",
         error:
-          "No hay cuenta en Firebase Auth con ese correo. El usuario debe iniciar sesión con Google al menos una vez usando ese email exacto.",
+          "No hay cuenta en Firebase Auth con ese correo. La cuenta se crea en sistemicar.app/acceso (Continuar con Google) con ese email exacto. Mientras tanto puedes registrar la activación pendiente.",
       });
     }
     res.json(result);
@@ -5262,8 +5293,21 @@ app.get("/api/admin/users/lookup", requireAdminToken, async (req, res) => {
   }
 });
 
+app.get("/api/admin/modules/grants", requireAdminToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "40";
+    const limit = parseInt(limitStr, 10) || 40;
+    const grants = await listModuleGrants(limit);
+    res.json({ grants });
+  } catch (error) {
+    console.error("[admin/modules/grants]", error);
+    res.status(500).json({ error: "Error listando activaciones de módulos." });
+  }
+});
+
 app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
   try {
+    const adminEmail = (req as { adminEmail?: string }).adminEmail;
     const { email, planId, source, note } = req.body || {};
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return res.status(400).json({ error: "Email válido requerido." });
@@ -5275,41 +5319,58 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
       });
     }
 
-    if (!isFirebaseAdminReady()) {
-      return res.status(503).json({
-        error:
-          "FIREBASE_SERVICE_ACCOUNT_JSON no está configurado en el servidor. Sin eso no se puede activar módulos en Firestore.",
-        adminReady: false,
+    const validSources = new Set(["yape", "paypal", "manual", "mp"]);
+    const paymentSource =
+      typeof source === "string" && validSources.has(source)
+        ? (source as "yape" | "paypal" | "manual" | "mp")
+        : "manual";
+
+    const result = await adminGrantPlanificacionModule({
+      buyerEmail: email,
+      planId: pid,
+      source: paymentSource,
+      reference: typeof note === "string" ? note : undefined,
+      note: typeof note === "string" ? note : undefined,
+      grantedBy: adminEmail,
+    });
+
+    if (result.duplicate) {
+      return res.status(409).json({
+        error: result.message,
+        ...result,
       });
     }
 
-    const lookup = await adminLookupUserByEmail(email.trim().toLowerCase());
-    if (!lookup.found || !lookup.uid) {
-      return res.status(404).json({
-        error:
-          "No se encontró usuario con ese correo en Firebase Auth. Debe iniciar sesión al menos una vez con Google usando ese email exacto.",
-        pending: true,
-        adminReady: lookup.adminReady,
-      });
+    const planName = displayNameForPlan(pid);
+    const clientWhatsapp = buildClientAccountWhatsapp(email.trim().toLowerCase(), planName);
+
+    if (result.granted || result.pending) {
+      try {
+        const grantPlan = SUBSCRIPTION_PLANS[pid as keyof typeof SUBSCRIPTION_PLANS];
+        await sendPaymentConfirmationEmail({
+          to: email.trim().toLowerCase(),
+          userName: email.split("@")[0],
+          planName: grantPlan?.name || planName,
+          amount: grantPlan && "price" in grantPlan ? grantPlan.price : 0,
+        });
+      } catch (emailErr) {
+        console.error("[admin/modules/grant] email:", emailErr);
+      }
     }
 
-    const activated = await activateModulesForUserById(lookup.uid, pid);
-    if (!activated) {
-      return res.status(500).json({
-        error: "Usuario encontrado pero no se pudo escribir la activación en Firestore.",
-        uid: lookup.uid,
-      });
-    }
     console.log(
-      `[admin/modules/grant] ${email} plan=${pid} source=${source ?? "manual"} note=${note ?? ""}`
+      `[admin/modules/grant] ${email} plan=${pid} source=${paymentSource} granted=${result.granted} pending=${result.pending}`
     );
     res.json({
       success: true,
-      activated: true,
+      activated: result.granted,
+      pending: result.pending,
       planId: pid,
-      uid: lookup.uid,
+      uid: result.uid,
       modules: modulesGrantedByPlan(pid),
-      message: `Módulo ${pid} activado para ${lookup.email ?? email}.`,
+      message: result.message,
+      accesoUrl: "https://sistemicar.app/acceso",
+      clientWhatsapp,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error activando módulo.";

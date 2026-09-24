@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { auth } from "@/lib/firebase";
+import { auth, getUserEmail, isUserAnonymous } from "@/lib/firebase";
+import { claimPendingPurchases } from "@/lib/claimPurchases";
+import { accesoUrlWithNext } from "@shared/clientAccount";
 import { motion, AnimatePresence } from "framer-motion";
 import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords, Zap } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -220,7 +222,16 @@ export default function Pagos() {
   const [loading, setLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [activeSellerRef, setActiveSellerRef] = useState<string | null>(null);
+  const [receiptSent, setReceiptSent] = useState(false);
   const paymentSectionRef = useRef<HTMLDivElement>(null);
+  const googleEmail = getUserEmail();
+  const hasGoogleAccount = Boolean(googleEmail) && !isUserAnonymous();
+
+  useEffect(() => {
+    if (hasGoogleAccount && googleEmail && !userEmail) {
+      setUserEmail(googleEmail);
+    }
+  }, [hasGoogleAccount, googleEmail, userEmail]);
 
   const selectStack = (addOnId: "soberania_dia" | "operativo") => {
     const plan = planificacionPlans.find((p) => p.id === addOnId);
@@ -232,26 +243,10 @@ export default function Pagos() {
     }
   };
   
-  const claimModule = useCallback(async (planId: string) => {
-    const user = auth?.currentUser;
-    if (!user || !modulesGrantedByPlan(planId).length) return;
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch("/api/planificacion/claim-module", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ planId }),
-      });
-      const data = await res.json();
-      if (data.activated) {
-        toast.success(data.message || "Módulo activado.");
-        window.dispatchEvent(new CustomEvent("progression-updated"));
-      }
-    } catch {
-      // webhook puede haber activado ya
+  const claimModule = useCallback(async () => {
+    const { grantedPlans } = await claimPendingPurchases();
+    if (grantedPlans.length > 0) {
+      toast.success("Módulo activado en tu cuenta.");
     }
   }, []);
 
@@ -337,9 +332,9 @@ export default function Pagos() {
         }
       } else if (planParam && modulesGrantedByPlan(planParam).length > 0) {
         toast.success("¡Pago confirmado! Activando tu módulo…");
-        void claimModule(planParam);
-        if (!auth?.currentUser) {
-          toast.info("Inicia sesión con el mismo correo del pago para acceder al módulo.");
+        void claimModule();
+        if (!auth?.currentUser || auth.currentUser.isAnonymous) {
+          toast.info("Crea tu cuenta en /acceso con el mismo Gmail del pago para activar el módulo.");
         }
       } else {
         toast.success(`¡Pago exitoso! Plan ${planParam || ""}`);
@@ -359,7 +354,7 @@ export default function Pagos() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: selectedPlan.id,
-          email: userEmail || localStorage.getItem("userEmail") || undefined,
+          email: googleEmail || userEmail || localStorage.getItem("userEmail") || undefined,
           userName: localStorage.getItem("userName") || undefined,
           sellerRef: getSellerRef() || undefined,
         })
@@ -403,6 +398,7 @@ export default function Pagos() {
       (getSellerRef() ? `\n🏷️ Ref vendedor: ${getSellerRef()}` : "")
     );
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${message}`, "_blank");
+    setReceiptSent(true);
   };
 
   return (
@@ -427,6 +423,13 @@ export default function Pagos() {
           </h1>
           <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
             {SISTEMICAR_CATEGORY.oneLiner}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-3 max-w-md mx-auto">
+            La cuenta se crea en{" "}
+            <Link href={accesoUrlWithNext("/pagos")} className="text-primary underline">
+              /acceso con Google
+            </Link>
+            , no al pagar. Usa el mismo Gmail del Yape.
           </p>
           <p className="text-[10px] text-slate-600 mt-2 italic max-w-md mx-auto">
             {SISTEMICAR_CATEGORY.notA}
@@ -822,6 +825,33 @@ export default function Pagos() {
 
         {/* Payment Method Selection */}
         <div ref={paymentSectionRef} className="p-6 rounded-2xl bg-card border border-white/10 mb-6">
+          <div
+            className={`mb-5 p-4 rounded-xl border ${
+              hasGoogleAccount
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : "border-amber-500/30 bg-amber-500/10"
+            }`}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+              Paso 1 · Crear cuenta
+            </p>
+            {hasGoogleAccount ? (
+              <p className="text-sm text-emerald-300">
+                Cuenta lista: <span className="font-bold text-white">{googleEmail}</span>
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-amber-100">
+                  Antes de pagar, crea tu cuenta con Google. Si no, el admin no te encuentra en Firebase.
+                </p>
+                <Link href={accesoUrlWithNext("/pagos")}>
+                  <span className="inline-flex items-center justify-center w-full py-3 rounded-xl bg-sky-500 text-white font-bold text-sm">
+                    Continuar con Google en /acceso
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
             Método de pago
           </h3>
@@ -960,13 +990,14 @@ export default function Pagos() {
                 
                 <div className="mb-4">
                   <label className="block text-xs text-slate-400 mb-2">
-                    Tu correo electrónico (para activar tu cuenta):
+                    Gmail de tu cuenta (el mismo de /acceso):
                   </label>
                   <input
                     type="email"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
                     placeholder="tu@correo.com"
+                    readOnly={hasGoogleAccount}
                     data-testid="input-email-paypal"
                     className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                   />
@@ -980,6 +1011,15 @@ export default function Pagos() {
                   <MessageCircle size={20} />
                   ENVIAR COMPROBANTE POR WHATSAPP
                 </button>
+                {receiptSent && (
+                  <p className="text-xs text-center text-slate-400 mt-3">
+                    Después entra en{" "}
+                    <Link href={accesoUrlWithNext("/pagos")} className="text-sky-400 underline">
+                      /acceso
+                    </Link>{" "}
+                    con ese mismo Gmail para que el plan se active.
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -1016,13 +1056,14 @@ export default function Pagos() {
                 
                 <div className="mb-4">
                   <label className="block text-xs text-slate-400 mb-2">
-                    Tu correo electrónico (para activar tu cuenta):
+                    Gmail de tu cuenta (el mismo de /acceso):
                   </label>
                   <input
                     type="email"
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
                     placeholder="tu@correo.com"
+                    readOnly={hasGoogleAccount}
                     data-testid="input-email-yape"
                     className="w-full px-4 py-3 rounded-xl bg-black/50 border border-white/10 text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
                   />
@@ -1036,6 +1077,15 @@ export default function Pagos() {
                   <MessageCircle size={20} />
                   ENVIAR COMPROBANTE POR WHATSAPP
                 </button>
+                {receiptSent && (
+                  <p className="text-xs text-center text-slate-400 mt-3">
+                    Después entra en{" "}
+                    <Link href={accesoUrlWithNext("/pagos")} className="text-sky-400 underline">
+                      /acceso
+                    </Link>{" "}
+                    con ese mismo Gmail para que el plan se active.
+                  </p>
+                )}
               </div>
             </motion.div>
           )}

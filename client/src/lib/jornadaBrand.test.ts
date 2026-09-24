@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  isAdminPath,
   isAppShellQuietPath,
   isCommercialEntryPath,
   isHouseRecintoPath,
@@ -43,6 +44,21 @@ describe("jornadaBrand", () => {
     assert.equal(isHouseRecintoPath("/menu"), false);
     assert.equal(isAppShellQuietPath("/analytics"), false);
     assert.equal(isAppShellQuietPath("/historial"), false);
+  });
+
+  it("admin calla el shell para que los toques lleguen a las pestañas", () => {
+    assert.equal(isAdminPath("/admin-gilson"), true);
+    assert.equal(isAdminPath("/admin-gilson?tab=modulos"), true);
+    assert.equal(isAdminPath("/admin-semillas"), true);
+    assert.equal(isAdminPath("/pagos"), false);
+    assert.equal(isAppShellQuietPath("/admin-gilson"), true);
+  });
+
+  it("App shell no monta Doctor/Centinela sobre admin", () => {
+    const app = readFileSync(join(dir, "../App.tsx"), "utf8");
+    assert.match(app, /isAdminPath/);
+    const doctor = readFileSync(join(dir, "../components/doctor-ia-chat.tsx"), "utf8");
+    assert.match(doctor, /\/admin-gilson/);
   });
 
   it("CTAs de /ventas-jornada son <a href> nativos, no Link de SPA", () => {

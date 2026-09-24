@@ -9,6 +9,8 @@ import { JornadaShell } from "@/components/jornada/JornadaShell";
 import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
+import { claimPendingPurchases } from "@/lib/claimPurchases";
+import { isUserAnonymous } from "@/lib/firebase";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess } from "@/lib/persistence";
 import {
   consumePreviewOpsQueryUnlock,
@@ -86,6 +88,7 @@ import { hardResetSpeechSystems, installSpeechStuckWatchdog } from "@/lib/speech
 import { ensureUbicacionVoiceRetryHub, retryAllPendingUbicacionVoice } from "@/lib/ubicacionVoiceReliable";
 import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
 import {
+  isAdminPath,
   isCommercialEntryPath,
   isJornada4WindowPath,
   JORNADA_V4_PATH,
@@ -107,13 +110,28 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuthContext = () => useContext(AuthContext);
 
+function ClaimPurchasesOnLogin() {
+  const { user, loading } = useAuthContext();
+  useEffect(() => {
+    if (loading || !user?.email || !user.uid) return;
+    if (isUserAnonymous()) return;
+    void claimPendingPurchases();
+  }, [user?.uid, user?.email, loading]);
+  return null;
+}
+
 function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, login, logout } = useAuth();
   const value = useMemo(
     () => ({ user, loading, login, logout }),
     [user, loading, login, logout]
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <ClaimPurchasesOnLogin />
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -584,7 +602,12 @@ function VoiceBootstrap() {
 /** Landings de anuncio: sin voz, Centinela ni cierre — el primer toque debe navegar. */
 function AppShellMotors() {
   const [location] = useLocation();
-  if (isCommercialEntryPath(location) || isCommercialEntryPath(window.location.pathname)) {
+  if (
+    isCommercialEntryPath(location) ||
+    isCommercialEntryPath(window.location.pathname) ||
+    isAdminPath(location) ||
+    isAdminPath(window.location.pathname)
+  ) {
     return null;
   }
   return (
