@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import { Check, Plus, TrendingUp, X as XIcon } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import { FLOTA_CONFIG, PLATA } from "@/components/flota/vehicleCardShared";
-import {
-  groupSubsBySeccion,
-  lastSeccionTitulo,
-} from "@/lib/desglosadorSecciones";
+import { groupSubsBySeccion } from "@/lib/desglosadorSecciones";
 import type { DestinoCierre } from "@/lib/destinoCierre";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
+import { useJornada4Tick } from "@/hooks/useJornada4Tick";
+import { formatElapsedHHMMSS } from "@/lib/desglosadorClock";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -27,8 +26,8 @@ type Props = {
 };
 
 /**
- * Lista libre de Enfoque — primera lista.
- * Filas directas, sin meta, sin cupos, sin presión de tiempo.
+ * Lista libre — vehículo de tiempo simple.
+ * Una fila a la vez, reloj de pared, minutos al proyecto. Sin desglosador.
  */
 export function SituacionLibreCard({
   vehicle,
@@ -40,22 +39,26 @@ export function SituacionLibreCard({
   onAddFila,
 }: Props) {
   const [draft, setDraft] = useState("");
-  const [draftSeccion, setDraftSeccion] = useState("");
+  const tick = useJornada4Tick(true);
   const rows = vehicle.subTareas ?? [];
   const seccionGroups = useMemo(() => groupSubsBySeccion(rows), [rows]);
-  const familiaActiva = lastSeccionTitulo(rows);
   const pending = rows.filter(
     r => (r.resultadoSituacion ?? (r.completada ? "cumplido" : "pendiente")) === "pendiente"
   );
   const done = rows.length - pending.length;
   const allDone = rows.length > 0 && pending.length === 0;
+  const now = Date.now();
+  void tick;
+  const wallSec = Math.max(
+    0,
+    Math.floor((now - (vehicle.aperturaAt && vehicle.aperturaAt > 0 ? vehicle.aperturaAt : now)) / 1000)
+  );
 
   const add = () => {
     const t = draft.trim();
     if (!t) return;
-    onAddFila(t, draftSeccion.trim() || undefined);
+    onAddFila(t);
     setDraft("");
-    if (!draftSeccion.trim()) setDraftSeccion(familiaActiva ?? "");
   };
 
   return (
@@ -82,11 +85,18 @@ export function SituacionLibreCard({
                 className="text-[8px] font-black px-1.5 py-0.5 rounded uppercase"
                 style={{ backgroundColor: "rgba(255,255,255,0.06)", color: MUTED }}
               >
-                Lista libre
+                Reloj simple
               </span>
             </div>
-            <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              Sin ring · sin meta · {done}/{rows.length} hechas
+            <p
+              className="text-2xl font-black tabular-nums tracking-tight mt-1"
+              style={{ color: flotaColor }}
+              data-testid="j4-libre-reloj"
+            >
+              {formatElapsedHHMMSS(wallSec)}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: MUTED }}>
+              Una a la vez · {done}/{rows.length} hechas
             </p>
           </div>
         </div>
@@ -97,18 +107,6 @@ export function SituacionLibreCard({
               key={`${group.seccion ?? "__lista"}-${group.items[0]?.id ?? "x"}`}
               className="space-y-1.5"
             >
-              {group.seccion ? (
-                <p
-                  className="text-[8px] font-black uppercase tracking-widest px-1"
-                  style={{ color: "#D4AF37" }}
-                  data-testid="j4-libre-familia-header"
-                >
-                  {group.seccion}
-                  <span className="ml-1 font-bold normal-case tracking-normal" style={{ color: MUTED }}>
-                    · título propio
-                  </span>
-                </p>
-              ) : null}
           {group.items.map(row => {
             const resultado =
               row.resultadoSituacion ?? (row.completada ? "cumplido" : "pendiente");
@@ -116,6 +114,7 @@ export function SituacionLibreCard({
             const isFail = resultado === "fallado";
             const isAvance = resultado === "avance";
             const isPending = resultado === "pendiente";
+            const rowSec = row.duracionRealSec;
             return (
               <div
                 key={row.id}
@@ -147,6 +146,15 @@ export function SituacionLibreCard({
                   >
                     {row.texto || `Fila ${rows.findIndex(r => r.id === row.id) + 1}`}
                   </p>
+                  {typeof rowSec === "number" && rowSec > 0 ? (
+                    <span
+                      className="text-[9px] font-mono font-black shrink-0"
+                      style={{ color: MUTED }}
+                      data-testid={`j4-libre-duracion-${row.id}`}
+                    >
+                      {formatElapsedHHMMSS(rowSec)}
+                    </span>
+                  ) : null}
                 </div>
                 {isPending ? (
                   <div className="flex gap-1.5 pl-7">
@@ -187,18 +195,6 @@ export function SituacionLibreCard({
           ))}
         </div>
 
-        <div className="space-y-1.5">
-          <input
-            value={draftSeccion}
-            onChange={e => setDraftSeccion(e.target.value)}
-            placeholder="Familia / título propio (vacío = sin familia)"
-            className="w-full p-2.5 rounded-xl bg-black/40 border text-sm focus:outline-none"
-            style={{
-              color: INK,
-              borderColor: draftSeccion.trim() ? "#D4AF37" : "rgba(255,255,255,0.12)",
-            }}
-            data-testid="j4-libre-add-seccion"
-          />
         <div className="flex gap-2">
           <input
             value={draft}
@@ -209,7 +205,7 @@ export function SituacionLibreCard({
                 add();
               }
             }}
-            placeholder="Añadir tarea…"
+            placeholder="Siguiente · una a la vez"
             className="flex-1 p-2.5 rounded-xl bg-black/40 border text-sm focus:outline-none"
             style={{ color: INK, borderColor: "rgba(255,255,255,0.12)" }}
             data-testid="j4-libre-add-input"
@@ -229,7 +225,6 @@ export function SituacionLibreCard({
             <Plus size={14} />
           </button>
         </div>
-        </div>
 
         {allDone || rows.length > 0 ? (
           <div className="space-y-2">
@@ -238,7 +233,6 @@ export function SituacionLibreCard({
                 value={vehicle.destinoCierre}
                 proyectoId={vehicle.proyectoId}
                 onChange={onDestinoChange}
-                blockedPorqueTodavia="todavía es lista libre — cubre el día sin ensuciar el proyecto"
               />
             ) : null}
             <button

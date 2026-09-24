@@ -109,7 +109,7 @@ export type FlotaLaunchForm = {
   oleadaPuntoId?: string;
   /**
    * Destino del cierre (presencia vs Dirección). Si se omite, el launch situacional
-   * lo sella: lista libre → presencia; ring solo sella peldaño si hay oleada + foco.
+   * sella peldaño solo si hay oleada + foco (lista libre y ring).
    */
   destinoCierre?: "presencia" | "peldano";
   /**

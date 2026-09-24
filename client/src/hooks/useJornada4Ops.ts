@@ -61,6 +61,7 @@ import {
   isConquistaRapido,
   isSituacionListaLibre,
 } from "@/jornada4/filters";
+import { applyListaLibreRowClose } from "@/jornada4/situacionLibreSeed";
 import {
   buildCoberturaHuecoIntervals,
   readCoberturaHuecosEvents,
@@ -1177,18 +1178,25 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle) || !vehicle.subTareas) return;
-        const subTareas = vehicle.subTareas.map(st =>
-          st.id === subTareaId
-            ? {
-                ...st,
-                completada: status === "cumplido",
-                resultadoSituacion: status,
-              }
-            : st
-        );
+        const closed = applyListaLibreRowClose(vehicle, subTareaId, status);
+        if (!closed) return;
+        const subTareas = closed.subTareas;
         paintVehicle(vehicleId, { subTareas });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
+
+        try {
+          acreditarMinutosSituacionEnProyecto(userId, {
+            vehicle: {
+              ...vehicle,
+              destinoCierre: destinoCierreVivo(userId, vehicle),
+            },
+            sub: closed.closed,
+            fuente: "lista-libre",
+          });
+        } catch (creditErr) {
+          console.error("[jornada4.closeSituacionLibreFila] minutos proyecto", creditErr);
+        }
 
         try {
           if (status === "cumplido") {
@@ -1247,8 +1255,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionListaLibre(vehicle)) return;
-        // Lista libre: sella pared al cerrar (presencia). No reclama Norte.
-        const destino: DestinoCierre = "presencia";
+        const destino = destinoCierreVivo(userId, vehicle);
         const cierreAt = Date.now();
         const apertura = vehicle.aperturaAt ?? cierreAt;
         const wallMin = Math.max(0, (cierreAt - apertura) / 60_000);
@@ -1283,8 +1290,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           );
           toast.success(
             awarded > 0
-              ? `Lista cerrada · +${awarded} PS · presencia`
-              : "Lista cerrada · presencia",
+              ? `Lista cerrada · +${awarded} PS · ${destino === "peldano" ? "Dirección" : "presencia"}`
+              : `Lista cerrada · ${destino === "peldano" ? "Dirección" : "presencia"}`,
             {
               style: {
                 backgroundColor: PIZARRA,

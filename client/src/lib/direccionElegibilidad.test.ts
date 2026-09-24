@@ -104,14 +104,14 @@ describe("direccionElegibilidad", () => {
     assert.equal(gates.find(g => g.ok)?.proyectoId, "abierto");
   });
 
-  it("lanzar: lista libre y rumbo cerrado quedan en presencia", () => {
+  it("lanzar: lista libre con rumbo abierto sella Dirección; rumbo cerrado queda en presencia", () => {
     assert.equal(
       destinoCierreAlLanzarConGate({
         esListaLibre: true,
         tieneDireccion: true,
         direccionAbierta: true,
       }),
-      "presencia"
+      "peldano"
     );
     assert.equal(
       destinoCierreAlLanzarConGate({

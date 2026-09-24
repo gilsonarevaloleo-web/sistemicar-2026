@@ -8,7 +8,7 @@ import { buildSituacionLibreSeed, isSituacionListaLibre } from "./situacionLibre
 import type { Vehicle } from "../lib/persistence.ts";
 
 describe("dirección / lista libre / restricciones", () => {
-  it("lista libre no lleva ring ni presión (sigue liviana)", () => {
+  it("lista libre no lleva ring ni presión (reloj simple, sin desglosador)", () => {
     const seed = buildSituacionLibreSeed({
       filas: ["llamar", "pagar"],
       proyectoEnfoqueId: "proy_a",

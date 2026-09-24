@@ -1,6 +1,6 @@
 /**
- * Semilla de lista libre situacional (sin ring / sin meta / sin presión).
- * Filas directas: se cumplen en cualquier orden, sin cupos ni contrato.
+ * Semilla de lista libre: vehículo de tiempo simple (sin desglosador / sin ring).
+ * Una fila a la vez, reloj de pared, minutos al proyecto.
  */
 import type { SubTarea, Vehicle } from "../lib/persistence";
 import { normalizeSeccionTitulo } from "../lib/desglosadorSecciones";
@@ -60,4 +60,68 @@ export function isSituacionListaLibre(v: Vehicle): boolean {
   // Ring pausado/operable no es lista libre (evita “pérdida” visual del ring al volver).
   if (ringSessionOperable(v.situacionCronometro, v.subTareas ?? [])) return false;
   return (v.subTareas?.length ?? 0) > 0;
+}
+
+/** Inicio del tramo medido: último cierre, apertura del vehículo o alta de la fila. */
+export function listaLibreRowStartedAt(
+  vehicle: Pick<Vehicle, "aperturaAt" | "subTareas">,
+  subId: string
+): number {
+  const rows = vehicle.subTareas ?? [];
+  const target = rows.find(r => r.id === subId);
+  let lastClosed = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const closed = rows[i]?.cerradaAt;
+    if (rows[i]?.id === subId) continue;
+    if (typeof closed === "number" && Number.isFinite(closed) && closed > lastClosed) {
+      lastClosed = closed;
+    }
+  }
+  const apertura =
+    typeof vehicle.aperturaAt === "number" && Number.isFinite(vehicle.aperturaAt)
+      ? vehicle.aperturaAt
+      : 0;
+  const creada =
+    typeof target?.creadaAt === "number" && Number.isFinite(target.creadaAt)
+      ? target.creadaAt
+      : 0;
+  return Math.max(lastClosed, apertura, creada);
+}
+
+export type ListaLibreRowCloseResult = {
+  subTareas: SubTarea[];
+  closed: SubTarea;
+};
+
+/**
+ * Cierra una fila de lista libre midiendo el tramo real.
+ * Mínimo 1 s — el gesto cuenta, como el clic del ring.
+ */
+export function applyListaLibreRowClose(
+  vehicle: Pick<Vehicle, "aperturaAt" | "subTareas" | "status" | "tipoFlota">,
+  subTareaId: string,
+  status: "cumplido" | "fallado" | "avance",
+  now = Date.now()
+): ListaLibreRowCloseResult | null {
+  if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") return null;
+  const rows = vehicle.subTareas ?? [];
+  const target = rows.find(r => r.id === subTareaId);
+  if (!target) return null;
+  const current = target.resultadoSituacion ?? (target.completada ? "cumplido" : "pendiente");
+  if (current !== "pendiente") return null;
+
+  const started = listaLibreRowStartedAt(vehicle, subTareaId);
+  const elapsed = started > 0 ? Math.floor((now - started) / 1000) : 0;
+  const duracionRealSec = Math.max(1, elapsed);
+  const closed: SubTarea = {
+    ...target,
+    completada: status === "cumplido",
+    resultadoSituacion: status,
+    duracionRealSec,
+    cerradaAt: now,
+  };
+  return {
+    subTareas: rows.map(r => (r.id === subTareaId ? closed : r)),
+    closed,
+  };
 }

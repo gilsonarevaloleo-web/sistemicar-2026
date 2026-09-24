@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSituacionLibreSeed, isSituacionListaLibre } from "./situacionLibreSeed.ts";
+import {
+  applyListaLibreRowClose,
+  buildSituacionLibreSeed,
+  isSituacionListaLibre,
+  listaLibreRowStartedAt,
+} from "./situacionLibreSeed.ts";
 import type { Vehicle } from "../lib/persistence.ts";
 
 describe("situacionLibreSeed", () => {
@@ -82,5 +87,55 @@ describe("situacionLibreSeed", () => {
       }),
       false
     );
+  });
+
+  it("mide el tramo de la fila desde apertura y acredita al menos 1s", () => {
+    const seed = buildSituacionLibreSeed({
+      filas: ["llamar"],
+      now: 10_000,
+    });
+    const vehicle = {
+      tipoFlota: "situacion" as const,
+      status: "activo" as const,
+      aperturaAt: 10_000,
+      subTareas: seed!.subTareas,
+    };
+    assert.equal(listaLibreRowStartedAt(vehicle, seed!.subTareas[0]!.id), 10_000);
+    const closed = applyListaLibreRowClose(vehicle, seed!.subTareas[0]!.id, "cumplido", 10_000);
+    assert.ok(closed);
+    assert.equal(closed!.closed.duracionRealSec, 1);
+    assert.equal(closed!.closed.resultadoSituacion, "cumplido");
+    assert.equal(closed!.closed.cerradaAt, 10_000);
+  });
+
+  it("la segunda fila empieza cuando cerró la anterior (una a la vez)", () => {
+    const seed = buildSituacionLibreSeed({
+      filas: ["a", "b"],
+      now: 1_000,
+    });
+    const first = applyListaLibreRowClose(
+      {
+        tipoFlota: "situacion",
+        status: "activo",
+        aperturaAt: 1_000,
+        subTareas: seed!.subTareas,
+      },
+      seed!.subTareas[0]!.id,
+      "cumplido",
+      61_000
+    );
+    assert.equal(first!.closed.duracionRealSec, 60);
+    const second = applyListaLibreRowClose(
+      {
+        tipoFlota: "situacion",
+        status: "activo",
+        aperturaAt: 1_000,
+        subTareas: first!.subTareas,
+      },
+      seed!.subTareas[1]!.id,
+      "cumplido",
+      91_000
+    );
+    assert.equal(second!.closed.duracionRealSec, 30);
   });
 });
