@@ -125,7 +125,7 @@ export default function Bienvenida() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      className="min-h-screen flex items-start justify-center px-4 py-8 relative"
       style={{ backgroundColor: "#020202" }}
       data-testid="bienvenida-page"
     >
@@ -149,13 +149,13 @@ export default function Bienvenida() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="text-center space-y-8">
-          <div className="space-y-4">
+        <div className="text-center space-y-5">
+          <div className="space-y-3">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="w-28 h-28 mx-auto"
+              className="w-20 h-20 mx-auto"
               style={{ filter: `drop-shadow(0 0 30px ${GOLD}40)` }}
             >
               <img
@@ -242,42 +242,11 @@ export default function Bienvenida() {
             {SISTEMA_OFERTA.puente}
           </p>
 
-          <div
-            className="rounded-xl p-4 text-left"
-            style={{
-              backgroundColor: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-            data-testid="bienvenida-dia"
-          >
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] mb-3"
-              style={{ color: GOLD }}
-            >
-              Un día en el sistema
-            </p>
-            <ul className="space-y-2.5">
-              {SISTEMA_DIA.map((paso) => (
-                <li key={paso.recinto} className="flex gap-3">
-                  <span
-                    className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0 pt-0.5"
-                    style={{ color: GOLD }}
-                  >
-                    {paso.recinto}
-                  </span>
-                  <span className="text-[11px] text-white/60 leading-snug">
-                    <span className="text-white/80">{paso.cuando}.</span> {paso.gesto}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-4">
+          <div className="space-y-3">
             <button
               onClick={handleLogin}
               disabled={loading || ctaLoading}
-              className="w-full py-5 rounded-full text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80"
+              className="w-full py-4 rounded-full text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80"
               style={{
                 background: ctaLoading
                   ? `linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)`
@@ -301,34 +270,31 @@ export default function Bienvenida() {
               Al continuar, aceptas que tus datos se almacenan de forma segura y privada
             </p>
 
-            <div className="pt-4 border-t border-white/10">
-              <p className="text-[10px] text-slate-500 text-center mb-3">¿Ya tienes cuenta?</p>
-              <button
-                onClick={handleGoogleLogin}
-                disabled={googleLoading}
-                className="w-full py-3 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all hover:bg-white/10"
-                style={{
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                }}
-                data-testid="button-google-existing"
-              >
-                {googleLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <LogIn size={16} />
-                )}
-                {googleLoading ? "Conectando..." : "Iniciar sesión con Google"}
-              </button>
-            </div>
+            <button
+              onClick={handleGoogleLogin}
+              disabled={googleLoading}
+              className="w-full py-3 rounded-xl text-white font-medium flex items-center justify-center gap-2 transition-all hover:bg-white/10"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}
+              data-testid="button-google-existing"
+            >
+              {googleLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <LogIn size={16} />
+              )}
+              {googleLoading ? "Conectando..." : "Iniciar sesión con Google"}
+            </button>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {SISTEMA_RECINTOS.filter((r) => r.publicExplore).map((recinto) => (
                 <button
                   key={recinto.id}
                   type="button"
                   onClick={() => navigate(recinto.exploreHref)}
-                  className="py-2.5 px-2 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1 hover:text-white transition-colors"
+                  className="py-2.5 px-1 text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-0.5 hover:text-white transition-colors"
                   style={{
                     color: recinto.color,
                     border: `1px solid ${recinto.color}44`,
@@ -337,21 +303,54 @@ export default function Bienvenida() {
                   data-testid={`bienvenida-explorar-${recinto.id}`}
                 >
                   {recinto.exploreLabel}
-                  <ChevronRight size={12} />
+                  <ChevronRight size={11} />
                 </button>
               ))}
             </div>
+          </div>
 
+          <div
+            className="rounded-xl p-3 text-left"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+            data-testid="bienvenida-dia"
+          >
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.2em] mb-2"
+              style={{ color: GOLD }}
+            >
+              Un día en el sistema
+            </p>
+            <ul className="space-y-1.5">
+              {SISTEMA_DIA.map((paso) => (
+                <li key={paso.recinto} className="flex gap-3">
+                  <span
+                    className="text-[10px] font-black uppercase tracking-widest w-16 shrink-0 pt-0.5"
+                    style={{ color: GOLD }}
+                  >
+                    {paso.recinto}
+                  </span>
+                  <span className="text-[11px] text-white/60 leading-snug">
+                    <span className="text-white/80">{paso.cuando}.</span> {paso.gesto}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-3">
             <button
               onClick={() => navigate("/acerca")}
-              className="w-full py-3 text-slate-500 text-sm hover:text-white transition-colors flex items-center justify-center gap-1"
+              className="w-full py-2 text-slate-500 text-sm hover:text-white transition-colors flex items-center justify-center gap-1"
               data-testid="button-about"
             >
               El manifiesto
               <ArrowRight size={14} />
             </button>
 
-            <div className="pt-6 border-t border-white/5">
+            <div className="pt-3 border-t border-white/5">
               <div className="flex items-center justify-center gap-4 text-[10px] text-slate-600">
                 <Link href="/terminos-condiciones">
                   <span className="flex items-center gap-1 hover:text-slate-400 transition-colors cursor-pointer">

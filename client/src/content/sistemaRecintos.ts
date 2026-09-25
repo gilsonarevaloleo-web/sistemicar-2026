@@ -63,7 +63,7 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     color: "#22C55E",
     exploreHref: "/ventas-jornada",
     publicExplore: true,
-    exploreLabel: "Ver Jornada Base",
+    exploreLabel: "Ver Jornada",
   },
   {
     id: "umbral",
@@ -76,7 +76,7 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     color: "#D4AF37",
     exploreHref: "/umbral/entrada",
     publicExplore: true,
-    exploreLabel: "Probar Código 1",
+    exploreLabel: "Código 1",
   },
 ] as const;
 
