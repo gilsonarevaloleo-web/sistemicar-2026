@@ -608,7 +608,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       </div>
 
       <p className="text-center text-[9px]" style={{ color: MUTED }}>
-        Dual Kernel · solo estos 2 vehículos (sin descanso ni verdad)
+        {canSituacion
+          ? "Dos gestos: Conquista (unidades) y Enfoque (imprevistos)."
+          : "Hoy solo Conquista. Enfoque se abre con Ritmo, después de tu primer cierre."}
       </p>
       <LeyFrenoHint variant="compact" />
 

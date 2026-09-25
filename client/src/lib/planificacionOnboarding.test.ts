@@ -55,4 +55,13 @@ describe("planificacionOnboarding", () => {
       PLANIFICACION_DOCTOR_QUICK_PROMPTS.some(q => /de frente/i.test(q))
     );
   });
+
+  it("tutorial Base termina en el gesto de Conquista, no en Doctor IA", () => {
+    const steps = getTutorialSteps("base");
+    const last = steps[steps.length - 1]!;
+    assert.match(last.title, /Hoy solo esto/i);
+    assert.match(last.description, /Conquista/i);
+    assert.doesNotMatch(last.description, /chat flotante|Doctor IA/i);
+    assert.match(last.action ?? "", /Conquista/i);
+  });
 });

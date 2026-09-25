@@ -14,6 +14,8 @@ import type { RevelacionPlanDia } from "@/jornada4/revelacionPlanDia";
 import type { ConcienciaTriadaModel } from "@/lib/concienciaTriadaOperador";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { Rocket } from "lucide-react";
+import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
+import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
 
 const revelacion: RevelacionPlanDia = {
   fecha: "2026-09-23",
@@ -101,6 +103,10 @@ const vehicles: Vehicle[] = [
 
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
+  const primer =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("primer") === "1";
+  const [showTutorial, setShowTutorial] = useState(primer);
 
   return (
     <div
@@ -111,14 +117,22 @@ export default function JornadaV4UiPreview() {
       <header className="sticky top-0 z-20 px-4 py-3 border-b border-white/10 bg-neutral-950/90 backdrop-blur-md">
         <p className={J4_UI.label}>La Jornada · preview UI</p>
         <p className="text-sm font-semibold text-neutral-100 mt-0.5">
-          OPERAR / PLAN / MÉTRICAS
+          {primer ? "Primer usuario · Base" : "OPERAR / PLAN / MÉTRICAS"}
         </p>
       </header>
       <Jornada4MobileNav value={tab} onChange={setTab} />
       <div className="max-w-lg mx-auto pt-2">
         {tab === "operar" ? (
           <div data-testid="jornada4-preview-operar">
-            <Jornada4RevelacionCard revelacion={revelacion} planEndLabel="23:00" />
+            {primer ? (
+              <Jornada4ComoOperarCard
+                hasRitmo={false}
+                onOpenTutorial={() => setShowTutorial(true)}
+              />
+            ) : null}
+            {!primer ? (
+              <Jornada4RevelacionCard revelacion={revelacion} planEndLabel="23:00" />
+            ) : null}
             <div className="px-3 sm:px-4 pb-3 space-y-3" data-testid="jornada4-launch">
               <div className="flex items-end justify-between gap-2">
                 <p className={J4_UI.label}>La Flota</p>
@@ -127,23 +141,73 @@ export default function JornadaV4UiPreview() {
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {["Conquista", "Enfoque"].map(label => (
+                {(primer ? ["Conquista"] : ["Conquista", "Enfoque"]).map(label => (
                   <div key={label} className={`${J4_UI.card} text-center`}>
                     <p className="text-xs font-black uppercase tracking-wider text-neutral-100">
                       {label}
                     </p>
-                    <p className={`${J4_UI.hint} mt-1`}>Lanzar vehículo</p>
+                    <p className={`${J4_UI.hint} mt-1`}>
+                      {label === "Conquista" ? "Unidades y cierre" : "Lanzar vehículo"}
+                    </p>
                   </div>
                 ))}
+                {primer ? (
+                  <div className={`${J4_UI.card} text-center opacity-70`}>
+                    <p className="text-xs font-black uppercase tracking-wider text-neutral-400">
+                      Enfoque
+                    </p>
+                    <p className={`${J4_UI.hint} mt-1`}>Requiere Ritmo del día</p>
+                  </div>
+                ) : null}
               </div>
+              {primer ? (
+                <p className="text-center text-[9px] text-neutral-500">
+                  Hoy solo Conquista. Enfoque se abre con Ritmo, después de tu primer cierre.
+                </p>
+              ) : null}
             </div>
-            <RecintoMinimoDock />
+            {primer ? (
+              <div
+                className={`mx-3 sm:mx-4 ${J4_UI.card} text-center space-y-1`}
+                data-testid="jornada4-empty"
+              >
+                <p className={J4_UI.label}>Aún no hay un bloque en curso</p>
+                <p className="text-[11px] text-neutral-400">
+                  Toca <strong className="text-neutral-100">Conquista</strong>, pon
+                  unidades y cierra cumplido o fallado. Eso es operar hoy.
+                </p>
+              </div>
+            ) : (
+              <RecintoMinimoDock />
+            )}
           </div>
         ) : null}
         {tab === "plan" ? (
           <div data-testid="jornada4-preview-plan">
-            <Jornada4CoberturaTimeline segmentos={segmentos} vehicles={vehicles} />
+            {primer ? (
+              <div
+                className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60"
+                data-testid="jornada4-plan-espera-cierre"
+              >
+                <p className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                  Plan espera tu primer cierre
+                </p>
+                <p className="text-sm text-slate-200 mt-1 leading-snug">
+                  Segmentos e imprevistos son Ritmo. Primero lanza una Conquista
+                  en Operar y ciérrala.
+                </p>
+              </div>
+            ) : (
+              <Jornada4CoberturaTimeline segmentos={segmentos} vehicles={vehicles} />
+            )}
           </div>
+        ) : null}
+        {showTutorial ? (
+          <PlanificacionTutorial
+            uid="preview-primer"
+            profile="base"
+            onComplete={() => setShowTutorial(false)}
+          />
         ) : null}
         {tab === "metricas" ? (
           <div data-testid="jornada4-preview-metricas" className="space-y-1">

@@ -44,6 +44,18 @@ import { ensureJornada4NotificationPermission } from "@/jornada4/puertaWindowAle
 import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import { usePlanificacionEntitlements } from "@/hooks/usePlanificacionEntitlements";
+import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
+import { PlanificacionPrimerDia } from "@/components/planificacion/PlanificacionPrimerDia";
+import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
+import {
+  isTutorialDone,
+  type PlanificacionPlanProfile,
+} from "@/lib/planificacionOnboarding";
+import { getLimaDayStartMs } from "@/lib/segmentTime";
+import {
+  countClosedConquista,
+  resolveOfertaMomento,
+} from "@shared/planificacionOfertaMomento";
 
 const Jornada4PlanTab = lazy(() => import("@/components/jornada4/Jornada4PlanTab"));
 const Jornada4MetricasTab = lazy(
@@ -82,6 +94,18 @@ export default function JornadaV4Session() {
   >(() =>
     typeof Notification === "undefined" ? "unsupported" : Notification.permission
   );
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  const onboardingProfile: PlanificacionPlanProfile = entitlements.hasNorte
+    ? "norte"
+    : entitlements.hasRitmo
+      ? "ritmo"
+      : "base";
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!isTutorialDone(user.uid)) setShowTutorial(true);
+  }, [user?.uid]);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -333,6 +357,28 @@ export default function JornadaV4Session() {
     [planillaApi.planilla]
   );
 
+  const oferta = useMemo(
+    () =>
+      resolveOfertaMomento({
+        hasRitmo: entitlements.hasRitmo,
+        hasNorte: entitlements.hasNorte,
+        closedConquistaCount: countClosedConquista(core.vehicles),
+        segmentosCount: planillaApi.planilla?.segmentos?.length ?? 0,
+      }),
+    [
+      entitlements.hasRitmo,
+      entitlements.hasNorte,
+      core.vehicles,
+      planillaApi.planilla,
+    ]
+  );
+
+  const openConquista = useCallback(() => {
+    requestJornada4OpenLaunch({ tipoFlota: "tiempo", modo: "desglose" });
+  }, []);
+
+  const dayStartMs = useMemo(() => getLimaDayStartMs(), []);
+
   const statusLine = planillaApi.segmentoActivo
     ? [
         `Segmento · ${planillaApi.segmentoActivo.nombre}`,
@@ -343,7 +389,9 @@ export default function JornadaV4Session() {
       ]
         .filter(Boolean)
         .join(" · ")
-    : "La Flota Dual Kernel · Conquista + Enfoque";
+    : entitlements.hasRitmo
+      ? "La Flota · Conquista + Enfoque"
+      : "Hoy: lanza Conquista y cierra unidades";
 
   return (
     <div
@@ -361,6 +409,25 @@ export default function JornadaV4Session() {
         <Jornada4ApunteCard />
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">
+            {user?.uid ? (
+              <div className="px-3 mb-3 sm:px-4">
+                <PlanificacionPrimerDia
+                  uid={user.uid}
+                  profile={onboardingProfile}
+                  dayStartMs={dayStartMs}
+                  segmentos={planillaApi.planilla?.segmentos ?? []}
+                  vehicles={core.vehicles}
+                  onOpenTutorial={() => setShowTutorial(true)}
+                />
+              </div>
+            ) : null}
+            {core.dualVehicles.length === 0 ? (
+              <Jornada4ComoOperarCard
+                hasRitmo={entitlements.hasRitmo}
+                onLaunchConquista={openConquista}
+                onOpenTutorial={() => setShowTutorial(true)}
+              />
+            ) : null}
             <Jornada4RevelacionCard
               revelacion={revelacionViva}
               planEndLabel={planEnd.planEndLabel}
@@ -388,8 +455,14 @@ export default function JornadaV4Session() {
               canModoEntrenamientoRing={canModoEntrenamientoRing}
               canAnclarDesglosadorSegmento={canAnclarDesglosadorSegmento}
             />
-            <RecintoMinimoDock />
-            <Jornada4VehicleList vehicles={core.dualVehicles} ops={opsWithHuecos} />
+            {entitlements.hasRitmo || core.dualVehicles.length > 0 ? (
+              <RecintoMinimoDock />
+            ) : null}
+            <Jornada4VehicleList
+              vehicles={core.dualVehicles}
+              ops={opsWithHuecos}
+              canSituacion={entitlements.hasRitmo}
+            />
           </div>
         ) : null}
 
@@ -397,23 +470,49 @@ export default function JornadaV4Session() {
           <>
             {!entitlements.hasRitmo ? (
               <div role="tabpanel" data-testid="jornada4-panel-plan">
-                <div
-                  className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
-                  data-testid="jornada4-ritmo-upsell"
-                >
-                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
-                    Ritmo del día
-                  </p>
-                  <p className="text-sm text-slate-200 mt-1 leading-snug">
-                    Segmentos y Situacional ordenan el día. Base ya te da Conquista (unidades).
-                  </p>
-                  <a
-                    href="/pagos?plan=operativo"
-                    className="inline-flex mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-300 underline"
+                {oferta.offerRitmo ? (
+                  <div
+                    className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
+                    data-testid="jornada4-ritmo-upsell"
                   >
-                    Activar Ritmo →
-                  </a>
-                </div>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                      Siguiente peldaño · Ritmo del día
+                    </p>
+                    <p className="text-sm text-slate-200 mt-1 leading-snug">
+                      Ya cerraste unidades. Ritmo ordena el día con segmentos e imprevistos.
+                    </p>
+                    <a
+                      href="/pagos?plan=operativo"
+                      className="inline-flex mt-3 text-[10px] font-black uppercase tracking-wider text-emerald-300 underline"
+                    >
+                      Activar Ritmo →
+                    </a>
+                  </div>
+                ) : (
+                  <div
+                    className="mx-3 mb-3 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60"
+                    data-testid="jornada4-plan-espera-cierre"
+                  >
+                    <p className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                      Plan espera tu primer cierre
+                    </p>
+                    <p className="text-sm text-slate-200 mt-1 leading-snug">
+                      Segmentos e imprevistos son Ritmo. Primero lanza una Conquista
+                      en Operar y ciérrala. Ahí aparece este peldaño.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileTab("operar");
+                        openConquista();
+                      }}
+                      className="inline-flex mt-3 text-[10px] font-black uppercase tracking-wider text-amber-300 underline"
+                      data-testid="jornada4-plan-ir-operar"
+                    >
+                      Ir a lanzar Conquista →
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <Suspense fallback={<TabChunkFallback label="Cargando plan…" />}>
@@ -447,16 +546,16 @@ export default function JornadaV4Session() {
                 />
               </Suspense>
             )}
-            {!entitlements.hasNorte ? (
+            {oferta.offerNorte ? (
               <div
                 className="mx-3 mt-2 sm:mx-4 p-4 rounded-xl border border-white/10 bg-neutral-900/60 backdrop-blur-md"
                 data-testid="jornada4-norte-upsell"
               >
                 <p className="text-[11px] font-black uppercase tracking-wider text-sky-400">
-                  Norte
+                  Siguiente peldaño · Norte
                 </p>
                 <p className="text-sm text-slate-200 mt-1 leading-snug">
-                  Crisol + Hub Proyectos: el peldaño de alto valor para quien ya cierra el día.
+                  Ya estructuraste el día. Norte guarda ideas en un proyecto con pasos.
                 </p>
                 <a
                   href="/pagos?plan=soberania_dia"
@@ -483,6 +582,14 @@ export default function JornadaV4Session() {
           </Suspense>
         ) : null}
       </div>
+
+      {user?.uid && showTutorial ? (
+        <PlanificacionTutorial
+          uid={user.uid}
+          profile={onboardingProfile}
+          onComplete={() => setShowTutorial(false)}
+        />
+      ) : null}
 
       {entitlements.hasNorte ? (
         <PlaneacionCrisolDock

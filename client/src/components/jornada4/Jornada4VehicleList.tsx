@@ -110,9 +110,15 @@ type Ops = {
 type Props = {
   vehicles: Vehicle[];
   ops: Ops;
+  /** Base: no mencionar ring / lista libre (eso es Ritmo). */
+  canSituacion?: boolean;
 };
 
-export function Jornada4VehicleList({ vehicles, ops }: Props) {
+export function Jornada4VehicleList({
+  vehicles,
+  ops,
+  canSituacion = true,
+}: Props) {
   const [open, setOpen] = useState(true);
 
   if (vehicles.length === 0) {
@@ -122,11 +128,21 @@ export function Jornada4VehicleList({ vehicles, ops }: Props) {
         data-testid="jornada4-empty"
       >
         <p className={J4_UI.label}>
-          Sin vehículos activos
+          Aún no hay un bloque en curso
         </p>
-        <p className="text-[9px]" style={{ color: MUTED }}>
-          Lanza desde <strong style={{ color: INK }}>La Flota</strong> —
-          conquista, lista libre o ring.
+        <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
+          {canSituacion ? (
+            <>
+              Toca <strong style={{ color: INK }}>Conquista</strong> para
+              unidades, o <strong style={{ color: INK }}>Enfoque</strong> para
+              imprevistos.
+            </>
+          ) : (
+            <>
+              Toca <strong style={{ color: INK }}>Conquista</strong>, pon
+              unidades y cierra cumplido o fallado. Eso es operar hoy.
+            </>
+          )}
         </p>
       </div>
     );
