@@ -6,8 +6,10 @@ import {
   isCommercialEntryPath,
   isHouseRecintoPath,
   isJornada4Path,
+  JORNADA_MODULE,
   JORNADA_V4_PATH,
 } from "./jornadaBrand.ts";
+import { SISTEMICAR_CATEGORY } from "./sistemicarCategory.ts";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +17,17 @@ import { fileURLToPath } from "node:url";
 const dir = dirname(fileURLToPath(import.meta.url));
 
 describe("jornadaBrand", () => {
+  it("el header de La Jornada nombra el Entrenador de Intención Panorámica", () => {
+    assert.equal(
+      JORNADA_MODULE.tagline,
+      "MÓDULO LA JORNADA · Entrenador de Intención Panorámica",
+    );
+    assert.equal(
+      SISTEMICAR_CATEGORY.name,
+      "Motor de cierre consciente por capas",
+    );
+  });
+
   it("detecta /jornada-v4 y query", () => {
     assert.equal(isJornada4Path(JORNADA_V4_PATH), true);
     assert.equal(isJornada4Path("/jornada-v4?x=1"), true);

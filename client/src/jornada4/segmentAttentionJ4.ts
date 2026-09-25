@@ -10,6 +10,7 @@ import {
   type SegmentAttentionEvent,
 } from "@/lib/segmentAttentionEngine";
 import { getJournalDateString, getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
+import { formatPuertasIntencionPanoramica } from "@shared/deposito/intencionPanoramica";
 
 export const J4_PUERTA_MANTRA = "Controlando tu día";
 
@@ -109,8 +110,7 @@ export function computePuertaPanorama(segmentos: SegmentoV5[]): PuertaPanorama {
 
   const conscientes = activasConscientes + cerradasConscientes;
   const saldoLabel = saldoPs === 0 ? "0" : saldoPs > 0 ? `+${saldoPs}` : `${saldoPs}`;
-  const headline =
-    total === 0 ? "Sin puertas hoy" : `${conscientes}/${total} puertas conscientes`;
+  const headline = formatPuertasIntencionPanoramica(conscientes, total);
   const parts: string[] = [];
   if (activasSistema > 0) parts.push(`${activasSistema} sistema`);
   if (entropia > 0) parts.push(`${entropia} entropía`);

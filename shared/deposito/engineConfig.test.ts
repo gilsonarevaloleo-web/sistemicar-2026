@@ -23,6 +23,8 @@ import {
   serializarPromptVolcado,
   validarCapturaParaGrado,
   buildDepositoSystemPrompt,
+  INTENCION_PANORAMICA_CRITERIO,
+  INTENCION_PANORAMICA_NOMBRE,
   type CodigoObservador,
 } from "./engineConfig.ts";
 
@@ -89,6 +91,10 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /FILTRO DE DESCOMPOSICIÓN/);
     assert.match(prompt.system, /lo no dicho revela la falla real/);
     assert.match(prompt.system, /lo que el alumno APRENDIÓ/);
+    assert.match(prompt.system, /Intención Panorámica/);
+    assert.match(prompt.system, /Presencia de Terreno en 0ms/);
+    assert.match(prompt.system, /prohibido evaluar La Jornada como una «Secuencia de Jornada»/i);
+    assert.match(prompt.system, /inercia biológica/);
     assert.match(prompt.system, /HECHOS REALES/);
     assert.match(prompt.system, /PROHIBIDO atajo de plantilla C6/);
     assert.match(prompt.system, /física de esa tarea/i);
@@ -574,6 +580,36 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     );
     assert.equal(techo.gradoSiguiente, null);
     assert.match(techo.motivo, /techo/i);
+  });
+
+  it("el evaluador define Intención Panorámica y nombra conquista/pérdida con métricas de La Jornada", () => {
+    assert.match(INTENCION_PANORAMICA_NOMBRE, /Presencia de Terreno en 0ms/);
+    assert.match(INTENCION_PANORAMICA_CRITERIO, /sensor de vigilia/);
+    assert.match(INTENCION_PANORAMICA_CRITERIO, /inercia biológica/);
+
+    const conquista = obtenerPromptVolcado(
+      "Hoy sostuve el mapa del día mientras cerraba la tarea presente.",
+      undefined,
+      [],
+      { puertasConquistadas: 3, puertasTotales: 3, puertasPerdidas: 0 },
+    );
+    assert.match(conquista.system, /Intención Panorámica/);
+    assert.doesNotMatch(
+      conquista.system,
+      /el indicador real de presencia es la Secuencia de Jornada/i,
+    );
+    assert.match(conquista.user, /3\/3 Puertas de Intención Panorámica/);
+    assert.match(conquista.user, /CONQUISTA/);
+
+    const perdida = diagnosticarVolcadoLocal(
+      "Hoy perdí la ventana de las 9 y seguí pegado a la materia.",
+      undefined,
+      [],
+      { puertasConquistadas: 1, puertasTotales: 4, puertasPerdidas: 2 },
+    );
+    assert.match(perdida.devolucionMaestro, /Intención Panorámica/);
+    assert.match(perdida.devolucionMaestro, /inercia biológica/);
+    assert.match(perdida.devolucionMaestro, /1\/4/);
   });
 
   it("C6 no arrastra plantilla social: costura/botones se quedan en la física", () => {
