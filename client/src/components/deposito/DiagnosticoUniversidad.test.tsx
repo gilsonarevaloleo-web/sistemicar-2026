@@ -87,4 +87,41 @@ describe("DiagnosticoUniversidad", () => {
     const badgesG3 = html.match(/G3 · Arquitecto de Punto Ciego/g) ?? [];
     assert.ok(badgesG3.length >= 1);
   });
+
+  it("G3 detectado sin mérito también oculta G1/G2 en Carga Superior", () => {
+    const base = diagnosticarVolcadoLocal(SECO);
+    const diagnostico = {
+      ...base,
+      nivelCargaSugerido: "SUPERIOR" as const,
+      evaluacionGrado: {
+        gradoDetectado: 3 as const,
+        meritoReconocido: false,
+        mensajeEncuadre: "Calibración G3.",
+      },
+      validacionGrado: {
+        gradoEvaluado: 1 as const,
+        comentarioMaestro: "Operó en la barra de G1.",
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(DiagnosticoUniversidad, {
+        diagnostico,
+        lectura: {
+          grado: "APRENDIZ_OJO",
+          codigoDominante: diagnostico.codigoDominante,
+          nombreOjoDominante: diagnostico.nombreOjoDominante,
+          capas: { senal: "hecho", ruido: "sin flor", noDicho: "omisión" },
+        },
+        expediente: {
+          ...calcularExpedienteOjos([diagnostico.codigoDominante]),
+          gradoOperador: "APRENDIZ_OJO",
+        },
+      }),
+    );
+    assert.match(html, /Carga Superior/);
+    assert.match(html, /G3 · Arquitecto de Punto Ciego/);
+    assert.doesNotMatch(html, /VALIDACIÓN DE GRADO 1/);
+    assert.doesNotMatch(html, /G1 · Aprendiz de Ojo/);
+    assert.doesNotMatch(html, /G2 · Detector de Ruido/);
+  });
 });

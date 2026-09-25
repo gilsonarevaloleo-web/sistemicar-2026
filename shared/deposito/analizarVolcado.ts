@@ -92,6 +92,9 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /como se hace/,
     /orden de/,
     /hice esto/,
+    /coser/,
+    /\bpase\b/,
+    /maquina/,
   ],
   4: [
     /estructura/,
@@ -104,6 +107,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /soporta/,
     /forma que/,
     /lo que sostiene/,
+    /tension/,
+    /ajuste/,
   ],
   5: [
     /decision/,
@@ -127,6 +132,8 @@ const PATRONES: Record<CodigoOjo, RegExp[]> = {
     /el otro/,
     /se encuentran/,
     /junto con/,
+    /boton/,
+    /encaje/,
   ],
   7: [
     /patron/,
@@ -249,6 +256,52 @@ function construirDictamen(d: Omit<DictamenOptico, "dictamen" | "mecanica">): Pi
   return {
     dictamen: `En ${d.tema} el ojo abierto es ${abierto}.${vistos}${hueco} Siguiente observación: ${etiqueta(d.siguiente)}.`,
     mecanica,
+  };
+}
+
+export const UMBRAL_ESTRUCTURA_DICTAMEN = 75;
+
+export function dictamenDebeValidarGrado(
+  gradoDetectado?: number | null,
+  densidadEstructural?: number | null,
+): boolean {
+  return (
+    (gradoDetectado ?? 0) >= 3 &&
+    (densidadEstructural ?? 0) > UMBRAL_ESTRUCTURA_DICTAMEN
+  );
+}
+
+/** Si Placement valida G3 y Estructura > 75, el dictamen no puede ser «ruido». */
+export function coherenciaDictamenConPlacement(
+  dictamen: DictamenOptico,
+  opts: {
+    gradoDetectado?: number | null;
+    densidadEstructural?: number | null;
+    mensajeEncuadre?: string;
+  } = {},
+): DictamenOptico {
+  if (
+    !dictamenDebeValidarGrado(opts.gradoDetectado, opts.densidadEstructural)
+  ) {
+    return dictamen;
+  }
+  const reflejaRuido = /ruido|reescrib/i.test(dictamen.dictamen);
+  if (dictamen.calidad !== "ruido" && !reflejaRuido) return dictamen;
+  const grado = opts.gradoDetectado ?? 3;
+  const dens = opts.densidadEstructural ?? 0;
+  const encuadre = opts.mensajeEncuadre?.trim();
+  const calidad: CalidadVolcado =
+    dictamen.frente > 0
+      ? "tecnico"
+      : dictamen.asomados.length > 0
+        ? "pose"
+        : "tecnico";
+  return {
+    ...dictamen,
+    calidad,
+    dictamen:
+      encuadre ||
+      `El volcado sostiene Grado ${grado}. Estructura ${dens}/100. El placement ya validó la lectura: no es ruido ni se reescribe.`,
   };
 }
 

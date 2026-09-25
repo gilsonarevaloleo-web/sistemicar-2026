@@ -317,11 +317,11 @@ export const DICCIONARIO_OJOS: Record<CodigoObservador, FichaOjoCodigo> = {
     numero: 6,
     nombreOjo: "El Ojo del Roce",
     focoAtencion: "fricción",
-    voz: "El Cuerpo en la Puerta",
+    voz: "El que Nombra el Ajuste",
     cegueraActiva:
-      "Ensaya en la cabeza y evita el contacto. El miedo al rechazo manda; el cuerpo no entra.",
+      "No observa el punto de roce del hecho concreto: dónde se traba el ajuste entre piezas, tensión, herramienta o proceso. Inventa una fricción que el texto no trajo.",
     gestoAbsorcion:
-      "Mañana, un solo roce físico mínimo: una llamada, una puerta o un mensaje enviado. El cuerpo entra; la mente deja de ensayar.",
+      "Mañana, nombrá el punto de roce de ESTE hecho y ejecutá UN ajuste mínimo en esa juntura — sin metáfora prestada.",
   },
   7: {
     numero: 7,
@@ -425,11 +425,14 @@ export function etiquetaGradoMaestria(grado: GradoMaestria): string {
   return `G${ficha.grado} · ${ficha.nombre}`;
 }
 
-/** UI: mérito reconocido → un solo badge, el grado detectado. */
+/** UI Carga Superior: un solo badge — el grado final. Oculta G1/G2 acumulados. */
 export function placementOcultaGradoAnterior(
   evaluacion?: EvaluacionGrado | null,
 ): evaluacion is EvaluacionGrado {
-  return Boolean(evaluacion?.meritoReconocido && evaluacion.gradoDetectado >= 3);
+  if (!evaluacion) return false;
+  return (
+    evaluacion.meritoReconocido === true || evaluacion.gradoDetectado >= 3
+  );
 }
 
 const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
@@ -496,6 +499,14 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /expos/,
     /roce/,
     /ansiedad/,
+    /juntura/,
+    /pieza/,
+    /ajuste/,
+    /tension/,
+    /tensión/,
+    /boton/,
+    /botón/,
+    /encaje/,
   ],
   7: [
     /precio/,
@@ -722,6 +733,18 @@ El centro de gravedad es lo que el alumno APRENDIÓ, no la palabra más repetida
 ═══ REGLA ANTI-ECO (INQUEBRANTABLE) ═══
 JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
 Aplica a explicacion, loNoDicho, espejo (devolucionMaestro) e instruccionUnica.
+
+═══ HECHOS REALES (INQUEBRANTABLE) ═══
+loNoDicho, espejo (devolucionMaestro) e instruccionUnica se construyen ESTRICTAMENTE sobre los hechos reales aportados en el texto del usuario.
+Prohibido importar una metáfora, miedo o escena social que el volcado no trajo.
+Si el volcado habla de herramientas físicas, automatización, producción o procesos mecánicos (máquina de coser, botones, tensión, taller, ajuste), la abstracción es la FÍSICA de esa tarea: encaje, tensión, recorrido, atasco de pieza.
+C6 (El Ojo del Roce) observa la fricción y la juntura del HECHO concreto.
+PROHIBIDO atajo de plantilla C6: no asocies C6 automáticamente con miedo al rechazo, evitar el contacto social o el cuerpo en la puerta.
+Esas frases solo existen si el alumno las escribió.
+
+═══ COHERENCIA PLACEMENT / DICTAMEN ═══
+Si metricasMerito.densidadEstructural > 75 y evaluacionGrado.gradoDetectado >= 3 (Placement valida G3), el dictamen / devolucionMaestro / comentarioMaestro NO puede llamar al volcado «ruido» ni exigir reescribir.
+El dictamen refleja la validación del grado otorgado.
 
 ═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
 El lenguaje humano tiene tres capas. Analizá en este orden:
@@ -1397,24 +1420,61 @@ function sellarDiagnostico(
   ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
   const volcado = captura.volcadoCrudo || "";
+  const norm = normalizar(volcado);
+  const permitePlantillaSocialC6 = textoTraeRoceSocial(norm);
+  const recortar = (campo: string) => {
+    const sinEco = recortarEcoDelVolcado(campo, volcado);
+    return permitePlantillaSocialC6
+      ? sinEco
+      : textosSinPlantillaSocialC6(sinEco);
+  };
   const limpio: DiagnosticoVolcado = {
     ...diagnostico,
-    justificacionDominante: recortarEcoDelVolcado(
-      diagnostico.justificacionDominante,
-      volcado,
+    justificacionDominante: recortar(diagnostico.justificacionDominante),
+    puntoCiego: recortar(diagnostico.puntoCiego),
+    devolucionMaestro: recortar(diagnostico.devolucionMaestro),
+    mecanicaAbsorcion: prohibirEcoInstruccion(
+      permitePlantillaSocialC6
+        ? diagnostico.mecanicaAbsorcion
+        : textosSinPlantillaSocialC6(diagnostico.mecanicaAbsorcion),
     ),
-    puntoCiego: recortarEcoDelVolcado(diagnostico.puntoCiego, volcado),
-    devolucionMaestro: recortarEcoDelVolcado(
-      diagnostico.devolucionMaestro,
-      volcado,
-    ),
-    mecanicaAbsorcion: prohibirEcoInstruccion(diagnostico.mecanicaAbsorcion),
   };
-  return anexarMerito(
-    anexarValidacion(limpio, captura),
-    captura,
-    ojosHistoricos,
+  return coherenciaDevolucionConPlacement(
+    anexarMerito(anexarValidacion(limpio, captura), captura, ojosHistoricos),
   );
+}
+
+const MARCA_RUIDO_DICTAMEN = /ruido|reescrib/i;
+
+function coherenciaDevolucionConPlacement(
+  diagnostico: DiagnosticoVolcado,
+): DiagnosticoVolcado {
+  const ev = diagnostico.evaluacionGrado;
+  const met = diagnostico.metricasMerito;
+  if (!ev || !met) return diagnostico;
+  if (ev.gradoDetectado < 3 || met.densidadEstructural <= 75) {
+    return diagnostico;
+  }
+  const sucioDevolucion = MARCA_RUIDO_DICTAMEN.test(
+    diagnostico.devolucionMaestro,
+  );
+  const sucioValidacion = MARCA_RUIDO_DICTAMEN.test(
+    diagnostico.validacionGrado?.comentarioMaestro ?? "",
+  );
+  if (!sucioDevolucion && !sucioValidacion) return diagnostico;
+  return {
+    ...diagnostico,
+    devolucionMaestro: sucioDevolucion
+      ? `Espejo: el volcado opera en G${ev.gradoDetectado}. 2ª resistencia: descontar la lectura como ruido. Veredicto: ${ev.mensajeEncuadre}`
+      : diagnostico.devolucionMaestro,
+    validacionGrado:
+      diagnostico.validacionGrado && sucioValidacion
+        ? {
+            ...diagnostico.validacionGrado,
+            comentarioMaestro: ev.mensajeEncuadre,
+          }
+        : diagnostico.validacionGrado,
+  };
 }
 
 function anexarValidacion(
@@ -1599,6 +1659,20 @@ function anclaDe(h: HechosVolcado): string {
   return h.pregunta || h.cita || h.tesis;
 }
 
+const MATERIA_FISICA =
+  /maquina|coser|boton|hilo|tela|costur|prenda|taller|herramient|automat|producc|tornillo|engranaje|prensa|tension|tensi[oó]n|ajuste|encaje|pieza/;
+
+const C6_PLANTILLA_SOCIAL =
+  /miedo al rechazo|evitar el contacto|contacto social|cuerpo en la puerta|ensaya en la cabeza/i;
+
+function esMateriaFisica(norm: string): boolean {
+  return MATERIA_FISICA.test(norm);
+}
+
+function textoTraeRoceSocial(norm: string): boolean {
+  return /rechazo|miedo|puerta|llamada|contacto social|ensay/.test(norm);
+}
+
 function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
   const norm = normalizar(textoVolcado);
   let mejor: CodigoObservador = 1;
@@ -1631,9 +1705,13 @@ function puntoCiegoAnclado(
   codigo: CodigoObservador,
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
+  norm: string,
 ): string {
   if (codigo === 9 && h.pregunta) {
     return `Ella ya pidió el nombre del patrón. El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
+  }
+  if (codigo === 6 && esMateriaFisica(norm) && !textoTraeRoceSocial(norm)) {
+    return `El relato opera la herramienta y no nombra el punto de roce físico: dónde se traba el ajuste entre pieza, tensión o recorrido.`;
   }
   if (anclaDe(h)) {
     return `${ojo.cegueraActiva} El volcado deja suelta la mecánica y no nombra el circuito.`;
@@ -1645,7 +1723,11 @@ function mecanicaAnclada(
   codigo: CodigoObservador,
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
+  norm: string,
 ): string {
+  if (codigo === 6 && esMateriaFisica(norm) && !textoTraeRoceSocial(norm)) {
+    return `Mañana, un solo ajuste medible en la misma herramienta: tensión, encaje o pase. Cero metáfora social.`;
+  }
   if (!anclaDe(h)) return ojo.gestoAbsorcion;
   if (codigo === 9) {
     return `Mañana, en UNA tarea de casa con la hija, al cierre nombrá en voz alta la ley. Contestá con un nombre, no con un sermón. Una frase. Sin comparaciones ni castigo.`;
@@ -1659,7 +1741,12 @@ function mecanicaAnclada(
 function devolucionAnclada(
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
+  codigo: CodigoObservador,
+  norm: string,
 ): string {
+  if (codigo === 6 && esMateriaFisica(norm) && !textoTraeRoceSocial(norm)) {
+    return `Espejo: la tarea es física. 2ª resistencia: narrar el atasco sin nombrar el punto de roce. Veredicto: un solo ajuste en la materia de hoy.`;
+  }
   const espejo = h.tesis
     ? `Espejo: el aprendizaje nombra el circuito, no el episodio.`
     : `Espejo: trajiste el día crudo; falta el circuito.`;
@@ -1669,6 +1756,11 @@ function devolucionAnclada(
   const r2 = `2ª resistencia: convertir el hallazgo en victoria de método, en vez de instalar ${ojo.focoAtencion}.`;
   const veredicto = `Veredicto: ${ojo.voz} corta a un solo gesto. Mañana el circuito tiene nombre, no héroe.`;
   return `${espejo}${prueba} ${r2} ${veredicto}`;
+}
+
+function textosSinPlantillaSocialC6<T extends string>(texto: T): T {
+  if (!C6_PLANTILLA_SOCIAL.test(texto)) return texto;
+  return texto.replace(C6_PLANTILLA_SOCIAL, "el punto de roce del hecho") as T;
 }
 
 /**
@@ -1713,7 +1805,8 @@ export function diagnosticarVolcadoLocal(
     ? `El aprendizaje gravita en ${ojo.nombreOjo}: se observa ${ojo.focoAtencion}, no un inventario de códigos.`
     : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
-  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos);
+  const norm = normalizar(captura.volcadoCrudo || texto);
+  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos, norm);
   if (captura.gradoMaestria >= 3 && captura.sombraOmision) {
     puntoCiego = `La sombra declarada confirma la omisión. ${puntoCiego}`;
   }
@@ -1722,8 +1815,8 @@ export function diagnosticarVolcadoLocal(
     hidratarDiagnostico(codigo, {
       justificacionDominante: tesis,
       puntoCiego,
-      devolucionMaestro: devolucionAnclada(ojo, hechos),
-      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos),
+      devolucionMaestro: devolucionAnclada(ojo, hechos, codigo, norm),
+      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos, norm),
       nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
     }),
     captura,

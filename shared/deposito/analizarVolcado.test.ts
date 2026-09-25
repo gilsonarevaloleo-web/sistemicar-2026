@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { analizarVolcado } from "./analizarVolcado.ts";
+import {
+  analizarVolcado,
+  coherenciaDictamenConPlacement,
+} from "./analizarVolcado.ts";
 
 describe("analizarVolcado — frente de observación", () => {
   it("un volcado corto es ruido y ofrece C1", () => {
@@ -43,5 +46,27 @@ describe("analizarVolcado — frente de observación", () => {
     assert.equal(d.siguiente, 4);
     assert.ok(d.asomados.includes(6) || d.abiertos.includes(6));
     assert.match(d.dictamen, /hueco|C4|Estructura/i);
+  });
+
+  it("máquina de coser y botones no se dictaminan como ruido suelto", () => {
+    const d = analizarVolcado(
+      "Hoy a las 8:10 usé la máquina de coser. Corté 12 botones. Ajusté la tensión del hilo y repetí el pase en el taller.",
+    );
+    assert.equal(d.tema, "costura");
+    assert.notEqual(d.calidad, "ruido");
+    assert.doesNotMatch(d.dictamen, /reescrib/i);
+  });
+
+  it("Placement G3 + Estructura > 75 anula dictamen de ruido", () => {
+    const ruido = analizarVolcado("hoy fue feo");
+    assert.equal(ruido.calidad, "ruido");
+    const coherente = coherenciaDictamenConPlacement(ruido, {
+      gradoDetectado: 3,
+      densidadEstructural: 82,
+      mensajeEncuadre: "Mérito reconocido: opera en Grado 3.",
+    });
+    assert.notEqual(coherente.calidad, "ruido");
+    assert.doesNotMatch(coherente.dictamen, /reescrib/i);
+    assert.match(coherente.dictamen, /Grado 3|Mérito/);
   });
 });
