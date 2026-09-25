@@ -14,6 +14,14 @@ export interface EvidenciaSelloInput {
   entropiaMin: number;
   vacioMin: number;
   jornadaPlanMin: number;
+  /** Presencia única sobre el plan (mismo reloj que Cobertura del día). */
+  minutosPresencia?: number;
+  /** Dirección única sobre el plan. */
+  minutosDireccion?: number;
+  /** Horario no planificado del día-jornada (24 h − plan). */
+  minutosNoConquistado?: number;
+  /** 100 − % no conquistado. Misma cifra que la barra de cobertura. */
+  coberturaPct?: number;
   segmentosTotales: number;
   segmentosCerradosManual: number;
   segmentosEntropia: number;
@@ -36,6 +44,10 @@ export interface SelloOperadorDraft {
   entropiaMin: number;
   vacioMin: number;
   jornadaPlanMin: number;
+  minutosPresencia?: number;
+  minutosDireccion?: number;
+  minutosNoConquistado?: number;
+  coberturaPct?: number;
   segmentosTotales: number;
   segmentosCerradosManual: number;
   tension: string;

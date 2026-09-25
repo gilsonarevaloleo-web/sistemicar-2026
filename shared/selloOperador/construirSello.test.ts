@@ -33,8 +33,30 @@ describe("construirSelloOperador", () => {
     assert.equal(s.selladoPor, "operador");
     assert.equal(s.conquistaMin, 180);
     assert.equal(s.totalPS, 12);
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("Conquista 3 h")));
     assert.ok(s.evidenciaHechos.some((h) => h.includes("Puertas cerradas a mano: 3 de 4")));
     assert.ok(s.evidenciaHechos.some((h) => h.includes("Lo ajeno")));
+  });
+
+  it("con tríada usa el mismo idioma que cobertura del día", () => {
+    const s = construirSelloOperador(
+      input({
+        conquistaMin: 943,
+        entropiaMin: 104,
+        vacioMin: 390,
+        minutosPresencia: 213,
+        minutosDireccion: 730,
+        minutosNoConquistado: 390,
+        coberturaPct: 73,
+      }),
+    );
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("Cobertura del día: 73%")));
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("Consciente 15 h 43 min")));
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("presencia 3 h 33 min")));
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("dirección 12 h 10 min")));
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("Inconsciente 1 h 44 min")));
+    assert.ok(s.evidenciaHechos.some((h) => h.includes("no conquistado 6 h 30 min")));
+    assert.equal(s.evidenciaHechos.some((h) => h.startsWith("Conquista ")), false);
   });
 
   it("si las puertas las cerró el sistema, la tensión no consuela", () => {

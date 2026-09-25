@@ -114,6 +114,7 @@ export default function Jornada4MetricasTab({
         segmentos={segmentos}
         vehicles={vehicles}
         todayPs={todayPs}
+        triada={triadaModel}
         tick={disciplinaTick}
       />
     </div>

@@ -1,4 +1,10 @@
-export { construirSelloOperador, recordatorioNoEsSello } from "./construirSello.ts";
+export {
+  construirSelloOperador,
+  hechosTiempoSello,
+  isHechoTiempoSello,
+  minLabelSello,
+  recordatorioNoEsSello,
+} from "./construirSello.ts";
 export {
   debeMostrarRelatoSello,
   debeRecordarSello,
