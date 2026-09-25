@@ -53,12 +53,12 @@ export default function Bienvenida() {
   const [abierto, setAbierto] = useState<SistemaRecinto["id"] | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user && isFirebaseConfigured()) {
       navigate("/menu");
     }
   }, [user, navigate]);
 
-  if (user) {
+  if (user && isFirebaseConfigured()) {
     return null;
   }
 
