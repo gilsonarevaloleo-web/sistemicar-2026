@@ -8,8 +8,11 @@ import { RecintoMinimoDock } from "@/components/jornada4/RecintoMinimoDock";
 import { Jornada4CoberturaTimeline } from "@/components/jornada4/Jornada4CoberturaTimeline";
 import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4ConcienciaTriadaCard";
 import { SelloOperadorCard } from "@/components/jornada4/SelloOperadorCard";
+import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
 import { Jornada4MobileNav, type Jornada4MobileTab } from "@/components/jornada4/Jornada4MobileNav";
 import { J4_UI } from "@/components/jornada4/jornada4Ui";
+import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
+import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import type { RevelacionPlanDia } from "@/jornada4/revelacionPlanDia";
 import type { ConcienciaTriadaModel } from "@/lib/concienciaTriadaOperador";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
@@ -99,21 +102,19 @@ const vehicles: Vehicle[] = [
   } as Vehicle,
 ];
 
+const noopCrisol = () => undefined;
+
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
+  const puertaPanorama = computePuertaPanorama(segmentos);
 
   return (
     <div
-      className="min-h-screen pb-16"
+      className="min-h-screen pb-24"
       style={{ backgroundColor: "#0a0a0a" }}
       data-testid="jornada4-ui-preview"
     >
-      <header className="sticky top-0 z-20 px-4 py-3 border-b border-white/10 bg-neutral-950/90 backdrop-blur-md">
-        <p className={J4_UI.label}>La Jornada · preview UI</p>
-        <p className="text-sm font-semibold text-neutral-100 mt-0.5">
-          OPERAR / PLAN / MÉTRICAS
-        </p>
-      </header>
+      <Jornada4Shell dualCount={1} dailyPS={12} statusLine="Preview UI" />
       <Jornada4MobileNav value={tab} onChange={setTab} />
       <div className="max-w-lg mx-auto pt-2">
         {tab === "operar" ? (
@@ -157,6 +158,18 @@ export default function JornadaV4UiPreview() {
           </div>
         ) : null}
       </div>
+      <PlaneacionCrisolDock
+        items={[]}
+        proyectos={[]}
+        onQuickAdd={noopCrisol}
+        onEnviarUnidad={noopCrisol}
+        onEnviarSeleccion={noopCrisol}
+        onDelete={noopCrisol}
+        onRutaChange={noopCrisol}
+        panoramaHeadline={puertaPanorama.headline}
+        panoramaSubline={puertaPanorama.subline}
+        panoramaMantra={puertaPanorama.mantra}
+      />
     </div>
   );
 }

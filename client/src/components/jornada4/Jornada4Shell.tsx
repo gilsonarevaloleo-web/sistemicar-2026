@@ -78,7 +78,7 @@ export function Jornada4Shell({ statusLine, dualCount = 0, dailyPS = 0 }: Props)
               </button>
             </div>
             <p
-              className="text-[8px] font-black uppercase tracking-[0.18em] truncate mt-0.5"
+              className="text-[8px] font-black uppercase tracking-[0.12em] leading-tight mt-0.5"
               style={{ color: GOLD }}
               data-testid="jornada4-shell-tagline"
             >
