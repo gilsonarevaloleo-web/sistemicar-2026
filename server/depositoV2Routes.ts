@@ -114,6 +114,7 @@ export function registerDepositoV2Routes(
     sombraOmision: req.body?.sombraOmision,
     codigoHipotesis: req.body?.codigoHipotesis,
     ojosHistoricos: req.body?.ojosHistoricos ?? req.body?.historialCodigos,
+    metricasJornada: req.body?.metricasJornada,
     callGemini,
   });
 
