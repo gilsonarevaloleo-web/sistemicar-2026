@@ -1,5 +1,5 @@
 /**
- * Pestaña Plan — secuencia de la jornada + timeline vertical de cobertura.
+ * Pestaña Plan — secuencia vertical de la jornada (colores de puerta) + segmentos + huecos.
  * Sin métricas duplicadas de conciencia (viven en MÉTRICAS).
  */
 import { useMemo } from "react";
@@ -80,7 +80,6 @@ export default function Jornada4PlanTab({
         ventanaCerrarIds={puertaWindows.cerrarIds}
         notifPermission={notifPermission}
         onRequestNotifPermission={onRequestNotifPermission}
-        hidePuertasTimeline
       />
       <CoberturaHuecosPanel refreshKey={huecosRefresh} vehicles={vehicles} />
     </div>

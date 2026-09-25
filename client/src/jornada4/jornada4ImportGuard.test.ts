@@ -149,6 +149,17 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /computePuertaPanorama/);
   });
 
+  it("PLAN pinta la secuencia vertical con el rastro de puertas", () => {
+    const plan = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4PlanTab.tsx"),
+      "utf8"
+    );
+    assert.match(plan, /Jornada4CoberturaTimeline/);
+    assert.equal(plan.includes("Jornada4PuertasTimeline"), false);
+    const preview = readFileSync(join(clientSrc, "pages/jornadaV4UiPreview.tsx"), "utf8");
+    assert.match(preview, /Jornada4CoberturaTimeline/);
+  });
+
   it("sesión difería Plan/Métricas (sin Pulso/recharts en el chunk Operar)", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /Jornada4PlanTab/);

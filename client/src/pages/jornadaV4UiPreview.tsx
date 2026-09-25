@@ -72,9 +72,9 @@ const segmentos: SegmentoV5[] = [
     horaFin: "10:00",
     color: "#34D399",
     icono: "sun",
-    estado: "cerrado_manual",
+    estado: "entropia",
     eventos: [],
-    psGanados: 4,
+    psGanados: 0,
   },
   {
     id: "s2",
@@ -94,9 +94,10 @@ const segmentos: SegmentoV5[] = [
     horaFin: "20:00",
     color: "#D4AF37",
     icono: "moon",
-    estado: "pendiente",
+    estado: "cerrado_manual",
+    activadoAt: Date.now() - 60 * 60 * 1000,
     eventos: [],
-    psGanados: 0,
+    psGanados: 4,
   },
 ];
 
