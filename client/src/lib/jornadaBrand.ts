@@ -84,6 +84,8 @@ export function isCommercialEntryPath(
   if (!pathname) return false;
   const path = pathname.split("?")[0] ?? pathname;
   return (
+    path === "/bienvenida" ||
+    path.startsWith("/bienvenida/") ||
     path === "/ventas-jornada" ||
     path.startsWith("/ventas-jornada/") ||
     path === "/vendedor" ||

@@ -19,7 +19,6 @@ import {
   Quote,
   ChevronLeft,
   ChevronRight,
-  Eye,
   Sunrise,
   Wand2,
   Heart,
@@ -123,14 +122,6 @@ function buildMenuItems(
     {
       id: "espejo",
       title: "ESPEJO",
-      subtitle: "Vaciado mental · Doctor IA",
-      icon: Eye,
-      route: "/espejo",
-      color: SPECTRUM.ROJO,
-    },
-    {
-      id: "espejo-v2",
-      title: "ESPEJO V2",
       subtitle: "Consola táctica · códigos 1.1–1.10",
       icon: Terminal,
       route: "/espejo/v2",
@@ -857,6 +848,7 @@ export default function MenuPrincipal() {
                         prefetchDepositoChunk();
                       } else if (
                         item.id === "espejo" ||
+                        item.route === "/espejo/v2" ||
                         item.route === "/espejo"
                       ) {
                         prefetchEspejoChunk();
@@ -1145,7 +1137,7 @@ export default function MenuPrincipal() {
           {(() => {
             const accessArgs = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
             const navItems = [
-              { icon: Eye, color: SPECTRUM.ROJO, route: "/espejo", label: "Espejo" },
+              { icon: Terminal, color: "#00FFC3", route: "/espejo/v2", label: "Espejo" },
               ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
                 ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),

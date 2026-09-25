@@ -61,7 +61,7 @@ export function prefetchDepositoChunk(): Promise<void> {
 }
 
 export function prefetchEspejoChunk(): Promise<void> {
-  return prefetch(() => import("@/pages/espejo"));
+  return prefetch(() => import("@/pages/espejo-v2"));
 }
 
 export function prefetchUmbralV2Chunk(): Promise<void> {

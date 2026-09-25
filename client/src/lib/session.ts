@@ -17,7 +17,7 @@ export async function logout(): Promise<void> {
   
   sessionStorage.clear();
   
-  window.location.href = "/espejo";
+  window.location.href = "/espejo/v2";
 }
 
 export function getUserId(): string {

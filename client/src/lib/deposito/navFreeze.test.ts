@@ -11,6 +11,17 @@ function readFromClient(rel: string): string {
 }
 
 describe("Depósito v2 visible y anti-freeze nav", () => {
+  it("el menú ofrece un solo Espejo: la consola V2", () => {
+    const menu = readFromClient("pages/menu-principal.tsx");
+    assert.match(menu, /route: "\/espejo\/v2"/);
+    assert.doesNotMatch(menu, /id: "espejo-v2"/);
+    assert.doesNotMatch(menu, /title: "ESPEJO V2"/);
+    assert.doesNotMatch(menu, /Vaciado mental/);
+    const app = readFromClient("App.tsx");
+    assert.match(app, /Redirect to="\/espejo\/v2"/);
+    assert.doesNotMatch(app, /import\("@\/pages\/espejo"\)/);
+  });
+
   it("el menú muestra DEPÓSITO V2 como ítem de primera (no En camino)", () => {
     const menu = readFromClient("pages/menu-principal.tsx");
     assert.match(menu, /id: "deposito-v2"/);
@@ -68,7 +79,7 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
   it("App carga Depósito (y las otras casas) en chunk lazy, no en el bundle inicial", () => {
     const src = readFromClient("App.tsx");
     assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/esperanza"\)\)/);
-    assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/espejo"\)\)/);
+    assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/espejo-v2"\)\)/);
     assert.match(src, /lazyWithRetry\(\(\) => import\("@\/pages\/umbral-v2"\)\)/);
     assert.match(src, /HouseRouteFallback/);
     assert.doesNotMatch(src, /import Esperanza from/);
