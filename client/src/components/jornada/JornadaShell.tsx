@@ -29,7 +29,12 @@ export function JornadaShell({ statusLine }: Props) {
           <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">
             {JORNADA_MODULE.titleUpper}
           </p>
-          <p className="text-[8px] text-slate-600 mt-0.5">{JORNADA_MODULE.tagline}</p>
+          <p
+            className="text-[8px] text-slate-600 mt-0.5"
+            data-testid="jornada-shell-tagline"
+          >
+            {JORNADA_MODULE.tagline}
+          </p>
           <div className="mt-2 flex gap-1">
             {(["operar", "metricas", "meta"] as const).map((tab, i) => (
               <div

@@ -111,8 +111,8 @@ export function isMenuPrincipalWindowPath(): boolean {
 export const JORNADA_MODULE = {
   title: "Jornada",
   titleUpper: "JORNADA",
-  /** Categoría pública — no "planificador". */
-  tagline: SISTEMICAR_CATEGORY.name,
+  /** Leyenda secundaria del header — entrenador de ventanas temporales. */
+  tagline: "MÓDULO LA JORNADA · Entrenador de Intención Panorámica",
   taglineShort: "Presencia · Entrada · Producción",
   /** Línea comercial en checkout (Planificación Base, etc.). */
   productLine: "Planificación",

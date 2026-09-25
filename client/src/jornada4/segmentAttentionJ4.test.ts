@@ -95,7 +95,7 @@ describe("segmentAttentionJ4", () => {
     assert.equal(panorama.activasSistema, 1);
     assert.equal(panorama.pendientes, 1);
     assert.equal(panorama.saldoPs, 2);
-    assert.match(panorama.headline, /1\/3/);
+    assert.match(panorama.headline, /1\/3 Puertas de Intención Panorámica/);
     assert.equal(panorama.mantra, J4_PUERTA_MANTRA);
   });
 

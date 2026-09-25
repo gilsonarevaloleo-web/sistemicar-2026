@@ -39,4 +39,20 @@ describe("evaluarDepositoVolcado", () => {
       /ejeMasculino|ejeFemenino|"polo"|género|"genero"/i,
     );
   });
+
+  it("con métricas de La Jornada el Maestro nombra la pérdida de Intención Panorámica", async () => {
+    const r = await evaluarDepositoVolcado({
+      textoVolcado: SECO,
+      gradoUsuarioActual: 1,
+      metricasJornada: {
+        puertasConquistadas: 0,
+        puertasTotales: 3,
+        puertasPerdidas: 3,
+      },
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.match(r.diagnostico.devolucionMaestro, /Intención Panorámica/);
+    assert.match(r.diagnostico.devolucionMaestro, /inercia biológica/);
+  });
 });
