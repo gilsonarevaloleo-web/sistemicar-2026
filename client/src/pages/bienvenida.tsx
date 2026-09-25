@@ -52,13 +52,18 @@ export default function Bienvenida() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [abierto, setAbierto] = useState<SistemaRecinto["id"] | null>(null);
 
+  const previewOferta =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("preview");
+
   useEffect(() => {
+    if (previewOferta) return;
     if (user && isFirebaseConfigured()) {
       navigate("/menu");
     }
-  }, [user, navigate]);
+  }, [user, navigate, previewOferta]);
 
-  if (user && isFirebaseConfigured()) {
+  if (!previewOferta && user && isFirebaseConfigured()) {
     return null;
   }
 
