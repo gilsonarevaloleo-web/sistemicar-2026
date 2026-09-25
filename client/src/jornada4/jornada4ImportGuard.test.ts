@@ -126,6 +126,18 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(overlay, /z-\[230\]/);
   });
 
+  it("tutorial de primer usuario queda por encima de El Crisol y el nav", () => {
+    const tutorial = readFileSync(
+      join(clientSrc, "components/planificacion/PlanificacionTutorial.tsx"),
+      "utf8"
+    );
+    assert.match(tutorial, /z-\[320\]/);
+    assert.match(tutorial, /items-center/);
+    assert.equal(tutorial.includes("items-end"), false);
+    assert.match(tutorial, /tutorial-plan-footer/);
+    assert.match(tutorial, /btn-tutorial-plan-next/);
+  });
+
   it("sesión monta atención de puertas Dual Kernel", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /useJornada4SegmentAttention/);
