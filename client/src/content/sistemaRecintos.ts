@@ -31,12 +31,12 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     id: "espejo",
     name: "Espejo",
     nameUpper: "ESPEJO",
-    ritual: "Limpia la carga",
-    oneLiner: "Vacías el bloqueo. Sales con protocolo, no con consuelo.",
+    ritual: "Nombra la interferencia",
+    oneLiner: "Expresas la queja. Sales con mandato, no con consuelo.",
     detail:
-      "Consola táctica: diagnóstico clínico y códigos 1.1–1.10. El Doctor nombra la interferencia y entrega el gesto. Créditos cuando la carga frena — sin suscripción.",
-    color: "#EF4444",
-    exploreHref: "/espejo",
+      "Consola táctica: códigos 1.1–1.10 y cinco fases (claridad → gobernador). El sistema clasifica el bloqueo y deja un gesto mínimo y uno máximo.",
+    color: "#00FFC3",
+    exploreHref: "/espejo/v2",
     publicExplore: true,
     exploreLabel: "Probar Espejo",
   },
@@ -84,7 +84,7 @@ export const SISTEMA_DIA = [
   {
     recinto: "Espejo",
     cuando: "Hay interferencia",
-    gesto: "Vaciar la carga y salir con protocolo.",
+    gesto: "Nombrar la queja y salir con mandato.",
   },
   {
     recinto: "Depósito",

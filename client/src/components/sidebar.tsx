@@ -122,7 +122,7 @@ export function Sidebar() {
 
   const baseNavItems: NavItem[] = [
     { path: "/menu", icon: Home, label: "Menú" },
-    { path: "/espejo", icon: Terminal, label: "Espejo" },
+    { path: "/espejo/v2", icon: Terminal, label: "Espejo" },
     { path: "/manuales", icon: BookOpen, label: "Manuales" },
     { path: "/pagos", icon: CreditCard, label: "Pagos" },
     { path: "/acerca", icon: Scroll, label: "Manifiesto" },
@@ -130,7 +130,7 @@ export function Sidebar() {
 
   const arquitectoModuleItems: NavItem[] = [
     { path: "/menu", icon: Home, label: "Menú" },
-    { path: "/espejo", icon: Terminal, label: "Espejo" },
+    { path: "/espejo/v2", icon: Terminal, label: "Espejo" },
     { path: "/radar", icon: Radio, label: "Radar" },
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
     { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
@@ -312,13 +312,13 @@ export function Sidebar() {
           const mobileItems = esArquitecto
             ? [
                 { path: "/menu", icon: Home, label: "Menú", color: "#A855F7" },
-                { path: "/espejo", icon: Terminal, label: "Espejo", color: "#3B82F6" },
+                { path: "/espejo/v2", icon: Terminal, label: "Espejo", color: "#3B82F6" },
                 { path: "/alquimia", icon: Flame, label: "Sabiduría", color: "#EF4444" },
                 { path: JORNADA_V4_PATH, icon: Compass, label: "Plan", color: "#7C3AED" },
               ]
             : [
                 { path: "/menu", icon: Home, label: "Menú", color: "#A855F7" },
-                { path: "/espejo", icon: Terminal, label: "Espejo", color: "#3B82F6" },
+                { path: "/espejo/v2", icon: Terminal, label: "Espejo", color: "#3B82F6" },
                 { path: "/manuales", icon: BookOpen, label: "Libros", color: "#D4AF37" },
                 { path: "/pagos", icon: CreditCard, label: "Upgrade", color: "#D4AF37" },
               ];

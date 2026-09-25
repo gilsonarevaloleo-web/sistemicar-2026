@@ -56,7 +56,6 @@ const LibroReclamaciones = lazyWithRetry(() => import("@/pages/libro-reclamacion
 const EmbudoSistemicar = lazyWithRetry(() => import("@/pages/embudo-sistemicar"));
 const Acceso = lazyWithRetry(() => import("@/pages/acceso"));
 const Documentos = lazyWithRetry(() => import("@/pages/documentos"));
-const Espejo = lazyWithRetry(() => import("@/pages/espejo"));
 const EspejoV2 = lazyWithRetry(() => import("@/pages/espejo-v2"));
 const EspejoExpedientes = lazyWithRetry(() => import("@/pages/espejo-expedientes"));
 const EspejoExpedienteDetalle = lazyWithRetry(() => import("@/pages/espejo-expediente-detalle"));
@@ -395,7 +394,7 @@ function Router() {
           <ProtectedRoute component={Tutorial} />
         </Route>
         <Route path="/console">
-          {() => { window.location.replace("/espejo"); return null; }}
+          {() => { window.location.replace("/espejo/v2"); return null; }}
         </Route>
         <Route path="/planeacion">
           <Redirect to={JORNADA_V4_PATH} />
@@ -489,7 +488,9 @@ function Router() {
         <Route path="/documentos" component={Documentos} />
         <Route path="/vendedores-planificacion" component={VendedoresPlanificacion} />
         <Route path="/espejo/v2" component={EspejoV2} />
-        <Route path="/espejo" component={Espejo} />
+        <Route path="/espejo">
+          <Redirect to="/espejo/v2" />
+        </Route>
         <Route path="/espejo/expedientes/:id" component={EspejoExpedienteDetalle} />
         <Route path="/espejo/expedientes" component={EspejoExpedientes} />
         <Route path="/gracias-compra" component={GraciasCompra} />

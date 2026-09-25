@@ -304,11 +304,11 @@ export default function EspejoV2() {
             )}
           </div>
           <Link
-            href="/espejo"
+            href="/menu"
             className="shrink-0 text-[11px] tracking-widest text-white/40 hover:text-[#00FFC3]"
-            data-testid="link-espejo-v1"
+            data-testid="link-espejo-menu"
           >
-            ← ESPEJO V1
+            ← MENÚ
           </Link>
         </header>
 
