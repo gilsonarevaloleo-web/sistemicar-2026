@@ -16,6 +16,10 @@ describe("draftToCierreLog", () => {
       entropiaMin: 30,
       vacioMin: 10,
       jornadaPlanMin: 160,
+      minutosPresencia: 40,
+      minutosDireccion: 80,
+      minutosNoConquistado: 10,
+      coberturaPct: 73,
       segmentosTotales: 3,
       segmentosCerradosManual: 2,
       tension: "Cerraste con evidencia. El ciclo no viaja a la cama.",
@@ -32,6 +36,9 @@ describe("draftToCierreLog", () => {
     assert.equal(log.selloEmitido, true);
     assert.equal(log.selladoPor, "operador");
     assert.equal(log.conquistaMin, 120);
+    assert.equal(log.minutosPresencia, 40);
+    assert.equal(log.minutosDireccion, 80);
+    assert.equal(log.coberturaPct, 73);
     assert.equal(log.totalPS, 9);
     assert.equal(log.selloTexto, draft.tension);
     assert.ok(log.evidenciaHechos?.includes("PS del día: 9"));

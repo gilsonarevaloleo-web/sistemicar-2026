@@ -604,6 +604,10 @@ export interface CierreJornadaLog {
   entropiaMin?: number;
   vacioMin?: number;
   jornadaPlanMin?: number;
+  minutosPresencia?: number;
+  minutosDireccion?: number;
+  minutosNoConquistado?: number;
+  coberturaPct?: number;
   /** Desglose PS por origen (Termodinámica Atencional). */
   psPanoramico?: number;
   psEspectro?: number;

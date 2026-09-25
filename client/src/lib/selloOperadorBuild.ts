@@ -3,8 +3,13 @@ import {
   adjuntarApunteAlCierre,
   type JornadaApunteCierre,
 } from "@shared/jornadaApunte";
-import { calcularBalanceConquistaJornada } from "@/engines/ConcienciaEngine";
+import {
+  buildConcienciaTriadaFromVehicles,
+  type ConcienciaTriadaModel,
+} from "@/lib/concienciaTriadaOperador";
+import { huecosLogToIntervals } from "@/lib/gastoConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
+import { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
 import {
   type CierreJornadaLog,
   type SegmentoV5,
@@ -13,6 +18,34 @@ import {
 } from "@/lib/persistence";
 import { conteoRecintosDelDia } from "@/lib/recintoMinimoStore";
 import { getJournalDateString } from "@/lib/segmentTime";
+import {
+  buildCoberturaHuecoIntervals,
+  readCoberturaHuecosEvents,
+} from "@/jornada4/coberturaHuecosLog";
+import type { MsInterval } from "@/lib/concienciaTriadaLinea";
+
+export { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
+
+function resolveSelloTriada(params: {
+  fecha: string;
+  segmentos: SegmentoV5[];
+  vehicles: Vehicle[];
+  nowMs: number;
+  triada?: ConcienciaTriadaModel;
+  huecosLog?: MsInterval[];
+}): ConcienciaTriadaModel {
+  if (params.triada) return params.triada;
+  const huecosLog =
+    params.huecosLog ??
+    huecosLogToIntervals(buildCoberturaHuecoIntervals(readCoberturaHuecosEvents()));
+  return buildConcienciaTriadaFromVehicles({
+    fecha: params.fecha,
+    segmentos: params.segmentos,
+    vehicles: params.vehicles,
+    now: params.nowMs,
+    huecosLog,
+  });
+}
 
 export function buildSelloDraft(params: {
   userId: string;
@@ -20,15 +53,22 @@ export function buildSelloDraft(params: {
   vehicles: Vehicle[];
   totalPS: number;
   nowMs?: number;
+  /** Misma tríada que Cobertura del día — si falta, se calcula igual. */
+  triada?: ConcienciaTriadaModel;
+  huecosLog?: MsInterval[];
 }): SelloOperadorDraft {
   const nowMs = params.nowMs ?? Date.now();
   const fecha = getJournalDateString(nowMs);
-  const vehiculos = filterVehiclesForAnilloCoverage(params.vehicles, nowMs);
-  const balance = calcularBalanceConquistaJornada({
+  const triada = resolveSelloTriada({
+    fecha,
     segmentos: params.segmentos,
-    vehiculos,
-    now: nowMs,
+    vehicles: params.vehicles,
+    nowMs,
+    triada: params.triada,
+    huecosLog: params.huecosLog,
   });
+  const tiempo = selloTiempoDesdeTriada(triada);
+  const vehiculos = filterVehiclesForAnilloCoverage(params.vehicles, nowMs);
   const delDia = vehiculos.filter((v) => {
     const at = v.cierreAt ?? v.aperturaAt ?? 0;
     return !at || getJournalDateString(at) === fecha || v.status === "activo";
@@ -39,10 +79,7 @@ export function buildSelloDraft(params: {
     nowMs,
     userId: params.userId,
     totalPS: params.totalPS,
-    conquistaMin: balance.conquistaMin,
-    entropiaMin: balance.entropiaMin,
-    vacioMin: balance.vacioMin,
-    jornadaPlanMin: balance.jornadaMin,
+    ...tiempo,
     segmentosTotales: params.segmentos.length,
     segmentosCerradosManual: params.segmentos.filter((s) => s.estado === "cerrado_manual").length,
     segmentosEntropia: params.segmentos.filter((s) => s.estado === "entropia").length,
@@ -79,6 +116,10 @@ export function draftToCierreLog(draft: SelloOperadorDraft): CierreJornadaLog {
     entropiaMin: draft.entropiaMin,
     vacioMin: draft.vacioMin,
     jornadaPlanMin: draft.jornadaPlanMin,
+    minutosPresencia: draft.minutosPresencia,
+    minutosDireccion: draft.minutosDireccion,
+    minutosNoConquistado: draft.minutosNoConquistado,
+    coberturaPct: draft.coberturaPct,
     selloTexto: draft.tension,
     selladoPor: "operador",
     tension: draft.tension,
@@ -99,6 +140,8 @@ export async function emitirSelloOperador(params: {
   totalPS: number;
   nowMs?: number;
   cierre: JornadaApunteCierre;
+  triada?: ConcienciaTriadaModel;
+  huecosLog?: MsInterval[];
 }): Promise<CierreJornadaLog> {
   const draft = buildSelloDraft(params);
   const log = adjuntarApunteAlCierre(draftToCierreLog(draft), params.cierre);

@@ -4,7 +4,7 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-function minLabel(n: number): string {
+export function minLabelSello(n: number): string {
   const v = Math.max(0, Math.round(n));
   if (v < 60) return `${v} min`;
   const h = Math.floor(v / 60);
@@ -12,14 +12,69 @@ function minLabel(n: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
+/** Líneas de reloj del sello (cobertura / consciente / inconsciente). */
+export function isHechoTiempoSello(line: string): boolean {
+  return /^(Cobertura del día|Consciente |Conquista |Inconsciente )/.test(line);
+}
+
+/**
+ * Hechos de tiempo. Si hay desglose de tríada, usa el mismo idioma que
+ * Cobertura del día (minutos únicos: presencia + dirección = consciente).
+ */
+export function hechosTiempoSello(input: {
+  conquistaMin: number;
+  entropiaMin: number;
+  vacioMin: number;
+  minutosPresencia?: number;
+  minutosDireccion?: number;
+  minutosNoConquistado?: number;
+  coberturaPct?: number;
+}): string[] {
+  const lines: string[] = [];
+  if (input.coberturaPct != null && Number.isFinite(input.coberturaPct)) {
+    lines.push(`Cobertura del día: ${Math.max(0, Math.round(input.coberturaPct))}%`);
+  }
+  const presencia = input.minutosPresencia;
+  const direccion = input.minutosDireccion;
+  if (presencia != null && direccion != null) {
+    lines.push(
+      `Consciente ${minLabelSello(input.conquistaMin)} · presencia ${minLabelSello(presencia)} · dirección ${minLabelSello(direccion)}`,
+    );
+    lines.push(
+      `Inconsciente ${minLabelSello(input.entropiaMin)} · no conquistado ${minLabelSello(input.minutosNoConquistado ?? input.vacioMin)}`,
+    );
+    return lines;
+  }
+  lines.push(
+    `Conquista ${minLabelSello(input.conquistaMin)} · inconsciente ${minLabelSello(input.entropiaMin)} · vacío ${minLabelSello(input.vacioMin)}`,
+  );
+  return lines;
+}
+
 export function construirSelloOperador(input: EvidenciaSelloInput): SelloOperadorDraft {
   const conquista = round1(input.conquistaMin);
   const entropia = round1(input.entropiaMin);
   const vacio = round1(input.vacioMin);
   const plan = round1(input.jornadaPlanMin);
+  const minutosPresencia =
+    input.minutosPresencia != null ? round1(input.minutosPresencia) : undefined;
+  const minutosDireccion =
+    input.minutosDireccion != null ? round1(input.minutosDireccion) : undefined;
+  const minutosNoConquistado =
+    input.minutosNoConquistado != null ? round1(input.minutosNoConquistado) : undefined;
+  const coberturaPct =
+    input.coberturaPct != null ? Math.max(0, Math.round(input.coberturaPct)) : undefined;
 
   const evidenciaHechos: string[] = [
-    `Conquista ${minLabel(conquista)} · inconsciente ${minLabel(entropia)} · vacío ${minLabel(vacio)}`,
+    ...hechosTiempoSello({
+      conquistaMin: conquista,
+      entropiaMin: entropia,
+      vacioMin: vacio,
+      minutosPresencia,
+      minutosDireccion,
+      minutosNoConquistado,
+      coberturaPct,
+    }),
     `Puertas cerradas a mano: ${input.segmentosCerradosManual} de ${input.segmentosTotales}`,
     `Vehículos que cerraste: ${input.vehiculosCerradosManual}. El sistema archivó ${input.vehiculosCerradosSistema}`,
     `PS del día: ${Math.max(0, Math.round(input.totalPS))}`,
@@ -45,6 +100,10 @@ export function construirSelloOperador(input: EvidenciaSelloInput): SelloOperado
     entropiaMin: entropia,
     vacioMin: vacio,
     jornadaPlanMin: plan,
+    minutosPresencia,
+    minutosDireccion,
+    minutosNoConquistado,
+    coberturaPct,
     segmentosTotales: input.segmentosTotales,
     segmentosCerradosManual: input.segmentosCerradosManual,
     tension,

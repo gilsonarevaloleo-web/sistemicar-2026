@@ -153,6 +153,7 @@ export default function JornadaV4UiPreview() {
               segmentos={segmentos}
               vehicles={vehicles}
               todayPs={12}
+              triada={triada}
             />
           </div>
         ) : null}

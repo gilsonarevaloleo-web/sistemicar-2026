@@ -3,6 +3,7 @@ import { Stamp } from "lucide-react";
 import { J4_COLORS } from "./Jornada4Shell";
 import { J4_UI } from "./jornada4Ui";
 import { buildSelloDraft, emitirSelloOperador } from "@/lib/selloOperadorBuild";
+import { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
 import {
   readLocalCierreJornadaByFecha,
   type CierreJornadaLog,
@@ -10,9 +11,12 @@ import {
   type Vehicle,
 } from "@/lib/persistence";
 import { getJournalDateString } from "@/lib/segmentTime";
+import type { ConcienciaTriadaModel } from "@/lib/concienciaTriadaOperador";
 import {
   debeMostrarRelatoSello,
   formatTerminoLabel,
+  hechosTiempoSello,
+  isHechoTiempoSello,
   resolveTerminoPlanMs,
 } from "@shared/selloOperador";
 import {
@@ -30,6 +34,8 @@ type Props = {
   segmentos: SegmentoV5[];
   vehicles: Vehicle[];
   todayPs: number;
+  /** Misma tríada que Cobertura del día — el sello no inventa otro reloj. */
+  triada?: ConcienciaTriadaModel;
   /** Pulso de la isla Métricas — el relato nace al término sin recargar. */
   tick?: number;
 };
@@ -72,6 +78,7 @@ export function SelloOperadorCard({
   segmentos,
   vehicles,
   todayPs,
+  triada,
   tick = 0,
 }: Props) {
   void tick;
@@ -114,10 +121,11 @@ export function SelloOperadorCard({
       vehicles,
       totalPS: todayPs,
       nowMs,
+      triada,
     });
     // nowMs se ancla al tick de la isla; relatoVisible cambia al término.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, segmentos, vehicles, todayPs, sello?.selloEmitido, relatoVisible]);
+  }, [userId, segmentos, vehicles, todayPs, sello?.selloEmitido, relatoVisible, triada]);
 
   const sellar = async () => {
     if (!userId || busy || !puedeSellar) return;
@@ -132,6 +140,7 @@ export function SelloOperadorCard({
         vehicles,
         totalPS: todayPs,
         cierre: cierreDesdeApunte(cerrado),
+        triada,
       });
       setSello(log);
     } catch (e) {
@@ -142,8 +151,17 @@ export function SelloOperadorCard({
   };
 
   const tension = sellado ? sello?.tension ?? sello?.selloTexto : draft?.tension;
-  const hechos = sellado ? sello?.evidenciaHechos : draft?.evidenciaHechos;
   const mandato = sellado ? sello?.mandato : draft?.mandato;
+  const tiempoHechos = useMemo(() => {
+    if (!triada?.hasPlanificacion) return null;
+    return hechosTiempoSello(selloTiempoDesdeTriada(triada));
+  }, [triada]);
+  const rawHechos = sellado ? sello?.evidenciaHechos : draft?.evidenciaHechos;
+  const hechos = useMemo(() => {
+    if (!tiempoHechos) return rawHechos;
+    const rest = (rawHechos ?? []).filter((h) => !isHechoTiempoSello(h));
+    return [...tiempoHechos, ...rest];
+  }, [tiempoHechos, rawHechos]);
 
   return (
     <section
