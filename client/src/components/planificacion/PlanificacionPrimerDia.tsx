@@ -22,7 +22,7 @@ type Props = {
   segmentos: Array<{ estado?: string }>;
   vehicles: Vehicle[];
   onOpenTutorial: () => void;
-  onAskDoctor: (prompt: string) => void;
+  onAskDoctor?: (prompt: string) => void;
 };
 
 export function PlanificacionPrimerDia({
@@ -129,20 +129,22 @@ export function PlanificacionPrimerDia({
               <GraduationCap size={12} />
               Ver tutorial
             </button>
-            <button
-              type="button"
-              onClick={() =>
-                onAskDoctor(
-                  `Estoy en mi primer día de Planificación. Mi checklist:\n${summary}\n¿Qué hago ahora?`
-                )
-              }
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white"
-              style={{ backgroundColor: BLOOD }}
-              data-testid="btn-primer-dia-ask-doctor"
-            >
-              <MessageCircle size={12} />
-              Preguntar al Doctor
-            </button>
+            {onAskDoctor ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onAskDoctor(
+                    `Estoy en mi primer día de Planificación. Mi checklist:\n${summary}\n¿Qué hago ahora?`
+                  )
+                }
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white"
+                style={{ backgroundColor: BLOOD }}
+                data-testid="btn-primer-dia-ask-doctor"
+              >
+                <MessageCircle size={12} />
+                Preguntar al Doctor
+              </button>
+            ) : null}
           </div>
 
           {allDone && (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { auth, getUserEmail, isUserAnonymous } from "@/lib/firebase";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import { accesoUrlWithNext } from "@shared/clientAccount";
@@ -22,6 +22,7 @@ import {
   SKU_NORTE,
   SKU_RITMO,
 } from "@shared/planificacionPricing";
+import { resolveCheckoutFocus } from "@shared/planificacionCheckoutFocus";
 import { UMBRAL_SKU } from "@shared/umbralPricing";
 import {
   ESPEJO_SKU_INICIO,
@@ -223,7 +224,26 @@ export default function Pagos() {
   const [userEmail, setUserEmail] = useState("");
   const [activeSellerRef, setActiveSellerRef] = useState<string | null>(null);
   const [receiptSent, setReceiptSent] = useState(false);
+  const [showLaterPeldanos, setShowLaterPeldanos] = useState(false);
   const paymentSectionRef = useRef<HTMLDivElement>(null);
+  const checkoutFocus = useMemo(() => {
+    if (typeof window === "undefined") return resolveCheckoutFocus("");
+    return resolveCheckoutFocus(window.location.search);
+  }, [location]);
+  const visibleJornadaPlans = useMemo(() => {
+    if (!checkoutFocus.collapseLaterPeldanos || showLaterPeldanos) {
+      return planificacionPlans;
+    }
+    if (checkoutFocus.focusSkuId === "operativo") {
+      return planificacionPlans.filter(
+        (p) => p.id === "operativo" || p.id === "planificacion_base",
+      );
+    }
+    if (checkoutFocus.focusSkuId) {
+      return planificacionPlans.filter((p) => p.id === checkoutFocus.focusSkuId);
+    }
+    return planificacionPlans;
+  }, [checkoutFocus, showLaterPeldanos]);
   const googleEmail = getUserEmail();
   const hasGoogleAccount = Boolean(googleEmail) && !isUserAnonymous();
 
@@ -451,7 +471,24 @@ export default function Pagos() {
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Jornada · Mensual</h2>
           </div>
 
-          {/* Embudo — autodiagnóstico */}
+          {checkoutFocus.headline ? (
+            <div
+              className="mb-6 p-4 rounded-xl border"
+              style={{ borderColor: `${GOLD}40`, backgroundColor: `${GOLD}0d` }}
+              data-testid="pagos-checkout-focus"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: GOLD }}>
+                Este momento
+              </p>
+              <h3 className="text-lg font-black text-white mt-1">{checkoutFocus.headline}</h3>
+              {checkoutFocus.subline ? (
+                <p className="text-[12px] text-slate-300 mt-1 leading-relaxed">{checkoutFocus.subline}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Embudo — solo catálogo abierto (no entrada de un peldaño) */}
+          {!checkoutFocus.focusSkuId ? (
           <div className="mb-6 p-4 rounded-xl border border-white/10 bg-black/30">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 text-center">
               ¿En qué peldaño estás?
@@ -473,8 +510,10 @@ export default function Pagos() {
               ))}
             </div>
           </div>
+          ) : null}
 
-          {/* Stacks orientación */}
+          {/* Stacks orientación — no en entrada de un solo peldaño */}
+          {!checkoutFocus.hideStacks ? (
           <div className="mb-6">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 text-center">
               Stacks recomendados
@@ -522,9 +561,10 @@ export default function Pagos() {
               ))}
             </div>
           </div>
+          ) : null}
 
         <div className="grid md:grid-cols-3 gap-4 mb-4">
-          {planificacionPlans.map((plan) => {
+          {visibleJornadaPlans.map((plan) => {
             const Icon = plan.icon;
             const isSelected = selectedPlan.id === plan.id;
             
@@ -638,10 +678,25 @@ export default function Pagos() {
           })}
         </div>
 
+        {checkoutFocus.collapseLaterPeldanos && !showLaterPeldanos ? (
+          <div className="mb-6 text-center">
+            <button
+              type="button"
+              onClick={() => setShowLaterPeldanos(true)}
+              className="text-[11px] underline text-slate-400"
+              data-testid="pagos-ver-peldanos-despues"
+            >
+              Ver peldaños siguientes (Ritmo / Norte) — no son este momento
+            </button>
+          </div>
+        ) : null}
+
         <p className="text-[10px] text-slate-600 text-center mb-8 leading-relaxed px-2">
           Comparado con apps de notas (~$10/mes): aquí pagas por unidades, ritmo y cierre de bloque — no por listas.
         </p>
 
+        {!checkoutFocus.hideOtherWorlds ? (
+        <>
         {/* Umbral — módulo aparte */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
@@ -796,9 +851,12 @@ export default function Pagos() {
             })}
           </div>
         </div>
+        </>
+        ) : null}
         </section>
 
         {/* Ecosistema — en camino */}
+        {!checkoutFocus.hideOtherWorlds ? (
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-4">
             <Map size={16} className="text-slate-500" />
@@ -822,6 +880,7 @@ export default function Pagos() {
             ))}
           </div>
         </section>
+        ) : null}
 
         {/* Payment Method Selection */}
         <div ref={paymentSectionRef} className="p-6 rounded-2xl bg-card border border-white/10 mb-6">
