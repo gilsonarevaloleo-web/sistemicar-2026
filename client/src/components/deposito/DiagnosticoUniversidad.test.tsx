@@ -39,6 +39,7 @@ describe("DiagnosticoUniversidad", () => {
     assert.match(html, /VALIDACIÓN DE GRADO/);
     assert.match(html, /PLACEMENT/);
     assert.match(html, /MÉRITO · 3 EJES/);
+    assert.match(html, new RegExp(`Rotación C${diagnostico.codigoDominante}`));
     assert.match(html, /G\d/);
     assert.match(html, /MAPA DE CALOR/);
     assert.doesNotMatch(html, /C1 y C2/);

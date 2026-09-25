@@ -185,7 +185,7 @@ export function bloquePlacementTest(gradoActual: GradoMaestria): string {
     "Prohibido descender el grado activo. El mérito solo calibra al alza.",
     "G4 exige evidencia de rotación del mapa de calor (1/10), no un solo volcado brillante.",
     "metricasMerito.densidadEstructural = 0–100 (hechos secos vs flor).",
-    "metricasMerito.variedadRotacionCodigo = el código sugerido REAL para equilibrar el mapa (hueco C1–C10). Prohibido fallback automático a C1 si el hueco es otro.",
+    "metricasMerito.variedadRotacionCodigo DEBE coincidir con ojoDominante.codigo. Prohibido fallback automático a C1 si el Ojo Dominante es otro.",
     "metricasMerito.metacognicionDetectada = true si el alumno vio su propio sesgo.",
   ].join("\n");
 }
@@ -197,6 +197,15 @@ export function detectarFlorMerito(texto: string): string[] {
     .trim();
   if (!t) return [];
   return FLOR.filter((f) => f.re.test(t)).map((f) => f.etiqueta);
+}
+
+/** true solo si hay flor aislada en el texto o ya listada por el motor. */
+export function detectaFlor(
+  texto: string,
+  florDetectada: readonly string[] = [],
+): boolean {
+  if (florDetectada.some((f) => String(f).trim())) return true;
+  return detectarFlorMerito(texto).length > 0;
 }
 
 function contarPalabras(texto: string): number {
@@ -425,7 +434,9 @@ export function evaluarMeritoVolcado(ctx: ContextoMerito): ResultadoMerito {
   ];
   const metricas: MetricasMerito = {
     densidadEstructural: calcularDensidadEstructural(captura, florLocal),
-    variedadRotacionCodigo: sugerirRotacionCodigo(ojos),
+    variedadRotacionCodigo: ctx.codigoDominante
+      ? etiquetaCodigoOjo(ctx.codigoDominante)
+      : sugerirRotacionCodigo(ojos),
     metacognicionDetectada: detectarMetacognicion(captura),
   };
   const gradoDetectado = detectarGradoPorMerito(
@@ -459,10 +470,7 @@ export function toDepositoEngineResponse(
   };
   const metricas: MetricasMerito = {
     densidadEstructural: diagnostico.metricasMerito?.densidadEstructural ?? 0,
-    variedadRotacionCodigo: resolverRotacionCodigo(
-      diagnostico.metricasMerito?.variedadRotacionCodigo,
-      [diagnostico.codigoDominante],
-    ),
+    variedadRotacionCodigo: etiquetaCodigoOjo(diagnostico.codigoDominante),
     metacognicionDetectada:
       diagnostico.metricasMerito?.metacognicionDetectada ?? false,
   };

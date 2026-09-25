@@ -11,7 +11,11 @@ import {
   diagnosticarVolcadoLocal,
   etiquetaGradoMaestria,
   placementOcultaGradoAnterior,
+  detectaFlor,
   evaluarRitualPasoGrado,
+  motivoRitualPasoVisible,
+  progresoRitualPaso,
+  toDepositoEngineResponse,
   isCodigoObservador,
   isGradoMaestria,
   normalizarCapturaVolcado,
@@ -452,10 +456,10 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(d.mecanicaAbsorcion, /ley/);
     assert.deepEqual(d.florDetectada, ["comparacion", "castigo"]);
     assert.equal(d.evaluacionGrado?.gradoDetectado, 3);
-    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C9");
   });
 
-  it("variedadRotacionCodigo usa el hueco real y no cae a C1", () => {
+  it("variedadRotacionCodigo coincide con ojoDominante y no cae a C1", () => {
     const raw = JSON.stringify({
       ojoDominante: {
         codigo: "C9",
@@ -477,7 +481,8 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       nivelCargaSugerido: "SUPERIOR",
     });
     const d = parseDiagnosticoVolcado(raw, 1, [1, 3, 9]);
-    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C2");
+    assert.equal(d.codigoDominante, 9);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C9");
 
     const sinCampo = parseDiagnosticoVolcado(
       JSON.stringify({
@@ -487,7 +492,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       1,
       [1, 3, 9],
     );
-    assert.equal(sinCampo.metricasMerito?.variedadRotacionCodigo, "C2");
+    assert.equal(sinCampo.metricasMerito?.variedadRotacionCodigo, "C9");
   });
 
   it("parseDiagnosticoVolcado conserva validacionGrado y la Triada", () => {
@@ -580,6 +585,58 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     );
     assert.equal(techo.gradoSiguiente, null);
     assert.match(techo.motivo, /techo/i);
+    assert.equal(motivoRitualPasoVisible(tres), false);
+    assert.equal(motivoRitualPasoVisible(techo), false);
+    assert.ok(progresoRitualPaso(tres) > 0);
+    assert.equal(progresoRitualPaso(techo), 1);
+  });
+
+  it("sin flor no acusa autoengaño genérico en el Punto Ciego de C4", () => {
+    const seco =
+      "Hoy nombré el quiebre del turno. El riesgo era la interrupción a las 11. Puse un límite de prevención. El estándar quedó escrito.";
+    assert.equal(detectaFlor(seco), false);
+    const d = diagnosticarVolcadoLocal(seco);
+    assert.equal(d.codigoDominante, 4);
+    assert.doesNotMatch(d.puntoCiego, /flor|ilusi[oó]n|ya ver[eé]|autoenga[nñ]o/i);
+    assert.match(d.puntoCiego, /quiebre|interrupci[oó]n/i);
+    const engine = toDepositoEngineResponse(d);
+    assert.equal(engine.ojoDominante.codigo, engine.metricasMerito.variedadRotacionCodigo);
+    assert.equal(engine.ojoDominante.codigo, "C4");
+  });
+
+  it("parseDiagnosticoVolcado no acusa flor si florDetectada está vacía", () => {
+    const d = parseDiagnosticoVolcado(
+      JSON.stringify({
+        codigoDominante: 4,
+        justificacionDominante: "El centro es prevención.",
+        puntoCiego: {
+          loNoDicho:
+            "No observa la interrupción ni el quiebre que se está armando. Cubre el riesgo con flor, ilusión o «ya veré».",
+          florDetectada: [],
+        },
+        mecanicaAbsorcion: "Mañana nombrá el quiebre.",
+        devolucionMaestro: "Espejo. R2. Veredicto.",
+        nivelCargaSugerido: "INTERMEDIO",
+        metricasMerito: {
+          densidadEstructural: 60,
+          variedadRotacionCodigo: "C1",
+          metacognicionDetectada: false,
+        },
+      }),
+    );
+    assert.equal(d.codigoDominante, 4);
+    assert.doesNotMatch(d.puntoCiego, /flor|ilusi[oó]n|ya ver[eé]/i);
+    assert.match(d.puntoCiego, /quiebre|interrupci[oó]n/i);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C4");
+  });
+
+  it("con flor detectada sí puede nombrar la cobertura en C4", () => {
+    const conFlor =
+      "Hoy vi el quiebre del estándar y el riesgo. Ya veré cómo prevengo. Fue increíble. La interrupción queda para después.";
+    assert.equal(detectaFlor(conFlor), true);
+    const d = diagnosticarVolcadoLocal(conFlor);
+    assert.equal(d.codigoDominante, 4);
+    assert.match(d.puntoCiego, /flor|ya ver[eé]|ilusi[oó]n/i);
   });
 
   it("el evaluador define Intención Panorámica y nombra conquista/pérdida con métricas de La Jornada", () => {
