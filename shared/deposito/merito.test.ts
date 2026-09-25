@@ -31,6 +31,11 @@ describe("Depósito v2 — mérito, placement y temperamento", () => {
     );
     assert.match(buildDepositoSystemPrompt(2), /FRICCIÓN MODERADA/);
     assert.match(buildDepositoSystemPrompt(2), /adjetivos y comparaciones/);
+    assert.match(buildDepositoSystemPrompt(1), /HECHOS REALES/);
+    assert.match(
+      buildDepositoSystemPrompt(1),
+      /prohibido asociarlo automáticamente con miedo al rechazo/i,
+    );
   });
 
   it("clima corto se queda en G1 sin mérito", () => {

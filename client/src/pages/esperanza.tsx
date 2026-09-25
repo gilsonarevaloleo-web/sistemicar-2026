@@ -30,6 +30,7 @@ import {
 } from "@/lib/depositoVolcados";
 import {
   analizarVolcado,
+  coherenciaDictamenConPlacement,
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
 import {
@@ -186,8 +187,13 @@ export default function Esperanza() {
       ojosHistoricos,
       metricasJornada,
     );
+    const dictamenCoherente = coherenciaDictamenConPlacement(d, {
+      gradoDetectado: localDiag.evaluacionGrado?.gradoDetectado,
+      densidadEstructural: localDiag.metricasMerito?.densidadEstructural,
+      mensajeEncuadre: localDiag.evaluacionGrado?.mensajeEncuadre,
+    });
 
-    setDictamen(d);
+    setDictamen(dictamenCoherente);
     setUltimoVolcado(crudo);
     aplicarDiagnostico(localDiag);
     requestAnimationFrame(() =>
@@ -200,14 +206,14 @@ export default function Esperanza() {
       return;
     }
 
-    const persistir = addVolcadoEntry(uid, crudo, d, localDiag, lista, {
+    const persistir = addVolcadoEntry(uid, crudo, dictamenCoherente, localDiag, lista, {
       waitForRemote: plan.esperarFirebase,
     });
     setFormKey((k) => k + 1);
     toast.success(
       localDiag.evaluacionGrado?.meritoReconocido
         ? "Volcado guardado."
-        : d.calidad === "ruido"
+        : dictamenCoherente.calidad === "ruido"
           ? "Ruido guardado. El no-dicho ya es el ojo."
           : "Volcado guardado.",
     );
@@ -219,6 +225,17 @@ export default function Esperanza() {
           metricasJornada,
         });
         aplicarDiagnostico(remoto.diagnostico);
+        setDictamen((prev) =>
+          prev
+            ? coherenciaDictamenConPlacement(prev, {
+                gradoDetectado: remoto.diagnostico.evaluacionGrado?.gradoDetectado,
+                densidadEstructural:
+                  remoto.diagnostico.metricasMerito?.densidadEstructural,
+                mensajeEncuadre:
+                  remoto.diagnostico.evaluacionGrado?.mensajeEncuadre,
+              })
+            : prev,
+        );
       } catch {
         /* G1 ya tiene feedback local. G2+ también conserva el diagnóstico local. */
       }

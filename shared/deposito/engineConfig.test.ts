@@ -95,6 +95,13 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /Presencia de Terreno en 0ms/);
     assert.match(prompt.system, /prohibido evaluar La Jornada como una «Secuencia de Jornada»/i);
     assert.match(prompt.system, /inercia biológica/);
+    assert.match(prompt.system, /HECHOS REALES/);
+    assert.match(prompt.system, /PROHIBIDO atajo de plantilla C6/);
+    assert.match(prompt.system, /física de esa tarea/i);
+    assert.match(prompt.system, /COHERENCIA PLACEMENT \/ DICTAMEN/);
+    assert.match(prompt.system, /densidadEstructural > 75/);
+    assert.doesNotMatch(prompt.system, /Ceguera típica:.*miedo al rechazo/);
+    assert.doesNotMatch(prompt.system, /Cuerpo en la Puerta/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
     assert.doesNotMatch(prompt.system, /Eje Masculino|Eje Femenino|CAPA INTERNA DE POLARIDAD/);
     assert.doesNotMatch(
@@ -250,9 +257,33 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     );
     assert.equal(
       placementOcultaGradoAnterior({
+        gradoDetectado: 3,
+        meritoReconocido: false,
+        mensajeEncuadre: "Ya está en G3.",
+      }),
+      true,
+    );
+    assert.equal(
+      placementOcultaGradoAnterior({
+        gradoDetectado: 2,
+        meritoReconocido: true,
+        mensajeEncuadre: "Mérito G2.",
+      }),
+      true,
+    );
+    assert.equal(
+      placementOcultaGradoAnterior({
         gradoDetectado: 1,
         meritoReconocido: false,
         mensajeEncuadre: "G1.",
+      }),
+      false,
+    );
+    assert.equal(
+      placementOcultaGradoAnterior({
+        gradoDetectado: 2,
+        meritoReconocido: false,
+        mensajeEncuadre: "Calibración G2.",
       }),
       false,
     );
@@ -319,6 +350,9 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(g1, /meritoReconocido': true/);
     assert.match(g1, /UNA SOLA INSTRUCCIÓN EJECUTABLE/);
     assert.match(g1, /JAMÁS repitas citas textuales largas/);
+    assert.match(g1, /HECHOS REALES/);
+    assert.match(g1, /prohibido asociarlo automáticamente con miedo al rechazo/i);
+    assert.match(g1, /COHERENCIA PLACEMENT \/ DICTAMEN/);
     assert.doesNotMatch(g1, /CAPA INTERNA DE POLARIDAD|Eje Masculino|F- \(rumiación/);
     assert.match(g1, /DepositoEngineResponse/);
 
@@ -576,5 +610,65 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(perdida.devolucionMaestro, /Intención Panorámica/);
     assert.match(perdida.devolucionMaestro, /inercia biológica/);
     assert.match(perdida.devolucionMaestro, /1\/4/);
+  });
+
+  it("C6 no arrastra plantilla social: costura/botones se quedan en la física", () => {
+    assert.doesNotMatch(DICCIONARIO_OJOS[6].cegueraActiva, /miedo al rechazo/);
+    assert.doesNotMatch(DICCIONARIO_OJOS[6].voz, /Cuerpo en la Puerta/i);
+    assert.doesNotMatch(
+      DICCIONARIO_OJOS[6].gestoAbsorcion,
+      /llamada|puerta|mensaje enviado/,
+    );
+
+    const costura =
+      "Hoy a las 8:10 aprendí que el botón no entra si la tensión no cierra el encaje. Usé la máquina de coser. Corté 12 botones. Ajusté la tensión del hilo a 4. Cosí el segundo. Armé la prenda. Medí el ojal. El sesgo: yo suelo forzar la pieza. No lo hice. Dijo: \"papá el botón no entra así\". No dije «después veo mañana». Cerré a las 8:40.";
+    const d = diagnosticarVolcadoLocal(costura);
+    const campos = [
+      d.puntoCiego,
+      d.devolucionMaestro,
+      d.mecanicaAbsorcion,
+      d.justificacionDominante,
+    ].join(" ");
+    assert.doesNotMatch(campos, /miedo al rechazo/);
+    assert.doesNotMatch(campos, /contacto social/);
+    assert.doesNotMatch(campos, /cuerpo en la puerta/i);
+    assert.doesNotMatch(campos, /ensaya en la cabeza/i);
+    assert.match(campos, /ajuste|tensión|pieza|herramient|física|roce físico/i);
+    assert.ok((d.evaluacionGrado?.gradoDetectado ?? 1) >= 3);
+    assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 75);
+    assert.doesNotMatch(d.devolucionMaestro, /reescrib/i);
+    assert.doesNotMatch(d.devolucionMaestro, /todavía es ruido/i);
+  });
+
+  it("si G3 y Estructura > 75, Gemini no puede dejar dictamen de ruido ni plantilla C6", async () => {
+    const costura =
+      "Hoy a las 8:10 aprendí que el botón no entra si la tensión no cierra el encaje. Usé la máquina de coser. Corté 12 botones. Ajusté la tensión del hilo a 4. Cosí el segundo. Armé la prenda. Medí el ojal. El sesgo: yo suelo forzar la pieza. No lo hice. Dijo: \"papá el botón no entra así\". No dije «después veo mañana». Cerré a las 8:40.";
+    const d = await procesarVolcadoAprendizaje(costura, {
+      callGemini: async () =>
+        JSON.stringify({
+          codigoDominante: 6,
+          justificacionDominante: "El roce es el encaje del botón.",
+          puntoCiego: "Evita la puerta por miedo al rechazo.",
+          devolucionMaestro:
+            "Esto todavía es ruido. Reescribilo como lo que el día te enseñó.",
+          mecanicaAbsorcion: "Mañana mandá un mensaje. El cuerpo entra.",
+          nivelCargaSugerido: "SUPERIOR",
+          evaluacionGrado: {
+            gradoDetectado: 3,
+            meritoReconocido: true,
+            mensajeEncuadre: "Mérito G3.",
+          },
+          metricasMerito: {
+            densidadEstructural: 82,
+            variedadRotacionCodigo: "C1",
+            metacognicionDetectada: true,
+          },
+        }),
+    });
+    assert.doesNotMatch(d.puntoCiego, /miedo al rechazo/);
+    assert.doesNotMatch(d.devolucionMaestro, /reescrib/i);
+    assert.doesNotMatch(d.devolucionMaestro, /todavía es ruido/i);
+    assert.ok((d.evaluacionGrado?.gradoDetectado ?? 1) >= 3);
+    assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 75);
   });
 });

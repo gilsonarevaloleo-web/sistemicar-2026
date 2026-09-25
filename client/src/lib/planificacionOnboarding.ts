@@ -73,10 +73,10 @@ const STEPS_BASE: TutorialStep[] = [
     action: "Cierra tu primer vehículo antes de salir.",
   },
   {
-    title: "Tu guía: Doctor IA",
+    title: "Hoy solo esto",
     description:
-      `En ${JORNADA_MODULE.title} el Doctor responde en modo guía: «¿cómo lanzo Conquista?», «¿qué es PS?». Pregunta con tu duda concreta.`,
-    action: "Abre el chat flotante y escribe: «¿Por dónde empiezo hoy?»",
+      "Toca Conquista, nombra lo que vas a medir y cuántas unidades. Al terminar, márcalo CUMPLIDO o FALLADO. Ritmo (imprevistos) y Norte (proyectos) no están en Base: aparecen después, cuando ya hayas cerrado.",
+    action: "Toca Conquista en La Flota. Eso es operar hoy.",
   },
 ];
 

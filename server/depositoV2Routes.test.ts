@@ -200,6 +200,31 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(body.engine.metricasMerito.metacognicionDetectada, true);
     });
   });
+
+  it("costura/botones no inyecta plantilla C6 de miedo social", async () => {
+    await withServer(undefined, async (base) => {
+      const res = await fetch(`${base}/api/deposito/volcado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          textoVolcado:
+            "Hoy a las 8:10 aprendí que el botón no entra si la tensión no cierra el encaje. Usé la máquina de coser. Corté 12 botones. Ajusté la tensión del hilo a 4. Cosí el segundo. Armé la prenda. Medí el ojal. El sesgo: yo suelo forzar la pieza. No lo hice. Dijo: \"papá el botón no entra así\". No dije «después veo mañana». Cerré a las 8:40.",
+          gradoMaestria: 1,
+        }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.success, true);
+      const blob = JSON.stringify(body);
+      assert.doesNotMatch(blob, /miedo al rechazo/);
+      assert.doesNotMatch(blob, /contacto social/);
+      assert.doesNotMatch(blob, /cuerpo en la puerta/i);
+      assert.ok(body.gradoDetectado >= 3 || body.engine.evaluacionGrado.gradoDetectado >= 3);
+      assert.ok(body.engine.metricasMerito.densidadEstructural > 75);
+      assert.doesNotMatch(body.diagnostico.devolucionMaestro, /reescrib/i);
+      assert.doesNotMatch(body.diagnostico.devolucionMaestro, /todavía es ruido/i);
+    });
+  });
 });
 
 describe("Depósito v2 — POST /api/deposito/evaluar", () => {

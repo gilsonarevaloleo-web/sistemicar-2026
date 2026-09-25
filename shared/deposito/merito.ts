@@ -60,7 +60,7 @@ const SESGO_PROPIO =
   /sesgo|me di cuenta|me doy cuenta|mi flor|no dije|evit[eé]|punto ciego|me justific|me cubr[ií]|mi excusa|lo no dicho|vi que yo|cuando yo suelo|mi omisi[oó]n|me enganch/i;
 
 const HECHO_CONCRETO =
-  /llam[eé]|cobr[eé]|anot[eé]|cort[eé]|mand[eé]|cerr[eé]|marqu[eé]|entr[eé]|sal[ií]|junt[eé]|escrib[ií]|med[ií]|pagu[eé]|ped[ií]|dije no|a las \d/gi;
+  /llam[eé]|cobr[eé]|anot[eé]|cort[eé]|mand[eé]|cerr[eé]|marqu[eé]|entr[eé]|sal[ií]|junt[eé]|escrib[ií]|med[ií]|pagu[eé]|ped[ií]|ajust[eé]|cos[ií]|arm[eé]|tens[eé]|dije no|a las \d/gi;
 
 /** Fricción del Maestro según el grado activo del perfil. */
 export const TEMPERAMENTO_MODO_OPERATIVO: Record<GradoMaestria, string> = {
@@ -96,6 +96,14 @@ REGLAS DE EVALUACIÓN Y MÉRITO (PLACEMENT TEST):
 
 REGLA ANTI-ECO (INQUEBRANTABLE):
 JAMÁS repitas citas textuales largas del volcado en los campos de respuesta. En su lugar, sintetiza la abstracción técnica en máximo 3 a 5 palabras. La 'instruccionUnica' debe ser una acción ejecutable directa, no un texto que contenga la frase del usuario entre comillas.
+
+HECHOS REALES (INQUEBRANTABLE):
+loNoDicho, espejo e instruccionUnica se construyen ESTRICTAMENTE sobre los hechos reales del texto del usuario.
+Si el volcado habla de herramientas físicas, automatización, producción o procesos mecánicos (máquina de coser, botones, tensión), la abstracción es la física de esa tarea. Cero metáforas no solicitadas sobre relaciones humanas o miedos sociales.
+C6 (El Ojo del Roce) no tiene plantilla: prohibido asociarlo automáticamente con miedo al rechazo, evitar el contacto social o el cuerpo en la puerta.
+
+COHERENCIA PLACEMENT / DICTAMEN:
+Si densidadEstructural > 75 y gradoDetectado >= 3 (G3 validado en Placement), el dictamen NO puede calificar el volcado como ruido ni exigir reescribir. El dictamen refleja la validación del grado otorgado.
 
 RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
 `.trim();
