@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight, ChevronLeft, Zap, Eye, Lock, Sparkles, Award } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, Zap, Eye, Sunrise, Heart } from "lucide-react";
+import { SISTEMA_OFERTA, SISTEMA_RECINTOS, SISTEMA_DIA } from "@/content/sistemaRecintos";
 
 interface OnboardingProps {
   isOpen: boolean;
@@ -8,71 +9,42 @@ interface OnboardingProps {
 }
 
 const GOLD = "#D4AF37";
-const AZURE = "#1E90FF";
+
+const RECINTO_ICONS = {
+  espejo: Eye,
+  deposito: Sunrise,
+  jornada: Heart,
+  umbral: Zap,
+} as const;
 
 const steps = [
   {
     id: 1,
     title: "Bienvenido a SISTEMICAR",
-    subtitle: "Tu Plataforma de Comando Mental",
-    content: "SISTEMICAR usa los mismos mecanismos que las redes sociales, pero para ENFOCARTE en lugar de distraerte. Es alquimia mental: transformamos tus pensamientos en acción.",
-    icon: Zap,
-    color: GOLD
+    subtitle: SISTEMA_OFERTA.headline,
+    content: SISTEMA_OFERTA.subhead,
   },
   {
     id: 2,
-    title: "Las 3 Áreas de Transmutación",
-    subtitle: "Transforma tu experiencia cotidiana",
+    title: "Los cuatro recintos",
+    subtitle: "El ofrecimiento actual — no el de la versión anterior",
     content: null,
-    icon: Sparkles,
-    color: GOLD,
-    isAreasStep: true
+    isAreasStep: true,
   },
   {
     id: 3,
-    title: "Sistema de Puntos de Comando",
-    subtitle: "Gana CP por cada acción consciente",
+    title: "Un día en el sistema",
+    subtitle: SISTEMA_OFERTA.puente,
     content: null,
-    icon: Award,
-    color: "#3B82F6",
-    isPointsStep: true
+    isDayStep: true,
   },
   {
     id: 4,
-    title: "¡Empieza Ahora!",
-    subtitle: "Tu primera transmutación",
-    content: "Ve a ESPERANZA y registra algo que te dé fuerzas para el futuro. Puede ser un recuerdo, una meta, o algo que te inspire. ¡Cada registro suma CP!",
-    icon: Lock,
-    color: AZURE
-  }
-];
-
-const areas = [
-  { 
-    name: "ESPEJO", 
-    icon: Eye, 
-    color: "#A855F7", 
-    desc: "Observa tu estado mental actual sin juicio. La consola de auto-conocimiento." 
+    title: "Empieza por lo que duele",
+    subtitle: "No hay tour. Hay un gesto.",
+    content:
+      "Si hay interferencia, entra al Espejo. Si el día ya ocurrió, volcá en Depósito. Si hay que producir, lanza Jornada. Si el obstáculo se repite, Umbral.",
   },
-  { 
-    name: "ESPERANZA", 
-    icon: Lock, 
-    color: AZURE, 
-    desc: "Guarda lo que te da fuerzas. Tu bóveda de motivación para días difíciles." 
-  },
-  { 
-    name: "ALQUIMIA", 
-    icon: Sparkles, 
-    color: GOLD, 
-    desc: "Destila sabiduría de tus experiencias. Transforma lo vivido en aprendizaje." 
-  }
-];
-
-const pointsTable = [
-  { type: "Registrar en Espejo", points: "+8 pts" },
-  { type: "Guardar en Esperanza", points: "+8 pts" },
-  { type: "Destilar en Alquimia", points: "+8 pts" },
-  { type: "Llegar a 180 pts", points: "= Alianza" }
 ];
 
 export function Onboarding({ isOpen, onComplete }: OnboardingProps) {
@@ -99,7 +71,6 @@ export function Onboarding({ isOpen, onComplete }: OnboardingProps) {
   if (!isOpen) return null;
 
   const step = steps[currentStep];
-  const StepIcon = step.icon;
 
   return (
     <AnimatePresence>
@@ -130,64 +101,68 @@ export function Onboarding({ isOpen, onComplete }: OnboardingProps) {
                 key={idx}
                 className="h-1 w-8 rounded-full transition-all"
                 style={{
-                  backgroundColor: idx <= currentStep ? GOLD : "rgba(255,255,255,0.1)"
+                  backgroundColor: idx <= currentStep ? GOLD : "rgba(255,255,255,0.1)",
                 }}
               />
             ))}
           </div>
 
-          <div className="flex justify-center mb-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: `${step.color}20`, border: `2px solid ${step.color}` }}
-            >
-              <StepIcon size={24} style={{ color: step.color }} />
-            </div>
-          </div>
-
           <h2 className="text-xl font-bold text-center text-white mb-1">{step.title}</h2>
-          <p className="text-xs text-center mb-4" style={{ color: step.color }}>{step.subtitle}</p>
+          <p className="text-xs text-center mb-4" style={{ color: GOLD }}>
+            {step.subtitle}
+          </p>
 
           {step.content && (
-            <p className="text-slate-300 text-center mb-4 leading-relaxed text-sm">{step.content}</p>
+            <p className="text-slate-300 text-center mb-4 leading-relaxed text-sm">
+              {step.content}
+            </p>
           )}
 
           {step.isAreasStep && (
             <div className="space-y-2 mb-4">
-              {areas.map((area) => {
-                const AreaIcon = area.icon;
+              {SISTEMA_RECINTOS.map((recinto) => {
+                const AreaIcon = RECINTO_ICONS[recinto.id];
                 return (
                   <div
-                    key={area.name}
+                    key={recinto.id}
                     className="p-3 rounded-lg"
-                    style={{ backgroundColor: `${area.color}10`, border: `1px solid ${area.color}30` }}
+                    style={{
+                      backgroundColor: `${recinto.color}10`,
+                      border: `1px solid ${recinto.color}30`,
+                    }}
+                    data-testid={`onboarding-recinto-${recinto.id}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <AreaIcon size={16} style={{ color: area.color }} />
-                      <span className="font-bold text-sm" style={{ color: area.color }}>{area.name}</span>
+                      <AreaIcon size={16} style={{ color: recinto.color }} />
+                      <span className="font-bold text-sm" style={{ color: recinto.color }}>
+                        {recinto.nameUpper}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-400">{area.desc}</p>
+                    <p className="text-xs text-slate-300">{recinto.ritual}</p>
+                    <p className="text-xs text-slate-400 mt-1">{recinto.oneLiner}</p>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {step.isPointsStep && (
-            <div className="space-y-1 mb-4">
-              {pointsTable.map((row, idx) => (
+          {step.isDayStep && (
+            <div className="space-y-2 mb-4">
+              {SISTEMA_DIA.map((paso) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 rounded-lg"
+                  key={paso.recinto}
+                  className="flex items-start justify-between gap-3 p-2 rounded-lg"
                   style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
                 >
-                  <span className="text-white text-xs">{row.type}</span>
-                  <span className="font-bold text-amber-400 text-xs">{row.points}</span>
+                  <div>
+                    <p className="text-white text-xs font-bold">{paso.recinto}</p>
+                    <p className="text-[11px] text-slate-400">{paso.cuando}</p>
+                  </div>
+                  <p className="text-[11px] text-amber-400/90 text-right max-w-[55%]">
+                    {paso.gesto}
+                  </p>
                 </div>
               ))}
-              <p className="text-xs text-center text-slate-500 mt-2">
-                180 pts Soberanía = Alianza (30% comisión)
-              </p>
             </div>
           )}
 
@@ -209,7 +184,7 @@ export function Onboarding({ isOpen, onComplete }: OnboardingProps) {
               style={{ backgroundColor: GOLD }}
               data-testid="button-onboarding-next"
             >
-              {currentStep === steps.length - 1 ? "¡Comenzar!" : "Siguiente"}
+              {currentStep === steps.length - 1 ? "Entrar" : "Siguiente"}
               {currentStep < steps.length - 1 && <ChevronRight size={18} />}
             </button>
           </div>

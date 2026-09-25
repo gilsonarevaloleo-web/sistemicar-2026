@@ -7,10 +7,18 @@ import { Link } from "wouter";
 
 const pagesWithHeader = ["/espejo", "/jornada-v4", "/esperanza", "/analytics", "/rewards", "/tutorial", "/historial"];
 
+const bareEntryPaths = ["/bienvenida", "/acceso"];
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
-  const showHeader = pagesWithHeader.includes(location);
-  
+  const path = location.split("?")[0] ?? location;
+  const showHeader = pagesWithHeader.includes(path);
+  const bareEntry = bareEntryPaths.includes(path);
+
+  if (bareEntry) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
       {/* Reduced noise opacity for cleaner look matching screenshots */}

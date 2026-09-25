@@ -24,10 +24,12 @@ describe("jornadaBrand", () => {
   });
 
   it("landing de anuncio es entrada comercial y calla el shell", () => {
+    assert.equal(isCommercialEntryPath("/bienvenida"), true);
     assert.equal(isCommercialEntryPath("/ventas-jornada"), true);
     assert.equal(isCommercialEntryPath("/ventas-jornada?utm_source=facebook"), true);
     assert.equal(isCommercialEntryPath("/vendedor?planeta=JORNADA"), true);
     assert.equal(isCommercialEntryPath("/pagos"), false);
+    assert.equal(isAppShellQuietPath("/bienvenida"), true);
     assert.equal(isAppShellQuietPath("/ventas-jornada"), true);
     assert.equal(isAppShellQuietPath("/menu"), true);
   });
