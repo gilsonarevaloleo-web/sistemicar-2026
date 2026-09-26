@@ -140,7 +140,7 @@ export default function VendedoresPlanificacion() {
             {SISTEMICAR_CATEGORY.name}
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
-            {SISTEMICAR_CATEGORY.oneLiner} Embudo comercial por peldaños + Escalera (capas de desarrollo). Solo Planificación — Espejo es otro producto.
+            {SISTEMICAR_CATEGORY.oneLiner} Embudo comercial por peldaños Base · Ritmo · Norte. Solo Jornada — Espejo es otro producto.
           </p>
         </div>
 
@@ -185,11 +185,11 @@ export default function VendedoresPlanificacion() {
           <div className="flex items-center gap-2 mb-2">
             <Layers size={16} style={{ color: "#A855F7" }} />
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-300">
-              Escalera de Conciencia
+              Peldaños de Jornada
             </h2>
           </div>
           <p className="text-[10px] text-slate-500 mb-4 leading-relaxed">
-            Tres capas de desarrollo (no jerarquía moral) — visible en Planificación ? Métricas. Vende la profundidad del método Base.
+            Tres peldaños comerciales — Base, Ritmo y Norte. Vende la profundidad del Entrenador de Intención Panorámica.
           </p>
           <div className="space-y-3">
             {ESCALERA_CAPAS.map(capa => (
@@ -203,7 +203,7 @@ export default function VendedoresPlanificacion() {
                   style={{ backgroundColor: capa.color }}
                 />
                 <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: capa.color }}>
-                  Capa {capa.capa} · {capa.titulo}
+                  Peldaño {capa.capa} · {capa.titulo}
                 </p>
                 <p className="text-[11px] font-bold text-slate-200 mt-1">{capa.pregunta}</p>
                 <p className="text-[10px] text-slate-500 mt-1">{capa.metrica}</p>

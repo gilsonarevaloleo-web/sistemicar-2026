@@ -65,6 +65,7 @@ const VentasEspejo = lazyWithRetry(() => import("@/pages/ventas-espejo"));
 const VentasJornada = lazyWithRetry(() => import("@/pages/ventas-jornada"));
 const MetricasDocumento = lazyWithRetry(() => import("@/pages/metricas-documento"));
 const MapaSistemicar = lazyWithRetry(() => import("@/pages/mapa-sistemicar"));
+const EnCamino = lazyWithRetry(() => import("@/pages/en-camino"));
 const VendedoresPlanificacion = lazyWithRetry(() => import("@/pages/vendedores-planificacion"));
 const VendedorTriagePage = lazyWithRetry(() => import("@/pages/vendedor"));
 const Manuales = lazyWithRetry(() => import("@/pages/manuales"));
@@ -502,6 +503,9 @@ function Router() {
         <Route path="/mapa">
           <ProtectedRoute component={MapaSistemicar} />
         </Route>
+        <Route path="/en-camino">
+          <ProtectedRoute component={EnCamino} />
+        </Route>
         <Route path="/registros">
           <ProtectedRoute component={Registros} />
         </Route>
@@ -564,7 +568,9 @@ function VoiceBootstrap() {
         p === "/deposito" ||
         p.startsWith("/deposito/") ||
         p === "/pagos" ||
-        p.startsWith("/pagos")
+        p.startsWith("/pagos") ||
+        p === "/en-camino" ||
+        p.startsWith("/en-camino/")
       );
     };
     const unlock = (e: Event) => {

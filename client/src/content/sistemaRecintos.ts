@@ -59,7 +59,7 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     ritual: "El día termina con un número",
     oneLiner: "Lanzas un bloque. Cierras unidades. Evidencia, no culpa.",
     detail:
-      "Motor de cierre consciente por capas: presencia, entrada y producción. Ocupado no cuenta. Base mide lo que cierras hoy — no otra lista infinita.",
+      "Entrenador de Intención Panorámica. Lanzas un bloque, cierras unidades, el día termina con un número. Ocupado no cuenta. Base · Ritmo · Norte.",
     color: "#22C55E",
     exploreHref: "/ventas-jornada",
     publicExplore: true,

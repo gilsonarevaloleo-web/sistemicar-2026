@@ -1,4 +1,4 @@
-import { ESCALERA_CAPAS_PUBLIC, SISTEMICAR_CATEGORY, CATEGORY_FOOTER } from "@/lib/sistemicarCategory";
+import { RECINTOS_PUBLIC, SISTEMICAR_CATEGORY, CATEGORY_FOOTER } from "@/lib/sistemicarCategory";
 
 type Variant = "compact" | "full";
 
@@ -7,10 +7,10 @@ export function CategoriaSistemicarBanner({ variant = "full" }: { variant?: Vari
     return (
       <div
         className="p-3 rounded-xl border text-center"
-        style={{ borderColor: "rgba(168,85,247,0.28)", backgroundColor: "rgba(168,85,247,0.06)" }}
+        style={{ borderColor: "rgba(34,197,94,0.28)", backgroundColor: "rgba(34,197,94,0.06)" }}
         data-testid="categoria-sistemicar-compact"
       >
-        <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: "#A855F7" }}>
+        <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: "#22C55E" }}>
           {SISTEMICAR_CATEGORY.name}
         </p>
         <p className="text-[10px] text-slate-400 mt-1 leading-snug">{SISTEMICAR_CATEGORY.oneLiner}</p>
@@ -21,28 +21,28 @@ export function CategoriaSistemicarBanner({ variant = "full" }: { variant?: Vari
   return (
     <div
       className="mb-6 p-4 rounded-xl border space-y-3"
-      style={{ borderColor: "rgba(168,85,247,0.28)", backgroundColor: "rgba(168,85,247,0.05)" }}
+      style={{ borderColor: "rgba(34,197,94,0.28)", backgroundColor: "rgba(34,197,94,0.05)" }}
       data-testid="categoria-sistemicar-banner"
     >
       <div className="text-center">
-        <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#A855F7" }}>
+        <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#22C55E" }}>
           {SISTEMICAR_CATEGORY.name}
         </p>
         <p className="text-sm text-slate-300 mt-2 leading-relaxed">{SISTEMICAR_CATEGORY.oneLiner}</p>
         <p className="text-[10px] text-slate-500 mt-2 italic">{SISTEMICAR_CATEGORY.notA}</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
-        {ESCALERA_CAPAS_PUBLIC.map(c => (
+      <div className="grid gap-2 grid-cols-2">
+        {RECINTOS_PUBLIC.map((r) => (
           <div
-            key={c.capa}
+            key={r.id}
             className="p-2.5 rounded-lg border text-center"
-            style={{ borderColor: `${c.color}30`, backgroundColor: `${c.color}08` }}
+            style={{ borderColor: `${r.color}30`, backgroundColor: `${r.color}08` }}
           >
-            <p className="text-[8px] font-black uppercase tracking-wider" style={{ color: c.color }}>
-              Capa {c.capa} · {c.titulo}
+            <p className="text-[8px] font-black uppercase tracking-wider" style={{ color: r.color }}>
+              {r.titulo}
             </p>
-            <p className="text-[9px] text-slate-400 mt-1 leading-snug">{c.pregunta}</p>
+            <p className="text-[9px] text-slate-400 mt-1 leading-snug">{r.pregunta}</p>
           </div>
         ))}
       </div>

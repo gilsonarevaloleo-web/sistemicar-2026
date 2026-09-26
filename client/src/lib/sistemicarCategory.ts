@@ -1,44 +1,56 @@
 /**
- * Identidad de categoría pública SISTEMICAR Planificación.
- * Una sola voz: checkout (/pagos), kit vendedores, onboarding y Jornada.
- * No somos planificador/calendario — somos motor de cierre consciente por capas.
+ * Identidad pública SISTEMICAR — una sola voz: checkout, kit, onboarding y Jornada.
+ * Recintos vivos: Espejo, Depósito, Jornada, Umbral.
+ * Jornada se vende por peldaños: Base · Ritmo · Norte.
+ * El “motor de cierre por capas” (presencia / entrada / producción) es pasado.
  */
 export const SISTEMICAR_CATEGORY = {
-  name: "Motor de cierre consciente por capas",
-  nameShort: "Cierre consciente por capas",
+  name: "Sistemicar · cuatro recintos",
+  nameShort: "Cuatro recintos",
   oneLiner:
-    "No es un calendario ni una lista: cierras el día midiendo presencia, entrada y producción.",
+    "Espejo limpia. Depósito nombra un ojo. Jornada cierra unidades. Umbral atraviesa con criterio.",
   notA:
-    "No competimos con Notion ni Google Calendar — ellos almacenan; nosotros medimos cierres y decisiones.",
+    "No competimos con Notion ni Google Calendar — ellos almacenan; nosotros cerramos el día.",
   puente:
-    "Conquista sin decisiones es ilusión de progreso. La Escalera te lo muestra sin culpa — capa por capa.",
+    "Espejo limpia la carga. Jornada cierra unidades. El día no se evapora — termina con un número.",
   elevator:
-    "SISTEMICAR Jornada es un motor de cierre consciente por capas: presencia (anillo), entrada (disciplina) y producción (decisiones). No es una lista — es maduración medida. Elige el peldaño comercial que necesitas.",
+    "SISTEMICAR es cuatro recintos: Espejo, Depósito, Jornada y Umbral. Jornada es el Entrenador de Intención Panorámica — Base (Conquista + PS), Ritmo (segmentos + Situacional) y Norte (Crisol + proyectos). No es una lista: el día termina con un número.",
 } as const;
 
-export const ESCALERA_CAPAS_PUBLIC = [
+/** Recintos vivos — reemplazan las tres capas públicas (presencia / entrada / producción). */
+export const RECINTOS_PUBLIC = [
   {
-    capa: 1,
-    titulo: "Presencia",
-    pregunta: "¿En qué se me va el tiempo?",
-    metrica: "Anillo de conciencia",
-    color: "#8B5CF6",
+    id: "espejo",
+    titulo: "Espejo",
+    pregunta: "¿Hay interferencia?",
+    metrica: "Mandato, no consuelo",
+    color: "#00FFC3",
   },
   {
-    capa: 2,
-    titulo: "Entrada",
-    pregunta: "¿Aparezco al trabajo consciente?",
-    metrica: "Disciplina por segmento",
+    id: "deposito",
+    titulo: "Depósito",
+    pregunta: "¿Qué aprendí hoy?",
+    metrica: "Un ojo en el Muro",
+    color: "#F97316",
+  },
+  {
+    id: "jornada",
+    titulo: "Jornada",
+    pregunta: "¿El día termina con un número?",
+    metrica: "Conquista + PS",
+    color: "#22C55E",
+  },
+  {
+    id: "umbral",
+    titulo: "Umbral",
+    pregunta: "¿El mismo obstáculo se repite?",
+    metrica: "Criterio, no motivación",
     color: "#D4AF37",
-  },
-  {
-    capa: 3,
-    titulo: "Producción",
-    pregunta: "¿Convierto el tiempo en decisiones?",
-    metrica: "Combustible de conciencia",
-    color: "#A855F7",
   },
 ] as const;
 
+/** @deprecated Usá RECINTOS_PUBLIC. Se mantiene por imports viejos del banner. */
+export const ESCALERA_CAPAS_PUBLIC = RECINTOS_PUBLIC;
+
 export const CATEGORY_FOOTER =
-  "Tres capas de desarrollo — ninguna sustituye a la otra. Los peldaños comerciales (Base, Operativo, Soberanía) profundizan el método.";
+  "Cuatro recintos — ninguno sustituye al otro. Jornada se profundiza por peldaños: Base, Ritmo y Norte.";

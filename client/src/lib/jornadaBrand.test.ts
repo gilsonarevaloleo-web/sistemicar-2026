@@ -6,6 +6,7 @@ import {
   isCommercialEntryPath,
   isHouseRecintoPath,
   isJornada4Path,
+  isEnCaminoPath,
   JORNADA_MODULE,
   JORNADA_V4_PATH,
 } from "./jornadaBrand.ts";
@@ -24,8 +25,11 @@ describe("jornadaBrand", () => {
     );
     assert.equal(
       SISTEMICAR_CATEGORY.name,
-      "Motor de cierre consciente por capas",
+      "Sistemicar · cuatro recintos",
     );
+    assert.match(SISTEMICAR_CATEGORY.oneLiner, /Espejo limpia/);
+    assert.doesNotMatch(SISTEMICAR_CATEGORY.name, /capas/i);
+    assert.equal(JORNADA_MODULE.taglineShort, "Base · Ritmo · Norte");
   });
 
   it("detecta /jornada-v4 y query", () => {
@@ -67,6 +71,8 @@ describe("jornadaBrand", () => {
     assert.equal(isAdminPath("/admin-semillas"), true);
     assert.equal(isAdminPath("/pagos"), false);
     assert.equal(isAppShellQuietPath("/admin-gilson"), true);
+    assert.equal(isEnCaminoPath("/en-camino"), true);
+    assert.equal(isAppShellQuietPath("/en-camino"), true);
   });
 
   it("App shell no monta Doctor/Centinela sobre admin", () => {

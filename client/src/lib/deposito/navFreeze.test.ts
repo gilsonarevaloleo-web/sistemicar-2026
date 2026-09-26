@@ -34,6 +34,16 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.doesNotMatch(catalog, /id: "deposito"/);
   });
 
+  it("el menú empaqueta los módulos en camino en un solo ítem", () => {
+    const menu = readFromClient("pages/menu-principal.tsx");
+    assert.match(menu, /PAQUETE_EN_CAMINO/);
+    assert.match(menu, /modulosLiberados/);
+    assert.match(menu, /modulosEnCamino/);
+    assert.doesNotMatch(menu, /for \(const mod of MODULOS_EN_CAMINO\)/);
+    const app = readFromClient("App.tsx");
+    assert.match(app, /path="\/en-camino"/);
+  });
+
   it("App VoiceBootstrap calla TTS en /esperanza y /deposito", () => {
     const src = readFromClient("App.tsx");
     assert.match(src, /p === "\/esperanza"/);

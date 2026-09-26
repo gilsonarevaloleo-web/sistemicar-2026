@@ -64,13 +64,21 @@ export function isAdminPath(pathname: string | null | undefined): boolean {
     || path === "/admin-semillas" || path.startsWith("/admin-semillas/");
 }
 
+/** Paquete de módulos futuros (un solo ítem en el menú). */
+export function isEnCaminoPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  const path = pathname.split("?")[0] ?? pathname;
+  return path === "/en-camino" || path.startsWith("/en-camino/");
+}
+
 export function isAppShellQuietPath(pathname: string | null | undefined): boolean {
   return (
     isProyectosHubPath(pathname) ||
     isMenuPrincipalPath(pathname) ||
     isCommercialEntryPath(pathname) ||
     isHouseRecintoPath(pathname) ||
-    isAdminPath(pathname)
+    isAdminPath(pathname) ||
+    isEnCaminoPath(pathname)
   );
 }
 
@@ -115,7 +123,7 @@ export const JORNADA_MODULE = {
   titleUpper: "JORNADA",
   /** Leyenda secundaria del header — entrenador de ventanas temporales. */
   tagline: "MÓDULO LA JORNADA · Entrenador de Intención Panorámica",
-  taglineShort: "Presencia · Entrada · Producción",
+  taglineShort: "Base · Ritmo · Norte",
   /** Línea comercial en checkout (Planificación Base, etc.). */
   productLine: "Planificación",
   category: SISTEMICAR_CATEGORY,
