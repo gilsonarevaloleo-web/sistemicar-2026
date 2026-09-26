@@ -22,6 +22,7 @@ import {
 } from "@/lib/conquistaPausa";
 import { resumeDesglosadorFromNestedPause } from "@/lib/nestedContextStack";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
+import { getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
 import { Rocket } from "lucide-react";
 import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
 import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
@@ -64,6 +65,8 @@ const triada: ConcienciaTriadaModel = {
   minutosParaleloGanado: 0,
 };
 
+const previewDayStart = getSegmentCalendarDayStartMs();
+
 const segmentos: SegmentoV5[] = [
   {
     id: "s1",
@@ -72,9 +75,9 @@ const segmentos: SegmentoV5[] = [
     horaFin: "10:00",
     color: "#34D399",
     icono: "sun",
-    estado: "cerrado_manual",
+    estado: "entropia",
     eventos: [],
-    psGanados: 4,
+    psGanados: 0,
   },
   {
     id: "s2",
@@ -94,9 +97,10 @@ const segmentos: SegmentoV5[] = [
     horaFin: "20:00",
     color: "#D4AF37",
     icono: "moon",
-    estado: "pendiente",
+    estado: "cerrado_manual",
+    activadoAt: previewDayStart + 16 * 60 * 60 * 1000,
     eventos: [],
-    psGanados: 0,
+    psGanados: 4,
   },
 ];
 
