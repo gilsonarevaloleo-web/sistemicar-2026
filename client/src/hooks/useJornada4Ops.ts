@@ -1760,6 +1760,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         vehiclesRef.current = optimisticList;
         setVehicles(optimisticList);
         scheduleSaveLocalVehicles(optimisticList);
+        noteHuecoAfterClose(optimisticList);
         burstJornada4Tick();
 
         toast.success("Interrupción lanzada", {
@@ -1806,6 +1807,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           vehiclesRef.current = rolledBack;
           setVehicles(rolledBack);
           scheduleSaveLocalVehicles(rolledBack);
+          noteHuecoAfterClose(rolledBack);
           toast.error("No se pudo lanzar la interrupción", {
             style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
           });
@@ -1848,6 +1850,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
       paintVehicle(parentId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
+      noteHuecoAfterClose(vehiclesRef.current);
       toast.info("Desglosador reanudado", {
         description: "Tiempo recuperado tras la interrupción.",
         style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },

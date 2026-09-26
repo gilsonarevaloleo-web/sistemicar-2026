@@ -3,6 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 import {
   computeTriadaLineaOccupancy,
   isTriadaAdvancingVehicle,
+  unjustifiedPauseIntervals,
   vehicleAdvancingIntervals,
 } from "./concienciaTriadaLinea.ts";
 import { buildConcienciaTriadaFromVehicles } from "./concienciaTriadaOperador.ts";
@@ -349,5 +350,105 @@ describe("concienciaTriadaLinea", () => {
       }),
       []
     ), false);
+  });
+
+  it("pausa no justificada (sin otro vehículo) es hueco = inconsciencia", () => {
+    const now = lima("12:00");
+    const vehicles = [
+      v({
+        id: "costura",
+        status: "archivado",
+        aperturaAt: lima("09:00"),
+        cierreAt: lima("12:00"),
+        destinoCierre: "peldano",
+        proyectoId: "n1",
+        pausas: [{ pausadoAt: lima("10:00"), reanudadoAt: lima("10:20") }],
+      }),
+    ];
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+    });
+    assert.equal(occ.minutosDireccion, 160);
+    assert.equal(occ.minutosHueco, 20);
+    assert.equal(occ.minutosInconsciente, 20);
+    assert.equal(occ.huecosIntervals.length, 1);
+    assert.equal(occ.huecosIntervals[0]?.start, lima("10:00"));
+    assert.equal(occ.huecosIntervals[0]?.end, lima("10:20"));
+
+    const unjust = unjustifiedPauseIntervals(vehicles, now);
+    assert.equal(unjust.length, 1);
+    assert.equal(unjust[0]?.start, lima("10:00"));
+    assert.equal(unjust[0]?.end, lima("10:20"));
+  });
+
+  it("pausa justificada por interrupt no es hueco", () => {
+    const now = lima("12:00");
+    const vehicles = [
+      v({
+        id: "conquista",
+        status: "archivado",
+        aperturaAt: lima("09:00"),
+        cierreAt: lima("12:00"),
+        destinoCierre: "peldano",
+        proyectoId: "n1",
+        pausas: [{ pausadoAt: lima("10:00"), reanudadoAt: lima("10:20"), titulo: "llamada" }],
+      }),
+      v({
+        id: "enfoque",
+        status: "archivado",
+        tipoFlota: "situacion",
+        aperturaAt: lima("10:00"),
+        cierreAt: lima("10:20"),
+        destinoCierre: "presencia",
+        vehiculoPadreDesglosadorId: "conquista",
+      }),
+    ];
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+    });
+    assert.equal(occ.minutosHueco, 0);
+    assert.equal(occ.minutosInconsciente, 0);
+    assert.equal(occ.minutosDireccion, 160);
+    assert.equal(occ.minutosPresencia, 20);
+    assert.equal(unjustifiedPauseIntervals(vehicles, now).length, 0);
+  });
+
+  it("pausa más larga que el interrupt deja el resto como hueco", () => {
+    const now = lima("12:00");
+    const vehicles = [
+      v({
+        id: "conquista",
+        status: "archivado",
+        aperturaAt: lima("09:00"),
+        cierreAt: lima("12:00"),
+        destinoCierre: "peldano",
+        proyectoId: "n1",
+        pausas: [{ pausadoAt: lima("10:00"), reanudadoAt: lima("10:20") }],
+      }),
+      v({
+        id: "enfoque",
+        status: "archivado",
+        tipoFlota: "situacion",
+        aperturaAt: lima("10:00"),
+        cierreAt: lima("10:08"),
+        destinoCierre: "presencia",
+        vehiculoPadreDesglosadorId: "conquista",
+      }),
+    ];
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles,
+      now,
+    });
+    assert.equal(occ.minutosPresencia, 8);
+    assert.equal(occ.minutosHueco, 12);
+    assert.equal(occ.minutosInconsciente, 12);
   });
 });

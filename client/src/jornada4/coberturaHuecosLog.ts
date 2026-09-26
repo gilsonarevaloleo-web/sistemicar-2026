@@ -3,6 +3,11 @@
  * Solo escribe en transiciones (hay / no hay vehículo consciente).
  * Sin timeline, sin anillo, sin computeLiveEntropy, sin tick 1s.
  */
+import {
+  subtractMsIntervals,
+  unjustifiedPauseIntervals,
+  type MsInterval,
+} from "@/lib/concienciaTriadaLinea";
 import { hasActiveConsciousCoverage } from "@/lib/entropyTimePolicy";
 import type { Vehicle } from "@/lib/persistence";
 import { getLimaDayStartMs } from "@/lib/segmentTime";
@@ -20,12 +25,16 @@ export type CoberturaHuecoEvent = {
   dayKey: string;
 };
 
+export type CoberturaHuecoReason = "corte" | "pausa_no_justificada";
+
 export type CoberturaHuecoInterval = {
   startMs: number;
   endMs: number | null;
   /** true si el hueco sigue abierto. */
   open: boolean;
   closedByTitulo?: string;
+  /** Corte de cobertura vs pausa sin otro vehículo (misma cifra que Inconsciente). */
+  reason?: CoberturaHuecoReason;
 };
 
 function dayKeyFromMs(ms: number): string {
@@ -193,6 +202,61 @@ export function sumCoberturaHuecosMinutes(
 /**
  * Copy de cobertura (cortes sin vehículo). Distinto de puntualidad de puertas.
  */
+function intervalToMs(it: CoberturaHuecoInterval, now: number): MsInterval | null {
+  const end = it.open ? now : (it.endMs ?? now);
+  return end > it.startMs ? { start: it.startMs, end } : null;
+}
+
+/**
+ * Pausa sin vehículo que la cubra → hueco, igual que Inconsciente en la métrica.
+ * No duplica un corte ya registrado en el log.
+ */
+export function appendUnjustifiedPausasToHuecos(
+  intervals: CoberturaHuecoInterval[],
+  vehicles: Vehicle[],
+  now = Date.now()
+): CoberturaHuecoInterval[] {
+  const pauses = unjustifiedPauseIntervals(vehicles, now);
+  if (pauses.length === 0) return intervals;
+
+  const logged: MsInterval[] = [];
+  for (let i = 0; i < intervals.length; i++) {
+    const ms = intervalToMs(intervals[i]!, now);
+    if (ms) logged.push(ms);
+  }
+  const extra = logged.length > 0 ? subtractMsIntervals(pauses, logged) : pauses;
+  if (extra.length === 0) return intervals;
+
+  const next = intervals.map(it => ({ ...it, reason: it.reason ?? ("corte" as const) }));
+  for (let i = 0; i < extra.length; i++) {
+    const p = extra[i]!;
+    const open = p.end >= now - 1_000;
+    next.push({
+      startMs: p.start,
+      endMs: open ? null : p.end,
+      open,
+      reason: "pausa_no_justificada",
+    });
+  }
+  next.sort((a, b) => a.startMs - b.startMs);
+  return next;
+}
+
+/** Cortes del log + pausas no justificadas (misma regla que la métrica). */
+export function buildMetricaHuecoIntervals(params: {
+  vehicles: Vehicle[];
+  now?: number;
+  events?: CoberturaHuecoEvent[];
+}): CoberturaHuecoInterval[] {
+  const now = params.now ?? Date.now();
+  const events = params.events ?? readCoberturaHuecosEvents();
+  return appendUnjustifiedPausasToHuecos(
+    buildCoberturaHuecoIntervals(events, now),
+    params.vehicles,
+    now
+  );
+}
+
 export function formatCoberturaHuecosSummary(
   intervals: CoberturaHuecoInterval[],
   now = Date.now()

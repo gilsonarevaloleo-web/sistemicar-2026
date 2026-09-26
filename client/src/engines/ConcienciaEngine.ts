@@ -86,6 +86,7 @@ export interface VehiculoAnilloLite {
   tipoDescanso?: string;
   interrupcionActiva?: boolean;
   desglosadorPausa?: unknown;
+  situacionNestedPause?: unknown;
   puntoCero?: { fase?: string };
   aperturaAt?: number;
   createdAt?: number | Date;
@@ -567,7 +568,7 @@ function isPuntoCeroNonCoverPhase(v: VehiculoAnilloLite): boolean {
 }
 
 function isVehiclePausedForAnillo(v: VehiculoAnilloLite): boolean {
-  return !!(v.interrupcionActiva || v.desglosadorPausa);
+  return !!(v.interrupcionActiva || v.desglosadorPausa || v.situacionNestedPause);
 }
 
 function isGapCoverVehicle(v: VehiculoAnilloLite): boolean {

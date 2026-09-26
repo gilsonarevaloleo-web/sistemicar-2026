@@ -30,8 +30,7 @@ import {
   type TimonEpisodio,
 } from "@/lib/timonHoras";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
 } from "@/jornada4/coberturaHuecosLog";
 import type { Vehicle } from "@/lib/persistence";
 
@@ -104,8 +103,8 @@ export function ProyectoGastoConcienciaCard({
   const fecha = getJournalDateString();
   const segmentos = useMemo(() => readLocalPlanillaSegmentos(fecha), [fecha]);
   const huecosLog = useMemo(
-    () => huecosLogToIntervals(buildCoberturaHuecoIntervals(readCoberturaHuecosEvents())),
-    []
+    () => huecosLogToIntervals(buildMetricaHuecoIntervals({ vehicles })),
+    [vehicles]
   );
   const delProyecto = useMemo(
     () => vehicles.filter(v => (v.proyectoId ?? "").trim() === proyectoId),

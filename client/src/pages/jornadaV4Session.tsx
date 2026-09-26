@@ -27,8 +27,7 @@ import {
   isPlanTerminado,
 } from "@/jornada4/revelacionPlanDia";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
   reconcileCoberturaHuecos,
 } from "@/jornada4/coberturaHuecosLog";
 import { useJornada4Planilla } from "@/hooks/useJornada4Planilla";
@@ -183,7 +182,7 @@ export default function JornadaV4Session() {
     const segs = planillaApi.planilla?.segmentos ?? [];
     if (!isPlanTerminado(segs)) return planEnd.revelacion;
     try {
-      const huecos = buildCoberturaHuecoIntervals(readCoberturaHuecosEvents());
+      const huecos = buildMetricaHuecoIntervals({ vehicles: core.vehicles });
       return (
         buildRevelacionPlanDia({
           segmentos: segs,
