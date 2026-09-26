@@ -874,7 +874,7 @@ export default function Pagos() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                {modulosEnCamino().length} módulos empaquetados — {PAQUETE_EN_CAMINO.desc}.
+                {modulosEnCamino().length} módulos en el paquete. Se sueltan al menú cuando están listos.
               </p>
             </div>
           </Link>
