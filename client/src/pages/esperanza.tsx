@@ -278,7 +278,10 @@ export default function Esperanza() {
     if (diagnostico && ultimoVolcado) {
       lecturas.unshift(calcularGradoVolcado(ultimoVolcado, diagnostico));
     }
-    return calcularExpedienteOjos(dominantes, lecturas);
+    return calcularExpedienteOjos(dominantes, lecturas, {
+      textoVolcado: ultimoVolcado,
+      variedadRotacionCodigo: diagnostico?.metricasMerito?.variedadRotacionCodigo,
+    });
   }, [historial, diagnostico, ultimoVolcado]);
 
   return (

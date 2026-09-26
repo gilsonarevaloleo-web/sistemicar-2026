@@ -57,4 +57,16 @@ describe("Universidad — grados del operador", () => {
     assert.notEqual(atascado.gradoOperador, "OPERADOR_SOBERANIA");
     assert.match(atascado.haciaDonde, /atasca en C9/i);
   });
+
+  it("el mapa no acusa atasco en C4 si el relato pide nutrir C1", () => {
+    const falsoC4 = calcularExpedienteOjos([4, 4, 4, 4, 3], [], {
+      variedadRotacionCodigo: "C1",
+      textoVolcado:
+        "Hoy tengo baja energía. La dopamina está en el piso. El código 1 tiene hambre de descanso.",
+    });
+    assert.equal(falsoC4.atasco, null);
+    assert.match(falsoC4.haciaDonde, /C1/);
+    assert.doesNotMatch(falsoC4.haciaDonde, /atasca en C4/i);
+    assert.match(falsoC4.haciaDonde, /biolog/i);
+  });
 });

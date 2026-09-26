@@ -449,6 +449,13 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /una frase/,
     /para que sirve/,
     /para qué sirve/,
+    /dopamina/,
+    /descanso/,
+    /fatiga/,
+    /baja energ/,
+    /cimiento/,
+    /nutrici[oó]n/,
+    /cansancio/,
   ],
   2: [
     /combin/,
@@ -553,6 +560,11 @@ const SENALES_OJO: Record<CodigoObservador, RegExp[]> = {
     /patron/,
     /patrón/,
     /entiende/,
+    /pastor/,
+    /matriz/,
+    /parte de 10/,
+    /10 c[oó]digos/,
+    /diez c[oó]digos/,
   ],
   10: [
     /\bautor/,
@@ -756,9 +768,16 @@ La etiqueta de dictamen prioriza el FONDO (matriz de códigos, metacognición, d
 Si densidadEstructural > 80 y el volcado desglosa capas, códigos o causa-efecto, PROHIBIDO acusar «el volcado deja suelta la mecánica y no nombra el circuito».
 puntoCiego confirma la lectura: el circuito ya fue desmantelado en física seca.
 
+═══ OJO DOMINANTE (C1 vs C4 vs C9) ═══
+PROHIBIDO asignar C4 (Seriedad) solo porque el texto dice producción, deber o exigencia.
+Si el operador DENUNCIA fatiga, baja energía, dopamina, cuerpo o descanso, ojoDominante = C1 (Cimiento/Biología).
+Si el volcado observa los 10 códigos como sistema de equilibrio (pastor, matriz, diez bocas), ojoDominante = C9 (El Ojo del Sistema).
+Si hay ambos, el hambre biológica nombrada (C1) manda el ojo; la matriz informa el dictamen, no roba el centro.
+
 ═══ ROTACIÓN Y MECÁNICA DE ABSORCIÓN ═══
 ojoDominante = el ojo de ESTE volcado. No se inventa otro centro.
-variedadRotacionCodigo coincide con ese ojo, EXCEPTO si el texto nombra sobre-explotación de C4 (seriedad/producción) y fatiga biológica: entonces C1 (cimiento) y mecanicaAbsorcion ejecuta nutrición/descanso, SIN gesto de prevención ni exigencia de control de C4.
+variedadRotacionCodigo coincide con ese ojo, EXCEPTO si el texto nombra fatiga biológica o sobre-explotación de C4: entonces C1 y mecanicaAbsorcion ejecuta nutrición/descanso, SIN gesto de prevención ni exigencia de control de C4.
+El mapa de calor NO acusa «atasco en C4» si C4 lo asignó el motor por palabras de producción. La rotación sigue al relato: nutrir C1 sin culpa moral.
 
 ═══ AUTONOMÍA EXCLUSIVA DEL DEPÓSITO ═══
 La devolución del Maestro se construye ÚNICAMENTE sobre el texto crudo ingresado HOY en el Depósito.
@@ -1436,6 +1455,7 @@ function sellarDiagnostico(
   ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
   const volcado = captura.volcadoCrudo || "";
+  diagnostico = recalibrarOjoDominante(diagnostico, volcado);
   const norm = normalizar(volcado);
   const permitePlantillaSocialC6 = textoTraeRoceSocial(norm);
   const hayFlor = detectaFlor(
@@ -1500,29 +1520,103 @@ const SENALES_DESGLOSE_CIRCUITO: RegExp[] = [
   /analog[ií]a (de|de la|estructural)|met[aá]fora de (los )?(?:10|diez|c[oó]digos|capas)/,
   /\bc[1-9]\b.*\bc(?:[1-9]|10)\b/,
   /intenci[oó]n y (el )?automatismo/,
+  /parte de 10|una parte de 10/,
+  /c[oó]digo\s*(?:[1-9]|10)/,
+  /pastor/,
+  /doble atadura/,
+  /10 tipos de animales/,
 ];
 
 const SENALES_C4_SOBREEXPLOTADO =
-  /\bc4\b|\bc[oó]digo 4\b|seriedad|producci[oó]n|sobre.?explot|exigencia(?:s)? de (?:control|rendimiento)|gesto de prevenci[oó]n/;
+  /\bc4\b|\bc[oó]digo 4\b|seriedad|producci[oó]n|productiv|sobre.?explot|exigencia(?:s)? de (?:control|rendimiento)|gesto de prevenci[oó]n|\bdeber\b/;
 
 const SENALES_C1_CIMIENTO =
-  /\bc1\b|\bc[oó]digo 1\b|cimiento|dopamina|biol[oó]gic|nutrici[oó]n|descanso|sue[nñ]o|fatiga|agotamiento|culpa moral|deber moral/;
+  /\bc1\b|\bc[oó]digo 1\b|cimiento|dopamina|biol[oó]gic|nutrici[oó]n|descanso|sue[nñ]o|fatiga|agotamiento|cansancio|baja energ|culpa moral|deber moral/;
+
+const SENALES_C1_BIOLOGIA: RegExp[] = [
+  /dopamina/,
+  /baja energ/,
+  /descanso/,
+  /fatiga|agotamiento|cansancio/,
+  /nutrici[oó]n/,
+  /c[oó]digo\s*1/,
+  /\bc1\b/,
+  /biol[oó]gic/,
+  /hambre.{0,24}c[oó]digo\s*1|c[oó]digo\s*1.{0,24}hambre/,
+];
+
+const SENALES_MATRIZ_SISTEMA: RegExp[] = [
+  /pastor/,
+  /10 tipos de animales/,
+  /parte de 10|una parte de 10/,
+  /10 c[oó]digos|diez c[oó]digos|matriz de c[oó]digos/,
+  /cada (?:parte|c[oó]digo) se deben alimentar/,
+  /no (?:estamos )?dise[nñ]ados para ir en un solo rumbo/,
+  /sistema de equilibrio|equilibrio (?:de|del) (?:los )?c[oó]digos/,
+];
+
+const SENALES_PRECIO_C7 =
+  /precio|cobr|barato|caro|intercambio|descuento|balanza|marcar precio/;
 
 export function detectaDesgloseCircuito(texto: string): boolean {
   const norm = normalizar(texto);
   return SENALES_DESGLOSE_CIRCUITO.filter((p) => p.test(norm)).length >= 2;
 }
 
+export function detectaCimientoBiologico(texto: string): boolean {
+  const norm = normalizar(texto);
+  return SENALES_C1_BIOLOGIA.filter((p) => p.test(norm)).length >= 2;
+}
+
+export function detectaMatrizSistema(texto: string): boolean {
+  const norm = normalizar(texto);
+  return SENALES_MATRIZ_SISTEMA.filter((p) => p.test(norm)).length >= 2;
+}
+
+export function detectaDenunciaProductividad(texto: string): boolean {
+  const norm = normalizar(texto);
+  const denuncia =
+    /producci[oó]n|productiv|\bdeber\b|exigencia|virtud|moralidad|\bdebo\b/.test(
+      norm,
+    );
+  const fatiga =
+    /fatiga|baja energ|dopamina|descanso|cansancio|divag|ya no.{0,20}atrae|inter[eé]s.{0,20}ca[ií]d|culpa/.test(
+      norm,
+    );
+  return denuncia && fatiga;
+}
+
 export function detectaRotacionC4HaciaC1(texto: string): boolean {
   const norm = normalizar(texto);
+  if (detectaCimientoBiologico(norm)) return true;
   return SENALES_C4_SOBREEXPLOTADO.test(norm) && SENALES_C1_CIMIENTO.test(norm);
+}
+
+export function codigoDominanteDelVolcado(
+  texto: string,
+  propuesto: CodigoObservador,
+): CodigoObservador {
+  if (detectaCimientoBiologico(texto)) return 1;
+  if (detectaMatrizSistema(texto)) return 9;
+  if (propuesto === 4 && detectaDenunciaProductividad(texto)) return 1;
+  if (
+    propuesto === 7 &&
+    !SENALES_PRECIO_C7.test(normalizar(texto)) &&
+    (detectaDenunciaProductividad(texto) || detectaMatrizSistema(texto))
+  ) {
+    return detectaMatrizSistema(texto) ? 9 : 1;
+  }
+  return propuesto;
 }
 
 export function codigoRotacionDelVolcado(
   dominante: CodigoObservador,
   texto: string,
 ): CodigoObservador {
-  return detectaRotacionC4HaciaC1(texto) ? 1 : dominante;
+  if (detectaCimientoBiologico(texto) || detectaRotacionC4HaciaC1(texto)) {
+    return 1;
+  }
+  return dominante;
 }
 
 function aplicarLecturaCualitativa(
@@ -1800,8 +1894,31 @@ function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
       mejor = n;
     }
   }
-  if (mejorHits <= 0) return 1;
-  return mejor;
+  if (mejorHits <= 0) {
+    return codigoDominanteDelVolcado(textoVolcado, 1);
+  }
+  return codigoDominanteDelVolcado(textoVolcado, mejor);
+}
+
+function recalibrarOjoDominante(
+  diagnostico: DiagnosticoVolcado,
+  texto: string,
+): DiagnosticoVolcado {
+  const codigo = codigoDominanteDelVolcado(texto, diagnostico.codigoDominante);
+  if (codigo === diagnostico.codigoDominante) return diagnostico;
+  const ojo = DICCIONARIO_OJOS[codigo];
+  const justificacionDominante =
+    codigo === 1
+      ? `El aprendizaje gravita en ${ojo.nombreOjo}: el cimiento biológico (energía, dopamina, descanso) es el centro, no la exigencia de producción.`
+      : codigo === 9
+        ? `El aprendizaje gravita en ${ojo.nombreOjo}: la matriz de diez códigos se observa como sistema de equilibrio, no como un solo rumbo.`
+        : diagnostico.justificacionDominante;
+  return {
+    ...diagnostico,
+    codigoDominante: codigo,
+    nombreOjoDominante: ojo.nombreOjo,
+    justificacionDominante,
+  };
 }
 
 function nivelCargaLocal(

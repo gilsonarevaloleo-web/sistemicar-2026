@@ -17,6 +17,7 @@
 import {
   CODIGOS_OBSERVADOR,
   DICCIONARIO_OJOS,
+  detectaCimientoBiologico,
   diagnosticarVolcadoLocal,
   extraerHechos,
   type CodigoObservador,
@@ -209,6 +210,10 @@ function conteoOjos(
 export function calcularExpedienteOjos(
   dominantes: readonly CodigoObservador[],
   lecturas: readonly LecturaGradoVolcado[] = [],
+  opts: {
+    textoVolcado?: string;
+    variedadRotacionCodigo?: string;
+  } = {},
 ): ExpedienteOjos {
   const conteo = conteoOjos(dominantes);
   const ojosNombrados = CODIGOS_OBSERVADOR.filter((n) => conteo.has(n));
@@ -220,16 +225,20 @@ export function calcularExpedienteOjos(
       break;
     }
   }
-  let atasco: CodigoObservador | null = null;
+  let atascoReal: CodigoObservador | null = null;
   let max = 0;
   for (const [n, k] of conteo) {
     if (k > max) {
       max = k;
-      atasco = n;
+      atascoReal = n;
     }
   }
-  const ratioAtasco = total > 0 && atasco ? max / total : 0;
-  if (ratioAtasco < 0.45 || total < 4) atasco = null;
+  const ratioAtasco = total > 0 && atascoReal ? max / total : 0;
+  if (ratioAtasco < 0.45 || total < 4) atascoReal = null;
+
+  const nutrirC1 =
+    opts.variedadRotacionCodigo === "C1" ||
+    Boolean(opts.textoVolcado && detectaCimientoBiologico(opts.textoVolcado));
 
   const rango = ojosNombrados.length;
   const balance = total === 0 ? 0 : rango / 10;
@@ -243,12 +252,17 @@ export function calcularExpedienteOjos(
   if (total >= 1) gradoOperador = "APRENDIZ_OJO";
   if (vioRuido || rango >= 2) gradoOperador = "DETECTOR_RUIDO";
   if (vioSombra && rango >= 1) gradoOperador = "ARQUITECTO_PUNTO_CIEGO";
-  if (rango >= 6 && !atasco && total >= 8) {
+  if (rango >= 6 && !atascoReal && total >= 8) {
     gradoOperador = "OPERADOR_SOBERANIA";
   }
 
+  const atasco = nutrirC1 && atascoReal === 4 ? null : atascoReal;
+
   let haciaDonde: string;
-  if (gradoOperador === "OPERADOR_SOBERANIA") {
+  if (nutrirC1) {
+    haciaDonde =
+      "Rotá hacia C1 (Cimiento): nutrí la biología sin culpa moral. El mapa no acusa atasco en C4 cuando el relato denunció la fatiga de la producción.";
+  } else if (gradoOperador === "OPERADOR_SOBERANIA") {
     haciaDonde =
       "Sintonía: los lentes rotan según la realidad. El título no es C10; es no atascarse.";
   } else if (atasco) {

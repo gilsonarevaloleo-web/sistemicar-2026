@@ -14,6 +14,8 @@ import {
   detectaFlor,
   detectaDesgloseCircuito,
   detectaRotacionC4HaciaC1,
+  detectaCimientoBiologico,
+  detectaMatrizSistema,
   GESTO_ABSORCION_C1_CIMIENTO,
   PUNTO_CIEGO_DESGLOSE_CONFIRMADO,
   evaluarRitualPasoGrado,
@@ -712,6 +714,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.equal(detectaRotacionC4HaciaC1(VOLCADO_MATRIZ), true);
     const d = diagnosticarVolcadoLocal(VOLCADO_MATRIZ);
     assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 80);
+    assert.equal(d.codigoDominante, 1);
     assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
     assert.doesNotMatch(d.puntoCiego, /suelta la mec[aá]nica/i);
     assert.doesNotMatch(d.devolucionMaestro, /Intenci[oó]n Panor[aá]mica|0\s*ms|planilla/i);
@@ -751,9 +754,41 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
           },
         }),
     });
+    assert.equal(d.codigoDominante, 1);
     assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
     assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
     assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
     assert.doesNotMatch(d.devolucionMaestro, /Intenci[oó]n Panor[aá]mica|0\s*ms|planilla/i);
+  });
+
+  const VOLCADO_PASTOR =
+    "Hoy aprendí que el verdadero enemigo es la moralidad o l virtud. Casi siempre he buscado ser correcto, ser positivo, ser productivo, etc. Pero en busca de ese camino solamente he encontrado culpa, mentira y baja energía. Por ejemplo días anteriores, en mí anterior corte de costura he si sumamente productivo y ahora en este otro corte mí interés por la producción ha caído, mí mente ha empesado a divagar. La pregunta es ¿Porque ahora a mí mente ya no lo atrae la producción igual que la semana pasada? La respuesta que tengo es: una persona no solamente es un todo, sino una parte de 10 y parece que cada parte se deben alimentar (la vez pasada estaba de hambre mí código 3 ya ahora lo que está de hambre creo que es mí código 1 que es dopamina) en ese sentido, el positivismo, l virtud, la moral nos condenan, porque ahí es donde se instala la doble atadura- el debo. Cuando en realidad se debe pensar ¿Que parte de mí está menos alimentado? ¿Cuánto de porsentaje de alimentación necesito en este código? Porque parece que no estamos diseñados para ir en un solo rumbo. En ese caso ser positibista viniera seralo, ser virtuoso viniera ser malo. Para mí parece que nosotros somos un pastor que cría 10 tipos de animales y el pastos tiene que cuidar, alimentar, Preguntarse si todos están alimentados bien.";
+
+  it("fatiga, dopamina o baja energía clasifican C1, no C4 ni C7", () => {
+    assert.equal(detectaCimientoBiologico(VOLCADO_PASTOR), true);
+    const d = diagnosticarVolcadoLocal(VOLCADO_PASTOR);
+    assert.equal(d.codigoDominante, 1);
+    assert.equal(d.nombreOjoDominante, "El Ojo de la Claridad");
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
+    assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
+    assert.doesNotMatch(d.justificacionDominante, /balanza|precio|Justicia/i);
+    assert.doesNotMatch(d.puntoCiego, /marcar precio|balanza de valor/i);
+  });
+
+  it("un volcado de quiebre/prevención sigue en C4", () => {
+    const seco =
+      "Hoy nombré el quiebre del turno. El riesgo era la interrupción a las 11. Puse un límite de prevención. El estándar quedó escrito.";
+    const d = diagnosticarVolcadoLocal(seco);
+    assert.equal(d.codigoDominante, 4);
+  });
+
+  it("la matriz-pastor sin hambre biológica abre C9", () => {
+    const pastor =
+      "Hoy aprendí que somos un pastor que cría 10 tipos de animales. Cada código se deben alimentar. No estamos diseñados para ir en un solo rumbo. El sistema de equilibrio de los códigos manda, no un inventario.";
+    assert.equal(detectaMatrizSistema(pastor), true);
+    assert.equal(detectaCimientoBiologico(pastor), false);
+    const d = diagnosticarVolcadoLocal(pastor);
+    assert.equal(d.codigoDominante, 9);
+    assert.equal(d.nombreOjoDominante, "El Ojo del Sistema");
   });
 });
