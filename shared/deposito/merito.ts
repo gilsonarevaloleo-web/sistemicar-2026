@@ -109,11 +109,14 @@ La etiqueta de dictamen prioriza el fondo (matriz de códigos, metacognición) s
 DESGLOSE DE CIRCUITO:
 Si densidadEstructural > 80 y el volcado desglosa capas, códigos o causa-efecto, PROHIBIDO acusar omisión de mecánica. Confirma que el circuito ya está en la superficie.
 
-OJO DOMINANTE:
-PROHIBIDO asignar C4 solo por producción, deber o exigencia. Fatiga / dopamina / descanso / baja energía → C1. Pastor / matriz de 10 como equilibrio → C9. Si hay ambos, manda el hambre biológica (C1).
+OJO QUE VE ≠ OJO QUE SUGIERE:
+ojoDominante = el ojo desde donde se vio (el de mayor jerarquía que se abrió al escribir).
+variedadRotacionCodigo = el ojo puntual de sugerencia.
+C9 (pastor / matriz / diez) engloba a C1 (dopamina / hambre). Si hay ambos, C9 ve y C1 se sugiere.
+PROHIBIDO asignar C4 solo por producción, deber o exigencia. Fatiga sola, sin marco de matriz → C1 ve.
 
 ROTACIÓN Y ABSORCIÓN:
-ojoDominante = este volcado. variedadRotacionCodigo = el mismo ojo, EXCEPTO fatiga biológica o sobre-explotación de C4 → C1 y mecanicaAbsorcion de nutrición/descanso, sin gesto de prevención de C4.
+La mecánica sigue la sugerencia: fatiga biológica → C1 nutrición/descanso, sin gesto de prevención de C4.
 El mapa de calor no acusa atasco en C4 si el motor asignó C4 por error. La rotación nutre C1 sin culpa moral.
 
 AUTONOMÍA DEL DEPÓSITO:

@@ -95,9 +95,8 @@ export interface MetricasMerito {
   /** 0–100. Ratio de hechos secos vs flor. */
   densidadEstructural: number;
   /**
-   * Suele igualar el Ojo Dominante de ESTE volcado.
-   * Diverge (C4 → C1) solo si el texto nombra sobre-explotación
-   * de seriedad/producción y fatiga biológica del cimiento.
+   * Ojo de SUGERENCIA (rotar / nutrir). No es el ojo que ve.
+   * Puede divergir del dominante: C9 ve la matriz y sugiere C1.
    */
   variedadRotacionCodigo: string;
   /** true si el usuario vio su propio sesgo. */
@@ -768,16 +767,18 @@ La etiqueta de dictamen prioriza el FONDO (matriz de códigos, metacognición, d
 Si densidadEstructural > 80 y el volcado desglosa capas, códigos o causa-efecto, PROHIBIDO acusar «el volcado deja suelta la mecánica y no nombra el circuito».
 puntoCiego confirma la lectura: el circuito ya fue desmantelado en física seca.
 
-═══ OJO DOMINANTE (C1 vs C4 vs C9) ═══
-PROHIBIDO asignar C4 (Seriedad) solo porque el texto dice producción, deber o exigencia.
-Si el operador DENUNCIA fatiga, baja energía, dopamina, cuerpo o descanso, ojoDominante = C1 (Cimiento/Biología).
-Si el volcado observa los 10 códigos como sistema de equilibrio (pastor, matriz, diez bocas), ojoDominante = C9 (El Ojo del Sistema).
-Si hay ambos, el hambre biológica nombrada (C1) manda el ojo; la matriz informa el dictamen, no roba el centro.
+═══ OJO QUE VE ≠ OJO QUE SUGIERE ═══
+ojoDominante = el ojo DESDE DONDE se vio el volcado (el más profundo que se abrió al escribir).
+variedadRotacionCodigo = el ojo puntual de sugerencia (la boca nombrada, el hambre a nutrir).
+Jerarquía: si aparece un ojo que engloba a otro, el de mayor jerarquía es el dominante.
+C9 (pastor / matriz / diez animales) engloba a C1 (dopamina / hambre puntual).
+PROHIBIDO asignar C4 solo porque el texto dice producción, deber o exigencia.
+Si SOLO hay fatiga, dopamina o descanso —sin marco de matriz—, el que ve es C1.
+Si hay ambos, C9 ve; C1 se sugiere. No se invierte.
 
 ═══ ROTACIÓN Y MECÁNICA DE ABSORCIÓN ═══
-ojoDominante = el ojo de ESTE volcado. No se inventa otro centro.
-variedadRotacionCodigo coincide con ese ojo, EXCEPTO si el texto nombra fatiga biológica o sobre-explotación de C4: entonces C1 y mecanicaAbsorcion ejecuta nutrición/descanso, SIN gesto de prevención ni exigencia de control de C4.
-El mapa de calor NO acusa «atasco en C4» si C4 lo asignó el motor por palabras de producción. La rotación sigue al relato: nutrir C1 sin culpa moral.
+La mecánica sigue al ojo de sugerencia cuando el relato nombra hambre biológica: C1 nutrición/descanso, SIN gesto de prevención de C4.
+El mapa de calor NO acusa «atasco en C4» si C4 lo asignó el motor por palabras de producción.
 
 ═══ AUTONOMÍA EXCLUSIVA DEL DEPÓSITO ═══
 La devolución del Maestro se construye ÚNICAMENTE sobre el texto crudo ingresado HOY en el Depósito.
@@ -1553,6 +1554,7 @@ const SENALES_MATRIZ_SISTEMA: RegExp[] = [
   /cada (?:parte|c[oó]digo) se deben alimentar/,
   /no (?:estamos )?dise[nñ]ados para ir en un solo rumbo/,
   /sistema de equilibrio|equilibrio (?:de|del) (?:los )?c[oó]digos/,
+  /\bmatriz\b/,
 ];
 
 const SENALES_PRECIO_C7 =
@@ -1596,15 +1598,15 @@ export function codigoDominanteDelVolcado(
   texto: string,
   propuesto: CodigoObservador,
 ): CodigoObservador {
-  if (detectaCimientoBiologico(texto)) return 1;
   if (detectaMatrizSistema(texto)) return 9;
+  if (detectaCimientoBiologico(texto)) return 1;
   if (propuesto === 4 && detectaDenunciaProductividad(texto)) return 1;
   if (
     propuesto === 7 &&
     !SENALES_PRECIO_C7.test(normalizar(texto)) &&
-    (detectaDenunciaProductividad(texto) || detectaMatrizSistema(texto))
+    detectaDenunciaProductividad(texto)
   ) {
-    return detectaMatrizSistema(texto) ? 9 : 1;
+    return 1;
   }
   return propuesto;
 }
@@ -1908,10 +1910,12 @@ function recalibrarOjoDominante(
   if (codigo === diagnostico.codigoDominante) return diagnostico;
   const ojo = DICCIONARIO_OJOS[codigo];
   const justificacionDominante =
-    codigo === 1
-      ? `El aprendizaje gravita en ${ojo.nombreOjo}: el cimiento biológico (energía, dopamina, descanso) es el centro, no la exigencia de producción.`
-      : codigo === 9
-        ? `El aprendizaje gravita en ${ojo.nombreOjo}: la matriz de diez códigos se observa como sistema de equilibrio, no como un solo rumbo.`
+    codigo === 9
+      ? detectaCimientoBiologico(texto)
+        ? `El aprendizaje gravita en ${ojo.nombreOjo}: el pastor de los diez engloba el hambre puntual. El ojo que ve es la matriz; C1 es la boca que sugiere nutrir.`
+        : `El aprendizaje gravita en ${ojo.nombreOjo}: la matriz de diez códigos se observa como sistema de equilibrio, no como un solo rumbo.`
+      : codigo === 1
+        ? `El aprendizaje gravita en ${ojo.nombreOjo}: el cimiento biológico (energía, dopamina, descanso) es el centro, no la exigencia de producción.`
         : diagnostico.justificacionDominante;
   return {
     ...diagnostico,

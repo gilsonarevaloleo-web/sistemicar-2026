@@ -714,7 +714,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.equal(detectaRotacionC4HaciaC1(VOLCADO_MATRIZ), true);
     const d = diagnosticarVolcadoLocal(VOLCADO_MATRIZ);
     assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 80);
-    assert.equal(d.codigoDominante, 1);
+    assert.equal(d.codigoDominante, 9);
     assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
     assert.doesNotMatch(d.puntoCiego, /suelta la mec[aá]nica/i);
     assert.doesNotMatch(d.devolucionMaestro, /Intenci[oó]n Panor[aá]mica|0\s*ms|planilla/i);
@@ -754,7 +754,7 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
           },
         }),
     });
-    assert.equal(d.codigoDominante, 1);
+    assert.equal(d.codigoDominante, 9);
     assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
     assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
     assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
@@ -764,15 +764,27 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
   const VOLCADO_PASTOR =
     "Hoy aprendí que el verdadero enemigo es la moralidad o l virtud. Casi siempre he buscado ser correcto, ser positivo, ser productivo, etc. Pero en busca de ese camino solamente he encontrado culpa, mentira y baja energía. Por ejemplo días anteriores, en mí anterior corte de costura he si sumamente productivo y ahora en este otro corte mí interés por la producción ha caído, mí mente ha empesado a divagar. La pregunta es ¿Porque ahora a mí mente ya no lo atrae la producción igual que la semana pasada? La respuesta que tengo es: una persona no solamente es un todo, sino una parte de 10 y parece que cada parte se deben alimentar (la vez pasada estaba de hambre mí código 3 ya ahora lo que está de hambre creo que es mí código 1 que es dopamina) en ese sentido, el positivismo, l virtud, la moral nos condenan, porque ahí es donde se instala la doble atadura- el debo. Cuando en realidad se debe pensar ¿Que parte de mí está menos alimentado? ¿Cuánto de porsentaje de alimentación necesito en este código? Porque parece que no estamos diseñados para ir en un solo rumbo. En ese caso ser positibista viniera seralo, ser virtuoso viniera ser malo. Para mí parece que nosotros somos un pastor que cría 10 tipos de animales y el pastos tiene que cuidar, alimentar, Preguntarse si todos están alimentados bien.";
 
-  it("fatiga, dopamina o baja energía clasifican C1, no C4 ni C7", () => {
+  it("el pastor de diez ve con C9 y sugiere nutrir C1", () => {
     assert.equal(detectaCimientoBiologico(VOLCADO_PASTOR), true);
+    assert.equal(detectaMatrizSistema(VOLCADO_PASTOR), true);
     const d = diagnosticarVolcadoLocal(VOLCADO_PASTOR);
-    assert.equal(d.codigoDominante, 1);
-    assert.equal(d.nombreOjoDominante, "El Ojo de la Claridad");
+    assert.equal(d.codigoDominante, 9);
+    assert.equal(d.nombreOjoDominante, "El Ojo del Sistema");
     assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
     assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
+    assert.match(d.justificacionDominante, /engloba|matriz|pastor/i);
     assert.doesNotMatch(d.justificacionDominante, /balanza|precio|Justicia/i);
     assert.doesNotMatch(d.puntoCiego, /marcar precio|balanza de valor/i);
+  });
+
+  it("fatiga y dopamina sin marco de matriz se ven con C1", () => {
+    const soloC1 =
+      "Hoy a las 8:10 aprendí que tengo baja energía. La dopamina está en el piso. Necesito descanso. El código 1 tiene hambre. Anoté el cuerpo. Cerré a las 8:40.";
+    assert.equal(detectaCimientoBiologico(soloC1), true);
+    assert.equal(detectaMatrizSistema(soloC1), false);
+    const d = diagnosticarVolcadoLocal(soloC1);
+    assert.equal(d.codigoDominante, 1);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
   });
 
   it("un volcado de quiebre/prevención sigue en C4", () => {
