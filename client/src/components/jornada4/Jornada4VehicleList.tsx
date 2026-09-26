@@ -97,6 +97,7 @@ type Ops = {
   failSituacionDistraccion?: (vehicleId: string) => Promise<void>;
   archiveAncladoPorSegmento?: (vehicleId: string) => Promise<void>;
   pausaInterrupcion: (vehicleId: string, titulo?: string) => Promise<void>;
+  labelPausaConquista?: (vehicleId: string, titulo: string) => Promise<void>;
   resumeDesglosador: (parentId: string) => Promise<void>;
   archivePausedConquista?: (vehicleId: string) => Promise<void>;
   postergarFilaEnFoco: (vehicleId: string) => void;
@@ -199,7 +200,12 @@ export function Jornada4VehicleList({
                     }
                     onAddSub={form => void ops.addConquistaSub(v.id, form)}
                     onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
-                    onPausaInterrupcion={() => void ops.pausaInterrupcion(v.id)}
+                    onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+                    onLabelPausa={
+                      ops.labelPausaConquista
+                        ? titulo => void ops.labelPausaConquista!(v.id, titulo)
+                        : undefined
+                    }
                     onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
                     onArchivarPausa={
                       ops.archivePausedConquista

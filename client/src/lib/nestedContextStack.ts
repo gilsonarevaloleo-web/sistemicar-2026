@@ -39,7 +39,8 @@ export function findActiveSituacionRingForNestedStack(vehicles: Vehicle[]): Vehi
 
 export function buildDesglosadorNestedPausePatch(
   vehicle: Vehicle,
-  kind: DesglosadorNestedPauseKind
+  kind: DesglosadorNestedPauseKind,
+  titulo?: string
 ): {
   subVehiculos: SubVehiculo[];
   desglosadorPausa: NonNullable<Vehicle["desglosadorPausa"]>;
@@ -62,7 +63,7 @@ export function buildDesglosadorNestedPausePatch(
       nestedKind: kind,
     },
     interrupcionActiva: true,
-    pausas: appendVehiculoPausa(vehicle.pausas, now),
+    pausas: appendVehiculoPausa(vehicle.pausas, now, titulo),
   };
 }
 

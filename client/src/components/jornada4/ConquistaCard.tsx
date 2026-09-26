@@ -64,7 +64,11 @@ import {
   searchDesglosadorListas,
   type DesglosadorListaGuardada,
 } from "@/lib/desglosadorListasStore";
-import { tituloPausaInterrupcion } from "@/lib/vehiculoPausa";
+import {
+  pausaAbiertaSinNombrar,
+  tituloPausaAbierta,
+  tituloPausaInterrupcion,
+} from "@/lib/vehiculoPausa";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -90,6 +94,7 @@ type Props = {
   onAddSub?: (form: AddSubForm) => void;
   onAddSubs?: (forms: AddSubForm[]) => void;
   onPausaInterrupcion?: (titulo?: string) => void;
+  onLabelPausa?: (titulo: string) => void;
   onResumeDesglosador?: () => void;
   onArchivarPausa?: () => void;
   onReorderSubs?: (movedId: string, direction: ReorderDirection) => void;
@@ -104,6 +109,7 @@ export function ConquistaCard({
   onAddSub,
   onAddSubs,
   onPausaInterrupcion,
+  onLabelPausa,
   onResumeDesglosador,
   onArchivarPausa,
   onReorderSubs,
@@ -171,6 +177,10 @@ export function ConquistaCard({
   const [listaPickSelected, setListaPickSelected] = useState<boolean[]>([]);
   const seccionGroups = useMemo(() => groupSubsBySeccion(subs), [subs]);
   const [pausaEnviando, setPausaEnviando] = useState(false);
+  const [showPausaForm, setShowPausaForm] = useState(false);
+  const [pausaTitulo, setPausaTitulo] = useState("");
+  const [showLabelForm, setShowLabelForm] = useState(false);
+  const [labelTitulo, setLabelTitulo] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
   const [cierreEnviando, setCierreEnviando] = useState<"cumplido" | "fallado" | "ciclo" | null>(null);
 
@@ -677,13 +687,15 @@ export function ConquistaCard({
               ) : null}
 
               {!paused && onPausaInterrupcion ? (
-                <div className="mb-1">
+                <div className="mb-1 space-y-1.5">
                   <button
                     type="button"
                     disabled={pausaEnviando}
                     onClick={() => {
                       if (pausaEnviando) return;
                       setPausaEnviando(true);
+                      setShowPausaForm(false);
+                      setPausaTitulo("");
                       try {
                         navigator.vibrate?.(14);
                       } catch {
@@ -701,8 +713,86 @@ export function ConquistaCard({
                     }}
                     data-testid="j4-conquista-pausa"
                   >
-                    {pausaEnviando ? "…" : "Pausar e interrumpir"}
+                    {pausaEnviando ? "…" : "Pausar"}
                   </button>
+                  {!showPausaForm ? (
+                    <button
+                      type="button"
+                      disabled={pausaEnviando}
+                      onClick={() => setShowPausaForm(true)}
+                      className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider touch-manipulation disabled:opacity-60"
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "rgba(255,255,255,0.62)",
+                        border: "1px dashed rgba(0,255,195,0.28)",
+                      }}
+                      data-testid="j4-conquista-pausa-nombrar"
+                    >
+                      Nombrar inconveniente
+                    </button>
+                  ) : (
+                    <div
+                      className="space-y-1.5 rounded-lg p-2"
+                      style={{
+                        backgroundColor: "rgba(0,255,195,0.05)",
+                        border: "1px solid rgba(0,255,195,0.2)",
+                      }}
+                      data-testid="j4-conquista-pausa-form"
+                    >
+                      <input
+                        value={pausaTitulo}
+                        onChange={e => setPausaTitulo(e.target.value)}
+                        placeholder="¿En qué se va el tiempo?"
+                        className="w-full bg-black/40 text-sm p-2 rounded border border-white/10 focus:outline-none"
+                        style={{ color: INK }}
+                        data-testid="j4-conquista-pausa-input"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={pausaEnviando || !pausaTitulo.trim()}
+                          onClick={() => {
+                            const titulo = pausaTitulo.trim();
+                            if (!titulo || pausaEnviando) return;
+                            setPausaEnviando(true);
+                            try {
+                              navigator.vibrate?.(14);
+                            } catch {
+                              /* no haptic */
+                            }
+                            void Promise.resolve(onPausaInterrupcion(titulo)).finally(
+                              () => {
+                                setPausaEnviando(false);
+                                setShowPausaForm(false);
+                                setPausaTitulo("");
+                              }
+                            );
+                          }}
+                          className="flex-1 py-2 rounded-lg text-[8px] font-bold uppercase tracking-wider disabled:opacity-40"
+                          style={{
+                            backgroundColor: "rgba(0,255,195,0.12)",
+                            color: CYAN,
+                            border: "1px solid rgba(0,255,195,0.3)",
+                          }}
+                          data-testid="j4-conquista-pausa-go"
+                        >
+                          Pausar con este nombre
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPausaForm(false);
+                            setPausaTitulo("");
+                          }}
+                          className="px-2 py-2 rounded-lg text-[8px] font-bold uppercase"
+                          style={{ color: MUTED }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -711,9 +801,77 @@ export function ConquistaCard({
                   <p
                     className="text-[8px] text-center uppercase tracking-wider"
                     style={{ color: CYAN }}
+                    data-testid="j4-conquista-pausa-titulo"
                   >
-                    En pausa · no ocupa cupo ni suma PS
+                    En pausa · {tituloPausaAbierta(vehicle)}
                   </p>
+                  <p
+                    className="text-[8px] text-center uppercase tracking-wider"
+                    style={{ color: "rgba(255,255,255,0.45)" }}
+                  >
+                    No ocupa cupo ni suma PS
+                  </p>
+                  {pausaAbiertaSinNombrar(vehicle) && onLabelPausa ? (
+                    !showLabelForm ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowLabelForm(true)}
+                        className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
+                        style={{
+                          backgroundColor: "transparent",
+                          color: CYAN,
+                          border: "1px dashed rgba(0,255,195,0.28)",
+                        }}
+                        data-testid="j4-conquista-pausa-label"
+                      >
+                        Nombrar esta pausa
+                      </button>
+                    ) : (
+                      <div className="space-y-1.5" data-testid="j4-conquista-pausa-label-form">
+                        <input
+                          value={labelTitulo}
+                          onChange={e => setLabelTitulo(e.target.value)}
+                          placeholder="¿Cuál fue el inconveniente?"
+                          className="w-full bg-black/40 text-sm p-2 rounded border border-white/10 focus:outline-none"
+                          style={{ color: INK }}
+                          data-testid="j4-conquista-pausa-label-input"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={!labelTitulo.trim()}
+                            onClick={() => {
+                              const titulo = labelTitulo.trim();
+                              if (!titulo) return;
+                              onLabelPausa(titulo);
+                              setShowLabelForm(false);
+                              setLabelTitulo("");
+                            }}
+                            className="flex-1 py-1.5 rounded-lg text-[8px] font-bold uppercase disabled:opacity-40"
+                            style={{
+                              backgroundColor: "rgba(0,255,195,0.12)",
+                              color: CYAN,
+                            }}
+                            data-testid="j4-conquista-pausa-label-go"
+                          >
+                            Guardar nombre
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowLabelForm(false);
+                              setLabelTitulo("");
+                            }}
+                            className="px-2 py-1.5 rounded-lg text-[8px] font-bold uppercase"
+                            style={{ color: MUTED }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  ) : null}
                   {onResumeDesglosador ? (
                     <button
                       type="button"
@@ -830,9 +988,60 @@ export function ConquistaCard({
             className="mt-3 p-3 rounded-xl border space-y-2"
             style={{ borderColor: `${CYAN}40`, backgroundColor: "rgba(0,255,195,0.06)" }}
           >
-            <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: CYAN }}>
-              En pausa por interrupción
+            <p
+              className="text-[9px] font-black uppercase tracking-wider"
+              style={{ color: CYAN }}
+              data-testid="j4-conquista-pausa-titulo-empty"
+            >
+              En pausa · {tituloPausaAbierta(vehicle)}
             </p>
+            {pausaAbiertaSinNombrar(vehicle) && onLabelPausa ? (
+              !showLabelForm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLabelForm(true)}
+                  className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
+                  style={{
+                    backgroundColor: "transparent",
+                    color: CYAN,
+                    border: "1px dashed rgba(0,255,195,0.28)",
+                  }}
+                  data-testid="j4-conquista-pausa-label-empty"
+                >
+                  Nombrar esta pausa
+                </button>
+              ) : (
+                <div className="space-y-1.5" data-testid="j4-conquista-pausa-label-form-empty">
+                  <input
+                    value={labelTitulo}
+                    onChange={e => setLabelTitulo(e.target.value)}
+                    placeholder="¿Cuál fue el inconveniente?"
+                    className="w-full bg-black/40 text-sm p-2 rounded border border-white/10 focus:outline-none"
+                    style={{ color: INK }}
+                    data-testid="j4-conquista-pausa-label-input-empty"
+                  />
+                  <button
+                    type="button"
+                    disabled={!labelTitulo.trim()}
+                    onClick={() => {
+                      const titulo = labelTitulo.trim();
+                      if (!titulo) return;
+                      onLabelPausa(titulo);
+                      setShowLabelForm(false);
+                      setLabelTitulo("");
+                    }}
+                    className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase disabled:opacity-40"
+                    style={{
+                      backgroundColor: "rgba(0,255,195,0.12)",
+                      color: CYAN,
+                    }}
+                    data-testid="j4-conquista-pausa-label-go-empty"
+                  >
+                    Guardar nombre
+                  </button>
+                </div>
+              )
+            ) : null}
             {onResumeDesglosador ? (
               <button
                 type="button"
