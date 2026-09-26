@@ -763,7 +763,7 @@ variedadRotacionCodigo coincide con ese ojo, EXCEPTO si el texto nombra sobre-ex
 ═══ AUTONOMÍA EXCLUSIVA DEL DEPÓSITO ═══
 La devolución del Maestro se construye ÚNICAMENTE sobre el texto crudo ingresado HOY en el Depósito.
 Evalúa ausencia de flor, claridad del hecho y madurez de la observación.
-PROHIBIDO importar Intención Panorámica, Puertas, 0 ms, planilla u otros módulos.
+PROHIBIDO importar escenas, métricas o rituales que este volcado no trajo.
 
 ═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
 El lenguaje humano tiene tres capas. Analizá en este orden:

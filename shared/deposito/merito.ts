@@ -113,7 +113,7 @@ ROTACIÓN Y ABSORCIÓN:
 ojoDominante = este volcado. variedadRotacionCodigo = el mismo ojo, EXCEPTO sobre-explotación de C4 + fatiga biológica → C1 y mecanicaAbsorcion de nutrición/descanso, sin gesto de prevención de C4.
 
 AUTONOMÍA DEL DEPÓSITO:
-La devolución se construye únicamente sobre el texto crudo de HOY. Cero Jornada, cero planilla, cero módulos ajenos.
+La devolución se construye únicamente sobre el texto crudo de HOY. Cero escenas, métricas o rituales ajenos al volcado.
 
 RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
 `.trim();
