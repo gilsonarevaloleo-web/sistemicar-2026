@@ -82,7 +82,7 @@ export default function Jornada4PlanTab({
         onRequestNotifPermission={onRequestNotifPermission}
         hidePuertasTimeline
       />
-      <CoberturaHuecosPanel refreshKey={huecosRefresh} />
+      <CoberturaHuecosPanel refreshKey={huecosRefresh} vehicles={vehicles} />
     </div>
   );
 }

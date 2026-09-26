@@ -18,10 +18,7 @@ import {
 } from "@/lib/persistence";
 import { conteoRecintosDelDia } from "@/lib/recintoMinimoStore";
 import { getJournalDateString } from "@/lib/segmentTime";
-import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
-} from "@/jornada4/coberturaHuecosLog";
+import { buildMetricaHuecoIntervals } from "@/jornada4/coberturaHuecosLog";
 import type { MsInterval } from "@/lib/concienciaTriadaLinea";
 
 export { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
@@ -37,7 +34,9 @@ function resolveSelloTriada(params: {
   if (params.triada) return params.triada;
   const huecosLog =
     params.huecosLog ??
-    huecosLogToIntervals(buildCoberturaHuecoIntervals(readCoberturaHuecosEvents()));
+    huecosLogToIntervals(
+      buildMetricaHuecoIntervals({ vehicles: params.vehicles, now: params.nowMs })
+    );
   return buildConcienciaTriadaFromVehicles({
     fecha: params.fecha,
     segmentos: params.segmentos,

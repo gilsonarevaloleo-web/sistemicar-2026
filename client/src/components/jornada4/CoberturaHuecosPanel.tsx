@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Clock3 } from "lucide-react";
 import {
-  buildCoberturaHuecoIntervals,
+  buildMetricaHuecoIntervals,
   formatCoberturaHuecosSummary,
   formatHuecoClock,
   formatHuecoDuration,
-  readCoberturaHuecosEvents,
   sumCoberturaHuecosMinutes,
   type CoberturaHuecoInterval,
 } from "@/jornada4/coberturaHuecosLog";
+import type { Vehicle } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
 
 const { INK, MUTED, GOLD } = J4_COLORS;
@@ -18,6 +18,8 @@ const EMERALD = "#50C878";
 type Props = {
   /** Bump para releer localStorage tras launch/cierre. */
   refreshKey?: number;
+  /** Flota del día: las pausas no justificadas entran como hueco. */
+  vehicles?: Vehicle[];
 };
 
 function intervalLabel(it: CoberturaHuecoInterval, now: number): string {
@@ -34,7 +36,7 @@ function intervalLabel(it: CoberturaHuecoInterval, now: number): string {
  * Revisión del día: cuándo se perdió cobertura.
  * Lista estática — sin tick, sin SVG, sin anillo.
  */
-export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
+export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [intervals, setIntervals] = useState<CoberturaHuecoInterval[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -42,8 +44,8 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
   const reload = useCallback(() => {
     const t = Date.now();
     setNow(t);
-    setIntervals(buildCoberturaHuecoIntervals(readCoberturaHuecosEvents(), t));
-  }, []);
+    setIntervals(buildMetricaHuecoIntervals({ vehicles, now: t }));
+  }, [vehicles]);
 
   useEffect(() => {
     reload();
@@ -103,8 +105,8 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
             ) : (
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
-                  Cortes sin vehículo. La tardanza a la hora de la puerta no entra aquí.
-                  El Pulso de arriba usa esta misma suma.
+                  Hueco = Inconsciente: plan ya ocurrido sin vehículo. Una pausa
+                  sin otro hilo que la cubra cuenta igual. La tardanza de puerta no entra.
                 </p>
                 {totalLabel ? (
                   <p
@@ -138,6 +140,12 @@ export function CoberturaHuecosPanel({ refreshKey = 0 }: Props) {
                       {it.closedByTitulo ? (
                         <p className="text-[9px] mt-0.5 truncate" style={{ color: MUTED }}>
                           Cubierto por · {it.closedByTitulo}
+                        </p>
+                      ) : it.reason === "pausa_no_justificada" ? (
+                        <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
+                          {it.open
+                            ? "Pausa no justificada · sin cobertura ahora"
+                            : "Pausa no justificada"}
                         </p>
                       ) : it.open ? (
                         <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>

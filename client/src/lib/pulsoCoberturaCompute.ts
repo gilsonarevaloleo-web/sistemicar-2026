@@ -1,7 +1,8 @@
 /**
  * Pulso de cobertura — métrica lite de conciencia (conquista vs inconsciente).
  * Solo existe dentro de la planificación del día: sin segmentos = sin pulso (ruido).
- * Inconsciente = cortes vividos sin vehículo (mismo idioma que Huecos), nunca el
+ * Inconsciente = cortes vividos sin vehículo + pausas no justificadas
+ * (mismo idioma que Huecos), nunca el
  * terreno futuro del plan ni el piso monótono del anillo. Prohibido en ms0 de gestos.
  */
 import {

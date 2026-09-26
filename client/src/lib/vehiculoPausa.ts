@@ -123,6 +123,23 @@ export function isPausedPresence(v: PausedPresenceVehicle): boolean {
   return (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
 }
 
+/**
+ * El padre está congelado: no cubre conciencia.
+ * El hijo interrupt (vehiculoPadreDesglosadorId) no entra aquí — él sí cubre.
+ */
+export function isParentCoveragePaused(
+  vehicle: Pick<
+    PausedPresenceVehicle,
+    "interrupcionActiva" | "desglosadorPausa" | "situacionNestedPause"
+  >
+): boolean {
+  if (vehicle.interrupcionActiva) return true;
+  if (vehicle.desglosadorPausa?.pausadoAt || vehicle.desglosadorPausa?.subActivoId) {
+    return true;
+  }
+  return !!vehicle.situacionNestedPause;
+}
+
 export function minutosPausa(
   stamp: Pick<VehiculoPausaStamp, "pausadoAt" | "reanudadoAt">,
   now = Date.now()

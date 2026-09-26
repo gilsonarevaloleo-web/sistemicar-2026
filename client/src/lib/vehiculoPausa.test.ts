@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   appendVehiculoPausa,
   closeVehiculoPausaAbierta,
+  isParentCoveragePaused,
   isPausedPresence,
   labelVehiculoPausaAbierta,
   minutosPausa,
@@ -66,5 +67,19 @@ describe("vehiculoPausa — historia de presencia", () => {
       true
     );
     assert.equal(isPausedPresence({ subVehiculos: [{ status: "activo" }] }), false);
+  });
+
+  it("el padre pausado no cubre; el hijo interrupt sí", () => {
+    assert.equal(isParentCoveragePaused({ interrupcionActiva: true }), true);
+    assert.equal(
+      isParentCoveragePaused({ desglosadorPausa: { pausadoAt: 1, subActivoId: "s1" } }),
+      true
+    );
+    assert.equal(
+      isParentCoveragePaused({ situacionNestedPause: { pausedAt: 1 } }),
+      true
+    );
+    assert.equal(isParentCoveragePaused({ vehiculoPadreDesglosadorId: "padre" }), false);
+    assert.equal(isParentCoveragePaused({}), false);
   });
 });

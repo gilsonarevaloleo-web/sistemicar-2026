@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
 import {
+  appendUnjustifiedPausasToHuecos,
   buildCoberturaHuecoIntervals,
+  buildMetricaHuecoIntervals,
   clearCoberturaHuecosLog,
   formatHuecoDuration,
   formatCoberturaHuecosSummary,
@@ -10,6 +12,7 @@ import {
   sumCoberturaHuecosMinutes,
   COBERTURA_HUECOS_KEY,
 } from "./coberturaHuecosLog.ts";
+import { hasActiveConsciousCoverage } from "../lib/entropyTimePolicy.ts";
 import type { Vehicle } from "../lib/persistence.ts";
 import { getLimaDayStartMs } from "../lib/segmentTime.ts";
 
@@ -128,5 +131,98 @@ describe("coberturaHuecosLog", () => {
       { startMs: 0, endMs: 25 * 60_000, open: false as const },
     ];
     assert.match(formatCoberturaHuecosSummary(withMinutes), /25 min/);
+  });
+
+  it("padre pausado sin hijo no cubre: abre hueco", () => {
+    const t0 = Date.now();
+    const paused = [
+      vehicle({
+        id: "p1",
+        titulo: "Costura",
+        aperturaAt: t0 - 60_000,
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: t0, subActivoId: "s1" },
+      }),
+    ];
+    assert.equal(hasActiveConsciousCoverage(paused, t0), false);
+    const open = reconcileCoberturaHuecos({ vehicles: paused, now: t0 });
+    assert.equal(open?.kind, "gap_open");
+  });
+
+  it("interrupt hijo sí cubre: no abre hueco", () => {
+    const t0 = Date.now();
+    const covered = [
+      vehicle({
+        id: "p1",
+        titulo: "Costura",
+        aperturaAt: t0 - 60_000,
+        interrupcionActiva: true,
+        desglosadorPausa: { pausadoAt: t0, subActivoId: "s1" },
+      }),
+      vehicle({
+        id: "c1",
+        titulo: "Llamada",
+        tipoFlota: "situacion",
+        aperturaAt: t0,
+        vehiculoPadreDesglosadorId: "p1",
+      }),
+    ];
+    assert.equal(hasActiveConsciousCoverage(covered, t0), true);
+    const open = reconcileCoberturaHuecos({ vehicles: covered, now: t0 });
+    assert.equal(open, null);
+  });
+
+  it("pausa no justificada entra al total de huecos como inconsciente", () => {
+    const t0 = Date.parse("2026-08-19T10:00:00-05:00");
+    const pauseStart = t0;
+    const pauseEnd = t0 + 20 * 60_000;
+    const vehicles = [
+      vehicle({
+        id: "costura",
+        status: "archivado",
+        aperturaAt: t0 - 60 * 60_000,
+        cierreAt: pauseEnd + 60 * 60_000,
+        pausas: [{ pausadoAt: pauseStart, reanudadoAt: pauseEnd }],
+      }),
+    ];
+    const merged = appendUnjustifiedPausasToHuecos([], vehicles, pauseEnd + 1000);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]?.reason, "pausa_no_justificada");
+    assert.equal(sumCoberturaHuecosMinutes(merged, pauseEnd), 20);
+
+    const withLog = appendUnjustifiedPausasToHuecos(
+      [{ startMs: pauseStart, endMs: pauseEnd, open: false, closedByTitulo: "Ya" }],
+      vehicles,
+      pauseEnd + 1000
+    );
+    assert.equal(withLog.length, 1);
+    assert.equal(withLog[0]?.closedByTitulo, "Ya");
+    assert.equal(sumCoberturaHuecosMinutes(withLog, pauseEnd), 20);
+  });
+
+  it("buildMetricaHuecoIntervals une cortes y pausas no justificadas", () => {
+    const t0 = Date.parse("2026-08-19T10:00:00-05:00");
+    const dayKey = String(getLimaDayStartMs(t0));
+    const events = [
+      { t: t0 - 30 * 60_000, kind: "gap_open" as const, dayKey },
+      { t: t0 - 25 * 60_000, kind: "gap_close" as const, dayKey, titulo: "Prueba" },
+    ];
+    localStorage.setItem(COBERTURA_HUECOS_KEY, JSON.stringify(events));
+    const vehicles = [
+      vehicle({
+        id: "v1",
+        status: "archivado",
+        aperturaAt: t0 - 2 * 60 * 60_000,
+        cierreAt: t0 + 60 * 60_000,
+        pausas: [{ pausadoAt: t0, reanudadoAt: t0 + 12 * 60_000 }],
+      }),
+    ];
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles,
+      now: t0 + 60 * 60_000,
+    });
+    assert.equal(sumCoberturaHuecosMinutes(intervals, t0 + 60 * 60_000), 17);
+    assert.ok(intervals.some(it => it.closedByTitulo === "Prueba"));
+    assert.ok(intervals.some(it => it.reason === "pausa_no_justificada"));
   });
 });
