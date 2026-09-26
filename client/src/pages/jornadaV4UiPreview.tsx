@@ -3,6 +3,7 @@
  * Sin auth: sirve para revisar jerarquía móvil del rediseño.
  */
 import { useState } from "react";
+import { ConquistaCard } from "@/components/jornada4/ConquistaCard";
 import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
 import { RecintoMinimoDock } from "@/components/jornada4/RecintoMinimoDock";
 import { Jornada4CoberturaTimeline } from "@/components/jornada4/Jornada4CoberturaTimeline";
@@ -15,6 +16,11 @@ import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import type { RevelacionPlanDia } from "@/jornada4/revelacionPlanDia";
 import type { ConcienciaTriadaModel } from "@/lib/concienciaTriadaOperador";
+import {
+  buildConquistaPauseLabelPatch,
+  buildConquistaPausePatch,
+} from "@/lib/conquistaPausa";
+import { resumeDesglosadorFromNestedPause } from "@/lib/nestedContextStack";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { Rocket } from "lucide-react";
 import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
@@ -106,12 +112,80 @@ const vehicles: Vehicle[] = [
 
 const noopCrisol = () => undefined;
 
+function previewConquistaSeed(now = Date.now()): Vehicle {
+  return {
+    id: "preview-conquista",
+    titulo: "Casaca",
+    status: "activo",
+    tipoReloj: "desglosador",
+    tipoFlota: "tiempo",
+    aperturaAt: now - 8 * 60_000,
+    criterioDetalle: "18:00",
+    subVehiculos: [
+      {
+        id: "s1",
+        titulo: "Pretina",
+        status: "activo",
+        aperturaAt: now - 8 * 60_000,
+        cantidadObjetivo: 9,
+        tiempoRecordMinPerUnit: 1.5,
+      },
+      {
+        id: "s2",
+        titulo: "Costura lateral",
+        status: "pendiente",
+      },
+    ],
+  } as Vehicle;
+}
+
+function PreviewConquistaPausa() {
+  const [vehicle, setVehicle] = useState<Vehicle>(() => previewConquistaSeed());
+  return (
+    <div className="px-3 sm:px-4 pb-48 space-y-2" data-testid="jornada4-preview-conquista-pausa">
+      <p className="text-[10px] font-black uppercase tracking-widest text-cyan-300">
+        Preview pausa · un vehículo, sin hijo
+      </p>
+      <p className="text-[10px] font-mono text-neutral-400" data-testid="jornada4-preview-vehicle-count">
+        vehículos en escena: 1
+      </p>
+      <ConquistaCard
+        vehicle={vehicle}
+        onCumplido={() => undefined}
+        onFallado={() => undefined}
+        onCerrarCiclo={() => undefined}
+        onPausaInterrupcion={titulo => {
+          setVehicle(v => {
+            const patch = buildConquistaPausePatch(v, titulo);
+            return patch ? { ...v, ...patch } : v;
+          });
+        }}
+        onLabelPausa={titulo => {
+          setVehicle(v => {
+            const patch = buildConquistaPauseLabelPatch(v, titulo);
+            return patch ? { ...v, ...patch } : v;
+          });
+        }}
+        onResumeDesglosador={() => {
+          setVehicle(v => {
+            const patch = resumeDesglosadorFromNestedPause(v);
+            return patch ? { ...v, ...patch } : v;
+          });
+        }}
+      />
+    </div>
+  );
+}
+
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
   const puertaPanorama = computePuertaPanorama(segmentos);
   const primer =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("primer") === "1";
+  const pausaPreview =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("pausa") === "1";
   const [showTutorial, setShowTutorial] = useState(primer);
 
   return (
@@ -125,6 +199,7 @@ export default function JornadaV4UiPreview() {
       <div className="max-w-lg mx-auto pt-2">
         {tab === "operar" ? (
           <div data-testid="jornada4-preview-operar">
+            {pausaPreview ? <PreviewConquistaPausa /> : null}
             {primer ? (
               <Jornada4ComoOperarCard
                 hasRitmo={false}
