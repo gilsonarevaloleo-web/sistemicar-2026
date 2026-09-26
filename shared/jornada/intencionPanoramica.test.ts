@@ -2,20 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   INTENCION_PANORAMICA_NOMBRE,
-  bloqueDirectivaIntencionPanoramica,
-  bloqueUserMetricasJornada,
   formatPuertasIntencionPanoramica,
   normalizarMetricasJornada,
   resumenIntencionPanoramica,
-  veredictoIntencionPanoramica,
 } from "./intencionPanoramica.ts";
 
-describe("Intención Panorámica", () => {
-  it("reemplaza Secuencia de Jornada en la directiva del evaluador", () => {
-    const bloque = bloqueDirectivaIntencionPanoramica();
-    assert.match(bloque, /Intención Panorámica \(Presencia de Terreno en 0ms\)/);
-    assert.match(bloque, /prohibido evaluar La Jornada como una «Secuencia de Jornada»/);
-    assert.match(bloque, /sensor de vigilia/);
+describe("Intención Panorámica — Jornada", () => {
+  it("nombra el sensor de vigilia, no una secuencia de tareas", () => {
+    assert.match(INTENCION_PANORAMICA_NOMBRE, /Presencia de Terreno en 0ms/);
     assert.equal(INTENCION_PANORAMICA_NOMBRE.includes("Secuencia de Jornada"), false);
   });
 
@@ -42,8 +36,6 @@ describe("Intención Panorámica", () => {
       puertasPerdidas: 1,
     });
     assert.equal(resumenIntencionPanoramica(ok!).conquistada, false);
-    assert.match(veredictoIntencionPanoramica(ok!), /perdiste/);
-    assert.match(bloqueUserMetricasJornada(ok!), /PÉRDIDA/);
 
     const full = normalizarMetricasJornada({
       puertasConquistadas: 2,
@@ -51,6 +43,5 @@ describe("Intención Panorámica", () => {
       puertasPerdidas: 0,
     });
     assert.equal(resumenIntencionPanoramica(full!).conquistada, true);
-    assert.match(veredictoIntencionPanoramica(full!), /conquistaste/);
   });
 });

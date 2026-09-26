@@ -8,7 +8,6 @@ import {
   isCodigoObservador,
   normalizarCapturaVolcado,
   normalizarGradoMaestria,
-  normalizarMetricasJornada,
   procesarVolcadoAprendizajeConFuente,
   toDepositoEngineResponse,
   validarCapturaParaGrado,
@@ -17,7 +16,6 @@ import {
   type DiagnosticoVolcado,
   type GeminiVolcadoCaller,
   type GradoMaestria,
-  type MetricasJornadaIntencion,
 } from "./engineConfig.ts";
 
 export function parseOjosHistoricos(raw: unknown): CodigoObservador[] {
@@ -39,8 +37,6 @@ export interface EvaluarDepositoInput {
   codigoHipotesis?: unknown;
   ojosHistoricos?: unknown;
   historialCodigos?: unknown;
-  /** Métricas de La Jornada: conquista/pérdida de Intención Panorámica. */
-  metricasJornada?: MetricasJornadaIntencion | unknown;
   callGemini?: GeminiVolcadoCaller;
 }
 
@@ -95,7 +91,6 @@ export async function evaluarDepositoVolcado(
       captura,
       gradoMaestria: captura.gradoMaestria,
       ojosHistoricos,
-      metricasJornada: normalizarMetricasJornada(input.metricasJornada),
     },
   );
   const engine = toDepositoEngineResponse(resultado.diagnostico);

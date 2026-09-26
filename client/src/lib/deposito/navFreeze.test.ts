@@ -65,6 +65,7 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /progresoRitualPaso/);
     assert.doesNotMatch(src, /ritualPaso\.motivo/);
     assert.doesNotMatch(src, /pendiente de implementación/);
+    assert.doesNotMatch(src, /jornadaMetricasDeposito|leerMetricasJornadaLocal|metricasJornada/);
     assert.match(src, /params.get\("grado"\)/);
     assert.match(src, /formRef/);
     assert.match(src, /getCaptura/);

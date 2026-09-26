@@ -19,13 +19,6 @@
 
 import { LEY_OPTICA_CODIGO_KERNEL } from "./leyOpticaCodigo.ts";
 import {
-  bloqueDirectivaIntencionPanoramica,
-  bloqueUserMetricasJornada,
-  normalizarMetricasJornada,
-  veredictoIntencionPanoramica,
-  type MetricasJornadaIntencion,
-} from "./intencionPanoramica.ts";
-import {
   bloquePlacementTest,
   bloqueTemperamento,
   buildDepositoSystemPrompt,
@@ -55,19 +48,6 @@ export {
   toDepositoEngineResponse,
 } from "./merito.ts";
 export type { FichaTemperamento, ResultadoMerito } from "./merito.ts";
-export {
-  INTENCION_PANORAMICA_CRITERIO,
-  INTENCION_PANORAMICA_NOMBRE,
-  PUERTAS_INTENCION_PANORAMICA_LABEL,
-  bloqueDirectivaIntencionPanoramica,
-  bloqueUserMetricasJornada,
-  formatPuertasIntencionPanoramica,
-  isMetricasJornadaIntencion,
-  normalizarMetricasJornada,
-  resumenIntencionPanoramica,
-  veredictoIntencionPanoramica,
-} from "./intencionPanoramica.ts";
-export type { MetricasJornadaIntencion } from "./intencionPanoramica.ts";
 
 export type CodigoObservador = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -255,8 +235,6 @@ export interface ProcesarVolcadoDeps {
   captura?: CapturaVolcadoInput;
   /** Dominantes previos para el eje de rotación del mapa de calor 1/10. */
   ojosHistoricos?: readonly CodigoObservador[];
-  /** Métricas de La Jornada: conquista/pérdida de Intención Panorámica. */
-  metricasJornada?: MetricasJornadaIntencion;
 }
 
 export interface ResultadoVolcadoAprendizaje {
@@ -777,8 +755,6 @@ C) OJO ÚNICO: si lo dicho habla de un discurso (moral, pedagogía, prisa) pero 
 
 Cero New Age, cero flor, cero «ánimo», cero listas de códigos.
 Cero plantilla. Si no podés nombrar el hecho, el JSON es inválido.
-
-${bloqueDirectivaIntencionPanoramica()}
 `.trim();
 
 function jsonSchemaEjemplo(
@@ -880,7 +856,6 @@ function bloqueInstruccionGrado(grado: GradoMaestria): string {
 function bloqueUserCaptura(
   captura: CapturaVolcadoExpansiva,
   ojosHistoricos: readonly CodigoObservador[] = [],
-  metricasJornada?: MetricasJornadaIntencion,
 ): string {
   const ficha = DICCIONARIO_GRADOS[captura.gradoMaestria];
   const temperamento = obtenerTemperamento(captura.gradoMaestria);
@@ -923,9 +898,6 @@ function bloqueUserCaptura(
         .join(", ")}`,
     );
   }
-  if (metricasJornada) {
-    lines.push("", bloqueUserMetricasJornada(metricasJornada));
-  }
   lines.push(
     "Diagnosticá el centro de gravedad. UN solo código. Evaluá densidad y placement. Respondé solo el JSON.",
   );
@@ -936,7 +908,6 @@ export function obtenerPromptVolcado(
   textoVolcado: string,
   capturaInput?: CapturaVolcadoInput,
   ojosHistoricos: readonly CodigoObservador[] = [],
-  metricasJornada?: MetricasJornadaIntencion,
 ): PromptVolcadoAprendizaje {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -945,7 +916,6 @@ export function obtenerPromptVolcado(
   );
   const grado = captura.gradoMaestria;
   const temperamento = obtenerTemperamento(grado);
-  const metricas = normalizarMetricasJornada(metricasJornada);
 
   const system = [
     buildDepositoSystemPrompt(grado),
@@ -991,7 +961,7 @@ export function obtenerPromptVolcado(
 
   return {
     system,
-    user: bloqueUserCaptura(captura, ojosHistoricos, metricas),
+    user: bloqueUserCaptura(captura, ojosHistoricos),
     responseSchema: {
       codigoDominante: 1,
       nombreOjoDominante: DICCIONARIO_OJOS[1].nombreOjo,
@@ -1442,29 +1412,10 @@ function anexarMerito(
   };
 }
 
-function anexarIntencionPanoramica(
-  diagnostico: DiagnosticoVolcado,
-  metricasJornada?: MetricasJornadaIntencion,
-): DiagnosticoVolcado {
-  const metricas = normalizarMetricasJornada(metricasJornada);
-  if (!metricas) return diagnostico;
-  if (/intenci[oó]n panor[aá]mica/i.test(diagnostico.devolucionMaestro)) {
-    return diagnostico;
-  }
-  return {
-    ...diagnostico,
-    devolucionMaestro: clamp(
-      `${diagnostico.devolucionMaestro} ${veredictoIntencionPanoramica(metricas)}`,
-      1200,
-    ),
-  };
-}
-
 function sellarDiagnostico(
   diagnostico: DiagnosticoVolcado,
   captura: CapturaVolcadoExpansiva,
   ojosHistoricos: readonly CodigoObservador[] = [],
-  metricasJornada?: MetricasJornadaIntencion,
 ): DiagnosticoVolcado {
   const volcado = captura.volcadoCrudo || "";
   const norm = normalizar(volcado);
@@ -1495,15 +1446,12 @@ function sellarDiagnostico(
         : textosSinPlantillaSocialC6(diagnostico.mecanicaAbsorcion),
     ),
   };
-  return anexarIntencionPanoramica(
-    coherenciaDevolucionConPlacement(
-      anexarMerito(
-        anexarValidacion(limpio, captura),
-        captura,
-        ojosHistoricos,
-      ),
+  return coherenciaDevolucionConPlacement(
+    anexarMerito(
+      anexarValidacion(limpio, captura),
+      captura,
+      ojosHistoricos,
     ),
-    metricasJornada,
   );
 }
 
@@ -1871,7 +1819,6 @@ export function diagnosticarVolcadoLocal(
   textoVolcado: string,
   capturaInput?: CapturaVolcadoInput,
   ojosHistoricos: readonly CodigoObservador[] = [],
-  metricasJornada?: MetricasJornadaIntencion,
 ): DiagnosticoVolcado {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -1898,7 +1845,6 @@ export function diagnosticarVolcadoLocal(
       }),
       captura,
       ojosHistoricos,
-      metricasJornada,
     );
   }
 
@@ -1927,7 +1873,6 @@ export function diagnosticarVolcadoLocal(
     ),
     captura,
     ojosHistoricos,
-    metricasJornada,
   );
 }
 
@@ -1953,12 +1898,10 @@ export async function procesarVolcadoAprendizajeConFuente(
 ): Promise<ResultadoVolcadoAprendizaje> {
   const captura = resolverCaptura(textoVolcado, deps);
   const ojosHistoricos = deps.ojosHistoricos ?? [];
-  const metricasJornada = normalizarMetricasJornada(deps.metricasJornada);
   const prompt = obtenerPromptVolcado(
     captura.volcadoCrudo,
     captura,
     ojosHistoricos,
-    metricasJornada,
   );
   const serialized = serializarPromptVolcado(prompt);
   const caller = deps.callGemini;
@@ -1971,7 +1914,6 @@ export async function procesarVolcadoAprendizajeConFuente(
           parseDiagnosticoVolcado(raw, captura.gradoMaestria, ojosHistoricos),
           captura,
           ojosHistoricos,
-          metricasJornada,
         ),
         source: "gemini",
       };
@@ -1987,7 +1929,6 @@ export async function procesarVolcadoAprendizajeConFuente(
             parseDiagnosticoVolcado(raw2, captura.gradoMaestria, ojosHistoricos),
             captura,
             ojosHistoricos,
-            metricasJornada,
           ),
           source: "gemini",
         };
@@ -2005,7 +1946,6 @@ export async function procesarVolcadoAprendizajeConFuente(
       captura.volcadoCrudo,
       captura,
       ojosHistoricos,
-      metricasJornada,
     ),
     source: "local_fallback",
   };

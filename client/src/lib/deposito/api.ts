@@ -4,7 +4,6 @@ import type {
   DepositoEngineResponse,
   DiagnosticoVolcado,
   GradoMaestria,
-  MetricasJornadaIntencion,
 } from "@shared/deposito/engineConfig";
 
 export interface DepositoVolcadoSuccess {
@@ -65,7 +64,6 @@ export async function procesarVolcadoRemoto(
   captura?: CapturaVolcadoInput,
   extras?: {
     ojosHistoricos?: CodigoObservador[];
-    metricasJornada?: MetricasJornadaIntencion;
   },
 ): Promise<DepositoVolcadoSuccess> {
   let res: Response;
@@ -79,7 +77,6 @@ export async function procesarVolcadoRemoto(
           ...captura,
           volcadoCrudo: captura?.volcadoCrudo ?? textoVolcado,
           ojosHistoricos: extras?.ojosHistoricos,
-          metricasJornada: extras?.metricasJornada,
         }),
       }),
       12000,

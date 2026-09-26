@@ -1,11 +1,11 @@
 /**
- * Lectura de métricas de La Jornada para el Depósito.
- * Solo lee la planilla local; no escribe ni toca el Crisol.
+ * Lectura local de puertas de Intención Panorámica (Jornada).
+ * No alimenta al Depósito: el volcado no consume estas métricas.
  */
 import {
   normalizarMetricasJornada,
   type MetricasJornadaIntencion,
-} from "@shared/deposito/intencionPanoramica";
+} from "@shared/jornada/intencionPanoramica";
 import { getJournalDateString } from "./segmentTime";
 
 const PLANILLA_LOCAL_KEY = "sistemicar_planilla_v5";

@@ -20,7 +20,6 @@ import { ManualTriggerButton } from "@/components/master-manual-drawer";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
-import { leerMetricasJornadaLocal } from "@/lib/jornadaMetricasDeposito";
 import { guardarGradoMaestria, leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
@@ -182,12 +181,10 @@ export default function Esperanza() {
     const ojosHistoricos = historial
       .map((v) => v.diagnostico?.codigoDominante)
       .filter((n): n is CodigoObservador => typeof n === "number");
-    const metricasJornada = leerMetricasJornadaLocal();
     const localDiag = diagnosticarVolcadoLocal(
       crudo,
       lista,
       ojosHistoricos,
-      metricasJornada,
     );
     const dictamenCoherente = coherenciaDictamenConPlacement(d, {
       gradoDetectado: localDiag.evaluacionGrado?.gradoDetectado,
@@ -224,7 +221,6 @@ export default function Esperanza() {
       try {
         const remoto = await procesarVolcadoRemoto(crudo, lista, {
           ojosHistoricos,
-          metricasJornada,
         });
         aplicarDiagnostico(remoto.diagnostico);
         setDictamen((prev) =>

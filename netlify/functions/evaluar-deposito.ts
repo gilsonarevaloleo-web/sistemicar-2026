@@ -109,7 +109,6 @@ export const handler: Handler = async (event) => {
         typeof parsed.sombraOmision === "string" ? parsed.sombraOmision : undefined,
       codigoHipotesis: parsed.codigoHipotesis,
       ojosHistoricos: parsed.ojosHistoricos ?? parsed.historialCodigos,
-      metricasJornada: parsed.metricasJornada,
       callGemini: geminiKeys().length > 0 ? callGemini : undefined,
     });
 

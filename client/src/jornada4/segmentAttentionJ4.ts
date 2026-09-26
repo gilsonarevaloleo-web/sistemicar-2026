@@ -10,7 +10,7 @@ import {
   type SegmentAttentionEvent,
 } from "@/lib/segmentAttentionEngine";
 import { getJournalDateString, getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
-import { formatPuertasIntencionPanoramica } from "@shared/deposito/intencionPanoramica";
+import { formatPuertasIntencionPanoramica } from "@shared/jornada/intencionPanoramica";
 
 export const J4_PUERTA_MANTRA = "Controlando tu día";
 
