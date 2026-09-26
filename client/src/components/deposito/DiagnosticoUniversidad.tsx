@@ -32,6 +32,7 @@ export function DiagnosticoUniversidad({
   expediente?: ExpedienteOjos;
 }) {
   const ojo = DICCIONARIO_OJOS[diagnostico.codigoDominante];
+  const codigoOjo = `C${diagnostico.codigoDominante}`;
   const evaluacion = diagnostico.evaluacionGrado;
   const soloGradoDetectado = placementOcultaGradoAnterior(evaluacion);
   const badgeGradoActivo = soloGradoDetectado
@@ -92,7 +93,7 @@ export function DiagnosticoUniversidad({
           1 · EL OJO DOMINANTE
         </p>
         <p className="text-lg font-light text-white">
-          C{diagnostico.codigoDominante} {diagnostico.nombreOjoDominante}
+          {codigoOjo} {diagnostico.nombreOjoDominante}
         </p>
         <p className="mt-1 text-[10px] uppercase tracking-widest text-white/35">
           Observa {ojo.focoAtencion} · {ojo.voz}
@@ -195,7 +196,7 @@ export function DiagnosticoUniversidad({
               Estructura {diagnostico.metricasMerito.densidadEstructural}/100
             </li>
             <li data-testid="deposito-rotacion">
-              Rotación {diagnostico.metricasMerito.variedadRotacionCodigo}
+              Rotación {codigoOjo}
             </li>
             <li data-testid="deposito-metacognicion">
               Metacognición{" "}
