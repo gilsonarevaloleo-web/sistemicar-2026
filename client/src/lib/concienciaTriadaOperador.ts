@@ -34,7 +34,7 @@ export const TRIADA_META: Record<
 > = {
   inconsciente: {
     label: "Inconsciente",
-    hint: "Sin actividad de vehículo en el plan ya ocurrido. Los huecos son inconsciencia.",
+    hint: "Sin actividad de vehículo en el plan ya ocurrido. Hueco = inconsciencia. Una pausa sin otro hilo que la cubra es hueco.",
     color: "#64748B",
   },
   presencia: {
@@ -178,10 +178,15 @@ export function buildTriadaInputSig(
       aperturaMix ^= v.desglosadorPausa?.pausadoAt ?? 0;
       aperturaMix ^= v.situacionNestedPause?.pausedAt ?? 0;
       destMix = (destMix * 19 + (v.vehiculoPadreDesglosadorId ? 7 : 1)) | 0;
+      destMix = (destMix * 13 + (v.pausas?.length ?? 0)) | 0;
+      const lastPausa = v.pausas?.[v.pausas.length - 1];
+      aperturaMix ^= lastPausa?.pausadoAt ?? 0;
+      aperturaMix ^= lastPausa?.reanudadoAt ?? 0;
     } else {
       closedN += 1;
       const dur = typeof v.duracionFinal === "number" ? v.duracionFinal : 0;
       closedMix = (closedMix * 33 + (dur | 0) + (v.destinoCierre === "peldano" ? 17 : 1)) | 0;
+      closedMix = (closedMix * 13 + (v.pausas?.length ?? 0)) | 0;
     }
   }
   return `${segPart}::${vehicles.length}:${active}:${destMix}:${aperturaMix}:${closedN}:${closedMix}`;

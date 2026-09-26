@@ -25,8 +25,7 @@ import {
   huecosLogToIntervals,
 } from "@/lib/gastoConcienciaEngine";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
 } from "@/jornada4/coberturaHuecosLog";
 import type { Vehicle } from "@/lib/persistence";
 
@@ -99,7 +98,7 @@ export function useConcienciaTriadaOperador({
     const uid = src.userId;
     if (!uid) return;
     const huecosLog = huecosLogToIntervals(
-      buildCoberturaHuecoIntervals(readCoberturaHuecosEvents())
+      buildMetricaHuecoIntervals({ vehicles: src.vehicles })
     );
     const next = buildConcienciaTriadaFromVehicles({
       fecha: src.fecha,

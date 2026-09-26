@@ -62,8 +62,7 @@ import {
 } from "@/jornada4/filters";
 import { applyListaLibreRowClose } from "@/jornada4/situacionLibreSeed";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
   reconcileCoberturaHuecos,
 } from "@/jornada4/coberturaHuecosLog";
 import {
@@ -358,7 +357,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const revelacion = sealRevelacionPlanDia(userId, {
           segmentos: segs,
           vehicles: vehiclesRef.current,
-          huecos: buildCoberturaHuecoIntervals(readCoberturaHuecosEvents()),
+          huecos: buildMetricaHuecoIntervals({ vehicles: vehiclesRef.current }),
         });
         return {
           revelacion,
@@ -1676,6 +1675,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         paintVehicle(vehicleId, pausedPatch);
         scheduleSaveLocalVehicles(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current);
         const nombrada = titulo !== PAUSA_INTERRUPCION_TITULO;
         toast.success(nombrada ? `En pausa · ${titulo}` : "En pausa", {
           description: nombrada
@@ -1761,6 +1761,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
       paintVehicle(parentId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
+      noteHuecoAfterClose(vehiclesRef.current);
       toast.info("Desglosador reanudado", {
         description: "Tiempo recuperado tras la interrupción.",
         style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },

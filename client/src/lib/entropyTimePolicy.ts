@@ -4,6 +4,7 @@
  */
 import type { Vehicle } from "./persistence";
 import { filterVehiclesForAnilloCoverage } from "./ghostVehicleEngine";
+import { isParentCoveragePaused } from "./vehiculoPausa";
 
 export const ENTROPY_TIME_POLICY = {
   /** Contador en vivo: el hueco cuenta desde el segundo 0 (sin colchón). */
@@ -41,6 +42,6 @@ export function hasActiveConsciousCoverage(
   nowMs = Date.now()
 ): boolean {
   return resolveCoverageVehicles(vehicles, nowMs).some(
-    v => v.status === "activo" && !v.autoVerdad
+    v => v.status === "activo" && !v.autoVerdad && !isParentCoveragePaused(v)
   );
 }

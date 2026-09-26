@@ -2,7 +2,8 @@
  * Reloj de línea vs paralelo meritorio — tríada de conciencia (idle).
  *
  * Línea: minutos únicos del plan. Un hilo.
- * Inconsciente = hueco: plan ya ocurrido sin vehículo. El futuro del plan no es
+ * Inconsciente = hueco: plan ya ocurrido sin vehículo. Pausa sin otro hilo
+ * que la cubra = hueco (no justificada). El futuro del plan no es
  * inconsciencia ni deuda — aún no ocurre. Lo no conquistado es el horario no planificado.
  * Interrupt: el padre se congela en pausadoAt; el enfoque cubre la línea. No multiplica.
  * Paralelo meritorio: ≥2 hilos avanzando de verdad (no el par padre-pausado + hijo).
@@ -15,6 +16,8 @@ import { getJournalDateString, getLimaDayStartMs, segmentWindowMs } from "./segm
 import type { Vehicle } from "./persistence";
 import { applyVehicleSessionSeal } from "./vehicleSessionSeal";
 
+export { isParentCoveragePaused } from "./vehiculoPausa";
+
 export type MsInterval = { start: number; end: number };
 
 export type TriadaLineaOccupancy = {
@@ -26,6 +29,8 @@ export type TriadaLineaOccupancy = {
   minutosHueco: number;
   minutosPlanFuturo: number;
   minutosInconsciente: number;
+  /** Huecos del plan ya ocurrido — misma cifra que Inconsciente. */
+  huecosIntervals: MsInterval[];
   hilosAvanzando: number;
   paraleloMeritorio: boolean;
   interruptCubreLinea: boolean;
@@ -41,6 +46,7 @@ export const EMPTY_TRIADA_LINEA: TriadaLineaOccupancy = {
   minutosHueco: 0,
   minutosPlanFuturo: 0,
   minutosInconsciente: 0,
+  huecosIntervals: [],
   hilosAvanzando: 0,
   paraleloMeritorio: false,
   interruptCubreLinea: false,
@@ -218,7 +224,36 @@ function interruptChildRawRanges(parentId: string, vehicles: Vehicle[], now: num
   return out;
 }
 
-/** Intervalos en los que el vehículo avanzó (agujero del interrupt hijo). */
+/**
+ * Pausas del vehículo (cerradas + viva).
+ * Si otro vehículo cubre ese rato, la pausa está justificada (presencia/dirección
+ * del otro hilo). Si no, es hueco = inconsciencia.
+ */
+export function vehiclePauseIntervals(vehicle: Vehicle, now: number): MsInterval[] {
+  const sealed = applyVehicleSessionSeal(vehicle);
+  const out: MsInterval[] = [];
+  const seen = new Set<number>();
+  const list = sealed.pausas ?? [];
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i];
+    const start = p?.pausadoAt;
+    if (typeof start !== "number" || !Number.isFinite(start) || start <= 0) continue;
+    const end =
+      typeof p.reanudadoAt === "number" && p.reanudadoAt > start ? p.reanudadoAt : now;
+    if (end > start) {
+      out.push({ start, end });
+      seen.add(start);
+    }
+  }
+  const liveAt =
+    sealed.desglosadorPausa?.pausadoAt ?? sealed.situacionNestedPause?.pausedAt;
+  if (typeof liveAt === "number" && Number.isFinite(liveAt) && liveAt > 0 && !seen.has(liveAt)) {
+    if (now > liveAt) out.push({ start: liveAt, end: now });
+  }
+  return mergeMsIntervals(out);
+}
+
+/** Intervalos en los que el vehículo avanzó (agujero del interrupt hijo y de las pausas). */
 export function vehicleAdvancingIntervals(
   vehicle: Vehicle,
   vehicles: Vehicle[],
@@ -227,8 +262,31 @@ export function vehicleAdvancingIntervals(
   if (skipsTriadaCoverage(vehicle)) return [];
   const raw = vehicleRawSessionRange(vehicle, now);
   if (!raw) return [];
-  const holes = vehicle.id ? interruptChildRawRanges(vehicle.id, vehicles, now) : [];
+  const holes = [
+    ...(vehicle.id ? interruptChildRawRanges(vehicle.id, vehicles, now) : []),
+    ...vehiclePauseIntervals(vehicle, now),
+  ];
   return holes.length > 0 ? subtractMsIntervals([raw], holes) : [raw];
+}
+
+/**
+ * Pausa sin otro vehículo consciente encima: hueco, igual que Inconsciente.
+ * Descanso / centinela no justifican — no cubren la línea.
+ */
+export function unjustifiedPauseIntervals(
+  vehicles: Vehicle[],
+  now: number
+): MsInterval[] {
+  const pauses: MsInterval[] = [];
+  const covering: MsInterval[] = [];
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (!v || skipsTriadaCoverage(v)) continue;
+    pauses.push(...vehiclePauseIntervals(v, now));
+    covering.push(...vehicleAdvancingIntervals(v, vehicles, now));
+  }
+  if (pauses.length === 0) return [];
+  return subtractMsIntervals(mergeMsIntervals(pauses), mergeMsIntervals(covering));
 }
 
 function vehicleIsDireccion(vehicle: Vehicle): boolean {
@@ -338,12 +396,12 @@ export function computeTriadaLineaOccupancy(params: {
   }
 
   const covered = mergeMsIntervals([...dirOnPlan, ...preOnPlan]);
-  const huecos = subtractMsIntervals(planElapsed, covered);
+  const huecosIntervals = subtractMsIntervals(planElapsed, covered);
 
   let minutosDireccion = round1(sumIntervalMinutes(dirOnPlan));
   let minutosPresencia = round1(sumIntervalMinutes(preOnPlan));
   const minutosPresenciaExtraida = round1(sumIntervalMinutes(overlapPreDir));
-  let minutosHueco = round1(sumIntervalMinutes(huecos));
+  let minutosHueco = round1(sumIntervalMinutes(huecosIntervals));
   let minutosPlanFuturo = round1(sumIntervalMinutes(planFuture));
   const planR = round1(minutosPlan);
   const used = minutosDireccion + minutosPresencia + minutosHueco + minutosPlanFuturo;
@@ -369,6 +427,7 @@ export function computeTriadaLineaOccupancy(params: {
     minutosHueco,
     minutosPlanFuturo,
     minutosInconsciente,
+    huecosIntervals,
     hilosAvanzando,
     paraleloMeritorio,
     interruptCubreLinea,

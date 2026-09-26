@@ -11,8 +11,7 @@ import {
 } from "@/lib/pulsoCoberturaCompute";
 import type { Vehicle } from "@/lib/persistence";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
   sumCoberturaHuecosMinutes,
 } from "@/jornada4/coberturaHuecosLog";
 
@@ -40,7 +39,10 @@ export function getCachedPulsoCobertura(params: {
   const now = params.now ?? Date.now();
   const segmentoActivoId = params.segmentoActivoId ?? null;
   const bucket = Math.floor(now / pulsoCacheBucketMs());
-  const intervals = buildCoberturaHuecoIntervals(readCoberturaHuecosEvents(), now);
+  const intervals = buildMetricaHuecoIntervals({
+    vehicles: params.vehicles,
+    now,
+  });
   const huecosMin =
     intervals.length > 0 ? sumCoberturaHuecosMinutes(intervals, now) : null;
   const sig = buildPulsoInputSig(params.segmentos, params.vehicles, segmentoActivoId);
