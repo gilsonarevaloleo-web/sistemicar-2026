@@ -1902,21 +1902,41 @@ function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
   return codigoDominanteDelVolcado(textoVolcado, mejor);
 }
 
+function justificacionOjoQueVe(
+  codigo: CodigoObservador,
+  texto: string,
+  fallback: string,
+): string {
+  const ojo = DICCIONARIO_OJOS[codigo];
+  if (codigo === 9 && detectaCimientoBiologico(texto)) {
+    return `El aprendizaje gravita en ${ojo.nombreOjo}: el pastor de los diez engloba el hambre puntual. El ojo que ve es la matriz; C1 es la boca que sugiere nutrir.`;
+  }
+  if (codigo === 9 && detectaMatrizSistema(texto)) {
+    return `El aprendizaje gravita en ${ojo.nombreOjo}: la matriz de diez códigos se observa como sistema de equilibrio, no como un solo rumbo.`;
+  }
+  if (codigo === 1 && detectaCimientoBiologico(texto)) {
+    return `El aprendizaje gravita en ${ojo.nombreOjo}: el cimiento biológico (energía, dopamina, descanso) es el centro, no la exigencia de producción.`;
+  }
+  return fallback;
+}
+
 function recalibrarOjoDominante(
   diagnostico: DiagnosticoVolcado,
   texto: string,
 ): DiagnosticoVolcado {
   const codigo = codigoDominanteDelVolcado(texto, diagnostico.codigoDominante);
-  if (codigo === diagnostico.codigoDominante) return diagnostico;
   const ojo = DICCIONARIO_OJOS[codigo];
-  const justificacionDominante =
-    codigo === 9
-      ? detectaCimientoBiologico(texto)
-        ? `El aprendizaje gravita en ${ojo.nombreOjo}: el pastor de los diez engloba el hambre puntual. El ojo que ve es la matriz; C1 es la boca que sugiere nutrir.`
-        : `El aprendizaje gravita en ${ojo.nombreOjo}: la matriz de diez códigos se observa como sistema de equilibrio, no como un solo rumbo.`
-      : codigo === 1
-        ? `El aprendizaje gravita en ${ojo.nombreOjo}: el cimiento biológico (energía, dopamina, descanso) es el centro, no la exigencia de producción.`
-        : diagnostico.justificacionDominante;
+  const justificacionDominante = justificacionOjoQueVe(
+    codigo,
+    texto,
+    diagnostico.justificacionDominante,
+  );
+  if (
+    codigo === diagnostico.codigoDominante &&
+    justificacionDominante === diagnostico.justificacionDominante
+  ) {
+    return diagnostico;
+  }
   return {
     ...diagnostico,
     codigoDominante: codigo,
