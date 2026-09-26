@@ -120,10 +120,15 @@ describe("desglosador nested pause — historia de presencia", () => {
         { id: "s1", titulo: "Casaca 1", status: "activo", aperturaAt: now - 10 * 60_000 },
       ],
     } as Vehicle;
-    const paused = buildDesglosadorNestedPausePatch(vehicle, "interrupcion_situacion");
+    const paused = buildDesglosadorNestedPausePatch(
+      vehicle,
+      "interrupcion_situacion",
+      "llamada"
+    );
     assert.ok(paused);
     assert.equal(paused!.interrupcionActiva, true);
     assert.equal(paused!.pausas.length, 1);
+    assert.equal(paused!.pausas[0]?.titulo, "llamada");
     const resumed = resumeDesglosadorFromNestedPause({
       ...vehicle,
       ...paused,

@@ -29,6 +29,47 @@ export function appendVehiculoPausa(
   return list;
 }
 
+/** Pone o corrige el nombre de la pausa abierta. No abre otra. */
+export function labelVehiculoPausaAbierta(
+  existing: VehiculoPausaStamp[] | undefined,
+  titulo: string,
+  fallbackPausadoAt?: number
+): VehiculoPausaStamp[] | undefined {
+  const t = titulo.trim();
+  if (!t) return existing;
+  const list = existing ? existing.map(p => ({ ...p })) : [];
+  const openIdx = list.findIndex(p => p.reanudadoAt == null);
+  if (openIdx >= 0) {
+    if (list[openIdx]!.titulo === t) return existing;
+    list[openIdx] = { ...list[openIdx]!, titulo: t };
+    return list;
+  }
+  if (fallbackPausadoAt != null && fallbackPausadoAt > 0) {
+    return appendVehiculoPausa(existing, fallbackPausadoAt, t);
+  }
+  return existing;
+}
+
+export function pausaAbiertaDe(
+  vehicle: { pausas?: VehiculoPausaStamp[] }
+): VehiculoPausaStamp | undefined {
+  return vehicle.pausas?.find(p => p.reanudadoAt == null);
+}
+
+export function tituloPausaAbierta(
+  vehicle: { pausas?: VehiculoPausaStamp[] }
+): string {
+  return nombrePausa(pausaAbiertaDe(vehicle) ?? {});
+}
+
+/** True si la pausa viva aún no tiene un inconveniente nombrado. */
+export function pausaAbiertaSinNombrar(
+  vehicle: { pausas?: VehiculoPausaStamp[] }
+): boolean {
+  const t = pausaAbiertaDe(vehicle)?.titulo?.trim();
+  return !t || t === PAUSA_INTERRUPCION_TITULO;
+}
+
 export function closeVehiculoPausaAbierta(
   existing: VehiculoPausaStamp[] | undefined,
   reanudadoAt: number

@@ -4,9 +4,12 @@ import {
   appendVehiculoPausa,
   closeVehiculoPausaAbierta,
   isPausedPresence,
+  labelVehiculoPausaAbierta,
   minutosPausa,
   nombrePausa,
   PAUSA_INTERRUPCION_TITULO,
+  pausaAbiertaSinNombrar,
+  tituloPausaAbierta,
   tituloPausaInterrupcion,
 } from "./vehiculoPausa.ts";
 
@@ -41,6 +44,16 @@ describe("vehiculoPausa — historia de presencia", () => {
     assert.equal(tituloPausaInterrupcion(null), PAUSA_INTERRUPCION_TITULO);
     assert.equal(tituloPausaInterrupcion("llamada"), "llamada");
     assert.equal(tituloPausaInterrupcion("  costura  "), "costura");
+  });
+
+  it("nombrar corrige la pausa abierta y no abre otra", () => {
+    const open = appendVehiculoPausa(undefined, 1000, "Pausa");
+    const labeled = labelVehiculoPausaAbierta(open, "costura");
+    assert.equal(labeled?.length, 1);
+    assert.equal(labeled?.[0]?.titulo, "costura");
+    assert.equal(tituloPausaAbierta({ pausas: labeled }), "costura");
+    assert.equal(pausaAbiertaSinNombrar({ pausas: labeled }), false);
+    assert.equal(pausaAbiertaSinNombrar({ pausas: open }), true);
   });
 
   it("pausa e interrupción son presencia, no misión activa", () => {
