@@ -126,6 +126,23 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(overlay, /z-\[230\]/);
   });
 
+  it("tutorial de primer usuario queda por encima de El Crisol y el nav", () => {
+    const tutorial = readFileSync(
+      join(clientSrc, "components/planificacion/PlanificacionTutorial.tsx"),
+      "utf8"
+    );
+    // El Crisol porta a body (z-250). Un z-320 dentro de <main z-10> no gana.
+    assert.match(tutorial, /createPortal/);
+    assert.match(tutorial, /document\.body/);
+    assert.match(tutorial, /z-\[320\]/);
+    assert.match(tutorial, /items-center/);
+    assert.equal(tutorial.includes("items-end"), false);
+    assert.match(tutorial, /tutorial-plan-footer/);
+    assert.match(tutorial, /btn-tutorial-plan-next/);
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    assert.match(session, /hasNorte && !showTutorial/);
+  });
+
   it("sesión monta atención de puertas Dual Kernel", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     assert.match(session, /useJornada4SegmentAttention/);

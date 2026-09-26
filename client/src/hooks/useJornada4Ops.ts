@@ -5,7 +5,6 @@
 import { useCallback, useRef, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
-  addVehicle,
   notifyVehicleClosed,
   updateVehicle,
   wasVehicleRecentlyClosed,
@@ -63,8 +62,7 @@ import {
 } from "@/jornada4/filters";
 import { applyListaLibreRowClose } from "@/jornada4/situacionLibreSeed";
 import {
-  buildCoberturaHuecoIntervals,
-  readCoberturaHuecosEvents,
+  buildMetricaHuecoIntervals,
   reconcileCoberturaHuecos,
 } from "@/jornada4/coberturaHuecosLog";
 import {
@@ -95,11 +93,15 @@ import {
   registrarCierreConcienciaTriada,
   resolveDuracionMinCierre,
 } from "@/lib/concienciaTriadaOperador";
+import { resumeDesglosadorFromNestedPause } from "@/lib/nestedContextStack";
 import {
-  buildDesglosadorNestedPausePatch,
-  resumeDesglosadorFromNestedPause,
-} from "@/lib/nestedContextStack";
-import { tituloPausaInterrupcion } from "@/lib/vehiculoPausa";
+  buildConquistaPauseLabelPatch,
+  buildConquistaPausePatch,
+} from "@/lib/conquistaPausa";
+import {
+  PAUSA_INTERRUPCION_TITULO,
+  tituloPausaInterrupcion,
+} from "@/lib/vehiculoPausa";
 import {
   firstPendingCronometroTexto,
   firstPendingSubVehiculoTitulo,
@@ -107,12 +109,6 @@ import {
   reorderSubVehiculos,
   type ReorderDirection,
 } from "@/lib/desglosadorReorder";
-import {
-  assertCanOpenVehicle,
-  formatOperationalSlotsBlockMessage,
-} from "@/lib/vehicleOperationalSlots";
-import { closeCentinelasBeforeConsciousLaunch } from "@/lib/centinelaEngine";
-import { generateStableUuid } from "@/lib/stableUuid";
 import {
   collectCierresConscientesAlTermino,
   isCierreConscienteAlTermino,
@@ -161,13 +157,6 @@ const CYAN = "#00FFC3";
 const VIOLET = "#8B5CF6";
 const AMBER = "#F59E0B";
 const GOLD = "#D4AF37";
-
-const STUB_EJES = {
-  enfoque: { text: "", trifecta: "omitir" as const },
-  conflicto: { text: "", trifecta: "omitir" as const },
-  pasos: { text: "", trifecta: "omitir" as const },
-  limite: { text: "", trifecta: "omitir" as const },
-};
 
 export type UseJornada4OpsParams = {
   userId: string | undefined;
@@ -368,7 +357,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const revelacion = sealRevelacionPlanDia(userId, {
           segmentos: segs,
           vehicles: vehiclesRef.current,
-          huecos: buildCoberturaHuecoIntervals(readCoberturaHuecosEvents()),
+          huecos: buildMetricaHuecoIntervals({ vehicles: vehiclesRef.current }),
         });
         return {
           revelacion,
@@ -1676,147 +1665,69 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
       if (!vehicle || !isConquistaDesglosador(vehicle) || vehicle.interrupcionActiva) return;
 
-      const existingInterrupt = vehiclesRef.current.find(
-        v =>
-          v.status === "activo" &&
-          !v.autoVerdad &&
-          v.vehiculoPadreDesglosadorId === vehicleId &&
-          !wasVehicleRecentlyClosed(v.id)
-      );
-      if (existingInterrupt) {
-        toast.error("Ya hay una interrupción activa", {
-          description: "Ciérrala arriba antes de lanzar otra.",
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-        });
-        return;
-      }
-
-      const slotsCheck = assertCanOpenVehicle(vehiclesRef.current, "interrupcion", {
-        parentDesglosadorId: vehicleId,
-      });
-      if (!slotsCheck.allowed) {
-        toast.error("Límite de misiones", {
-          description: formatOperationalSlotsBlockMessage(slotsCheck),
-          style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-          duration: 5500,
-        });
-        return;
-      }
-
-      const nestedPause = buildDesglosadorNestedPausePatch(vehicle, "interrupcion_situacion");
-      if (!nestedPause) {
+      const pausedPatch = buildConquistaPausePatch(vehicle, titulo);
+      if (!pausedPatch) {
         toast.error("No hay unidad activa para pausar");
         return;
       }
 
       inFlightRef.current.add(key);
       try {
-        const activeSub = (vehicle.subVehiculos || []).find(s => s.status === "activo");
-        let restanteUnidades: number | undefined;
-        if (activeSub?.aperturaAt && activeSub.cantidadObjetivo && activeSub.tiempoRecordMinPerUnit) {
-          const elapsedSec = Math.floor((Date.now() - activeSub.aperturaAt) / 1000);
-          const done = Math.floor(elapsedSec / 60 / activeSub.tiempoRecordMinPerUnit);
-          restanteUnidades = Math.max(0, activeSub.cantidadObjetivo - done);
-        }
-        const pausedPatch = {
-          ...nestedPause,
-          desglosadorPausa: {
-            ...nestedPause.desglosadorPausa,
-            restanteUnidades,
-          },
-          pausas: nestedPause.pausas.map((p, i, arr) =>
-            i === arr.length - 1 && !p.reanudadoAt && !p.titulo
-              ? { ...p, titulo }
-              : p
-          ),
-        };
-
-        void closeCentinelasBeforeConsciousLaunch(userId, vehiclesRef.current);
-
-        const provisionalInterruptId = generateStableUuid();
-        const clientRequestId = `crq_${generateStableUuid()}`;
-        const interruptVehicle: Vehicle = {
-          id: provisionalInterruptId,
-          titulo,
-          criterioFin: "circunstancia",
-          criterioDetalle: "Interrupción",
-          tiempoInicio: new Date(),
-          createdAt: new Date(),
-          userId,
-          status: "activo",
-          ejes: STUB_EJES,
-          tipoTerminoRapido: "situacion",
-          tipoFlota: "situacion",
-          aperturaAt: Date.now(),
-          excluirDeHistorial: true,
-          vehiculoPadreDesglosadorId: vehicleId,
-          clientRequestId,
-        };
-
-        const pausedList = vehiclesRef.current.map(v =>
-          v.id === vehicleId ? { ...v, ...pausedPatch } : v
-        );
-        const optimisticList = [interruptVehicle, ...pausedList];
-        vehiclesRef.current = optimisticList;
-        setVehicles(optimisticList);
-        scheduleSaveLocalVehicles(optimisticList);
-        noteHuecoAfterClose(optimisticList);
-        burstJornada4Tick();
-
-        toast.success("Interrupción lanzada", {
-          description: "Cierra la situación arriba (Cumplido o Incumplido) para reanudar.",
+        paintVehicle(vehicleId, pausedPatch);
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current);
+        const nombrada = titulo !== PAUSA_INTERRUPCION_TITULO;
+        toast.success(nombrada ? `En pausa · ${titulo}` : "En pausa", {
+          description: nombrada
+            ? "El inconveniente queda nombrado. El desglosador no ocupa cupo."
+            : "Rápido, sin vehículo extra. Puedes nombrar el motivo cuando quieras.",
           style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
-          duration: 4200,
+          duration: 3600,
         });
-
-        try {
-          void updateVehicle(userId, vehicleId, pausedPatch, { skipLocalSync: true }).catch(e =>
-            console.warn("[jornada4.pausa] parent", e)
-          );
-          const { id: realId } = await addVehicle(
-            userId,
-            {
-              titulo,
-              criterioFin: "circunstancia",
-              criterioDetalle: "Interrupción",
-              tiempoInicio: new Date(),
-              ejes: STUB_EJES,
-              tipoTerminoRapido: "situacion",
-              tipoFlota: "situacion",
-              aperturaAt: Date.now(),
-              excluirDeHistorial: true,
-              vehiculoPadreDesglosadorId: vehicleId,
-            },
-            { provisionalId: provisionalInterruptId, clientRequestId }
-          );
-          if (realId !== provisionalInterruptId) {
-            const synced = vehiclesRef.current.map(v =>
-              v.id === provisionalInterruptId ? { ...v, id: realId } : v
-            );
-            vehiclesRef.current = synced;
-            setVehicles(synced);
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(userId, vehicleId, pausedPatch, { skipLocalSync: true });
+          } catch (e) {
+            console.warn("[jornada4.pausa] parent", e);
           }
-        } catch {
-          const rolledBack = vehiclesRef.current
-            .filter(v => v.id !== provisionalInterruptId)
-            .map(v =>
-              v.id === vehicleId
-                ? { ...v, desglosadorPausa: undefined, interrupcionActiva: false }
-                : v
-            );
-          vehiclesRef.current = rolledBack;
-          setVehicles(rolledBack);
-          scheduleSaveLocalVehicles(rolledBack);
-          noteHuecoAfterClose(rolledBack);
-          toast.error("No se pudo lanzar la interrupción", {
-            style: { backgroundColor: PIZARRA, border: `1px solid ${BLOOD}`, color: BLOOD },
-          });
-        }
+        });
       } finally {
         inFlightRef.current.delete(key);
       }
     },
-    [userId, vehiclesRef, setVehicles]
+    [userId, vehiclesRef, paintVehicle]
+  );
+
+  const labelPausaConquista = useCallback(
+    async (vehicleId: string, titulo: string) => {
+      if (!userId) return;
+      const key = `pauselabel:${vehicleId}`;
+      if (inFlightRef.current.has(key)) return;
+      const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
+      if (!vehicle || !isConquistaDesglosador(vehicle)) return;
+      const patch = buildConquistaPauseLabelPatch(vehicle, titulo);
+      if (!patch) return;
+      inFlightRef.current.add(key);
+      try {
+        paintVehicle(vehicleId, patch);
+        scheduleSaveLocalVehicles(vehiclesRef.current);
+        toast.success(`Pausa · ${tituloPausaInterrupcion(titulo)}`, {
+          description: "El hueco queda justificado. Sin vehículo extra.",
+          style: { backgroundColor: PIZARRA, border: `1px solid ${CYAN}`, color: CYAN },
+          duration: 2800,
+        });
+        void runShadowTaskAsync(async () => {
+          try {
+            await updateVehicle(userId, vehicleId, patch, { skipLocalSync: true });
+          } catch (e) {
+            console.warn("[jornada4.pausa.label]", e);
+          }
+        });
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [userId, vehiclesRef, paintVehicle]
   );
 
   const resumeDesglosador = useCallback(
@@ -2180,6 +2091,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     archiveAncladoPorSegmento,
     archivePausedConquista,
     pausaInterrupcion,
+    labelPausaConquista,
     resumeDesglosador,
     postergarFilaEnFoco,
     quitarSituacionFila,

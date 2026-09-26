@@ -124,7 +124,10 @@ describe("Depósito v2 — mérito, placement y temperamento", () => {
     assert.equal(engine.evaluacionGrado.gradoDetectado, 3);
     assert.equal(engine.evaluacionGrado.meritoReconocido, true);
     assert.equal(typeof engine.metricasMerito.densidadEstructural, "number");
-    assert.match(engine.metricasMerito.variedadRotacionCodigo, /^C\d+$/);
+    assert.equal(
+      engine.metricasMerito.variedadRotacionCodigo,
+      engine.ojoDominante.codigo,
+    );
     assert.equal(engine.mecanicaAbsorcion.instruccionUnica, d.mecanicaAbsorcion);
   });
 

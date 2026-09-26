@@ -38,6 +38,8 @@ import {
   GRADO_MAESTRIA_INICIAL,
   diagnosticarVolcadoLocal,
   evaluarRitualPasoGrado,
+  motivoRitualPasoVisible,
+  progresoRitualPaso,
   isGradoMaestria,
   normalizarCapturaVolcado,
   type CapturaVolcadoExpansiva,
@@ -366,15 +368,33 @@ export default function Esperanza() {
               {saving && grado !== 1 ? "Leyendo el volcado…" : "Guardar volcado"}
             </button>
           </div>
-          {ritualPaso.volcadosEvaluados >= 3 && (
-            <p
-              className="mt-3 text-[10px] leading-relaxed text-white/35"
-              data-testid="deposito-ritual-paso"
-            >
-              Ritual de Paso · G{ritualPaso.gradoActual}
-              {ritualPaso.gradoSiguiente ? ` → G${ritualPaso.gradoSiguiente}` : ""}
-              : {ritualPaso.motivo}
-            </p>
+          {grado < 4 && ritualPaso.volcadosEvaluados > 0 && (
+            <div className="mt-3" data-testid="deposito-ritual-paso">
+              {motivoRitualPasoVisible(ritualPaso) ? (
+                <p className="text-[10px] leading-relaxed text-white/35">
+                  Ritual de Paso · G{ritualPaso.gradoActual}
+                  {ritualPaso.gradoSiguiente
+                    ? ` → G${ritualPaso.gradoSiguiente}`
+                    : ""}
+                </p>
+              ) : null}
+              <div
+                className="h-1 w-full overflow-hidden rounded-full bg-white/10"
+                data-testid="deposito-ritual-progreso"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progresoRitualPaso(ritualPaso) * 100)}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.round(progresoRitualPaso(ritualPaso) * 100)}%`,
+                    backgroundColor: GOLD,
+                  }}
+                />
+              </div>
+            </div>
           )}
         </section>
 

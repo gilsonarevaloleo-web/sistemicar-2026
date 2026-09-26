@@ -29,11 +29,11 @@ import {
   bloquePlacementTest,
   bloqueTemperamento,
   buildDepositoSystemPrompt,
+  detectaFlor,
+  etiquetaCodigoOjo,
   evaluarMeritoVolcado,
   obtenerTemperamento,
   parseCodigoOjo,
-  resolverRotacionCodigo,
-  sugerirRotacionCodigo,
 } from "./merito.ts";
 export {
   MATRIZ_TEMPERAMENTO,
@@ -42,6 +42,7 @@ export {
   bloqueTemperamento,
   buildDepositoSystemPrompt,
   calcularDensidadEstructural,
+  detectaFlor,
   detectarFlorMerito,
   detectarGradoPorMerito,
   etiquetaCodigoOjo,
@@ -321,7 +322,7 @@ export const DICCIONARIO_OJOS: Record<CodigoObservador, FichaOjoCodigo> = {
     focoAtencion: "prevención",
     voz: "El Ingeniero sin Flor",
     cegueraActiva:
-      "No observa la interrupción ni el quiebre que se está armando. Cubre el riesgo con flor, ilusión o «ya veré».",
+      "No observa la interrupción ni el quiebre que se está armando.",
     gestoAbsorcion:
       "Mañana, nombrá el quiebre más probable del día y ejecutá UNA acción mínima de prevención (hecho + límite) antes de las 12:00. Cero floritura.",
   },
@@ -782,7 +783,7 @@ ${bloqueDirectivaIntencionPanoramica()}
 
 function jsonSchemaEjemplo(
   grado: GradoMaestria,
-  ojosHistoricos: readonly CodigoObservador[] = [],
+  _ojosHistoricos: readonly CodigoObservador[] = [],
 ): string {
   const validacion: Record<string, unknown> = {
     gradoEvaluado: grado,
@@ -792,7 +793,6 @@ function jsonSchemaEjemplo(
   if (grado >= 2) validacion.ruidoDetectadoCorrectamente = true;
   if (grado >= 3) validacion.sombraIntegrada = true;
   if (grado >= 4) validacion.hipotesisOjoAcierta = false;
-  const rotacionSugerida = sugerirRotacionCodigo(ojosHistoricos);
 
   return `{
   "ojoDominante": {
@@ -814,7 +814,7 @@ function jsonSchemaEjemplo(
   },
   "metricasMerito": {
     "densidadEstructural": 64,
-    "variedadRotacionCodigo": "${rotacionSugerida}",
+    "variedadRotacionCodigo": "C3",
     "metacognicionDetectada": false
   },
   "devolucionMaestro": "Tres tiempos, temperamento del grado activo: Espejo -> Revelación de 2ª resistencia -> Veredicto.",
@@ -963,9 +963,10 @@ export function obtenerPromptVolcado(
     "ojoDominante.codigo DEBE ser C1–C10. codigoDominante (entero 1–10) es alias coherente.",
     "nombreOjoDominante / ojoDominante.nombre DEBE coincidir con el diccionario del código elegido.",
     "puntoCiego.florDetectada lista excusas, comparaciones o adjetivos aislados del volcado.",
+    "Si florDetectada está vacía, PROHIBIDO acusar flor, ilusión, «ya veré» o autoengaño genérico en loNoDicho.",
     "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón ni comillas del usuario.",
     "JAMÁS repitas citas textuales largas del volcado en explicacion, loNoDicho, espejo o instruccionUnica.",
-    "metricasMerito.variedadRotacionCodigo = el hueco real del mapa, no un fallback automático a C1.",
+    "metricasMerito.variedadRotacionCodigo DEBE coincidir con ojoDominante.codigo. Prohibido fallback automático a C1 si el Ojo Dominante es otro.",
   ].join("\n");
 
   const engineSchema: DepositoEngineResponse = {
@@ -983,7 +984,7 @@ export function obtenerPromptVolcado(
     },
     metricasMerito: {
       densidadEstructural: 0,
-      variedadRotacionCodigo: sugerirRotacionCodigo(ojosHistoricos),
+      variedadRotacionCodigo: "C1",
       metacognicionDetectada: false,
     },
   };
@@ -1109,6 +1110,7 @@ function recortarEcoDelVolcado(campo: string, volcado: string): string {
 function hidratarDiagnostico(
   codigo: CodigoObservador,
   campos: Partial<DiagnosticoVolcado>,
+  opts?: { detectaFlor?: boolean },
 ): DiagnosticoVolcado {
   const ojo = DICCIONARIO_OJOS[codigo];
   const justificacionDominante = clamp(
@@ -1118,8 +1120,15 @@ function hidratarDiagnostico(
     ),
     800,
   );
+  const hayFlor = opts?.detectaFlor ?? detectaFlor("", campos.florDetectada);
   const puntoCiego = clamp(
-    prohibirEcoTextual(campos.puntoCiego?.trim() || ojo.cegueraActiva),
+    prohibirEcoTextual(
+      aplicarPuntoCiegoSinFlorPlantilla(
+        campos.puntoCiego?.trim() || cegueraParaPuntoCiego(ojo, hayFlor),
+        hayFlor,
+        cegueraParaPuntoCiego(ojo, false),
+      ),
+    ),
     600,
   );
   const devolucionMaestro = clamp(
@@ -1378,7 +1387,7 @@ function extraerEvaluacionGradoGemini(
 
 function extraerMetricasMeritoGemini(
   obj: Record<string, unknown>,
-  ojos: readonly CodigoObservador[] = [],
+  codigoDominante: CodigoObservador,
 ): MetricasMerito | undefined {
   const raw = asRecord(obj.metricasMerito ?? obj.metricas_merito);
   if (!raw) return undefined;
@@ -1389,11 +1398,6 @@ function extraerMetricasMeritoGemini(
       : typeof densRaw === "string"
         ? Number(densRaw)
         : NaN;
-  const rot = pickString(raw, [
-    "variedadRotacionCodigo",
-    "variedad_rotacion_codigo",
-    "rotacion",
-  ]);
   const meta = parseBooleanLoose(
     raw.metacognicionDetectada ?? raw.metacognicion_detectada,
   );
@@ -1401,7 +1405,7 @@ function extraerMetricasMeritoGemini(
     densidadEstructural: Number.isFinite(dens)
       ? Math.max(0, Math.min(100, Math.round(dens)))
       : 0,
-    variedadRotacionCodigo: resolverRotacionCodigo(rot, ojos),
+    variedadRotacionCodigo: etiquetaCodigoOjo(codigoDominante),
     metacognicionDetectada: meta === true,
   };
 }
@@ -1432,13 +1436,7 @@ function anexarMerito(
     },
     metricasMerito: {
       ...local.metricas,
-      variedadRotacionCodigo: resolverRotacionCodigo(
-        diagnostico.metricasMerito?.variedadRotacionCodigo,
-        [
-          ...ojosHistoricos,
-          diagnostico.codigoDominante,
-        ],
-      ),
+      variedadRotacionCodigo: etiquetaCodigoOjo(diagnostico.codigoDominante),
     },
     florDetectada: local.florDetectada,
   };
@@ -1471,16 +1469,25 @@ function sellarDiagnostico(
   const volcado = captura.volcadoCrudo || "";
   const norm = normalizar(volcado);
   const permitePlantillaSocialC6 = textoTraeRoceSocial(norm);
+  const hayFlor = detectaFlor(
+    componerTextoDiagnostico(captura),
+    diagnostico.florDetectada,
+  );
   const recortar = (campo: string) => {
     const sinEco = recortarEcoDelVolcado(campo, volcado);
     return permitePlantillaSocialC6
       ? sinEco
       : textosSinPlantillaSocialC6(sinEco);
   };
+  const ojo = DICCIONARIO_OJOS[diagnostico.codigoDominante];
   const limpio: DiagnosticoVolcado = {
     ...diagnostico,
     justificacionDominante: recortar(diagnostico.justificacionDominante),
-    puntoCiego: recortar(diagnostico.puntoCiego),
+    puntoCiego: aplicarPuntoCiegoSinFlorPlantilla(
+      recortar(diagnostico.puntoCiego),
+      hayFlor,
+      cegueraParaPuntoCiego(ojo, false),
+    ),
     devolucionMaestro: recortar(diagnostico.devolucionMaestro),
     mecanicaAbsorcion: prohibirEcoInstruccion(
       permitePlantillaSocialC6
@@ -1594,7 +1601,7 @@ function componerTextoDiagnostico(captura: CapturaVolcadoExpansiva): string {
 export function parseDiagnosticoVolcado(
   raw: string,
   gradoActual: GradoMaestria = GRADO_MAESTRIA_INICIAL,
-  ojosHistoricos: readonly CodigoObservador[] = [],
+  _ojosHistoricos: readonly CodigoObservador[] = [],
 ): DiagnosticoVolcado {
   const obj = extraerJsonObject(raw);
   const ojo = extraerOjoDominante(obj);
@@ -1642,12 +1649,9 @@ export function parseDiagnosticoVolcado(
       : undefined,
     validacionGrado: extraerValidacionGrado(obj, gradoActual),
     evaluacionGrado: extraerEvaluacionGradoGemini(obj),
-    metricasMerito: extraerMetricasMeritoGemini(obj, [
-      ...ojosHistoricos,
-      codigo,
-    ]),
+    metricasMerito: extraerMetricasMeritoGemini(obj, codigo),
     florDetectada,
-  });
+  }, { detectaFlor: detectaFlor("", florDetectada) });
 }
 
 function contarPalabras(texto: string): number {
@@ -1757,11 +1761,49 @@ function nivelCargaLocal(
   return "INTERMEDIO";
 }
 
+const CEGUERA_FLOR_C4 =
+  "Cubre el riesgo con flor, ilusión o «ya veré».";
+
+const ACUSACION_FLOR_PLANTILLA =
+  /flor|ilus[ií][oó]n|«?ya ver[eé]»?|autoenga[nñ]o/i;
+
+function cegueraParaPuntoCiego(
+  ojo: FichaOjoCodigo,
+  hayFlor: boolean,
+): string {
+  if (ojo.numero === 4 && hayFlor) {
+    return `${ojo.cegueraActiva} ${CEGUERA_FLOR_C4}`;
+  }
+  return ojo.cegueraActiva;
+}
+
+function redactarPuntoCiegoSinFlor(
+  texto: string,
+  fallback: string,
+): string {
+  const partes = texto
+    .split(/(?<=[.!?…])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => !ACUSACION_FLOR_PLANTILLA.test(s));
+  return partes.join(" ").trim() || fallback;
+}
+
+function aplicarPuntoCiegoSinFlorPlantilla(
+  texto: string,
+  hayFlor: boolean,
+  fallback: string,
+): string {
+  if (hayFlor) return texto;
+  return redactarPuntoCiegoSinFlor(texto, fallback);
+}
+
 function puntoCiegoAnclado(
   codigo: CodigoObservador,
   ojo: FichaOjoCodigo,
   h: HechosVolcado,
   norm: string,
+  hayFlor: boolean,
 ): string {
   if (codigo === 9 && h.pregunta) {
     return `Ella ya pidió el nombre del patrón. El relato todavía cuenta el evento —quién enseñó mejor— y no el circuito que se va a repetir mañana en cada frase adulta de la casa.`;
@@ -1769,10 +1811,11 @@ function puntoCiegoAnclado(
   if (codigo === 6 && esMateriaFisica(norm) && !textoTraeRoceSocial(norm)) {
     return `El relato opera la herramienta y no nombra el punto de roce físico: dónde se traba el ajuste entre pieza, tensión o recorrido.`;
   }
+  const ceguera = cegueraParaPuntoCiego(ojo, hayFlor);
   if (anclaDe(h)) {
-    return `${ojo.cegueraActiva} El volcado deja suelta la mecánica y no nombra el circuito.`;
+    return `${ceguera} El volcado deja suelta la mecánica y no nombra el circuito.`;
   }
-  return ojo.cegueraActiva;
+  return ceguera;
 }
 
 function mecanicaAnclada(
@@ -1864,19 +1907,24 @@ export function diagnosticarVolcadoLocal(
     : `El relato gravita en ${ojo.nombreOjo} porque el peso observable es ${ojo.focoAtencion}, no un inventario de códigos.`;
 
   const norm = normalizar(captura.volcadoCrudo || texto);
-  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos, norm);
+  const hayFlor = detectaFlor(texto);
+  let puntoCiego = puntoCiegoAnclado(codigo, ojo, hechos, norm, hayFlor);
   if (captura.gradoMaestria >= 3 && captura.sombraOmision) {
     puntoCiego = `La sombra declarada confirma la omisión. ${puntoCiego}`;
   }
 
   return sellarDiagnostico(
-    hidratarDiagnostico(codigo, {
-      justificacionDominante: tesis,
-      puntoCiego,
-      devolucionMaestro: devolucionAnclada(ojo, hechos, codigo, norm),
-      mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos, norm),
-      nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
-    }),
+    hidratarDiagnostico(
+      codigo,
+      {
+        justificacionDominante: tesis,
+        puntoCiego,
+        devolucionMaestro: devolucionAnclada(ojo, hechos, codigo, norm),
+        mecanicaAbsorcion: mecanicaAnclada(codigo, ojo, hechos, norm),
+        nivelCargaSugerido: nivelCargaLocal(palabras, codigo, hechos),
+      },
+      { detectaFlor: hayFlor },
+    ),
     captura,
     ojosHistoricos,
     metricasJornada,
@@ -2039,4 +2087,19 @@ export function evaluarRitualPasoGrado(
       "Ritual de Paso: evaluación de densidad de absorción pendiente de implementación. La firma queda lista; el veredicto aún no autoriza el ascenso.",
     pendienteImplementacion: true,
   };
+}
+
+/** El motivo de depuración no se muestra mientras la densidad real esté pendiente. */
+export function motivoRitualPasoVisible(
+  r: ResultadoRitualPasoGrado,
+): boolean {
+  return r.autorizado && !r.pendienteImplementacion;
+}
+
+/** 0–1. Barra de absorción hacia el siguiente grado (sin copy de desarrollo). */
+export function progresoRitualPaso(r: ResultadoRitualPasoGrado): number {
+  if (r.gradoActual >= 4) return 1;
+  const porVolcados =
+    r.volcadosEvaluados / VOLCADOS_REQUERIDOS_RITUAL_PASO;
+  return Math.max(0, Math.min(1, Math.max(r.densidadAbsorcion, porVolcados)));
 }

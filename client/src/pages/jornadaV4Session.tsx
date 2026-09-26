@@ -590,7 +590,7 @@ export default function JornadaV4Session() {
         />
       ) : null}
 
-      {entitlements.hasNorte ? (
+      {entitlements.hasNorte && !showTutorial ? (
         <PlaneacionCrisolDock
           items={crisol.reservaActivas}
           proyectos={crisol.imanProyectos}
