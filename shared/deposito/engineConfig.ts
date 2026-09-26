@@ -398,7 +398,7 @@ export const DICCIONARIO_GRADOS: Record<GradoMaestria, FichaGradoMaestria> = {
     nombre: "Arquitecto de Punto Ciego",
     titulo: "Grado 3 — Arquitecto de Punto Ciego",
     descripcion:
-      "Identificación de «lo no dicho», la sombra, la omisión y las intenciones ocultas.",
+      "Primero el volcado. Flor y lo no dicho solo se piden si el texto los dejó sueltos.",
     camposVisibles: ["volcadoCrudo", "friccionDetectada", "sombraOmision"],
     preguntaVolcado: "¿Qué aprendí hoy?",
     preguntaFriccion: "¿Dónde detectas 'flor' o excusa hoy?",
@@ -641,6 +641,39 @@ export function campoVisibleEnGrado(
   return camposVisiblesPorGrado(grado).includes(campo);
 }
 
+const MIN_PALABRAS_SOMBRA = 6;
+
+export function volcadoNombraOmision(texto: string): boolean {
+  const t = texto.trim();
+  if (!t) return false;
+  if (detectaDesgloseCircuito(t)) return true;
+  const h = extraerHechos(t);
+  if (h.pregunta) return true;
+  return /no dije|lo no dicho|\bsesgo\b|punto ciego|omisi[oó]n|\bsombra\b/i.test(
+    t,
+  );
+}
+
+/** Campo extra del grado: solo si el volcado lo dejó suelto. */
+export function campoExpansivoPedido(
+  campo: CampoCapturaVolcado,
+  texto: string,
+  grado: GradoMaestria,
+): boolean {
+  if (campo === "volcadoCrudo") return true;
+  if (!campoVisibleEnGrado(campo, grado)) return false;
+  const crudo = texto.trim();
+  if (!crudo) return false;
+  if (campo === "friccionDetectada") return detectaFlor(crudo);
+  if (campo === "sombraOmision") {
+    return contarPalabras(crudo) >= MIN_PALABRAS_SOMBRA && !volcadoNombraOmision(crudo);
+  }
+  if (campo === "codigoHipotesis") {
+    return contarPalabras(crudo) >= MIN_PALABRAS_SOMBRA;
+  }
+  return false;
+}
+
 export function normalizarCapturaVolcado(
   input: CapturaVolcadoInput | string,
   gradoFallback: GradoMaestria = GRADO_MAESTRIA_INICIAL,
@@ -688,13 +721,22 @@ export function validarCapturaParaGrado(
 ): string | null {
   const c = normalizarCapturaVolcado(captura, gradoFallback);
   if (!c.volcadoCrudo) return "volcadoCrudo es requerido";
-  if (c.gradoMaestria >= 2 && !c.friccionDetectada) {
+  if (
+    campoExpansivoPedido("friccionDetectada", c.volcadoCrudo, c.gradoMaestria) &&
+    !c.friccionDetectada
+  ) {
     return "friccionDetectada es requerido en Grado 2+";
   }
-  if (c.gradoMaestria >= 3 && !c.sombraOmision) {
+  if (
+    campoExpansivoPedido("sombraOmision", c.volcadoCrudo, c.gradoMaestria) &&
+    !c.sombraOmision
+  ) {
     return "sombraOmision es requerido en Grado 3+";
   }
-  if (c.gradoMaestria >= 4 && !c.codigoHipotesis) {
+  if (
+    campoExpansivoPedido("codigoHipotesis", c.volcadoCrudo, c.gradoMaestria) &&
+    !c.codigoHipotesis
+  ) {
     return "codigoHipotesis es requerido en Grado 4";
   }
   return null;

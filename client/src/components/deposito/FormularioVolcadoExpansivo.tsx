@@ -10,7 +10,7 @@ import {
   DICCIONARIO_GRADOS,
   DICCIONARIO_OJOS,
   GRADOS_MAESTRIA,
-  type CampoCapturaVolcado,
+  campoExpansivoPedido,
   type CapturaVolcadoExpansiva,
   type CodigoObservador,
   type GradoMaestria,
@@ -32,10 +32,11 @@ export interface FormularioVolcadoHandle {
 }
 
 function visible(
-  campo: CampoCapturaVolcado,
+  campo: "friccionDetectada" | "sombraOmision" | "codigoHipotesis",
   grado: GradoMaestria,
+  texto: string,
 ): boolean {
-  return DICCIONARIO_GRADOS[grado].camposVisibles.includes(campo);
+  return campoExpansivoPedido(campo, texto, grado);
 }
 
 export function EscalaGradosMaestria({
@@ -151,7 +152,7 @@ export const FormularioVolcadoExpansivo = forwardRef<
         data-testid="deposito-volcado-input"
       />
 
-      {visible("friccionDetectada", gradoMaestria) && (
+      {visible("friccionDetectada", gradoMaestria, draft.volcadoCrudo) && (
         <div className="mt-5" data-testid="deposito-campo-friccion">
           <label
             htmlFor="volcado-friccion"
@@ -174,7 +175,7 @@ export const FormularioVolcadoExpansivo = forwardRef<
         </div>
       )}
 
-      {visible("sombraOmision", gradoMaestria) && (
+      {visible("sombraOmision", gradoMaestria, draft.volcadoCrudo) && (
         <div className="mt-5" data-testid="deposito-campo-sombra">
           <label
             htmlFor="volcado-sombra"
@@ -197,7 +198,7 @@ export const FormularioVolcadoExpansivo = forwardRef<
         </div>
       )}
 
-      {visible("codigoHipotesis", gradoMaestria) && (
+      {visible("codigoHipotesis", gradoMaestria, draft.volcadoCrudo) && (
         <div className="mt-5" data-testid="deposito-campo-hipotesis">
           <label
             htmlFor="volcado-hipotesis"

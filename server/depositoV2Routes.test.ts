@@ -118,13 +118,13 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
     });
   });
 
-  it("rechaza Grado 2 sin friccionDetectada", async () => {
+  it("rechaza Grado 2 sin friccionDetectada si el volcado trae flor", async () => {
     await withServer(undefined, async (base) => {
       const res = await fetch(`${base}/api/deposito/volcado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          textoVolcado: "Hoy aprendí una utilidad concreta.",
+          textoVolcado: "Hoy fue increíble. Ya veré cómo sigo.",
           gradoMaestria: 2,
         }),
       });

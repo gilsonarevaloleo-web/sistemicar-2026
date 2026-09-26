@@ -33,12 +33,17 @@ describe("flujoVolcado G1 — no rebotar / mérito UI", () => {
     assert.equal(errorGuardadoVolcado(g1conTexto, 1), null);
   });
 
-  it("G2 sigue exigiendo fricción", () => {
-    const g2 = normalizarCapturaVolcado({
+  it("G2 exige fricción solo si el volcado trae flor", () => {
+    const limpio = normalizarCapturaVolcado({
       gradoMaestria: 2,
-      volcadoCrudo: "Hoy llamé.",
+      volcadoCrudo: "Hoy llamé al cliente y anoté el monto.",
     });
-    assert.match(errorGuardadoVolcado(g2, 2) ?? "", /friccionDetectada/);
+    assert.equal(errorGuardadoVolcado(limpio, 2), null);
+    const conFlor = normalizarCapturaVolcado({
+      gradoMaestria: 2,
+      volcadoCrudo: "Hoy fue increíble. Ya veré cómo sigo.",
+    });
+    assert.match(errorGuardadoVolcado(conFlor, 2) ?? "", /friccionDetectada/);
   });
 
   it("lectura seca G1 promociona y arma la felicitación canónica", () => {

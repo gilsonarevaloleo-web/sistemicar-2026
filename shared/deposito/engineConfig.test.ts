@@ -32,6 +32,8 @@ import {
   procesarVolcadoAprendizajeConFuente,
   serializarPromptVolcado,
   validarCapturaParaGrado,
+  campoExpansivoPedido,
+  volcadoNombraOmision,
   buildDepositoSystemPrompt,
   type CodigoObservador,
 } from "./engineConfig.ts";
@@ -326,10 +328,17 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
       validarCapturaParaGrado("Hoy aprendí a cortar la niebla."),
       null,
     );
-    assert.match(
+    assert.equal(
       validarCapturaParaGrado({
         gradoMaestria: 2,
         volcadoCrudo: "Hoy aprendí a cortar la niebla.",
+      }),
+      null,
+    );
+    assert.match(
+      validarCapturaParaGrado({
+        gradoMaestria: 2,
+        volcadoCrudo: "Hoy fue increíble. Ya veré cómo sigo.",
       }) ?? "",
       /friccionDetectada/,
     );
@@ -349,6 +358,19 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
         sombraOmision: "No dije que evité la llamada.",
       }) ?? "",
       /codigoHipotesis/,
+    );
+    assert.equal(
+      validarCapturaParaGrado({
+        gradoMaestria: 3,
+        volcadoCrudo:
+          "Hoy a las 8:10 aprendí que el código 1 es dopamina. El pastor cría 10 animales. El sesgo: yo suelo cubrir la fatiga. No dije que evité el descanso. Cerré a las 8:40.",
+      }),
+      null,
+    );
+    assert.equal(campoExpansivoPedido("friccionDetectada", "", 3), false);
+    assert.equal(
+      volcadoNombraOmision("El sesgo: yo suelo cubrir. No dije el descanso."),
+      true,
     );
   });
 
