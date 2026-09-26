@@ -12,6 +12,10 @@ import {
   etiquetaGradoMaestria,
   placementOcultaGradoAnterior,
   detectaFlor,
+  detectaDesgloseCircuito,
+  detectaRotacionC4HaciaC1,
+  GESTO_ABSORCION_C1_CIMIENTO,
+  PUNTO_CIEGO_DESGLOSE_CONFIRMADO,
   evaluarRitualPasoGrado,
   motivoRitualPasoVisible,
   progresoRitualPaso,
@@ -102,6 +106,9 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /física de esa tarea/i);
     assert.match(prompt.system, /COHERENCIA PLACEMENT \/ DICTAMEN/);
     assert.match(prompt.system, /densidadEstructural > 75/);
+    assert.match(prompt.system, /AUTONOMÍA EXCLUSIVA DEL DEPÓSITO/);
+    assert.match(prompt.system, /DESGLOSE DE CIRCUITO/);
+    assert.match(prompt.system, /texto crudo ingresado HOY/);
     assert.doesNotMatch(prompt.system, /Ceguera típica:.*miedo al rechazo/);
     assert.doesNotMatch(prompt.system, /Cuerpo en la Puerta/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
@@ -695,5 +702,58 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.doesNotMatch(d.devolucionMaestro, /todavía es ruido/i);
     assert.ok((d.evaluacionGrado?.gradoDetectado ?? 1) >= 3);
     assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 75);
+  });
+
+  const VOLCADO_MATRIZ =
+    "Hoy a las 8:10 aprendí que ante la incomodidad la mente opera en 3 capas: la intención, el automatismo biológico y el deber moral. Los 10 códigos no son adorno. C4 · Seriedad/Producción se sobre-explota hasta la fatiga y tapa C1 · Cimiento/Dopamina. El circuito es causa-efecto: la culpa moral exige más control y niega nutrición y descanso. Analogía de estructura: la matriz no es un inventario, es física seca. El sesgo: yo suelo cubrir la fatiga con un gesto de prevención. Anoté las 3 capas. No hay flor. Cerré a las 8:40.";
+
+  it("desglose con Estructura > 80 confirma el circuito y no acusa omisión de mecánica", () => {
+    assert.equal(detectaDesgloseCircuito(VOLCADO_MATRIZ), true);
+    assert.equal(detectaRotacionC4HaciaC1(VOLCADO_MATRIZ), true);
+    const d = diagnosticarVolcadoLocal(VOLCADO_MATRIZ);
+    assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 80);
+    assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
+    assert.doesNotMatch(d.puntoCiego, /suelta la mec[aá]nica/i);
+    assert.doesNotMatch(d.devolucionMaestro, /Intenci[oó]n Panor[aá]mica|0\s*ms|planilla/i);
+  });
+
+  it("sobre-explotación de C4 + fatiga rota a C1 y la absorción no pide más control", () => {
+    const d = diagnosticarVolcadoLocal(VOLCADO_MATRIZ);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
+    assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
+    assert.doesNotMatch(d.mecanicaAbsorcion, /prevenci[oó]n|antes de las 12/i);
+    const engine = toDepositoEngineResponse(d);
+    assert.equal(engine.metricasMerito.variedadRotacionCodigo, "C1");
+    assert.equal(engine.mecanicaAbsorcion.instruccionUnica, GESTO_ABSORCION_C1_CIMIENTO);
+  });
+
+  it("Gemini no puede dejar omisión de mecánica ni gesto C4 si el volcado desmanteló el circuito", async () => {
+    const d = await procesarVolcadoAprendizaje(VOLCADO_MATRIZ, {
+      callGemini: async () =>
+        JSON.stringify({
+          codigoDominante: 4,
+          justificacionDominante: "El centro es prevención.",
+          puntoCiego:
+            "No observa la interrupción. El volcado deja suelta la mecánica y no nombra el circuito.",
+          devolucionMaestro: "Espejo del quiebre. Veredicto: prevení.",
+          mecanicaAbsorcion:
+            "Mañana nombrá el quiebre y ejecutá UNA acción mínima de prevención antes de las 12:00.",
+          nivelCargaSugerido: "SUPERIOR",
+          evaluacionGrado: {
+            gradoDetectado: 3,
+            meritoReconocido: true,
+            mensajeEncuadre: "Mérito G3.",
+          },
+          metricasMerito: {
+            densidadEstructural: 88,
+            variedadRotacionCodigo: "C4",
+            metacognicionDetectada: true,
+          },
+        }),
+    });
+    assert.equal(d.puntoCiego, PUNTO_CIEGO_DESGLOSE_CONFIRMADO);
+    assert.equal(d.metricasMerito?.variedadRotacionCodigo, "C1");
+    assert.equal(d.mecanicaAbsorcion, GESTO_ABSORCION_C1_CIMIENTO);
+    assert.doesNotMatch(d.devolucionMaestro, /Intenci[oó]n Panor[aá]mica|0\s*ms|planilla/i);
   });
 });

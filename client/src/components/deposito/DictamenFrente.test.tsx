@@ -12,6 +12,16 @@ describe("DictamenFrente", () => {
     );
     const html = renderToStaticMarkup(createElement(DictamenFrente, { dictamen }));
     assert.match(html, /DICTAMEN/);
+    assert.match(html, /DICTAMEN · COSTURA/);
     assert.match(html, /Observar con C/);
+  });
+
+  it("etiqueta el fondo de la matriz, no la anécdota de tela", () => {
+    const dictamen = analizarVolcado(
+      "Hoy en la tela evalué los 10 códigos, el deber moral, la fatiga biológica y la dopamina de C4 sobre C1.",
+    );
+    const html = renderToStaticMarkup(createElement(DictamenFrente, { dictamen }));
+    assert.match(html, /DICTAMEN · MATRIZ DE CÓDIGOS/);
+    assert.doesNotMatch(html, /DICTAMEN · COSTURA/);
   });
 });

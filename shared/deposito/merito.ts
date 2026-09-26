@@ -104,6 +104,16 @@ C6 (El Ojo del Roce) no tiene plantilla: prohibido asociarlo automáticamente co
 
 COHERENCIA PLACEMENT / DICTAMEN:
 Si densidadEstructural > 75 y gradoDetectado >= 3 (G3 validado en Placement), el dictamen NO puede calificar el volcado como ruido ni exigir reescribir. El dictamen refleja la validación del grado otorgado.
+La etiqueta de dictamen prioriza el fondo (matriz de códigos, metacognición) sobre la anécdota de oficio.
+
+DESGLOSE DE CIRCUITO:
+Si densidadEstructural > 80 y el volcado desglosa capas, códigos o causa-efecto, PROHIBIDO acusar omisión de mecánica. Confirma que el circuito ya está en la superficie.
+
+ROTACIÓN Y ABSORCIÓN:
+ojoDominante = este volcado. variedadRotacionCodigo = el mismo ojo, EXCEPTO sobre-explotación de C4 + fatiga biológica → C1 y mecanicaAbsorcion de nutrición/descanso, sin gesto de prevención de C4.
+
+AUTONOMÍA DEL DEPÓSITO:
+La devolución se construye únicamente sobre el texto crudo de HOY. Cero Jornada, cero planilla, cero módulos ajenos.
 
 RESPONDE EXCLUSIVAMENTE EN FORMATO JSON CUMPLIENDO LA INTERFAZ 'DepositoEngineResponse'.
 `.trim();
@@ -185,7 +195,7 @@ export function bloquePlacementTest(gradoActual: GradoMaestria): string {
     "Prohibido descender el grado activo. El mérito solo calibra al alza.",
     "G4 exige evidencia de rotación del mapa de calor (1/10), no un solo volcado brillante.",
     "metricasMerito.densidadEstructural = 0–100 (hechos secos vs flor).",
-    "metricasMerito.variedadRotacionCodigo DEBE coincidir con ojoDominante.codigo. Prohibido fallback automático a C1 si el Ojo Dominante es otro.",
+    "metricasMerito.variedadRotacionCodigo coincide con ojoDominante.codigo, EXCEPTO si el volcado nombra sobre-explotación de C4 y fatiga biológica: entonces C1 y la mecánica sigue a C1. Prohibido fallback automático a C1 si el Ojo Dominante es otro y el texto no pidió esa rotación.",
     "metricasMerito.metacognicionDetectada = true si el alumno vio su propio sesgo.",
   ].join("\n");
 }
@@ -470,7 +480,9 @@ export function toDepositoEngineResponse(
   };
   const metricas: MetricasMerito = {
     densidadEstructural: diagnostico.metricasMerito?.densidadEstructural ?? 0,
-    variedadRotacionCodigo: etiquetaCodigoOjo(diagnostico.codigoDominante),
+    variedadRotacionCodigo:
+      diagnostico.metricasMerito?.variedadRotacionCodigo?.trim() ||
+      etiquetaCodigoOjo(diagnostico.codigoDominante),
     metacognicionDetectada:
       diagnostico.metricasMerito?.metacognicionDetectada ?? false,
   };

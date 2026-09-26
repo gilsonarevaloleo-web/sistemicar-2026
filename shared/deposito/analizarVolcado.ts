@@ -39,7 +39,36 @@ const UMBRAL_ABIERTO = 2;
 /** Un ojo 2–4 abierto implica los inmediatamente inferiores de este tema. */
 const IMPLICA_HASTA = 4;
 
-const TEMAS: { id: string; pats: RegExp[] }[] = [
+/** Fondo (matriz / metacognición) gana a la anécdota de oficio. */
+const TEMAS_FONDO: { id: string; pats: RegExp[]; fuerte: RegExp }[] = [
+  {
+    id: "matriz de códigos",
+    fuerte: /10 c[oó]digos|diez c[oó]digos|matriz de c[oó]digos|los 10 ojos|diez ojos/,
+    pats: [
+      /dopamina/,
+      /biol[oó]gic/,
+      /deber moral|culpa moral|moralidad/,
+      /fatiga|sobre.?explot|agotamiento/,
+      /resistencia biol[oó]gic/,
+      /arquitectura mental/,
+      /\bc4\b.*\bc1\b|\bc1\b.*\bc4\b/,
+    ],
+  },
+  {
+    id: "metacognición",
+    fuerte: /metacognic/,
+    pats: [
+      /\bsesgo\b/,
+      /punto ciego/,
+      /capas? de la mente/,
+      /automatismo/,
+      /arquitectura mental/,
+      /lo no dicho/,
+    ],
+  },
+];
+
+const TEMAS_ANECDOTA: { id: string; pats: RegExp[] }[] = [
   { id: "costura", pats: [/costur/, /tela/, /hilo/, /prenda/, /coser/, /maquina/] },
   { id: "dinero", pats: [/dinero/, /\bplata\b/, /cobr/, /deuda/, /ingreso/, /sueldo/] },
   { id: "casa", pats: [/\bcasa\b/, /cuarto/, /hogar/, /habitacion/, /departamento/] },
@@ -200,7 +229,11 @@ function hitsDe(norm: string, pats: RegExp[]): number {
 }
 
 export function detectarTema(norm: string): string {
-  for (const t of TEMAS) {
+  for (const t of TEMAS_FONDO) {
+    const hits = t.pats.filter((p) => p.test(norm)).length;
+    if (t.fuerte.test(norm) || hits >= 2) return t.id;
+  }
+  for (const t of TEMAS_ANECDOTA) {
     if (t.pats.some((p) => p.test(norm))) return t.id;
   }
   return "este día";

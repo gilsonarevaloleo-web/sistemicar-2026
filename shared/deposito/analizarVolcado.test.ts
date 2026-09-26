@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   analizarVolcado,
   coherenciaDictamenConPlacement,
+  detectarTema,
 } from "./analizarVolcado.ts";
 
 describe("analizarVolcado — frente de observación", () => {
@@ -55,6 +56,26 @@ describe("analizarVolcado — frente de observación", () => {
     assert.equal(d.tema, "costura");
     assert.notEqual(d.calidad, "ruido");
     assert.doesNotMatch(d.dictamen, /reescrib/i);
+  });
+
+  it("un corte suelto no dictamina COSTURA", () => {
+    const d = analizarVolcado("Hoy hice un corte y seguí con la tarea.");
+    assert.notEqual(d.tema, "costura");
+  });
+
+  it("fondo de 10 códigos gana a la anécdota de tela", () => {
+    const texto =
+      "Hoy en la tela evalué los 10 códigos, el deber moral, la fatiga biológica y la dopamina de C4 sobre C1.";
+    assert.equal(detectarTema(texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()), "matriz de códigos");
+    const d = analizarVolcado(texto);
+    assert.equal(d.tema, "matriz de códigos");
+  });
+
+  it("metacognición gana si el núcleo es el sesgo y no el oficio", () => {
+    const d = analizarVolcado(
+      "Hoy vi mi sesgo y el punto ciego. La metacognición nombró el automatismo de la mente.",
+    );
+    assert.equal(d.tema, "metacognición");
   });
 
   it("Placement G3 + Estructura > 75 anula dictamen de ruido", () => {

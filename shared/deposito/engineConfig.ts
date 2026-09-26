@@ -94,7 +94,11 @@ export interface EvaluacionGrado {
 export interface MetricasMerito {
   /** 0–100. Ratio de hechos secos vs flor. */
   densidadEstructural: number;
-  /** Código sugerido para equilibrar el mapa de calor (ej. "C1"). */
+  /**
+   * Suele igualar el Ojo Dominante de ESTE volcado.
+   * Diverge (C4 → C1) solo si el texto nombra sobre-explotación
+   * de seriedad/producción y fatiga biológica del cimiento.
+   */
   variedadRotacionCodigo: string;
   /** true si el usuario vio su propio sesgo. */
   metacognicionDetectada: boolean;
@@ -746,6 +750,20 @@ Esas frases solo existen si el alumno las escribió.
 ═══ COHERENCIA PLACEMENT / DICTAMEN ═══
 Si metricasMerito.densidadEstructural > 75 y evaluacionGrado.gradoDetectado >= 3 (Placement valida G3), el dictamen / devolucionMaestro / comentarioMaestro NO puede llamar al volcado «ruido» ni exigir reescribir.
 El dictamen refleja la validación del grado otorgado.
+La etiqueta de dictamen prioriza el FONDO (matriz de códigos, metacognición, deber moral, fatiga, dopamina) sobre la anécdota de oficio (corte, tela, taller).
+
+═══ DESGLOSE DE CIRCUITO (PUNTO CIEGO) ═══
+Si densidadEstructural > 80 y el volcado desglosa capas, códigos o causa-efecto, PROHIBIDO acusar «el volcado deja suelta la mecánica y no nombra el circuito».
+puntoCiego confirma la lectura: el circuito ya fue desmantelado en física seca.
+
+═══ ROTACIÓN Y MECÁNICA DE ABSORCIÓN ═══
+ojoDominante = el ojo de ESTE volcado. No se inventa otro centro.
+variedadRotacionCodigo coincide con ese ojo, EXCEPTO si el texto nombra sobre-explotación de C4 (seriedad/producción) y fatiga biológica: entonces C1 (cimiento) y mecanicaAbsorcion ejecuta nutrición/descanso, SIN gesto de prevención ni exigencia de control de C4.
+
+═══ AUTONOMÍA EXCLUSIVA DEL DEPÓSITO ═══
+La devolución del Maestro se construye ÚNICAMENTE sobre el texto crudo ingresado HOY en el Depósito.
+Evalúa ausencia de flor, claridad del hecho y madurez de la observación.
+PROHIBIDO importar Intención Panorámica, Puertas, 0 ms, planilla u otros módulos.
 
 ═══ FILTRO DE DESCOMPOSICIÓN (MOTOR SILENCIOSO) ═══
 El lenguaje humano tiene tres capas. Analizá en este orden:
@@ -936,7 +954,7 @@ export function obtenerPromptVolcado(
     "Si florDetectada está vacía, PROHIBIDO acusar flor, ilusión, «ya veré» o autoengaño genérico en loNoDicho.",
     "mecanicaAbsorcion.instruccionUnica = UNA frase ejecutable, sin sermón ni comillas del usuario.",
     "JAMÁS repitas citas textuales largas del volcado en explicacion, loNoDicho, espejo o instruccionUnica.",
-    "metricasMerito.variedadRotacionCodigo DEBE coincidir con ojoDominante.codigo. Prohibido fallback automático a C1 si el Ojo Dominante es otro.",
+    "metricasMerito.variedadRotacionCodigo coincide con ojoDominante.codigo, EXCEPTO si el volcado nombra sobre-explotación de C4 y fatiga biológica: entonces C1 y la mecánica sigue a C1, no a un gesto de prevención de C4. Prohibido fallback automático a C1 si el Ojo Dominante es otro y el texto no pidió esa rotación.",
   ].join("\n");
 
   const engineSchema: DepositoEngineResponse = {
@@ -1446,16 +1464,106 @@ function sellarDiagnostico(
         : textosSinPlantillaSocialC6(diagnostico.mecanicaAbsorcion),
     ),
   };
-  return coherenciaDevolucionConPlacement(
-    anexarMerito(
-      anexarValidacion(limpio, captura),
-      captura,
-      ojosHistoricos,
+  return aplicarLecturaCualitativa(
+    coherenciaDevolucionConPlacement(
+      anexarMerito(
+        anexarValidacion(limpio, captura),
+        captura,
+        ojosHistoricos,
+      ),
     ),
+    captura,
   );
 }
 
 const MARCA_RUIDO_DICTAMEN = /ruido|reescrib/i;
+
+export const UMBRAL_ESTRUCTURA_DESGLOSE = 80;
+
+export const PUNTO_CIEGO_DESGLOSE_CONFIRMADO =
+  "El circuito ha sido desmantelado en su física seca. La intención y el automatismo biológico han sido traídos a la superficie sin flor.";
+
+export const GESTO_ABSORCION_C1_CIMIENTO =
+  "Mañana, asigna y ejecuta la cuota exacta de nutrición y descanso biológico (C1) sin culpa moral ni exigencias de rendimiento de C4.";
+
+const OMISION_MECANICA_PLANTILLA =
+  /el volcado deja suelta la mec[aá]nica y no nombra el circuito/i;
+
+const SENALES_DESGLOSE_CIRCUITO: RegExp[] = [
+  /capas? (de la mente|mentales|del (hecho|sistema|relato))/,
+  /\b(?:tres|3) capas\b/,
+  /10 c[oó]digos|diez c[oó]digos|matriz de c[oó]digos/,
+  /causa[\s-]?efecto|causa y efecto/,
+  /automatismo/,
+  /arquitectura (mental|de la mente|del (hecho|sistema))/,
+  /desmantel|desglos(?:e|ar|ó|o)/,
+  /analog[ií]a (de|de la|estructural)|met[aá]fora de (los )?(?:10|diez|c[oó]digos|capas)/,
+  /\bc[1-9]\b.*\bc(?:[1-9]|10)\b/,
+  /intenci[oó]n y (el )?automatismo/,
+];
+
+const SENALES_C4_SOBREEXPLOTADO =
+  /\bc4\b|\bc[oó]digo 4\b|seriedad|producci[oó]n|sobre.?explot|exigencia(?:s)? de (?:control|rendimiento)|gesto de prevenci[oó]n/;
+
+const SENALES_C1_CIMIENTO =
+  /\bc1\b|\bc[oó]digo 1\b|cimiento|dopamina|biol[oó]gic|nutrici[oó]n|descanso|sue[nñ]o|fatiga|agotamiento|culpa moral|deber moral/;
+
+export function detectaDesgloseCircuito(texto: string): boolean {
+  const norm = normalizar(texto);
+  return SENALES_DESGLOSE_CIRCUITO.filter((p) => p.test(norm)).length >= 2;
+}
+
+export function detectaRotacionC4HaciaC1(texto: string): boolean {
+  const norm = normalizar(texto);
+  return SENALES_C4_SOBREEXPLOTADO.test(norm) && SENALES_C1_CIMIENTO.test(norm);
+}
+
+export function codigoRotacionDelVolcado(
+  dominante: CodigoObservador,
+  texto: string,
+): CodigoObservador {
+  return detectaRotacionC4HaciaC1(texto) ? 1 : dominante;
+}
+
+function aplicarLecturaCualitativa(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+): DiagnosticoVolcado {
+  const texto = captura.volcadoCrudo || "";
+  const dens = diagnostico.metricasMerito?.densidadEstructural ?? 0;
+  const desglose = detectaDesgloseCircuito(texto);
+  let puntoCiego = diagnostico.puntoCiego;
+  if (desglose && dens > UMBRAL_ESTRUCTURA_DESGLOSE) {
+    puntoCiego = PUNTO_CIEGO_DESGLOSE_CONFIRMADO;
+  } else if (desglose && OMISION_MECANICA_PLANTILLA.test(puntoCiego)) {
+    puntoCiego =
+      redactarPuntoCiegoSinFlor(
+        puntoCiego.replace(OMISION_MECANICA_PLANTILLA, ""),
+        diagnostico.puntoCiego,
+      ) || diagnostico.puntoCiego.replace(OMISION_MECANICA_PLANTILLA, "").trim();
+  }
+
+  const rotacion = codigoRotacionDelVolcado(
+    diagnostico.codigoDominante,
+    texto,
+  );
+  const rotaC1 = rotacion === 1 && detectaRotacionC4HaciaC1(texto);
+  const mecanicaAbsorcion = rotaC1
+    ? GESTO_ABSORCION_C1_CIMIENTO
+    : diagnostico.mecanicaAbsorcion;
+
+  return {
+    ...diagnostico,
+    puntoCiego,
+    mecanicaAbsorcion,
+    metricasMerito: diagnostico.metricasMerito
+      ? {
+          ...diagnostico.metricasMerito,
+          variedadRotacionCodigo: etiquetaCodigoOjo(rotacion),
+        }
+      : diagnostico.metricasMerito,
+  };
+}
 
 function coherenciaDevolucionConPlacement(
   diagnostico: DiagnosticoVolcado,
@@ -1760,7 +1868,7 @@ function puntoCiegoAnclado(
     return `El relato opera la herramienta y no nombra el punto de roce físico: dónde se traba el ajuste entre pieza, tensión o recorrido.`;
   }
   const ceguera = cegueraParaPuntoCiego(ojo, hayFlor);
-  if (anclaDe(h)) {
+  if (anclaDe(h) && !detectaDesgloseCircuito(norm)) {
     return `${ceguera} El volcado deja suelta la mecánica y no nombra el circuito.`;
   }
   return ceguera;

@@ -125,4 +125,17 @@ describe("DiagnosticoUniversidad", () => {
     assert.doesNotMatch(html, /G1 · Aprendiz de Ojo/);
     assert.doesNotMatch(html, /G2 · Detector de Ruido/);
   });
+
+  it("rotación C1 por fatiga de C4 se lee en el pie, no el dominante", () => {
+    const diagnostico = diagnosticarVolcadoLocal(
+      "Hoy a las 8:10 aprendí que ante la incomodidad la mente opera en 3 capas: la intención, el automatismo biológico y el deber moral. Los 10 códigos no son adorno. C4 · Seriedad/Producción se sobre-explota hasta la fatiga y tapa C1 · Cimiento/Dopamina. El circuito es causa-efecto: la culpa moral exige más control y niega nutrición y descanso. Analogía de estructura: la matriz no es un inventario, es física seca. El sesgo: yo suelo cubrir la fatiga con un gesto de prevención. Anoté las 3 capas. No hay flor. Cerré a las 8:40.",
+    );
+    assert.equal(diagnostico.metricasMerito?.variedadRotacionCodigo, "C1");
+    const html = renderToStaticMarkup(
+      createElement(DiagnosticoUniversidad, { diagnostico }),
+    );
+    assert.match(html, /Rotación C1/);
+    assert.match(html, /nutrición y descanso biológico/);
+    assert.match(html, /desmantelado en su física seca/);
+  });
 });

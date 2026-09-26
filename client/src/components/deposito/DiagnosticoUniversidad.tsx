@@ -196,7 +196,7 @@ export function DiagnosticoUniversidad({
               Estructura {diagnostico.metricasMerito.densidadEstructural}/100
             </li>
             <li data-testid="deposito-rotacion">
-              Rotación {codigoOjo}
+              Rotación {diagnostico.metricasMerito.variedadRotacionCodigo}
             </li>
             <li data-testid="deposito-metacognicion">
               Metacognición{" "}
