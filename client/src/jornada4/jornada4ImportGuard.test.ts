@@ -158,6 +158,13 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.equal(plan.includes("Jornada4PuertasTimeline"), false);
     const preview = readFileSync(join(clientSrc, "pages/jornadaV4UiPreview.tsx"), "utf8");
     assert.match(preview, /Jornada4CoberturaTimeline/);
+    const secuencia = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4CoberturaTimeline.tsx"),
+      "utf8"
+    );
+    assert.match(secuencia, /buildSecuenciaJornadaNodes/);
+    assert.match(secuencia, /data-puerta-kind/);
+    assert.match(secuencia, /#FF2A2A|#D4AF37|#00C851|PUERTA_TIMELINE_COLORS/);
   });
 
   it("sesión difería Plan/Métricas (sin Pulso/recharts en el chunk Operar)", () => {
