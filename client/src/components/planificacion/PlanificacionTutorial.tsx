@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronRight, ChevronLeft, Compass, MessageCircle } from "lucide-react";
 import {
@@ -21,7 +22,9 @@ type Props = {
 
 /**
  * Overlay de primer usuario.
- * z-320: por encima de El Crisol (250) y el nav inferior (310).
+ * Porta a document.body: El Crisol también vive en body (z-250) y el
+ * <main> del layout es z-10, así que un z-320 dentro de main no gana.
+ * z-320 + portal: por encima de El Crisol y el nav (310).
  * Centrado + footer fijo: el botón de pasos no queda tapado abajo.
  */
 export function PlanificacionTutorial({ uid, profile, onComplete, onAskDoctor }: Props) {
@@ -36,7 +39,7 @@ export function PlanificacionTutorial({ uid, profile, onComplete, onAskDoctor }:
   const current = steps[step];
   const isLast = step >= steps.length - 1;
 
-  return (
+  const overlay = (
     <div
       className="fixed inset-0 z-[320] flex items-center justify-center px-4 bg-black/85"
       style={{
@@ -154,4 +157,7 @@ export function PlanificacionTutorial({ uid, profile, onComplete, onAskDoctor }:
       </motion.div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(overlay, document.body);
 }
