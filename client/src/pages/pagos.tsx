@@ -12,7 +12,7 @@ import {
   UMBRAL_CHECKOUT_PLANS,
   ESPEJO_CHECKOUT_PLANS,
 } from "@shared/mercadopagoPlans";
-import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
+import { BADGE_EN_CAMINO, PAQUETE_EN_CAMINO, modulosEnCamino } from "@shared/moduleCatalog";
 import { modulesGrantedByPlan } from "@shared/moduleAccess";
 import {
   EMBUDO_PREGUNTAS_V2,
@@ -554,7 +554,7 @@ export default function Pagos() {
                   ) : (
                     <p className="text-[9px] text-slate-500 italic">
                       Usuario comprometido: Base + Ritmo + Norte ≈ ${PLANIFICACION_FULL_MONTHLY_USD}/mes
-                      (tres capas apiladas).
+                      (tres peldaños apilados).
                     </p>
                   )}
                 </div>
@@ -855,30 +855,29 @@ export default function Pagos() {
         ) : null}
         </section>
 
-        {/* Ecosistema — en camino */}
-        {!checkoutFocus.hideOtherWorlds ? (
+        {/* Ecosistema — un solo paquete para no ensuciar checkout */}
+        {!checkoutFocus.hideOtherWorlds && modulosEnCamino().length > 0 ? (
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-4">
             <Map size={16} className="text-slate-500" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Ecosistema Sistemicar</h2>
           </div>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {MODULOS_EN_CAMINO.map((mod) => (
-              <div
-                key={mod.id}
-                className="p-4 rounded-xl border border-white/10 bg-card/50"
-                data-testid={`modulo-en-camino-${mod.id}`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="text-sm font-bold text-white">{mod.nombre}</h3>
-                  <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "rgba(100,116,139,0.2)", color: "#94a3b8" }}>
-                    {BADGE_EN_CAMINO}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{mod.desc}</p>
+          <Link href={PAQUETE_EN_CAMINO.route}>
+            <div
+              className="p-4 rounded-xl border border-white/10 bg-card/50"
+              data-testid="paquete-en-camino-checkout"
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-sm font-bold text-white">{PAQUETE_EN_CAMINO.nombre}</h3>
+                <span className="text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: "rgba(100,116,139,0.2)", color: "#94a3b8" }}>
+                  {BADGE_EN_CAMINO}
+                </span>
               </div>
-            ))}
-          </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                {modulosEnCamino().length} módulos empaquetados — {PAQUETE_EN_CAMINO.desc}.
+              </p>
+            </div>
+          </Link>
         </section>
         ) : null}
 

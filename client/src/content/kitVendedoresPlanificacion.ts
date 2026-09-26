@@ -24,41 +24,41 @@ export const KIT_RESUMEN_30S = [
   `Peldaño 2 ${SKU_RITMO.name} (+$${SKU_RITMO.priceUsd}) — segmentos + Situacional.`,
   `Peldaño 3 ${SKU_NORTE.name} (+$${SKU_NORTE.priceUsd}) — Crisol + Hub Proyectos (último, alto valor).`,
   `Espejo: packs de créditos — Inicio $${ESPEJO_SKU_INICIO.priceUsd} (${ESPEJO_SKU_INICIO.credits} créd.) / Recarga $${ESPEJO_SKU_RECARGA.priceUsd} (${ESPEJO_SKU_RECARGA.credits} créd.), pago único.`,
-  `Comprometido paga ~$${PLANIFICACION_FULL_MONTHLY_USD}/mes (tres capas apiladas). Comisión 30%.`,
+  `Comprometido paga ~$${PLANIFICACION_FULL_MONTHLY_USD}/mes (tres peldaños apilados). Comisión 30%.`,
 ];
 
 export const ESCALERA_CAPAS = [
   {
     capa: 1,
-    id: "presencia",
-    titulo: "Presencia",
-    pregunta: "¿En qué se me va el tiempo?",
-    metrica: "Cierre medible (Conquista + PS)",
+    id: "base",
+    titulo: "Base",
+    pregunta: "¿Necesitas medir unidades y cerrar hoy?",
+    metrica: "Conquista + PS",
     color: "#8B5CF6",
     copyVenta:
-      "Primera capa: dejar de inventar el día. Conquista muestra unidades cerradas — veredicto, no culpa.",
+      "Peldaño 1: dejar de inventar el día. Conquista muestra unidades cerradas — veredicto, no culpa.",
     demo: "Lanzar Conquista → cerrar 2 subs → ver PS.",
   },
   {
     capa: 2,
-    id: "entrada",
-    titulo: "Entrada",
-    pregunta: "¿Aparezco en la ventana del día?",
-    metrica: "Segmentos + Situacional (Ritmo)",
+    id: "ritmo",
+    titulo: "Ritmo",
+    pregunta: "¿Quieres estructurar el día y sostener imprevistos?",
+    metrica: "Segmentos + Situacional",
     color: "#D4AF37",
     copyVenta:
-      "Segunda capa: estructura e imprevistos. Ritmo del día para quien ya mide unidades.",
+      "Peldaño 2: estructura e imprevistos. Ritmo del día para quien ya mide unidades.",
     demo: "Crear segmento → lanzar Situacional → cerrar bloque.",
   },
   {
     capa: 3,
-    id: "produccion",
+    id: "norte",
     titulo: "Norte",
-    pregunta: "¿Mis ideas van a un proyecto?",
+    pregunta: "¿Tus ideas van a un proyecto con pasos?",
     metrica: "Crisol + Hub Proyectos",
     color: "#A855F7",
     copyVenta:
-      "Tercera capa (última): horizonte. Solo el comprometido apunta ideas a largo plazo.",
+      "Peldaño 3 (último): horizonte. Solo el comprometido apunta ideas a largo plazo.",
     demo: "Crisol → nido → paso #N en Hub.",
   },
 ] as const;

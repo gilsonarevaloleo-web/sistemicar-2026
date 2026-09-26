@@ -35,6 +35,7 @@ import {
   Sprout,
   Radio,
   Terminal,
+  Package,
 } from "lucide-react";
 import { Link } from "wouter";
 import { DataStatusPanel } from "@/components/data-status";
@@ -54,7 +55,11 @@ import {
   consumePreviewOpsQueryUnlock,
   previewPlaneacionHref,
 } from "@/lib/previewOps";
-import { MODULOS_EN_CAMINO, BADGE_EN_CAMINO } from "@shared/moduleCatalog";
+import {
+  PAQUETE_EN_CAMINO,
+  modulosEnCamino,
+  modulosLiberados,
+} from "@shared/moduleCatalog";
 import { toast } from "sonner";
 import {
   auth,
@@ -156,14 +161,26 @@ function buildMenuItems(
     });
   }
 
-  for (const mod of MODULOS_EN_CAMINO) {
+  for (const mod of modulosLiberados()) {
     items.push({
       id: mod.id,
       title: mod.nombre.toUpperCase(),
-      subtitle: BADGE_EN_CAMINO,
+      subtitle: mod.desc,
       icon: MODULO_ICONS[mod.id] ?? Sparkles,
       route: mod.route ?? "/pagos",
       color: mod.color ?? "#64748b",
+    });
+  }
+
+  const packed = modulosEnCamino();
+  if (packed.length > 0) {
+    items.push({
+      id: PAQUETE_EN_CAMINO.id,
+      title: PAQUETE_EN_CAMINO.nombre.toUpperCase(),
+      subtitle: `${packed.length} módulos empaquetados`,
+      icon: Package,
+      route: PAQUETE_EN_CAMINO.route,
+      color: PAQUETE_EN_CAMINO.color,
       enCamino: true,
     });
   }
@@ -829,7 +846,7 @@ export default function MenuPrincipal() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
                     onClick={() => {
-                      if (item.id === "proximo" || !item.route) return;
+                      if (!item.route) return;
                       // Soft-start: al salir del menú los motores del shell no
                       // deben despertar en el mismo gesto que monta el destino.
                       armDualKernelExitSoftStart({ href: item.route });
@@ -864,7 +881,7 @@ export default function MenuPrincipal() {
                       backgroundColor: "#0a0a0a",
                       borderColor: `${item.color}25`,
                       boxShadow: `0 0 20px ${item.color}15`,
-                      cursor: item.id === "proximo" ? "default" : "pointer",
+                      cursor: "pointer",
                     }}
                     data-testid={`menu-${item.id}`}
                   >
