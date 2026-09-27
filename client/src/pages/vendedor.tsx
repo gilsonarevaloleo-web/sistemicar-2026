@@ -22,8 +22,10 @@ import {
   enlacePagoJornadaBase,
   mensajeEnlacePagoWhatsapp,
 } from "@shared/vendedor/entradaComercial";
+import { captureAdAttributionFromUrl, getAdAttribution, getAdVideoLabel } from "@/lib/adAttribution";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { trackJornadaLead } from "@/lib/metaPixel";
+import { withAdAttribution } from "@shared/adAttribution";
 import {
   saveFijacionVendedor,
   withSellerRef,
@@ -56,8 +58,17 @@ export default function VendedorTriagePage() {
 
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
+    captureAdAttributionFromUrl(window.location.search);
     return getSellerRef();
   }, []);
+  const videoLabel = useMemo(() => getAdVideoLabel(), []);
+
+  function hrefConRastro(href: string): string {
+    return withSellerRef(
+      withAdAttribution(href, getAdAttribution()),
+      sellerRef,
+    );
+  }
 
   useEffect(() => {
     if (entradaAplicada.current) return;
@@ -121,9 +132,11 @@ export default function VendedorTriagePage() {
     setFallbackDeepLink(null);
     setFallbackShareHref(null);
     entradaAplicada.current = true;
-    const keepRef = sellerRef
-      ? `?ref=${encodeURIComponent(sellerRef)}`
-      : "";
+    const keep = new URLSearchParams();
+    if (sellerRef) keep.set("ref", sellerRef);
+    const persisted = getAdAttribution();
+    if (persisted?.utmContent) keep.set("utm_content", persisted.utmContent);
+    const keepRef = keep.toString() ? `?${keep.toString()}` : "";
     if (/[?&]planeta=/.test(window.location.search)) {
       setLocation(`/vendedor${keepRef}`);
     }
@@ -150,6 +163,7 @@ export default function VendedorTriagePage() {
           codigo: fijacion.codigo,
           planeta: "JORNADA",
           sellerRef: sellerRef || undefined,
+          adVideo: videoLabel || undefined,
           consentimiento: "llamame",
         }),
       });
@@ -202,6 +216,7 @@ export default function VendedorTriagePage() {
           codigo: fijacion.codigo,
           planeta: "JORNADA",
           sellerRef: sellerRef || undefined,
+          adVideo: videoLabel || undefined,
           consentimiento: "enlace-pago",
         }),
       });
@@ -282,9 +297,14 @@ export default function VendedorTriagePage() {
         <p className="mt-2 text-sm text-white/55">
           Dos toques. Con eso te dejo el camino a Jornada Base.
         </p>
-        {sellerRef && (
-          <p className="mt-2 text-[10px] tracking-widest text-white/35">
-            REF · {sellerRef}
+        {(sellerRef || videoLabel) && (
+          <p
+            className="mt-2 text-[10px] tracking-widest text-white/35"
+            data-testid="vendedor-attribution"
+          >
+            {videoLabel ? `ANUNCIO · ${videoLabel}` : null}
+            {videoLabel && sellerRef ? " · " : null}
+            {sellerRef ? `REF · ${sellerRef}` : null}
           </p>
         )}
 
@@ -598,7 +618,7 @@ export default function VendedorTriagePage() {
             </div>
 
             <Link
-              href={withSellerRef(fijacion.trialHref, sellerRef)}
+              href={hrefConRastro(fijacion.trialHref)}
               className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
               style={{
                 background: `linear-gradient(90deg, ${fijacion.color}22, ${GOLD}18)`,
@@ -612,7 +632,7 @@ export default function VendedorTriagePage() {
             </Link>
 
             <Link
-              href={withSellerRef(fijacion.checkoutHref, sellerRef)}
+              href={hrefConRastro(fijacion.checkoutHref)}
               className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[11px] tracking-widest"
               style={{ borderColor: `${GOLD}66`, color: GOLD }}
               data-testid="vendedor-cta-checkout"

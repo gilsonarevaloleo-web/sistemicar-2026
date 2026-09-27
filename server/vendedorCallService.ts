@@ -1,3 +1,4 @@
+import { adVideoLabel } from "../shared/adAttribution";
 import { construirGuionLlamada } from "../shared/vendedor/callScripts";
 import {
   buildWhatsAppClickToChatHref,
@@ -43,12 +44,17 @@ async function sendWhatsappWithTemplate(opts: {
   });
 }
 
+function cleanAdVideo(raw?: string | null): string | null {
+  return adVideoLabel(raw);
+}
+
 export type SolicitarLlamadaInput = {
   telefono: string;
   whatsapp?: string | null;
   codigo: number;
   planeta: string;
   sellerRef?: string | null;
+  adVideo?: string | null;
   consentimiento: string;
 };
 
@@ -95,6 +101,7 @@ export async function solicitarLlamadaVendedor(
       ? normalizePhoneE164(input.whatsapp)
       : telefono) || telefono;
   const sellerRef = input.sellerRef?.trim().toUpperCase() || null;
+  const adVideo = cleanAdVideo(input.adVideo);
   const codigo = clampCodigoJornadaBase(input.codigo);
   const planeta: PlanetaId = "JORNADA";
   const guion = construirGuionLlamada(codigo, planeta, sellerRef);
@@ -111,6 +118,7 @@ export async function solicitarLlamadaVendedor(
       codigo,
       planeta,
       sellerRef,
+      adVideo,
       consentimiento: "llamame",
       status: "limit_blocked",
       canalUsado: null,
@@ -137,6 +145,7 @@ export async function solicitarLlamadaVendedor(
     codigo,
     planeta,
     sellerRef,
+    adVideo,
     consentimiento: "llamame",
     status: "queued",
     canalUsado: null,
@@ -454,6 +463,7 @@ export type EnviarEnlacePagoInput = {
   whatsapp?: string | null;
   codigo: number;
   sellerRef?: string | null;
+  adVideo?: string | null;
   consentimiento: string;
 };
 
@@ -521,6 +531,7 @@ export async function enviarEnlacePagoWhatsapp(
       ? normalizePhoneE164(input.whatsapp)
       : telefono) || telefono;
   const sellerRef = sellerRefEarly;
+  const adVideo = cleanAdVideo(input.adVideo);
   const entrega = entregaEnlacePayload({
     telefono: whatsappRaw,
     sellerRef,
@@ -549,6 +560,7 @@ export async function enviarEnlacePagoWhatsapp(
     codigo,
     planeta,
     sellerRef,
+    adVideo,
     consentimiento: "enlace-pago",
     status: "queued",
     canalUsado: "whatsapp",

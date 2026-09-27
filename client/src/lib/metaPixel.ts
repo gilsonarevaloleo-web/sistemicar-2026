@@ -11,6 +11,8 @@ import {
   extractMercadoPagoPaymentId,
   resolveMetaPurchase,
 } from "@shared/metaPurchaseCatalog";
+import { adVideoLabel } from "@shared/adAttribution";
+import { getAdAttribution } from "./adAttribution.ts";
 
 export const META_PIXEL_ID = "1066497298319685";
 
@@ -81,13 +83,32 @@ export function identifyMetaUser(opts: {
   return true;
 }
 
-export function jornadaBasePixelPayload() {
+function videoFromAttribution(utmContent?: string | null): {
+  video?: string;
+  utm_content?: string | null;
+} {
+  const stored =
+    utmContent ??
+    (typeof window !== "undefined" ? getAdAttribution()?.utmContent : null);
+  const video = adVideoLabel(stored);
+  if (!video) return {};
   return {
-    content_name: "Jornada Base",
+    video,
+    utm_content: stored,
+  };
+}
+
+export function jornadaBasePixelPayload(utmContent?: string | null) {
+  const video = videoFromAttribution(utmContent);
+  return {
+    content_name: video.video
+      ? `Jornada Base · ${video.video}`
+      : "Jornada Base",
     content_ids: ["planificacion_base"],
     content_category: "Jornada",
     value: 24.99,
     currency: "USD",
+    ...video,
   };
 }
 
@@ -161,11 +182,13 @@ export function trackPaidPurchase(opts: {
     "";
   const key = `meta_purchase_${catalog.content_ids[0]}_${paymentId || "session"}`;
   if (!consumeOnce(key, "session")) return false;
+  const video = videoFromAttribution();
   return trackMeta(
     "Purchase",
     {
       ...catalog,
       content_category: "Premium Module",
+      ...video,
     },
     { eventID: paymentId || key }
   );

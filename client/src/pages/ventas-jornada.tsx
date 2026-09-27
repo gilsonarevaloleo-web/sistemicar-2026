@@ -19,6 +19,7 @@ import {
   VENDEDOR_JORNADA_ADS_HREF,
   withTrackedQuery,
 } from "@shared/vendedor/entradaComercial";
+import { captureAdAttributionFromUrl, getAdVideoLabel } from "@/lib/adAttribution";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { trackJornadaViewContent } from "@/lib/metaPixel";
 
@@ -27,8 +28,10 @@ const GOLD = "#D4AF37";
 export default function VentasJornada() {
   const sellerRef = useMemo(() => {
     captureSellerRefFromUrl(window.location.search);
+    captureAdAttributionFromUrl(window.location.search);
     return getSellerRef();
   }, []);
+  const videoLabel = useMemo(() => getAdVideoLabel(), []);
 
   const search = typeof window !== "undefined" ? window.location.search : "";
   const vendedorHref = withTrackedQuery(VENDEDOR_JORNADA_ADS_HREF, search);
@@ -65,9 +68,14 @@ export default function VentasJornada() {
           Trabajaste. Contestaste. Apagaste incendios. Al final no hay un
           número — solo la sensación de que el día se evaporó.
         </p>
-        {sellerRef && (
-          <p className="mt-2 text-[10px] tracking-widest text-white/35">
-            REF · {sellerRef}
+        {(sellerRef || videoLabel) && (
+          <p
+            className="mt-2 text-[10px] tracking-widest text-white/35"
+            data-testid="ventas-jornada-attribution"
+          >
+            {videoLabel ? `ANUNCIO · ${videoLabel}` : null}
+            {videoLabel && sellerRef ? " · " : null}
+            {sellerRef ? `REF · ${sellerRef}` : null}
           </p>
         )}
 

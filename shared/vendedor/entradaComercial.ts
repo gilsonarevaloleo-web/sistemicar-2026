@@ -5,6 +5,10 @@
 
 import type { PlanetaId } from "./planetasConfig.ts";
 import {
+  VENTAS_JORNADA_VIDEO_A_URL,
+  VENTAS_JORNADA_VIDEO_B_URL,
+} from "../adAttribution.ts";
+import {
   clampCodigoJornadaBase,
   resolverTriageVendedor,
   type CodigoJornadaBase,
@@ -14,9 +18,11 @@ import {
 /** Landing pública del anuncio Base. */
 export const VENTAS_JORNADA_PATH = "/ventas-jornada";
 
-/** URL exacta para pegar en Meta (única campaña de este corte). */
+/** URL base de la campaña (sin video). En Meta usa las dos de abajo. */
 export const VENTAS_JORNADA_AD_URL =
   "https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base";
+
+export { VENTAS_JORNADA_VIDEO_A_URL, VENTAS_JORNADA_VIDEO_B_URL };
 
 /** Vendedor con planeta y código del anuncio (día sin cierre = Código 3). */
 export const VENDEDOR_JORNADA_ADS_HREF = "/vendedor?planeta=JORNADA&codigo=3";
@@ -117,6 +123,7 @@ export function withTrackedQuery(
     "utm_medium",
     "utm_campaign",
     "utm_content",
+    "fbclid",
   ]) {
     const value = current.get(key);
     if (value && !url.searchParams.get(key)) {

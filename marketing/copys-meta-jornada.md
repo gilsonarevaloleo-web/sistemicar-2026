@@ -1,21 +1,33 @@
-# Copy Meta — Jornada Base (único anuncio de este corte)
+# Copy Meta — Jornada Base (2 videos, 1 campaña)
 
-**Versión:** 1.0 · agosto 2026  
+**Versión:** 2.0 · septiembre 2026  
 **Producto:** Jornada Base · 7 días gratis, después $24.99/mes · 500 PS = Base gratis
-**Destino del anuncio (pégalo tal cual):**
 
-```
-https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base
-```
-
-No uses `/pagos`, `/vendedor` ni `/bienvenida` como destino del anuncio.  
-La landing entrega al vendedor con planeta **JORNADA** ya fijado.
-
-B y C (Ritmo / Norte) **no se publican ahora**. Son remarketing cuando Base ya traiga llamadas o pagos.
+Una campaña `jornada_base_dia_sin_numero`. Un conjunto. **Dos anuncios.**  
+El clic siempre va a `/ventas-jornada`. No uses `/pagos`, `/vendedor` ni `/bienvenida`.
 
 ---
 
-## Anuncio A — El día sin número (PUBLICAR)
+## Destino — pégalo tal cual en cada anuncio
+
+**Anuncio VIDEO A**
+
+```
+https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a
+```
+
+**Anuncio VIDEO B**
+
+```
+https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b
+```
+
+`utm_content` es lo que une el video con la página, el Pixel y el vendedor.  
+Facebook agrega `fbclid` solo; no lo escribas tú.
+
+---
+
+## Texto (el mismo en A y B)
 
 **Título / gancho (primera línea, ≤ 10 palabras)**  
 El día se te fue sin un número.
@@ -53,23 +65,28 @@ Toca y entra. O pide que te llame el vendedor.
 ```
 
 **CTA del anuncio (en Meta):**  
-Elige **Más información** o **Más información** / Learn more.  
-No elijas “Comprar” ni “Enviar mensaje de WhatsApp” para este corte: el clic debe ir a la landing.
+**Más información** / Learn more.  
+No elijas “Comprar” ni “Enviar mensaje de WhatsApp”.
 
 **Descripción opcional (enlace):**  
 Cierra el día con unidades, no con culpa.
 
-**Emojis:** ninguno en el gancho. Si quieres uno, un solo ⚡ al final del cuerpo. Nada de filas de iconos.
+**Emojis:** ninguno en el gancho. Si quieres uno, un solo ⚡ al final del cuerpo.
 
-**Video del anuncio (vertical 9:16, 16 s):** `public/ads/jornada-base-spot.mp4`  
-Tras el deploy: https://sistemicar.app/ads/jornada-base-spot.mp4
+---
 
-**Imagen / miniatura (si Meta la pide):** `public/ads/jornada-base-spot-thumb.png`
+## Videos
+
+Sube **tu** archivo en cada anuncio (Ads Manager). Un video = un anuncio.  
+No armes un carrusel con los dos. No pongas el video en la landing.
+
+Si más adelante quieres un gancho distinto por video, cambia solo la primera línea.  
+Las URLs de arriba no se tocan.
 
 ---
 
 ## Lo que NO se publica todavía
 
-- Versión B (interrupciones / Ritmo)
-- Versión C (apagar incendios / Norte / proyectos)
-- Grabación de la pantalla de Jornada (Reloj, Desglosador) — eso es un segundo video, cuando este spot ya traiga clics.
+- Ritmo / Norte
+- Un tercer anuncio “por si acaso”
+- Destino WhatsApp o `/pagos` directo

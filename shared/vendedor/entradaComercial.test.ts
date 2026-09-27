@@ -52,13 +52,15 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.match(f.trialLabel, /7 días gratis/i);
   });
 
-  it("arrastra ref y utm al siguiente href", () => {
+  it("arrastra ref, utm y fbclid al siguiente href", () => {
     const next = withTrackedQuery(
       VENDEDOR_JORNADA_ADS_HREF,
-      "?utm_source=facebook&utm_campaign=jornada_base&ref=GILSON",
+      "?utm_source=facebook&utm_campaign=jornada_base&utm_content=video_a&fbclid=IwAR9&ref=GILSON",
     );
     assert.match(next, /planeta=JORNADA/);
     assert.match(next, /utm_source=facebook/);
+    assert.match(next, /utm_content=video_a/);
+    assert.match(next, /fbclid=IwAR9/);
     assert.match(next, /ref=GILSON/);
   });
 
