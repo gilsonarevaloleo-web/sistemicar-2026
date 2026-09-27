@@ -60,12 +60,13 @@ describe("anti-freeze Dual Kernel session", () => {
     assert.match(espejo, /mostrarCosecha/);
   });
 
-  it("Pulso solo monta en PlanTab", () => {
+  it("PlanTab monta secuencia vertical, no Pulso", () => {
     const plan = readFileSync(
       join(dir, "../components/jornada4/Jornada4PlanTab.tsx"),
       "utf8"
     );
-    assert.match(plan, /usePulsoCobertura/);
+    assert.match(plan, /Jornada4CoberturaTimeline/);
+    assert.equal(plan.includes("usePulsoCobertura"), false);
     assert.match(plan, /useJornada4Tick/);
   });
 

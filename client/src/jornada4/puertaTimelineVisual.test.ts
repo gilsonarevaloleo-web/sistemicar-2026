@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolvePuertaTimelineVisual } from "./puertaTimelineVisual.ts";
+import {
+  pickPuertaTimelineFocusId,
+  resolvePuertaTimelineVisual,
+} from "./puertaTimelineVisual.ts";
 
 describe("resolvePuertaTimelineVisual", () => {
   it("foco: activo consciente (anillo oro, pulso)", () => {
@@ -61,5 +64,24 @@ describe("resolvePuertaTimelineVisual", () => {
     });
     assert.equal(v.kind, "pendiente");
     assert.equal(v.pulse, false);
+  });
+
+  it("costado: prioriza foco, luego fracaso", () => {
+    assert.equal(
+      pickPuertaTimelineFocusId([
+        { id: "a", kind: "logro" },
+        { id: "b", kind: "foco" },
+        { id: "c", kind: "fracaso" },
+      ]),
+      "b"
+    );
+    assert.equal(
+      pickPuertaTimelineFocusId([
+        { id: "a", kind: "logro" },
+        { id: "c", kind: "fracaso" },
+      ]),
+      "c"
+    );
+    assert.equal(pickPuertaTimelineFocusId([]), null);
   });
 });

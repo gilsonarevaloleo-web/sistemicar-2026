@@ -18,6 +18,13 @@ export const PUERTA_TIMELINE_COLORS = {
 
 export type PuertaTimelineKind = "foco" | "logro" | "fracaso" | "pendiente";
 
+export const PUERTA_TIMELINE_KIND_LABEL: Record<PuertaTimelineKind, string> = {
+  foco: "Foco",
+  logro: "Logro",
+  fracaso: "Fracaso",
+  pendiente: "Pendiente",
+};
+
 export type PuertaTimelineVisual = {
   kind: PuertaTimelineKind;
   backgroundColor: string;
@@ -26,6 +33,17 @@ export type PuertaTimelineVisual = {
   labelColor: string;
   pulse: boolean;
 };
+
+/** Puerta que el costado debe espejar: foco vivo, si no el primer fracaso, si no la primera. */
+export function pickPuertaTimelineFocusId(
+  items: ReadonlyArray<{ id: string; kind: PuertaTimelineKind }>
+): string | null {
+  const foco = items.find(i => i.kind === "foco");
+  if (foco) return foco.id;
+  const fracaso = items.find(i => i.kind === "fracaso");
+  if (fracaso) return fracaso.id;
+  return items[0]?.id ?? null;
+}
 
 type SegLite = Pick<SegmentoV5, "estado" | "puertaSistema">;
 type EntradaLite = Pick<DisciplinaEntrada, "estado" | "contribucionPct">;
