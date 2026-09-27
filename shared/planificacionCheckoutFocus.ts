@@ -5,6 +5,7 @@
  */
 
 import type { PlanificacionSkuId } from "./planificacionPricing.ts";
+import { JORNADA_BASE_TRIAL_COPY } from "./jornadaBaseAccess.ts";
 
 export type CheckoutFocus = {
   focusSkuId: PlanificacionSkuId | null;
@@ -38,8 +39,7 @@ export function resolveCheckoutFocus(search: string): CheckoutFocus {
       collapseLaterPeldanos: true,
       hideOtherWorlds: true,
       headline: "Jornada Base",
-      subline:
-        "Peldaño 1 · $24.99/mes. Ritmo y Norte se ofrecen después, cuando ya mides unidades.",
+      subline: `Peldaño 1 · ${JORNADA_BASE_TRIAL_COPY.short} Ritmo y Norte se ofrecen después, cuando ya mides unidades.`,
     };
   }
 

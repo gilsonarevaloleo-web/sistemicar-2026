@@ -60,7 +60,6 @@ import { mergePlantillasRutina } from "./plantillasRutinaMerge";
 import {
   type ModuleAccessInput,
   type ModuleId,
-  hasPlanificacionBaseAccess as _hasPlanificacionBaseAccess,
   hasSoberaniaDiaAccess as _hasSoberaniaDiaAccess,
   hasOperativoAccess as _hasOperativoAccess,
   hasRitmoAccess as _hasRitmoAccess,
@@ -71,6 +70,14 @@ import {
   modulesGrantedByPlan,
   isOwnerEmail as _isOwnerEmail,
 } from "@shared/moduleAccess";
+import {
+  JORNADA_BASE_POINTS_UNLOCK,
+  canEnterJornadaBase as _canEnterJornadaBase,
+  resolveJornadaBaseAccess,
+  toEpochMs,
+  type JornadaBaseAccess,
+  type JornadaBaseAccessInput,
+} from "@shared/jornadaBaseAccess";
 import { isPreviewOpsUnlocked } from "./previewOps";
 
 export interface AcervoEntry {
@@ -2567,24 +2574,88 @@ export type UserRank = "iniciado" | "guerrero" | "operador" | "arquitecto" | "so
 
 const OWNER_EMAIL = "gilsonarevalo.leo@gmail.com";
 
+export type JornadaBaseAccessExtras = Pick<
+  JornadaBaseAccessInput,
+  "sovereigntyPoints" | "jornadaBaseTrialStartedAt" | "jornadaBaseEarnedFree"
+>;
+
 function accessInput(
   subscriptionPlan?: string | null,
   email?: string | null,
   rank?: UserRank | null,
-  activeModules?: string[] | null
-): ModuleAccessInput {
-  return { subscriptionPlan, email, rank, activeModules };
+  activeModules?: string[] | null,
+  extras?: JornadaBaseAccessExtras | null
+): JornadaBaseAccessInput {
+  return {
+    subscriptionPlan,
+    email,
+    rank,
+    activeModules,
+    sovereigntyPoints: extras?.sovereigntyPoints,
+    jornadaBaseTrialStartedAt: extras?.jornadaBaseTrialStartedAt,
+    jornadaBaseEarnedFree: extras?.jornadaBaseEarnedFree,
+  };
+}
+
+export function extrasFromProgression(
+  progression?: UserProgression | null
+): JornadaBaseAccessExtras {
+  return {
+    sovereigntyPoints: progression?.sovereigntyPoints,
+    jornadaBaseTrialStartedAt: progression?.jornadaBaseTrialStartedAt,
+    jornadaBaseEarnedFree: progression?.jornadaBaseEarnedFree,
+  };
+}
+
+export function resolveUserJornadaBaseAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null,
+  extras?: JornadaBaseAccessExtras | null
+): JornadaBaseAccess {
+  if (isPreviewOpsUnlocked()) {
+    return {
+      allowed: true,
+      kind: "owner",
+      points: extras?.sovereigntyPoints ?? 0,
+      pointsRemaining: 0,
+    };
+  }
+  return resolveJornadaBaseAccess(
+    accessInput(subscriptionPlan, email, rank, activeModules, extras)
+  );
 }
 
 export function hasPlanificacionBaseAccess(
   subscriptionPlan?: string | null,
   email?: string | null,
   rank?: UserRank | null,
-  activeModules?: string[] | null
+  activeModules?: string[] | null,
+  extras?: JornadaBaseAccessExtras | null
 ): boolean {
   // Deploy Preview Netlify: sesión distinta a producción; ver previewOps.ts
   if (isPreviewOpsUnlocked()) return true;
-  return _hasPlanificacionBaseAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+  return resolveUserJornadaBaseAccess(
+    subscriptionPlan,
+    email,
+    rank,
+    activeModules,
+    extras
+  ).allowed;
+}
+
+export function canEnterJornadaBaseMenu(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null,
+  extras?: JornadaBaseAccessExtras | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _canEnterJornadaBase(
+    accessInput(subscriptionPlan, email, rank, activeModules, extras)
+  );
 }
 
 export function hasSoberaniaDiaAccess(
@@ -2727,6 +2798,10 @@ export interface UserProgression {
   subscriptionPlan?: string | null;
   /** Módulos comprados (venta independiente por producto). */
   activeModules?: string[];
+  /** Epoch ms — inicio del trial de 7 días de Jornada Base. */
+  jornadaBaseTrialStartedAt?: number | null;
+  /** Gancho: llegó a 500 PS y Base queda gratis. */
+  jornadaBaseEarnedFree?: boolean;
 }
 
 const PROGRESSION_KEY = "sistemicar_progression";
@@ -2795,7 +2870,9 @@ function getDefaultProgression(userId: string): UserProgression {
     sovereigntyPoints: 0,
     ptsEspejo: 0,
     ptsPlanificacion: 0,
-    ptsDeposito: 0
+    ptsDeposito: 0,
+    jornadaBaseTrialStartedAt: null,
+    jornadaBaseEarnedFree: false,
   };
 }
 
@@ -2879,6 +2956,17 @@ export function subscribeToProgression(
         const ptsPlanificacion = Math.max(remoteMax.ptsP, localProg.ptsPlanificacion ?? 0);
         const ptsDeposito = Math.max(remoteMax.ptsD, localProg.ptsDeposito ?? 0);
         const totalCP = Math.max(remoteMax.totalCP, localProg.totalCP ?? 0);
+        const remoteTrial = toEpochMs(data.jornadaBaseTrialStartedAt);
+        const localTrial = toEpochMs(localProg.jornadaBaseTrialStartedAt);
+        const jornadaBaseTrialStartedAt =
+          remoteTrial && localTrial
+            ? Math.min(remoteTrial, localTrial)
+            : remoteTrial ?? localTrial ?? null;
+        const jornadaBaseEarnedFree = Boolean(
+          data.jornadaBaseEarnedFree ||
+            localProg.jornadaBaseEarnedFree ||
+            sovereigntyPoints >= JORNADA_BASE_POINTS_UNLOCK
+        );
         const prog = {
           id: d.id,
           ...data,
@@ -2887,6 +2975,8 @@ export function subscribeToProgression(
           ptsPlanificacion,
           ptsDeposito,
           totalCP,
+          jornadaBaseTrialStartedAt,
+          jornadaBaseEarnedFree,
           lastActivityDate: data.lastActivityDate?.toDate() || null,
           cooldownUntil: data.cooldownUntil?.toDate() || null,
           createdAt: data.createdAt?.toDate() || new Date(),
@@ -2973,6 +3063,29 @@ export async function updateProgression(
   } else {
     saveLocally();
   }
+}
+
+/** Arranca el trial de 7 días de Jornada Base (idempotente). */
+export async function startJornadaBaseTrial(
+  userId: string
+): Promise<{ started: boolean; startedAt: number }> {
+  const prog = getLocalProgression(userId);
+  const existing = toEpochMs(prog.jornadaBaseTrialStartedAt);
+  if (existing != null) {
+    return { started: false, startedAt: existing };
+  }
+  const startedAt = Date.now();
+  await updateProgression(userId, { jornadaBaseTrialStartedAt: startedAt });
+  return { started: true, startedAt };
+}
+
+function applyJornadaBasePointsGrant(
+  prog: UserProgression,
+  newTotal: number
+): Pick<UserProgression, "jornadaBaseEarnedFree"> {
+  const earned =
+    Boolean(prog.jornadaBaseEarnedFree) || newTotal >= JORNADA_BASE_POINTS_UNLOCK;
+  return { jornadaBaseEarnedFree: earned || prog.jornadaBaseEarnedFree };
 }
 
 export type ModuleKey = "espejo" | "planificacion" | "deposito";
@@ -3321,6 +3434,11 @@ export async function awardSovereigntyPoints(
   if (roundedAmount <= 0) return { newTotal: progBefore.sovereigntyPoints || 0 };
 
   const newTotal = (progBefore.sovereigntyPoints || 0) + roundedAmount;
+  const justEarnedBase =
+    !progBefore.jornadaBaseEarnedFree &&
+    (progBefore.sovereigntyPoints || 0) < JORNADA_BASE_POINTS_UNLOCK &&
+    newTotal >= JORNADA_BASE_POINTS_UNLOCK;
+  const pointsGrant = applyJornadaBasePointsGrant(progBefore, newTotal);
 
   const logEntry: SovereigntyPointsLog = {
     id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -3338,8 +3456,15 @@ export async function awardSovereigntyPoints(
     console.error("[awardSovereigntyPoints] No se pudo persistir SP log (local):", error);
   }
   try {
-    saveLocalProgression({ ...progBefore, userId, sovereigntyPoints: newTotal, updatedAt: new Date() });
-    backupToLocal("progression", { ...progBefore, userId, sovereigntyPoints: newTotal, updatedAt: new Date() });
+    const nextProg = {
+      ...progBefore,
+      userId,
+      sovereigntyPoints: newTotal,
+      ...pointsGrant,
+      updatedAt: new Date(),
+    };
+    saveLocalProgression(nextProg);
+    backupToLocal("progression", nextProg);
   } catch (error) {
     console.error("[awardSovereigntyPoints] No se pudo persistir progresión (local):", error);
   }
@@ -3349,6 +3474,11 @@ export async function awardSovereigntyPoints(
   window.dispatchEvent(new CustomEvent("sovereignty-points-awarded", {
     detail: { amount: roundedAmount, source, newTotal: uiTotal }
   }));
+  if (justEarnedBase) {
+    window.dispatchEvent(
+      new CustomEvent("jornada-base-earned-free", { detail: { points: uiTotal } })
+    );
+  }
 
   if (isFirebaseConfigured() && db) {
     void (async () => {
@@ -3366,12 +3496,16 @@ export async function awardSovereigntyPoints(
         const pathProg = getPrivatePath(userId, "progression");
         const snap = await getDocs(query(collection(db, pathProg)));
         if (snap.empty) {
-          await updateProgression(userId, { sovereigntyPoints: newTotal });
+          await updateProgression(userId, {
+            sovereigntyPoints: newTotal,
+            ...pointsGrant,
+          });
         } else {
           const latest = pickLatestProgressionDoc(snap.docs);
           const targetId = latest?.id ?? snap.docs[0].id;
           await updateDoc(doc(db, pathProg, targetId), {
             sovereigntyPoints: increment(roundedAmount),
+            ...(justEarnedBase ? { jornadaBaseEarnedFree: true } : {}),
             updatedAt: serverTimestamp()
           });
         }

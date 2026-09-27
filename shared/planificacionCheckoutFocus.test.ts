@@ -11,7 +11,8 @@ describe("planificacionCheckoutFocus", () => {
     assert.equal(f.hideStacks, true);
     assert.equal(f.collapseLaterPeldanos, true);
     assert.equal(f.hideOtherWorlds, true);
-    assert.match(f.subline ?? "", /después/i);
+    assert.match(f.subline ?? "", /7 días gratis/i);
+    assert.match(f.subline ?? "", /500 PS/i);
   });
 
   it("campaña sin plan también enfoca Base", () => {

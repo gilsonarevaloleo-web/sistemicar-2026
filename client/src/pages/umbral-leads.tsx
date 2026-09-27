@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { addProspecto } from "@/lib/persistence";
+import { trackJornadaLead } from "@/lib/metaPixel";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 
 const GOLD = "#D4AF37";
@@ -97,6 +98,7 @@ export default function UmbralLeads() {
       localStorage.setItem("sistemicar_prospecto_email", correo.trim().toLowerCase());
       localStorage.setItem("sistemicar_prospecto_nombre", nombre.trim());
       
+      trackJornadaLead(trackingParams.source || "umbral-leads");
       toast.success("¡Registro exitoso!");
       if (trackingParams.retorno === "espejo") {
         navigate("/espejo");

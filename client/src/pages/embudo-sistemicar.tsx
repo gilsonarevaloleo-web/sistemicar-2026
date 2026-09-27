@@ -218,6 +218,8 @@ export default function EmbudoSistemicar() {
         })
       });
       setLeadGuardado(true);
+      const { trackJornadaLead } = await import("@/lib/metaPixel");
+      trackJornadaLead(planSeleccionado || "embudo");
     } catch (error) {
       console.error("Error guardando lead:", error);
     }

@@ -23,6 +23,7 @@ import {
   mensajeEnlacePagoWhatsapp,
 } from "@shared/vendedor/entradaComercial";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
+import { trackJornadaLead } from "@/lib/metaPixel";
 import {
   saveFijacionVendedor,
   withSellerRef,
@@ -167,6 +168,7 @@ export default function VendedorTriagePage() {
         toast.error(msg);
       } else {
         setCallDone(true);
+        trackJornadaLead("vendedor-llamada");
         toast.success(data.message || msg);
       }
     } catch (e: unknown) {
@@ -216,6 +218,7 @@ export default function VendedorTriagePage() {
       setFallbackDeepLink(deepLink);
       setFallbackShareHref(shareHref);
       if (!res.ok) throw new Error(data.error || "Error");
+      trackJornadaLead("vendedor-whatsapp");
       const msg = data.message || "Te mandé el enlace por WhatsApp.";
       setLinkStatusMsg(msg);
       if (data.whatsappOk) {

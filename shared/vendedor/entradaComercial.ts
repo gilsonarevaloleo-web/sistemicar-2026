@@ -23,6 +23,9 @@ export const VENDEDOR_JORNADA_ADS_HREF = "/vendedor?planeta=JORNADA&codigo=3";
 
 export const PAGOS_JORNADA_BASE_HREF = "/pagos?plan=planificacion_base";
 
+/** Entrada del trial (cuenta Google → Jornada). */
+export const JORNADA_BASE_TRIAL_HREF = "/acceso?next=/jornada-v4";
+
 /** Dolor del anuncio Base — Código 3 (día sin cierre). */
 export const JORNADA_ADS_CODIGO_DEFAULT = 3 as CodigoJornadaBase;
 
@@ -67,6 +70,13 @@ export function enlacePagoJornadaBase(sellerRef?: string | null): string {
   return `${base}&ref=${encodeURIComponent(sellerRef.trim())}`;
 }
 
+/** Enlace absoluto del trial de 7 días. */
+export function enlaceTrialJornadaBase(sellerRef?: string | null): string {
+  const base = "https://www.sistemicar.app/acceso?next=/jornada-v4";
+  if (!sellerRef?.trim()) return base;
+  return `${base}&ref=${encodeURIComponent(sellerRef.trim())}`;
+}
+
 /**
  * wa.me para que el vendedor mande el enlace desde su WhatsApp
  * si Twilio no puede (p. ej. error 63007).
@@ -85,10 +95,11 @@ export function mensajeEnlacePagoWhatsapp(
   deepLink: string,
   sellerRef?: string | null,
 ): string {
+  const trial = enlaceTrialJornadaBase(sellerRef);
   const ref = sellerRef?.trim()
     ? ` Al pagar, menciona ${sellerRef.trim()}.`
     : "";
-  return `Jornada Base — mides lo que cierras hoy. Enlace de pago: ${deepLink}.${ref}`;
+  return `Jornada Base — 7 días gratis: ${trial} Si ya quieres pagar: ${deepLink}.${ref} Si llegas a 500 puntos, te queda gratis.`;
 }
 
 /** Copia ?ref= y utm_* de la URL actual a un href interno. */

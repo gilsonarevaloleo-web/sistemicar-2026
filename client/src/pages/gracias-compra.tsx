@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Crown, CheckCircle, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
+import { SKU_BASE } from "@shared/planificacionPricing";
+import { trackPurchase } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 const DARK_BG = "#050505";
@@ -10,14 +12,22 @@ export default function GraciasCompra() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Purchase', {
-        content_name: 'PROTOCOLO DE SOBERANÍA ESPEJO',
-        content_category: 'Premium Module',
-        value: 17.00,
-        currency: 'USD'
+    const params = new URLSearchParams(window.location.search);
+    const plan = (params.get("plan") || params.get("producto") || "").trim();
+    if (plan === "planificacion_base" || plan === "jornada_base") {
+      trackPurchase({
+        content_name: SKU_BASE.name,
+        value: SKU_BASE.priceUsd,
+        content_ids: [SKU_BASE.id],
       });
+      return;
     }
+    const value = Number(params.get("value") || params.get("amount") || 17);
+    trackPurchase({
+      content_name: params.get("content_name") || "SISTEMICAR",
+      value: Number.isFinite(value) ? value : 17,
+      content_ids: plan ? [plan] : undefined,
+    });
   }, []);
 
   return (

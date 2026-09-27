@@ -5,6 +5,7 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearch, useLocation } from "wouter";
+import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { requestJornada4OpenLaunch } from "@/lib/pulsoCoberturaEvents";
 import { Jornada4Shell } from "@/components/jornada4/Jornada4Shell";
@@ -46,6 +47,7 @@ import { usePlanificacionEntitlements } from "@/hooks/usePlanificacionEntitlemen
 import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
 import { PlanificacionPrimerDia } from "@/components/planificacion/PlanificacionPrimerDia";
 import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
+import { JornadaBaseTrialBanner } from "@/components/jornada4/JornadaBaseTrialBanner";
 import {
   isTutorialDone,
   type PlanificacionPlanProfile,
@@ -105,6 +107,14 @@ export default function JornadaV4Session() {
     if (!user?.uid) return;
     if (!isTutorialDone(user.uid)) setShowTutorial(true);
   }, [user?.uid]);
+
+  useEffect(() => {
+    const onEarned = () => {
+      toast.success("Llegaste a 500 PS. Jornada Base te queda gratis.");
+    };
+    window.addEventListener("jornada-base-earned-free", onEarned);
+    return () => window.removeEventListener("jornada-base-earned-free", onEarned);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -405,6 +415,9 @@ export default function JornadaV4Session() {
       />
       <Jornada4MobileNav value={mobileTab} onChange={setMobileTab} />
       <div className="max-w-lg mx-auto pt-2">
+        {entitlements.baseGrant.kind === "trial" || entitlements.baseGrant.kind === "points" ? (
+          <JornadaBaseTrialBanner access={entitlements.baseGrant} />
+        ) : null}
         <Jornada4ApunteCard />
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">

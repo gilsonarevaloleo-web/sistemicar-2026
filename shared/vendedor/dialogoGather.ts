@@ -146,13 +146,13 @@ export function buildDialogTurns(
   const mirrorNoBeats = beats(MIRROR_NO[codigoJ]);
   const ctaSiBeats = beats([
     "Listo. Te acabo de mandar el enlace por WhatsApp.",
-    "Ábrelo cuando cuelgues. Es Jornada Base, veinticinco al mes.",
+    "Ábrelo cuando cuelgues. Es Jornada Base, siete días gratis y después veinticinco al mes. Si llegas a quinientos puntos, te queda gratis.",
     refNota.trim(),
     "Gracias por el rato. Cuídate.",
   ]);
   const ctaSiSinWhatsappBeats = beats([
     "Listo. Al colgar te dejo el enlace por WhatsApp.",
-    "Es Jornada Base, veinticinco al mes.",
+    "Es Jornada Base, siete días gratis y después veinticinco al mes.",
     refNota.trim(),
     "Gracias por el rato. Cuídate.",
   ]);
