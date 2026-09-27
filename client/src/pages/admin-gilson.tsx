@@ -188,6 +188,7 @@ export default function AdminGilson() {
     codigo: number;
     planeta: string;
     sellerRef: string | null;
+    adVideo?: string | null;
     status: string;
     canalUsado: string | null;
     intentos: number;
@@ -1879,6 +1880,7 @@ export default function AdminGilson() {
                       <p className="text-white">
                         {c.telefono}
                         {c.sellerRef ? ` · ref ${c.sellerRef}` : ""}
+                        {c.adVideo ? ` · ${c.adVideo}` : ""}
                       </p>
                       <p className="text-slate-400 mt-0.5">
                         status <span className="text-sky-300">{c.status}</span>

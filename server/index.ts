@@ -5388,6 +5388,7 @@ app.post("/api/vendedor/solicitar-llamada", async (req, res) => {
       codigo: Number(req.body?.codigo),
       planeta: String(req.body?.planeta || ""),
       sellerRef: req.body?.sellerRef ? String(req.body.sellerRef) : null,
+      adVideo: req.body?.adVideo ? String(req.body.adVideo) : null,
       consentimiento: String(req.body?.consentimiento || ""),
     });
     if (!result.ok) {
@@ -5420,6 +5421,7 @@ app.post("/api/vendedor/enviar-enlace-pago", async (req, res) => {
       whatsapp: req.body?.whatsapp ? String(req.body.whatsapp) : null,
       codigo: Number(req.body?.codigo),
       sellerRef: req.body?.sellerRef ? String(req.body.sellerRef) : null,
+      adVideo: req.body?.adVideo ? String(req.body.adVideo) : null,
       consentimiento: String(req.body?.consentimiento || ""),
     });
     if (!result.ok) {

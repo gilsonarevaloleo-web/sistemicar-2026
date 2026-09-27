@@ -15,6 +15,14 @@ describe("metaPixel Jornada Base", () => {
     assert.equal(p.currency, "USD");
   });
 
+  it("marca VIDEO A o VIDEO B en el payload del Pixel", () => {
+    const a = jornadaBasePixelPayload("video_a");
+    const b = jornadaBasePixelPayload("video_b");
+    assert.equal(a.content_name, "Jornada Base · VIDEO A");
+    assert.equal(a.video, "VIDEO A");
+    assert.equal(b.video, "VIDEO B");
+  });
+
   it("Purchase de Base no se confunde con Espejo $17", () => {
     const paid = resolveMetaPurchase("planificacion_base");
     assert.ok(paid);

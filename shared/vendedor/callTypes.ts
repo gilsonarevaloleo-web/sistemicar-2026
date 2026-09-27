@@ -21,6 +21,8 @@ export interface VendedorCallRecord {
   codigo: CodigoNumero;
   planeta: PlanetaId;
   sellerRef: string | null;
+  /** VIDEO A / VIDEO B si el lead llegó por anuncio. */
+  adVideo?: string | null;
   consentimiento: "llamame" | "enlace-pago";
   status: VendedorCallStatus;
   canalUsado: VendedorCallCanal | null;
