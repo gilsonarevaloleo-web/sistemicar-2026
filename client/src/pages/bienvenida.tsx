@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { signInWithGoogle, isFirebaseConfigured } from "@/lib/firebase";
+import { trackCompleteRegistration } from "@/lib/metaPixel";
 import { sendWelcomeEmail } from "@/lib/emailApi";
 import { clearMigrationPending } from "@/lib/persistence";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
@@ -106,6 +107,12 @@ export default function Bienvenida() {
       const isNewUser =
         result.user.metadata?.creationTime === result.user.metadata?.lastSignInTime;
       if (isNewUser && result.user.email) {
+        trackCompleteRegistration({
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName,
+          method: "google",
+        });
         sendWelcomeEmail(result.user.email, result.user.displayName || undefined);
         toast.success("Bienvenido. Revisa tu correo.");
       } else {

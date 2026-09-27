@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { jornadaBasePixelPayload, META_PIXEL_ID } from "./metaPixel.ts";
+import { jornadaBasePixelPayload, META_PIXEL_ID, resolveMetaPurchase } from "./metaPixel.ts";
 
 describe("metaPixel Jornada Base", () => {
   it("ID del pixel de prospectos está vigente en código", () => {
@@ -13,5 +13,12 @@ describe("metaPixel Jornada Base", () => {
     assert.deepEqual(p.content_ids, ["planificacion_base"]);
     assert.equal(p.value, 24.99);
     assert.equal(p.currency, "USD");
+  });
+
+  it("Purchase de Base no se confunde con Espejo $17", () => {
+    const paid = resolveMetaPurchase("planificacion_base");
+    assert.ok(paid);
+    assert.equal(paid.value, 24.99);
+    assert.notEqual(paid.value, 17);
   });
 });

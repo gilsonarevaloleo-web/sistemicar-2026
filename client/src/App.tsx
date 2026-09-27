@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import { isUserAnonymous } from "@/lib/firebase";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial } from "@/lib/persistence";
-import { trackJornadaStartTrial } from "@/lib/metaPixel";
+import { identifyMetaUser, trackCompleteRegistration, trackJornadaStartTrial } from "@/lib/metaPixel";
 import {
   consumePreviewOpsQueryUnlock,
   isPreviewOpsUnlocked,
@@ -121,6 +121,35 @@ function ClaimPurchasesOnLogin() {
   return null;
 }
 
+/** Meta: email del registrado + CompleteRegistration si la cuenta es nueva. */
+function MetaConversionsOnAuth() {
+  const { user, loading } = useAuthContext();
+  useEffect(() => {
+    if (loading || !user?.email || !user.uid) return;
+    if (isUserAnonymous()) return;
+    if (user.uid === "user_arquitecto") return;
+    const raw = user as {
+      metadata?: { creationTime?: string; lastSignInTime?: string };
+    };
+    identifyMetaUser({
+      email: user.email,
+      name: user.displayName,
+      uid: user.uid,
+    });
+    const created = raw.metadata?.creationTime;
+    const last = raw.metadata?.lastSignInTime;
+    if (created && last && created === last) {
+      trackCompleteRegistration({
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName,
+        method: "google",
+      });
+    }
+  }, [user?.uid, user?.email, user?.displayName, loading]);
+  return null;
+}
+
 function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, login, logout } = useAuth();
   const value = useMemo(
@@ -130,6 +159,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       <ClaimPurchasesOnLogin />
+      <MetaConversionsOnAuth />
       {children}
     </AuthContext.Provider>
   );

@@ -9,6 +9,7 @@ import { signInWithGoogle, isFirebaseConfigured, getGoogleAuthErrorMessage, isUs
 import { sendWelcomeEmail } from "@/lib/emailApi";
 import { clearMigrationPending } from "@/lib/persistence";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
+import { trackCompleteRegistration } from "@/lib/metaPixel";
 import { safePostLoginPath } from "@shared/clientAccount";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 
@@ -55,6 +56,12 @@ export default function Acceso() {
 
       const isNewUser = result?.user?.metadata?.creationTime === result?.user?.metadata?.lastSignInTime;
       if (isNewUser && result?.user?.email) {
+        trackCompleteRegistration({
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName,
+          method: "google",
+        });
         sendWelcomeEmail(result.user.email, result.user.displayName || undefined);
         toast.success("Cuenta creada. Si ya pagaste, tu plan se activa ahora.");
       } else {

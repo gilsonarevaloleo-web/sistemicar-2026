@@ -34,7 +34,7 @@ import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanne
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
 import { JORNADA_BASE_TRIAL_COPY } from "@shared/jornadaBaseAccess";
 import { startJornadaBaseTrial } from "@/lib/persistence";
-import { trackJornadaInitiateCheckout, trackJornadaStartTrial } from "@/lib/metaPixel";
+import { trackJornadaInitiateCheckout, trackJornadaStartTrial, trackPaidPurchase } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 const UMBRAL_ACCENT = "#FF6B35";
@@ -353,6 +353,11 @@ export default function Pagos() {
     }
 
     if (status === "success") {
+      trackPaidPurchase({
+        planId: planParam || effectivePlan,
+        search: window.location.search,
+        email: googleEmail || userEmail || undefined,
+      });
       if (planParam && isEspejoSkuId(planParam)) {
         const credits =
           planParam === "espejo_recarga"

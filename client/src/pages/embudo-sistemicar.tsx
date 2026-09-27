@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { signInWithGoogle, isFirebaseConfigured } from "@/lib/firebase";
+import { trackCompleteRegistration } from "@/lib/metaPixel";
 import { useAuthContext } from "@/App";
 import { clearMigrationPending } from "@/lib/persistence";
 import { sendWelcomeEmail } from "@/lib/emailApi";
@@ -166,6 +167,12 @@ export default function EmbudoSistemicar() {
       // Verificar si es nuevo usuario y enviar correo de bienvenida
       const isNewUser = result?.user?.metadata?.creationTime === result?.user?.metadata?.lastSignInTime;
       if (isNewUser && result?.user?.email) {
+        trackCompleteRegistration({
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName,
+          method: "google",
+        });
         sendWelcomeEmail(result.user.email, result.user.displayName || undefined);
         toast.success("¡Bienvenido al Umbral! Revisa tu correo.");
       } else {
