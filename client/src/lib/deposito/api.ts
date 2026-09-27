@@ -1,6 +1,7 @@
 import type {
   CapturaVolcadoInput,
   CodigoObservador,
+  CriterioVivo,
   DepositoEngineResponse,
   DiagnosticoVolcado,
   GradoMaestria,
@@ -66,6 +67,7 @@ export async function procesarVolcadoRemoto(
   extras?: {
     ojosHistoricos?: CodigoObservador[];
     metricasJornada?: MetricasJornadaIntencion;
+    criteriosVivos?: CriterioVivo[];
   },
 ): Promise<DepositoVolcadoSuccess> {
   let res: Response;
@@ -80,6 +82,7 @@ export async function procesarVolcadoRemoto(
           volcadoCrudo: captura?.volcadoCrudo ?? textoVolcado,
           ojosHistoricos: extras?.ojosHistoricos,
           metricasJornada: extras?.metricasJornada,
+          criteriosVivos: extras?.criteriosVivos,
         }),
       }),
       12000,

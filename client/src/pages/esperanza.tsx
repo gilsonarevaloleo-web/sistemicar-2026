@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { BannerMeritoDetectado } from "@/components/deposito/BannerMeritoDetectado";
+import { CardCriterioVivo } from "@/components/deposito/CardCriterioVivo";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
+import { SelloCriterio } from "@/components/deposito/SelloCriterio";
 import {
   FormularioVolcadoExpansivo,
   type FormularioVolcadoHandle,
@@ -21,6 +23,11 @@ import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
 import { leerMetricasJornadaLocal } from "@/lib/jornadaMetricasDeposito";
+import {
+  leerCriteriosVivos,
+  sellarCriterioLocal,
+  guardarCriteriosVivos,
+} from "@/lib/depositoCriterios";
 import { guardarGradoMaestria, leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
@@ -41,8 +48,10 @@ import {
   motivoRitualPasoVisible,
   progresoRitualPaso,
   isGradoMaestria,
+  marcarUsoCriterios,
   normalizarCapturaVolcado,
   type CapturaVolcadoExpansiva,
+  type CriterioVivo,
   type DiagnosticoVolcado,
   type GradoMaestria,
 } from "@shared/deposito/engineConfig";
@@ -77,9 +86,13 @@ export default function Esperanza() {
   const [ultimoVolcado, setUltimoVolcado] = useState("");
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
   const [meritoOverlay, setMeritoOverlay] = useState<GradoMaestria | null>(null);
+  const [acervo, setAcervo] = useState<CriterioVivo[]>([]);
   const dictamenRef = useRef<HTMLDivElement>(null);
   const gradoRef = useRef<GradoMaestria>(grado);
+  const acervoRef = useRef<CriterioVivo[]>([]);
+  const usosMarcadosRef = useRef("");
   gradoRef.current = grado;
+  acervoRef.current = acervo;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -90,6 +103,7 @@ export default function Esperanza() {
       : leerGradoMaestria(user?.uid);
     gradoDesdeQueryRef.current = isGradoMaestria(desdeQuery);
     setGrado(activo);
+    setAcervo(leerCriteriosVivos(user?.uid ?? "anon"));
   }, [user]);
 
   useEffect(() => {
@@ -145,6 +159,22 @@ export default function Esperanza() {
 
   const aplicarDiagnostico = (diag: DiagnosticoVolcado) => {
     setDiagnostico(diag);
+    const aplicados = diag.criterioAplicado ?? [];
+    const firmaUsos = aplicados
+      .map((c) => c.id)
+      .sort()
+      .join(",");
+    if (aplicados.length > 0 && usosMarcadosRef.current !== firmaUsos) {
+      usosMarcadosRef.current = firmaUsos;
+      const uid = user?.uid ?? "anon";
+      const usado = marcarUsoCriterios(
+        acervoRef.current,
+        aplicados.map((c) => c.id),
+      );
+      acervoRef.current = usado;
+      setAcervo(usado);
+      guardarCriteriosVivos(uid, usado);
+    }
     const promovido = diagnosticoPromueve(
       diag,
       gradoRef.current,
@@ -188,6 +218,7 @@ export default function Esperanza() {
       lista,
       ojosHistoricos,
       metricasJornada,
+      acervoRef.current,
     );
     const dictamenCoherente = coherenciaDictamenConPlacement(d, {
       gradoDetectado: localDiag.evaluacionGrado?.gradoDetectado,
@@ -197,6 +228,7 @@ export default function Esperanza() {
 
     setDictamen(dictamenCoherente);
     setUltimoVolcado(crudo);
+    usosMarcadosRef.current = "";
     aplicarDiagnostico(localDiag);
     requestAnimationFrame(() =>
       dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -225,6 +257,7 @@ export default function Esperanza() {
         const remoto = await procesarVolcadoRemoto(crudo, lista, {
           ojosHistoricos,
           metricasJornada,
+          criteriosVivos: acervoRef.current,
         });
         aplicarDiagnostico(remoto.diagnostico);
         setDictamen((prev) =>
@@ -408,6 +441,38 @@ export default function Esperanza() {
               />
             )}
             {dictamen && <DictamenFrente dictamen={dictamen} />}
+            {diagnostico && ultimoVolcado && (
+              <SelloCriterio
+                volcadoCrudo={ultimoVolcado}
+                codigoMotor={diagnostico.codigoDominante}
+                onSellar={(sabiduria) => {
+                  const uid = user?.uid ?? "anon";
+                  const siguiente = sellarCriterioLocal(uid, {
+                    codigo: diagnostico.codigoDominante,
+                    origen: "sello",
+                    sabiduria,
+                    volcadoCrudo: ultimoVolcado,
+                    codigoMotor: diagnostico.codigoDominante,
+                  });
+                  acervoRef.current = siguiente;
+                  setAcervo(siguiente);
+                  toast.success("El Maestro guardó tu criterio.");
+                }}
+                onCorregir={(codigo, sabiduria) => {
+                  const uid = user?.uid ?? "anon";
+                  const siguiente = sellarCriterioLocal(uid, {
+                    codigo,
+                    origen: "correccion",
+                    sabiduria,
+                    volcadoCrudo: ultimoVolcado,
+                    codigoMotor: diagnostico.codigoDominante,
+                  });
+                  acervoRef.current = siguiente;
+                  setAcervo(siguiente);
+                  toast.success("El Maestro corrigió el ojo con tu sabiduría.");
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -444,6 +509,7 @@ export default function Esperanza() {
         {anexoReady && (
           <>
             <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
+            <CardCriterioVivo acervo={acervo} />
             <CardLeyOpticaCodigo />
           </>
         )}

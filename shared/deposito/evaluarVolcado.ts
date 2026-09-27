@@ -15,10 +15,12 @@ import {
   type CodigoObservador,
   type DepositoEngineResponse,
   type DiagnosticoVolcado,
+  type CriterioVivo,
   type GeminiVolcadoCaller,
   type GradoMaestria,
   type MetricasJornadaIntencion,
 } from "./engineConfig.ts";
+import { normalizarAcervoCriterios } from "./criterioMaestro.ts";
 
 export function parseOjosHistoricos(raw: unknown): CodigoObservador[] {
   if (!Array.isArray(raw)) return [];
@@ -41,6 +43,8 @@ export interface EvaluarDepositoInput {
   historialCodigos?: unknown;
   /** Métricas de La Jornada: conquista/pérdida de Intención Panorámica. */
   metricasJornada?: MetricasJornadaIntencion | unknown;
+  /** Sabiduría sellada del operador. El Maestro la cita; no la inventa. */
+  criteriosVivos?: readonly CriterioVivo[] | unknown;
   callGemini?: GeminiVolcadoCaller;
 }
 
@@ -96,6 +100,7 @@ export async function evaluarDepositoVolcado(
       gradoMaestria: captura.gradoMaestria,
       ojosHistoricos,
       metricasJornada: normalizarMetricasJornada(input.metricasJornada),
+      criteriosVivos: normalizarAcervoCriterios(input.criteriosVivos),
     },
   );
   const engine = toDepositoEngineResponse(resultado.diagnostico);

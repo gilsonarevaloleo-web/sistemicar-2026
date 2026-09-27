@@ -100,6 +100,8 @@ export function registerDepositoV2Routes(
         nombreOjo: o.nombreOjo,
         focoAtencion: o.focoAtencion,
       })),
+      criterioVivo: true,
+      ritualCriterio: "Esto es lo que vi",
       gemini: Boolean(callGemini),
       fallbackLocal: true,
     });
@@ -115,6 +117,7 @@ export function registerDepositoV2Routes(
     codigoHipotesis: req.body?.codigoHipotesis,
     ojosHistoricos: req.body?.ojosHistoricos ?? req.body?.historialCodigos,
     metricasJornada: req.body?.metricasJornada,
+    criteriosVivos: req.body?.criteriosVivos ?? req.body?.criterios,
     callGemini,
   });
 
