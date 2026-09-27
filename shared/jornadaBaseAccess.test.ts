@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   JORNADA_BASE_POINTS_UNLOCK,
+  JORNADA_BASE_TRIAL_COPY,
   JORNADA_BASE_TRIAL_DAYS,
   JORNADA_BASE_TRIAL_MS,
   canEnterJornadaBase,
   resolveJornadaBaseAccess,
+  resolveJornadaBaseRegistroStep,
   toEpochMs,
   trialBannerText,
 } from "./jornadaBaseAccess.ts";
@@ -92,6 +94,84 @@ describe("jornadaBaseAccess", () => {
     );
     assert.equal(a.kind, "points");
     assert.equal(a.allowed, true);
+  });
+
+  it("sin Firebase o owner no pide registro", () => {
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: false,
+        isAnonymous: true,
+        progressionReady: false,
+      }),
+      "ready",
+    );
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isOwner: true,
+        isAnonymous: false,
+        email: "gilsonarevalo.leo@gmail.com",
+        progressionReady: false,
+      }),
+      "ready",
+    );
+  });
+
+  it("anónimo o sin Gmail va a Google", () => {
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isAnonymous: true,
+        progressionReady: false,
+      }),
+      "google",
+    );
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isAnonymous: false,
+        email: "",
+        progressionReady: true,
+      }),
+      "google",
+    );
+  });
+
+  it("con Gmail espera progresión y luego pide WhatsApp", () => {
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isAnonymous: false,
+        email: "tina@gmail.com",
+        progressionReady: false,
+      }),
+      "loading",
+    );
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isAnonymous: false,
+        email: "tina@gmail.com",
+        whatsapp: "",
+        progressionReady: true,
+      }),
+      "phone",
+    );
+    assert.equal(
+      resolveJornadaBaseRegistroStep({
+        firebaseConfigured: true,
+        isAnonymous: false,
+        email: "tina@gmail.com",
+        whatsapp: "918260514",
+        progressionReady: true,
+      }),
+      "ready",
+    );
+  });
+
+  it("el copy de registro pide Google y WhatsApp", () => {
+    assert.match(JORNADA_BASE_TRIAL_COPY.register, /Google/);
+    assert.match(JORNADA_BASE_TRIAL_COPY.register, /WhatsApp/);
   });
 
   it("toEpochMs lee number, ISO y Date", () => {

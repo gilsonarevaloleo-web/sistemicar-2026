@@ -10,7 +10,7 @@ import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3Suspens
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
-import { isUserAnonymous } from "@/lib/firebase";
+import { isFirebaseConfigured, isUserAnonymous } from "@/lib/firebase";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial } from "@/lib/persistence";
 import { identifyMetaUser, trackCompleteRegistration, trackJornadaStartTrial } from "@/lib/metaPixel";
 import {
@@ -18,6 +18,10 @@ import {
   isPreviewOpsUnlocked,
 } from "@/lib/previewOps";
 import type { ModuleId } from "@shared/moduleAccess";
+import {
+  JORNADA_BASE_TRIAL_ACCESO_HREF,
+  resolveJornadaBaseRegistroStep,
+} from "@shared/jornadaBaseAccess";
 
 interface AppUser {
   uid: string;
@@ -272,11 +276,40 @@ function ModuleRoute({
       return;
     }
 
+    if (!loading && user && requiredModule === "planificacion_base") {
+      const preStep = resolveJornadaBaseRegistroStep({
+        firebaseConfigured: isFirebaseConfigured(),
+        isOwner: ownerBypass,
+        isAnonymous: isUserAnonymous() || !user.email,
+        email: user.email,
+        whatsapp: null,
+        progressionReady: false,
+      });
+      if (preStep === "google") {
+        navigate(JORNADA_BASE_TRIAL_ACCESO_HREF);
+        return;
+      }
+    }
+
     if (user?.uid) {
       const unsub = subscribeToProgression(
         user.uid,
         (prog) => {
           setProgression(prog);
+          if (requiredModule === "planificacion_base") {
+            const regStep = resolveJornadaBaseRegistroStep({
+              firebaseConfigured: isFirebaseConfigured(),
+              isOwner: ownerBypass,
+              isAnonymous: isUserAnonymous() || !user?.email,
+              email: user?.email,
+              whatsapp: prog?.whatsapp,
+              progressionReady: true,
+            });
+            if (regStep === "google" || regStep === "phone") {
+              navigate(JORNADA_BASE_TRIAL_ACCESO_HREF);
+              return;
+            }
+          }
           if (requiredModule === "planificacion_base" && !hasAccess(prog)) {
             const grant = resolveUserJornadaBaseAccess(
               prog?.subscriptionPlan,

@@ -65,6 +65,7 @@ type AdminUserLookup = {
   totalCP?: number;
   activeModules?: string[];
   subscriptionPlan?: string | null;
+  whatsapp?: string | null;
 };
 
 const ADMIN_TABS = [
@@ -1574,7 +1575,7 @@ export default function AdminGilson() {
             <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20">
               <h3 className="text-sky-400 font-bold mb-3">Activar Planificación (Yape / manual)</h3>
               <p className="text-xs text-slate-400 mb-4">
-                La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Si aún no entró, registra la activación pendiente y mándale el mensaje de WhatsApp: al entrar con ese mismo Gmail el plan se enciende solo.
+                La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Ahí también deja su WhatsApp. Si aún no entró, registra la activación pendiente y mándale el mensaje: al entrar con ese mismo Gmail el plan se enciende solo.
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
@@ -1672,6 +1673,12 @@ export default function AdminGilson() {
                   {moduleSearchResult.activeModules?.length ? (
                     <p>Módulos: {moduleSearchResult.activeModules.join(", ")}</p>
                   ) : null}
+                  <p>
+                    WhatsApp:{" "}
+                    {moduleSearchResult.whatsapp
+                      ? moduleSearchResult.whatsapp
+                      : "aún no lo dejó en /acceso"}
+                  </p>
                   {moduleSearchResult.adminReady === false && (
                     <p className="text-amber-400">
                       Servidor sin FIREBASE_SERVICE_ACCOUNT_JSON — la activación puede fallar.

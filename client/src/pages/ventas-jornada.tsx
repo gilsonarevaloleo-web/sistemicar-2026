@@ -101,6 +101,9 @@ export default function VentasJornada() {
           <p className="mt-1 text-[11px] text-white/40">
             Peldaño 1. Ritmo y Norte vienen después, cuando ya mides.
           </p>
+          <p className="mt-3 text-[12px] text-white/55">
+            {JORNADA_BASE_TRIAL_COPY.register}
+          </p>
         </section>
 
         <div className="mt-6 space-y-3">

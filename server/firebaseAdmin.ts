@@ -210,6 +210,7 @@ export type AdminUserLookupResult = {
   totalCP?: number;
   activeModules?: string[];
   subscriptionPlan?: string | null;
+  whatsapp?: string | null;
 };
 
 /** Busca usuario en Firebase Auth (fuente de verdad) + progresión si Admin SDK está listo. */
@@ -246,6 +247,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
   let totalCP = 0;
   let activeModules: string[] | undefined;
   let subscriptionPlan: string | null | undefined;
+  let whatsapp: string | null | undefined;
 
   if (adminApp && uid) {
     const db = getFirestore(adminApp);
@@ -255,6 +257,10 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
       totalCP = (prog.data.totalCP as number) || (prog.data.points as number) || 0;
       activeModules = prog.data.activeModules as string[] | undefined;
       subscriptionPlan = (prog.data.subscriptionPlan as string) || null;
+      whatsapp =
+        typeof prog.data.whatsapp === "string" && prog.data.whatsapp.trim()
+          ? prog.data.whatsapp.trim()
+          : null;
     }
   }
 
@@ -270,5 +276,6 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     totalCP,
     activeModules,
     subscriptionPlan,
+    whatsapp,
   };
 }

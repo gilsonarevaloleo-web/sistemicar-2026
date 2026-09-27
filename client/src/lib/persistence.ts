@@ -78,6 +78,7 @@ import {
   type JornadaBaseAccess,
   type JornadaBaseAccessInput,
 } from "@shared/jornadaBaseAccess";
+import { normalizeClientPhone, pickClientPhone } from "@shared/phone";
 import { isPreviewOpsUnlocked } from "./previewOps";
 
 export interface AcervoEntry {
@@ -2802,6 +2803,8 @@ export interface UserProgression {
   jornadaBaseTrialStartedAt?: number | null;
   /** Gancho: llegó a 500 PS y Base queda gratis. */
   jornadaBaseEarnedFree?: boolean;
+  /** WhatsApp E.164. Obligatorio para entrar a Jornada Base. */
+  whatsapp?: string | null;
 }
 
 const PROGRESSION_KEY = "sistemicar_progression";
@@ -2873,6 +2876,7 @@ function getDefaultProgression(userId: string): UserProgression {
     ptsDeposito: 0,
     jornadaBaseTrialStartedAt: null,
     jornadaBaseEarnedFree: false,
+    whatsapp: null,
   };
 }
 
@@ -2967,6 +2971,7 @@ export function subscribeToProgression(
             localProg.jornadaBaseEarnedFree ||
             sovereigntyPoints >= JORNADA_BASE_POINTS_UNLOCK
         );
+        const whatsapp = pickClientPhone(data.whatsapp, localProg.whatsapp);
         const prog = {
           id: d.id,
           ...data,
@@ -2977,6 +2982,7 @@ export function subscribeToProgression(
           totalCP,
           jornadaBaseTrialStartedAt,
           jornadaBaseEarnedFree,
+          whatsapp,
           lastActivityDate: data.lastActivityDate?.toDate() || null,
           cooldownUntil: data.cooldownUntil?.toDate() || null,
           createdAt: data.createdAt?.toDate() || new Date(),
@@ -5288,6 +5294,34 @@ export async function addProspecto(
   }
 
   return newProspecto;
+}
+
+/** Guarda WhatsApp en la cuenta y lo deja como lead (prospecto). */
+export async function saveJornadaBaseContact(
+  userId: string,
+  opts: { email: string; nombre?: string | null; whatsapp: string }
+): Promise<string> {
+  const phone = normalizeClientPhone(opts.whatsapp);
+  if (!phone) throw new Error("whatsapp_invalido");
+  await updateProgression(userId, { whatsapp: phone });
+  const email = opts.email.trim().toLowerCase();
+  const existing = await getProspectoByEmail(email);
+  if (existing) {
+    await updateProspecto(email, { whatsapp: phone, ultimaActividad: new Date() });
+  } else {
+    await addProspecto({
+      nombre: (opts.nombre || "").trim() || email.split("@")[0],
+      whatsapp: phone,
+      correo: email,
+      registradoEn: new Date(),
+      pagoConfirmado: false,
+      retoGuerreroActivo: false,
+      retoGuerreroInicio: null,
+      ultimaActividad: new Date(),
+      source: "jornada-base-acceso",
+    });
+  }
+  return phone;
 }
 
 export async function getProspectoByEmail(email: string): Promise<Prospecto | null> {
