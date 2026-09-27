@@ -1,10 +1,12 @@
 import type {
   CapturaVolcadoInput,
   CodigoObservador,
+  CriterioVivo,
   DepositoEngineResponse,
   DiagnosticoVolcado,
   GradoMaestria,
   MetricasJornadaIntencion,
+  UserMetacognitionStore,
 } from "@shared/deposito/engineConfig";
 
 export interface DepositoVolcadoSuccess {
@@ -16,6 +18,7 @@ export interface DepositoVolcadoSuccess {
   gradoMaestria?: GradoMaestria;
   gradoDetectado?: GradoMaestria;
   meritoReconocido?: boolean;
+  metacognicion?: UserMetacognitionStore;
 }
 
 export interface DepositoVolcadoError {
@@ -66,6 +69,8 @@ export async function procesarVolcadoRemoto(
   extras?: {
     ojosHistoricos?: CodigoObservador[];
     metricasJornada?: MetricasJornadaIntencion;
+    criteriosVivos?: CriterioVivo[];
+    metacognicion?: UserMetacognitionStore;
   },
 ): Promise<DepositoVolcadoSuccess> {
   let res: Response;
@@ -80,6 +85,8 @@ export async function procesarVolcadoRemoto(
           volcadoCrudo: captura?.volcadoCrudo ?? textoVolcado,
           ojosHistoricos: extras?.ojosHistoricos,
           metricasJornada: extras?.metricasJornada,
+          criteriosVivos: extras?.criteriosVivos,
+          metacognicion: extras?.metacognicion,
         }),
       }),
       12000,

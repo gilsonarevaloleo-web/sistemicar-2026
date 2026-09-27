@@ -72,22 +72,24 @@ Copia lista: `marketing/copys-meta-jornada.md`.
 2. Si te pide Administrador comercial, créalo. Sin tarjeta no se publica.
 3. Conecta la página de Facebook y el Instagram de Sistemicar.
 
-El Píxel **ya está en la web** (ID `1066497298319685`). En Events Manager:
+El Píxel **ya está en la web** (ID `1066497298319685`). En Events Manager debe verse:
 
-**Conversiones que Meta usa para ubicar públicos:**
+**Las dos conversiones que Meta usa para ubicar públicos:**
 
-- `CompleteRegistration` — se registra con Google.
-- `Purchase` — Mercado Pago vuelve a `/pagos?status=success&plan=…` (Base $24.99).
+- `CompleteRegistration` — el usuario se registra con Google (`/acceso`, `/bienvenida`). Lleva el email (Advanced Matching) para que Meta sepa quién es.
+- `Purchase` — el usuario paga y Mercado Pago lo devuelve a `/pagos?status=success&plan=…`. Valor real del plan (Jornada Base $24.99). No depende de `/gracias-compra`.
 
 **El resto del embudo (lleva VIDEO A o VIDEO B):**
 
 - `PageView` en todas las páginas
 - `ViewContent` en `/ventas-jornada`
-- `Lead` cuando deja teléfono en el vendedor
-- `StartTrial` al empezar los 7 días
+- `Lead` cuando el prospecto deja teléfono (vendedor) o se anota
+- `StartTrial` al empezar los 7 días gratis
 - `InitiateCheckout` en `/pagos?plan=planificacion_base`
 
-Objetivo **Conversiones**. Evento: `Purchase`. Si aún no hay pagos, `CompleteRegistration`.
+En el anuncio, objetivo **Conversiones** (no solo Tráfico) y evento de optimización: `Purchase`. Si aún no hay pagos, usa `CompleteRegistration`.
+
+Si Events Manager no muestra el pixel o dice “no recibe eventos”, el plugin **no está vigente** del lado de Meta (cuenta, dominio o pixel pausado). El código de la web sí dispara.
 
 ---
 

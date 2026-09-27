@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { BannerMeritoDetectado } from "@/components/deposito/BannerMeritoDetectado";
+import { CardAxiomasMetacognicion } from "@/components/deposito/CardAxiomasMetacognicion";
+import { CardCriterioVivo } from "@/components/deposito/CardCriterioVivo";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
 import { DiagnosticoUniversidad } from "@/components/deposito/DiagnosticoUniversidad";
 import { DictamenFrente } from "@/components/deposito/DictamenFrente";
+import { SelloCriterio } from "@/components/deposito/SelloCriterio";
 import {
   FormularioVolcadoExpansivo,
   type FormularioVolcadoHandle,
@@ -21,6 +24,16 @@ import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { procesarVolcadoRemoto } from "@/lib/deposito/api";
 import { leerMetricasJornadaLocal } from "@/lib/jornadaMetricasDeposito";
+import {
+  leerCriteriosVivos,
+  sellarCriterioLocal,
+  guardarCriteriosVivos,
+} from "@/lib/depositoCriterios";
+import {
+  absorberHallazgoLocal,
+  guardarMetacognicion,
+  leerMetacognicion,
+} from "@/lib/depositoMetacognicion";
 import { guardarGradoMaestria, leerGradoMaestria } from "@/lib/depositoPerfil";
 import {
   addVolcadoEntry,
@@ -41,10 +54,13 @@ import {
   motivoRitualPasoVisible,
   progresoRitualPaso,
   isGradoMaestria,
+  marcarUsoCriterios,
   normalizarCapturaVolcado,
   type CapturaVolcadoExpansiva,
+  type CriterioVivo,
   type DiagnosticoVolcado,
   type GradoMaestria,
+  type UserMetacognitionStore,
 } from "@shared/deposito/engineConfig";
 import {
   calcularExpedienteOjos,
@@ -77,9 +93,18 @@ export default function Esperanza() {
   const [ultimoVolcado, setUltimoVolcado] = useState("");
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
   const [meritoOverlay, setMeritoOverlay] = useState<GradoMaestria | null>(null);
+  const [acervo, setAcervo] = useState<CriterioVivo[]>([]);
+  const [metacognicion, setMetacognicion] = useState<UserMetacognitionStore>({
+    axiomas: [],
+  });
   const dictamenRef = useRef<HTMLDivElement>(null);
   const gradoRef = useRef<GradoMaestria>(grado);
+  const acervoRef = useRef<CriterioVivo[]>([]);
+  const metacognicionRef = useRef<UserMetacognitionStore>({ axiomas: [] });
+  const usosMarcadosRef = useRef("");
   gradoRef.current = grado;
+  acervoRef.current = acervo;
+  metacognicionRef.current = metacognicion;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -90,6 +115,8 @@ export default function Esperanza() {
       : leerGradoMaestria(user?.uid);
     gradoDesdeQueryRef.current = isGradoMaestria(desdeQuery);
     setGrado(activo);
+    setAcervo(leerCriteriosVivos(user?.uid ?? "anon"));
+    setMetacognicion(leerMetacognicion(user?.uid ?? "anon"));
   }, [user]);
 
   useEffect(() => {
@@ -143,10 +170,33 @@ export default function Esperanza() {
     [historial, grado],
   );
 
-  const aplicarDiagnostico = (diag: DiagnosticoVolcado) => {
-    setDiagnostico(diag);
-    const promovido = diagnosticoPromueve(
+  const aplicarDiagnostico = (diag: DiagnosticoVolcado, volcado = "") => {
+    const uid = user?.uid ?? "anon";
+    const hallazgo = absorberHallazgoLocal(
+      uid,
       diag,
+      volcado || ultimoVolcado,
+    );
+    metacognicionRef.current = hallazgo.store;
+    setMetacognicion(hallazgo.store);
+    setDiagnostico(hallazgo.diagnostico);
+    const aplicados = hallazgo.diagnostico.criterioAplicado ?? [];
+    const firmaUsos = aplicados
+      .map((c) => c.id)
+      .sort()
+      .join(",");
+    if (aplicados.length > 0 && usosMarcadosRef.current !== firmaUsos) {
+      usosMarcadosRef.current = firmaUsos;
+      const usado = marcarUsoCriterios(
+        acervoRef.current,
+        aplicados.map((c) => c.id),
+      );
+      acervoRef.current = usado;
+      setAcervo(usado);
+      guardarCriteriosVivos(uid, usado);
+    }
+    const promovido = diagnosticoPromueve(
+      hallazgo.diagnostico,
       gradoRef.current,
       gradoDesdeQueryRef.current,
     );
@@ -188,6 +238,8 @@ export default function Esperanza() {
       lista,
       ojosHistoricos,
       metricasJornada,
+      acervoRef.current,
+      metacognicionRef.current,
     );
     const dictamenCoherente = coherenciaDictamenConPlacement(d, {
       gradoDetectado: localDiag.evaluacionGrado?.gradoDetectado,
@@ -197,7 +249,8 @@ export default function Esperanza() {
 
     setDictamen(dictamenCoherente);
     setUltimoVolcado(crudo);
-    aplicarDiagnostico(localDiag);
+    usosMarcadosRef.current = "";
+    aplicarDiagnostico(localDiag, crudo);
     requestAnimationFrame(() =>
       dictamenRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
@@ -225,8 +278,15 @@ export default function Esperanza() {
         const remoto = await procesarVolcadoRemoto(crudo, lista, {
           ojosHistoricos,
           metricasJornada,
+          criteriosVivos: acervoRef.current,
+          metacognicion: metacognicionRef.current,
         });
-        aplicarDiagnostico(remoto.diagnostico);
+        if (remoto.metacognicion) {
+          metacognicionRef.current = remoto.metacognicion;
+          setMetacognicion(remoto.metacognicion);
+          guardarMetacognicion(uid, remoto.metacognicion);
+        }
+        aplicarDiagnostico(remoto.diagnostico, crudo);
         setDictamen((prev) =>
           prev
             ? coherenciaDictamenConPlacement(prev, {
@@ -408,6 +468,38 @@ export default function Esperanza() {
               />
             )}
             {dictamen && <DictamenFrente dictamen={dictamen} />}
+            {diagnostico && ultimoVolcado && (
+              <SelloCriterio
+                volcadoCrudo={ultimoVolcado}
+                codigoMotor={diagnostico.codigoDominante}
+                onSellar={(sabiduria) => {
+                  const uid = user?.uid ?? "anon";
+                  const siguiente = sellarCriterioLocal(uid, {
+                    codigo: diagnostico.codigoDominante,
+                    origen: "sello",
+                    sabiduria,
+                    volcadoCrudo: ultimoVolcado,
+                    codigoMotor: diagnostico.codigoDominante,
+                  });
+                  acervoRef.current = siguiente;
+                  setAcervo(siguiente);
+                  toast.success("El Maestro guardó tu criterio.");
+                }}
+                onCorregir={(codigo, sabiduria) => {
+                  const uid = user?.uid ?? "anon";
+                  const siguiente = sellarCriterioLocal(uid, {
+                    codigo,
+                    origen: "correccion",
+                    sabiduria,
+                    volcadoCrudo: ultimoVolcado,
+                    codigoMotor: diagnostico.codigoDominante,
+                  });
+                  acervoRef.current = siguiente;
+                  setAcervo(siguiente);
+                  toast.success("El Maestro corrigió el ojo con tu sabiduría.");
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -444,6 +536,8 @@ export default function Esperanza() {
         {anexoReady && (
           <>
             <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
+            <CardAxiomasMetacognicion store={metacognicion} />
+            <CardCriterioVivo acervo={acervo} />
             <CardLeyOpticaCodigo />
           </>
         )}

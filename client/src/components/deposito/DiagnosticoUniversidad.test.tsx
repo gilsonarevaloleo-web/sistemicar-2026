@@ -125,4 +125,44 @@ describe("DiagnosticoUniversidad", () => {
     assert.doesNotMatch(html, /G1 · Aprendiz de Ojo/);
     assert.doesNotMatch(html, /G2 · Detector de Ruido/);
   });
+
+  it("nombra el criterio vivo que el Maestro usó", () => {
+    const base = diagnosticarVolcadoLocal(RITMO);
+    const diagnostico = {
+      ...base,
+      criterioAplicado: [
+        {
+          id: "crit_1",
+          codigo: 3 as const,
+          enunciado: "C3 Ritmo: la secuencia es el aprendizaje.",
+          origen: "sello" as const,
+          resonancia: 0.4,
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(DiagnosticoUniversidad, { diagnostico }),
+    );
+    assert.match(html, /El Maestro usó tu criterio/);
+    assert.match(html, /C3/);
+  });
+
+  it("muestra el axioma descubierto del operador", () => {
+    const base = diagnosticarVolcadoLocal(RITMO);
+    const diagnostico = {
+      ...base,
+      axiomaDescubierto: {
+        fecha: 1,
+        codigoRelacionado: "C3" as const,
+        principioDescubierto:
+          "La secuencia es el aprendizaje, no la prisa del pistón.",
+        metaforaClave: "El relojero práctico",
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(DiagnosticoUniversidad, { diagnostico }),
+    );
+    assert.match(html, /Axioma C3/);
+    assert.match(html, /El relojero práctico/);
+  });
 });

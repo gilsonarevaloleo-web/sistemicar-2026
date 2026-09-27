@@ -29,6 +29,7 @@ import {
   buildDepositoSystemPrompt,
   INTENCION_PANORAMICA_CRITERIO,
   INTENCION_PANORAMICA_NOMBRE,
+  sellarCriterio,
   type CodigoObservador,
 } from "./engineConfig.ts";
 
@@ -106,6 +107,11 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.match(prompt.system, /densidadEstructural > 75/);
     assert.doesNotMatch(prompt.system, /Ceguera típica:.*miedo al rechazo/);
     assert.doesNotMatch(prompt.system, /Cuerpo en la Puerta/);
+    assert.match(prompt.system, /CRITERIO VIVO DEL MAESTRO/);
+    assert.match(prompt.system, /Acervo vacío/);
+    assert.match(prompt.system, /CRITERIO ADAPTATIVO/);
+    assert.match(prompt.system, /principios previamente descubiertos por el operador/);
+    assert.match(prompt.system, /automatismo/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
     assert.doesNotMatch(prompt.system, /Eje Masculino|Eje Femenino|CAPA INTERNA DE POLARIDAD/);
     assert.doesNotMatch(
@@ -727,5 +733,42 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.doesNotMatch(d.devolucionMaestro, /todavía es ruido/i);
     assert.ok((d.evaluacionGrado?.gradoDetectado ?? 1) >= 3);
     assert.ok((d.metricasMerito?.densidadEstructural ?? 0) > 75);
+  });
+
+  it("el Maestro cita el criterio sellado y puede desplazar el ojo local", () => {
+    const pelea =
+      "Hoy la pelea con el cliente empezó por el precio. Yo no respondí. Corté la llamada a las 9:14. Anoté el rechazo. No dije después veo.";
+    const hermano =
+      "Otra pelea por el precio. El cliente insistió. Yo corté. No respondí el ataque. Cerré a las 10:02 y anoté el rechazo.";
+    const acervo = sellarCriterio([], {
+      codigo: 5,
+      origen: "correccion",
+      sabiduria:
+        "Cuando nombro el corte y no la pelea, el ojo es Decisión, no roce.",
+      volcadoCrudo: pelea,
+      codigoMotor: 6,
+      id: "crit_c5_corte",
+    });
+    const sinMemoria = diagnosticarVolcadoLocal(hermano);
+    const conMemoria = diagnosticarVolcadoLocal(
+      hermano,
+      undefined,
+      [],
+      undefined,
+      acervo,
+    );
+    assert.equal(conMemoria.codigoDominante, 5);
+    assert.match(conMemoria.devolucionMaestro, /Criterio vivo/);
+    assert.ok((conMemoria.criterioAplicado?.length ?? 0) >= 1);
+    assert.notEqual(sinMemoria.criterioAplicado?.length ?? 0, 1);
+    const prompt = obtenerPromptVolcado(
+      hermano,
+      undefined,
+      [],
+      undefined,
+      acervo,
+    );
+    assert.match(prompt.system, /C5/);
+    assert.match(prompt.system, /CÍTALO|CITALO/i);
   });
 });
