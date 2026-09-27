@@ -7,15 +7,20 @@
  * (voz, Firebase, higiene de storage) el toque no navega y la página se ve congelada.
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { ArrowRight, Phone } from "lucide-react";
 import { SKU_BASE } from "@shared/planificacionPricing";
+import {
+  JORNADA_BASE_TRIAL_ACCESO_HREF,
+  JORNADA_BASE_TRIAL_COPY,
+} from "@shared/jornadaBaseAccess";
 import {
   PAGOS_JORNADA_BASE_HREF,
   VENDEDOR_JORNADA_ADS_HREF,
   withTrackedQuery,
 } from "@shared/vendedor/entradaComercial";
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
+import { trackJornadaViewContent } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 
@@ -28,6 +33,11 @@ export default function VentasJornada() {
   const search = typeof window !== "undefined" ? window.location.search : "";
   const vendedorHref = withTrackedQuery(VENDEDOR_JORNADA_ADS_HREF, search);
   const pagosHref = withTrackedQuery(PAGOS_JORNADA_BASE_HREF, search);
+  const trialHref = withTrackedQuery(JORNADA_BASE_TRIAL_ACCESO_HREF, search);
+
+  useEffect(() => {
+    trackJornadaViewContent();
+  }, []);
 
   return (
     <div
@@ -80,10 +90,13 @@ export default function VentasJornada() {
             <li>El día termina con evidencia, no con culpa.</li>
           </ul>
           <p className="mt-4 text-2xl font-black text-white">
-            ${SKU_BASE.priceUsd}
+            {JORNADA_BASE_TRIAL_COPY.headline}
             <span className="ml-2 text-sm font-normal text-white/45">
-              /mes · ~S/ {SKU_BASE.pricePen}
+              {JORNADA_BASE_TRIAL_COPY.after} · ~S/ {SKU_BASE.pricePen}
             </span>
+          </p>
+          <p className="mt-2 text-[12px] text-white/70">
+            {JORNADA_BASE_TRIAL_COPY.hook}
           </p>
           <p className="mt-1 text-[11px] text-white/40">
             Peldaño 1. Ritmo y Norte vienen después, cuando ya mides.
@@ -92,13 +105,22 @@ export default function VentasJornada() {
 
         <div className="mt-6 space-y-3">
           <a
-            href={vendedorHref}
+            href={trialHref}
             className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[13px] font-black tracking-[0.12em] touch-manipulation"
             style={{
               background: GOLD,
               color: "#0A0A0A",
               WebkitTapHighlightColor: "rgba(212,175,55,0.35)",
             }}
+            data-testid="ventas-jornada-cta-trial"
+          >
+            EMPEZAR 7 DÍAS GRATIS
+            <ArrowRight size={14} />
+          </a>
+          <a
+            href={vendedorHref}
+            className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[12px] font-bold tracking-[0.12em] touch-manipulation"
+            style={{ borderColor: `${GOLD}66`, color: GOLD }}
             data-testid="ventas-jornada-cta-vendedor"
           >
             <Phone size={16} />
@@ -106,18 +128,16 @@ export default function VentasJornada() {
           </a>
           <a
             href={pagosHref}
-            className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[12px] font-bold tracking-[0.12em] touch-manipulation"
-            style={{ borderColor: `${GOLD}66`, color: GOLD }}
+            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-bold tracking-[0.12em] text-white/45 touch-manipulation"
             data-testid="ventas-jornada-cta-pagos"
           >
-            ACTIVAR JORNADA BASE
-            <ArrowRight size={14} />
+            Activar ahora · ${SKU_BASE.priceUsd}/mes
           </a>
         </div>
 
         <p className="mt-6 text-center text-[11px] leading-relaxed text-white/30">
-          Dos preguntas cortas y te llamo — o te mando el enlace de pago
-          por WhatsApp. Si ya lo tienes claro, activa Base ahora.
+          Entras 7 días sin pagar. Después cobramos ${SKU_BASE.priceUsd}/mes.
+          Si llegas a 500 PS, Base te queda gratis.
         </p>
       </div>
     </div>

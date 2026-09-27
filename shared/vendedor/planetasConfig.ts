@@ -54,8 +54,8 @@ export const PLANETAS: Record<PlanetaId, PlanetaConfig> = {
       "Cansancio, falta de tiempo, dispersión o sensación de apagar incendios.",
     metodoEntrada:
       "Ejecución por bloques: medir unidades, ritmo y cierre diario.",
-    trialHref: "/pagos?plan=planificacion_base",
-    trialLabel: "Ver Jornada Base",
+    trialHref: "/acceso?next=/jornada-v4",
+    trialLabel: "Empezar 7 días gratis",
     checkoutHref: "/pagos?plan=planificacion_base",
     checkoutLabel: "Activar Jornada Base",
     color: "#D4AF37",

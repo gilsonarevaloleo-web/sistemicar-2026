@@ -28,7 +28,24 @@ Copia lista para pegar: `marketing/copys-meta-jornada.md`.
 3. Si te pide verificar identidad o agregar tarjeta: hazlo. Sin tarjeta no se publica.
 4. Conecta tu página de Facebook y tu Instagram (el mismo manag­er te guía). Si no tienes página, créala en 5 minutos: nombre “SISTEMICAR”, categoría “Software”.
 
-No instales el Píxel todavía. Para el primer anuncio no lo necesitas.
+El Píxel **ya está en la web** (ID `1066497298319685`). En Events Manager debe verse:
+
+**Las dos conversiones que Meta usa para ubicar públicos:**
+
+- `CompleteRegistration` — el usuario se registra con Google (`/acceso`, `/bienvenida`). Lleva el email (Advanced Matching) para que Meta sepa quién es.
+- `Purchase` — el usuario paga y Mercado Pago lo devuelve a `/pagos?status=success&plan=…`. Valor real del plan (Jornada Base $24.99). No depende de `/gracias-compra`.
+
+**El resto del embudo:**
+
+- `PageView` en todas las páginas
+- `ViewContent` en `/ventas-jornada`
+- `Lead` cuando el prospecto deja teléfono (vendedor) o se anota
+- `StartTrial` al empezar los 7 días gratis
+- `InitiateCheckout` en `/pagos?plan=planificacion_base`
+
+En el anuncio, objetivo **Conversiones** (no solo Tráfico) y evento de optimización: `Purchase`. Si aún no hay pagos, usa `CompleteRegistration`.
+
+Si Events Manager no muestra el pixel o dice “no recibe eventos”, el plugin **no está vigente** del lado de Meta (cuenta, dominio o pixel pausado). El código de la web sí dispara.
 
 ---
 

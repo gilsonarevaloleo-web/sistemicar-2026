@@ -59,7 +59,7 @@ export const SKU_BASE: PlanificacionSku = {
   ],
   identity: "Mido lo que cierro hoy",
   forWho: "Entrada — producción urgente",
-  funnelHint: "Empieza aquí",
+  funnelHint: "7 días gratis · 500 PS = Base gratis",
   commissionUsd: commission(24.99),
 };
 

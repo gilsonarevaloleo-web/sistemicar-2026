@@ -1,7 +1,7 @@
 # Copy Meta — Jornada Base (único anuncio de este corte)
 
 **Versión:** 1.0 · agosto 2026  
-**Producto:** Jornada Base · $24.99/mes  
+**Producto:** Jornada Base · 7 días gratis, después $24.99/mes · 500 PS = Base gratis
 **Destino del anuncio (pégalo tal cual):**
 
 ```
@@ -28,10 +28,10 @@ El día se te fue sin un número.
 Trabajaste. Contestaste. Apagaste incendios.
 Al final no sabes cuánto cerraste.
 
-Jornada Base: mides unidades y el día termina con evidencia.
-$24.99 al mes.
+Jornada Base: 7 días gratis. Mides unidades y el día termina con evidencia.
+Después $24.99 al mes. Si llegas a 500 puntos, te queda gratis.
 
-Toca. El vendedor te llama.
+Toca. Empieza el trial o pide que te llame el vendedor.
 ```
 
 **Texto largo** (si Meta pide cuerpo extendido):
@@ -45,10 +45,11 @@ Al final no hay un cierre — solo la sensación de que el día se evaporó.
 Jornada Base no es otra lista.
 Lanzas un bloque, cierras unidades y el día termina con evidencia, no con culpa.
 
-$24.99 al mes. Empieza por lo urgente.
+7 días gratis. Después $24.99 al mes.
+Si llegas a 500 puntos de soberanía, Jornada Base te queda gratis.
 Ritmo y proyectos vienen después, cuando ya mides.
 
-Toca y pide que te llame el vendedor.
+Toca y entra. O pide que te llame el vendedor.
 ```
 
 **CTA del anuncio (en Meta):**  

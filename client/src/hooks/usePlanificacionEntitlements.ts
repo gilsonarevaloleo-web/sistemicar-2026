@@ -5,13 +5,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthContext } from "@/App";
 import {
+  extrasFromProgression,
   hasNorteAccess,
   hasPlanificacionBaseAccess,
   hasRitmoAccess,
+  resolveUserJornadaBaseAccess,
   subscribeToProgression,
   type UserProgression,
 } from "@/lib/persistence";
 import { isPreviewOpsUnlocked } from "@/lib/previewOps";
+import type { JornadaBaseAccess } from "@shared/jornadaBaseAccess";
 import { isOwnerEmail } from "@shared/moduleAccess";
 
 export type PlanificacionEntitlements = {
@@ -24,6 +27,8 @@ export type PlanificacionEntitlements = {
   hasNorte: boolean;
   /** Bypass owner / preview */
   bypass: boolean;
+  /** Cómo se abrió Base (pago, trial, 500 PS). */
+  baseGrant: JornadaBaseAccess;
 };
 
 export function usePlanificacionEntitlements(): PlanificacionEntitlements {
@@ -73,20 +78,29 @@ export function usePlanificacionEntitlements(): PlanificacionEntitlements {
         hasRitmo: true,
         hasNorte: true,
         bypass: true,
+        baseGrant: {
+          allowed: true,
+          kind: "owner",
+          points: progression?.sovereigntyPoints ?? 0,
+          pointsRemaining: 0,
+        },
       };
     }
+    const extras = extrasFromProgression(progression);
     const args = [
       progression?.subscriptionPlan,
       user?.email,
       progression?.rank,
       progression?.activeModules,
     ] as const;
+    const baseGrant = resolveUserJornadaBaseAccess(...args, extras);
     return {
       ready,
-      hasBase: hasPlanificacionBaseAccess(...args),
+      hasBase: hasPlanificacionBaseAccess(...args, extras),
       hasRitmo: hasRitmoAccess(...args),
       hasNorte: hasNorteAccess(...args),
       bypass: false,
+      baseGrant,
     };
   }, [user?.email, progression, ready, previewOps]);
 }

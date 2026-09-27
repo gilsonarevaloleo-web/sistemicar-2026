@@ -48,6 +48,8 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.equal(f.planeta, "JORNADA");
     assert.equal(f.codigo, 3);
     assert.match(f.checkoutHref, /planificacion_base/);
+    assert.match(f.trialHref, /jornada-v4/);
+    assert.match(f.trialLabel, /7 días gratis/i);
   });
 
   it("arrastra ref y utm al siguiente href", () => {
@@ -76,6 +78,8 @@ describe("Entrada comercial Jornada (anuncios)", () => {
     assert.match(href, /^https:\/\/wa\.me\/51918260514\?text=/);
     const text = decodeURIComponent(href.split("text=")[1] || "");
     assert.match(text, /planificacion_base/);
+    assert.match(text, /jornada-v4/);
+    assert.match(text, /7 días gratis/);
     assert.match(text, /ANA/);
   });
 });

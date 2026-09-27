@@ -11,7 +11,8 @@ import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary"
 import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import { isUserAnonymous } from "@/lib/firebase";
-import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess } from "@/lib/persistence";
+import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial } from "@/lib/persistence";
+import { identifyMetaUser, trackCompleteRegistration, trackJornadaStartTrial } from "@/lib/metaPixel";
 import {
   consumePreviewOpsQueryUnlock,
   isPreviewOpsUnlocked,
@@ -120,6 +121,35 @@ function ClaimPurchasesOnLogin() {
   return null;
 }
 
+/** Meta: email del registrado + CompleteRegistration si la cuenta es nueva. */
+function MetaConversionsOnAuth() {
+  const { user, loading } = useAuthContext();
+  useEffect(() => {
+    if (loading || !user?.email || !user.uid) return;
+    if (isUserAnonymous()) return;
+    if (user.uid === "user_arquitecto") return;
+    const raw = user as {
+      metadata?: { creationTime?: string; lastSignInTime?: string };
+    };
+    identifyMetaUser({
+      email: user.email,
+      name: user.displayName,
+      uid: user.uid,
+    });
+    const created = raw.metadata?.creationTime;
+    const last = raw.metadata?.lastSignInTime;
+    if (created && last && created === last) {
+      trackCompleteRegistration({
+        uid: user.uid,
+        email: user.email,
+        name: user.displayName,
+        method: "google",
+      });
+    }
+  }, [user?.uid, user?.email, user?.displayName, loading]);
+  return null;
+}
+
 function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, login, logout } = useAuth();
   const value = useMemo(
@@ -129,6 +159,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={value}>
       <ClaimPurchasesOnLogin />
+      <MetaConversionsOnAuth />
       {children}
     </AuthContext.Provider>
   );
@@ -182,6 +213,7 @@ function ModuleRoute({
   const [progression, setProgression] = useState<UserProgression | null>(null);
   const [checkingTier, setCheckingTier] = useState(true);
   const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
+  const [startingTrial, setStartingTrial] = useState(false);
 
   const ownerBypass = isOwnerEmail(user?.email);
   const previewBypass = previewOps || isPreviewOpsUnlocked();
@@ -199,12 +231,34 @@ function ModuleRoute({
 
   const hasAccess = (prog: UserProgression | null): boolean => {
     if (ownerBypass || previewBypass || isPreviewOpsUnlocked()) return true;
+    const extras = extrasFromProgression(prog);
     const args = [prog?.subscriptionPlan, user?.email, prog?.rank, prog?.activeModules] as const;
-    if (requiredModule === "planificacion_base") return hasPlanificacionBaseAccess(...args);
+    if (requiredModule === "planificacion_base") {
+      return hasPlanificacionBaseAccess(...args, extras);
+    }
     if (requiredModule === "operativo") return hasOperativoAccess(...args);
     if (requiredModule === "soberania_dia") return hasSoberaniaDiaAccess(...args);
     if (requiredModule === "umbral") return hasUmbralAccess(...args);
     return false;
+  };
+
+  const pagosHrefForDeny = (prog: UserProgression | null): string => {
+    if (requiredModule === "umbral") return "/pagos?plan=umbral";
+    if (requiredModule === "planificacion_base") {
+      const extras = extrasFromProgression(prog);
+      const grant = resolveUserJornadaBaseAccess(
+        prog?.subscriptionPlan,
+        user?.email,
+        prog?.rank,
+        prog?.activeModules,
+        extras,
+      );
+      if (grant.kind === "expired") {
+        return "/pagos?plan=planificacion_base&trial=expired";
+      }
+      return "/pagos?plan=planificacion_base";
+    }
+    return "/pagos";
   };
 
   useEffect(() => {
@@ -223,19 +277,39 @@ function ModuleRoute({
         user.uid,
         (prog) => {
           setProgression(prog);
+          if (requiredModule === "planificacion_base" && !hasAccess(prog)) {
+            const grant = resolveUserJornadaBaseAccess(
+              prog?.subscriptionPlan,
+              user.email,
+              prog?.rank,
+              prog?.activeModules,
+              extrasFromProgression(prog),
+            );
+            if (grant.kind === "eligible_trial") {
+              setStartingTrial(true);
+              setCheckingTier(true);
+              void startJornadaBaseTrial(user.uid).then((result) => {
+                if (result.started) trackJornadaStartTrial();
+                setProgression((prev) =>
+                  prev
+                    ? { ...prev, jornadaBaseTrialStartedAt: result.startedAt }
+                    : prev
+                );
+                setStartingTrial(false);
+                setCheckingTier(false);
+              });
+              return;
+            }
+          }
           setCheckingTier(false);
           if (!isPreviewOpsUnlocked() && !hasAccess(prog)) {
-            navigate(
-              requiredModule === "umbral" ? "/pagos?plan=umbral" : "/pagos",
-            );
+            navigate(pagosHrefForDeny(prog));
           }
         },
         () => {
           setCheckingTier(false);
           if (!ownerBypass && !isPreviewOpsUnlocked()) {
-            navigate(
-              requiredModule === "umbral" ? "/pagos?plan=umbral" : "/pagos",
-            );
+            navigate(pagosHrefForDeny(null));
           }
         }
       );
@@ -262,7 +336,7 @@ function ModuleRoute({
     return <Component />;
   }
 
-  if (loading || checkingTier) {
+  if (loading || checkingTier || startingTrial) {
     return tierLoadingUi;
   }
 

@@ -81,7 +81,12 @@ export function SegmentAttentionBackground() {
           p?.subscriptionPlan,
           user.email,
           p?.rank,
-          p?.activeModules
+          p?.activeModules,
+          {
+            sovereigntyPoints: p?.sovereigntyPoints,
+            jornadaBaseTrialStartedAt: p?.jornadaBaseTrialStartedAt,
+            jornadaBaseEarnedFree: p?.jornadaBaseEarnedFree,
+          }
         );
       },
       e => console.error("[SegmentAttentionBackground] progression", e)
@@ -105,7 +110,12 @@ export function SegmentAttentionBackground() {
         p?.subscriptionPlan,
         user.email,
         p?.rank,
-        p?.activeModules
+        p?.activeModules,
+        {
+          sovereigntyPoints: p?.sovereigntyPoints,
+          jornadaBaseTrialStartedAt: p?.jornadaBaseTrialStartedAt,
+          jornadaBaseEarnedFree: p?.jornadaBaseEarnedFree,
+        }
       );
     }, INITIAL_TICK_DEFER_MS);
 

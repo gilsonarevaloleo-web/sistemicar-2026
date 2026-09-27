@@ -121,7 +121,7 @@ export default function MapaSistemicar() {
 
         <div className="p-3 rounded-xl border mb-4 flex items-center gap-3" style={{ backgroundColor: `${GOLD}05`, borderColor: `${GOLD}15` }}>
           <Map size={16} style={{ color: GOLD }} />
-          <p className="text-[10px] text-slate-400">Precios hoy: Jornada Base $24.99/mes · Ritmo del día $29.99/mes · Norte $34.99/mes</p>
+          <p className="text-[10px] text-slate-400">Precios hoy: Jornada Base 7 días gratis, después $24.99/mes (500 PS = gratis) · Ritmo del día $29.99/mes · Norte $34.99/mes</p>
         </div>
 
         <div className="flex gap-2 mb-4 flex-wrap">

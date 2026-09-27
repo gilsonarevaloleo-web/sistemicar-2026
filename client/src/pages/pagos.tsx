@@ -32,6 +32,9 @@ import {
 import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
+import { JORNADA_BASE_TRIAL_COPY } from "@shared/jornadaBaseAccess";
+import { startJornadaBaseTrial } from "@/lib/persistence";
+import { trackJornadaInitiateCheckout, trackJornadaStartTrial, trackPaidPurchase } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 const UMBRAL_ACCENT = "#FF6B35";
@@ -246,12 +249,22 @@ export default function Pagos() {
   }, [checkoutFocus, showLaterPeldanos]);
   const googleEmail = getUserEmail();
   const hasGoogleAccount = Boolean(googleEmail) && !isUserAnonymous();
+  const trialExpired = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("trial") === "expired";
+  }, [location]);
 
   useEffect(() => {
     if (hasGoogleAccount && googleEmail && !userEmail) {
       setUserEmail(googleEmail);
     }
   }, [hasGoogleAccount, googleEmail, userEmail]);
+
+  useEffect(() => {
+    if (selectedPlan.id === "planificacion_base") {
+      trackJornadaInitiateCheckout();
+    }
+  }, [selectedPlan.id]);
 
   const selectStack = (addOnId: "soberania_dia" | "operativo") => {
     const plan = planificacionPlans.find((p) => p.id === addOnId);
@@ -340,6 +353,11 @@ export default function Pagos() {
     }
 
     if (status === "success") {
+      trackPaidPurchase({
+        planId: planParam || effectivePlan,
+        search: window.location.search,
+        email: googleEmail || userEmail || undefined,
+      });
       if (planParam && isEspejoSkuId(planParam)) {
         const credits =
           planParam === "espejo_recarga"
@@ -390,6 +408,24 @@ export default function Pagos() {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al procesar el pago. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startBaseTrial = async () => {
+    const user = auth?.currentUser;
+    if (!user || user.isAnonymous) {
+      window.location.href = accesoUrlWithNext("/jornada-v4");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await startJornadaBaseTrial(user.uid);
+      if (result.started) trackJornadaStartTrial();
+      window.location.href = "/jornada-v4";
+    } catch {
+      toast.error("No se pudo abrir el trial. Entra de nuevo en /acceso.");
     } finally {
       setLoading(false);
     }
@@ -483,6 +519,11 @@ export default function Pagos() {
               <h3 className="text-lg font-black text-white mt-1">{checkoutFocus.headline}</h3>
               {checkoutFocus.subline ? (
                 <p className="text-[12px] text-slate-300 mt-1 leading-relaxed">{checkoutFocus.subline}</p>
+              ) : null}
+              {trialExpired ? (
+                <p className="text-[12px] text-amber-200 mt-2" data-testid="pagos-trial-expired">
+                  Se acabaron tus 7 días. Activa Base por ${SKU_BASE.priceUsd}/mes — o llega a 500 PS y te queda gratis.
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -879,6 +920,30 @@ export default function Pagos() {
             </div>
           </Link>
         </section>
+        ) : null}
+
+        {selectedPlan.id === "planificacion_base" && !trialExpired ? (
+          <div
+            className="mb-6 p-5 rounded-2xl border"
+            style={{ borderColor: `${GOLD}55`, backgroundColor: `${GOLD}10` }}
+            data-testid="pagos-jornada-trial"
+          >
+            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
+              {JORNADA_BASE_TRIAL_COPY.headline}
+            </p>
+            <p className="text-sm text-white mt-1">{JORNADA_BASE_TRIAL_COPY.hook}</p>
+            <p className="text-[11px] text-white/50 mt-1">{JORNADA_BASE_TRIAL_COPY.after}</p>
+            <button
+              type="button"
+              onClick={() => void startBaseTrial()}
+              disabled={loading}
+              className="mt-4 w-full py-3.5 rounded-xl font-black tracking-widest text-black"
+              style={{ background: GOLD }}
+              data-testid="pagos-empezar-trial"
+            >
+              EMPEZAR 7 DÍAS GRATIS
+            </button>
+          </div>
         ) : null}
 
         {/* Payment Method Selection */}

@@ -43,7 +43,7 @@ import { StatusAlianza } from "@/components/status-alianza";
 import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
-import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, hasPlanificacionBaseAccess } from "@/lib/persistence";
+import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, extrasFromProgression, canEnterJornadaBaseMenu } from "@/lib/persistence";
 import {
   armDualKernelExitSoftStart,
   useDualKernelMotorsQuiet,
@@ -122,6 +122,7 @@ function buildMenuItems(
   email: string | null,
   previewOps = false
 ): MenuItem[] {
+  const extras = extrasFromProgression(progression);
   const accessArgs = [progression?.subscriptionPlan, email, progression?.rank, progression?.activeModules] as const;
   const items: MenuItem[] = [
     {
@@ -150,7 +151,7 @@ function buildMenuItems(
     },
   ];
 
-  if (previewOps || hasPlanificacionBaseAccess(...accessArgs)) {
+  if (previewOps || canEnterJornadaBaseMenu(...accessArgs, extras)) {
     items.push({
       id: "planificacion",
       title: JORNADA_MODULE.titleUpper,
@@ -291,8 +292,9 @@ export default function MenuPrincipal() {
 
   useEffect(() => {
     if (!user?.uid) return;
+    const extras = extrasFromProgression(progression);
     const args = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
-    if (!previewUnlocked && !hasPlanificacionBaseAccess(...args)) return;
+    if (!previewUnlocked && !canEnterJornadaBaseMenu(...args, extras)) return;
     const run = () => {
       void prefetchJornadaChunk();
     };
@@ -760,11 +762,12 @@ export default function MenuPrincipal() {
           const menuItems = buildMenuItems(progression, userEmail, previewUnlocked);
           const tienePlanificacion =
             previewUnlocked ||
-            hasPlanificacionBaseAccess(
+            canEnterJornadaBaseMenu(
               progression?.subscriptionPlan,
               userEmail,
               progression?.rank,
-              progression?.activeModules
+              progression?.activeModules,
+              extrasFromProgression(progression)
             );
           const showPreviewUnlock = isDeployPreviewHost() && !tienePlanificacion;
 
@@ -1152,10 +1155,11 @@ export default function MenuPrincipal() {
           }}
         >
           {(() => {
+            const extras = extrasFromProgression(progression);
             const accessArgs = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
             const navItems = [
               { icon: Terminal, color: "#00FFC3", route: "/espejo/v2", label: "Espejo" },
-              ...(previewUnlocked || hasPlanificacionBaseAccess(...accessArgs)
+              ...(previewUnlocked || canEnterJornadaBaseMenu(...accessArgs, extras)
                 ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
                 : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
             ];

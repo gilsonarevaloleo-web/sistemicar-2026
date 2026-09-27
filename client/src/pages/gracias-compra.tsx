@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Crown, CheckCircle, ArrowRight } from "lucide-react";
 import { useLocation } from "wouter";
+import { trackPaidPurchase } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 const DARK_BG = "#050505";
@@ -10,14 +11,12 @@ export default function GraciasCompra() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Purchase', {
-        content_name: 'PROTOCOLO DE SOBERANÍA ESPEJO',
-        content_category: 'Premium Module',
-        value: 17.00,
-        currency: 'USD'
-      });
-    }
+    const params = new URLSearchParams(window.location.search);
+    const plan = (params.get("plan") || params.get("producto") || "").trim();
+    trackPaidPurchase({
+      planId: plan || "planificacion_base",
+      search: window.location.search,
+    });
   }, []);
 
   return (
