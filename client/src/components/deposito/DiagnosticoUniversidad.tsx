@@ -133,6 +133,31 @@ export function DiagnosticoUniversidad({
         <p className="text-sm leading-relaxed text-white/80">
           {diagnostico.devolucionMaestro}
         </p>
+        {diagnostico.criterioAplicado &&
+          diagnostico.criterioAplicado.length > 0 && (
+            <p
+              className="mt-2 text-[11px] leading-relaxed text-white/45"
+              data-testid="deposito-criterio-aplicado"
+            >
+              El Maestro usó tu criterio:{" "}
+              {diagnostico.criterioAplicado
+                .slice(0, 2)
+                .map((c) => `C${c.codigo}`)
+                .join(" · ")}
+            </p>
+          )}
+        {diagnostico.axiomaDescubierto && (
+          <p
+            className="mt-2 text-[11px] leading-relaxed text-white/55"
+            data-testid="deposito-axioma-descubierto"
+          >
+            Axioma {diagnostico.axiomaDescubierto.codigoRelacionado}:{" "}
+            {diagnostico.axiomaDescubierto.principioDescubierto}
+            {diagnostico.axiomaDescubierto.metaforaClave
+              ? ` · ${diagnostico.axiomaDescubierto.metaforaClave}`
+              : ""}
+          </p>
+        )}
       </div>
 
       <div data-testid="deposito-mecanica-absorcion">

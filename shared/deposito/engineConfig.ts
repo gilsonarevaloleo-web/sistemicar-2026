@@ -19,6 +19,24 @@
 
 import { LEY_OPTICA_CODIGO_KERNEL } from "./leyOpticaCodigo.ts";
 import {
+  bloqueCriterioVivo,
+  citarCriteriosEnDevolucion,
+  consultarCriterios,
+  marcarUsoCriterios,
+  normalizarAcervoCriterios,
+  sesgoCriterioPorOjo,
+  type CriterioAplicado,
+  type CriterioVivo,
+} from "./criterioMaestro.ts";
+import {
+  absorberHallazgo,
+  bloqueInyeccionMaestro,
+  normalizarAxioma,
+  normalizarStore,
+  type AxiomaDescubierto,
+  type UserMetacognitionStore,
+} from "./memoryEngine.ts";
+import {
   bloqueDirectivaIntencionPanoramica,
   bloqueUserMetricasJornada,
   normalizarMetricasJornada,
@@ -68,6 +86,37 @@ export {
   veredictoIntencionPanoramica,
 } from "./intencionPanoramica.ts";
 export type { MetricasJornadaIntencion } from "./intencionPanoramica.ts";
+export {
+  LEY_CRITERIO_VIVO_FIRMA,
+  LEY_CRITERIO_VIVO_KERNEL,
+  LEY_CRITERIO_VIVO_MARCA,
+  LEY_CRITERIO_VIVO_NOMBRE,
+  LEY_CRITERIO_VIVO_RITUAL,
+  bloqueCriterioVivo,
+  consultarCriterios,
+  marcarUsoCriterios,
+  normalizarAcervoCriterios,
+  sellarCriterio,
+  sesgoCriterioPorOjo,
+} from "./criterioMaestro.ts";
+export type {
+  CriterioAplicado,
+  CriterioVivo,
+  OrigenCriterio,
+  SelloCriterioInput,
+} from "./criterioMaestro.ts";
+export {
+  INSTRUCCION_CRITERIO_ADAPTATIVO,
+  UMBRAL_AXIOMA_ESTRUCTURA,
+  absorberHallazgo,
+  bloqueInyeccionMaestro,
+  normalizarStore,
+  sintetizarAxioma,
+} from "./memoryEngine.ts";
+export type {
+  AxiomaDescubierto,
+  UserMetacognitionStore,
+} from "./memoryEngine.ts";
 
 export type CodigoObservador = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -159,6 +208,10 @@ export interface DiagnosticoVolcado {
   metricasMerito?: MetricasMerito;
   /** Flor aislada (excusas, comparaciones, adjetivos). */
   florDetectada?: string[];
+  /** Criterios sellados por el operador que resonaron en este volcado. */
+  criterioAplicado?: CriterioAplicado[];
+  /** Hallazgo de estructura > 85: nueva regla del operador sobre la matriz. */
+  axiomaDescubierto?: AxiomaDescubierto;
 }
 
 export interface FichaGradoMaestria {
@@ -257,6 +310,10 @@ export interface ProcesarVolcadoDeps {
   ojosHistoricos?: readonly CodigoObservador[];
   /** Métricas de La Jornada: conquista/pérdida de Intención Panorámica. */
   metricasJornada?: MetricasJornadaIntencion;
+  /** Sabiduría sellada del operador. El Maestro la cita; no la inventa. */
+  criteriosVivos?: readonly CriterioVivo[];
+  /** Axiomas descubiertos (UserMetacognitionStore). Criterio adaptativo. */
+  metacognicion?: UserMetacognitionStore;
 }
 
 export interface ResultadoVolcadoAprendizaje {
@@ -821,7 +878,12 @@ function jsonSchemaEjemplo(
   "nivelCargaSugerido": "INTERMEDIO",
   "codigoDominante": 3,
   "justificacionDominante": "Alias de ojoDominante.explicacion.",
-  "validacionGrado": ${JSON.stringify(validacion, null, 2).replace(/\n/g, "\n  ")}
+  "validacionGrado": ${JSON.stringify(validacion, null, 2).replace(/\n/g, "\n  ")},
+  "axiomaDescubierto": {
+    "codigoRelacionado": "C3",
+    "principioDescubierto": "Solo si densidadEstructural > 85: regla nueva de la matriz, en voz del operador.",
+    "metaforaClave": "Imagen que el operador usó para ver esa regla."
+  }
 }`;
 }
 
@@ -881,6 +943,7 @@ function bloqueUserCaptura(
   captura: CapturaVolcadoExpansiva,
   ojosHistoricos: readonly CodigoObservador[] = [],
   metricasJornada?: MetricasJornadaIntencion,
+  criteriosVivos: readonly CriterioVivo[] = [],
 ): string {
   const ficha = DICCIONARIO_GRADOS[captura.gradoMaestria];
   const temperamento = obtenerTemperamento(captura.gradoMaestria);
@@ -926,6 +989,9 @@ function bloqueUserCaptura(
   if (metricasJornada) {
     lines.push("", bloqueUserMetricasJornada(metricasJornada));
   }
+  if (criteriosVivos.length > 0) {
+    lines.push("", bloqueCriterioVivo(criteriosVivos));
+  }
   lines.push(
     "Diagnosticá el centro de gravedad. UN solo código. Evaluá densidad y placement. Respondé solo el JSON.",
   );
@@ -937,6 +1003,8 @@ export function obtenerPromptVolcado(
   capturaInput?: CapturaVolcadoInput,
   ojosHistoricos: readonly CodigoObservador[] = [],
   metricasJornada?: MetricasJornadaIntencion,
+  criteriosVivos: readonly CriterioVivo[] = [],
+  metacognicion?: UserMetacognitionStore,
 ): PromptVolcadoAprendizaje {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -951,6 +1019,10 @@ export function obtenerPromptVolcado(
     buildDepositoSystemPrompt(grado),
     "",
     KERNEL_UNIVERSIDAD,
+    "",
+    bloqueInyeccionMaestro(normalizarStore(metacognicion)),
+    "",
+    bloqueCriterioVivo(criteriosVivos),
     "",
     bloqueInstruccionGrado(grado),
     "",
@@ -991,7 +1063,7 @@ export function obtenerPromptVolcado(
 
   return {
     system,
-    user: bloqueUserCaptura(captura, ojosHistoricos, metricas),
+    user: bloqueUserCaptura(captura, ojosHistoricos, metricas, criteriosVivos),
     responseSchema: {
       codigoDominante: 1,
       nombreOjoDominante: DICCIONARIO_OJOS[1].nombreOjo,
@@ -1168,6 +1240,9 @@ function hidratarDiagnostico(
   }
   if (campos.florDetectada?.length) {
     diagnostico.florDetectada = campos.florDetectada;
+  }
+  if (campos.axiomaDescubierto) {
+    diagnostico.axiomaDescubierto = campos.axiomaDescubierto;
   }
   return diagnostico;
 }
@@ -1460,11 +1535,36 @@ function anexarIntencionPanoramica(
   };
 }
 
+function anexarCriterioVivo(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+  criteriosVivos: readonly CriterioVivo[] = [],
+): DiagnosticoVolcado {
+  const acervo = normalizarAcervoCriterios(criteriosVivos);
+  if (acervo.length === 0) return diagnostico;
+  const aplicados = consultarCriterios({
+    acervo,
+    volcadoCrudo: captura.volcadoCrudo,
+    codigoDominante: diagnostico.codigoDominante,
+  });
+  if (aplicados.length === 0) return diagnostico;
+  return {
+    ...diagnostico,
+    criterioAplicado: aplicados,
+    devolucionMaestro: citarCriteriosEnDevolucion(
+      diagnostico.devolucionMaestro,
+      aplicados,
+    ),
+  };
+}
+
 function sellarDiagnostico(
   diagnostico: DiagnosticoVolcado,
   captura: CapturaVolcadoExpansiva,
   ojosHistoricos: readonly CodigoObservador[] = [],
   metricasJornada?: MetricasJornadaIntencion,
+  criteriosVivos: readonly CriterioVivo[] = [],
+  metacognicion?: UserMetacognitionStore,
 ): DiagnosticoVolcado {
   const volcado = captura.volcadoCrudo || "";
   const norm = normalizar(volcado);
@@ -1495,16 +1595,38 @@ function sellarDiagnostico(
         : textosSinPlantillaSocialC6(diagnostico.mecanicaAbsorcion),
     ),
   };
-  return anexarIntencionPanoramica(
-    coherenciaDevolucionConPlacement(
-      anexarMerito(
-        anexarValidacion(limpio, captura),
-        captura,
-        ojosHistoricos,
+  return anexarMemoriaOperador(
+    anexarCriterioVivo(
+      anexarIntencionPanoramica(
+        coherenciaDevolucionConPlacement(
+          anexarMerito(
+            anexarValidacion(limpio, captura),
+            captura,
+            ojosHistoricos,
+          ),
+        ),
+        metricasJornada,
       ),
+      captura,
+      criteriosVivos,
     ),
-    metricasJornada,
+    captura,
+    metacognicion,
   );
+}
+
+function anexarMemoriaOperador(
+  diagnostico: DiagnosticoVolcado,
+  captura: CapturaVolcadoExpansiva,
+  metacognicion?: UserMetacognitionStore,
+): DiagnosticoVolcado {
+  return absorberHallazgo({
+    store: normalizarStore(metacognicion),
+    diagnostico,
+    volcadoCrudo: captura.volcadoCrudo,
+    principioSugerido: diagnostico.axiomaDescubierto?.principioDescubierto,
+    metaforaSugerida: diagnostico.axiomaDescubierto?.metaforaClave,
+  }).diagnostico;
 }
 
 const MARCA_RUIDO_DICTAMEN = /ruido|reescrib/i;
@@ -1651,7 +1773,23 @@ export function parseDiagnosticoVolcado(
     evaluacionGrado: extraerEvaluacionGradoGemini(obj),
     metricasMerito: extraerMetricasMeritoGemini(obj, codigo),
     florDetectada,
+    axiomaDescubierto: extraerAxiomaGemini(obj, codigo),
   }, { detectaFlor: detectaFlor("", florDetectada) });
+}
+
+function extraerAxiomaGemini(
+  obj: Record<string, unknown>,
+  codigo: CodigoObservador,
+): AxiomaDescubierto | undefined {
+  const raw = obj.axiomaDescubierto ?? obj.axioma_descubierto ?? obj.axioma;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const v = raw as Record<string, unknown>;
+  return (
+    normalizarAxioma({
+      ...v,
+      codigoRelacionado: v.codigoRelacionado ?? v.codigo ?? `C${codigo}`,
+    }) ?? undefined
+  );
 }
 
 function contarPalabras(texto: string): number {
@@ -1733,12 +1871,16 @@ function textoTraeRoceSocial(norm: string): boolean {
   return /rechazo|miedo|puerta|llamada|contacto social|ensay/.test(norm);
 }
 
-function elegirCodigoDominanteLocal(textoVolcado: string): CodigoObservador {
+function elegirCodigoDominanteLocal(
+  textoVolcado: string,
+  criteriosVivos: readonly CriterioVivo[] = [],
+): CodigoObservador {
   const norm = normalizar(textoVolcado);
+  const sesgo = sesgoCriterioPorOjo(criteriosVivos, textoVolcado);
   let mejor: CodigoObservador = 1;
   let mejorHits = -1;
   for (const n of CODIGOS_OBSERVADOR) {
-    const hits = hitsDe(norm, SENALES_OJO[n]);
+    const hits = hitsDe(norm, SENALES_OJO[n]) + (sesgo[n] ?? 0);
     if (hits > mejorHits) {
       mejorHits = hits;
       mejor = n;
@@ -1872,6 +2014,8 @@ export function diagnosticarVolcadoLocal(
   capturaInput?: CapturaVolcadoInput,
   ojosHistoricos: readonly CodigoObservador[] = [],
   metricasJornada?: MetricasJornadaIntencion,
+  criteriosVivos: readonly CriterioVivo[] = [],
+  metacognicion?: UserMetacognitionStore,
 ): DiagnosticoVolcado {
   const captura = normalizarCapturaVolcado(
     capturaInput
@@ -1881,7 +2025,7 @@ export function diagnosticarVolcadoLocal(
   const texto = componerTextoDiagnostico(captura) || textoVolcado.trim();
   const palabras = contarPalabras(captura.volcadoCrudo || texto);
   const hechos = extraerHechos(captura.volcadoCrudo || texto);
-  const codigo = elegirCodigoDominanteLocal(texto);
+  const codigo = elegirCodigoDominanteLocal(texto, criteriosVivos);
   const ojo = DICCIONARIO_OJOS[codigo];
 
   if (palabras < 6) {
@@ -1899,6 +2043,8 @@ export function diagnosticarVolcadoLocal(
       captura,
       ojosHistoricos,
       metricasJornada,
+      criteriosVivos,
+      metacognicion,
     );
   }
 
@@ -1928,6 +2074,8 @@ export function diagnosticarVolcadoLocal(
     captura,
     ojosHistoricos,
     metricasJornada,
+    criteriosVivos,
+    metacognicion,
   );
 }
 
@@ -1954,11 +2102,15 @@ export async function procesarVolcadoAprendizajeConFuente(
   const captura = resolverCaptura(textoVolcado, deps);
   const ojosHistoricos = deps.ojosHistoricos ?? [];
   const metricasJornada = normalizarMetricasJornada(deps.metricasJornada);
+  const criteriosVivos = normalizarAcervoCriterios(deps.criteriosVivos);
+  const metacognicion = normalizarStore(deps.metacognicion);
   const prompt = obtenerPromptVolcado(
     captura.volcadoCrudo,
     captura,
     ojosHistoricos,
     metricasJornada,
+    criteriosVivos,
+    metacognicion,
   );
   const serialized = serializarPromptVolcado(prompt);
   const caller = deps.callGemini;
@@ -1972,6 +2124,8 @@ export async function procesarVolcadoAprendizajeConFuente(
           captura,
           ojosHistoricos,
           metricasJornada,
+          criteriosVivos,
+          metacognicion,
         ),
         source: "gemini",
       };
@@ -1988,6 +2142,8 @@ export async function procesarVolcadoAprendizajeConFuente(
             captura,
             ojosHistoricos,
             metricasJornada,
+            criteriosVivos,
+            metacognicion,
           ),
           source: "gemini",
         };
@@ -2006,6 +2162,8 @@ export async function procesarVolcadoAprendizajeConFuente(
       captura,
       ojosHistoricos,
       metricasJornada,
+      criteriosVivos,
+      metacognicion,
     ),
     source: "local_fallback",
   };

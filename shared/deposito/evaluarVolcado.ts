@@ -15,10 +15,17 @@ import {
   type CodigoObservador,
   type DepositoEngineResponse,
   type DiagnosticoVolcado,
+  type CriterioVivo,
   type GeminiVolcadoCaller,
   type GradoMaestria,
   type MetricasJornadaIntencion,
+  type UserMetacognitionStore,
 } from "./engineConfig.ts";
+import { normalizarAcervoCriterios } from "./criterioMaestro.ts";
+import {
+  absorberHallazgo,
+  normalizarStore,
+} from "./memoryEngine.ts";
 
 export function parseOjosHistoricos(raw: unknown): CodigoObservador[] {
   if (!Array.isArray(raw)) return [];
@@ -41,6 +48,10 @@ export interface EvaluarDepositoInput {
   historialCodigos?: unknown;
   /** Métricas de La Jornada: conquista/pérdida de Intención Panorámica. */
   metricasJornada?: MetricasJornadaIntencion | unknown;
+  /** Sabiduría sellada del operador. El Maestro la cita; no la inventa. */
+  criteriosVivos?: readonly CriterioVivo[] | unknown;
+  /** Axiomas descubiertos del operador (UserMetacognitionStore). */
+  metacognicion?: UserMetacognitionStore | unknown;
   callGemini?: GeminiVolcadoCaller;
 }
 
@@ -51,6 +62,7 @@ export interface EvaluarDepositoOk {
   source: "gemini" | "local_fallback";
   gradoUsuarioActual: GradoMaestria;
   perfilPromovido: boolean;
+  metacognicion: UserMetacognitionStore;
 }
 
 export interface EvaluarDepositoErr {
@@ -88,6 +100,7 @@ export async function evaluarDepositoVolcado(
   const ojosHistoricos = parseOjosHistoricos(
     input.ojosHistoricos ?? input.historialCodigos,
   );
+  const storeEntrada = normalizarStore(input.metacognicion);
   const resultado = await procesarVolcadoAprendizajeConFuente(
     captura.volcadoCrudo,
     {
@@ -96,9 +109,19 @@ export async function evaluarDepositoVolcado(
       gradoMaestria: captura.gradoMaestria,
       ojosHistoricos,
       metricasJornada: normalizarMetricasJornada(input.metricasJornada),
+      criteriosVivos: normalizarAcervoCriterios(input.criteriosVivos),
+      metacognicion: storeEntrada,
     },
   );
-  const engine = toDepositoEngineResponse(resultado.diagnostico);
+  const hallazgo = absorberHallazgo({
+    store: storeEntrada,
+    diagnostico: resultado.diagnostico,
+    volcadoCrudo: captura.volcadoCrudo,
+    principioSugerido:
+      resultado.diagnostico.axiomaDescubierto?.principioDescubierto,
+    metaforaSugerida: resultado.diagnostico.axiomaDescubierto?.metaforaClave,
+  });
+  const engine = toDepositoEngineResponse(hallazgo.diagnostico);
   const perfilPromovido =
     engine.evaluacionGrado.meritoReconocido &&
     engine.evaluacionGrado.gradoDetectado > gradoUsuarioActual;
@@ -106,9 +129,10 @@ export async function evaluarDepositoVolcado(
   return {
     ok: true,
     engine,
-    diagnostico: resultado.diagnostico,
+    diagnostico: hallazgo.diagnostico,
     source: resultado.source,
     gradoUsuarioActual,
     perfilPromovido,
+    metacognicion: hallazgo.store,
   };
 }

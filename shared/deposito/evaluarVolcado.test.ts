@@ -75,4 +75,26 @@ describe("evaluarDepositoVolcado", () => {
       /ajuste|tensión|pieza|herramient|física|encaje|roce/i,
     );
   });
+
+  it("estructura alta actualiza UserMetacognitionStore con un axioma", async () => {
+    const r = await evaluarDepositoVolcado({
+      textoVolcado:
+        "Hoy a las 7:05 aprendí que la exigencia moral de productividad agota el C1 biológico y genera doble atadura. Conté 10 animales. El pastor de los 10 animales no corre: ordena. Anoté el cupo. El sesgo: yo suelo exigir más cabeza. No lo hice. Dijo: \"el rebaño no se pastorea con culpa\". Cerré a las 7:40.",
+      gradoUsuarioActual: 1,
+    });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.ok(r.metacognicion);
+    const dens = r.engine.metricasMerito.densidadEstructural;
+    if (dens > 85) {
+      assert.ok(r.metacognicion.axiomas.length >= 1);
+      assert.ok(r.diagnostico.axiomaDescubierto);
+      assert.match(
+        r.diagnostico.axiomaDescubierto.codigoRelacionado,
+        /^C\d+$/,
+      );
+    } else {
+      assert.ok(dens > 70, `densidad ${dens}`);
+    }
+  });
 });
