@@ -111,6 +111,7 @@ export const handler: Handler = async (event) => {
       ojosHistoricos: parsed.ojosHistoricos ?? parsed.historialCodigos,
       metricasJornada: parsed.metricasJornada,
       criteriosVivos: parsed.criteriosVivos ?? parsed.criterios,
+      metacognicion: parsed.metacognicion ?? parsed.axiomas,
       callGemini: geminiKeys().length > 0 ? callGemini : undefined,
     });
 

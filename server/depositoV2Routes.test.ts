@@ -47,6 +47,8 @@ describe("Depósito v2 — POST /api/deposito/volcado", () => {
       assert.equal(body.gemini, false);
       assert.equal(body.criterioVivo, true);
       assert.equal(body.ritualCriterio, "Esto es lo que vi");
+      assert.equal(body.criterioAdaptativo, true);
+      assert.equal(body.umbralAxiomaEstructura, 85);
     });
   });
 

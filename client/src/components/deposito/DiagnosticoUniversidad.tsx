@@ -146,6 +146,18 @@ export function DiagnosticoUniversidad({
                 .join(" · ")}
             </p>
           )}
+        {diagnostico.axiomaDescubierto && (
+          <p
+            className="mt-2 text-[11px] leading-relaxed text-white/55"
+            data-testid="deposito-axioma-descubierto"
+          >
+            Axioma {diagnostico.axiomaDescubierto.codigoRelacionado}:{" "}
+            {diagnostico.axiomaDescubierto.principioDescubierto}
+            {diagnostico.axiomaDescubierto.metaforaClave
+              ? ` · ${diagnostico.axiomaDescubierto.metaforaClave}`
+              : ""}
+          </p>
+        )}
       </div>
 
       <div data-testid="deposito-mecanica-absorcion">

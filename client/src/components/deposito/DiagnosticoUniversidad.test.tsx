@@ -146,4 +146,23 @@ describe("DiagnosticoUniversidad", () => {
     assert.match(html, /El Maestro usó tu criterio/);
     assert.match(html, /C3/);
   });
+
+  it("muestra el axioma descubierto del operador", () => {
+    const base = diagnosticarVolcadoLocal(RITMO);
+    const diagnostico = {
+      ...base,
+      axiomaDescubierto: {
+        fecha: 1,
+        codigoRelacionado: "C3" as const,
+        principioDescubierto:
+          "La secuencia es el aprendizaje, no la prisa del pistón.",
+        metaforaClave: "El relojero práctico",
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(DiagnosticoUniversidad, { diagnostico }),
+    );
+    assert.match(html, /Axioma C3/);
+    assert.match(html, /El relojero práctico/);
+  });
 });

@@ -109,6 +109,9 @@ describe("Depósito v2 — Universidad / engineConfig", () => {
     assert.doesNotMatch(prompt.system, /Cuerpo en la Puerta/);
     assert.match(prompt.system, /CRITERIO VIVO DEL MAESTRO/);
     assert.match(prompt.system, /Acervo vacío/);
+    assert.match(prompt.system, /CRITERIO ADAPTATIVO/);
+    assert.match(prompt.system, /principios previamente descubiertos por el operador/);
+    assert.match(prompt.system, /automatismo/);
     assert.doesNotMatch(prompt.system, /listá los códigos abiertos/i);
     assert.doesNotMatch(prompt.system, /Eje Masculino|Eje Femenino|CAPA INTERNA DE POLARIDAD/);
     assert.doesNotMatch(

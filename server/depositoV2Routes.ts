@@ -12,6 +12,7 @@ import {
   type DepositoEngineResponse,
   type DiagnosticoVolcado,
   type GradoMaestria,
+  type UserMetacognitionStore,
 } from "../shared/deposito/engineConfig";
 import { evaluarDepositoVolcado } from "../shared/deposito/evaluarVolcado";
 
@@ -40,6 +41,7 @@ function jsonDeposito(
     gradoMaestria: resultado.gradoUsuarioActual,
     gradoDetectado: resultado.engine.evaluacionGrado.gradoDetectado,
     meritoReconocido: resultado.engine.evaluacionGrado.meritoReconocido,
+    metacognicion: resultado.metacognicion,
   };
 }
 
@@ -52,6 +54,7 @@ export interface DepositoVolcadoSuccess {
   gradoMaestria: GradoMaestria;
   gradoDetectado: GradoMaestria;
   meritoReconocido: boolean;
+  metacognicion?: UserMetacognitionStore;
 }
 
 export interface DepositoVolcadoErrorBody {
@@ -102,6 +105,8 @@ export function registerDepositoV2Routes(
       })),
       criterioVivo: true,
       ritualCriterio: "Esto es lo que vi",
+      criterioAdaptativo: true,
+      umbralAxiomaEstructura: 85,
       gemini: Boolean(callGemini),
       fallbackLocal: true,
     });
@@ -118,6 +123,7 @@ export function registerDepositoV2Routes(
     ojosHistoricos: req.body?.ojosHistoricos ?? req.body?.historialCodigos,
     metricasJornada: req.body?.metricasJornada,
     criteriosVivos: req.body?.criteriosVivos ?? req.body?.criterios,
+    metacognicion: req.body?.metacognicion ?? req.body?.axiomas,
     callGemini,
   });
 
