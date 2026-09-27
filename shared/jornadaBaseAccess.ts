@@ -51,6 +51,40 @@ export function resolveJornadaBaseRegistroStep(input: {
   return "ready";
 }
 
+/**
+ * Si Firestore aún no tiene `progression` (usuario nuevo o write en vuelo),
+ * no se puede tirar el local: el WhatsApp acaba de guardarse ahí.
+ * Tirarlo provoca el bucle /acceso (número) ↔ spinner ↔ /acceso.
+ */
+export function shouldKeepLocalProgressionWhenRemoteEmpty(input: {
+  belongsToUser: boolean;
+  totalCP?: number | null;
+  sovereigntyPoints?: number | null;
+  ptsEspejo?: number | null;
+  ptsPlanificacion?: number | null;
+  ptsDeposito?: number | null;
+  totalMissionsCompleted?: number | null;
+  whatsapp?: unknown;
+  jornadaBaseTrialStartedAt?: unknown;
+  jornadaBaseEarnedFree?: boolean | null;
+}): boolean {
+  if (!input.belongsToUser) return false;
+  if (hasValidClientPhone(input.whatsapp)) return true;
+  if (toEpochMs(input.jornadaBaseTrialStartedAt) != null) return true;
+  if (input.jornadaBaseEarnedFree) return true;
+  if ((input.totalCP ?? 0) > 0) return true;
+  if ((input.sovereigntyPoints ?? 0) > 0) return true;
+  if (
+    (input.ptsEspejo ?? 0) +
+      (input.ptsPlanificacion ?? 0) +
+      (input.ptsDeposito ?? 0) >
+    0
+  ) {
+    return true;
+  }
+  return (input.totalMissionsCompleted ?? 0) > 0;
+}
+
 export type JornadaBaseAccessKind =
   | "owner"
   | "paid"

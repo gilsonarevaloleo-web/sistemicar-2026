@@ -16,14 +16,18 @@ export function hasValidClientPhone(raw: unknown): boolean {
   return typeof raw === "string" && normalizeClientPhone(raw) != null;
 }
 
+export function pickClientPhoneFromSources(...sources: unknown[]): string | null {
+  for (const source of sources) {
+    if (typeof source !== "string") continue;
+    const normalized = normalizeClientPhone(source);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
 export function pickClientPhone(
   remote: unknown,
   local: unknown,
 ): string | null {
-  const remoteNorm =
-    typeof remote === "string" ? normalizeClientPhone(remote) : null;
-  if (remoteNorm) return remoteNorm;
-  const localNorm =
-    typeof local === "string" ? normalizeClientPhone(local) : null;
-  return localNorm;
+  return pickClientPhoneFromSources(remote, local);
 }

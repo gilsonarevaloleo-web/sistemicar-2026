@@ -4,6 +4,7 @@ import {
   hasValidClientPhone,
   normalizeClientPhone,
   pickClientPhone,
+  pickClientPhoneFromSources,
 } from "./phone.ts";
 
 describe("phone — WhatsApp del cliente", () => {
@@ -28,5 +29,14 @@ describe("phone — WhatsApp del cliente", () => {
     assert.equal(pickClientPhone("+51918260514", "999888777"), "+51918260514");
     assert.equal(pickClientPhone("", "999888777"), "+51999888777");
     assert.equal(pickClientPhone("x", null), null);
+  });
+
+  it("no pierde un número ya guardado si el remoto viene vacío", () => {
+    assert.equal(pickClientPhone(null, "+51918260514"), "+51918260514");
+    assert.equal(pickClientPhone("", "918260514"), "+51918260514");
+    assert.equal(
+      pickClientPhoneFromSources(null, "", "x", "918 260 514"),
+      "+51918260514",
+    );
   });
 });

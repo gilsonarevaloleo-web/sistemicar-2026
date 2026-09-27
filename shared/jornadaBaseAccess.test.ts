@@ -8,6 +8,7 @@ import {
   canEnterJornadaBase,
   resolveJornadaBaseAccess,
   resolveJornadaBaseRegistroStep,
+  shouldKeepLocalProgressionWhenRemoteEmpty,
   toEpochMs,
   trialBannerText,
 } from "./jornadaBaseAccess.ts";
@@ -166,6 +167,37 @@ describe("jornadaBaseAccess", () => {
         progressionReady: true,
       }),
       "ready",
+    );
+  });
+
+  it("un WhatsApp local no se tira si Firestore aún está vacío", () => {
+    assert.equal(
+      shouldKeepLocalProgressionWhenRemoteEmpty({
+        belongsToUser: true,
+        whatsapp: "918260514",
+      }),
+      true,
+    );
+    assert.equal(
+      shouldKeepLocalProgressionWhenRemoteEmpty({
+        belongsToUser: true,
+        whatsapp: "",
+      }),
+      false,
+    );
+    assert.equal(
+      shouldKeepLocalProgressionWhenRemoteEmpty({
+        belongsToUser: false,
+        whatsapp: "918260514",
+      }),
+      false,
+    );
+    assert.equal(
+      shouldKeepLocalProgressionWhenRemoteEmpty({
+        belongsToUser: true,
+        jornadaBaseTrialStartedAt: NOW,
+      }),
+      true,
     );
   });
 

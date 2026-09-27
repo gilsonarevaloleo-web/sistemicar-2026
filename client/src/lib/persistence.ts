@@ -74,11 +74,12 @@ import {
   JORNADA_BASE_POINTS_UNLOCK,
   canEnterJornadaBase as _canEnterJornadaBase,
   resolveJornadaBaseAccess,
+  shouldKeepLocalProgressionWhenRemoteEmpty,
   toEpochMs,
   type JornadaBaseAccess,
   type JornadaBaseAccessInput,
 } from "@shared/jornadaBaseAccess";
-import { normalizeClientPhone, pickClientPhone } from "@shared/phone";
+import { normalizeClientPhone, pickClientPhoneFromSources } from "@shared/phone";
 import { isPreviewOpsUnlocked } from "./previewOps";
 
 export interface AcervoEntry {
@@ -2929,12 +2930,18 @@ export function subscribeToProgression(
         const defaultProg = getDefaultProgression(userId);
         const localProg = reconcileProgressionFromLocalLog(userId);
         const localBelongsToUser = !localProg.userId || localProg.userId === userId;
-        const localHasMeaningfulProgress =
-          localBelongsToUser &&
-          ((localProg.totalCP ?? 0) > 0 ||
-            (localProg.sovereigntyPoints ?? 0) > 0 ||
-            (localProg.ptsEspejo ?? 0) + (localProg.ptsPlanificacion ?? 0) + (localProg.ptsDeposito ?? 0) > 0 ||
-            (localProg.totalMissionsCompleted ?? 0) > 0);
+        const localHasMeaningfulProgress = shouldKeepLocalProgressionWhenRemoteEmpty({
+          belongsToUser: localBelongsToUser,
+          totalCP: localProg.totalCP,
+          sovereigntyPoints: localProg.sovereigntyPoints,
+          ptsEspejo: localProg.ptsEspejo,
+          ptsPlanificacion: localProg.ptsPlanificacion,
+          ptsDeposito: localProg.ptsDeposito,
+          totalMissionsCompleted: localProg.totalMissionsCompleted,
+          whatsapp: localProg.whatsapp,
+          jornadaBaseTrialStartedAt: localProg.jornadaBaseTrialStartedAt,
+          jornadaBaseEarnedFree: localProg.jornadaBaseEarnedFree,
+        });
         if (localHasMeaningfulProgress) {
           deactivateSovereignModeGlobal();
           backupToLocal("progression", localProg);
@@ -2971,7 +2978,11 @@ export function subscribeToProgression(
             localProg.jornadaBaseEarnedFree ||
             sovereigntyPoints >= JORNADA_BASE_POINTS_UNLOCK
         );
-        const whatsapp = pickClientPhone(data.whatsapp, localProg.whatsapp);
+        const whatsapp = pickClientPhoneFromSources(
+          ...snapshot.docs.map((remoteDoc) => remoteDoc.data().whatsapp),
+          data.whatsapp,
+          localProg.whatsapp,
+        );
         const prog = {
           id: d.id,
           ...data,
@@ -5305,22 +5316,28 @@ export async function saveJornadaBaseContact(
   if (!phone) throw new Error("whatsapp_invalido");
   await updateProgression(userId, { whatsapp: phone });
   const email = opts.email.trim().toLowerCase();
-  const existing = await getProspectoByEmail(email);
-  if (existing) {
-    await updateProspecto(email, { whatsapp: phone, ultimaActividad: new Date() });
-  } else {
-    await addProspecto({
-      nombre: (opts.nombre || "").trim() || email.split("@")[0],
-      whatsapp: phone,
-      correo: email,
-      registradoEn: new Date(),
-      pagoConfirmado: false,
-      retoGuerreroActivo: false,
-      retoGuerreroInicio: null,
-      ultimaActividad: new Date(),
-      source: "jornada-base-acceso",
-    });
-  }
+  void (async () => {
+    try {
+      const existing = await getProspectoByEmail(email);
+      if (existing) {
+        await updateProspecto(email, { whatsapp: phone, ultimaActividad: new Date() });
+        return;
+      }
+      await addProspecto({
+        nombre: (opts.nombre || "").trim() || email.split("@")[0],
+        whatsapp: phone,
+        correo: email,
+        registradoEn: new Date(),
+        pagoConfirmado: false,
+        retoGuerreroActivo: false,
+        retoGuerreroInicio: null,
+        ultimaActividad: new Date(),
+        source: "jornada-base-acceso",
+      });
+    } catch (error) {
+      console.error("No se pudo copiar el WhatsApp a prospectos:", error);
+    }
+  })();
   return phone;
 }
 
