@@ -22,6 +22,7 @@ import {
   JORNADA_BASE_TRIAL_ACCESO_HREF,
   resolveJornadaBaseRegistroStep,
 } from "@shared/jornadaBaseAccess";
+import { hasValidClientPhone } from "@shared/phone";
 
 interface AppUser {
   uid: string;
@@ -292,6 +293,7 @@ function ModuleRoute({
     }
 
     if (user?.uid) {
+      let firstProgressionEmit = true;
       const unsub = subscribeToProgression(
         user.uid,
         (prog) => {
@@ -305,11 +307,20 @@ function ModuleRoute({
               whatsapp: prog?.whatsapp,
               progressionReady: true,
             });
-            if (regStep === "google" || regStep === "phone") {
+            if (regStep === "google") {
+              navigate(JORNADA_BASE_TRIAL_ACCESO_HREF);
+              return;
+            }
+            if (regStep === "phone") {
+              if (firstProgressionEmit) {
+                firstProgressionEmit = false;
+                return;
+              }
               navigate(JORNADA_BASE_TRIAL_ACCESO_HREF);
               return;
             }
           }
+          firstProgressionEmit = false;
           if (requiredModule === "planificacion_base" && !hasAccess(prog)) {
             const grant = resolveUserJornadaBaseAccess(
               prog?.subscriptionPlan,
@@ -352,9 +363,19 @@ function ModuleRoute({
 
   useEffect(() => {
     if (!checkingTier) return;
-    const id = window.setTimeout(() => setCheckingTier(false), 8000);
+    const id = window.setTimeout(() => {
+      setCheckingTier(false);
+      if (
+        requiredModule === "planificacion_base" &&
+        !ownerBypass &&
+        !isPreviewOpsUnlocked() &&
+        !hasValidClientPhone(progression?.whatsapp)
+      ) {
+        navigate(JORNADA_BASE_TRIAL_ACCESO_HREF);
+      }
+    }, 8000);
     return () => clearTimeout(id);
-  }, [checkingTier]);
+  }, [checkingTier, requiredModule, ownerBypass, progression, navigate]);
 
   const tierLoadingUi = loadingFallback ?? (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>

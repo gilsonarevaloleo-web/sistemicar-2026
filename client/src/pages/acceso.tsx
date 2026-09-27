@@ -20,7 +20,7 @@ import {
   JORNADA_BASE_TRIAL_COPY,
   resolveJornadaBaseRegistroStep,
 } from "@shared/jornadaBaseAccess";
-import { normalizeClientPhone } from "@shared/phone";
+import { normalizeClientPhone, pickClientPhone } from "@shared/phone";
 import logoSistemicar from "@/assets/logo-sistemicar.png";
 
 const GOLD = "#D4AF37";
@@ -49,10 +49,10 @@ export default function Acceso() {
     const unsub = subscribeToProgression(
       user.uid,
       (prog) => {
-        setWhatsappSaved(prog.whatsapp ?? null);
+        setWhatsappSaved((prev) => pickClientPhone(prog.whatsapp, prev) ?? null);
       },
       () => {
-        setWhatsappSaved(null);
+        setWhatsappSaved((prev) => pickClientPhone(prev, null));
       },
     );
     return () => unsub();
@@ -139,6 +139,8 @@ export default function Acceso() {
       setWhatsappSaved(saved);
       trackJornadaLead("acceso-registro");
       toast.success("Listo. Ya puedes entrar.");
+      void claimPendingPurchases();
+      navigate(nextPath);
     } catch {
       toast.error("No se pudo guardar el número. Intenta de nuevo.");
     } finally {
