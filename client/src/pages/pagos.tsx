@@ -33,8 +33,7 @@ import { captureSellerRefFromUrl, getSellerRef } from "@/lib/sellerRef";
 import { CategoriaSistemicarBanner } from "@/components/CategoriaSistemicarBanner";
 import { SISTEMICAR_CATEGORY } from "@/lib/sistemicarCategory";
 import { JORNADA_BASE_TRIAL_COPY } from "@shared/jornadaBaseAccess";
-import { startJornadaBaseTrial } from "@/lib/persistence";
-import { trackJornadaInitiateCheckout, trackJornadaStartTrial, trackPaidPurchase } from "@/lib/metaPixel";
+import { trackJornadaInitiateCheckout, trackPaidPurchase } from "@/lib/metaPixel";
 
 const GOLD = "#D4AF37";
 const UMBRAL_ACCENT = "#FF6B35";
@@ -419,16 +418,8 @@ export default function Pagos() {
       window.location.href = accesoUrlWithNext("/jornada-v4");
       return;
     }
-    setLoading(true);
-    try {
-      const result = await startJornadaBaseTrial(user.uid);
-      if (result.started) trackJornadaStartTrial();
-      window.location.href = "/jornada-v4";
-    } catch {
-      toast.error("No se pudo abrir el trial. Entra de nuevo en /acceso.");
-    } finally {
-      setLoading(false);
-    }
+    // La ruta /jornada-v4 pide WhatsApp y recién ahí arranca el trial.
+    window.location.href = "/jornada-v4";
   };
 
   const openPayPal = () => {
@@ -933,6 +924,7 @@ export default function Pagos() {
             </p>
             <p className="text-sm text-white mt-1">{JORNADA_BASE_TRIAL_COPY.hook}</p>
             <p className="text-[11px] text-white/50 mt-1">{JORNADA_BASE_TRIAL_COPY.after}</p>
+            <p className="text-[11px] text-white/45 mt-2">{JORNADA_BASE_TRIAL_COPY.register}</p>
             <button
               type="button"
               onClick={() => void startBaseTrial()}

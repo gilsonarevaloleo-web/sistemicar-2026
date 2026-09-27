@@ -1,6 +1,7 @@
 /**
  * La cuenta del cliente NO se crea al pagar (Yape / PayPal / MP).
  * Se crea en /acceso al pulsar «Continuar con Google» con el mismo correo del pago.
+ * Para entrar a Jornada Base también deja su WhatsApp en ese mismo paso.
  */
 
 export const CLIENT_ACCESO_PATH = "/acceso";

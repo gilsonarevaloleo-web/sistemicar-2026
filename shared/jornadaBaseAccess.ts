@@ -1,6 +1,9 @@
 /**
  * Acceso a Jornada Base: pago, trial de 7 días, o gancho de 500 PS.
  * Fuente canónica del “entra gente” comercial.
+ *
+ * Entrar a Base exige cuenta Google + WhatsApp. El trial no arranca
+ * en sesión anónima: primero /acceso.
  */
 
 import {
@@ -8,6 +11,7 @@ import {
   isOwnerEmail,
   type ModuleAccessInput,
 } from "./moduleAccess.ts";
+import { hasValidClientPhone } from "./phone.ts";
 
 export const JORNADA_BASE_TRIAL_DAYS = 7;
 export const JORNADA_BASE_POINTS_UNLOCK = 500;
@@ -26,7 +30,26 @@ export const JORNADA_BASE_TRIAL_COPY = {
   short: "7 días gratis. Después $24.99/mes. 500 PS = Base gratis.",
   voice:
     "Siete días gratis. Después veinticinco al mes. Si llegas a quinientos puntos, te queda gratis.",
+  register: "Crea tu cuenta con Google y deja tu WhatsApp.",
 } as const;
+
+/** Pasos de /acceso antes de abrir Jornada Base. */
+export type JornadaBaseRegistroStep = "google" | "loading" | "phone" | "ready";
+
+export function resolveJornadaBaseRegistroStep(input: {
+  firebaseConfigured: boolean;
+  isOwner?: boolean;
+  isAnonymous: boolean;
+  email?: string | null;
+  whatsapp?: string | null;
+  progressionReady: boolean;
+}): JornadaBaseRegistroStep {
+  if (!input.firebaseConfigured || input.isOwner) return "ready";
+  if (input.isAnonymous || !input.email?.trim()) return "google";
+  if (!input.progressionReady) return "loading";
+  if (!hasValidClientPhone(input.whatsapp)) return "phone";
+  return "ready";
+}
 
 export type JornadaBaseAccessKind =
   | "owner"
