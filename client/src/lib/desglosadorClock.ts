@@ -8,11 +8,22 @@ export const SUB_APERTURA_ACTIVATION_SKEW_MS = 50;
 /** Drift de merge local/Firebase considerado el mismo sub activo (no remontar reloj). */
 export const SUB_APERTURA_MERGE_TOLERANCE_MS = 2500;
 
+/** Récord fijado del vehículo (cant × MIN/U o sugerido). No se mueve con ganancias. */
 export function suggestedSec(sub: SubVehiculo): number | null {
   if (sub.cantidadObjetivo && sub.tiempoRecordMinPerUnit) {
     return Math.round(sub.cantidadObjetivo * sub.tiempoRecordMinPerUnit * 60);
   }
   return sub.tiempoSugeridoSeg ?? null;
+}
+
+/**
+ * Reloj proyectivo del vehículo: dos operaciones.
+ * 1. Presente al cerrar el anterior (= apertura del que entra).
+ * 2. Suma los minutos fijos del vehículo entrante.
+ * Ganancias/pérdidas no entran aquí: van al reloj global de ganancia.
+ */
+export function projectVehicleEndAt(presentMs: number, incomingFixedSec: number): number {
+  return presentMs + incomingFixedSec * 1000;
 }
 
 /** Tope del ciclo conquista: meta HH:mm si existe; si no, apertura + Σ sugeridos originales. */
@@ -100,23 +111,26 @@ export type DesglosadorClockOpsInput = {
 };
 
 export type DesglosadorClockOps = {
-  /** Ganancia/pérdida visible: cerrados + overtime del sub activo. */
+  /** Ganancia/pérdida visible: cerrados + overtime del sub activo. Reloj aparte. */
   liveAccumDeltaSec: number;
   /** Trabajo restante si se cumple el plan (no incluye delta ni pausa). */
   remainWorkSec: number;
   /** Tope corrido por pausas (suma). */
   effectiveTopeMs: number | null;
   topeRemainSec: number | null;
-  /** Holgura vs tope: positivo = ganancia absorbible; negativo = vamos tarde. */
+  /** Holgura vs tope. Informativa: no mueve los relojes proyectivos. */
   slackSec: number;
+  /** Ahora + restante de este sub + Σ pendientes. */
   cycleRemainSec: number;
-  absorbSlackIntoActive: boolean;
 };
 
 /**
- * Motor aritmético del reloj global.
- * Suma: pérdida, overtime, pausa (estiran el tope).
- * Resta: ganancia (holgura contra el tope, no contra el trabajo restante).
+ * Motor del ciclo y del reloj de ganancia.
+ *
+ * Reloj proyectivo del vehículo: presente al cerrar + minutos fijos del que entra
+ * (lo arma `projectVehicleEndAt`, no esta función).
+ * Ciclo global: ahora + récords fijos que aún faltan (este + posteriores).
+ * Ganancia/pérdida es OTRO reloj (`liveAccumDeltaSec`).
  */
 export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): DesglosadorClockOps {
   const liveAccumDeltaSec = input.completedDeltaSec + Math.max(0, input.liveOvertimeSec);
@@ -127,16 +141,13 @@ export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): Desgl
   const topeRemainSec =
     effectiveTopeMs != null ? Math.floor((effectiveTopeMs - input.nowMs) / 1000) : null;
   const slackSec = topeRemainSec != null ? topeRemainSec - remainWorkSec : 0;
-  const keepGlobalClock = topeRemainSec != null && slackSec > 0;
-  const cycleRemainSec = keepGlobalClock ? Math.max(0, topeRemainSec) : remainWorkSec;
   return {
     liveAccumDeltaSec,
     remainWorkSec,
     effectiveTopeMs,
     topeRemainSec,
     slackSec,
-    cycleRemainSec,
-    absorbSlackIntoActive: keepGlobalClock && input.hasActiveSuggested,
+    cycleRemainSec: remainWorkSec,
   };
 }
 
@@ -151,7 +162,7 @@ export interface DesglosadorClockResult {
   hasProjection: boolean;
   /** Pausa acumulada (pared − trabajo), incluye la pausa en curso. */
   pauseAccumSec: number;
-  /** Holgura vs tope efectivo. Positivo = ganancia; negativo = retraso. */
+  /** Holgura vs tope efectivo. Informativa: no mueve Termina a las ni el ciclo. */
   slackSec: number;
 }
 
@@ -220,12 +231,20 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
-  let subRemainingSec =
-    objSecs != null ? Math.max(0, objSecs - subElapsedSec) : null;
-  let subEndAt =
-    activeSub?.aperturaAt && objSecs != null
-      ? activeSub.aperturaAt + objSecs * 1000
-      : null;
+  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
+  const subRemainingSec = objSecs != null ? remainActive : null;
+  // Presente al cerrar (apertura del que entra) + récord fijo del entrante.
+  // En pausa el récord sigue fijo: solo se desliza el presente.
+  let subEndAt: number | null = null;
+  if (objSecs != null && activeSub) {
+    if (frozen) {
+      subEndAt = now + remainActive * 1000;
+    } else if (activeSub.aperturaAt) {
+      subEndAt = projectVehicleEndAt(activeSub.aperturaAt, objSecs);
+    } else {
+      subEndAt = projectVehicleEndAt(now, objSecs);
+    }
+  }
 
   let unitsRemaining: number | null = null;
   if (
@@ -259,7 +278,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     };
   }
 
-  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
   const liveOvertimeSec = objSecs != null ? Math.max(0, subElapsedSec - objSecs) : 0;
   const ops = applyDesglosadorClockOps({
     remainActiveSec: remainActive,
@@ -271,11 +289,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     nowMs: now,
     hasActiveSuggested: objSecs != null,
   });
-
-  if (ops.absorbSlackIntoActive) {
-    subRemainingSec = remainActive + ops.slackSec;
-    subEndAt = now + subRemainingSec * 1000;
-  }
 
   const cycleRemainSec = ops.cycleRemainSec;
   const cycleEndAt = now + cycleRemainSec * 1000;

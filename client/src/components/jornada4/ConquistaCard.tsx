@@ -493,6 +493,15 @@ export function ConquistaCard({
                     >
                       {futuroSub}
                     </p>
+                    {objSecs != null ? (
+                      <p
+                        className="text-[7px] font-mono"
+                        style={{ color: "rgba(255,255,255,0.5)" }}
+                        data-testid="j4-conquista-termina-suma"
+                      >
+                        +{formatMMSS(objSecs)}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="text-center min-w-0">
                     <p
