@@ -103,6 +103,7 @@ export function Jornada4OpsToolsRail({
   const tools: Array<{
     id: Jornada4OpsToolId;
     label: string;
+    short: string;
     icon: typeof Timer;
     show: boolean;
     badge?: number;
@@ -112,6 +113,7 @@ export function Jornada4OpsToolsRail({
     {
       id: "apunte",
       label: "Apunte",
+      short: "Apunte",
       icon: Crosshair,
       show: true,
       activeDot: apunte.apuntado,
@@ -119,6 +121,7 @@ export function Jornada4OpsToolsRail({
     {
       id: "recinto",
       label: "Recinto",
+      short: "Recinto",
       icon: Timer,
       show: showRecinto,
       badge: recintoVivos > 0 ? recintoVivos : undefined,
@@ -127,18 +130,21 @@ export function Jornada4OpsToolsRail({
     {
       id: "guia",
       label: "Cómo operar",
+      short: "Guía",
       icon: CircleDot,
       show: showGuia,
     },
     {
       id: "primer-dia",
       label: "Primer día",
+      short: "1° día",
       icon: ListChecks,
       show: Boolean(primerDia) && !primerDiaDone,
     },
     {
       id: "revelacion",
       label: "Revelación",
+      short: "Día",
       icon: Eye,
       show: showRevelacion,
     },
@@ -169,7 +175,7 @@ export function Jornada4OpsToolsRail({
               aria-label={tool.label}
               aria-pressed={active}
               onClick={() => toggle(tool.id)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg touch-manipulation"
+              className="relative flex h-11 min-w-[3.15rem] flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 touch-manipulation"
               style={{
                 backgroundColor: active ? "rgba(212,175,55,0.16)" : "transparent",
                 color: active ? GOLD : MUTED,
@@ -178,16 +184,22 @@ export function Jornada4OpsToolsRail({
               data-testid={`jornada4-ops-tool-${tool.id}`}
             >
               <Icon size={14} strokeWidth={active ? 2.4 : 2} />
+              <span
+                className="text-[7px] font-black uppercase tracking-wider leading-none"
+                style={{ color: active ? INK : MUTED }}
+              >
+                {tool.short}
+              </span>
               {tool.activeDot ? (
                 <span
-                  className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full"
+                  className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: GOLD }}
                   data-testid={`jornada4-ops-dot-${tool.id}`}
                 />
               ) : null}
               {tool.badge != null ? (
                 <span
-                  className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full text-[8px] font-black leading-[14px] text-center"
+                  className="absolute top-0.5 right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full text-[8px] font-black leading-[14px] text-center"
                   style={{
                     backgroundColor: tool.badgeColor ?? GOLD,
                     color: "#0a0a0a",
@@ -206,11 +218,14 @@ export function Jornada4OpsToolsRail({
             title="Tutorial"
             aria-label="Ver tutorial"
             onClick={onOpenTutorial}
-            className="flex h-9 w-9 items-center justify-center rounded-lg touch-manipulation"
+            className="flex h-11 min-w-[3.15rem] flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 touch-manipulation"
             style={{ color: MUTED }}
             data-testid="jornada4-ops-tool-tutorial"
           >
             <GraduationCap size={14} />
+            <span className="text-[7px] font-black uppercase tracking-wider leading-none">
+              Manual
+            </span>
           </button>
         ) : null}
       </div>
@@ -257,12 +272,6 @@ export function Jornada4OpsToolsRail({
             planEndLabel={planEndLabel ?? null}
           />
         </div>
-      ) : null}
-
-      {open ? (
-        <p className="mt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: INK, opacity: 0.45 }}>
-          {visible.find(t => t.id === open)?.label}
-        </p>
       ) : null}
     </div>
   );
