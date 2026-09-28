@@ -4,8 +4,7 @@
  */
 import { useState } from "react";
 import { ConquistaCard } from "@/components/jornada4/ConquistaCard";
-import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
-import { RecintoMinimoDock } from "@/components/jornada4/RecintoMinimoDock";
+import { Jornada4OpsToolsRail } from "@/components/jornada4/Jornada4OpsToolsRail";
 import { Jornada4CoberturaTimeline } from "@/components/jornada4/Jornada4CoberturaTimeline";
 import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4ConcienciaTriadaCard";
 import { SelloOperadorCard } from "@/components/jornada4/SelloOperadorCard";
@@ -23,8 +22,7 @@ import {
 import { resumeDesglosadorFromNestedPause } from "@/lib/nestedContextStack";
 import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
-import { Rocket } from "lucide-react";
-import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
+import { Clock, Flag } from "lucide-react";
 import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
 
 const revelacion: RevelacionPlanDia = {
@@ -204,47 +202,45 @@ export default function JornadaV4UiPreview() {
         {tab === "operar" ? (
           <div data-testid="jornada4-preview-operar">
             {pausaPreview ? <PreviewConquistaPausa /> : null}
-            {primer ? (
-              <Jornada4ComoOperarCard
-                hasRitmo={false}
-                onOpenTutorial={() => setShowTutorial(true)}
-              />
-            ) : null}
-            {!primer ? (
-              <Jornada4RevelacionCard revelacion={revelacion} planEndLabel="23:00" />
-            ) : null}
-            <div className="px-3 sm:px-4 pb-3 space-y-3" data-testid="jornada4-launch">
-              <div className="flex items-end justify-between gap-2">
-                <p className={J4_UI.label}>La Flota</p>
-                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-100">
-                  <Rocket size={12} className="inline mr-1" /> Lanzar
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+            <Jornada4OpsToolsRail
+              onOpenTutorial={() => setShowTutorial(true)}
+              showRecinto={!primer}
+              showGuia={primer}
+              showRevelacion={!primer}
+              hasRitmo={!primer}
+              revelacion={primer ? null : revelacion}
+              planEndLabel={primer ? null : "23:00"}
+            />
+            <div className="px-3 sm:px-4 pb-2 space-y-1.5" data-testid="jornada4-launch">
+              <div className="grid grid-cols-2 gap-1.5">
                 {(primer ? ["Conquista"] : ["Conquista", "Enfoque"]).map(label => (
-                  <div key={label} className={`${J4_UI.card} text-center`}>
-                    <p className="text-xs font-black uppercase tracking-wider text-neutral-100">
+                  <div
+                    key={label}
+                    className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border"
+                    style={{
+                      borderColor: label === "Conquista" ? "rgba(249,115,22,0.4)" : "rgba(148,163,184,0.4)",
+                      backgroundColor: label === "Conquista" ? "rgba(249,115,22,0.12)" : "rgba(148,163,184,0.12)",
+                    }}
+                  >
+                    {label === "Conquista" ? (
+                      <Clock size={15} className="text-orange-400" />
+                    ) : (
+                      <Flag size={15} className="text-slate-400" />
+                    )}
+                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-100">
                       {label}
-                    </p>
-                    <p className={`${J4_UI.hint} mt-1`}>
-                      {label === "Conquista" ? "Unidades y cierre" : "Lanzar vehículo"}
                     </p>
                   </div>
                 ))}
                 {primer ? (
-                  <div className={`${J4_UI.card} text-center opacity-70`}>
-                    <p className="text-xs font-black uppercase tracking-wider text-neutral-400">
+                  <div className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border opacity-70 border-white/10">
+                    <Flag size={15} className="text-neutral-500" />
+                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
                       Enfoque
                     </p>
-                    <p className={`${J4_UI.hint} mt-1`}>Requiere Ritmo del día</p>
                   </div>
                 ) : null}
               </div>
-              {primer ? (
-                <p className="text-center text-[9px] text-neutral-500">
-                  Hoy solo Conquista. Enfoque se abre con Ritmo, después de tu primer cierre.
-                </p>
-              ) : null}
             </div>
             {primer ? (
               <div
@@ -257,9 +253,17 @@ export default function JornadaV4UiPreview() {
                   unidades y cierra cumplido o fallado. Eso es operar hoy.
                 </p>
               </div>
-            ) : (
-              <RecintoMinimoDock />
-            )}
+            ) : !pausaPreview ? (
+              <div className="px-3 sm:px-4 space-y-2" data-testid="jornada4-list">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-800">
+                  Vehículos · 1
+                </p>
+                <div className={J4_UI.card}>
+                  <p className="text-sm font-bold text-neutral-100">{vehicles[0]?.titulo}</p>
+                  <p className={`${J4_UI.hint} mt-0.5`}>Conquista · activo</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {tab === "plan" ? (

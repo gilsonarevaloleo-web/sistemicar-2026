@@ -7,7 +7,12 @@ import { J4_UI } from "./jornada4Ui";
 
 const { INK, MUTED, GOLD } = J4_COLORS;
 
-export function Jornada4ApunteCard() {
+type Props = {
+  /** Sin márgenes laterales: vive dentro del rail de símbolos. */
+  embedded?: boolean;
+};
+
+export function Jornada4ApunteCard({ embedded = false }: Props) {
   const { record, apuntado, cerrado, error, apuntar } = useJornadaApunte();
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
@@ -22,7 +27,7 @@ export function Jornada4ApunteCard() {
 
   return (
     <section
-      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-2`}
+      className={`${embedded ? "" : "mx-3 mb-3 sm:mx-4 "} ${J4_UI.card} space-y-2`}
       data-testid="jornada4-apunte-card"
     >
       <p

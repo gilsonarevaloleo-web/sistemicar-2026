@@ -16,13 +16,11 @@ import {
 import { Jornada4LaunchPanel } from "@/components/jornada4/Jornada4LaunchPanel";
 import { Jornada4VehicleList } from "@/components/jornada4/Jornada4VehicleList";
 import PlaneacionCrisolDock from "@/components/planeacion/PlaneacionCrisolDock";
-import { RecintoMinimoDock } from "@/components/jornada4/RecintoMinimoDock";
+import { Jornada4OpsToolsRail } from "@/components/jornada4/Jornada4OpsToolsRail";
 import { useJornada4Core } from "@/hooks/useJornada4Core";
 import { useJornada4Crisol } from "@/hooks/useJornada4Crisol";
 import { useJornada4Ops } from "@/hooks/useJornada4Ops";
 import { useJornada4PlanEnd } from "@/hooks/useJornada4PlanEnd";
-import { Jornada4RevelacionCard } from "@/components/jornada4/Jornada4RevelacionCard";
-import { Jornada4ApunteCard } from "@/components/jornada4/Jornada4ApunteCard";
 import {
   buildRevelacionPlanDia,
   isPlanTerminado,
@@ -45,8 +43,6 @@ import { unlockPuertaAudio } from "@/jornada4/puertaChime";
 import { computePuertaPanorama } from "@/jornada4/segmentAttentionJ4";
 import { usePlanificacionEntitlements } from "@/hooks/usePlanificacionEntitlements";
 import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
-import { PlanificacionPrimerDia } from "@/components/planificacion/PlanificacionPrimerDia";
-import { Jornada4ComoOperarCard } from "@/components/jornada4/Jornada4ComoOperarCard";
 import { JornadaBaseTrialBanner } from "@/components/jornada4/JornadaBaseTrialBanner";
 import {
   isTutorialDone,
@@ -418,29 +414,26 @@ export default function JornadaV4Session() {
         {entitlements.baseGrant.kind === "trial" || entitlements.baseGrant.kind === "points" ? (
           <JornadaBaseTrialBanner access={entitlements.baseGrant} />
         ) : null}
-        <Jornada4ApunteCard />
         {mobileTab === "operar" ? (
           <div role="tabpanel" data-testid="jornada4-panel-operar">
-            {user?.uid ? (
-              <div className="px-3 mb-3 sm:px-4">
-                <PlanificacionPrimerDia
-                  uid={user.uid}
-                  profile={onboardingProfile}
-                  dayStartMs={dayStartMs}
-                  segmentos={planillaApi.planilla?.segmentos ?? []}
-                  vehicles={core.vehicles}
-                  onOpenTutorial={() => setShowTutorial(true)}
-                />
-              </div>
-            ) : null}
-            {core.dualVehicles.length === 0 ? (
-              <Jornada4ComoOperarCard
-                hasRitmo={entitlements.hasRitmo}
-                onLaunchConquista={openConquista}
-                onOpenTutorial={() => setShowTutorial(true)}
-              />
-            ) : null}
-            <Jornada4RevelacionCard
+            <Jornada4OpsToolsRail
+              onOpenTutorial={() => setShowTutorial(true)}
+              onLaunchConquista={openConquista}
+              showRecinto={entitlements.hasRitmo || core.dualVehicles.length > 0}
+              showGuia={core.dualVehicles.length === 0}
+              showRevelacion={Boolean(revelacionViva || planEnd.planEndLabel)}
+              hasRitmo={entitlements.hasRitmo}
+              primerDia={
+                user?.uid
+                  ? {
+                      uid: user.uid,
+                      profile: onboardingProfile,
+                      dayStartMs,
+                      segmentos: planillaApi.planilla?.segmentos ?? [],
+                      vehicles: core.vehicles,
+                    }
+                  : null
+              }
               revelacion={revelacionViva}
               planEndLabel={planEnd.planEndLabel}
             />
@@ -467,9 +460,6 @@ export default function JornadaV4Session() {
               canModoEntrenamientoRing={canModoEntrenamientoRing}
               canAnclarDesglosadorSegmento={canAnclarDesglosadorSegmento}
             />
-            {entitlements.hasRitmo || core.dualVehicles.length > 0 ? (
-              <RecintoMinimoDock />
-            ) : null}
             <Jornada4VehicleList
               vehicles={core.dualVehicles}
               ops={opsWithHuecos}

@@ -26,6 +26,8 @@ type Props = {
   hasRitmo?: boolean;
   onLaunchConquista?: () => void;
   onOpenTutorial?: () => void;
+  /** Sin márgenes laterales: vive dentro del rail de símbolos. */
+  embedded?: boolean;
 };
 
 /**
@@ -36,10 +38,11 @@ export function Jornada4ComoOperarCard({
   hasRitmo = false,
   onLaunchConquista,
   onOpenTutorial,
+  embedded = false,
 }: Props) {
   return (
     <section
-      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-3`}
+      className={`${embedded ? "" : "mx-3 mb-3 sm:mx-4 "} ${J4_UI.card} space-y-3`}
       data-testid="jornada4-como-operar"
     >
       <p className={`${J4_UI.label} flex items-center gap-1`}>

@@ -177,8 +177,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     // Toasts sí; tick UI de badges no (false = sin setState root cada 1s).
     assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
     assert.match(session, /useJornada4PlanEnd/);
-    assert.match(session, /Jornada4RevelacionCard/);
-    assert.match(session, /Jornada4ApunteCard/);
+    assert.match(session, /Jornada4OpsToolsRail/);
     assert.equal(session.includes("useJornada4Tick"), false);
     assert.equal(session.includes("HubRendicionTiempo"), false);
   });
@@ -187,6 +186,31 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     const hub = readFileSync(join(clientSrc, "pages/proyectos.tsx"), "utf8");
     assert.equal(hub.includes("HubRendicionTiempo"), false);
     assert.equal(hub.includes("buildProyectoRendicion"), false);
+  });
+
+  it("Operar compacta tutorial, recinto y apunte en rail de símbolos", () => {
+    const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
+    assert.match(session, /Jornada4OpsToolsRail/);
+    assert.equal(session.includes("RecintoMinimoDock"), false);
+    assert.equal(session.includes("Jornada4ComoOperarCard"), false);
+    assert.equal(session.includes("Jornada4ApunteCard"), false);
+    const rail = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4OpsToolsRail.tsx"),
+      "utf8"
+    );
+    assert.match(rail, /jornada4-ops-rail/);
+    assert.match(rail, /RecintoMinimoDock/);
+    assert.match(rail, /Jornada4ApunteCard/);
+    assert.match(rail, /Jornada4ComoOperarCard/);
+    assert.match(rail, /Jornada4RevelacionCard/);
+    const launch = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4LaunchPanel.tsx"),
+      "utf8"
+    );
+    assert.match(launch, /jornada4-flota-grid/);
+    assert.equal(launch.includes("FLOTA_SELECTOR_DISCRIMINATOR"), false);
+    const preview = readFileSync(join(clientSrc, "pages/jornadaV4UiPreview.tsx"), "utf8");
+    assert.match(preview, /Jornada4OpsToolsRail/);
   });
 
   it("Ley del Freno: card en Métricas, pista en el lanzador, no en sesión", () => {

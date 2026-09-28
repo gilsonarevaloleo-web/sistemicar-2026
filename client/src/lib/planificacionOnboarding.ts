@@ -252,6 +252,26 @@ export function computePrimerDiaAutoComplete(params: {
   return out;
 }
 
+export function isPrimerDiaComplete(params: {
+  uid: string;
+  profile: PlanificacionPlanProfile;
+  dayStartMs: number;
+  segmentos: Array<{ estado?: string }>;
+  vehicles: Array<{
+    status?: string;
+    tipoReloj?: string;
+    cierreAt?: number;
+    aperturaAt?: number;
+    subVehiculos?: Array<{ status?: string; cierreAt?: number }>;
+  }>;
+}): boolean {
+  const items = getPrimerDiaItems(params.profile);
+  if (items.length === 0) return true;
+  const manual = loadChecklistState(params.uid);
+  const auto = computePrimerDiaAutoComplete(params);
+  return items.every(it => Boolean(manual[it.key] || auto[it.key]));
+}
+
 export function buildPrimerDiaSummaryForDoctor(
   items: PrimerDiaItem[],
   manual: Record<string, boolean>,
