@@ -224,4 +224,21 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.equal(metricas.includes('from "@/hooks/usePulsoCobertura"'), false);
     assert.equal(metricas.includes('from "@/engines/ConcienciaEngine"'), false);
   });
+
+  it("App no monta el reloj clásico ni Centinela dentro de /jornada-v4", () => {
+    const app = readFileSync(join(clientSrc, "App.tsx"), "utf8");
+    assert.match(app, /Jornada4SuspenseFallback/);
+    assert.equal(app.includes("JornadaV3SuspenseFallback"), false);
+    assert.match(app, /const onJornada4 = isJornada4Path\(location\) \|\| isJornada4WindowPath\(\)/);
+    assert.match(app, /!onJornada4 && <SegmentAttentionBackground \/>/);
+    assert.match(app, /!onJornada4 && <CentinelaEngine \/>/);
+    assert.match(app, /useAppShellMotorsQuiet/);
+  });
+
+  it("cierre de fila situacional no despierta el reloj de conciencia en V4", () => {
+    const close = readFileSync(join(clientSrc, "lib/situacionRingCloseMs0.ts"), "utf8");
+    assert.match(close, /isJornada4WindowPath/);
+    assert.match(close, /burstJornada4Tick/);
+    assert.match(close, /burstConcienciaClockTick/);
+  });
 });

@@ -6,7 +6,7 @@ import { lazyWithRetry, lazyJornadaWithRetry } from "@/lib/lazyWithRetry";
 import { HouseRouteFallback } from "@/components/HouseRouteFallback";
 import { SellerRefCapture } from "./components/seller-ref-capture";
 import { JornadaShell } from "@/components/jornada/JornadaShell";
-import { JornadaV3SuspenseFallback } from "@/components/jornada/JornadaV3SuspenseFallback";
+import { Jornada4SuspenseFallback } from "@/components/jornada/Jornada4SuspenseFallback";
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
@@ -96,9 +96,11 @@ import { installVoiceLifecycleHub } from "@/lib/voiceLifecycle";
 import {
   isAdminPath,
   isCommercialEntryPath,
+  isJornada4Path,
   isJornada4WindowPath,
   JORNADA_V4_PATH,
 } from "@/lib/jornadaBrand";
+import { useAppShellMotorsQuiet } from "@/lib/dualKernelQuiet";
 
 interface AuthContextType {
   user: AppUser | null;
@@ -479,7 +481,7 @@ function ArquitectoRoute({ component: Component }: { component: React.ComponentT
 function JornadaV4ModuleRoute() {
   return (
     <JornadaErrorBoundary>
-      <Suspense fallback={<JornadaV3SuspenseFallback />}>
+      <Suspense fallback={<Jornada4SuspenseFallback />}>
         <ModuleRoute
           component={JornadaV4}
           requiredModule="planificacion_base"
@@ -737,6 +739,9 @@ function VoiceBootstrap() {
 /** Landings de anuncio: sin voz, Centinela ni cierre — el primer toque debe navegar. */
 function AppShellMotors() {
   const [location] = useLocation();
+  // Latch Dual Kernel aunque el reloj clásico no se monte en V4.
+  useAppShellMotorsQuiet();
+  const onJornada4 = isJornada4Path(location) || isJornada4WindowPath();
   if (
     isCommercialEntryPath(location) ||
     isCommercialEntryPath(window.location.pathname) ||
@@ -751,8 +756,8 @@ function AppShellMotors() {
       <CierreJornadaModal />
       <SovereigntyListener />
       <VoiceBootstrap />
-      <SegmentAttentionBackground />
-      <CentinelaEngine />
+      {!onJornada4 && <SegmentAttentionBackground />}
+      {!onJornada4 && <CentinelaEngine />}
     </>
   );
 }

@@ -1,6 +1,8 @@
 import type { MutableRefObject } from "react";
 import type { SubTarea, Vehicle } from "@/lib/persistence";
+import { burstJornada4Tick } from "@/jornada4/jornada4Tick";
 import { burstConcienciaClockTick } from "@/lib/concienciaClock";
+import { isJornada4WindowPath } from "@/lib/jornadaBrand";
 import {
   aplicarTiempoGanadoAlCumplir,
   registrarCierreFalladoCronometro,
@@ -77,7 +79,11 @@ export function paintSituacionRingRowCloseOptimistic(
   setVehicles(prev =>
     prev.map(v => (v.id === vehicleId ? { ...v, subTareas, situacionCupoAnchor } : v))
   );
-  burstConcienciaClockTick(1);
+  if (isJornada4WindowPath()) {
+    burstJornada4Tick();
+  } else {
+    burstConcienciaClockTick(1);
+  }
 
   return {
     subTareas,

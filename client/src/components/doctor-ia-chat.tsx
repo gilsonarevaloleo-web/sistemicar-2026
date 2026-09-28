@@ -8,6 +8,7 @@ import {
 } from "@/lib/planificacionProfile";
 import { useAuthContext } from "@/App";
 import { isOwner } from "@/lib/owner";
+import { isJornada4Path } from "@/lib/jornadaBrand";
 import {
   subscribeToPrincipiosMaestros, addPrincipioMaestro, PrincipioMaestro,
   subscribeToGenomeLaws, GenomeLaw,
@@ -83,7 +84,7 @@ export function DoctorIAChat() {
 
   const isCreator = isOwner(user?.email);
   const currentModule = MODULE_NAMES[location] || null;
-  const isPlanificacionModule = location === "/jornada-v4" || location.startsWith("/jornada-v4?");
+  const isPlanificacionModule = isJornada4Path(location);
   const [planificacionProfile, setPlanificacionProfile] =
     useState<PlanificacionPlanProfile>("base");
 
@@ -448,7 +449,6 @@ export function DoctorIAChat() {
     "/ventas-espejo",
     "/ventas-jornada",
     "/vendedor",
-    "/jornada-v4", // Dual Kernel: sin FAB ni ~10 listeners Firebase
     "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos
     "/umbral/entrada",
     "/umbral/metricas",
@@ -460,9 +460,9 @@ export function DoctorIAChat() {
   if (
     !user ||
     hiddenPages.includes(location) ||
+    isJornada4Path(location) ||
     location.startsWith("/admin-gilson") ||
     location.startsWith("/admin-semillas") ||
-    location.startsWith("/jornada-v4?") ||
     location.startsWith("/umbral/") ||
     location.startsWith("/esperanza") ||
     location.startsWith("/deposito")
