@@ -185,6 +185,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const [showListasPanel, setShowListasPanel] = useState(false);
   const [listaPickerId, setListaPickerId] = useState<string | null>(null);
   const [listaPickerSelected, setListaPickerSelected] = useState<boolean[]>([]);
+  const [showGuardarNombre, setShowGuardarNombre] = useState(false);
+  const [listaNombre, setListaNombre] = useState("");
   const [activeSubSugIdx, setActiveSubSugIdx] = useState<number | null>(null);
   const [modoEntrenamientoRing, setModoEntrenamientoRing] = useState(false);
   const [ancladoAlSegmento, setAncladoAlSegmento] = useState(false);
@@ -315,6 +317,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setShowListasPanel(false);
     setListaPickerId(null);
     setListaPickerSelected([]);
+    setShowGuardarNombre(false);
+    setListaNombre("");
     setActiveSubSugIdx(null);
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
@@ -341,7 +345,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const handleGuardarLista = useCallback(() => {
     const named = subs.filter(s => s.titulo.trim());
     const result = saveDesglosadorLista({
-      nombre: titulo.trim() || named[0]!.titulo.trim(),
+      nombre: listaNombre.trim(),
       items: named.map(s => ({
         titulo: s.titulo.trim(),
         ...(s.cantidadObjetivo.trim() ? { cantidadObjetivo: s.cantidadObjetivo.trim() } : {}),
@@ -355,6 +359,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       toast.message(result.error);
       return;
     }
+    setTitulo(result.lista.nombre);
+    setShowGuardarNombre(false);
     setListasTick(n => n + 1);
     toast.message(
       result.overwritten
@@ -362,7 +368,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         : `Guardada en el buscador · ${result.lista.items.length} ops`,
       { duration: 2200 }
     );
-  }, [subs, titulo]);
+  }, [subs, listaNombre]);
 
   const openTipo = useCallback((t: (typeof V4_TIPOS)[number]) => {
     if (isJ4GpsClipsEnabled()) unlockJ4GpsClips();
@@ -1492,19 +1498,72 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       </button>
                       {conquistaMultiModo === "secuencia" &&
                       subs.filter(s => s.titulo.trim()).length >= 2 ? (
-                        <button
-                          type="button"
-                          onClick={handleGuardarLista}
-                          className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
-                          style={{
-                            backgroundColor: `${GOLD}18`,
-                            color: GOLD,
-                            border: `1px solid ${GOLD}45`,
-                          }}
-                          data-testid="jornada4-guardar-lista"
-                        >
-                          <BookmarkPlus size={13} /> Guardar en el buscador
-                        </button>
+                        showGuardarNombre ? (
+                          <div className="space-y-2" data-testid="jornada4-guardar-lista-form">
+                            <label
+                              className="text-[10px] font-black uppercase tracking-wider block"
+                              style={{ color: GOLD }}
+                            >
+                              Nombre de la lista
+                            </label>
+                            <input
+                              value={listaNombre}
+                              onChange={e => setListaNombre(e.target.value)}
+                              placeholder="Ej: Casaca leñadora"
+                              className="w-full p-3.5 rounded-xl bg-black/60 border-2 text-base focus:outline-none"
+                              style={{ color: INK, borderColor: listaNombre.trim() ? GOLD : "rgba(255,255,255,0.16)" }}
+                              autoFocus
+                              data-testid="jornada4-guardar-lista-nombre"
+                              onKeyDown={e => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleGuardarLista();
+                                }
+                              }}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowGuardarNombre(false)}
+                                className="py-3 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                                style={{ color: MUTED, border: "1px solid rgba(255,255,255,0.12)" }}
+                                data-testid="jornada4-guardar-lista-cancelar"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleGuardarLista}
+                                className="py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                                style={{
+                                  backgroundColor: `${GOLD}18`,
+                                  color: GOLD,
+                                  border: `1px solid ${GOLD}45`,
+                                }}
+                                data-testid="jornada4-guardar-lista"
+                              >
+                                <BookmarkPlus size={13} /> Guardar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setListaNombre("");
+                              setShowGuardarNombre(true);
+                            }}
+                            className="w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5"
+                            style={{
+                              backgroundColor: `${GOLD}18`,
+                              color: GOLD,
+                              border: `1px solid ${GOLD}45`,
+                            }}
+                            data-testid="jornada4-guardar-lista-abrir"
+                          >
+                            <BookmarkPlus size={13} /> Guardar en el buscador
+                          </button>
+                        )
                       ) : null}
                     </div>
                   ) : tipo === "situacion" && modo === "desglose" ? (

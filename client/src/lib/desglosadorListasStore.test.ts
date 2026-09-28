@@ -48,6 +48,16 @@ describe("desglosadorListasStore", () => {
     assert.equal(r.ok, false);
   });
 
+  it("exige nombre propio — no guarda vacío", () => {
+    const r = saveDesglosadorLista({
+      nombre: "  ",
+      items: [{ titulo: "Cortar" }, { titulo: "Manga" }],
+    });
+    assert.equal(r.ok, false);
+    if (r.ok) return;
+    assert.match(r.error, /nombre/i);
+  });
+
   it("guarda y aparece en el buscador", () => {
     const r = saveDesglosadorLista({
       nombre: "Casaca leñadora",

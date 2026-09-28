@@ -213,6 +213,24 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(preview, /Jornada4OpsToolsRail/);
   });
 
+  it("rumbo del lanzador no despliega la lista al abrir; guardar lista pide nombre", () => {
+    const picker = readFileSync(
+      join(clientSrc, "components/jornada4/DireccionDestinoPicker.tsx"),
+      "utf8"
+    );
+    assert.match(picker, /rumboPickerListVisible/);
+    assert.match(picker, /useState\(false\)/);
+    assert.match(picker, /-resumen/);
+    const launch = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4LaunchPanel.tsx"),
+      "utf8"
+    );
+    assert.match(launch, /jornada4-guardar-lista-nombre/);
+    assert.match(launch, /nombre: listaNombre\.trim\(\)/);
+    assert.equal(launch.includes("named[0]!.titulo"), false);
+    assert.equal(launch.includes("titulo.trim() || named"), false);
+  });
+
   it("Ley del Freno: card en Métricas, pista en el lanzador, no en sesión", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     const metricas = readFileSync(
