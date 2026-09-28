@@ -9,7 +9,7 @@ type Props = {
   statusLine?: string;
 };
 
-/** Shell ligero de Jornada — pinta en <50ms; no depende del chunk lazy. */
+/** Shell ligero de Jornada V4 — pinta en <50ms; no depende del chunk lazy. */
 export function JornadaShell({ statusLine }: Props) {
   return (
     <div
@@ -36,7 +36,7 @@ export function JornadaShell({ statusLine }: Props) {
             {JORNADA_MODULE.tagline}
           </p>
           <div className="mt-2 flex gap-1">
-            {(["operar", "metricas", "meta"] as const).map((tab, i) => (
+            {(["operar", "plan", "metricas"] as const).map((tab, i) => (
               <div
                 key={tab}
                 className="flex-1 py-1.5 rounded-lg text-center text-[8px] font-black uppercase tracking-wider"
@@ -46,7 +46,7 @@ export function JornadaShell({ statusLine }: Props) {
                   border: i === 0 ? `1px solid ${VERDE}40` : "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                {tab === "operar" ? "Operar" : tab === "metricas" ? "Métricas" : "Meta"}
+                {tab === "operar" ? "Operar" : tab === "plan" ? "Plan" : "Métricas"}
               </div>
             ))}
           </div>
@@ -60,11 +60,10 @@ export function JornadaShell({ statusLine }: Props) {
         {[0, 1, 2].map(i => (
           <div
             key={i}
-            className="rounded-xl border p-3 animate-pulse"
+            className="rounded-xl border p-3"
             style={{
               backgroundColor: "rgba(255,255,255,0.02)",
               borderColor: "rgba(255,255,255,0.08)",
-              animationDuration: i === 0 ? "1.4s" : `${1.4 + i * 0.2}s`,
             }}
             data-testid={`jornada-shell-vehicle-${i}`}
           >

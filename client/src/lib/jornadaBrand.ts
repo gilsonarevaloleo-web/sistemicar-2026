@@ -9,10 +9,11 @@ export const PROYECTOS_HUB_PATH = "/proyectos" as const;
 /** Centro de Comando (menú principal). */
 export const MENU_PRINCIPAL_PATH = "/menu" as const;
 
-/** True en `/jornada-v4` (y query). Usado para pausar motores globales del App shell. */
+/** True en `/jornada-v4` (query, slash). Usado para no montar el reloj clásico. */
 export function isJornada4Path(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
-  return pathname === JORNADA_V4_PATH || pathname.startsWith(`${JORNADA_V4_PATH}?`);
+  const path = pathname.split("?")[0] ?? pathname;
+  return path === JORNADA_V4_PATH || path.startsWith(`${JORNADA_V4_PATH}/`);
 }
 
 /** True en `/proyectos` (listado o `?id=`). */

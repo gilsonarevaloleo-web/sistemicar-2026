@@ -1,4 +1,4 @@
-/** Diagnóstico de carga del chunk lazy de Jornada V3 (bloque 0 del estudio). */
+/** Diagnóstico de carga del chunk lazy de Jornada V4. */
 export type JornadaChunkLoadPhase = "idle" | "loading" | "loaded" | "failed" | "timeout";
 
 let phase: JornadaChunkLoadPhase = "idle";

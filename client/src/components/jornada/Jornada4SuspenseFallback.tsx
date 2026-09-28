@@ -8,7 +8,7 @@ const SLOW_LOAD_MS = isMobilePerfMode() ? 4_000 : 3_000;
 const WATCHDOG_MS = isMobilePerfMode() ? 18_000 : 10_000;
 
 /** Fallback Suspense para /jornada-v4 — watchdog largo. */
-export function JornadaV3SuspenseFallback() {
+export function Jornada4SuspenseFallback() {
   const [slow, setSlow] = useState(false);
   const [stuck, setStuck] = useState(false);
 

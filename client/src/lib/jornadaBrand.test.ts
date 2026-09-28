@@ -35,6 +35,8 @@ describe("jornadaBrand", () => {
   it("detecta /jornada-v4 y query", () => {
     assert.equal(isJornada4Path(JORNADA_V4_PATH), true);
     assert.equal(isJornada4Path("/jornada-v4?x=1"), true);
+    assert.equal(isJornada4Path("/jornada-v4/"), true);
+    assert.equal(isJornada4Path("/jornada-v4-ui"), false);
     assert.equal(isJornada4Path("/planeacion"), false);
     assert.equal(isJornada4Path("/jornada-v3"), false);
     assert.equal(isJornada4Path("/menu"), false);

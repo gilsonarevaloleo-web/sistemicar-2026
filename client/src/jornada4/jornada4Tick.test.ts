@@ -13,6 +13,14 @@ describe("jornada4Tick burst coalesce", () => {
     assert.match(src, /requestAnimationFrame/);
     assert.match(src, /burstRaf/);
   });
+
+  it("latido 1s en primer plano; 5s solo con pestaña oculta", () => {
+    const src = readFileSync(join(dir, "jornada4Tick.ts"), "utf8");
+    assert.match(src, /const FG_MS = 1000/);
+    assert.match(src, /const BG_MS = 5000/);
+    assert.match(src, /document\.visibilityState === "hidden"/);
+    assert.equal(src.includes("CLOCK_MS_IDLE"), false);
+  });
 });
 
 describe("anti-freeze Dual Kernel session", () => {
