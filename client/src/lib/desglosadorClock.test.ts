@@ -10,6 +10,7 @@ import {
   desglosadorSubClockKey,
   desglosadorSubTimerUiFromClocks,
   isDesglosadorClockPaused,
+  projectVehicleEndAt,
   resolveConquistaTopeMs,
   suggestedSec,
   sumDesglosadorUnitCycle,
@@ -340,9 +341,10 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
       criterioDetalle: "",
       subVehiculos: subs,
     } as Vehicle);
-    // B = sus 10 min. Global = ahora + B + C. Ganancia −5 min vive en su propio reloj.
+    // Presente al cerrar + récord fijo de B (10 min). Ganancia −5 min al reloj de ganancia.
+    assert.equal(suggestedSec(subs[1]), 600);
     assert.equal(clocks.subRemainingSec, 600);
-    assert.equal(clocks.subEndAt, now + 600_000);
+    assert.equal(clocks.subEndAt, projectVehicleEndAt(now, 600));
     assert.equal(clocks.cycleRemainSec, 1200);
     assert.equal(clocks.cycleEndAt, now + 1200_000);
     assert.equal(clocks.liveAccumDeltaSec, -300);
@@ -350,6 +352,70 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
     assert.equal(ui.display, "10:00");
     assert.equal(ui.isCountdown, true);
     assert.equal(ui.expired, false);
+  });
+});
+
+describe("reloj proyectivo del vehículo — presente + tiempo entrante", () => {
+  it("al cerrar, Termina a las = presente + récord fijo del que entra", () => {
+    const start = 1_700_000_000_000;
+    const closeAt = start + 300_000;
+    const incoming = sub({
+      id: "b",
+      status: "activo",
+      aperturaAt: closeAt,
+      cantidadObjetivo: 6,
+      tiempoRecordMinPerUnit: 3.5, // 21 min fijados
+    });
+    assert.equal(suggestedSec(incoming), 21 * 60);
+
+    const vehicle = {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 300,
+          cierreAt: closeAt,
+        }),
+        incoming,
+      ],
+    } as Vehicle;
+
+    const atClose = computeDesglosadorClocks(closeAt, vehicle);
+    assert.equal(atClose.subEndAt, projectVehicleEndAt(closeAt, 21 * 60));
+    assert.equal(atClose.liveAccumDeltaSec, -300);
+
+    const later = computeDesglosadorClocks(closeAt + 120_000, vehicle);
+    assert.equal(later.subEndAt, atClose.subEndAt);
+    assert.equal(suggestedSec(incoming), 21 * 60);
+    assert.equal(later.liveAccumDeltaSec, -300);
+  });
+
+  it("pérdida previa tampoco estira el récord del que entra", () => {
+    const start = 1_700_000_000_000;
+    const closeAt = start + 900_000;
+    const incoming = sub({
+      id: "b",
+      tiempoSugeridoSeg: 600,
+      status: "activo",
+      aperturaAt: closeAt,
+    });
+    const clocks = computeDesglosadorClocks(closeAt, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 900,
+        }),
+        incoming,
+      ],
+    } as Vehicle);
+    assert.equal(suggestedSec(incoming), 600);
+    assert.equal(clocks.subEndAt, projectVehicleEndAt(closeAt, 600));
+    assert.equal(clocks.liveAccumDeltaSec, 300);
   });
 });
 

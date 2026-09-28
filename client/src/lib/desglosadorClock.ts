@@ -8,11 +8,22 @@ export const SUB_APERTURA_ACTIVATION_SKEW_MS = 50;
 /** Drift de merge local/Firebase considerado el mismo sub activo (no remontar reloj). */
 export const SUB_APERTURA_MERGE_TOLERANCE_MS = 2500;
 
+/** Récord fijado del vehículo (cant × MIN/U o sugerido). No se mueve con ganancias. */
 export function suggestedSec(sub: SubVehiculo): number | null {
   if (sub.cantidadObjetivo && sub.tiempoRecordMinPerUnit) {
     return Math.round(sub.cantidadObjetivo * sub.tiempoRecordMinPerUnit * 60);
   }
   return sub.tiempoSugeridoSeg ?? null;
+}
+
+/**
+ * Reloj proyectivo del vehículo: dos operaciones.
+ * 1. Presente al cerrar el anterior (= apertura del que entra).
+ * 2. Suma los minutos fijos del vehículo entrante.
+ * Ganancias/pérdidas no entran aquí: van al reloj global de ganancia.
+ */
+export function projectVehicleEndAt(presentMs: number, incomingFixedSec: number): number {
+  return presentMs + incomingFixedSec * 1000;
 }
 
 /** Tope del ciclo conquista: meta HH:mm si existe; si no, apertura + Σ sugeridos originales. */
@@ -114,12 +125,12 @@ export type DesglosadorClockOps = {
 };
 
 /**
- * Motor aritmético de los relojes proyectivos.
+ * Motor del ciclo y del reloj de ganancia.
  *
- * Reloj del vehículo: solo su restante (lo inyecta computeDesglosadorClocks).
- * Reloj global: ahora + restante de este sub + Σ tiempo de los posteriores.
- * Ganancia/pérdida es otro reloj (`liveAccumDeltaSec`); no adelanta ni atrasa
- * la hora proyectada. El tope/holgura se calcula, pero no se absorbe.
+ * Reloj proyectivo del vehículo: presente al cerrar + minutos fijos del que entra
+ * (lo arma `projectVehicleEndAt`, no esta función).
+ * Ciclo global: ahora + récords fijos que aún faltan (este + posteriores).
+ * Ganancia/pérdida es OTRO reloj (`liveAccumDeltaSec`).
  */
 export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): DesglosadorClockOps {
   const liveAccumDeltaSec = input.completedDeltaSec + Math.max(0, input.liveOvertimeSec);
@@ -222,17 +233,16 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
   const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
   const subRemainingSec = objSecs != null ? remainActive : null;
-  // Proyectivo del vehículo = ahora + restante de ESTE sub.
-  // En marcha equivale a apertura + sugerido; en pausa empuja el fin.
-  // Nunca suma holgura de ganancias/pérdidas de otros subs.
+  // Presente al cerrar (apertura del que entra) + récord fijo del entrante.
+  // En pausa el récord sigue fijo: solo se desliza el presente.
   let subEndAt: number | null = null;
   if (objSecs != null && activeSub) {
     if (frozen) {
       subEndAt = now + remainActive * 1000;
     } else if (activeSub.aperturaAt) {
-      subEndAt = activeSub.aperturaAt + objSecs * 1000;
+      subEndAt = projectVehicleEndAt(activeSub.aperturaAt, objSecs);
     } else {
-      subEndAt = now + remainActive * 1000;
+      subEndAt = projectVehicleEndAt(now, objSecs);
     }
   }
 
