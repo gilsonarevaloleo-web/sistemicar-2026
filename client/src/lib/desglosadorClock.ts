@@ -100,23 +100,26 @@ export type DesglosadorClockOpsInput = {
 };
 
 export type DesglosadorClockOps = {
-  /** Ganancia/pérdida visible: cerrados + overtime del sub activo. */
+  /** Ganancia/pérdida visible: cerrados + overtime del sub activo. Reloj aparte. */
   liveAccumDeltaSec: number;
   /** Trabajo restante si se cumple el plan (no incluye delta ni pausa). */
   remainWorkSec: number;
   /** Tope corrido por pausas (suma). */
   effectiveTopeMs: number | null;
   topeRemainSec: number | null;
-  /** Holgura vs tope: positivo = ganancia absorbible; negativo = vamos tarde. */
+  /** Holgura vs tope. Informativa: no mueve los relojes proyectivos. */
   slackSec: number;
+  /** Ahora + restante de este sub + Σ pendientes. */
   cycleRemainSec: number;
-  absorbSlackIntoActive: boolean;
 };
 
 /**
- * Motor aritmético del reloj global.
- * Suma: pérdida, overtime, pausa (estiran el tope).
- * Resta: ganancia (holgura contra el tope, no contra el trabajo restante).
+ * Motor aritmético de los relojes proyectivos.
+ *
+ * Reloj del vehículo: solo su restante (lo inyecta computeDesglosadorClocks).
+ * Reloj global: ahora + restante de este sub + Σ tiempo de los posteriores.
+ * Ganancia/pérdida es otro reloj (`liveAccumDeltaSec`); no adelanta ni atrasa
+ * la hora proyectada. El tope/holgura se calcula, pero no se absorbe.
  */
 export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): DesglosadorClockOps {
   const liveAccumDeltaSec = input.completedDeltaSec + Math.max(0, input.liveOvertimeSec);
@@ -127,16 +130,13 @@ export function applyDesglosadorClockOps(input: DesglosadorClockOpsInput): Desgl
   const topeRemainSec =
     effectiveTopeMs != null ? Math.floor((effectiveTopeMs - input.nowMs) / 1000) : null;
   const slackSec = topeRemainSec != null ? topeRemainSec - remainWorkSec : 0;
-  const keepGlobalClock = topeRemainSec != null && slackSec > 0;
-  const cycleRemainSec = keepGlobalClock ? Math.max(0, topeRemainSec) : remainWorkSec;
   return {
     liveAccumDeltaSec,
     remainWorkSec,
     effectiveTopeMs,
     topeRemainSec,
     slackSec,
-    cycleRemainSec,
-    absorbSlackIntoActive: keepGlobalClock && input.hasActiveSuggested,
+    cycleRemainSec: remainWorkSec,
   };
 }
 
@@ -151,7 +151,7 @@ export interface DesglosadorClockResult {
   hasProjection: boolean;
   /** Pausa acumulada (pared − trabajo), incluye la pausa en curso. */
   pauseAccumSec: number;
-  /** Holgura vs tope efectivo. Positivo = ganancia; negativo = retraso. */
+  /** Holgura vs tope efectivo. Informativa: no mueve Termina a las ni el ciclo. */
   slackSec: number;
 }
 
@@ -220,12 +220,21 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
   }
 
   const objSecs = activeSub ? suggestedSec(activeSub) : null;
-  let subRemainingSec =
-    objSecs != null ? Math.max(0, objSecs - subElapsedSec) : null;
-  let subEndAt =
-    activeSub?.aperturaAt && objSecs != null
-      ? activeSub.aperturaAt + objSecs * 1000
-      : null;
+  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
+  const subRemainingSec = objSecs != null ? remainActive : null;
+  // Proyectivo del vehículo = ahora + restante de ESTE sub.
+  // En marcha equivale a apertura + sugerido; en pausa empuja el fin.
+  // Nunca suma holgura de ganancias/pérdidas de otros subs.
+  let subEndAt: number | null = null;
+  if (objSecs != null && activeSub) {
+    if (frozen) {
+      subEndAt = now + remainActive * 1000;
+    } else if (activeSub.aperturaAt) {
+      subEndAt = activeSub.aperturaAt + objSecs * 1000;
+    } else {
+      subEndAt = now + remainActive * 1000;
+    }
+  }
 
   let unitsRemaining: number | null = null;
   if (
@@ -259,7 +268,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     };
   }
 
-  const remainActive = objSecs != null ? Math.max(0, objSecs - subElapsedSec) : 0;
   const liveOvertimeSec = objSecs != null ? Math.max(0, subElapsedSec - objSecs) : 0;
   const ops = applyDesglosadorClockOps({
     remainActiveSec: remainActive,
@@ -271,11 +279,6 @@ export function computeDesglosadorClocks(now: number, vehicle: Vehicle): Desglos
     nowMs: now,
     hasActiveSuggested: objSecs != null,
   });
-
-  if (ops.absorbSlackIntoActive) {
-    subRemainingSec = remainActive + ops.slackSec;
-    subEndAt = now + subRemainingSec * 1000;
-  }
 
   const cycleRemainSec = ops.cycleRemainSec;
   const cycleEndAt = now + cycleRemainSec * 1000;

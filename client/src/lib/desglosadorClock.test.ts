@@ -231,6 +231,8 @@ describe("computeDesglosadorClocks nested_paused", () => {
     const later = computeDesglosadorClocks(1_040_000, v);
     assert.equal(later.subElapsedSec, 120);
     assert.equal(later.liveAccumDeltaSec, clocks.liveAccumDeltaSec);
+    assert.equal(later.subRemainingSec, 0);
+    assert.equal(later.subEndAt, 1_040_000);
   });
 
   it("interrupcionActiva huérfana no congela el reloj", () => {
@@ -319,7 +321,7 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
     assert.equal(tope, start + 1800_000);
   });
 
-  it("tras cerrar con ganancia, el siguiente sub absorbe holgura hasta el tope", () => {
+  it("tras cerrar con ganancia, el proyectivo del vehículo no absorbe holgura", () => {
     const start = 1_700_000_000_000;
     const now = start + 300_000; // A cerró 5 min antes de su cupo de 10
     const subs: SubVehiculo[] = [
@@ -338,14 +340,21 @@ describe("resolveConquistaTopeMs / holgura al siguiente sub", () => {
       criterioDetalle: "",
       subVehiculos: subs,
     } as Vehicle);
-    // Tope original 30 min; quedan 25. C sigue con 10 → B recibe 15, no 10 fijados.
-    assert.equal(clocks.subRemainingSec, 900);
-    assert.equal(clocks.cycleRemainSec, 1500);
+    // B = sus 10 min. Global = ahora + B + C. Ganancia −5 min vive en su propio reloj.
+    assert.equal(clocks.subRemainingSec, 600);
+    assert.equal(clocks.subEndAt, now + 600_000);
+    assert.equal(clocks.cycleRemainSec, 1200);
+    assert.equal(clocks.cycleEndAt, now + 1200_000);
+    assert.equal(clocks.liveAccumDeltaSec, -300);
+    const ui = desglosadorSubTimerUiFromClocks(clocks, 600);
+    assert.equal(ui.display, "10:00");
+    assert.equal(ui.isCountdown, true);
+    assert.equal(ui.expired, false);
   });
 });
 
 describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
-  it("resta ganancia del tope, no del trabajo restante", () => {
+  it("ganancia no recorta ni estira el trabajo restante", () => {
     const start = 1_000_000;
     const ops = applyDesglosadorClockOps({
       remainActiveSec: 3500,
@@ -361,7 +370,7 @@ describe("applyDesglosadorClockOps — motor suma/resta/pausa", () => {
     assert.equal(ops.liveAccumDeltaSec, -6000);
     assert.equal(ops.topeRemainSec, 9500);
     assert.equal(ops.slackSec, 6000);
-    assert.equal(ops.cycleRemainSec, 9500);
+    assert.equal(ops.cycleRemainSec, 3500);
   });
 
   it("suma pérdida y overtime a la ganancia visible, no al trabajo restante", () => {
@@ -427,6 +436,8 @@ describe("reloj global — operaciones finales de todo el día", () => {
     } as Vehicle);
     // Ganancia real = −300 s. No −300 − 600 del sub que recién abre.
     assert.equal(clocks.liveAccumDeltaSec, -300);
+    assert.equal(clocks.subRemainingSec, 600);
+    assert.equal(clocks.subEndAt, now + 600_000);
   });
 
   it("en la última unidad, ganancia grande no pone el ciclo en 0", () => {
@@ -456,8 +467,9 @@ describe("reloj global — operaciones finales de todo el día", () => {
       ],
     } as Vehicle);
     assert.equal(clocks.subElapsedSec, 100);
-    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
-    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.subRemainingSec, 3500);
+    assert.equal(clocks.subEndAt, (now - 100_000) + 3600_000);
+    assert.equal(clocks.cycleRemainSec, 3500);
     assert.equal(clocks.liveAccumDeltaSec, -6000);
   });
 
@@ -498,9 +510,64 @@ describe("reloj global — operaciones finales de todo el día", () => {
     const pauseAccum = desglosadorPauseAccumSec({ aperturaAt: start }, now, workSec);
     assert.equal(pauseAccum, 7200);
     assert.equal(clocks.subElapsedSec, 100);
-    assert.ok((clocks.cycleRemainSec ?? 0) >= 3500);
-    assert.notEqual(clocks.cycleRemainSec, 0);
+    assert.equal(clocks.subRemainingSec, 3500);
+    assert.equal(clocks.subEndAt, now + 3500_000);
+    assert.equal(clocks.cycleRemainSec, 3500);
     assert.equal(clocks.pauseAccumSec, pauseAccum);
+    assert.equal(clocks.liveAccumDeltaSec, -6000);
+  });
+
+  it("añadir un vehículo pendiente suma su tiempo al ciclo, no al proyectivo de este sub", () => {
+    const start = 1_700_000_000_000;
+    const now = start;
+    const before = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+      ],
+    } as Vehicle);
+    const after = computeDesglosadorClocks(now, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: now }),
+        sub({ id: "b", tiempoSugeridoSeg: 2640, status: "pendiente" }),
+      ],
+    } as Vehicle);
+    assert.equal(before.subRemainingSec, 600);
+    assert.equal(after.subRemainingSec, 600);
+    assert.equal(after.subEndAt, before.subEndAt);
+    assert.equal(before.cycleRemainSec, 600);
+    assert.equal(after.cycleRemainSec, 600 + 2640);
+    assert.equal(after.liveAccumDeltaSec, 0);
+  });
+
+  it("cerrar con ganancia adelanta el ciclo por el trabajo que ya no falta, no por restar el delta", () => {
+    const start = 1_700_000_000_000;
+    const closeAt = start + 300_000;
+    const beforeClose = computeDesglosadorClocks(closeAt, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({ id: "a", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: start }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "pendiente" }),
+      ],
+    } as Vehicle);
+    const afterClose = computeDesglosadorClocks(closeAt, {
+      aperturaAt: start,
+      subVehiculos: [
+        sub({
+          id: "a",
+          tiempoSugeridoSeg: 600,
+          status: "cumplido",
+          duracionFinal: 300,
+        }),
+        sub({ id: "b", tiempoSugeridoSeg: 600, status: "activo", aperturaAt: closeAt }),
+      ],
+    } as Vehicle);
+    assert.equal(beforeClose.subRemainingSec, 300);
+    assert.equal(afterClose.subRemainingSec, 600);
+    assert.equal(beforeClose.cycleEndAt, closeAt + 900_000);
+    assert.equal(afterClose.cycleEndAt, closeAt + 600_000);
+    assert.equal(afterClose.liveAccumDeltaSec, -300);
   });
 
   it("pérdida empuja el fin proyectado = trabajo restante, sin sumar el delta otra vez", () => {
@@ -521,6 +588,8 @@ describe("reloj global — operaciones finales de todo el día", () => {
     } as Vehicle);
     // Trabajo restante 10+10; no 10+10+5 de la pérdida ya realizada.
     assert.equal(clocks.liveAccumDeltaSec, 300);
+    assert.equal(clocks.subRemainingSec, 600);
+    assert.equal(clocks.subEndAt, now + 600_000);
     assert.equal(clocks.cycleRemainSec, 1200);
   });
 
