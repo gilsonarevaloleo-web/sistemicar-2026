@@ -15,6 +15,7 @@ import {
 } from "@/lib/segmentTime";
 
 const KEY = "sistemicar_recinto_minimo_v1";
+export const RECINTO_MINIMO_EVENT = "sistemicar-recinto-minimo";
 
 function readAll(): RecintoAjeno[] {
   try {
@@ -32,6 +33,11 @@ function writeAll(list: RecintoAjeno[]): void {
     localStorage.setItem(KEY, JSON.stringify(list.slice(0, 80)));
   } catch (e) {
     console.error("[recintoMinimo] persist", e);
+  }
+  try {
+    window.dispatchEvent(new Event(RECINTO_MINIMO_EVENT));
+  } catch {
+    /* SSR / tests without window */
   }
 }
 

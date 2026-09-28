@@ -23,6 +23,8 @@ type Props = {
   vehicles: Vehicle[];
   onOpenTutorial: () => void;
   onAskDoctor?: (prompt: string) => void;
+  /** El rail ya abre/cierra: el checklist entra desplegado, sin chrome extra. */
+  embedded?: boolean;
 };
 
 export function PlanificacionPrimerDia({
@@ -33,6 +35,7 @@ export function PlanificacionPrimerDia({
   vehicles,
   onOpenTutorial,
   onAskDoctor,
+  embedded = false,
 }: Props) {
   const items = useMemo(() => getPrimerDiaItems(profile), [profile]);
   const auto = useMemo(
@@ -42,6 +45,7 @@ export function PlanificacionPrimerDia({
 
   const [manual, setManual] = useState<Record<string, boolean>>(() => loadChecklistState(uid));
   const [collapsed, setCollapsed] = useState(false);
+  const hideChrome = embedded;
 
   useEffect(() => {
     setManual(loadChecklistState(uid));
@@ -56,7 +60,7 @@ export function PlanificacionPrimerDia({
   const doneCount = items.filter(it => manual[it.key] || auto[it.key]).length;
   const allDone = doneCount >= items.length;
 
-  if (allDone && collapsed) {
+  if (!hideChrome && allDone && collapsed) {
     return null;
   }
 
@@ -70,27 +74,29 @@ export function PlanificacionPrimerDia({
       style={{ borderColor: `${GOLD}35`, backgroundColor: `${GOLD}06` }}
       data-testid="panel-primer-dia-planificacion"
     >
-      <button
-        type="button"
-        onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-2">
-          <ListChecks size={16} style={{ color: GOLD }} />
-          <div>
-            <p className="text-xs font-black text-white uppercase tracking-wide">Tu primer día</p>
-            <p className="text-[10px] text-slate-500">
-              {doneCount}/{items.length} pasos · checklist de arranque
-            </p>
+      {!hideChrome ? (
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <ListChecks size={16} style={{ color: GOLD }} />
+            <div>
+              <p className="text-xs font-black text-white uppercase tracking-wide">Tu primer día</p>
+              <p className="text-[10px] text-slate-500">
+                {doneCount}/{items.length} pasos · checklist de arranque
+              </p>
+            </div>
           </div>
-        </div>
-        <span className="text-[10px] font-bold" style={{ color: GOLD }}>
-          {collapsed ? "Ver" : "Ocultar"}
-        </span>
-      </button>
+          <span className="text-[10px] font-bold" style={{ color: GOLD }}>
+            {collapsed ? "Ver" : "Ocultar"}
+          </span>
+        </button>
+      ) : null}
 
-      {!collapsed && (
-        <div className="px-4 pb-4 space-y-2 border-t border-white/5">
+      {(hideChrome || !collapsed) && (
+        <div className={hideChrome ? "px-4 py-3 space-y-2" : "px-4 pb-4 space-y-2 border-t border-white/5"}>
           {items.map(it => {
             const done = Boolean(manual[it.key] || auto[it.key]);
             return (

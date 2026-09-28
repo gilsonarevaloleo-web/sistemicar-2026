@@ -4,6 +4,7 @@ import {
   computePrimerDiaAutoComplete,
   getPrimerDiaItems,
   getTutorialSteps,
+  isPrimerDiaComplete,
   PLANIFICACION_DOCTOR_QUICK_PROMPTS,
 } from "./planificacionOnboarding.ts";
 
@@ -42,6 +43,39 @@ describe("planificacionOnboarding", () => {
     assert.ok(step, "falta el paso de Conquista/Flota");
     assert.doesNotMatch(step!.description, /4 ejes|Express|Profundo|conflicto.*alcance/i);
     assert.match(step!.description, /Conquista|Enfoque/i);
+  });
+
+  it("isPrimerDiaComplete exige todos los pasos del perfil", () => {
+    const dayStart = Date.now() - 3600_000;
+    const now = Date.now();
+    assert.equal(
+      isPrimerDiaComplete({
+        uid: "u-primer-dia",
+        profile: "base",
+        dayStartMs: dayStart,
+        segmentos: [],
+        vehicles: [],
+      }),
+      false
+    );
+    assert.equal(
+      isPrimerDiaComplete({
+        uid: "u-primer-dia",
+        profile: "base",
+        dayStartMs: dayStart,
+        segmentos: [],
+        vehicles: [
+          {
+            status: "cumplido",
+            tipoReloj: "desglosador",
+            cierreAt: now,
+            aperturaAt: now,
+            subVehiculos: [{ status: "cumplido", cierreAt: now }],
+          },
+        ],
+      }),
+      true
+    );
   });
 
   it("getPrimerDiaItems incluye desglosador en produccion", () => {

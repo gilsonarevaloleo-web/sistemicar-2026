@@ -15,6 +15,9 @@ import { J4_TRIADA_NEON, J4_UI } from "./jornada4Ui";
 export type Jornada4RevelacionCardProps = {
   revelacion: RevelacionPlanDia | null;
   planEndLabel: string | null;
+  /** Sin márgenes laterales: vive dentro del rail de símbolos. */
+  embedded?: boolean;
+  defaultOpen?: boolean;
 };
 
 function pct(part: number, total: number): number {
@@ -32,8 +35,10 @@ const BUCKET_NEON = {
 export function Jornada4RevelacionCard({
   revelacion,
   planEndLabel,
+  embedded = false,
+  defaultOpen = false,
 }: Jornada4RevelacionCardProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   if (!planEndLabel && !revelacion) return null;
 
@@ -43,7 +48,7 @@ export function Jornada4RevelacionCard({
 
   return (
     <section
-      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.cardCompact}`}
+      className={`${embedded ? "" : "mx-3 mb-3 sm:mx-4 "} ${J4_UI.cardCompact}`}
       data-testid={revelacion ? "jornada4-revelacion" : "jornada4-revelacion-espera"}
     >
       <button

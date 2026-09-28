@@ -1,12 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookmarkPlus, Clock, ListTodo, Lock, Plus, Rocket, Trash2, Zap, X } from "lucide-react";
+import { BookmarkPlus, Clock, ListTodo, Lock, Plus, Trash2, Zap, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   FLOTA_CONFIG,
   getSubVehicleRecordSuggestions,
   getHistoricalVehicleData,
 } from "@/components/flota/vehicleCardShared";
-import { FLOTA_SELECTOR_DISCRIMINATOR } from "@/lib/flotaBrand";
 import type { DesglosadorSubFormRow, FlotaLaunchModo } from "@/lib/executeFlotaLaunch";
 import {
   getDesglosadorHabitualResolved,
@@ -43,7 +42,6 @@ import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPicker";
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
-import { J4_UI } from "./jornada4Ui";
 import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
 import { isJ4GpsClipsEnabled } from "@/jornada4/gpsClipPref";
 import {
@@ -519,47 +517,19 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   };
 
   return (
-    <div className="px-3 pb-3 sm:px-4 space-y-3" data-testid="jornada4-launch">
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <p className={J4_UI.label}>
-            La Flota
-          </p>
-          <p className="text-[9px] mt-0.5 leading-snug" style={{ color: MUTED }}>
-            {FLOTA_SELECTOR_DISCRIMINATOR}
-          </p>
-          {segmentoActivoNombre ? (
-            <p
-              className="text-[9px] mt-1 font-bold"
-              style={{ color: EMERALD }}
-              data-testid="jornada4-launch-seg-chip"
-            >
-              Lanza en · {segmentoActivoNombre}
-              {segmentoHoraFin ? ` · meta ${segmentoHoraFin}` : ""}
-            </p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => {
-            if (isJ4GpsClipsEnabled()) unlockJ4GpsClips();
-            setTipo(null);
-            setOpen(true);
-          }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wider touch-manipulation shrink-0"
-          style={{
-            borderColor: `${GOLD}40`,
-            backgroundColor: `${GOLD}12`,
-            color: GOLD,
-          }}
-          data-testid="jornada4-launch-open"
+    <div className="px-3 pb-2 sm:px-4 space-y-1.5" data-testid="jornada4-launch">
+      {segmentoActivoNombre ? (
+        <p
+          className="text-[9px] font-bold truncate"
+          style={{ color: EMERALD }}
+          data-testid="jornada4-launch-seg-chip"
         >
-          <Rocket size={12} /> Lanzar
-        </button>
-      </div>
+          Lanza en · {segmentoActivoNombre}
+          {segmentoHoraFin ? ` · meta ${segmentoHoraFin}` : ""}
+        </p>
+      ) : null}
 
-      <div className="grid grid-cols-2 gap-2" data-testid="jornada4-flota-grid">
+      <div className="grid grid-cols-2 gap-1.5" data-testid="jornada4-flota-grid">
         {V4_TIPOS.map(t => {
           const cfg = FLOTA_CONFIG[t];
           const Icon = cfg.icon;
@@ -570,49 +540,29 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
               type="button"
               disabled={disabled}
               onClick={() => openTipo(t)}
-              className={`${J4_UI.card} flex flex-col items-center gap-2 transition-all hover:scale-[1.02] touch-manipulation disabled:opacity-40 relative`}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border touch-manipulation disabled:opacity-40 relative"
               style={{
+                borderColor: `${cfg.color}40`,
+                backgroundColor: `${cfg.color}12`,
                 opacity: locked ? 0.72 : 1,
               }}
               data-testid={`jornada4-flota-${t}`}
+              aria-label={locked ? `${cfg.label} · requiere Ritmo` : `Lanzar ${cfg.label}`}
             >
               {locked ? (
-                <span
-                  className="absolute top-2 right-2 flex items-center gap-0.5 text-[7px] font-black uppercase tracking-wider"
-                  style={{ color: GOLD }}
-                >
-                  <Lock size={9} /> Ritmo
-                </span>
+                <Lock size={10} className="absolute top-1.5 right-1.5" style={{ color: GOLD }} />
               ) : null}
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${cfg.color}20` }}
-              >
-                <Icon size={20} style={{ color: cfg.color }} />
-              </div>
-              <span className="text-xs font-black uppercase tracking-wider" style={{ color: cfg.color }}>
-                {cfg.label}
-              </span>
-              <span className="text-[9px] text-center leading-tight" style={{ color: MUTED }}>
-                {locked ? "Requiere Ritmo del día" : cfg.sublabel}
-              </span>
+              <Icon size={15} style={{ color: cfg.color }} />
               <span
-                className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                className="text-[10px] font-black uppercase tracking-wider"
+                style={{ color: cfg.color }}
               >
-                {cfg.relojLabel}
+                {cfg.label}
               </span>
             </button>
           );
         })}
       </div>
-
-      <p className="text-center text-[9px]" style={{ color: MUTED }}>
-        {canSituacion
-          ? "Dos gestos: Conquista (unidades) y Enfoque (imprevistos)."
-          : "Hoy solo Conquista. Enfoque se abre con Ritmo, después de tu primer cierre."}
-      </p>
-      <LeyFrenoHint variant="compact" />
 
       {open ? (
         <div

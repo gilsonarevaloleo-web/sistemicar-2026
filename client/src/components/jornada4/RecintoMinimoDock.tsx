@@ -5,6 +5,7 @@ import {
   addRecintoMinimo,
   defaultSaleHm,
   listRecintosDelDia,
+  RECINTO_MINIMO_EVENT,
   sacarRecintoOperador,
 } from "@/lib/recintoMinimoStore";
 import { formatLimaTimeHM } from "@/lib/segmentTime";
@@ -12,7 +13,12 @@ import { J4_NEON, J4_UI } from "./jornada4Ui";
 
 const BLOOD = "#FF2A2A";
 
-export function RecintoMinimoDock() {
+type Props = {
+  /** Sin márgenes laterales: vive dentro del rail de símbolos. */
+  embedded?: boolean;
+};
+
+export function RecintoMinimoDock({ embedded = false }: Props) {
   const [texto, setTexto] = useState("");
   const [saleHm, setSaleHm] = useState(() => defaultSaleHm());
   const [items, setItems] = useState<RecintoAjeno[]>(() => listRecintosDelDia());
@@ -21,8 +27,12 @@ export function RecintoMinimoDock() {
   useEffect(() => {
     const tick = () => setItems(listRecintosDelDia());
     tick();
+    window.addEventListener(RECINTO_MINIMO_EVENT, tick);
     const id = window.setInterval(tick, 30_000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.removeEventListener(RECINTO_MINIMO_EVENT, tick);
+      window.clearInterval(id);
+    };
   }, []);
 
   const capturar = () => {
@@ -39,7 +49,7 @@ export function RecintoMinimoDock() {
 
   return (
     <section
-      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-2`}
+      className={`${embedded ? "" : "mx-3 mb-3 sm:mx-4 "} ${J4_UI.card} space-y-2`}
       data-testid="recinto-minimo-dock"
     >
       <p className={`${J4_UI.label} flex items-center gap-1.5`}>

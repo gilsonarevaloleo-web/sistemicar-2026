@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import type { Vehicle } from "@/lib/persistence";
 import {
   isConquistaDesglosador,
@@ -120,8 +119,6 @@ export function Jornada4VehicleList({
   ops,
   canSituacion = true,
 }: Props) {
-  const [open, setOpen] = useState(true);
-
   if (vehicles.length === 0) {
     return (
       <div
@@ -150,40 +147,24 @@ export function Jornada4VehicleList({
   }
 
   return (
-    <div className="px-4 pb-24" data-testid="jornada4-list">
-      <div
-        className={`${J4_UI.cardCompact} overflow-hidden`}
-      >
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          className="w-full p-4 flex items-center justify-between"
-          data-testid="jornada4-activos-toggle"
+    <div className="px-3 pb-24 sm:px-4 space-y-2" data-testid="jornada4-list">
+      <div className="flex items-center gap-2 px-0.5">
+        <Zap size={12} style={{ color: BLOOD }} />
+        <span
+          className="text-[10px] font-black uppercase tracking-widest"
+          style={{ color: BLOOD }}
         >
-          <div className="flex items-center gap-2">
-            <Zap size={14} style={{ color: BLOOD }} />
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: BLOOD }}>
-              Vehículos activos
-            </span>
-            <span
-              className="text-[9px] px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: `${BLOOD}20`, color: BLOOD }}
-            >
-              {vehicles.length} activo{vehicles.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          {open ? (
-            <ChevronUp size={14} style={{ color: MUTED }} />
-          ) : (
-            <ChevronDown size={14} style={{ color: MUTED }} />
-          )}
-        </button>
-
-        {open ? (
-          <div
-            className="px-3 pb-3 space-y-2 border-t"
-            style={{ borderColor: "rgba(255,255,255,0.05)" }}
-          >
+          Vehículos
+        </span>
+        <span
+          className="text-[9px] px-1.5 py-0.5 rounded-full"
+          style={{ backgroundColor: `${BLOOD}20`, color: BLOOD }}
+          data-testid="jornada4-activos-count"
+        >
+          {vehicles.length}
+        </span>
+      </div>
+      <div className="space-y-2">
             {vehicles.map(v => {
               if (isConquistaDesglosador(v)) {
                 return (
@@ -290,8 +271,6 @@ export function Jornada4VehicleList({
             <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
               Dual Kernel · pausa · postergar · quitar cola · reorden · conquista · ring
             </p>
-          </div>
-        ) : null}
       </div>
     </div>
   );
