@@ -5,6 +5,7 @@
 import type { Vehicle } from "./persistence";
 import { filterVehiclesForAnilloCoverage } from "./ghostVehicleEngine";
 import { isParentCoveragePaused } from "./vehiculoPausa";
+import { hasTickingDesgloseWork, isContenedorDesglose } from "./vehiculoMinutos";
 
 export const ENTROPY_TIME_POLICY = {
   /** Contador en vivo: el hueco cuenta desde el segundo 0 (sin colchón). */
@@ -41,7 +42,9 @@ export function hasActiveConsciousCoverage(
   vehicles: Vehicle[],
   nowMs = Date.now()
 ): boolean {
-  return resolveCoverageVehicles(vehicles, nowMs).some(
-    v => v.status === "activo" && !v.autoVerdad && !isParentCoveragePaused(v)
-  );
+  return resolveCoverageVehicles(vehicles, nowMs).some(v => {
+    if (v.status !== "activo" || v.autoVerdad || isParentCoveragePaused(v)) return false;
+    if (isContenedorDesglose(v) && !hasTickingDesgloseWork(v, nowMs)) return false;
+    return true;
+  });
 }

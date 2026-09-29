@@ -208,8 +208,8 @@ function intervalToMs(it: CoberturaHuecoInterval, now: number): MsInterval | nul
 }
 
 /**
- * Pausa sin vehículo que la cubra → hueco, igual que Inconsciente en la métrica.
- * No duplica un corte ya registrado en el log.
+ * Pausa sin vehículo que la cubra, o idle del desglosador (pared − unidades):
+ * hueco, igual que Inconsciente. No duplica un corte ya registrado en el log.
  */
 export function appendUnjustifiedPausasToHuecos(
   intervals: CoberturaHuecoInterval[],
@@ -242,7 +242,7 @@ export function appendUnjustifiedPausasToHuecos(
   return next;
 }
 
-/** Cortes del log + pausas no justificadas (misma regla que la métrica). */
+/** Cortes del log + pausas no justificadas + idle del desglosador (misma regla que la métrica). */
 export function buildMetricaHuecoIntervals(params: {
   vehicles: Vehicle[];
   now?: number;

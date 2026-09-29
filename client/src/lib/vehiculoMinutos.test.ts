@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   idleSecondsContenedor,
   isContenedorDesglose,
+  hasTickingDesgloseWork,
+  measuredWorkIntervals,
   measuredWorkSeconds,
   trabajoMinutosDeVehiculo,
 } from "./vehiculoMinutos.ts";
@@ -106,5 +108,40 @@ describe("vehiculoMinutos — reporte en minutos de vehículo", () => {
     };
     assert.equal(measuredWorkSeconds(v, now), 5 * 60);
     assert.equal(idleSecondsContenedor(v, 20 * 60, now), 15 * 60);
+  });
+
+  it("intervalos de conquista no heredan la pared del contenedor", () => {
+    const t0 = 1_000_000;
+    const now = t0 + 12 * 60 * 60_000;
+    const v = {
+      status: "activo",
+      tipoReloj: "desglosador",
+      subVehiculos: [
+        {
+          id: "u1",
+          status: "cumplido" as const,
+          aperturaAt: t0,
+          cierreAt: t0 + 20 * 60_000,
+          duracionFinal: 20 * 60,
+        },
+        { id: "u2", status: "activo" as const, aperturaAt: now - 10 * 60_000 },
+      ],
+    };
+    const iv = measuredWorkIntervals(v, now);
+    assert.equal(iv.length, 2);
+    const workMs = iv.reduce((a, x) => a + (x.end - x.start), 0);
+    assert.equal(Math.round(workMs / 60_000), 30);
+    assert.equal(hasTickingDesgloseWork(v, now), true);
+    assert.equal(
+      hasTickingDesgloseWork(
+        {
+          status: "activo",
+          tipoReloj: "desglosador",
+          subVehiculos: [{ id: "p", status: "pendiente" as const }],
+        },
+        now
+      ),
+      false
+    );
   });
 });

@@ -105,8 +105,9 @@ export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
             ) : (
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
-                  Hueco = Inconsciente: plan ya ocurrido sin vehículo. Una pausa
-                  sin otro hilo que la cubra cuenta igual. La tardanza de puerta no entra.
+                  Hueco = Inconsciente: plan ya ocurrido sin vehículo. Idle del
+                  desglosador (sin unidad/fila) y una pausa sin otro hilo cuentan
+                  igual. La tardanza de puerta no entra.
                 </p>
                 {totalLabel ? (
                   <p
@@ -144,8 +145,8 @@ export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
                       ) : it.reason === "pausa_no_justificada" ? (
                         <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
                           {it.open
-                            ? "Pausa no justificada · sin cobertura ahora"
-                            : "Pausa no justificada"}
+                            ? "Sin unidad/fila ahora · idle o pausa"
+                            : "Idle del desglosador o pausa no justificada"}
                         </p>
                       ) : it.open ? (
                         <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
