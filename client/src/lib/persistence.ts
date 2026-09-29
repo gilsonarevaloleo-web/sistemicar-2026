@@ -65,6 +65,9 @@ import {
   hasRitmoAccess as _hasRitmoAccess,
   hasNorteAccess as _hasNorteAccess,
   hasUmbralAccess as _hasUmbralAccess,
+  hasDepositoMatriculaAccess as _hasDepositoMatriculaAccess,
+  hasDepositoCarreraAccess as _hasDepositoCarreraAccess,
+  hasDepositoTituloAccess as _hasDepositoTituloAccess,
   resolveActiveModules,
   mergeModuleIds,
   modulesGrantedByPlan,
@@ -2711,6 +2714,45 @@ export function hasUmbralAccess(
 ): boolean {
   if (isPreviewOpsUnlocked()) return true;
   return _hasUmbralAccess(accessInput(subscriptionPlan, email, rank, activeModules));
+}
+
+/** Universidad Matrícula — volcados G1 + dictamen. */
+export function hasDepositoMatriculaAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasDepositoMatriculaAccess(
+    accessInput(subscriptionPlan, email, rank, activeModules),
+  );
+}
+
+/** Universidad Carrera — G2–G3 + mapa de calor. */
+export function hasDepositoCarreraAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasDepositoCarreraAccess(
+    accessInput(subscriptionPlan, email, rank, activeModules),
+  );
+}
+
+/** Universidad Título — G4 + criterio vivo. */
+export function hasDepositoTituloAccess(
+  subscriptionPlan?: string | null,
+  email?: string | null,
+  rank?: UserRank | null,
+  activeModules?: string[] | null
+): boolean {
+  if (isPreviewOpsUnlocked()) return true;
+  return _hasDepositoTituloAccess(
+    accessInput(subscriptionPlan, email, rank, activeModules),
+  );
 }
 
 export function hasDesglosadorAccess(

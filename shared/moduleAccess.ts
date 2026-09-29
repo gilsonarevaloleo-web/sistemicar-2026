@@ -1,12 +1,16 @@
-/** IDs de módulos vendibles (Planificación + Umbral + futuros).
+/** IDs de módulos vendibles (Planificación + Umbral + Universidad + futuros).
  * Display comercial (v2): Base · Ritmo · Norte — ver planificacionPricing.ts
  * Umbral — ver umbralPricing.ts
+ * Universidad — ver depositoPricing.ts (Matrícula · Carrera · Título)
  */
 export type ModuleId =
   | "planificacion_base"
   | "soberania_dia"
   | "operativo"
-  | "umbral";
+  | "umbral"
+  | "deposito_matricula"
+  | "deposito_carrera"
+  | "deposito_titulo";
 
 export const MODULE_IDS = {
   /** Jornada Base — Conquista + PS */
@@ -19,6 +23,15 @@ export const MODULE_IDS = {
   RITMO: "operativo" as const,
   /** Umbral v2 — Forja + Arena (trial C1 gratis) */
   UMBRAL: "umbral" as const,
+  /** Universidad Matrícula — G1 + dictamen */
+  DEPOSITO_MATRICULA: "deposito_matricula" as const,
+  MATRICULA: "deposito_matricula" as const,
+  /** Universidad Carrera — G2–G3 + mapa de calor */
+  DEPOSITO_CARRERA: "deposito_carrera" as const,
+  CARRERA: "deposito_carrera" as const,
+  /** Universidad Título — G4 + criterio vivo */
+  DEPOSITO_TITULO: "deposito_titulo" as const,
+  TITULO: "deposito_titulo" as const,
 };
 
 const VALID_MODULE_IDS = new Set<ModuleId>([
@@ -26,18 +39,24 @@ const VALID_MODULE_IDS = new Set<ModuleId>([
   "soberania_dia",
   "operativo",
   "umbral",
+  "deposito_matricula",
+  "deposito_carrera",
+  "deposito_titulo",
 ]);
 
 function isModuleId(value: string): value is ModuleId {
   return VALID_MODULE_IDS.has(value as ModuleId);
 }
 
-/** Planes de checkout activos (Planificación + Umbral + packs Espejo). */
+/** Planes de checkout activos (Planificación + Umbral + Universidad + packs Espejo). */
 export type ActivePlanId =
   | "planificacion_base"
   | "soberania_dia"
   | "operativo"
   | "umbral"
+  | "deposito_matricula"
+  | "deposito_carrera"
+  | "deposito_titulo"
   | "espejo_inicio"
   | "espejo_recarga";
 
@@ -68,7 +87,25 @@ export const PLAN_MODULE_GRANTS: Record<string, ModuleId[]> = {
   soberania_dia: ["soberania_dia"],
   operativo: ["operativo"],
   umbral: ["umbral"],
+  deposito_matricula: ["deposito_matricula"],
+  deposito_carrera: ["deposito_carrera"],
+  deposito_titulo: ["deposito_titulo"],
 };
+
+/** Planes que el admin / webhook puede otorgar (suscripción, no packs Espejo). */
+export const GRANTABLE_MODULE_PLAN_IDS = [
+  "planificacion_base",
+  "soberania_dia",
+  "operativo",
+  "umbral",
+  "deposito_matricula",
+  "deposito_carrera",
+  "deposito_titulo",
+] as const;
+
+export function grantablePlanHint(): string {
+  return GRANTABLE_MODULE_PLAN_IDS.join(", ");
+}
 
 const LEGACY_RANK_MODULES: Record<string, ModuleId[]> = {
   arquitecto: ["planificacion_base", "soberania_dia"],
@@ -89,6 +126,9 @@ export function resolveActiveModules(input: ModuleAccessInput): Set<ModuleId> {
       "soberania_dia",
       "operativo",
       "umbral",
+      "deposito_matricula",
+      "deposito_carrera",
+      "deposito_titulo",
     ]);
   }
   for (const m of input.activeModules ?? []) {
@@ -138,6 +178,21 @@ export function hasRitmoAccess(input: ModuleAccessInput): boolean {
 /** Umbral v2 — Forja + Arena (Códigos 2–10 + métricas). */
 export function hasUmbralAccess(input: ModuleAccessInput): boolean {
   return hasModule(input, "umbral");
+}
+
+/** Universidad Matrícula — volcados G1 + dictamen. */
+export function hasDepositoMatriculaAccess(input: ModuleAccessInput): boolean {
+  return hasModule(input, "deposito_matricula");
+}
+
+/** Universidad Carrera — G2–G3 + mapa de calor. */
+export function hasDepositoCarreraAccess(input: ModuleAccessInput): boolean {
+  return hasModule(input, "deposito_carrera");
+}
+
+/** Universidad Título — G4 + criterio vivo + axiomas. */
+export function hasDepositoTituloAccess(input: ModuleAccessInput): boolean {
+  return hasModule(input, "deposito_titulo");
 }
 
 /** @deprecated Usar hasOperativoAccess / hasRitmoAccess */

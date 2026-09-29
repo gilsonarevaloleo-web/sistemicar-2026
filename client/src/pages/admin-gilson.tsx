@@ -1603,6 +1603,10 @@ export default function AdminGilson() {
                 <option value="planificacion_base">Jornada Base</option>
                 <option value="operativo">Ritmo del día</option>
                 <option value="soberania_dia">Norte</option>
+                <option value="umbral">Umbral</option>
+                <option value="deposito_matricula">Universidad Matrícula</option>
+                <option value="deposito_carrera">Universidad Carrera</option>
+                <option value="deposito_titulo">Universidad Título</option>
               </select>
               <input
                 type="text"

@@ -34,5 +34,15 @@ describe("planificacionCheckoutFocus", () => {
     assert.equal(f.focusSkuId, null);
     assert.equal(f.hideStacks, false);
     assert.equal(f.hideOtherWorlds, false);
+    assert.equal(f.world, "open");
+  });
+
+  it("Universidad Matrícula enfoca el peldaño 1 y esconde otros mundos", () => {
+    const f = resolveCheckoutFocus("?plan=deposito_matricula");
+    assert.equal(f.focusSkuId, "deposito_matricula");
+    assert.equal(f.world, "deposito");
+    assert.equal(f.hideStacks, true);
+    assert.equal(f.hideOtherWorlds, true);
+    assert.match(f.subline ?? "", /1 volcado/i);
   });
 });

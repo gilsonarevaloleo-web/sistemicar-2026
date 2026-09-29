@@ -10,6 +10,9 @@ describe("sistemaRecintos — oferta actual", () => {
     );
     const blob = `${SISTEMA_OFERTA.headline} ${SISTEMA_OFERTA.subhead} ${SISTEMA_RECINTOS.map((r) => r.detail).join(" ")}`;
     assert.doesNotMatch(blob, /Alquimia|Historia|ordenar (la|mi) mente/i);
+    const deposito = SISTEMA_RECINTOS.find((r) => r.id === "deposito");
+    assert.equal(deposito?.exploreHref, "/ventas-deposito");
+    assert.equal(deposito?.publicExplore, true);
     const espejo = SISTEMA_RECINTOS.find((r) => r.id === "espejo");
     assert.equal(espejo?.exploreHref, "/espejo/v2");
     assert.notEqual(espejo?.exploreHref, "/espejo");

@@ -21,6 +21,8 @@ describe("clientAccount — dónde se crea la cuenta", () => {
     assert.equal(displayNameForPlan("soberania_dia"), "Norte");
     assert.equal(displayNameForPlan("operativo"), "Ritmo del día");
     assert.equal(displayNameForPlan("planificacion_base"), "Jornada Base");
+    assert.equal(displayNameForPlan("deposito_matricula"), "Universidad Matrícula");
+    assert.equal(displayNameForPlan("deposito_titulo"), "Universidad Título");
   });
 
   it("rechaza next= abierto o absoluto", () => {

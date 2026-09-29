@@ -69,6 +69,7 @@ const GraciasCompra = lazyWithRetry(() => import("@/pages/gracias-compra"));
 const UmbralLeads = lazyWithRetry(() => import("@/pages/umbral-leads"));
 const VentasEspejo = lazyWithRetry(() => import("@/pages/ventas-espejo"));
 const VentasJornada = lazyWithRetry(() => import("@/pages/ventas-jornada"));
+const VentasDeposito = lazyWithRetry(() => import("@/pages/ventas-deposito"));
 const MetricasDocumento = lazyWithRetry(() => import("@/pages/metricas-documento"));
 const MapaSistemicar = lazyWithRetry(() => import("@/pages/mapa-sistemicar"));
 const EnCamino = lazyWithRetry(() => import("@/pages/en-camino"));
@@ -511,6 +512,14 @@ function Router() {
       </Suspense>
     );
   }
+  if (location === "/ventas-deposito" || location.startsWith("/ventas-deposito")) {
+    return (
+      <Suspense fallback={<HouseRouteFallback />}>
+        <SellerRefCapture />
+        <VentasDeposito />
+      </Suspense>
+    );
+  }
 
   return (
     <Layout>
@@ -691,6 +700,8 @@ function VoiceBootstrap() {
         p.startsWith("/vendedor/") ||
         p === "/ventas-jornada" ||
         p.startsWith("/ventas-jornada") ||
+        p === "/ventas-deposito" ||
+        p.startsWith("/ventas-deposito") ||
         p === "/umbral" ||
         p.startsWith("/umbral/") ||
         p === "/esperanza" ||

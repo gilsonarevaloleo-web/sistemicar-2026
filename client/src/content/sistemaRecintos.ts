@@ -49,8 +49,9 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     detail:
       "La Universidad de Sistemicar. No eliges código: tiras el día. Los Diez Ojos diagnostican el centro de gravedad. El techo de aprender es el techo de ver.",
     color: "#F97316",
-    exploreHref: "/esperanza",
-    publicExplore: false,
+    exploreHref: "/ventas-deposito",
+    publicExplore: true,
+    exploreLabel: "Probar un volcado",
   },
   {
     id: "jornada",
