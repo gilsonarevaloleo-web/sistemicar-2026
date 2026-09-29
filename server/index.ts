@@ -82,7 +82,7 @@ import {
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
 import { adminLookupUserByEmail } from "./firebaseAdmin";
-import { modulesGrantedByPlan } from "../shared/moduleAccess";
+import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
   displayNameForPlan,
@@ -5315,7 +5315,7 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
     const pid = typeof planId === "string" ? planId.trim() : "";
     if (!pid || modulesGrantedByPlan(pid).length === 0) {
       return res.status(400).json({
-        error: "Plan no válido. Usa: planificacion_base, soberania_dia, operativo o umbral.",
+        error: `Plan no válido. Usa: ${grantablePlanHint()}.`,
       });
     }
 

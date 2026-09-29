@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
+import { PaywallUniversidad } from "@/components/deposito/PaywallUniversidad";
 import { BannerMeritoDetectado } from "@/components/deposito/BannerMeritoDetectado";
+import { useDepositoEntitlements } from "@/hooks/useDepositoEntitlements";
 import { CardAxiomasMetacognicion } from "@/components/deposito/CardAxiomasMetacognicion";
 import { CardCriterioVivo } from "@/components/deposito/CardCriterioVivo";
 import { CardLeyOpticaCodigo } from "@/components/deposito/CardLeyOpticaCodigo";
@@ -47,6 +49,12 @@ import {
   type DictamenOptico,
 } from "@shared/deposito/analizarVolcado";
 import {
+  SKU_CARRERA,
+  SKU_MATRICULA,
+  SKU_TITULO,
+  requierePagoMatricula,
+} from "@shared/depositoPricing";
+import {
   DICCIONARIO_GRADOS,
   GRADO_MAESTRIA_INICIAL,
   diagnosticarVolcadoLocal,
@@ -79,6 +87,7 @@ function capturaVacia(grado: GradoMaestria): CapturaVolcadoExpansiva {
 
 export default function Esperanza() {
   const { user } = useAuthContext();
+  const entitlements = useDepositoEntitlements();
   useViewTransitionShield();
   // Soft-start al venir de Dual Kernel: no clavar el hilo con Firestore.
   const motorsQuiet = useDualKernelMotorsQuiet();
@@ -93,6 +102,9 @@ export default function Esperanza() {
   const [ultimoVolcado, setUltimoVolcado] = useState("");
   const [historial, setHistorial] = useState<VolcadoEntry[]>([]);
   const [meritoOverlay, setMeritoOverlay] = useState<GradoMaestria | null>(null);
+  const [paywallSku, setPaywallSku] = useState<
+    typeof SKU_MATRICULA | typeof SKU_CARRERA | typeof SKU_TITULO | null
+  >(null);
   const [acervo, setAcervo] = useState<CriterioVivo[]>([]);
   const [metacognicion, setMetacognicion] = useState<UserMetacognitionStore>({
     axiomas: [],
@@ -201,6 +213,10 @@ export default function Esperanza() {
       gradoDesdeQueryRef.current,
     );
     if (!promovido) return;
+    if (promovido > entitlements.gradoMaximo) {
+      setPaywallSku(promovido >= 4 ? SKU_TITULO : SKU_CARRERA);
+      return;
+    }
     gradoRef.current = promovido;
     setGrado(promovido);
     guardarGradoMaestria(user?.uid ?? "anon", promovido);
@@ -208,7 +224,18 @@ export default function Esperanza() {
   };
 
   const guardar = async () => {
-    const gradoActivo = gradoRef.current;
+    if (
+      entitlements.ready &&
+      requierePagoMatricula(historial.length, entitlements.hasMatricula)
+    ) {
+      setPaywallSku(SKU_MATRICULA);
+      toast.error("La prueba ya se usó. Activa Matrícula para seguir volcando.");
+      return;
+    }
+    const gradoActivo = Math.min(
+      gradoRef.current,
+      entitlements.ready ? entitlements.gradoMaximo : gradoRef.current,
+    ) as GradoMaestria;
     const plan = planGuardadoVolcado(gradoActivo);
     const lista =
       formRef.current?.getCaptura() ?? capturaVacia(gradoActivo);
@@ -322,7 +349,23 @@ export default function Esperanza() {
     }
   };
 
-  const ficha = DICCIONARIO_GRADOS[grado];
+  const gradoEfectivo = (
+    entitlements.ready
+      ? Math.min(grado, entitlements.gradoMaximo)
+      : grado
+  ) as GradoMaestria;
+  const ficha = DICCIONARIO_GRADOS[gradoEfectivo];
+  const trialDisponible =
+    entitlements.ready &&
+    !entitlements.hasMatricula &&
+    historial.length === 0;
+  const formBloqueado =
+    entitlements.ready &&
+    requierePagoMatricula(
+      historial.length,
+      entitlements.hasMatricula,
+    );
+  const mostrarTitulo = entitlements.hasTitulo;
   const lectura = useMemo(
     () =>
       diagnostico && ultimoVolcado
@@ -344,6 +387,9 @@ export default function Esperanza() {
     }
     return calcularExpedienteOjos(dominantes, lecturas);
   }, [historial, diagnostico, ultimoVolcado]);
+  const mostrarMapa =
+    (entitlements.hasCarrera || entitlements.hasTitulo) &&
+    expediente.rango > 0;
 
   return (
     <div
@@ -386,7 +432,7 @@ export default function Esperanza() {
           >
             {ficha.titulo}
           </p>
-          {expediente.rango > 0 && (
+          {mostrarMapa && (
             <div className="mt-5 text-left">
               <MapaCalorOjos
                 expediente={expediente}
@@ -397,6 +443,38 @@ export default function Esperanza() {
           )}
         </header>
 
+        {trialDisponible && (
+          <p
+            className="mb-6 border border-[#F97316]/25 bg-[#F97316]/08 px-3 py-2 text-[11px] text-[#F97316]/90"
+            data-testid="deposito-trial-banner"
+          >
+            PRUEBA · 1 volcado G1 gratis · Matrícula ${SKU_MATRICULA.priceUsd}/mes
+            para seguir
+          </p>
+        )}
+
+        {formBloqueado ? (
+          <div className="mb-8">
+            <PaywallUniversidad
+              sku={SKU_MATRICULA}
+              motivo="La clase de prueba ya se usó. Matrícula para seguir volcando."
+            />
+          </div>
+        ) : (
+        <>
+        {paywallSku && paywallSku.id !== "deposito_matricula" ? (
+          <div className="mb-6">
+            <PaywallUniversidad
+              sku={paywallSku}
+              motivo={
+                paywallSku.id === "deposito_carrera"
+                  ? "El mérito pide Carrera: filtro de flor y lo no dicho."
+                  : "El título sella tu criterio y rota los 10 lentes."
+              }
+              onVolverTrial={() => setPaywallSku(null)}
+            />
+          </div>
+        ) : null}
         <section
           className="mb-8"
           data-testid="deposito-volcado"
@@ -404,20 +482,20 @@ export default function Esperanza() {
           <FormularioVolcadoExpansivo
             key={formKey}
             ref={formRef}
-            gradoMaestria={grado}
-            captura={capturaVacia(grado)}
-            disabled={saving && grado !== 1}
+            gradoMaestria={gradoEfectivo}
+            captura={capturaVacia(gradoEfectivo)}
+            disabled={saving && gradoEfectivo !== 1}
           />
           <div className="mt-4 flex items-center justify-between gap-3">
             <p className="text-[10px] text-white/30 uppercase tracking-widest">
-              {grado === 1
+              {gradoEfectivo === 1
                 ? "No elijas eje. No elijas código. Volcá."
                 : "Filtro activo. La captura se expande; la ruta no."}
             </p>
             <button
               type="button"
               onClick={guardar}
-              disabled={saving && grado !== 1}
+              disabled={saving && gradoEfectivo !== 1}
               className="text-[11px] font-bold uppercase tracking-widest px-5 py-3 disabled:opacity-40"
               style={{
                 backgroundColor: GOLD,
@@ -425,10 +503,12 @@ export default function Esperanza() {
               }}
               data-testid="deposito-guardar"
             >
-              {saving && grado !== 1 ? "Leyendo el volcado…" : "Guardar volcado"}
+              {saving && gradoEfectivo !== 1 ? "Leyendo el volcado…" : "Guardar volcado"}
             </button>
           </div>
-          {grado < 4 && ritualPaso.volcadosEvaluados > 0 && (
+          {(entitlements.hasCarrera || entitlements.hasTitulo) &&
+            gradoEfectivo < 4 &&
+            ritualPaso.volcadosEvaluados > 0 && (
             <div className="mt-3" data-testid="deposito-ritual-paso">
               {motivoRitualPasoVisible(ritualPaso) ? (
                 <p className="text-[10px] leading-relaxed text-white/35">
@@ -457,6 +537,8 @@ export default function Esperanza() {
             </div>
           )}
         </section>
+        </>
+        )}
 
         {(diagnostico || dictamen) && (
           <div ref={dictamenRef} className="mb-10 space-y-4">
@@ -468,7 +550,7 @@ export default function Esperanza() {
               />
             )}
             {dictamen && <DictamenFrente dictamen={dictamen} />}
-            {diagnostico && ultimoVolcado && (
+            {diagnostico && ultimoVolcado && mostrarTitulo && (
               <SelloCriterio
                 volcadoCrudo={ultimoVolcado}
                 codigoMotor={diagnostico.codigoDominante}
@@ -498,6 +580,12 @@ export default function Esperanza() {
                   setAcervo(siguiente);
                   toast.success("El Maestro corrigió el ojo con tu sabiduría.");
                 }}
+              />
+            )}
+            {diagnostico && ultimoVolcado && !mostrarTitulo && entitlements.hasMatricula && (
+              <PaywallUniversidad
+                sku={SKU_TITULO}
+                motivo="El Título sella tu criterio. El Maestro deja de inventar: cita lo que vos sellaste."
               />
             )}
           </div>
@@ -536,8 +624,12 @@ export default function Esperanza() {
         {anexoReady && (
           <>
             <CardLeyCasasUmbral planetaActivo={PLANETA_DEPOSITO} />
-            <CardAxiomasMetacognicion store={metacognicion} />
-            <CardCriterioVivo acervo={acervo} />
+            {mostrarTitulo ? (
+              <>
+                <CardAxiomasMetacognicion store={metacognicion} />
+                <CardCriterioVivo acervo={acervo} />
+              </>
+            ) : null}
             <CardLeyOpticaCodigo />
           </>
         )}

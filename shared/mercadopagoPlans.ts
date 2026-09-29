@@ -9,6 +9,10 @@ import {
   ESPEJO_SKU_INICIO,
   ESPEJO_SKU_RECARGA,
 } from "./espejoPricing";
+import {
+  DEPOSITO_CHECKOUT_ORDER,
+  DEPOSITO_SKU_BY_ID,
+} from "./depositoPricing";
 
 export const SUBSCRIPTION_PLANS = {
   /** Espejo — pack créditos entrada (pago único). */
@@ -52,6 +56,24 @@ export const SUBSCRIPTION_PLANS = {
     name: UMBRAL_SKU.name,
     price: UMBRAL_SKU.priceUsd,
   },
+  /** Universidad — Matrícula (G1 + dictamen) */
+  deposito_matricula: {
+    id: "deposito_matricula",
+    name: DEPOSITO_SKU_BY_ID.deposito_matricula.name,
+    price: DEPOSITO_SKU_BY_ID.deposito_matricula.priceUsd,
+  },
+  /** Universidad — Carrera (G2–G3 + mapa) */
+  deposito_carrera: {
+    id: "deposito_carrera",
+    name: DEPOSITO_SKU_BY_ID.deposito_carrera.name,
+    price: DEPOSITO_SKU_BY_ID.deposito_carrera.priceUsd,
+  },
+  /** Universidad — Título (G4 + criterio) */
+  deposito_titulo: {
+    id: "deposito_titulo",
+    name: DEPOSITO_SKU_BY_ID.deposito_titulo.name,
+    price: DEPOSITO_SKU_BY_ID.deposito_titulo.priceUsd,
+  },
   /** Legacy — grandfather / webhooks antiguos (no checkout UI) */
   arquitecto: { id: "arquitecto", name: "Arquitecto", price: 24.99, legacy: true },
   soberano_operativo: { id: "soberano_operativo", name: "Soberano Operativo", price: 34.99, legacy: true },
@@ -86,3 +108,7 @@ export type UmbralCheckoutPlanId = (typeof UMBRAL_CHECKOUT_PLANS)[number];
 /** Packs Espejo (créditos, pago único) vía /pagos?plan=espejo_inicio|espejo_recarga */
 export const ESPEJO_CHECKOUT_PLANS = ESPEJO_CHECKOUT_ORDER;
 export type EspejoCheckoutPlanId = (typeof ESPEJO_CHECKOUT_PLANS)[number];
+
+/** Universidad (Depósito) vía /pagos?plan=deposito_matricula|deposito_carrera|deposito_titulo */
+export const DEPOSITO_CHECKOUT_PLANS = DEPOSITO_CHECKOUT_ORDER;
+export type DepositoCheckoutPlanId = (typeof DEPOSITO_CHECKOUT_PLANS)[number];

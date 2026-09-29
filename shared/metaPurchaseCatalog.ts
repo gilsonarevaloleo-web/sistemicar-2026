@@ -6,6 +6,7 @@
 import { PLANIFICACION_SKU_BY_ID } from "./planificacionPricing.ts";
 import { UMBRAL_SKU } from "./umbralPricing.ts";
 import { ESPEJO_SKU_INICIO, ESPEJO_SKU_RECARGA } from "./espejoPricing.ts";
+import { DEPOSITO_SKU_BY_ID } from "./depositoPricing.ts";
 
 export type MetaPurchaseCatalog = {
   content_name: string;
@@ -43,6 +44,24 @@ const CATALOG: Record<string, MetaPurchaseCatalog> = {
     content_name: UMBRAL_SKU.name,
     content_ids: ["umbral"],
     value: UMBRAL_SKU.priceUsd,
+    currency: "USD",
+  },
+  deposito_matricula: {
+    content_name: DEPOSITO_SKU_BY_ID.deposito_matricula.name,
+    content_ids: ["deposito_matricula"],
+    value: DEPOSITO_SKU_BY_ID.deposito_matricula.priceUsd,
+    currency: "USD",
+  },
+  deposito_carrera: {
+    content_name: DEPOSITO_SKU_BY_ID.deposito_carrera.name,
+    content_ids: ["deposito_carrera"],
+    value: DEPOSITO_SKU_BY_ID.deposito_carrera.priceUsd,
+    currency: "USD",
+  },
+  deposito_titulo: {
+    content_name: DEPOSITO_SKU_BY_ID.deposito_titulo.name,
+    content_ids: ["deposito_titulo"],
+    value: DEPOSITO_SKU_BY_ID.deposito_titulo.priceUsd,
     currency: "USD",
   },
   espejo_inicio: {

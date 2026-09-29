@@ -14,10 +14,13 @@ describe("metaPurchaseCatalog", () => {
     assert.deepEqual(p.content_ids, ["planificacion_base"]);
   });
 
-  it("Ritmo, Norte, Umbral y Espejo tienen precio propio", () => {
+  it("Ritmo, Norte, Umbral, Universidad y Espejo tienen precio propio", () => {
     assert.equal(resolveMetaPurchase("operativo")?.value, 29.99);
     assert.equal(resolveMetaPurchase("soberania_dia")?.value, 34.99);
     assert.equal(resolveMetaPurchase("umbral")?.value, 24.99);
+    assert.equal(resolveMetaPurchase("deposito_matricula")?.value, 24.99);
+    assert.equal(resolveMetaPurchase("deposito_carrera")?.value, 29.99);
+    assert.equal(resolveMetaPurchase("deposito_titulo")?.value, 34.99);
     assert.equal(resolveMetaPurchase("espejo_inicio")?.value, 9.9);
     assert.equal(resolveMetaPurchase("espejo_recarga")?.value, 19.9);
   });

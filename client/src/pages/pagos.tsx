@@ -3,7 +3,7 @@ import { auth, getUserEmail, isUserAnonymous } from "@/lib/firebase";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import { accesoUrlWithNext } from "@shared/clientAccount";
 import { motion, AnimatePresence } from "framer-motion";
-import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords, Zap } from "lucide-react";
+import { CreditCard, ArrowLeft, Shield, Check, Sparkles, Smartphone, ExternalLink, MessageCircle, Compass, Map, Layers, Clock, TrendingUp, Swords, Zap, Sunrise } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +11,7 @@ import {
   PLANIFICACION_CHECKOUT_PLANS,
   UMBRAL_CHECKOUT_PLANS,
   ESPEJO_CHECKOUT_PLANS,
+  DEPOSITO_CHECKOUT_PLANS,
 } from "@shared/mercadopagoPlans";
 import { BADGE_EN_CAMINO, PAQUETE_EN_CAMINO, modulosEnCamino } from "@shared/moduleCatalog";
 import { modulesGrantedByPlan } from "@shared/moduleAccess";
@@ -25,6 +26,12 @@ import {
 import { resolveCheckoutFocus } from "@shared/planificacionCheckoutFocus";
 import { UMBRAL_SKU } from "@shared/umbralPricing";
 import {
+  EMBUDO_UNIVERSIDAD,
+  SKU_CARRERA,
+  SKU_MATRICULA,
+  SKU_TITULO,
+} from "@shared/depositoPricing";
+import {
   ESPEJO_SKU_INICIO,
   ESPEJO_SKU_RECARGA,
   isEspejoSkuId,
@@ -38,6 +45,7 @@ import { trackJornadaInitiateCheckout, trackPaidPurchase } from "@/lib/metaPixel
 const GOLD = "#D4AF37";
 const UMBRAL_ACCENT = "#FF6B35";
 const ESPEJO_ACCENT = "#38BDF8";
+const DEPOSITO_ACCENT = "#F97316";
 
 const PAYPAL_LINK = "https://paypal.me/ElimanAte";
 const WHATSAPP_NUMBER = "51918260514";
@@ -154,6 +162,66 @@ const umbralPlan: Plan = {
   popular: false,
 };
 
+const depositoPlans: Plan[] = [
+  {
+    id: SKU_MATRICULA.id,
+    name: SKU_MATRICULA.name,
+    price: SKU_MATRICULA.priceUsd,
+    pricePEN: SKU_MATRICULA.pricePen,
+    peldaño: "Peldaño 1 · Matrícula",
+    forWho: SKU_MATRICULA.forWho,
+    anchorCopy: SKU_MATRICULA.identity,
+    roiCopy: "1 volcado G1 de prueba. Pagas para seguir viendo el ojo.",
+    features: SKU_MATRICULA.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
+    icon: Sunrise,
+    color: DEPOSITO_ACCENT,
+    popular: true,
+    funnelHint: SKU_MATRICULA.funnelHint,
+  },
+  {
+    id: SKU_CARRERA.id,
+    name: SKU_CARRERA.name,
+    price: SKU_CARRERA.priceUsd,
+    pricePEN: SKU_CARRERA.pricePen,
+    peldaño: "Peldaño 2 · Carrera",
+    funnelHint: SKU_CARRERA.funnelHint,
+    forWho: SKU_CARRERA.forWho,
+    anchorCopy: SKU_CARRERA.identity,
+    roiCopy: "G2 Detector de Ruido + G3 Punto Ciego + mapa de calor.",
+    features: SKU_CARRERA.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
+    icon: Sunrise,
+    color: "#FB923C",
+    badge: "CARRERA",
+  },
+  {
+    id: SKU_TITULO.id,
+    name: SKU_TITULO.name,
+    price: SKU_TITULO.priceUsd,
+    pricePEN: SKU_TITULO.pricePen,
+    peldaño: "Peldaño 3 · Título",
+    funnelHint: SKU_TITULO.funnelHint,
+    forWho: SKU_TITULO.forWho,
+    anchorCopy: SKU_TITULO.identity,
+    roiCopy: "G4 + Criterio Vivo + axiomas. El alumno se vuelve autor.",
+    features: SKU_TITULO.unlocks.map((name, i) => ({
+      name,
+      locked: false,
+      highlight: i < 2,
+    })),
+    icon: Sunrise,
+    color: GOLD,
+    badge: "TÍTULO",
+  },
+];
+
 const espejoPlans: Plan[] = [
   {
     id: ESPEJO_SKU_INICIO.id,
@@ -198,7 +266,12 @@ const espejoPlans: Plan[] = [
   },
 ];
 
-const allCheckoutPlans: Plan[] = [...planificacionPlans, umbralPlan, ...espejoPlans];
+const allCheckoutPlans: Plan[] = [
+  ...planificacionPlans,
+  ...depositoPlans,
+  umbralPlan,
+  ...espejoPlans,
+];
 
 const STACK_COLORS: Record<string, string> = {
   ritmo: "#00C851",
@@ -233,6 +306,7 @@ export default function Pagos() {
     return resolveCheckoutFocus(window.location.search);
   }, [location]);
   const visibleJornadaPlans = useMemo(() => {
+    if (checkoutFocus.world === "deposito") return [];
     if (!checkoutFocus.collapseLaterPeldanos || showLaterPeldanos) {
       return planificacionPlans;
     }
@@ -245,6 +319,22 @@ export default function Pagos() {
       return planificacionPlans.filter((p) => p.id === checkoutFocus.focusSkuId);
     }
     return planificacionPlans;
+  }, [checkoutFocus, showLaterPeldanos]);
+  const visibleDepositoPlans = useMemo(() => {
+    if (checkoutFocus.world === "jornada") return [];
+    if (checkoutFocus.world !== "deposito") return depositoPlans;
+    if (!checkoutFocus.collapseLaterPeldanos || showLaterPeldanos) {
+      return depositoPlans;
+    }
+    if (checkoutFocus.focusSkuId === "deposito_carrera") {
+      return depositoPlans.filter(
+        (p) => p.id === "deposito_carrera" || p.id === "deposito_matricula",
+      );
+    }
+    if (checkoutFocus.focusSkuId) {
+      return depositoPlans.filter((p) => p.id === checkoutFocus.focusSkuId);
+    }
+    return depositoPlans;
   }, [checkoutFocus, showLaterPeldanos]);
   const googleEmail = getUserEmail();
   const hasGoogleAccount = Boolean(googleEmail) && !isUserAnonymous();
@@ -265,8 +355,8 @@ export default function Pagos() {
     }
   }, [selectedPlan.id]);
 
-  const selectStack = (addOnId: "soberania_dia" | "operativo") => {
-    const plan = planificacionPlans.find((p) => p.id === addOnId);
+  const selectStack = (addOnId: string) => {
+    const plan = allCheckoutPlans.find((p) => p.id === addOnId);
     if (plan) {
       setSelectedPlan(plan);
       setTimeout(() => {
@@ -338,10 +428,13 @@ export default function Pagos() {
     const isUmbral = UMBRAL_CHECKOUT_PLANS.includes(
       effectivePlan as (typeof UMBRAL_CHECKOUT_PLANS)[number],
     );
+    const isDeposito = DEPOSITO_CHECKOUT_PLANS.includes(
+      effectivePlan as (typeof DEPOSITO_CHECKOUT_PLANS)[number],
+    );
     const isEspejo = ESPEJO_CHECKOUT_PLANS.includes(
       effectivePlan as (typeof ESPEJO_CHECKOUT_PLANS)[number],
     );
-    if (effectivePlan && (isPlanificacion || isUmbral || isEspejo)) {
+    if (effectivePlan && (isPlanificacion || isUmbral || isDeposito || isEspejo)) {
       const p = allCheckoutPlans.find((x) => x.id === effectivePlan);
       if (p) {
         setSelectedPlan(p);
@@ -494,8 +587,19 @@ export default function Pagos() {
           <CategoriaSistemicarBanner />
 
           <div className="flex items-center gap-2 mb-4">
-            <Compass size={16} style={{ color: GOLD }} />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Jornada · Mensual</h2>
+            {checkoutFocus.world === "deposito" ? (
+              <>
+                <Sunrise size={16} style={{ color: DEPOSITO_ACCENT }} />
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  Universidad · Matrícula · Carrera · Título
+                </h2>
+              </>
+            ) : (
+              <>
+                <Compass size={16} style={{ color: GOLD }} />
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">Jornada · Mensual</h2>
+              </>
+            )}
           </div>
 
           {checkoutFocus.headline ? (
@@ -526,7 +630,10 @@ export default function Pagos() {
               ¿En qué peldaño estás?
             </p>
             <div className="space-y-3">
-              {EMBUDO_PREGUNTAS.map((item) => (
+              {(checkoutFocus.world === "deposito"
+                ? EMBUDO_UNIVERSIDAD
+                : EMBUDO_PREGUNTAS
+              ).map((item) => (
                 <div key={item.id} className="flex gap-3 items-start">
                   <span
                     className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black"
@@ -545,7 +652,7 @@ export default function Pagos() {
           ) : null}
 
           {/* Stacks orientación — no en entrada de un solo peldaño */}
-          {!checkoutFocus.hideStacks ? (
+          {!checkoutFocus.hideStacks && checkoutFocus.world !== "deposito" ? (
           <div className="mb-6">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3 text-center">
               Stacks recomendados
@@ -596,7 +703,10 @@ export default function Pagos() {
           ) : null}
 
         <div className="grid md:grid-cols-3 gap-4 mb-4">
-          {visibleJornadaPlans.map((plan) => {
+          {(checkoutFocus.world === "deposito"
+            ? visibleDepositoPlans
+            : visibleJornadaPlans
+          ).map((plan) => {
             const Icon = plan.icon;
             const isSelected = selectedPlan.id === plan.id;
             
@@ -718,17 +828,104 @@ export default function Pagos() {
               className="text-[11px] underline text-slate-400"
               data-testid="pagos-ver-peldanos-despues"
             >
-              Ver peldaños siguientes (Ritmo / Norte) — no son este momento
+              Ver peldaños siguientes (
+              {checkoutFocus.world === "deposito"
+                ? "Carrera / Título"
+                : "Ritmo / Norte"}
+              ) — no son este momento
             </button>
           </div>
         ) : null}
 
         <p className="text-[10px] text-slate-600 text-center mb-8 leading-relaxed px-2">
-          Comparado con apps de notas (~$10/mes): aquí pagas por unidades, ritmo y cierre de bloque — no por listas.
+          {checkoutFocus.world === "deposito"
+            ? "La universidad se vende como se vende un ojo, una carrera y un título — no como un recinto gratis."
+            : "Comparado con apps de notas (~$10/mes): aquí pagas por unidades, ritmo y cierre de bloque — no por listas."}
         </p>
 
         {!checkoutFocus.hideOtherWorlds ? (
         <>
+        {/* Universidad — tres peldaños */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <Sunrise size={14} style={{ color: DEPOSITO_ACCENT }} />
+            <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: DEPOSITO_ACCENT }}>
+              Universidad · Depósito
+            </h2>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+            1 volcado G1 de prueba. Después Matrícula, Carrera y Título — apilados.
+          </p>
+          <div className="grid md:grid-cols-3 gap-4">
+            {depositoPlans.map((plan) => {
+              const Icon = plan.icon;
+              const isSelected = selectedPlan.id === plan.id;
+              return (
+                <motion.button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedPlan(plan)}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  data-testid={`select-plan-${plan.id}`}
+                  className="relative p-6 rounded-2xl border-2 text-left transition-all"
+                  style={{
+                    borderColor: isSelected ? plan.color : "rgba(255,255,255,0.12)",
+                    background: isSelected ? `${plan.color}15` : "rgba(0,0,0,0.35)",
+                  }}
+                >
+                  {plan.badge && (
+                    <div
+                      className="absolute -top-3 right-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-black"
+                      style={{ background: plan.color }}
+                    >
+                      {plan.badge}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-xl" style={{ background: `${plan.color}20` }}>
+                      <Icon size={22} style={{ color: plan.color }} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-lg">{plan.name}</h3>
+                      <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: plan.color }}>
+                        {plan.peldaño}
+                      </p>
+                    </div>
+                  </div>
+                  {plan.funnelHint && (
+                    <p className="text-[9px] font-bold uppercase tracking-wide mb-2" style={{ color: plan.color }}>
+                      {plan.funnelHint}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-400 italic mb-2">{plan.anchorCopy}</p>
+                  <div className="mb-3">
+                    <span className="text-3xl font-black text-white">${plan.price}</span>
+                    <span className="text-slate-500 text-sm">/mes</span>
+                    <p className="text-[10px] text-slate-600 mt-0.5">S/ {plan.pricePEN.toFixed(0)} soles</p>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-slate-300">
+                        <Check size={14} style={{ color: plan.color }} />
+                        {feature.name}
+                      </li>
+                    ))}
+                  </ul>
+                  <a
+                    href="/ventas-deposito"
+                    className="inline-block mt-3 text-[10px] tracking-widest uppercase"
+                    style={{ color: plan.color }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Ver Matrícula →
+                  </a>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Umbral — módulo aparte */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">

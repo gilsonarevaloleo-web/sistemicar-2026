@@ -9,6 +9,9 @@ export const SELLER_PLAN_IDS = [
   "soberania_dia",
   "operativo",
   "umbral",
+  "deposito_matricula",
+  "deposito_carrera",
+  "deposito_titulo",
   "espejo_inicio",
   "espejo_recarga",
 ] as const;

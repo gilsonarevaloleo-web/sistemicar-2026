@@ -4,7 +4,7 @@ import {
   activateModulesForUserById,
   lookupUidByEmail,
 } from "./firebaseAdmin";
-import { modulesGrantedByPlan } from "../shared/moduleAccess";
+import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildGrantDeliveryId,
   moduleGrantAdminMessage,
@@ -221,7 +221,7 @@ export async function adminGrantPlanificacionModule(params: {
     throw new Error("Email válido requerido.");
   }
   if (modulesGrantedByPlan(planId).length === 0) {
-    throw new Error("Plan no válido. Usa: planificacion_base, soberania_dia, operativo o umbral.");
+    throw new Error(`Plan no válido. Usa: ${grantablePlanHint()}.`);
   }
 
   const deliveryId = params.reference?.trim()

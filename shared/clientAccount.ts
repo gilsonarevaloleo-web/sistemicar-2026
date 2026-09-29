@@ -12,6 +12,9 @@ const PLAN_DISPLAY_NAMES: Record<string, string> = {
   operativo: "Ritmo del día",
   soberania_dia: "Norte",
   umbral: "Umbral",
+  deposito_matricula: "Universidad Matrícula",
+  deposito_carrera: "Universidad Carrera",
+  deposito_titulo: "Universidad Título",
 };
 
 export function displayNameForPlan(planId: string): string {

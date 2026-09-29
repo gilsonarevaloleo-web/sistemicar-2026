@@ -144,7 +144,7 @@ function buildMenuItems(
     {
       id: "deposito-v2",
       title: "DEPÓSITO V2",
-      subtitle: "Universidad · ¿Qué aprendí hoy?",
+      subtitle: "Universidad · 1 volcado de prueba",
       icon: Sunrise,
       route: "/esperanza",
       color: SPECTRUM.NARANJA,

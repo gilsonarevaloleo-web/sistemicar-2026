@@ -31,7 +31,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/espejo", nombre: "Espejo Soberano", desc: "Vaciado mental · Doctor IA", icon: Heart, color: "#ef4444", acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
-      { path: "/esperanza", nombre: "Depósito V2", desc: "Óptica-Código · volcado y diez ojos", icon: Star, color: EMERALD, acceso: "usuario" },
+      { path: "/esperanza", nombre: "Depósito V2", desc: "Universidad — 1 volcado G1 de prueba, después Matrícula", icon: Star, color: EMERALD, acceso: "usuario" },
     ]
   },
   {
@@ -71,10 +71,11 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     color: ORANGE,
     rutas: [
       { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Landing anuncio Base → vendedor o checkout", icon: ExternalLink, color: GOLD, acceso: "libre" },
+      { path: "/ventas-deposito", nombre: "Ventas Universidad", desc: "Landing Matrícula → 1 volcado de prueba o checkout", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/embudo", nombre: "Embudo SISTEMICAR", desc: "Funnel de ventas principal", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/umbral", nombre: "Umbral", desc: "Página de entrada y conversión", icon: Lock, color: GOLD, acceso: "en_camino" },
       { path: "/umbral-leads", nombre: "Umbral Leads", desc: "Captura de prospectos interesados", icon: Users, color: BLUE, acceso: "libre" },
-      { path: "/pagos", nombre: "Pagos", desc: "Jornada V4 — Base, Ritmo del día, Norte", icon: ShoppingCart, color: EMERALD, acceso: "libre" },
+      { path: "/pagos", nombre: "Pagos", desc: "Jornada + Universidad + Umbral + Espejo", icon: ShoppingCart, color: EMERALD, acceso: "libre" },
       { path: "/gracias-compra", nombre: "Gracias por tu Compra", desc: "Página post-compra con siguiente paso", icon: Star, color: GOLD, acceso: "libre" },
     ]
   },
