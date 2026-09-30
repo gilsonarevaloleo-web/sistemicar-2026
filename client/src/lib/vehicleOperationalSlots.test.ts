@@ -47,6 +47,14 @@ describe("vehicleOperationalSlots", () => {
     const paused = v({ ...desg, id: "d2", interrupcionActiva: true, subVehiculos: [] });
     assert.equal(isDesglosadorEnFoco(paused), true);
 
+    const nestedOnly = v({
+      ...desg,
+      id: "d2n",
+      subVehiculos: [{ id: "s1", titulo: "A", status: "nested_paused" }],
+    });
+    assert.equal(isDesglosadorEnFoco(nestedOnly), true);
+    assert.equal(isLiveWorkCrossSegmentExempt(nestedOnly), true);
+
     const done = v({
       id: "d3",
       tipoReloj: "desglosador",

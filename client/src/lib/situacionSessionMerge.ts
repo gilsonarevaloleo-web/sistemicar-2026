@@ -1,5 +1,6 @@
 import type { DetalleSubTarea, SubTarea, SubVehiculo, Vehicle } from "./persistence";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
+import { conquistaSessionPauseRank, isPausedPresence } from "./vehiculoPausa";
 
 function countSubTareasEnCronometro(v: Vehicle): number {
   return v.subTareas?.filter(st => st.enDesgloseCronometro).length ?? 0;
@@ -169,6 +170,7 @@ function countSubsCerrados(subs: SubVehiculo[] | undefined): number {
 function subVehiculoProgressScore(sub: SubVehiculo): number {
   if (sub.status === "pendiente") return 0;
   if (sub.status === "activo") return 10 + (sub.aperturaAt ?? 0) / 1e15;
+  if (sub.status === "nested_paused") return 15 + (sub.aperturaAt ?? 0) / 1e15;
   return 20 + (sub.cierreAt ?? 0) / 1e15;
 }
 
@@ -239,12 +241,27 @@ export function preferLocalSubVehiculosInVehicleList(
   let changed = false;
   const out = merged.map(m => {
     const local = localSources.find(l => l.id === m.id);
-    if (!local || !shouldPreferLocalSubVehiculos(m, local)) return m;
+    if (!local) return m;
+    const preferSubs = shouldPreferLocalSubVehiculos(m, local);
+    const localPauseWins = conquistaSessionPauseRank(local) > conquistaSessionPauseRank(m);
+    if (!preferSubs && !localPauseWins) return m;
     changed = true;
-    return {
-      ...m,
-      subVehiculos: mergeSubVehiculosById(m.subVehiculos, local.subVehiculos),
-    };
+    const next: Vehicle = preferSubs
+      ? {
+          ...m,
+          subVehiculos: mergeSubVehiculosById(m.subVehiculos, local.subVehiculos),
+        }
+      : m;
+    if (localPauseWins || isPausedPresence(local)) {
+      return {
+        ...next,
+        interrupcionActiva: local.interrupcionActiva,
+        desglosadorPausa: local.desglosadorPausa,
+        pausas: local.pausas ?? next.pausas,
+        subVehiculos: local.subVehiculos ?? next.subVehiculos,
+      };
+    }
+    return next;
   });
   return changed ? out : merged;
 }
@@ -404,7 +421,10 @@ export function mergeActiveVehicleSessionState(firebaseV: Vehicle, localV: Vehic
       (localV.subVehiculos?.length ?? 0) > 0 &&
       localV.subVehiculos!.every(s => s.status === "cumplido" || s.status === "fallado");
     const localClosed = localV.status !== "activo" || localV.cierreAt != null;
-    const keepPause = localV.interrupcionActiva === true && !!localV.desglosadorPausa?.subActivoId;
+    const localRank = conquistaSessionPauseRank(localV);
+    const remoteRank = conquistaSessionPauseRank(sealedRemote);
+    const pauseSrc = localRank >= remoteRank ? localV : sealedRemote;
+    const keepPause = conquistaSessionPauseRank(pauseSrc) === 1;
     merged = {
       ...merged,
       ...(localSubsDone && localClosed
@@ -416,14 +436,12 @@ export function mergeActiveVehicleSessionState(firebaseV: Vehicle, localV: Vehic
             interrupcionActiva: false,
             desglosadorPausa: undefined,
           }
-        : {}),
-      interrupcionActiva: keepPause || localV.interrupcionActiva === true,
-      desglosadorPausa: keepPause
-        ? localV.desglosadorPausa
-        : localV.interrupcionActiva
-          ? localV.desglosadorPausa
-          : undefined,
-      subVehiculos: localV.subVehiculos ?? merged.subVehiculos,
+        : {
+            interrupcionActiva: keepPause,
+            desglosadorPausa: keepPause ? pauseSrc.desglosadorPausa : undefined,
+            pausas: pauseSrc.pausas ?? localV.pausas ?? merged.pausas,
+            subVehiculos: pauseSrc.subVehiculos ?? localV.subVehiculos ?? merged.subVehiculos,
+          }),
     };
   }
 

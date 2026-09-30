@@ -40,7 +40,12 @@ export function isDesglosadorEnFoco(vehicle: Vehicle): boolean {
   if (vehicle.interrupcionActiva) return true;
   const subs = vehicle.subVehiculos ?? [];
   if (subs.length === 0) return false;
-  return subs.some(s => s.status === "activo" || s.status === "pendiente");
+  return subs.some(
+    s =>
+      s.status === "activo" ||
+      s.status === "pendiente" ||
+      s.status === "nested_paused"
+  );
 }
 
 /**

@@ -214,4 +214,34 @@ describe("jornada4 filters", () => {
     const dual = filterJornada4Vehicles([paused, ...flood]);
     assert.equal(dual.some(x => x.id === "paused-conq"), true);
   });
+
+  it("conquista en pausa queda arriba del enfoque recién lanzado", () => {
+    const paused = v({
+      id: "paused-conq",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: NOW, subActivoId: "s1" },
+      subVehiculos: [{ id: "s1", titulo: "Corte", status: "nested_paused" }],
+    });
+    const enfoque = v({
+      id: "enf-nuevo",
+      tipoFlota: "situacion",
+      aperturaAt: NOW + 1,
+      situacionCronometro: { activo: true, bloqueInicioAt: NOW },
+      subTareas: [
+        {
+          id: "f1",
+          texto: "Llamada",
+          completada: false,
+          creadaAt: NOW,
+          enDesgloseCronometro: true,
+          resultadoSituacion: "pendiente",
+        },
+      ],
+    });
+    const dual = filterJornada4Vehicles([enfoque, paused]);
+    assert.equal(dual[0]?.id, "paused-conq");
+    assert.equal(dual[1]?.id, "enf-nuevo");
+  });
 });

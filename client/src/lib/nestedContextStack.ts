@@ -1,7 +1,11 @@
 import type { SubVehiculo, Vehicle } from "@/lib/persistence";
 import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { hardwareClockNow } from "@/lib/hardwareClock";
-import { appendVehiculoPausa, closeVehiculoPausaAbierta } from "@/lib/vehiculoPausa";
+import {
+  appendVehiculoPausa,
+  closeVehiculoPausaAbierta,
+  pausaAbiertaDe,
+} from "@/lib/vehiculoPausa";
 
 export type DesglosadorNestedPauseKind = "punto_cero" | "interrupcion_situacion";
 export type NestedPauseKind = DesglosadorNestedPauseKind | "postergacion";
@@ -93,9 +97,19 @@ export function buildSituacionNestedPausePatch(
 /** Restaura desglosador tras Punto Cero anidado — mismo sub-paso donde se quedó. */
 export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehicle> | null {
   const pausa = parent.desglosadorPausa;
-  if (!pausa?.subActivoId) return null;
   const subs = [...(parent.subVehiculos ?? [])];
-  const idx = subs.findIndex(s => s.id === pausa.subActivoId);
+  const nestedId = subs.find(s => s.status === "nested_paused")?.id;
+  const pausedId = pausa?.subActivoId ?? nestedId;
+  if (!pausedId) {
+    if (!parent.interrupcionActiva) return null;
+    const now = hardwareClockNow();
+    return {
+      desglosadorPausa: undefined,
+      interrupcionActiva: false,
+      pausas: closeVehiculoPausaAbierta(parent.pausas, now),
+    };
+  }
+  const idx = subs.findIndex(s => s.id === pausedId);
   const now = hardwareClockNow();
   if (idx === -1) {
     return {
@@ -104,11 +118,16 @@ export function resumeDesglosadorFromNestedPause(parent: Vehicle): Partial<Vehic
       pausas: closeVehiculoPausaAbierta(parent.pausas, now),
     };
   }
+  const frozen = subs[idx]!;
+  const openStamp = pausaAbiertaDe(parent);
+  const elapsedSec =
+    pausa?.elapsedSecSnapshot ??
+    (frozen.aperturaAt && openStamp
+      ? Math.max(0, Math.floor((openStamp.pausadoAt - frozen.aperturaAt) / 1000))
+      : undefined);
   const resumedApertura =
-    pausa.elapsedSecSnapshot != null
-      ? now - pausa.elapsedSecSnapshot * 1000
-      : now;
-  subs[idx] = { ...subs[idx], status: "activo", aperturaAt: resumedApertura };
+    elapsedSec != null ? now - elapsedSec * 1000 : frozen.aperturaAt ?? now;
+  subs[idx] = { ...frozen, status: "activo", aperturaAt: resumedApertura };
   return {
     subVehiculos: subs,
     desglosadorPausa: undefined,

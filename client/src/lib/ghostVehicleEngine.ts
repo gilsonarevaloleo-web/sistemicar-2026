@@ -53,6 +53,9 @@ export function lastLiveActivityMs(v: Vehicle): number {
   }
   const pausaAt = v.desglosadorPausa?.pausadoAt;
   if (pausaAt) last = Math.max(last, pausaAt);
+  for (const p of v.pausas ?? []) {
+    last = Math.max(last, p.pausadoAt, p.reanudadoAt ?? 0);
+  }
   const bloqueAt = v.situacionCronometro?.bloqueInicioAt;
   if (bloqueAt) last = Math.max(last, bloqueAt);
   for (const st of v.subTareas ?? []) {
@@ -212,7 +215,13 @@ export function isGhostActiveVehicleStable(
     sessionGhostIds.delete(v.id);
     return false;
   }
-  if (sessionGhostIds.has(v.id)) return true;
+  // Faena viva o pausa no se queda pegada al cajón: un dump histórico no
+  // puede esconder la conquista que el operador quiere reanudar.
+  if (hasLiveDesglosadorWork(v) || isPausedPresence(v)) {
+    sessionGhostIds.delete(v.id);
+  } else if (sessionGhostIds.has(v.id)) {
+    return true;
+  }
   const ghost = isGhostActiveVehicle(v, nowMs, dayStartMs, vehiclesById);
   if (ghost) sessionGhostIds.add(v.id);
   return ghost;

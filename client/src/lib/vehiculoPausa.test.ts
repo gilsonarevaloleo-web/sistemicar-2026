@@ -12,6 +12,7 @@ import {
   pausaAbiertaSinNombrar,
   tituloPausaAbierta,
   tituloPausaInterrupcion,
+  conquistaSessionPauseRank,
 } from "./vehiculoPausa.ts";
 
 describe("vehiculoPausa — historia de presencia", () => {
@@ -81,5 +82,32 @@ describe("vehiculoPausa — historia de presencia", () => {
     );
     assert.equal(isParentCoveragePaused({ vehiculoPadreDesglosadorId: "padre" }), false);
     assert.equal(isParentCoveragePaused({}), false);
+  });
+
+  it("conquistaSessionPauseRank: pausa abierta > snapshot en curso; reanudar gana", () => {
+    assert.equal(
+      conquistaSessionPauseRank({
+        tipoReloj: "desglosador",
+        interrupcionActiva: true,
+        desglosadorPausa: { subActivoId: "s1" },
+        subVehiculos: [{ status: "nested_paused" }],
+      }),
+      1
+    );
+    assert.equal(
+      conquistaSessionPauseRank({
+        tipoReloj: "desglosador",
+        subVehiculos: [{ status: "activo" }],
+      }),
+      0
+    );
+    assert.equal(
+      conquistaSessionPauseRank({
+        tipoReloj: "desglosador",
+        pausas: [{ pausadoAt: 1, reanudadoAt: 2 }],
+        subVehiculos: [{ status: "activo" }],
+      }),
+      2
+    );
   });
 });

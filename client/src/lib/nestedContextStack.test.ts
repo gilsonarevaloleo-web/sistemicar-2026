@@ -137,4 +137,29 @@ describe("desglosador nested pause — historia de presencia", () => {
     assert.equal(resumed!.interrupcionActiva, false);
     assert.ok(resumed!.pausas?.[0]?.reanudadoAt);
   });
+
+  it("reanuda un nested_paused aunque el sello desglosadorPausa se haya perdido", () => {
+    const now = Date.now();
+    const vehicle = {
+      id: "c1",
+      titulo: "Conquista",
+      status: "activo",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      subVehiculos: [
+        {
+          id: "s1",
+          titulo: "Casaca 1",
+          status: "nested_paused",
+          aperturaAt: now - 10 * 60_000,
+        },
+      ],
+      pausas: [{ pausadoAt: now - 2 * 60_000 }],
+    } as Vehicle;
+    const resumed = resumeDesglosadorFromNestedPause(vehicle);
+    assert.ok(resumed);
+    assert.equal(resumed!.interrupcionActiva, false);
+    assert.equal(resumed!.subVehiculos?.[0]?.status, "activo");
+    assert.ok(resumed!.pausas?.[0]?.reanudadoAt);
+  });
 });
