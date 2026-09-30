@@ -28,7 +28,7 @@ export type VehiculoMinutosFuente = {
   } | null;
   vehiculoPadreDesglosadorId?: string;
   subVehiculos?: Array<
-    Pick<SubVehiculo, "duracionFinal" | "status" | "aperturaAt" | "id">
+    Pick<SubVehiculo, "duracionFinal" | "status" | "aperturaAt" | "cierreAt" | "id">
   > | null;
   subTareas?: Array<
     Pick<
@@ -37,9 +37,12 @@ export type VehiculoMinutosFuente = {
       | "duracionRealSec"
       | "enDesgloseCronometro"
       | "resultadoSituacion"
+      | "cerradaAt"
     >
   > | null;
 };
+
+export type WorkMsInterval = { start: number; end: number };
 
 function isFinitePos(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n > 0;
@@ -109,6 +112,147 @@ function filaPendiente(
 ): boolean {
   if (isFinitePos(st.duracionRealSec)) return false;
   return !!st.enDesgloseCronometro && (st.resultadoSituacion ?? "pendiente") === "pendiente";
+}
+
+function isConquistaFrozen(v: VehiculoMinutosFuente): boolean {
+  const pausa = v.desglosadorPausa;
+  const nestedPaused = (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
+  return (
+    nestedPaused ||
+    (v.interrupcionActiva === true &&
+      pausa?.subActivoId != null &&
+      pausa.elapsedSecSnapshot != null)
+  );
+}
+
+function intervalFromDurationSec(
+  start: number | undefined,
+  end: number,
+  durSec: number
+): WorkMsInterval | null {
+  if (!isFinitePos(end) || !isFinitePos(durSec)) return null;
+  const durMs = Math.floor(durSec) * 1000;
+  const s =
+    typeof start === "number" && Number.isFinite(start) && start > 0 && start < end
+      ? start
+      : end - durMs;
+  return end > s ? { start: s, end } : null;
+}
+
+function conquistaUnitIntervals(v: VehiculoMinutosFuente, now: number): WorkMsInterval[] {
+  const out: WorkMsInterval[] = [];
+  const pausa = v.desglosadorPausa;
+  const frozen = isConquistaFrozen(v);
+  const subs = v.subVehiculos ?? [];
+  for (let i = 0; i < subs.length; i++) {
+    const sub = subs[i];
+    if (!sub) continue;
+    if (sub.status === "cumplido" || sub.status === "fallado") {
+      const dur = sub.duracionFinal;
+      if (!isFinitePos(dur)) continue;
+      const end =
+        typeof sub.cierreAt === "number" && sub.cierreAt > 0
+          ? sub.cierreAt
+          : typeof sub.aperturaAt === "number" && sub.aperturaAt > 0
+            ? sub.aperturaAt + Math.floor(dur) * 1000
+            : 0;
+      const iv = intervalFromDurationSec(sub.aperturaAt, end, dur);
+      if (iv) out.push(iv);
+      continue;
+    }
+    const isPausedSub =
+      sub.status === "nested_paused" ||
+      (frozen && pausa?.subActivoId != null && pausa.subActivoId === sub.id);
+    if (isPausedSub) {
+      if (
+        sub.aperturaAt &&
+        pausa?.pausadoAt &&
+        pausa.pausadoAt > sub.aperturaAt
+      ) {
+        out.push({ start: sub.aperturaAt, end: pausa.pausadoAt });
+        continue;
+      }
+      if (pausa?.elapsedSecSnapshot != null && pausa.elapsedSecSnapshot > 0 && sub.aperturaAt) {
+        out.push({
+          start: sub.aperturaAt,
+          end: sub.aperturaAt + Math.floor(pausa.elapsedSecSnapshot) * 1000,
+        });
+      }
+      continue;
+    }
+    if (sub.status !== "activo" || v.status !== "activo" || frozen) continue;
+    if (!sub.aperturaAt || sub.aperturaAt <= 0) continue;
+    if (isFinitePos(sub.duracionFinal)) continue;
+    if (now > sub.aperturaAt) out.push({ start: sub.aperturaAt, end: now });
+  }
+  return out;
+}
+
+function enfoqueFilaIntervals(v: VehiculoMinutosFuente, now: number): WorkMsInterval[] {
+  const out: WorkMsInterval[] = [];
+  const filas = v.subTareas ?? [];
+  const snap = v.situacionNestedPause;
+  const liveAnchor = snap?.situacionCupoAnchor ?? v.situacionCupoAnchor;
+  for (let i = 0; i < filas.length; i++) {
+    const fila = filas[i];
+    if (!fila) continue;
+    const sec =
+      typeof fila.duracionRealSec === "number" && fila.duracionRealSec > 0
+        ? fila.duracionRealSec
+        : 0;
+    if (isFinitePos(sec)) {
+      const end =
+        typeof fila.cerradaAt === "number" && fila.cerradaAt > 0
+          ? fila.cerradaAt
+          : 0;
+      if (end > 0) {
+        const iv = intervalFromDurationSec(undefined, end, sec);
+        if (iv) out.push(iv);
+        continue;
+      }
+    }
+    if (v.status !== "activo") continue;
+    if (!liveAnchor || !fila.id || liveAnchor.subTareaId !== fila.id) continue;
+    if (!filaPendiente(fila)) continue;
+    const started = liveAnchor.startedAt;
+    if (!isFinitePos(started)) continue;
+    const z = snap?.pausedAt && snap.pausedAt > started ? snap.pausedAt : now;
+    if (z > started) out.push({ start: started, end: z });
+  }
+  return out;
+}
+
+/**
+ * Intervalos de trabajo medido (unidades / filas), no la pared del contenedor.
+ * Un desglosador abierto todo el día con 40 min de unidades cubre 40 min, no 21 h.
+ */
+export function measuredWorkIntervals(
+  v: VehiculoMinutosFuente,
+  now = Date.now()
+): WorkMsInterval[] {
+  if (v.tipoReloj === "desglosador") return conquistaUnitIntervals(v, now);
+  if (v.tipoFlota === "situacion" && isContenedorDesglose(v)) {
+    return enfoqueFilaIntervals(v, now);
+  }
+  return [];
+}
+
+/**
+ * Hay reloj vivo de unidad/fila. Un desglosador `activo` sin pieza en curso
+ * no cubre conciencia — ese rato es hueco, no trabajo.
+ */
+export function hasTickingDesgloseWork(
+  v: VehiculoMinutosFuente,
+  now = Date.now()
+): boolean {
+  if (!isContenedorDesglose(v) || v.status !== "activo") return false;
+  if (v.interrupcionActiva) return false;
+  if (v.desglosadorPausa?.pausadoAt || v.desglosadorPausa?.subActivoId) return false;
+  if (v.situacionNestedPause) return false;
+  if (v.tipoReloj === "desglosador") {
+    return (v.subVehiculos ?? []).some(s => s.status === "activo");
+  }
+  return liveEnfoqueSeconds(v, now) > 0;
 }
 
 function liveEnfoqueSeconds(v: VehiculoMinutosFuente, now: number): number {

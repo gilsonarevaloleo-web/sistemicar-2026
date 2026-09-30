@@ -3,8 +3,9 @@
  *
  * Línea: minutos únicos del plan. Un hilo.
  * Inconsciente = hueco: plan ya ocurrido sin vehículo. Pausa sin otro hilo
- * que la cubra = hueco (no justificada). El futuro del plan no es
- * inconsciencia ni deuda — aún no ocurre. Lo no conquistado es el horario no planificado.
+ * que la cubra = hueco (no justificada). Idle del desglosador (pared sin
+ * unidad/fila) es el mismo hueco: no se pinta la pared como trabajo.
+ * El futuro del plan no es inconsciencia ni deuda — aún no ocurre.
  * Interrupt: el padre se congela en pausadoAt; el enfoque cubre la línea. No multiplica.
  * Paralelo meritorio: ≥2 hilos avanzando de verdad (no el par padre-pausado + hijo).
  * Dopamina: extra = apilado − único, y ambos cierran cumplido.
@@ -12,9 +13,19 @@
  * No importa ConcienciaEngine / pulso / ms0.
  */
 import { vehicleCuentaComoDireccion } from "./destinoCierre";
-import { getJournalDateString, getLimaDayStartMs, segmentWindowMs } from "./segmentTime";
+import {
+  getJournalDateString,
+  getJournalDayStartMs,
+  getLimaDayStartMs,
+  segmentWindowMs,
+} from "./segmentTime";
 import type { Vehicle } from "./persistence";
 import { applyVehicleSessionSeal } from "./vehicleSessionSeal";
+import {
+  hasTickingDesgloseWork,
+  isContenedorDesglose,
+  measuredWorkIntervals,
+} from "./vehiculoMinutos";
 
 export { isParentCoveragePaused } from "./vehiculoPausa";
 
@@ -86,6 +97,7 @@ export function isTriadaAdvancingVehicle(vehicle: Vehicle, vehicles: Vehicle[] =
   if (v.interrupcionActiva) return false;
   if (v.situacionNestedPause) return false;
   if (hasActiveInterruptChild(v, vehicles)) return false;
+  if (isContenedorDesglose(v) && !hasTickingDesgloseWork(v)) return false;
   return true;
 }
 
@@ -191,10 +203,11 @@ export function plannedWindowsMs(
 
 function vehicleRawSessionRange(v: Vehicle, now: number): MsInterval | null {
   const sealed = applyVehicleSessionSeal(v);
-  const start = sealed.aperturaAt;
+  let start = sealed.aperturaAt;
   if (typeof start !== "number" || !Number.isFinite(start) || start <= 0) return null;
   let end: number;
   if (sealed.status === "activo") {
+    const journalStart = getJournalDayStartMs(now);
     if (sealed.interrupcionActiva && sealed.desglosadorPausa?.pausadoAt) {
       end = sealed.desglosadorPausa.pausadoAt;
     } else if (sealed.situacionNestedPause?.pausedAt) {
@@ -202,6 +215,8 @@ function vehicleRawSessionRange(v: Vehicle, now: number): MsInterval | null {
     } else {
       end = now;
     }
+    if (end <= journalStart) return null;
+    if (start < journalStart) start = journalStart;
   } else if (typeof sealed.cierreAt === "number" && sealed.cierreAt > start) {
     end = sealed.cierreAt;
   } else if (typeof sealed.duracionFinal === "number" && sealed.duracionFinal > 0) {
@@ -260,18 +275,33 @@ export function vehicleAdvancingIntervals(
   now: number
 ): MsInterval[] {
   if (skipsTriadaCoverage(vehicle)) return [];
+  const childHoles = vehicle.id ? interruptChildRawRanges(vehicle.id, vehicles, now) : [];
+  if (isContenedorDesglose(vehicle)) {
+    const pieces = mergeMsIntervals(measuredWorkIntervals(vehicle, now));
+    if (pieces.length === 0) return [];
+    return childHoles.length > 0 ? subtractMsIntervals(pieces, childHoles) : pieces;
+  }
   const raw = vehicleRawSessionRange(vehicle, now);
   if (!raw) return [];
-  const holes = [
-    ...(vehicle.id ? interruptChildRawRanges(vehicle.id, vehicles, now) : []),
-    ...vehiclePauseIntervals(vehicle, now),
-  ];
+  const holes = [...childHoles, ...vehiclePauseIntervals(vehicle, now)];
   return holes.length > 0 ? subtractMsIntervals([raw], holes) : [raw];
 }
 
 /**
- * Pausa sin otro vehículo consciente encima: hueco, igual que Inconsciente.
- * Descanso / centinela no justifican — no cubren la línea.
+ * Idle del contenedor: pared − unidades/filas. Ese rato es hueco, no trabajo.
+ * Las pausas cortas no explican 21 h: la pared abierta sí.
+ */
+export function containerIdleIntervals(vehicle: Vehicle, now: number): MsInterval[] {
+  if (skipsTriadaCoverage(vehicle) || !isContenedorDesglose(vehicle)) return [];
+  const raw = vehicleRawSessionRange(vehicle, now);
+  if (!raw) return [];
+  const work = mergeMsIntervals(measuredWorkIntervals(vehicle, now));
+  return subtractMsIntervals([raw], work);
+}
+
+/**
+ * Pausa sin otro vehículo consciente encima + idle del contenedor:
+ * hueco, igual que Inconsciente. Descanso / centinela no justifican.
  */
 export function unjustifiedPauseIntervals(
   vehicles: Vehicle[],
@@ -279,14 +309,17 @@ export function unjustifiedPauseIntervals(
 ): MsInterval[] {
   const pauses: MsInterval[] = [];
   const covering: MsInterval[] = [];
+  const idle: MsInterval[] = [];
   for (let i = 0; i < vehicles.length; i++) {
     const v = vehicles[i];
     if (!v || skipsTriadaCoverage(v)) continue;
     pauses.push(...vehiclePauseIntervals(v, now));
     covering.push(...vehicleAdvancingIntervals(v, vehicles, now));
+    idle.push(...containerIdleIntervals(v, now));
   }
-  if (pauses.length === 0) return [];
-  return subtractMsIntervals(mergeMsIntervals(pauses), mergeMsIntervals(covering));
+  const holes = mergeMsIntervals([...pauses, ...idle]);
+  if (holes.length === 0) return [];
+  return subtractMsIntervals(holes, mergeMsIntervals(covering));
 }
 
 function vehicleIsDireccion(vehicle: Vehicle): boolean {

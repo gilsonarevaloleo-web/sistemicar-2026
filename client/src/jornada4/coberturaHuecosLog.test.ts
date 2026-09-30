@@ -172,6 +172,25 @@ describe("coberturaHuecosLog", () => {
     assert.equal(open, null);
   });
 
+  it("desglosador sin unidad activa no cubre", () => {
+    const t0 = Date.now();
+    const idle = [
+      vehicle({
+        id: "p1",
+        titulo: "Costura",
+        tipoReloj: "desglosador",
+        aperturaAt: t0 - 8 * 60 * 60_000,
+        subVehiculos: [
+          { id: "s1", titulo: "A", status: "cumplido", duracionFinal: 10 * 60 },
+          { id: "s2", titulo: "B", status: "pendiente" },
+        ],
+      }),
+    ];
+    assert.equal(hasActiveConsciousCoverage(idle, t0), false);
+    const open = reconcileCoberturaHuecos({ vehicles: idle, now: t0 });
+    assert.equal(open?.kind, "gap_open");
+  });
+
   it("pausa no justificada entra al total de huecos como inconsciente", () => {
     const t0 = Date.parse("2026-08-19T10:00:00-05:00");
     const pauseStart = t0;
@@ -224,5 +243,43 @@ describe("coberturaHuecosLog", () => {
     assert.equal(sumCoberturaHuecosMinutes(intervals, t0 + 60 * 60_000), 17);
     assert.ok(intervals.some(it => it.closedByTitulo === "Prueba"));
     assert.ok(intervals.some(it => it.reason === "pausa_no_justificada"));
+  });
+
+  it("idle del desglosador conquista entra como hueco, no como 21 h trabajadas", () => {
+    const t0 = Date.parse("2026-08-19T05:00:00-05:00");
+    const now = Date.parse("2026-08-19T23:00:00-05:00");
+    const vehicles = [
+      vehicle({
+        id: "costura",
+        status: "activo",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        aperturaAt: t0,
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "Corte",
+            status: "cumplido",
+            aperturaAt: t0 + 2 * 60 * 60_000,
+            cierreAt: t0 + 2 * 60 * 60_000 + 20 * 60_000,
+            duracionFinal: 20 * 60,
+          },
+          {
+            id: "u2",
+            titulo: "Vivo",
+            status: "activo",
+            aperturaAt: now - 10 * 60_000,
+          },
+        ],
+      }),
+    ];
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles,
+      now,
+      events: [],
+    });
+    const total = sumCoberturaHuecosMinutes(intervals, now);
+    assert.ok(total >= 17 * 60, `idle ~17.5 h, no 30 min: ${total}`);
+    assert.ok(total < 18 * 60);
   });
 });

@@ -451,4 +451,119 @@ describe("concienciaTriadaLinea", () => {
     assert.equal(occ.minutosHueco, 12);
     assert.equal(occ.minutosInconsciente, 12);
   });
+
+  it("conquista abierta todo el día no pinta la pared: solo unidades, el resto es hueco", () => {
+    const now = lima("23:00");
+    const vehicles = [
+      v({
+        id: "costura",
+        status: "activo",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        aperturaAt: lima("05:00"),
+        destinoCierre: "peldano",
+        proyectoId: "n1",
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "Corte",
+            status: "cumplido",
+            aperturaAt: lima("07:00"),
+            cierreAt: lima("07:20"),
+            duracionFinal: 20 * 60,
+          },
+          {
+            id: "u2",
+            titulo: "Costura",
+            status: "cumplido",
+            aperturaAt: lima("11:00"),
+            cierreAt: lima("11:20"),
+            duracionFinal: 20 * 60,
+          },
+          {
+            id: "u3",
+            titulo: "Acabado",
+            status: "activo",
+            aperturaAt: lima("22:40"),
+          },
+        ],
+      }),
+    ];
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: [{ horaInicio: "05:00", horaFin: "23:00" }],
+      vehicles,
+      now,
+    });
+    assert.equal(occ.minutosDireccion, 60);
+    assert.equal(occ.minutosHueco, 17 * 60);
+    assert.equal(occ.minutosDireccion + occ.minutosHueco, 18 * 60);
+    assert.equal(isTriadaAdvancingVehicle(vehicles[0]!, vehicles), true);
+
+    const idle = unjustifiedPauseIntervals(vehicles, now);
+    const idleMin = idle.reduce((a, iv) => a + (iv.end - iv.start) / 60_000, 0);
+    assert.ok(idleMin >= 16 * 60, `idle del contenedor ~17 h, no 20 min de pausa: ${idleMin}`);
+  });
+
+  it("pausa corta de conquista no convierte el día en trabajo", () => {
+    const now = lima("23:00");
+    const pauseAt = lima("12:00");
+    const resumeAt = lima("12:10");
+    const vehicles = [
+      v({
+        id: "costura",
+        status: "activo",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        aperturaAt: lima("05:00"),
+        destinoCierre: "peldano",
+        proyectoId: "n1",
+        pausas: [{ pausadoAt: pauseAt, reanudadoAt: resumeAt, titulo: "almuerzo" }],
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "Turno",
+            status: "activo",
+            // Resume reescribe aperturaAt = now − elapsed (50 min de unidad).
+            aperturaAt: lima("22:10"),
+          },
+        ],
+      }),
+    ];
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: [{ horaInicio: "05:00", horaFin: "23:00" }],
+      vehicles,
+      now,
+    });
+    assert.equal(occ.minutosDireccion, 50);
+    assert.equal(occ.minutosHueco, 18 * 60 - 50);
+    assert.ok(occ.minutosDireccion < 90);
+  });
+
+  it("desglosador activo sin unidad en curso no cubre: es hueco", () => {
+    const now = lima("12:00");
+    const vehicle = v({
+      id: "costura",
+      status: "activo",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      aperturaAt: lima("09:00"),
+      destinoCierre: "peldano",
+      proyectoId: "n1",
+      subVehiculos: [
+        { id: "u1", titulo: "A", status: "cumplido", aperturaAt: lima("09:00"), cierreAt: lima("09:15"), duracionFinal: 15 * 60 },
+        { id: "u2", titulo: "B", status: "pendiente" },
+      ],
+    });
+    assert.equal(isTriadaAdvancingVehicle(vehicle, [vehicle]), false);
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: SEG_MANANA,
+      vehicles: [vehicle],
+      now,
+    });
+    assert.equal(occ.minutosDireccion, 15);
+    assert.equal(occ.minutosHueco, 165);
+  });
 });
