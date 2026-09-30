@@ -7,6 +7,7 @@ import {
   isSituacionListaLibre,
   isSituacionRing,
 } from "@/jornada4/filters";
+import { isPausedPresence } from "@/lib/vehiculoPausa";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import type { DestinoCierre } from "@/lib/destinoCierre";
 import { ConquistaCard } from "./ConquistaCard";
@@ -114,6 +115,108 @@ type Props = {
   canSituacion?: boolean;
 };
 
+const CYAN = "#00FFC3";
+
+function renderVehicleCard(v: Vehicle, ops: Ops) {
+  if (isConquistaDesglosador(v)) {
+    return (
+      <ConquistaCard
+        key={v.id}
+        vehicle={v}
+        onCumplido={cantidad => void ops.closeConquistaSub(v.id, "cumplido", cantidad)}
+        onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
+        onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
+        onDestinoChange={(destino, proyectoId) =>
+          ops.setDestinoCierre(v.id, destino, proyectoId)
+        }
+        onAddSub={form => void ops.addConquistaSub(v.id, form)}
+        onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
+        onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+        onLabelPausa={
+          ops.labelPausaConquista
+            ? titulo => void ops.labelPausaConquista!(v.id, titulo)
+            : undefined
+        }
+        onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
+        onArchivarPausa={
+          ops.archivePausedConquista
+            ? () => void ops.archivePausedConquista!(v.id)
+            : undefined
+        }
+        onReorderSubs={(movedId, direction) =>
+          ops.reorderConquistaSubs(v.id, movedId, direction)
+        }
+      />
+    );
+  }
+  if (isExpressSituacion(v)) {
+    return (
+      <InterruptCard
+        key={v.id}
+        vehicle={v}
+        onCumplido={() => void ops.closeExpressVehicle(v.id, "cumplido")}
+        onIncumplido={() => void ops.closeExpressVehicle(v.id, "archivado")}
+      />
+    );
+  }
+  if (isSituacionRing(v)) {
+    return (
+      <SituacionCard
+        key={v.id}
+        vehicle={v}
+        onCumplido={id => void ops.closeSituacionRow(v.id, id, "cumplido")}
+        onAvance={id => void ops.closeSituacionRow(v.id, id, "avance")}
+        onFallado={id => void ops.closeSituacionRow(v.id, id, "fallado")}
+        onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
+        onDestinoChange={(destino, proyectoId) =>
+          ops.setDestinoCierre(v.id, destino, proyectoId)
+        }
+        onAddFila={(texto, seccion) => void ops.addSituacionFila(v.id, texto, seccion)}
+        onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
+        onReorderFilas={(movedId, direction) =>
+          ops.reorderSituacionFilas(v.id, movedId, direction)
+        }
+        onSustituirFoco={
+          ops.sustituirSituacionFoco
+            ? id => ops.sustituirSituacionFoco!(v.id, id)
+            : undefined
+        }
+        onPostergarFoco={() => ops.postergarFilaEnFoco(v.id)}
+        onQuitarFila={id => ops.quitarSituacionFila(v.id, id)}
+      />
+    );
+  }
+  if (isSituacionListaLibre(v)) {
+    return (
+      <SituacionLibreCard
+        key={v.id}
+        vehicle={v}
+        onCumplido={id => void ops.closeSituacionLibreFila(v.id, id, "cumplido")}
+        onAvance={id => void ops.closeSituacionLibreFila(v.id, id, "avance")}
+        onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
+        onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
+        onDestinoChange={(destino, proyectoId) =>
+          ops.setDestinoCierre(v.id, destino, proyectoId)
+        }
+        onAddFila={(texto, seccion) =>
+          void ops.addSituacionLibreFila(v.id, texto, seccion)
+        }
+      />
+    );
+  }
+  if (isConquistaRapido(v)) {
+    return (
+      <RapidoCard
+        key={v.id}
+        vehicle={v}
+        onCumplir={cant => void ops.closeRapidoVehicle(v.id, "cumplido", cant)}
+        onArchivar={() => void ops.closeRapidoVehicle(v.id, "archivado")}
+      />
+    );
+  }
+  return null;
+}
+
 export function Jornada4VehicleList({
   vehicles,
   ops,
@@ -125,9 +228,7 @@ export function Jornada4VehicleList({
         className={`mx-3 sm:mx-4 ${J4_UI.card} text-center space-y-1`}
         data-testid="jornada4-empty"
       >
-        <p className={J4_UI.label}>
-          Aún no hay un bloque en curso
-        </p>
+        <p className={J4_UI.label}>Aún no hay un bloque en curso</p>
         <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
           {canSituacion ? (
             <>
@@ -145,6 +246,9 @@ export function Jornada4VehicleList({
       </div>
     );
   }
+
+  const paused = vehicles.filter(isPausedPresence);
+  const live = vehicles.filter(v => !isPausedPresence(v));
 
   return (
     <div className="px-3 pb-24 sm:px-4 space-y-2" data-testid="jornada4-list">
@@ -165,112 +269,24 @@ export function Jornada4VehicleList({
         </span>
       </div>
       <div className="space-y-2">
-            {vehicles.map(v => {
-              if (isConquistaDesglosador(v)) {
-                return (
-                  <ConquistaCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplido={cantidad =>
-                      void ops.closeConquistaSub(v.id, "cumplido", cantidad)
-                    }
-                    onFallado={() => void ops.closeConquistaSub(v.id, "fallado")}
-                    onCerrarCiclo={() => void ops.closeConquistaCycle(v.id)}
-                    onDestinoChange={(destino, proyectoId) =>
-                      ops.setDestinoCierre(v.id, destino, proyectoId)
-                    }
-                    onAddSub={form => void ops.addConquistaSub(v.id, form)}
-                    onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
-                    onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
-                    onLabelPausa={
-                      ops.labelPausaConquista
-                        ? titulo => void ops.labelPausaConquista!(v.id, titulo)
-                        : undefined
-                    }
-                    onResumeDesglosador={() => void ops.resumeDesglosador(v.id)}
-                    onArchivarPausa={
-                      ops.archivePausedConquista
-                        ? () => void ops.archivePausedConquista!(v.id)
-                        : undefined
-                    }
-                    onReorderSubs={(movedId, direction) =>
-                      ops.reorderConquistaSubs(v.id, movedId, direction)
-                    }
-                  />
-                );
-              }
-              if (isExpressSituacion(v)) {
-                return (
-                  <InterruptCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplido={() => void ops.closeExpressVehicle(v.id, "cumplido")}
-                    onIncumplido={() => void ops.closeExpressVehicle(v.id, "archivado")}
-                  />
-                );
-              }
-              if (isSituacionRing(v)) {
-                return (
-                  <SituacionCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplido={id => void ops.closeSituacionRow(v.id, id, "cumplido")}
-                    onAvance={id => void ops.closeSituacionRow(v.id, id, "avance")}
-                    onFallado={id => void ops.closeSituacionRow(v.id, id, "fallado")}
-                    onCerrarBloque={() => void ops.closeSituacionBlock(v.id)}
-                    onDestinoChange={(destino, proyectoId) =>
-                      ops.setDestinoCierre(v.id, destino, proyectoId)
-                    }
-                    onAddFila={(texto, seccion) =>
-                      void ops.addSituacionFila(v.id, texto, seccion)
-                    }
-                    onSetCupo={(id, min) => void ops.setSituacionCupo(v.id, id, min)}
-                    onReorderFilas={(movedId, direction) =>
-                      ops.reorderSituacionFilas(v.id, movedId, direction)
-                    }
-                    onSustituirFoco={
-                      ops.sustituirSituacionFoco
-                        ? id => ops.sustituirSituacionFoco!(v.id, id)
-                        : undefined
-                    }
-                    onPostergarFoco={() => ops.postergarFilaEnFoco(v.id)}
-                    onQuitarFila={id => ops.quitarSituacionFila(v.id, id)}
-                  />
-                );
-              }
-              if (isSituacionListaLibre(v)) {
-                return (
-                  <SituacionLibreCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplido={id => void ops.closeSituacionLibreFila(v.id, id, "cumplido")}
-                    onAvance={id => void ops.closeSituacionLibreFila(v.id, id, "avance")}
-                    onFallado={id => void ops.closeSituacionLibreFila(v.id, id, "fallado")}
-                    onCerrar={() => void ops.closeSituacionLibreBloque(v.id)}
-                    onDestinoChange={(destino, proyectoId) =>
-                      ops.setDestinoCierre(v.id, destino, proyectoId)
-                    }
-                    onAddFila={(texto, seccion) =>
-                      void ops.addSituacionLibreFila(v.id, texto, seccion)
-                    }
-                  />
-                );
-              }
-              if (isConquistaRapido(v)) {
-                return (
-                  <RapidoCard
-                    key={v.id}
-                    vehicle={v}
-                    onCumplir={cant => void ops.closeRapidoVehicle(v.id, "cumplido", cant)}
-                    onArchivar={() => void ops.closeRapidoVehicle(v.id, "archivado")}
-                  />
-                );
-              }
-              return null;
-            })}
-            <p className="pt-1 text-center text-[8px] uppercase tracking-wider" style={{ color: GOLD }}>
-              Dual Kernel · pausa · postergar · quitar cola · reorden · conquista · ring
+        {paused.length > 0 ? (
+          <div className="space-y-2" data-testid="jornada4-paused-stack">
+            <p
+              className="px-0.5 text-[8px] font-black uppercase tracking-widest"
+              style={{ color: CYAN }}
+            >
+              En pausa · reanuda cuando termines el otro desglosador
             </p>
+            {paused.map(v => renderVehicleCard(v, ops))}
+          </div>
+        ) : null}
+        {live.map(v => renderVehicleCard(v, ops))}
+        <p
+          className="pt-1 text-center text-[8px] uppercase tracking-wider"
+          style={{ color: GOLD }}
+        >
+          Dual Kernel · pausa · postergar · quitar cola · reorden · conquista · ring
+        </p>
       </div>
     </div>
   );

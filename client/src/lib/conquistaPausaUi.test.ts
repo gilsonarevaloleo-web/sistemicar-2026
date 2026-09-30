@@ -29,6 +29,8 @@ describe("conquista pausa UI — directa y justificada, sin vehículo sombra", (
     assert.match(card, /data-testid="j4-conquista-pausa-label"/);
     assert.match(card, /Nombrar esta pausa/);
     assert.match(list, /onLabelPausa/);
+    assert.match(list, /jornada4-paused-stack/);
+    assert.match(list, /isPausedPresence/);
   });
 
   it("el ops de pausa no crea hijo de interrupción", () => {

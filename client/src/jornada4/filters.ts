@@ -39,7 +39,13 @@ export function filterJornada4Vehicles(
     .filter(v => !visibleIds.has(v.id) && (isPausedPresence(v) || isZombieConsciousVehicle(v)))
     .sort((a, b) => lastLiveActivityMs(b) - lastLiveActivityMs(a))
     .slice(0, MAX_LEFTOVER_CLOSEABLE);
-  return leftover.length === 0 ? visible : [...leftover, ...visible];
+  const combined = leftover.length === 0 ? visible : [...leftover, ...visible];
+  // Pausa arriba: al lanzar Enfoque el ring nuevo se prependea y tapaba la
+  // conquista congelada. El operador debe reanudar de un toque.
+  const paused = combined.filter(isPausedPresence);
+  if (paused.length === 0) return combined;
+  const rest = combined.filter(v => !isPausedPresence(v));
+  return [...paused, ...rest];
 }
 
 export function isConquistaDesglosador(v: Vehicle): boolean {

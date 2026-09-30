@@ -12,6 +12,7 @@ import {
 import { getJournalDayStartMs } from "./segmentTime";
 import { ringSessionOperable } from "./ringEnfoqueReal";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge";
+import { conquistaSessionPauseRank } from "./vehiculoPausa";
 import {
   applyVehicleSessionSeal,
   isVehicleSessionSealed,
@@ -54,6 +55,8 @@ function conquistaSessionRichness(v: Vehicle): number {
   if ((v.desglosadorBloqueDepthPsGranted ?? 0) > 0) {
     score += v.desglosadorBloqueDepthPsGranted!;
   }
+  // Pausa abierta pesa más que un snapshot «en curso» sin sello de reanudación.
+  score += conquistaSessionPauseRank(v) * 40;
   return score;
 }
 
@@ -67,7 +70,9 @@ export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boo
   const dCon = conquistaSessionRichness(disk);
   const mCon = conquistaSessionRichness(memory);
   if (dCon !== mCon) return dCon > mCon;
-  // Pausa vs en curso con la misma faena no es riqueza: no pisar interrupción ni reanudación.
+  const dPause = conquistaSessionPauseRank(disk);
+  const mPause = conquistaSessionPauseRank(memory);
+  if (dPause !== mPause) return dPause > mPause;
   return false;
 }
 

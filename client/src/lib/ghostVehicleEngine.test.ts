@@ -9,6 +9,7 @@ import {
   hasLiveDesglosadorWork,
   hasRealActiveConsciousVehicle,
   isGhostActiveVehicle,
+  isGhostActiveVehicleStable,
   isJournalStaleActiveVehicle,
   isZombieConsciousVehicle,
   MAX_LIVE_DESGLOSADOR_SESSIONS,
@@ -236,6 +237,24 @@ describe("ghostVehicleEngine", () => {
     for (const p of paused) {
       assert.equal(isGhostActiveVehicle(p, NOW, DAY_START, byId), false);
     }
+  });
+
+  it("unstick: pausa viva borra el sello de fantasma de sesión", () => {
+    const stale = v({
+      id: "sticky",
+      aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000,
+    });
+    assert.equal(isGhostActiveVehicleStable(stale, NOW, DAY_START), true);
+    const paused = v({
+      id: "sticky",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: NOW, subActivoId: "s1" },
+      subVehiculos: [{ id: "s1", titulo: "Unidad", status: "nested_paused" }],
+      aperturaAt: NOW - GHOST_MAX_SESSION_MS - 1000,
+    });
+    assert.equal(isGhostActiveVehicleStable(paused, NOW, DAY_START), false);
   });
 
   it("una sola conquista larga no se corta por la avalancha", () => {

@@ -247,15 +247,42 @@ describe("mergeActiveVehicleSessionState situacion", () => {
         subActivoId: "sub1",
         elapsedSecSnapshot: 120,
       },
+      subVehiculos: [{ id: "sub1", titulo: "A", status: "nested_paused", aperturaAt: 800 }],
+      pausas: [{ pausadoAt: 1000 }],
     };
     const local: Vehicle = {
       ...fb,
       interrupcionActiva: false,
       desglosadorPausa: undefined,
+      subVehiculos: [{ id: "sub1", titulo: "A", status: "activo", aperturaAt: 2000 }],
+      pausas: [{ pausadoAt: 1000, reanudadoAt: 2000 }],
     };
     const merged = mergeActiveVehicleSessionState(fb, local);
     assert.equal(merged.interrupcionActiva, false);
     assert.equal(merged.desglosadorPausa, undefined);
+    assert.equal(merged.subVehiculos?.[0]?.status, "activo");
+  });
+
+  it("conserva pausa local cuando Firebase aún trae el desglosador en curso", () => {
+    const fb: Vehicle = {
+      ...(baseVehicle() as Vehicle),
+      id: "d1",
+      tipoReloj: "desglosador",
+      tipoFlota: "tiempo",
+      status: "activo",
+      subVehiculos: [{ id: "sub1", titulo: "A", status: "activo", aperturaAt: 800 }],
+    };
+    const local: Vehicle = {
+      ...fb,
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: 1000, subActivoId: "sub1", elapsedSecSnapshot: 20 },
+      subVehiculos: [{ id: "sub1", titulo: "A", status: "nested_paused", aperturaAt: 800 }],
+      pausas: [{ pausadoAt: 1000 }],
+    };
+    const merged = mergeActiveVehicleSessionState(fb, local);
+    assert.equal(merged.interrupcionActiva, true);
+    assert.equal(merged.desglosadorPausa?.subActivoId, "sub1");
+    assert.equal(merged.subVehiculos?.[0]?.status, "nested_paused");
   });
 
   it("mergeSubVehiculosById keeps local active sub when firebase still has first pending", () => {

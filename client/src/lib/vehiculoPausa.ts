@@ -124,6 +124,33 @@ export function isPausedPresence(v: PausedPresenceVehicle): boolean {
 }
 
 /**
+ * Quién gana en un merge de conquista: reanudar explícito > pausa abierta >
+ * en curso sin sello (snapshot viejo que aún no vio el Pause).
+ *
+ * 2 = el operador ya reanudó (sello cerrado + sub activo)
+ * 1 = pausa abierta — debe sobrevivir a un eco Firebase en curso
+ * 0 = en curso sin sello de reanudación (puede ser el snapshot previo a pausar)
+ */
+export function conquistaSessionPauseRank(v: {
+  tipoReloj?: string;
+  interrupcionActiva?: boolean;
+  desglosadorPausa?: { subActivoId?: string } | null;
+  subVehiculos?: Array<{ status?: string }>;
+  pausas?: VehiculoPausaStamp[];
+}): number {
+  if (v.tipoReloj !== "desglosador") return 0;
+  const paused =
+    v.interrupcionActiva === true ||
+    !!v.desglosadorPausa?.subActivoId ||
+    (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
+  if (paused) return 1;
+  const resumed = (v.pausas ?? []).some(p => p.reanudadoAt != null);
+  const hasActive = (v.subVehiculos ?? []).some(s => s.status === "activo");
+  if (resumed && hasActive) return 2;
+  return 0;
+}
+
+/**
  * El padre está congelado: no cubre conciencia.
  * El hijo interrupt (vehiculoPadreDesglosadorId) no entra aquí — él sí cubre.
  */

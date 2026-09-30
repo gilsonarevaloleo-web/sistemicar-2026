@@ -1749,15 +1749,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         return;
       }
       const parent = vehiclesRef.current.find(v => v.id === parentId);
-      if (!parent?.desglosadorPausa && !parent?.interrupcionActiva) return;
+      if (!parent) return;
+      const pausedSub = parent.subVehiculos?.some(s => s.status === "nested_paused");
+      if (!parent.desglosadorPausa && !parent.interrupcionActiva && !pausedSub) return;
 
-      let patch: Partial<Vehicle>;
-      if (parent.desglosadorPausa) {
-        const nestedResume = resumeDesglosadorFromNestedPause(parent);
-        patch = nestedResume ?? { desglosadorPausa: undefined, interrupcionActiva: false };
-      } else {
-        patch = { desglosadorPausa: undefined, interrupcionActiva: false };
-      }
+      const nestedResume = resumeDesglosadorFromNestedPause(parent);
+      const patch: Partial<Vehicle> = nestedResume ?? {
+        desglosadorPausa: undefined,
+        interrupcionActiva: false,
+      };
 
       paintVehicle(parentId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);

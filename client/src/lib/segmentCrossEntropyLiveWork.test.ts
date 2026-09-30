@@ -78,4 +78,30 @@ describe("cruce de segmento: trabajo vivo Dual Kernel", () => {
       false
     );
   });
+
+  it("no auto-cierra conquista en pausa (nested_paused) al cruzar segmento", () => {
+    const { start } = segmentWindowMs("10:00", "12:00", dayStart);
+    const active = seg({ id: "b", estado: "activo", horaInicio: "10:00" });
+    const paused = vehicle({
+      id: "conq",
+      segmentoId: "a",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      subVehiculos: [{ id: "s1", titulo: "Corte", status: "nested_paused" }],
+    });
+    const { events } = evaluateSegmentCrossEntropy({
+      vehicles: [paused],
+      segmentos: [
+        seg({ id: "a", estado: "activo", horaInicio: "08:00", nombre: "A" }),
+        active,
+      ],
+      nowMs: start + CRUCE_GRACE_MIN * 60000,
+      dayStartMs: dayStart,
+      warnedVehicleIds: new Set(),
+    });
+    assert.equal(
+      events.some(e => e.type === "auto_close" && e.vehicleId === "conq"),
+      false
+    );
+  });
 });

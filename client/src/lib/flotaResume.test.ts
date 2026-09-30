@@ -330,7 +330,7 @@ describe("flotaResume", () => {
       ],
     });
     assert.equal(diskSessionRicherThanMemory(paused, running), false);
-    assert.equal(diskSessionRicherThanMemory(running, paused), false);
+    assert.equal(diskSessionRicherThanMemory(running, paused), true);
 
     const keepPause = rehydrateFlotaFromDiskSources({
       memory: [paused],
@@ -343,16 +343,36 @@ describe("flotaResume", () => {
     assert.equal(keepPause.next[0]!.interrupcionActiva, true);
     assert.equal(keepPause.next[0]!.subVehiculos?.[0]?.status, "nested_paused");
 
-    const keepRunning = rehydrateFlotaFromDiskSources({
+    const restorePause = rehydrateFlotaFromDiskSources({
       memory: [running],
       local: [paused],
       parked: [paused],
       nowMs: Date.now(),
       dayStartMs: 0,
     });
-    assert.equal(keepRunning.changed, false);
-    assert.equal(keepRunning.next[0]!.interrupcionActiva, undefined);
-    assert.equal(keepRunning.next[0]!.subVehiculos?.[0]?.status, "activo");
+    assert.equal(restorePause.changed, true);
+    assert.equal(restorePause.next[0]!.interrupcionActiva, true);
+    assert.equal(restorePause.next[0]!.subVehiculos?.[0]?.status, "nested_paused");
+
+    const resumed = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      pausas: [{ pausadoAt: 150, reanudadoAt: 400 }],
+      subVehiculos: [
+        { id: "u1", titulo: "Unidad 1", status: "activo", aperturaAt: 400 },
+        { id: "u2", titulo: "Unidad 2", status: "pendiente" },
+      ],
+    });
+    const keepResume = rehydrateFlotaFromDiskSources({
+      memory: [resumed],
+      local: [paused],
+      parked: [paused],
+      nowMs: Date.now(),
+      dayStartMs: 0,
+    });
+    assert.equal(keepResume.next[0]!.subVehiculos?.[0]?.status, "activo");
+    assert.equal(keepResume.next[0]!.interrupcionActiva, undefined);
   });
 
   it("rehydrate no resucita parked sellado ni cubre huecos posteriores", () => {
