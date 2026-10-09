@@ -20,6 +20,7 @@ import {
   cleanSubTitulo,
   getSubVehicleRecordSuggestions,
 } from "@/components/flota/vehicleCardShared";
+import { RING_BRAND } from "@/lib/flotaBrand";
 import {
   ConquistaUnitFocusOverlay,
 } from "@/components/flota/ConquistaUnitFocusOverlay";
@@ -270,7 +271,7 @@ export function ConquistaCard({
                 }}
                 data-testid="j4-conquista-fase"
               >
-                Desglosador
+                {RING_BRAND.conquista}
               </span>
               {vehicle.ancladoAlSegmento === true ? (
                 <span
@@ -286,7 +287,7 @@ export function ConquistaCard({
               ) : null}
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              {`Desglosador · secuencia · ${conquistaProgressLabel(vehicle)}`}
+              {`${RING_BRAND.conquista} · secuencia · ${conquistaProgressLabel(vehicle)}`}
               {profundidadPotencial > 0
                 ? ` · profundidad ${profundidadGanada}/${profundidadPotencial} PS`
                 : ""}

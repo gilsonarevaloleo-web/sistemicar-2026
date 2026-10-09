@@ -68,7 +68,7 @@ export const CARTA_TELEMETRIA = {
     "La Jornada no es un anotador de tareas; es telemetría en 3 datos de precisión:",
   instrumentos: [
     {
-      name: "Desglosador",
+      name: "Ring de conquista",
       text: "Cero costo de redefinición. Registras la unidad una vez y el objetivo se parametriza solo.",
     },
     {
@@ -91,7 +91,7 @@ export const CARTA_FRICCION = {
     "Al activar, lanzas un vehículo en 5 segundos. Si en medio minuto sientes la más mínima complicación, aprietas pausa, cierras la pantalla y no pasó nada.",
   c7Title: "La balanza de intercambio",
   c7:
-    "Abundan herramientas gratuitas o de $5 si lo único que buscas es una lista estática impulsada por obligación. Pero Sistemicar es un motor de ejecución operativa que transforma el trabajo en energía de reto mediante el Descenso de Conteo y el Ring de Conquista.",
+    "Abundan herramientas gratuitas o de $5 si lo único que buscas es una lista estática impulsada por obligación. Pero Sistemicar es un motor de ejecución operativa que transforma el trabajo en energía de reto mediante el Descenso de Conteo y el Ring de conquista.",
 } as const;
 
 export type EscaleraTierId = "base" | "ritmo" | "direccion";
@@ -115,7 +115,7 @@ export const CARTA_ESCALERA: readonly EscaleraTier[] = [
     badge: "Fase de pre-lanzamiento · entrada",
     bullets: [
       `Menos de $1 al día por atacar el 40% de fuga en tu producción.`,
-      "Acceso al motor de telemetría, Desglosador de Conquista y medición de unidades.",
+      "Acceso al motor de telemetría, Ring de conquista y medición de unidades.",
       "Para el operador que necesita validar su velocidad real.",
     ],
   },
@@ -127,8 +127,8 @@ export const CARTA_ESCALERA: readonly EscaleraTier[] = [
     afterNote: "Después de Base. No se compra en esta puerta.",
     bullets: [
       "Segmentación por hábitos: contenedores claros (Desarrollo, Trabajo, Familia, Almuerzo).",
-      "Desglosador de Conquista para volumen y cantidad contable.",
-      "Desglosador de Enfoque para lo intangible o el imprevisto, sin romper la secuencia del día.",
+      "Ring de conquista para volumen y cantidad contable.",
+      "Ring de enfoque para lo intangible o el imprevisto, sin romper la secuencia del día.",
     ],
   },
   {

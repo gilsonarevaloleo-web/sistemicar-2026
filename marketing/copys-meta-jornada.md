@@ -60,7 +60,7 @@ Trabajaste. Contestaste. Apagaste incendios.
 Al final no hay un cierre — solo la sensación de que el día se evaporó.
 
 Jornada Base no es un anotador de tareas.
-Es telemetría: Desglosador, Reloj Proyectivo y varianza en tiempo real.
+Es telemetría: Ring de conquista, Reloj Proyectivo y varianza en tiempo real.
 
 $24.99 al mes. Ritmo y Dirección se ofrecen después, cuando ya mides.
 

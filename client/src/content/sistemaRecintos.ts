@@ -58,9 +58,9 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     name: "Jornada",
     nameUpper: "JORNADA",
     ritual: "El día termina con un número",
-    oneLiner: "Lanzas un bloque. Cierras unidades. Evidencia, no culpa.",
+    oneLiner: "Lanzas el ring de conquista. Cierras unidades. Evidencia, no culpa.",
     detail:
-      "Entrenador de Intención Panorámica. Lanzas un bloque, cierras unidades, el día termina con un número. Ocupado no cuenta. Base · Ritmo · Norte.",
+      "Entrenador de Intención Panorámica. El ring de conquista cierra unidades; el ring de enfoque sella imprevistos. El día termina con un número. Ocupado no cuenta. Base · Ritmo · Norte.",
     color: "#22C55E",
     exploreHref: "/ventas-jornada",
     publicExplore: true,
@@ -95,7 +95,7 @@ export const SISTEMA_DIA = [
   {
     recinto: "Jornada",
     cuando: "Hay que producir",
-    gesto: "Lanzar un bloque y cerrar unidades.",
+    gesto: "Lanzar el ring de conquista y cerrar unidades.",
   },
   {
     recinto: "Umbral",

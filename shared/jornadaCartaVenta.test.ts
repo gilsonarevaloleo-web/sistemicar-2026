@@ -46,6 +46,19 @@ describe("jornadaCartaVenta", () => {
     assert.equal(CARTA_PRECIO_RITMO_USD, stackRitmo.totalUsd);
     assert.equal(CARTA_PRECIO_DIRECCION_USD, PLANIFICACION_FULL_MONTHLY_USD);
   });
+
+  it("Base vende ring de conquista; Ritmo nombra el ring de enfoque", () => {
+    const text = cartaVentaPublicText();
+    const base = CARTA_ESCALERA.find((t) => t.id === "base")!;
+    const ritmo = CARTA_ESCALERA.find((t) => t.id === "ritmo")!;
+    assert.match(text, /Ring de conquista/);
+    assert.match(text, /Ring de enfoque/);
+    assert.doesNotMatch(text, /Desglosador/);
+    assert.match(base.bullets.join(" "), /Ring de conquista/);
+    assert.doesNotMatch(base.bullets.join(" "), /Ring de enfoque/);
+    assert.match(ritmo.bullets.join(" "), /Ring de conquista/);
+    assert.match(ritmo.bullets.join(" "), /Ring de enfoque/);
+  });
 });
 
 describe("ventas-jornada carta", () => {

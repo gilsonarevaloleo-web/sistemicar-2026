@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   FLOTA_BRAND,
   FLOTA_SELECTOR_DISCRIMINATOR,
+  RING_BRAND,
   flotaLabelUpper,
   flotaLabelsRecord,
 } from "./flotaBrand.ts";
@@ -16,6 +17,13 @@ describe("flotaBrand", () => {
   it("situacion se muestra como ENFOQUE", () => {
     assert.equal(flotaLabelUpper("situacion"), "ENFOQUE");
     assert.match(FLOTA_BRAND.situacion.sublabel, /ring/i);
+  });
+
+  it("el par de rings queda nombrado en Conquista y Enfoque", () => {
+    assert.equal(RING_BRAND.conquista, "Ring de conquista");
+    assert.equal(RING_BRAND.enfoque, "Ring de enfoque");
+    assert.match(FLOTA_BRAND.tiempo.sublabel, /Ring de conquista/);
+    assert.match(FLOTA_BRAND.situacion.sublabel, /ring de enfoque/i);
   });
 
   it("discriminador orienta medir vs sellar", () => {

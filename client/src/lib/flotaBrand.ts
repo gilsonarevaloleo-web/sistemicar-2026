@@ -4,6 +4,15 @@ import type { TipoFlota } from "./persistence";
 export const FLOTA_SELECTOR_DISCRIMINATOR =
   "¿Vas a medir unidades o a sellar decisiones con tiempo?";
 
+/**
+ * Par público de instrumentos. La carta de venta y Dual Kernel usan los mismos nombres:
+ * Conquista cierra unidades; Enfoque sella imprevistos con tiempo.
+ */
+export const RING_BRAND = {
+  conquista: "Ring de conquista",
+  enfoque: "Ring de enfoque",
+} as const;
+
 export type FlotaBrandEntry = {
   label: string;
   labelUpper: string;
@@ -18,7 +27,7 @@ export const FLOTA_BRAND: Record<TipoFlota, FlotaBrandEntry> = {
   tiempo: {
     label: "Conquista",
     labelUpper: "CONQUISTA",
-    sublabel: "Desglosador · misión + unidades",
+    sublabel: "Ring de conquista · misión + unidades",
     relojLabel: "Reloj proyectivo",
     psCierre: "PS al cumplir objetivo",
     vehiclePhrase: "conquista",
@@ -26,7 +35,7 @@ export const FLOTA_BRAND: Record<TipoFlota, FlotaBrandEntry> = {
   situacion: {
     label: "Enfoque",
     labelUpper: "ENFOQUE",
-    sublabel: "Reloj simple o ring con meta",
+    sublabel: "Lista libre o ring de enfoque",
     relojLabel: "Meta y cupos",
     psCierre: "2 PS por subtarea (+ cierre ciclo)",
     vehiclePhrase: "enfoque",

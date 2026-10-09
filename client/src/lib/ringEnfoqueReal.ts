@@ -1,3 +1,4 @@
+import { RING_BRAND } from "./flotaBrand";
 import type { SubTarea, Vehicle } from "./persistence";
 
 /** Minutos de holgura en meta para invitar a nueva ronda o vehículo. */
@@ -5,28 +6,28 @@ export const RING_SOBRA_INVITACION_MIN = 20;
 
 export const RING_COPY = {
   taller: "Taller",
-  ring: "Ring de enfoque real",
-  abrirRing: "Abrir ring de enfoque real",
+  ring: RING_BRAND.enfoque,
+  abrirRing: "Abrir ring de enfoque",
   siguienteRonda: "Siguiente ronda",
   sellarEnRing: "Sellar en ring (con tiempo)",
-  cerrarRing: "Cerrar ring de enfoque real",
+  cerrarRing: "Cerrar ring de enfoque",
   cerrarRingGolpe: "Cerrar ring de golpe",
   anadirAlRing: "Añadir al ring de enfoque",
   sellarDirectoRing: "Sellar en ring",
   quitarDelPlan: "Quitar de lista",
   quitarDelPlanHint:
-    "Elimina esta fila del ring. El tiempo no se posterga ni se monta en el foco.",
+    "Elimina esta fila del ring de enfoque. El tiempo no se posterga ni se monta en el foco.",
   rondaLista: "Ronda lista — cierra el ring cuando quieras",
   tallerHint:
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",
   ringHint:
-    "El ring es limitado — sella aquí solo lo que vas a sostener con tiempo. El resto ciérralo en Taller sin reloj.",
+    "El ring de enfoque es limitado — sella aquí solo lo que vas a sostener con tiempo. El resto ciérralo en Taller sin reloj.",
 } as const;
 
 export function ringBienvenidaParts(retoNumero: number): string[] {
   if (retoNumero > 1) {
     return [
-      "Siguiente ronda. Ring de enfoque real.",
+      "Siguiente ronda. Ring de enfoque.",
       "Sostén cada decisión con tiempo sellado.",
     ];
   }

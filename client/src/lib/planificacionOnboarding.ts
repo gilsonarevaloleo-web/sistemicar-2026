@@ -1,5 +1,5 @@
 import { JORNADA_MODULE } from "./jornadaBrand";
-import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR } from "./flotaBrand";
+import { FLOTA_BRAND, FLOTA_SELECTOR_DISCRIMINATOR, RING_BRAND } from "./flotaBrand";
 import { SISTEMICAR_CATEGORY } from "./sistemicarCategory";
 
 /** base | ritmo | norte — aliases legacy: produccion→ritmo, estudiante→norte */
@@ -63,7 +63,7 @@ const STEPS_BASE: TutorialStep[] = [
   {
     title: "Conquista = unidades con veredicto",
     description:
-      `${FLOTA_SELECTOR_DISCRIMINATOR} **${FLOTA_BRAND.tiempo.label}** mide cantidad y ritmo. Cada sub se cierra cumplido o fallado. Sin cierre no hay PS.`,
+      `${FLOTA_SELECTOR_DISCRIMINATOR} **${FLOTA_BRAND.tiempo.label}** abre el **${RING_BRAND.conquista.toLowerCase()}**: mide cantidad y ritmo. Cada sub se cierra cumplido o fallado. Sin cierre no hay PS.`,
     action: `Lanza un vehículo de ${FLOTA_BRAND.tiempo.label} con algo concreto de hoy.`,
   },
   {
@@ -90,7 +90,7 @@ const STEPS_RITMO_EXTRA: TutorialStep[] = [
   {
     title: "Situacional / Enfoque",
     description:
-      `**${FLOTA_BRAND.situacion.label}** = ring, cupos e imprevistos. Ideal cuando nadie te marca la agenda.`,
+      `**${FLOTA_BRAND.situacion.label}** = ${RING_BRAND.enfoque.toLowerCase()}, cupos e imprevistos. Ideal cuando nadie te marca la agenda.`,
     action: "Crea un vehículo Situacional y cierra al menos un bloque.",
   },
 ];
@@ -146,7 +146,7 @@ export function getPrimerDiaItems(profile: PlanificacionPlanProfile): PrimerDiaI
     {
       key: "desglosador",
       label: "Cerré al menos un sub de Conquista",
-      hint: "Desglosador conquista → subs por unidades.",
+      hint: `${RING_BRAND.conquista} → subs por unidades.`,
       requires: "desglosador",
     },
   ];
