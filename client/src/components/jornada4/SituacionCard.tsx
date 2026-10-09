@@ -10,6 +10,7 @@ import {
   situacionFilaCronometroPendiente,
 } from "@/lib/situacionCupoDistrib";
 import { situacionContratoFinMs } from "@/lib/situacionGanancia";
+import { RING_BRAND } from "@/lib/flotaBrand";
 import { RING_COPY } from "@/lib/ringEnfoqueReal";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import {
@@ -159,7 +160,7 @@ export function SituacionCard({
               ) : null}
             </div>
             <p className="text-[10px] mt-1" style={{ color: MUTED }}>
-              Ring · {situacionProgressLabel(vehicle)}
+              {RING_BRAND.enfoque} · {situacionProgressLabel(vehicle)}
               {remBudget != null ? ` · cupo ${remBudget} min` : ""}
               {vehicle.criterioDetalle ? ` · ${vehicle.criterioDetalle}` : ""}
             </p>
@@ -352,7 +353,7 @@ export function SituacionCard({
             }}
           >
             <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
-              Ring sin filas pendientes
+              Ring de enfoque sin filas pendientes
             </p>
             {onDestinoChange ? (
               <DestinoCierreToggle
@@ -391,7 +392,7 @@ export function SituacionCard({
           </div>
         ) : (
           <p className="mt-3 text-sm" style={{ color: MUTED }}>
-            Ring sin filas. Lanza de nuevo con filas, o cierra el bloque.
+            Ring de enfoque sin filas. Lanza de nuevo con filas, o cierra el bloque.
           </p>
         )}
 

@@ -218,7 +218,7 @@ export async function executeJornada4Launch(
   const firstFila = (situacionFilas ?? []).map(f => f.trim()).find(Boolean);
   const situacionTitulo =
     baseForm.tipoFlota === "situacion"
-      ? baseForm.titulo.trim() || firstFila || (modo === "rapido" ? "Lista libre" : "Ring")
+      ? baseForm.titulo.trim() || firstFila || (modo === "rapido" ? "Lista libre" : "Ring de enfoque")
       : baseForm.titulo;
 
   // Ring / lista libre: semilla ANTES del launch para paint + remote atómicos.

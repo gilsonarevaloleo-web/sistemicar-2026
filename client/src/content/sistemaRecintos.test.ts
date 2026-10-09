@@ -20,6 +20,9 @@ describe("sistemaRecintos — oferta actual", () => {
       `${espejo?.detail} ${espejo?.oneLiner}`,
       /Doctor IA|créditos|vaciado mental/i,
     );
+    const jornada = SISTEMA_RECINTOS.find((r) => r.id === "jornada");
+    assert.match(`${jornada?.oneLiner} ${jornada?.detail}`, /ring de conquista/i);
+    assert.match(`${jornada?.detail}`, /ring de enfoque/i);
   });
 
   it("cada recinto tiene ritual, detalle y un día encaja", () => {

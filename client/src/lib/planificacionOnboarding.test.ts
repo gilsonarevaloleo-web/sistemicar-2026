@@ -43,6 +43,7 @@ describe("planificacionOnboarding", () => {
     assert.ok(step, "falta el paso de Conquista/Flota");
     assert.doesNotMatch(step!.description, /4 ejes|Express|Profundo|conflicto.*alcance/i);
     assert.match(step!.description, /Conquista|Enfoque/i);
+    assert.match(step!.description, /ring de conquista/i);
   });
 
   it("isPrimerDiaComplete exige todos los pasos del perfil", () => {

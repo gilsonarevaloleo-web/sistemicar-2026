@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SubTarea } from "./persistence";
+import { RING_BRAND } from "./flotaBrand";
 import {
+  RING_COPY,
   buildSituacionCronometroPausaInactividad,
   filtrarRingPendientes,
   liberarRingPendientesAlTaller,
@@ -15,6 +17,11 @@ describe("ringEnfoqueReal", () => {
     const parts = ringBienvenidaParts(1);
     expect(parts[0]).toContain("entrenamiento de enfoque real");
     expect(parts.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("el nombre público del ring de enfoque queda sincronizado", () => {
+    expect(RING_COPY.ring).toBe(RING_BRAND.enfoque);
+    expect(ringBienvenidaParts(2)[0]).toContain(RING_BRAND.enfoque);
   });
 
   it("ringTiempoSobraParts menciona minutos sobrantes", () => {

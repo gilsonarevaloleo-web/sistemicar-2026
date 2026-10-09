@@ -8,7 +8,7 @@ const STEPS = [
   {
     n: "1",
     title: "Toca Conquista",
-    hint: "No Enfoque. Conquista mide unidades.",
+    hint: "No Enfoque. El ring de conquista mide unidades.",
   },
   {
     n: "2",

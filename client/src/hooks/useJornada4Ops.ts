@@ -772,7 +772,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             );
           }
           if (patch.bloqueListo) {
-            toast.message("Ring listo — cierra el bloque", { duration: 3200 });
+            toast.message("Ring de enfoque listo — cierra el bloque", { duration: 3200 });
           }
         } catch (e) {
           console.error("[jornada4.closeSituacionRow] PS", e);
@@ -884,8 +884,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             : " · presencia";
           toast.success(
             awarded > 0
-              ? `Ring cerrado · +${awarded} PS${hubNote}`
-              : `Ring cerrado${hubNote}`,
+              ? `Ring de enfoque cerrado · +${awarded} PS${hubNote}`
+              : `Ring de enfoque cerrado${hubNote}`,
             {
               style: {
                 backgroundColor: PIZARRA,
@@ -1576,7 +1576,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           },
         });
         if (patch.bloqueListo) {
-          toast.message("Ring listo — cierra el bloque", { duration: 3200 });
+          toast.message("Ring de enfoque listo — cierra el bloque", { duration: 3200 });
         }
 
         void runShadowTaskAsync(async () => {

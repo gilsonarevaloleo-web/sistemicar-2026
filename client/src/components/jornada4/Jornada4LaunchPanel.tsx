@@ -43,6 +43,7 @@ import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPi
 import type { Proyecto } from "@/lib/proyectos";
 import { J4_COLORS } from "./Jornada4Shell";
 import { ENTRENAMIENTO_COPY } from "@/jornada4/entrenamientoRestricciones";
+import { RING_BRAND } from "@/lib/flotaBrand";
 import { isJ4GpsClipsEnabled } from "@/jornada4/gpsClipPref";
 import {
   playJ4GpsClip,
@@ -680,7 +681,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         },
                         {
                           id: "desglose" as const,
-                          label: "Ring",
+                          label: RING_BRAND.enfoque,
                           hint: "Filas + meta sellada",
                           icon: ListTodo,
                         },
@@ -744,11 +745,11 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       {subs.filter(s => s.titulo.trim()).length > 1 &&
                       conquistaMultiModo === "independientes"
                         ? "Independientes · sin secuencia"
-                        : "Desglosador · secuencia"}
+                        : `${RING_BRAND.conquista} · secuencia`}
                     </p>
                     <p className="text-[8px] leading-snug" style={{ color: MUTED }}>
                       Unidades con cantidad y récord. El rumbo va al proyecto. Al añadir
-                      2+ unidades puedes elegir secuencia (un desglosador) o independientes.
+                      2+ unidades puedes elegir secuencia (un ring de conquista) o independientes.
                     </p>
                   </div>
                   )}
@@ -1111,7 +1112,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                           className="text-[10px] font-black uppercase tracking-wider"
                           style={{ color: ORANGE }}
                         >
-                          Unidades del desglosador
+                          Unidades del ring de conquista
                         </p>
                         <p className="text-[8px]" style={{ color: MUTED }}>
                           Nombre · Cantidad · Récord
@@ -1131,7 +1132,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                               {
                                 id: "secuencia" as const,
                                 label: "Secuencia",
-                                hint: "Un desglosador · orden fijo",
+                                hint: "Un ring · orden fijo",
                               },
                               {
                                 id: "independientes" as const,
@@ -1702,10 +1703,10 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                       ? conquistaMultiModo === "independientes" &&
                         subs.filter(s => s.titulo.trim()).length > 1
                         ? "Lanzar independientes"
-                        : "Lanzar desglosador"
+                        : `Lanzar ${RING_BRAND.conquista.toLowerCase()}`
                       : modo === "rapido"
                         ? "Lanzar lista libre"
-                        : "Lanzar ring"}
+                        : `Lanzar ${RING_BRAND.enfoque.toLowerCase()}`}
                 </button>
               </div>
             ) : null}

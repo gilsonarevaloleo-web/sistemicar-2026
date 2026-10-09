@@ -93,7 +93,7 @@ export default function VentasJornada() {
             QUÉ HACE BASE
           </p>
           <ul className="mt-3 space-y-2.5 text-sm text-white/80">
-            <li>Lanzas un bloque de trabajo — no otra lista infinita.</li>
+            <li>Lanzas el ring de conquista — no otra lista infinita.</li>
             <li>Cierras unidades. Ocupado no cuenta.</li>
             <li>El día termina con evidencia, no con culpa.</li>
           </ul>

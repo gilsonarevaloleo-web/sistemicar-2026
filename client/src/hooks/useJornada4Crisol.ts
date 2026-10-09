@@ -366,13 +366,13 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
           duration: 3200,
         });
       } else if (result.mode === "open_ring") {
-        toast.success("Ring abierto desde El Crisol", {
+        toast.success("Ring de enfoque abierto desde El Crisol", {
           description: `${item.texto} · ${rumboCopy}`,
           style: toastStyle,
           duration: 3200,
         });
       } else {
-        toast.success("Añadido a la cola del ring", {
+        toast.success("Añadido a la cola del ring de enfoque", {
           description: `${item.texto} · ${rumboCopy}`,
           style: toastStyle,
           duration: 3200,
