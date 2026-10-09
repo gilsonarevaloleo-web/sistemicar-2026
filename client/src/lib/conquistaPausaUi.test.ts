@@ -33,6 +33,19 @@ describe("conquista pausa UI — directa y justificada, sin vehículo sombra", (
     assert.match(list, /isPausedPresence/);
   });
 
+  it("una sola pausa de conquista: el ops consulta el cupo", () => {
+    const start = ops.indexOf("const pausaInterrupcion");
+    const end = ops.indexOf("const labelPausaConquista");
+    assert.ok(start >= 0 && end > start);
+    const fn = ops.slice(start, end);
+    assert.match(fn, /canOpenConquistaPausa/);
+    assert.match(fn, /CONQUISTA_PAUSA_UNICA_TOAST/);
+    assert.match(list, /pausaBloqueadaPor/);
+    assert.match(list, /findOtraConquistaPausa/);
+    assert.match(card, /data-testid="j4-conquista-pausa-unica"/);
+    assert.match(card, /Una sola pausa/);
+  });
+
   it("el ops de pausa no crea hijo de interrupción", () => {
     const start = ops.indexOf("const pausaInterrupcion");
     const end = ops.indexOf("const labelPausaConquista");

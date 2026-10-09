@@ -94,6 +94,8 @@ type Props = {
   onAddSub?: (form: AddSubForm) => void;
   onAddSubs?: (forms: AddSubForm[]) => void;
   onPausaInterrupcion?: (titulo?: string) => void;
+  /** Título de la otra conquista que ya ocupa la única pausa. */
+  pausaBloqueadaPor?: string;
   onLabelPausa?: (titulo: string) => void;
   onResumeDesglosador?: () => void;
   onArchivarPausa?: () => void;
@@ -109,6 +111,7 @@ export function ConquistaCard({
   onAddSub,
   onAddSubs,
   onPausaInterrupcion,
+  pausaBloqueadaPor,
   onLabelPausa,
   onResumeDesglosador,
   onArchivarPausa,
@@ -697,11 +700,20 @@ export function ConquistaCard({
 
               {!paused && onPausaInterrupcion ? (
                 <div className="mb-1 space-y-1.5">
+                  {pausaBloqueadaPor ? (
+                    <p
+                      className="text-[8px] text-center uppercase tracking-wider leading-snug"
+                      style={{ color: "rgba(0,255,195,0.75)" }}
+                      data-testid="j4-conquista-pausa-unica"
+                    >
+                      Una sola pausa · reanuda {pausaBloqueadaPor} primero
+                    </p>
+                  ) : null}
                   <button
                     type="button"
-                    disabled={pausaEnviando}
+                    disabled={pausaEnviando || Boolean(pausaBloqueadaPor)}
                     onClick={() => {
-                      if (pausaEnviando) return;
+                      if (pausaEnviando || pausaBloqueadaPor) return;
                       setPausaEnviando(true);
                       setShowPausaForm(false);
                       setPausaTitulo("");
@@ -727,8 +739,11 @@ export function ConquistaCard({
                   {!showPausaForm ? (
                     <button
                       type="button"
-                      disabled={pausaEnviando}
-                      onClick={() => setShowPausaForm(true)}
+                      disabled={pausaEnviando || Boolean(pausaBloqueadaPor)}
+                      onClick={() => {
+                        if (pausaBloqueadaPor) return;
+                        setShowPausaForm(true);
+                      }}
                       className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider touch-manipulation disabled:opacity-60"
                       style={{
                         backgroundColor: "transparent",
@@ -760,10 +775,14 @@ export function ConquistaCard({
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          disabled={pausaEnviando || !pausaTitulo.trim()}
+                          disabled={
+                            pausaEnviando ||
+                            Boolean(pausaBloqueadaPor) ||
+                            !pausaTitulo.trim()
+                          }
                           onClick={() => {
                             const titulo = pausaTitulo.trim();
-                            if (!titulo || pausaEnviando) return;
+                            if (!titulo || pausaEnviando || pausaBloqueadaPor) return;
                             setPausaEnviando(true);
                             try {
                               navigator.vibrate?.(14);

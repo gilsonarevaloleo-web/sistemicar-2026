@@ -97,6 +97,9 @@ import { resumeDesglosadorFromNestedPause } from "@/lib/nestedContextStack";
 import {
   buildConquistaPauseLabelPatch,
   buildConquistaPausePatch,
+  canOpenConquistaPausa,
+  CONQUISTA_PAUSA_UNICA_TOAST,
+  conquistaPausaUnicaHint,
 } from "@/lib/conquistaPausa";
 import {
   PAUSA_INTERRUPCION_TITULO,
@@ -1670,6 +1673,20 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       if (inFlightRef.current.has(key)) return;
       const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
       if (!vehicle || !isConquistaDesglosador(vehicle) || vehicle.interrupcionActiva) return;
+
+      const gate = canOpenConquistaPausa(vehiclesRef.current, vehicleId);
+      if (!gate.ok) {
+        toast.error(CONQUISTA_PAUSA_UNICA_TOAST, {
+          description: conquistaPausaUnicaHint(gate.occupiedBy.titulo),
+          duration: 4200,
+          style: {
+            backgroundColor: PIZARRA,
+            border: `1px solid ${CYAN}`,
+            color: CYAN,
+          },
+        });
+        return;
+      }
 
       const pausedPatch = buildConquistaPausePatch(vehicle, titulo);
       if (!pausedPatch) {
