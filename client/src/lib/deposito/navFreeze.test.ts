@@ -49,6 +49,21 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(src, /p === "\/esperanza"/);
     assert.match(src, /p\.startsWith\("\/esperanza\/"\)/);
     assert.match(src, /p === "\/deposito"/);
+    assert.match(src, /p === "\/deposito-v3"/);
+  });
+
+  it("Depósito V3 es laboratorio paralelo, no reemplaza /esperanza", () => {
+    const src = readFromClient("App.tsx");
+    assert.match(src, /path="\/deposito-v3"/);
+    assert.match(src, /import\("@\/pages\/deposito-v3"\)/);
+    const page = readFromClient("pages/deposito-v3.tsx");
+    assert.match(page, /data-testid="deposito-v3-page"/);
+    assert.match(page, /FormularioAuditoriaV3/);
+    assert.match(page, /MapaCalorV3/);
+    assert.match(page, /DictamenCardV3/);
+    assert.match(page, /auditarVolcadoV3|FormularioAuditoriaV3/);
+    assert.doesNotMatch(page, /FormularioVolcadoExpansivo/);
+    assert.doesNotMatch(page, /\/api\/deposito\/volcado/);
   });
 
   it("/deposito redirige a /esperanza", () => {
