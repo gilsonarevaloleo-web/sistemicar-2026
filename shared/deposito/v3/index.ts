@@ -1,6 +1,6 @@
 /**
- * Depósito V3 — contratos públicos.
- * No reexporta el motor V2. No registra rutas. No pinta UI.
+ * Depósito V3 — contratos + motor de auditoría.
+ * No reexporta el motor V2. No pinta UI.
  */
 
 export { DEPOSITO_V3_VERSION } from "./types.ts";
@@ -62,3 +62,24 @@ export {
   scaffoldAnalysisResult,
   validarPayload,
 } from "./validar.ts";
+
+export {
+  DEPOSITO_V3_RITUAL,
+  buildDepositoV3SystemPrompt,
+  buildDepositoV3UserPrompt,
+  serializarPromptAuditoria,
+} from "./prompt.ts";
+
+export {
+  diagnosticarAuditoriaLocal,
+  procesarAuditoriaV3,
+} from "./motor.ts";
+export type { GeminiAuditCaller, ResultadoAuditoriaV3 } from "./motor.ts";
+
+export { evaluarDepositoV3 } from "./evaluar.ts";
+export type {
+  EvaluarDepositoV3Err,
+  EvaluarDepositoV3Input,
+  EvaluarDepositoV3Ok,
+  EvaluarDepositoV3Result,
+} from "./evaluar.ts";

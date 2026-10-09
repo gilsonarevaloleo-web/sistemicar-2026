@@ -8,6 +8,7 @@ import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "../server/merc
 import { isEspejoSkuId } from "../shared/espejoPricing";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
 import { registerDepositoV2Routes } from "../server/depositoV2Routes";
+import { registerDepositoV3Routes } from "../server/depositoV3Routes";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -60,6 +61,9 @@ registerUmbralV2Routes(app, {
   sessionStore: createDefaultUmbralSessionStore(),
 });
 registerDepositoV2Routes(app, {
+  callGemini: callGeminiUmbral,
+});
+registerDepositoV3Routes(app, {
   callGemini: callGeminiUmbral,
 });
 
