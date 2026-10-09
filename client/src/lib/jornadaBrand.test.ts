@@ -56,6 +56,10 @@ describe("jornadaBrand", () => {
   it("casas de escritura/consola callan el shell (no 10 webs: 10 recintos quietos)", () => {
     assert.equal(isAppShellQuietPath("/esperanza"), true);
     assert.equal(isAppShellQuietPath("/deposito"), true);
+    assert.equal(isAppShellQuietPath("/deposito-v2"), true);
+    assert.equal(isAppShellQuietPath("/deposito-v3"), true);
+    assert.equal(isHouseRecintoPath("/deposito-v2"), true);
+    assert.equal(isHouseRecintoPath("/deposito-v3"), true);
     assert.equal(isAppShellQuietPath("/espejo"), true);
     assert.equal(isAppShellQuietPath("/espejo/v2"), true);
     assert.equal(isAppShellQuietPath("/umbral/v2"), true);

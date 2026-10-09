@@ -558,11 +558,14 @@ function Router() {
         <Route path="/deposito">
           <Redirect to="/esperanza" />
         </Route>
-        <Route path="/esperanza">
-          <ProtectedRoute component={Esperanza} />
-        </Route>
         <Route path="/deposito-v3">
+          <Redirect to="/esperanza" />
+        </Route>
+        <Route path="/esperanza">
           <ProtectedRoute component={DepositoV3} />
+        </Route>
+        <Route path="/deposito-v2">
+          <ProtectedRoute component={Esperanza} />
         </Route>
         <Route path="/rewards">
           <ProtectedRoute component={Rewards} />
@@ -712,6 +715,8 @@ function VoiceBootstrap() {
         p.startsWith("/esperanza/") ||
         p === "/deposito" ||
         p.startsWith("/deposito/") ||
+        p === "/deposito-v2" ||
+        p.startsWith("/deposito-v2/") ||
         p === "/deposito-v3" ||
         p.startsWith("/deposito-v3/") ||
         p === "/pagos" ||

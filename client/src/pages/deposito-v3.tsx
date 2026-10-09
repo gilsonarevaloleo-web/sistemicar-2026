@@ -54,16 +54,16 @@ export default function DepositoV3Page() {
             style={{ color: GOLD }}
             data-testid="deposito-v3-badge"
           >
-            UNIVERSIDAD · DEPÓSITO V3 · LABORATORIO
+            UNIVERSIDAD · DEPÓSITO V3
           </p>
           <h1 className="text-3xl font-light tracking-tight md:text-4xl">
             {DEPOSITO_V3_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El dictamen es óptica + carácter + Δ. V2 sigue en su recinto.
+            El dictamen es óptica + carácter + Δ. V2 queda en su recinto.
           </p>
           <Link
-            href="/esperanza"
+            href="/deposito-v2"
             className="mt-4 inline-block text-[10px] uppercase tracking-[0.2em] text-white/35 hover:text-white/70"
             data-testid="deposito-v3-volver-v2"
           >

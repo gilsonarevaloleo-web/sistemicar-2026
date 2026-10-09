@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
 import { toast } from "sonner";
 import { useAuthContext } from "@/App";
 import { PaywallUniversidad } from "@/components/deposito/PaywallUniversidad";
@@ -425,6 +426,13 @@ export default function Esperanza() {
           <p className="mt-3 text-sm text-white/45">
             Volcá el día. Crudo. El ruido también es ojo. El Muro nombra uno.
           </p>
+          <Link
+            href="/esperanza"
+            className="mt-4 inline-block text-[10px] uppercase tracking-[0.2em] text-white/35 hover:text-white/70"
+            data-testid="deposito-v2-ir-v3"
+          >
+            Ir a Depósito V3
+          </Link>
           <p
             className="mt-2 text-[10px] tracking-[0.22em]"
             style={{ color: GOLD }}
