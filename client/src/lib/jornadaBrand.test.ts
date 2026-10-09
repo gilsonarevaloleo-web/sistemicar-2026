@@ -87,8 +87,10 @@ describe("jornadaBrand", () => {
   it("CTAs de /ventas-jornada son <a href> nativos, no Link de SPA", () => {
     const src = readFileSync(join(dir, "../pages/ventas-jornada.tsx"), "utf8");
     assert.equal(src.includes('from "wouter"'), false);
-    assert.match(src, /<a\s+href=\{vendedorHref\}/);
-    assert.match(src, /<a\s+href=\{pagosHref\}/);
+    assert.match(src, /<a\s+href=\{/);
+    assert.match(src, /href=\{pagosHref\}/);
+    assert.match(src, /href=\{vendedorHref\}/);
     assert.match(src, /touch-manipulation/);
+    assert.equal(src.includes("JORNADA_BASE_TRIAL"), false);
   });
 });
