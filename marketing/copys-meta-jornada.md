@@ -1,10 +1,13 @@
 # Copy Meta — Jornada Base (2 videos, 1 campaña)
 
-**Versión:** 2.0 · septiembre 2026  
-**Producto:** Jornada Base · 7 días gratis, después $24.99/mes · 500 PS = Base gratis
+**Versión:** 3.0 · octubre 2026  
+**Producto:** Jornada Base · $24.99/mes · telemetría de unidades  
+**Carta:** `/ventas-jornada`
 
 Una campaña `jornada_base_dia_sin_numero`. Un conjunto. **Dos anuncios.**  
 El clic siempre va a `/ventas-jornada`. No uses `/pagos`, `/vendedor` ni `/bienvenida`.
+
+Las URLs `video_a` / `video_b` no se tocan si cambias el archivo del video.
 
 ---
 
@@ -30,38 +33,38 @@ Facebook agrega `fbclid` solo; no lo escribas tú.
 ## Texto (el mismo en A y B)
 
 **Título / gancho (primera línea, ≤ 10 palabras)**  
-El día se te fue sin un número.
+No tienes un problema de disciplina.
 
 **Texto corto** (lo que se ve antes de “Ver más”):
 
 ```
-El día se te fue sin un número.
+No tienes un problema de disciplina.
+Tienes una fuga invisible en la telemetría de tu tiempo.
 
-Trabajaste. Contestaste. Apagaste incendios.
-Al final no sabes cuánto cerraste.
+Las listas te dejaron una mancha mental.
+Jornada Base no es otra lista: lanzas un bloque, mides unidades
+y el día termina con evidencia.
 
-Jornada Base: 7 días gratis. Mides unidades y el día termina con evidencia.
-Después $24.99 al mes. Si llegas a 500 puntos, te queda gratis.
+$24.99 al mes. Ritmo y Dirección vienen después, cuando ya mides.
 
-Toca. Empieza el trial o pide que te llame el vendedor.
+Toca. Activa Base o pide que te llame el vendedor.
 ```
 
 **Texto largo** (si Meta pide cuerpo extendido):
 
 ```
-El día se te fue sin un número.
+No tienes un problema de disciplina.
+Tienes una fuga invisible en la telemetría de tu tiempo.
 
 Trabajaste. Contestaste. Apagaste incendios.
 Al final no hay un cierre — solo la sensación de que el día se evaporó.
 
-Jornada Base no es otra lista.
-Lanzas un bloque, cierras unidades y el día termina con evidencia, no con culpa.
+Jornada Base no es un anotador de tareas.
+Es telemetría: Ring de conquista, Reloj Proyectivo y varianza en tiempo real.
 
-7 días gratis. Después $24.99 al mes.
-Si llegas a 500 puntos de soberanía, Jornada Base te queda gratis.
-Ritmo y proyectos vienen después, cuando ya mides.
+$24.99 al mes. Ritmo y Dirección se ofrecen después, cuando ya mides.
 
-Toca y entra. O pide que te llame el vendedor.
+Toca y activa. O pide que te llame el vendedor.
 ```
 
 **CTA del anuncio (en Meta):**  
@@ -69,7 +72,7 @@ Toca y entra. O pide que te llame el vendedor.
 No elijas “Comprar” ni “Enviar mensaje de WhatsApp”.
 
 **Descripción opcional (enlace):**  
-Cierra el día con unidades, no con culpa.
+Telemetría de unidades. El día termina con evidencia.
 
 **Emojis:** ninguno en el gancho. Si quieres uno, un solo ⚡ al final del cuerpo.
 
@@ -80,13 +83,14 @@ Cierra el día con unidades, no con culpa.
 Sube **tu** archivo en cada anuncio (Ads Manager). Un video = un anuncio.  
 No armes un carrusel con los dos. No pongas el video en la landing.
 
-Si más adelante quieres un gancho distinto por video, cambia solo la primera línea.  
-Las URLs de arriba no se tocan.
+Los dos videos viejos (día sin número / trial) se pausan.  
+Los nuevos usan las **mismas URLs** `video_a` y `video_b`.
 
 ---
 
 ## Lo que NO se publica todavía
 
-- Ritmo / Norte
+- Ritmo / Dirección (carta propia, después)
 - Un tercer anuncio “por si acaso”
 - Destino WhatsApp o `/pagos` directo
+- “7 días gratis” ni “500 PS = Base gratis”

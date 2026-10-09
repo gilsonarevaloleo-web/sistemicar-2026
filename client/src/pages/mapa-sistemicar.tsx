@@ -31,7 +31,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/espejo", nombre: "Espejo Soberano", desc: "Vaciado mental · Doctor IA", icon: Heart, color: "#ef4444", acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
-      { path: "/esperanza", nombre: "Depósito V2", desc: "Universidad — 1 volcado G1 de prueba, después Matrícula", icon: Star, color: EMERALD, acceso: "usuario" },
+      { path: "/esperanza", nombre: "Depósito V3", desc: "Universidad — óptica + carácter + Δ", icon: Star, color: EMERALD, acceso: "usuario" },
     ]
   },
   {
@@ -70,7 +70,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     titulo: "Comercio y Acceso",
     color: ORANGE,
     rutas: [
-      { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Landing anuncio Base → vendedor o checkout", icon: ExternalLink, color: GOLD, acceso: "libre" },
+      { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Carta de venta Base → checkout o vendedor", icon: ExternalLink, color: GOLD, acceso: "libre" },
       { path: "/ventas-deposito", nombre: "Ventas Universidad", desc: "Landing Matrícula → 1 volcado de prueba o checkout", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/embudo", nombre: "Embudo SISTEMICAR", desc: "Funnel de ventas principal", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/umbral", nombre: "Umbral", desc: "Página de entrada y conversión", icon: Lock, color: GOLD, acceso: "en_camino" },
@@ -122,7 +122,7 @@ export default function MapaSistemicar() {
 
         <div className="p-3 rounded-xl border mb-4 flex items-center gap-3" style={{ backgroundColor: `${GOLD}05`, borderColor: `${GOLD}15` }}>
           <Map size={16} style={{ color: GOLD }} />
-          <p className="text-[10px] text-slate-400">Precios hoy: Jornada Base 7 días gratis, después $24.99/mes (500 PS = gratis) · Ritmo del día $29.99/mes · Norte $34.99/mes</p>
+          <p className="text-[10px] text-slate-400">Precios hoy: Jornada Base $24.99/mes · Ritmo del día $29.99/mes · Norte $34.99/mes</p>
         </div>
 
         <div className="flex gap-2 mb-4 flex-wrap">

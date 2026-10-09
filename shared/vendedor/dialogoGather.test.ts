@@ -60,6 +60,7 @@ describe("Vendedor diálogo Gather (humano, Jornada Base)", () => {
     assert.match(t.ctaSi, /WhatsApp/i);
     assert.match(t.ctaNo, /WhatsApp/i);
     assert.match(t.ctaSiSinWhatsapp, /WhatsApp|sistemicar/i);
+    assert.doesNotMatch(t.ctaSi + t.ctaSiSinWhatsapp, /siete días|7 días|quinientos puntos/i);
   });
 
   it("parseGatherChoice lee dígitos y habla corta", () => {

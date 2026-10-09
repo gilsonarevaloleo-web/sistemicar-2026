@@ -18,6 +18,7 @@ import {
   clampCodigoJornadaBase,
   type CodigoJornadaBase,
 } from "./triageLogic.ts";
+import { CARTA_CIERRE_VOZ } from "../jornadaCartaVenta.ts";
 
 export type DialogStep = "open" | "mirror";
 
@@ -146,13 +147,13 @@ export function buildDialogTurns(
   const mirrorNoBeats = beats(MIRROR_NO[codigoJ]);
   const ctaSiBeats = beats([
     "Listo. Te acabo de mandar el enlace por WhatsApp.",
-    "Ábrelo cuando cuelgues. Es Jornada Base, siete días gratis y después veinticinco al mes. Si llegas a quinientos puntos, te queda gratis.",
+    `Ábrelo cuando cuelgues. ${CARTA_CIERRE_VOZ}`,
     refNota.trim(),
     "Gracias por el rato. Cuídate.",
   ]);
   const ctaSiSinWhatsappBeats = beats([
     "Listo. Al colgar te dejo el enlace por WhatsApp.",
-    "Es Jornada Base, siete días gratis y después veinticinco al mes.",
+    CARTA_CIERRE_VOZ,
     refNota.trim(),
     "Gracias por el rato. Cuídate.",
   ]);

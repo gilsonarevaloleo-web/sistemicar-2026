@@ -36,6 +36,7 @@ const Tutorial = lazyWithRetry(() => import("@/pages/tutorial"));
 const Console = lazyWithRetry(() => import("@/pages/console"));
 const JornadaV4 = lazyJornadaWithRetry(() => import("@/pages/jornadaV4"));
 const Esperanza = lazyWithRetry(() => import("@/pages/esperanza"));
+const DepositoV3 = lazyWithRetry(() => import("@/pages/deposito-v3"));
 const Rewards = lazyWithRetry(() => import("@/pages/rewards"));
 const Analytics = lazyWithRetry(() => import("@/pages/analytics"));
 const Acerca = lazyWithRetry(() => import("@/pages/acerca"));
@@ -557,7 +558,13 @@ function Router() {
         <Route path="/deposito">
           <Redirect to="/esperanza" />
         </Route>
+        <Route path="/deposito-v3">
+          <Redirect to="/esperanza" />
+        </Route>
         <Route path="/esperanza">
+          <ProtectedRoute component={DepositoV3} />
+        </Route>
+        <Route path="/deposito-v2">
           <ProtectedRoute component={Esperanza} />
         </Route>
         <Route path="/rewards">
@@ -708,6 +715,10 @@ function VoiceBootstrap() {
         p.startsWith("/esperanza/") ||
         p === "/deposito" ||
         p.startsWith("/deposito/") ||
+        p === "/deposito-v2" ||
+        p.startsWith("/deposito-v2/") ||
+        p === "/deposito-v3" ||
+        p.startsWith("/deposito-v3/") ||
         p === "/pagos" ||
         p.startsWith("/pagos") ||
         p === "/en-camino" ||

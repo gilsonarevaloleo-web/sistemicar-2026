@@ -39,6 +39,8 @@ export function isMenuPrincipalPath(pathname: string | null | undefined): boolea
 const HOUSE_RECINTO_PREFIXES = [
   "/esperanza",
   "/deposito",
+  "/deposito-v2",
+  "/deposito-v3",
   "/espejo",
   "/umbral",
   "/alquimia",

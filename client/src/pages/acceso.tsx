@@ -216,7 +216,7 @@ export default function Acceso() {
           </p>
           <p className="text-gray-500 text-sm mt-2">
             {askingPhone
-              ? "Así te avisamos y no pierdes los 7 días de Base."
+              ? "Así te avisamos y el vendedor te encuentra."
               : "Usa el mismo Gmail del pago (Yape / PayPal). No hay usuario y contraseña."}
           </p>
         </motion.div>

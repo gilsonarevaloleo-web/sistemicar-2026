@@ -5,7 +5,7 @@ import { PageHeader } from "./page-header";
 import { PageContainer } from "./page-container";
 import { Link } from "wouter";
 
-const pagesWithHeader = ["/espejo", "/jornada-v4", "/esperanza", "/analytics", "/rewards", "/tutorial", "/historial"];
+const pagesWithHeader = ["/espejo", "/jornada-v4", "/esperanza", "/deposito-v2", "/analytics", "/rewards", "/tutorial", "/historial"];
 
 const bareEntryPaths = ["/bienvenida", "/acceso"];
 
