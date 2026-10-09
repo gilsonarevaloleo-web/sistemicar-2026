@@ -11,8 +11,10 @@ describe("planificacionCheckoutFocus", () => {
     assert.equal(f.hideStacks, true);
     assert.equal(f.collapseLaterPeldanos, true);
     assert.equal(f.hideOtherWorlds, true);
-    assert.match(f.subline ?? "", /7 días gratis/i);
-    assert.match(f.subline ?? "", /500 PS/i);
+    assert.match(f.subline ?? "", /\$24\.99\/mes/i);
+    assert.match(f.subline ?? "", /Ritmo y Dirección/i);
+    assert.doesNotMatch(f.subline ?? "", /7\s*d[ií]as\s+gratis/i);
+    assert.doesNotMatch(f.subline ?? "", /500\s*PS/i);
   });
 
   it("campaña sin plan también enfoca Base", () => {

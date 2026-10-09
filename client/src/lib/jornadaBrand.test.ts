@@ -56,6 +56,10 @@ describe("jornadaBrand", () => {
   it("casas de escritura/consola callan el shell (no 10 webs: 10 recintos quietos)", () => {
     assert.equal(isAppShellQuietPath("/esperanza"), true);
     assert.equal(isAppShellQuietPath("/deposito"), true);
+    assert.equal(isAppShellQuietPath("/deposito-v2"), true);
+    assert.equal(isAppShellQuietPath("/deposito-v3"), true);
+    assert.equal(isHouseRecintoPath("/deposito-v2"), true);
+    assert.equal(isHouseRecintoPath("/deposito-v3"), true);
     assert.equal(isAppShellQuietPath("/espejo"), true);
     assert.equal(isAppShellQuietPath("/espejo/v2"), true);
     assert.equal(isAppShellQuietPath("/umbral/v2"), true);
@@ -87,8 +91,10 @@ describe("jornadaBrand", () => {
   it("CTAs de /ventas-jornada son <a href> nativos, no Link de SPA", () => {
     const src = readFileSync(join(dir, "../pages/ventas-jornada.tsx"), "utf8");
     assert.equal(src.includes('from "wouter"'), false);
-    assert.match(src, /<a\s+href=\{vendedorHref\}/);
-    assert.match(src, /<a\s+href=\{pagosHref\}/);
+    assert.match(src, /<a\s+href=\{/);
+    assert.match(src, /href=\{pagosHref\}/);
+    assert.match(src, /href=\{vendedorHref\}/);
     assert.match(src, /touch-manipulation/);
+    assert.equal(src.includes("JORNADA_BASE_TRIAL"), false);
   });
 });

@@ -55,9 +55,9 @@ export function prefetchJornadaChunk(): Promise<void> {
   return prefetch(() => import("@/pages/jornadaV4"));
 }
 
-/** Precarga Depósito V2 — el recinto de escritura no debe parsearse en el gesto. */
+/** Precarga Depósito V3 — el recinto de escritura no debe parsearse en el gesto. */
 export function prefetchDepositoChunk(): Promise<void> {
-  return prefetch(() => import("@/pages/esperanza"));
+  return prefetch(() => import("@/pages/deposito-v3"));
 }
 
 export function prefetchEspejoChunk(): Promise<void> {

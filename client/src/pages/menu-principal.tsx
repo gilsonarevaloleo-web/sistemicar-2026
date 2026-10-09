@@ -142,9 +142,9 @@ function buildMenuItems(
       color: "#D4AF37",
     },
     {
-      id: "deposito-v2",
-      title: "DEPÓSITO V2",
-      subtitle: "Universidad · 1 volcado de prueba",
+      id: "deposito-v3",
+      title: "DEPÓSITO V3",
+      subtitle: "Universidad · óptica + carácter + Δ",
       icon: Sunrise,
       route: "/esperanza",
       color: SPECTRUM.NARANJA,
@@ -862,7 +862,7 @@ export default function MenuPrincipal() {
                       ) {
                         prefetchJornadaChunk();
                       } else if (
-                        item.id === "deposito-v2" ||
+                        item.id === "deposito-v3" ||
                         item.route === "/esperanza"
                       ) {
                         prefetchDepositoChunk();

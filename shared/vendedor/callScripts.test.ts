@@ -25,6 +25,8 @@ describe("Vendedor llamadas — guiones", () => {
     assert.match(g.whatsapp, /Hola, soy de Sistemicar/);
     assert.match(g.voz, /te llamo de Sistemicar/i);
     assert.match(g.voz, /Jornada/i);
+    assert.doesNotMatch(g.voz, /siete días|7 días|quinientos puntos/i);
+    assert.doesNotMatch(g.whatsapp, /7 días gratis|500 puntos/i);
   });
 
   it("código 1 también cierra en Jornada Base", () => {
