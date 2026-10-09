@@ -49,13 +49,13 @@ const PERCEPCION: Record<EyeCode, RegExp[]> = {
 const SINTAXIS: Record<EyeCode, RegExp[]> = {
   1: [/cansad/, /fatiga/, /no conect/, /suelto/, /materia prima/],
   2: [/entonces/, /despues me/, /después me/, /entro y/, /sali[oó]/],
-  3: [/\d{1,2}:\d{2}/, /a las \d/, /minutos/, /pasos?/, /secuencia/, /primero .+ segundo/s],
+  3: [/\d{1,2}:\d{2}/, /a las \d/, /minutos/, /pasos?/, /secuencia/, /primero [\s\S]+ segundo/],
   4: [/¿[^?]{6,}\?/, /por que la regla/, /por qué la regla/, /el muro/, /la norma/],
   5: [/\bcort[eé]\b/, /\bno\.\b/, /cero excusa/, /dispar[eé]/, /decid[ií]/],
   6: [/"[^"]{4,}"/, /me dijo/, /le dije/, /con ella/, /con él/, /cliente/],
   7: [/la ley es/, /el patron/, /el patrón/, /se repite el modelo/, /en abstracto/],
   8: [/48\s*h/, /24\s*h/, /me volvi[oó]/, /dos dias/, /dos días/, /ansiedad/],
-  9: [/al mismo tiempo/, /varios hilos/, /balance de carga/, /mientras .+ tambien/s],
+  9: [/al mismo tiempo/, /varios hilos/, /balance de carga/, /mientras [\s\S]+ tambien/],
   10: [/la fuente/, /de raiz/, /de raíz/, /el origen de este/],
 };
 

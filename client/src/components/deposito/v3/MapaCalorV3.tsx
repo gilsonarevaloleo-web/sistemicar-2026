@@ -1,3 +1,4 @@
+import React from "react";
 import {
   CANON_TEN_EYES,
   EYE_CODES,

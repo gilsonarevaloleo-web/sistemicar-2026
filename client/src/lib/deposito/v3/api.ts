@@ -74,8 +74,11 @@ export async function auditarVolcadoV3(
   const data = await parseJsonResponse<
     DepositoV3AuditSuccess | DepositoV3AuditError
   >(res);
-  if (!res.ok || data.success === false) {
+  if (data.success === false) {
     throw new Error(data.error || `Error HTTP ${res.status} al auditar`);
+  }
+  if (!res.ok) {
+    throw new Error(`Error HTTP ${res.status} al auditar`);
   }
   return data;
 }

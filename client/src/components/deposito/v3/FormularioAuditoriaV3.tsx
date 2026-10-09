@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import React, { useState, type FormEvent } from "react";
 import {
   camposVisiblesPorTier,
   isAdvancedTier,

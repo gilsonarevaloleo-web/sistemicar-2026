@@ -1,3 +1,4 @@
+import React from "react";
 import { CANON_TEN_EYES, type DepotAnalysisResult } from "@shared/deposito/v3";
 
 const GOLD = "#D4AF37";
