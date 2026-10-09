@@ -64,6 +64,9 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(page, /auditarVolcadoV3|FormularioAuditoriaV3/);
     assert.doesNotMatch(page, /FormularioVolcadoExpansivo/);
     assert.doesNotMatch(page, /\/api\/deposito\/volcado/);
+    assert.match(page, /addVolcadoV3Entry/);
+    assert.match(page, /HistorialV3/);
+    assert.doesNotMatch(page, /from "@\/lib\/depositoVolcados"/);
   });
 
   it("/deposito redirige a /esperanza", () => {

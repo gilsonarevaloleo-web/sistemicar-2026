@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useAuthContext } from "@/App";
 import { useDepositoEntitlements } from "@/hooks/useDepositoEntitlements";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { FormularioAuditoriaV3 } from "@/components/deposito/v3/FormularioAuditoriaV3";
 import { MapaCalorV3 } from "@/components/deposito/v3/MapaCalorV3";
 import { DictamenCardV3 } from "@/components/deposito/v3/DictamenCardV3";
+import { HistorialV3 } from "@/components/deposito/v3/HistorialV3";
+import {
+  addVolcadoV3Entry,
+  listVolcadosV3Local,
+  subscribeToVolcadosV3,
+  type VolcadoV3Entry,
+} from "@/lib/deposito/v3/volcados";
 import {
   DEPOSITO_V3_RITUAL,
   userTierFromEntitlements,
@@ -16,11 +24,22 @@ const GOLD = "#D4AF37";
 
 export default function DepositoV3Page() {
   useViewTransitionShield();
-  useDualKernelMotorsQuiet();
+  const motorsQuiet = useDualKernelMotorsQuiet();
+  const { user } = useAuthContext();
   const entitlements = useDepositoEntitlements();
   const userTier = userTierFromEntitlements(entitlements);
+  const uid = user?.uid ?? "anon";
   const [analysis, setAnalysis] = useState<DepotAnalysisResult | null>(null);
   const [source, setSource] = useState<"gemini" | "local_fallback" | null>(null);
+  const [historial, setHistorial] = useState<VolcadoV3Entry[]>([]);
+
+  useEffect(() => {
+    setHistorial(listVolcadosV3Local(uid));
+    if (motorsQuiet) return;
+    return subscribeToVolcadosV3(uid, setHistorial, () => {
+      setHistorial(listVolcadosV3Local(uid));
+    });
+  }, [uid, motorsQuiet]);
 
   return (
     <main
@@ -55,9 +74,17 @@ export default function DepositoV3Page() {
         <FormularioAuditoriaV3
           userTier={userTier}
           disabled={!entitlements.ready}
-          onAnalysisComplete={(result, origen) => {
+          onAnalysisComplete={async (result, origen, payload) => {
             setAnalysis(result);
             setSource(origen);
+            await addVolcadoV3Entry({
+              userId: uid,
+              payload,
+              result,
+              source: origen,
+              waitForRemote: false,
+            });
+            setHistorial(listVolcadosV3Local(uid));
           }}
         />
 
@@ -72,6 +99,14 @@ export default function DepositoV3Page() {
             <DictamenCardV3 result={analysis} />
           </div>
         )}
+
+        <HistorialV3
+          entries={historial}
+          onSelect={(entry) => {
+            setAnalysis(entry.result);
+            setSource(entry.source);
+          }}
+        />
       </div>
     </main>
   );

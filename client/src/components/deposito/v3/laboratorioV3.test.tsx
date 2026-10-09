@@ -10,6 +10,7 @@ import {
 import { FormularioAuditoriaV3 } from "./FormularioAuditoriaV3.tsx";
 import { MapaCalorV3 } from "./MapaCalorV3.tsx";
 import { DictamenCardV3 } from "./DictamenCardV3.tsx";
+import { HistorialV3 } from "./HistorialV3.tsx";
 
 function fixture(): DepotAnalysisResult {
   const audits = emptyEyeAudits();
@@ -100,6 +101,32 @@ describe("MapaCalorV3", () => {
     assert.match(html, /deposito-v3-friccion-3/);
     assert.match(html, /data-locked="1"/);
     assert.match(html, /BLOQ/);
+  });
+});
+
+describe("HistorialV3", () => {
+  it("lista óptica, carácter y Δ sin mezclar V2", () => {
+    const html = renderToStaticMarkup(
+      createElement(HistorialV3, {
+        entries: [
+          {
+            id: "local_v3_1",
+            userId: "u1",
+            createdAt: new Date("2026-01-01"),
+            rawFact: "Vi el patrón a las 9:00.",
+            userTier: "MATRICULA",
+            result: fixture(),
+            source: "local_fallback",
+          },
+        ],
+        onSelect: () => {},
+      }),
+    );
+    assert.match(html, /deposito-v3-historial/);
+    assert.match(html, /C7 Cimiento|C7 Visión/);
+    assert.match(html, /Δ 4/);
+    assert.doesNotMatch(html, /OJO DOMINANTE/);
+    assert.doesNotMatch(html, /sistemicar_volcados[^\-_]/);
   });
 });
 

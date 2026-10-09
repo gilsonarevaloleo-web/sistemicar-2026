@@ -3,6 +3,7 @@ import {
   camposVisiblesPorTier,
   isAdvancedTier,
   type DepotAnalysisResult,
+  type DepotEntryPayload,
   type UserTier,
 } from "@shared/deposito/v3";
 import { auditarVolcadoV3 } from "@/lib/deposito/v3/api";
@@ -15,6 +16,7 @@ export interface FormularioAuditoriaV3Props {
   onAnalysisComplete: (
     result: DepotAnalysisResult,
     source: "gemini" | "local_fallback",
+    payload: DepotEntryPayload,
   ) => void;
   disabled?: boolean;
 }
@@ -51,14 +53,15 @@ export function FormularioAuditoriaV3({
 
     setIsLoading(true);
     try {
-      const data = await auditarVolcadoV3({
+      const payload: DepotEntryPayload = {
         rawFact: rawFact.trim(),
         detectedNoise: avanzado ? detectedNoise.trim() : undefined,
         omittedShadow: avanzado ? omittedShadow.trim() : undefined,
         studentHypothesis: studentHypothesis.trim() || undefined,
         userTier,
-      });
-      onAnalysisComplete(data.result, data.source);
+      };
+      const data = await auditarVolcadoV3(payload);
+      onAnalysisComplete(data.result, data.source, payload);
     } catch (err) {
       const message =
         err instanceof Error
