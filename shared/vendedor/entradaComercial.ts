@@ -101,11 +101,10 @@ export function mensajeEnlacePagoWhatsapp(
   deepLink: string,
   sellerRef?: string | null,
 ): string {
-  const trial = enlaceTrialJornadaBase(sellerRef);
   const ref = sellerRef?.trim()
     ? ` Al pagar, menciona ${sellerRef.trim()}.`
     : "";
-  return `Jornada Base — 7 días gratis: ${trial} Si ya quieres pagar: ${deepLink}.${ref} Si llegas a 500 puntos, te queda gratis.`;
+  return `Jornada Base — $24.99/mes. Activa aquí: ${deepLink}.${ref} Ritmo y Dirección se ofrecen después, cuando ya mides.`;
 }
 
 /** Copia ?ref= y utm_* de la URL actual a un href interno. */

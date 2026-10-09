@@ -6,8 +6,8 @@
 
 import type { PlanificacionSkuId } from "./planificacionPricing.ts";
 import type { DepositoSkuId } from "./depositoPricing.ts";
-import { JORNADA_BASE_TRIAL_COPY } from "./jornadaBaseAccess.ts";
 import { SKU_MATRICULA } from "./depositoPricing.ts";
+import { CARTA_CIERRE, formatUsdMes, CARTA_PRECIO_BASE_USD } from "./jornadaCartaVenta.ts";
 
 export type CheckoutWorld = "jornada" | "deposito" | "open";
 
@@ -50,7 +50,7 @@ export function resolveCheckoutFocus(search: string): CheckoutFocus {
       collapseLaterPeldanos: true,
       hideOtherWorlds: true,
       headline: "Jornada Base",
-      subline: `Peldaño 1 · ${JORNADA_BASE_TRIAL_COPY.short} Ritmo y Norte se ofrecen después, cuando ya mides unidades.`,
+      subline: `Peldaño 1 · ${formatUsdMes(CARTA_PRECIO_BASE_USD)}. ${CARTA_CIERRE}`,
     };
   }
 

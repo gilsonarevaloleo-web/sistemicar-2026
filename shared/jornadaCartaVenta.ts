@@ -158,6 +158,14 @@ export const CARTA_DILACION = {
 export const CARTA_CIERRE =
   "Pagas Jornada Base. Ritmo y Dirección se ofrecen después, cuando ya mides unidades.";
 
+/** Cierre hablado (llamada / Twilio). Precio redondo para que se oiga. */
+export const CARTA_CIERRE_VOZ =
+  "La entrada es Jornada Base, veinticinco dólares al mes. Mides unidades. Ritmo y Dirección vienen después, cuando ya mides.";
+
+/** Cierre escrito (WhatsApp / checkout). */
+export const CARTA_CIERRE_WHATSAPP =
+  "Jornada Base: 24.99 al mes. Mides unidades. Ritmo y Dirección se ofrecen después, cuando ya mides.";
+
 const TRIAL_OFFER_RE =
   /7\s*d[ií]as\s+gratis|empezar\s+7\s*d[ií]as|500\s*ps\s*=|base\s+gratis|prueba\s+de\s+telemetr[ií]a/i;
 
@@ -174,6 +182,8 @@ export function cartaVentaPublicText(): string {
     CARTA_CTA_FINAL,
     CARTA_CTA_VENDEDOR,
     CARTA_CIERRE,
+    CARTA_CIERRE_VOZ,
+    CARTA_CIERRE_WHATSAPP,
     CARTA_DIAGNOSTICO.lead,
     CARTA_DIAGNOSTICO.mancha,
     CARTA_DIAGNOSTICO.pregunta,
@@ -193,8 +203,12 @@ export function cartaVentaPublicText(): string {
   ].join("\n");
 }
 
+export function textoOfreceTrial(text: string): boolean {
+  return TRIAL_OFFER_RE.test(text);
+}
+
 export function cartaVentaOfreceTrial(): boolean {
-  return TRIAL_OFFER_RE.test(cartaVentaPublicText());
+  return textoOfreceTrial(cartaVentaPublicText());
 }
 
 export function escaleraTiersComprables(): EscaleraTierId[] {

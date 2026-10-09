@@ -54,6 +54,20 @@ describe("ventas-jornada carta", () => {
     "utf8",
   );
 
+  it("vendedor y checkout no reabren el trial", () => {
+    const vendedor = readFileSync(
+      join(dir, "../client/src/pages/vendedor.tsx"),
+      "utf8",
+    );
+    const pagos = readFileSync(
+      join(dir, "../client/src/pages/pagos.tsx"),
+      "utf8",
+    );
+    assert.match(vendedor, /offerTrial/);
+    assert.doesNotMatch(pagos, /EMPEZAR 7 D[IÍ]AS GRATIS/i);
+    assert.doesNotMatch(pagos, /pagos-empezar-trial/);
+  });
+
   it("es carta de pago, no landing de trial", () => {
     assert.match(src, /jornadaCartaVenta/);
     assert.equal(src.includes("JORNADA_BASE_TRIAL"), false);

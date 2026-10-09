@@ -22,9 +22,11 @@ export interface PlanetaConfig {
   grieta: string;
   /** Cómo entra al producto. */
   metodoEntrada: string;
-  /** Ruta de prueba / producto. */
+  /** Ruta de prueba / producto (no se ofrece si offerTrial es false). */
   trialHref: string;
   trialLabel: string;
+  /** Si false, la puerta cobra: no hay CTA ni guion de trial. */
+  offerTrial: boolean;
   /** Checkout con plan concreto (añadir &ref= en UI). */
   checkoutHref: string;
   checkoutLabel: string;
@@ -42,6 +44,7 @@ export const PLANETAS: Record<PlanetaId, PlanetaConfig> = {
       "Limpieza por créditos: desahogo y diagnóstico para neutralizar la mente.",
     trialHref: "/espejo",
     trialLabel: "Abrir el Espejo",
+    offerTrial: true,
     checkoutHref: "/pagos?plan=espejo_inicio",
     checkoutLabel: "Pack Espejo Inicio · créditos",
     color: "#38BDF8",
@@ -55,7 +58,8 @@ export const PLANETAS: Record<PlanetaId, PlanetaConfig> = {
     metodoEntrada:
       "Ejecución por bloques: medir unidades, ritmo y cierre diario.",
     trialHref: "/acceso?next=/jornada-v4",
-    trialLabel: "Empezar 7 días gratis",
+    trialLabel: "Activar Jornada Base",
+    offerTrial: false,
     checkoutHref: "/pagos?plan=planificacion_base",
     checkoutLabel: "Activar Jornada Base",
     color: "#D4AF37",
@@ -70,6 +74,7 @@ export const PLANETAS: Record<PlanetaId, PlanetaConfig> = {
       "Simulador de fricción (Forja / Arena): crear callo operativo.",
     trialHref: "/umbral/entrada",
     trialLabel: "Probar Código 1 gratis",
+    offerTrial: true,
     checkoutHref: "/pagos?plan=umbral",
     checkoutLabel: "Activar Umbral",
     color: "#FF6B35",
