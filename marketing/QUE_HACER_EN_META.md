@@ -19,9 +19,8 @@ VIDEO A o VIDEO B  (Ads Manager)
         ├─ Pixel ViewContent  →  “Jornada Base · VIDEO A”
         ├─ se guarda el video en el celular (utm + fbclid)
         │
-        ├─ EMPEZAR 7 DÍAS GRATIS  →  /acceso → Jornada  →  StartTrial / CompleteRegistration
-        ├─ QUE ME LLAME           →  /vendedor (JORNADA, código 3)  →  Lead + llamada
-        └─ Activar ahora          →  /pagos?plan=planificacion_base  →  Purchase
+        ├─ ACTIVAR JORNADA BASE   →  /pagos?plan=planificacion_base  →  Purchase
+        └─ QUE ME LLAME           →  /vendedor (JORNADA, código 3)  →  Lead + llamada
 ```
 
 **Facebook** sabe qué video convirtió porque:
@@ -30,7 +29,7 @@ VIDEO A o VIDEO B  (Ads Manager)
 2. Facebook agrega `fbclid` al clic. El Pixel (ID `1066497298319685`) vive en `sistemicar.app`.
 3. Al registrarse, Advanced Matching manda el email. Al pagar, `Purchase` con $24.99.
 
-**La página** copia `utm_*` y `fbclid` a trial, vendedor y checkout.  
+**La página** copia `utm_*` y `fbclid` a vendedor y checkout.  
 **El vendedor** llega con Jornada Base ya fijada (código 3) y el admin ve `VIDEO A` o `VIDEO B` junto a la llamada.
 
 No pegues el video en la landing. El video se ve en Facebook; el clic abre la página.
@@ -55,10 +54,10 @@ https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_ca
 
 En cada una debes ver:
 
-1. El titular del día sin unidades.
+1. El titular de telemetría (no disciplina: fuga de tiempo).
 2. Arriba, en letra chica: `ANUNCIO · VIDEO A` o `VIDEO B`.
-3. El botón dorado **EMPEZAR 7 DÍAS GRATIS**.
-4. **QUE ME LLAME** → vendedor con La Jornada ya fijada y el mismo `ANUNCIO · VIDEO A/B`.
+3. El botón dorado **ACTIVAR JORNADA BASE · $24.99/mes**.
+4. **QUE ME LLAME** → vendedor con La Jornada ya fijada y el mismo `ANUNCIO · VIDEO A/B`. Sin trial.
 
 Si da 404, el deploy todavía no salió. No gastes plata.
 
@@ -84,7 +83,6 @@ El Píxel **ya está en la web** (ID `1066497298319685`). En Events Manager debe
 - `PageView` en todas las páginas
 - `ViewContent` en `/ventas-jornada`
 - `Lead` cuando el prospecto deja teléfono (vendedor) o se anota
-- `StartTrial` al empezar los 7 días gratis
 - `InitiateCheckout` en `/pagos?plan=planificacion_base`
 
 En el anuncio, objetivo **Conversiones** (no solo Tráfico) y evento de optimización: `Purchase`. Si aún no hay pagos, usa `CompleteRegistration`.
@@ -133,8 +131,8 @@ Para **cada** video:
 2. Destino del clic: pega la URL **completa** de ese video (arriba, paso 0).  
    El anuncio A **no** puede usar la URL B.
 3. Texto: el de `copys-meta-jornada.md` (puedes usar el mismo en los dos).
-4. Título: `El día se te fue sin un número.`
-5. Descripción: `Cierra el día con unidades, no con culpa.`
+4. Título: `No tienes un problema de disciplina.`
+5. Descripción: `Telemetría de unidades. El día termina con evidencia.`
 6. Botón: **Más información** (no Comprar, no WhatsApp).
 7. Vista previa: el toque abre `sistemicar.app/ventas-jornada`, no el chat.
 
@@ -160,7 +158,7 @@ En Ads Manager, desglosa por **Anuncio** (no por campaña):
 | Clics a la landing | Hay clics en A o B | 0 clics en 3 días → el gancho no para el scroll |
 | ViewContent VIDEO A/B | Events Manager muestra el video | Llegan sin `utm_content` → pegaste mal la URL |
 | Lead / llamada | Admin muestra `VIDEO A` o `VIDEO B` | Llegan y se van → el teléfono da miedo |
-| Registro / pago | CompleteRegistration o Purchase | Clics sin registro → sigue 7 días |
+| Registro / pago | CompleteRegistration o Purchase | Clics sin pago → el close de la carta no cerró |
 
 A los **7 días**: deja prendido el que trajo llamadas o pagos. Pausa el otro.  
 No subas presupuesto a los 2 días. No publiques Ritmo ni Norte todavía.

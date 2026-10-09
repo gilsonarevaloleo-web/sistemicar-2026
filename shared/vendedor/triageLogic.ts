@@ -112,6 +112,7 @@ export interface FijacionVendedor {
   arquetipoNombre: string | null;
   trialHref: string;
   trialLabel: string;
+  offerTrial: boolean;
   checkoutHref: string;
   checkoutLabel: string;
   color: string;
@@ -162,6 +163,7 @@ export function resolverTriageVendedor(
     arquetipoNombre: cfg.modoExterno.arquetipoNombre,
     trialHref: puerta.trialHref,
     trialLabel: puerta.trialLabel,
+    offerTrial: puerta.offerTrial,
     checkoutHref: puerta.checkoutHref,
     checkoutLabel: puerta.checkoutLabel,
     color: puerta.color,

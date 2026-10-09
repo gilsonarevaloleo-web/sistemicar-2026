@@ -617,27 +617,30 @@ export default function VendedorTriagePage() {
               )}
             </div>
 
-            <Link
-              href={hrefConRastro(fijacion.trialHref)}
-              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
-              style={{
-                background: `linear-gradient(90deg, ${fijacion.color}22, ${GOLD}18)`,
-                border: `1px solid ${fijacion.color}66`,
-                color: fijacion.color,
-              }}
-              data-testid="vendedor-cta-trial"
-            >
-              {fijacion.trialLabel}
-              <ArrowRight size={14} />
-            </Link>
+            {fijacion.offerTrial ? (
+              <Link
+                href={hrefConRastro(fijacion.trialHref)}
+                className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
+                style={{
+                  background: `linear-gradient(90deg, ${fijacion.color}22, ${GOLD}18)`,
+                  border: `1px solid ${fijacion.color}66`,
+                  color: fijacion.color,
+                }}
+                data-testid="vendedor-cta-trial"
+              >
+                {fijacion.trialLabel}
+                <ArrowRight size={14} />
+              </Link>
+            ) : null}
 
             <Link
               href={hrefConRastro(fijacion.checkoutHref)}
-              className="flex w-full items-center justify-center gap-2 border px-4 py-3 text-[11px] tracking-widest"
-              style={{ borderColor: `${GOLD}66`, color: GOLD }}
+              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.14em]"
+              style={{ background: GOLD, color: "#0A0A0A" }}
               data-testid="vendedor-cta-checkout"
             >
               {fijacion.checkoutLabel}
+              <ArrowRight size={14} />
             </Link>
 
             <button
