@@ -98,7 +98,10 @@ export function useConcienciaTriadaOperador({
     const uid = src.userId;
     if (!uid) return;
     const huecosLog = huecosLogToIntervals(
-      buildMetricaHuecoIntervals({ vehicles: src.vehicles })
+      buildMetricaHuecoIntervals({
+        vehicles: src.vehicles,
+        segmentos: src.segmentos,
+      })
     );
     const next = buildConcienciaTriadaFromVehicles({
       fecha: src.fecha,

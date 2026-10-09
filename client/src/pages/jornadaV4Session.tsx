@@ -188,7 +188,10 @@ export default function JornadaV4Session() {
     const segs = planillaApi.planilla?.segmentos ?? [];
     if (!isPlanTerminado(segs)) return planEnd.revelacion;
     try {
-      const huecos = buildMetricaHuecoIntervals({ vehicles: core.vehicles });
+      const huecos = buildMetricaHuecoIntervals({
+        vehicles: core.vehicles,
+        segmentos: segs,
+      });
       return (
         buildRevelacionPlanDia({
           segmentos: segs,
@@ -269,7 +272,10 @@ export default function JornadaV4Session() {
     const run = () => {
       if (cancelled) return;
       try {
-        reconcileCoberturaHuecos({ vehicles: core.vehiclesRef.current });
+        reconcileCoberturaHuecos({
+          vehicles: core.vehiclesRef.current,
+          segmentos: planillaApi.planilla?.segmentos ?? [],
+        });
         bumpHuecos();
       } catch {
         /* non-fatal */

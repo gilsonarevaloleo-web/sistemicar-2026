@@ -81,7 +81,11 @@ export default function Jornada4PlanTab({
         notifPermission={notifPermission}
         onRequestNotifPermission={onRequestNotifPermission}
       />
-      <CoberturaHuecosPanel refreshKey={huecosRefresh} vehicles={vehicles} />
+      <CoberturaHuecosPanel
+        refreshKey={huecosRefresh}
+        vehicles={vehicles}
+        segmentos={planilla?.segmentos ?? []}
+      />
     </div>
   );
 }

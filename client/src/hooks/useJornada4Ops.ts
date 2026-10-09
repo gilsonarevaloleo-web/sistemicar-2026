@@ -141,9 +141,12 @@ function destinoCierreVivo(
   return gate.ok ? "peldano" : "presencia";
 }
 
-function noteHuecoAfterClose(vehicles: Vehicle[]): void {
+function noteHuecoAfterClose(
+  vehicles: Vehicle[],
+  segmentos?: { horaInicio?: string; horaFin?: string }[]
+): void {
   try {
-    reconcileCoberturaHuecos({ vehicles });
+    reconcileCoberturaHuecos({ vehicles, segmentos });
   } catch {
     /* non-fatal */
   }
@@ -256,7 +259,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         paintVehicle(vehicleId, patch);
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
-        noteHuecoAfterClose(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
 
         void runShadowTaskAsync(async () => {
           try {
@@ -357,7 +360,10 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const revelacion = sealRevelacionPlanDia(userId, {
           segmentos: segs,
           vehicles: vehiclesRef.current,
-          huecos: buildMetricaHuecoIntervals({ vehicles: vehiclesRef.current }),
+          huecos: buildMetricaHuecoIntervals({
+            vehicles: vehiclesRef.current,
+            segmentos: segs,
+          }),
         });
         return {
           revelacion,
@@ -596,7 +602,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             safeAwardPS
           );
           cyclePs = settled.cyclePs;
-          noteHuecoAfterClose(vehiclesRef.current);
+          noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
           tryPremiarCierreConsciente({
             id: vehicle.id,
             titulo: vehicle.titulo,
@@ -872,7 +878,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             patch.status,
             safeAwardPS
           );
-          noteHuecoAfterClose(vehiclesRef.current);
+          noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
           tryPremiarCierreConsciente({
             id: vehicle.id,
             titulo: vehicle.titulo,
@@ -1100,7 +1106,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           if (amount > 0) {
             await safeAwardPS(amount, `J4 rápido · ${status} · ${vehicle.titulo}`);
           }
-          noteHuecoAfterClose(vehiclesRef.current);
+          noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
           tryPremiarCierreConsciente({
             id: vehicle.id,
             titulo: vehicle.titulo,
@@ -1265,7 +1271,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
         let awarded = 0;
         try {
-          noteHuecoAfterClose(vehiclesRef.current);
+          noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
           tryPremiarCierreConsciente({
             id: vehicle.id,
             titulo: vehicle.titulo,
@@ -1630,7 +1636,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         paintVehicle(vehicleId, patch);
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
-        noteHuecoAfterClose(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
 
         toast.error(ENTRENAMIENTO_COPY.cierreAnclado, {
           description: `${vehicle.titulo} · no puede pasar su segmento`,
@@ -1675,7 +1681,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         paintVehicle(vehicleId, pausedPatch);
         scheduleSaveLocalVehicles(vehiclesRef.current);
-        noteHuecoAfterClose(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
         const nombrada = titulo !== PAUSA_INTERRUPCION_TITULO;
         toast.success(nombrada ? `En pausa · ${titulo}` : "En pausa", {
           description: nombrada
@@ -1761,7 +1767,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
       paintVehicle(parentId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
-      noteHuecoAfterClose(vehiclesRef.current);
+      noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
       toast.info("Desglosador reanudado", {
         description: "Tiempo recuperado tras la interrupción.",
         style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
@@ -2028,7 +2034,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         }
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
-        noteHuecoAfterClose(vehiclesRef.current);
+        noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
         toast.info("Vehículo cerrado en pausa", {
           description: "La pausa no suma PS. El cupo queda libre.",
           style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
