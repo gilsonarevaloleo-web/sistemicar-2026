@@ -250,6 +250,74 @@ describe("concienciaTriadaLinea", () => {
     assert.equal(occ.minutosParaleloGanado, 60);
   });
 
+  it("la rutina del día cubre el hueco entre segmentos, no cada franja suelta", () => {
+    const now = lima("13:00");
+    const segs = [
+      { horaInicio: "09:00", horaFin: "12:00" },
+      { horaInicio: "14:00", horaFin: "18:00" },
+    ];
+    const vacio = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: segs,
+      vehicles: [],
+      now,
+    });
+    assert.equal(vacio.minutosPlan, 9 * 60);
+    assert.equal(vacio.minutosHueco, 4 * 60);
+    assert.equal(vacio.minutosPlanFuturo, 5 * 60);
+
+    const trabajando = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: segs,
+      vehicles: [
+        v({
+          id: "costura",
+          status: "activo",
+          aperturaAt: lima("09:00"),
+          destinoCierre: "presencia",
+        }),
+      ],
+      now,
+    });
+    assert.equal(trabajando.minutosPresencia, 4 * 60);
+    assert.equal(trabajando.minutosHueco, 0);
+    assert.equal(trabajando.minutosDireccion, 0);
+  });
+
+  it("trabajo de la mañana en la rutina es dirección, no inconsciente", () => {
+    const now = lima("08:14");
+    const occ = computeTriadaLineaOccupancy({
+      fecha: FECHA,
+      segmentos: [
+        { horaInicio: "05:30", horaFin: "08:00" },
+        { horaInicio: "08:00", horaFin: "12:00" },
+        { horaInicio: "14:00", horaFin: "23:00" },
+      ],
+      vehicles: [
+        v({
+          id: "costura",
+          status: "activo",
+          tipoReloj: "desglosador",
+          tipoFlota: "tiempo",
+          aperturaAt: lima("05:30"),
+          destinoCierre: "peldano",
+          proyectoId: "n1",
+          subVehiculos: [
+            {
+              id: "u1",
+              titulo: "Corte",
+              status: "activo",
+              aperturaAt: lima("05:30"),
+            },
+          ],
+        }),
+      ],
+      now,
+    });
+    assert.ok(occ.minutosDireccion >= 160, `trabajo de la mañana, no 0: ${occ.minutosDireccion}`);
+    assert.ok(occ.minutosHueco < 30, `la rutina cubre el trabajo: ${occ.minutosHueco}`);
+  });
+
   it("centinela y descanso no cubren la línea", () => {
     const now = lima("10:00");
     const occ = computeTriadaLineaOccupancy({

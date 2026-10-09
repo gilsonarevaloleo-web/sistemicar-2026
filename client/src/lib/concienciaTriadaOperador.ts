@@ -235,37 +235,25 @@ function vehicleJournalFecha(vehicle: Vehicle): string | null {
   return null;
 }
 
-/** Minutos únicos del plan (ventanas fusionadas por solape). Ese total es el 100%. */
+/** Minutos de la rutina del día: primera hora → última hora (no cada segmento). */
 export function sumMinutosPlanDelDia(
   segmentos: { horaInicio?: string; horaFin?: string }[]
 ): number {
   if (!Array.isArray(segmentos) || segmentos.length === 0) return 0;
-  const windows: { start: number; end: number }[] = [];
+  let start = Infinity;
+  let end = -Infinity;
   for (const s of segmentos) {
     if (!s) continue;
     const ini = segmentTimeToMinutes(s.horaInicio || "");
     const fin = segmentTimeToMinutes(s.horaFin || "");
     if (!Number.isFinite(ini) || !Number.isFinite(fin)) continue;
-    const end = fin >= ini ? fin : fin + 1440;
-    if (end > ini) windows.push({ start: ini, end });
+    const z = fin >= ini ? fin : fin + 1440;
+    if (z <= ini) continue;
+    if (ini < start) start = ini;
+    if (z > end) end = z;
   }
-  if (windows.length === 0) return 0;
-  windows.sort((a, b) => a.start - b.start);
-  let total = 0;
-  let curStart = windows[0].start;
-  let curEnd = windows[0].end;
-  for (let i = 1; i < windows.length; i++) {
-    const w = windows[i];
-    if (w.start <= curEnd) {
-      curEnd = Math.max(curEnd, w.end);
-    } else {
-      total += curEnd - curStart;
-      curStart = w.start;
-      curEnd = w.end;
-    }
-  }
-  total += curEnd - curStart;
-  return total;
+  if (!Number.isFinite(start) || end <= start) return 0;
+  return end - start;
 }
 
 /** Duración de cierre en minutos (vehículo). */

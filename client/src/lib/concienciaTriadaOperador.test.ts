@@ -114,13 +114,13 @@ describe("concienciaTriadaOperador", () => {
     assert.equal(m.pctInconsciente, 0);
   });
 
-  it("suma minutos únicos del plan", () => {
+  it("suma minutos de la rutina del día (primera→última hora)", () => {
     assert.equal(
       sumMinutosPlanDelDia([
         { horaInicio: "09:00", horaFin: "12:00" },
         { horaInicio: "14:00", horaFin: "16:00" },
       ]),
-      300
+      420
     );
     assert.equal(
       sumMinutosPlanDelDia([

@@ -1,8 +1,9 @@
 /**
  * Reloj de línea vs paralelo meritorio — tríada de conciencia (idle).
  *
- * Línea: minutos únicos del plan. Un hilo.
- * Inconsciente = hueco: plan ya ocurrido sin vehículo. Pausa sin otro hilo
+ * Línea: la rutina del día (primer horaInicio → último horaFin), no cada
+ * segmento por separado. Un hilo.
+ * Inconsciente = hueco: rutina ya ocurrida sin vehículo. Pausa sin otro hilo
  * que la cubra = hueco (no justificada). Idle del desglosador (pared sin
  * unidad/fila) es el mismo hueco: no se pinta la pared como trabajo.
  * El futuro del plan no es inconsciencia ni deuda — aún no ocurre.
@@ -201,6 +202,34 @@ export function plannedWindowsMs(
   return mergeMsIntervals(windows);
 }
 
+/**
+ * Rutina del día: de la primera puerta al término de la última.
+ * Los huecos y la tríada viven aquí, no en cada segmento suelto.
+ */
+export function routineWindowMs(
+  segmentos: { horaInicio?: string; horaFin?: string }[],
+  limaDayStartMs: number
+): MsInterval | null {
+  const windows = plannedWindowsMs(segmentos, limaDayStartMs);
+  if (windows.length === 0) return null;
+  let start = windows[0]!.start;
+  let end = windows[0]!.end;
+  for (let i = 1; i < windows.length; i++) {
+    const w = windows[i]!;
+    if (w.start < start) start = w.start;
+    if (w.end > end) end = w.end;
+  }
+  return end > start ? { start, end } : null;
+}
+
+export function routineWindowsMs(
+  segmentos: { horaInicio?: string; horaFin?: string }[],
+  limaDayStartMs: number
+): MsInterval[] {
+  const w = routineWindowMs(segmentos, limaDayStartMs);
+  return w ? [w] : [];
+}
+
 function vehicleRawSessionRange(v: Vehicle, now: number): MsInterval | null {
   const sealed = applyVehicleSessionSeal(v);
   let start = sealed.aperturaAt;
@@ -357,11 +386,11 @@ function splitPlanElapsedFuture(
 }
 
 /**
- * Ocupación de línea: intersección única con el plan.
+ * Ocupación de línea: intersección única con la rutina del día.
  * Presencia extraída: el solape con Dirección no mancha rumbo.
  * Un `peldano` sin casa cuenta como presencia.
- * Inconsciente = huecos (plan ya ocurrido sin vehículo). El futuro no se suma.
- * `huecosLog` agujerea cobertura cuando el registro de cortes dice que no había vehículo.
+ * Inconsciente = huecos (rutina ya ocurrida sin vehículo). El futuro no se suma.
+ * `huecosLog` solo agujerea cobertura inflada; no debe tapar trabajo real.
  */
 export function computeTriadaLineaOccupancy(params: {
   fecha: string;
@@ -373,7 +402,7 @@ export function computeTriadaLineaOccupancy(params: {
   const now = params.now ?? Date.now();
   const limaMidnight =
     limaMidnightFromJournalFecha(params.fecha) ?? getLimaDayStartMs(now);
-  const plan = plannedWindowsMs(params.segmentos, limaMidnight);
+  const plan = routineWindowsMs(params.segmentos, limaMidnight);
   const minutosPlan = sumIntervalMinutes(plan);
   if (minutosPlan <= 0) return { ...EMPTY_TRIADA_LINEA };
 

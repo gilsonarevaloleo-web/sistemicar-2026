@@ -21,12 +21,6 @@ import {
   type TriadaDaySnapshot,
 } from "@/lib/concienciaTriadaOperador";
 import { getJournalDateString } from "@/lib/segmentTime";
-import {
-  huecosLogToIntervals,
-} from "@/lib/gastoConcienciaEngine";
-import {
-  buildMetricaHuecoIntervals,
-} from "@/jornada4/coberturaHuecosLog";
 import type { Vehicle } from "@/lib/persistence";
 
 export type UseConcienciaTriadaOperadorParams = {
@@ -97,17 +91,10 @@ export function useConcienciaTriadaOperador({
     const src = latestRef.current;
     const uid = src.userId;
     if (!uid) return;
-    const huecosLog = huecosLogToIntervals(
-      buildMetricaHuecoIntervals({
-        vehicles: src.vehicles,
-        segmentos: src.segmentos,
-      })
-    );
     const next = buildConcienciaTriadaFromVehicles({
       fecha: src.fecha,
       segmentos: src.segmentos,
       vehicles: src.vehicles,
-      huecosLog,
     });
     if (triadaModelEquals(modelRef.current, next)) return;
     modelRef.current = next;
