@@ -103,8 +103,11 @@ export function ProyectoGastoConcienciaCard({
   const fecha = getJournalDateString();
   const segmentos = useMemo(() => readLocalPlanillaSegmentos(fecha), [fecha]);
   const huecosLog = useMemo(
-    () => huecosLogToIntervals(buildMetricaHuecoIntervals({ vehicles })),
-    [vehicles]
+    () =>
+      huecosLogToIntervals(
+        buildMetricaHuecoIntervals({ vehicles, segmentos })
+      ),
+    [vehicles, segmentos]
   );
   const delProyecto = useMemo(
     () => vehicles.filter(v => (v.proyectoId ?? "").trim() === proyectoId),

@@ -1,13 +1,52 @@
 /**
  * Pausa de Conquista: congela el desglosador y sella presencia.
  * La justificación vive en `pausas[].titulo`. No crea vehículo hijo.
+ *
+ * Regla: pueden convivir dos conquistas; no dos pausas.
+ * La segunda pausa duplica el hueco (paredes idle apiladas).
  */
 import type { Vehicle } from "@/lib/persistence";
 import { buildDesglosadorNestedPausePatch } from "@/lib/nestedContextStack";
 import {
+  isPausedPresence,
   labelVehiculoPausaAbierta,
   tituloPausaInterrupcion,
 } from "@/lib/vehiculoPausa";
+
+function isConquistaDesglosadorLite(v: Pick<Vehicle, "tipoFlota" | "tipoReloj">): boolean {
+  return v.tipoFlota === "tiempo" && v.tipoReloj === "desglosador";
+}
+
+/** Conquista activa congelada (pausa directa o nested). */
+export function isConquistaPausaAbierta(v: Vehicle): boolean {
+  if (v.status !== "activo") return false;
+  if (!isConquistaDesglosadorLite(v)) return false;
+  return isPausedPresence(v);
+}
+
+/** La otra conquista que ya ocupa el único cupo de pausa. */
+export function findOtraConquistaPausa(
+  vehicles: Vehicle[],
+  exceptId?: string
+): Vehicle | undefined {
+  return vehicles.find(v => v.id !== exceptId && isConquistaPausaAbierta(v));
+}
+
+export function canOpenConquistaPausa(
+  vehicles: Vehicle[],
+  vehicleId: string
+): { ok: true } | { ok: false; occupiedBy: Vehicle } {
+  const occupiedBy = findOtraConquistaPausa(vehicles, vehicleId);
+  if (occupiedBy) return { ok: false, occupiedBy };
+  return { ok: true };
+}
+
+export const CONQUISTA_PAUSA_UNICA_TOAST = "Ya hay una conquista en pausa";
+
+export function conquistaPausaUnicaHint(titulo?: string | null): string {
+  const t = (titulo ?? "").trim() || "la otra conquista";
+  return `${t} está congelada. Reanúdala o ciérrala antes de pausar otra.`;
+}
 
 function restanteUnidadesAlPausar(vehicle: Vehicle, now: number): number | undefined {
   const activeSub = (vehicle.subVehiculos ?? []).find(s => s.status === "activo");

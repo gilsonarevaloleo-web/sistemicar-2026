@@ -1,16 +1,33 @@
 /**
  * Historial liviano de huecos de cobertura.
+ *
+ * Regla: no hay plan → no hay hueco. El hueco nace en el horario del plan,
+ * no al abrir la jornada, y muere cuando termina la planificación.
+ * Fuera del plan, aunque la jornada esté abierta, no se mide.
+ *
  * Solo escribe en transiciones (hay / no hay vehículo consciente).
  * Sin timeline, sin anillo, sin computeLiveEntropy, sin tick 1s.
  */
 import {
+  clipInterval,
+  computeTriadaLineaOccupancy,
+  intersectIntervalsWithWindows,
+  mergeMsIntervals,
+  plannedWindowsMs,
   subtractMsIntervals,
   unjustifiedPauseIntervals,
   type MsInterval,
 } from "@/lib/concienciaTriadaLinea";
 import { hasActiveConsciousCoverage } from "@/lib/entropyTimePolicy";
+import { readLocalPlanillaSegmentos } from "@/lib/gastoConcienciaEngine";
 import type { Vehicle } from "@/lib/persistence";
-import { getLimaDayStartMs } from "@/lib/segmentTime";
+import {
+  getJournalDateString,
+  getLimaDayStartMs,
+  getSegmentCalendarDayStartMs,
+} from "@/lib/segmentTime";
+
+export type HuecoPlanSegmento = { horaInicio?: string; horaFin?: string };
 
 export const COBERTURA_HUECOS_KEY = "sistemicar_j4_cobertura_huecos_v1";
 export const MAX_HUECOS_EVENTS = 48;
@@ -39,6 +56,117 @@ export type CoberturaHuecoInterval = {
 
 function dayKeyFromMs(ms: number): string {
   return String(getLimaDayStartMs(ms));
+}
+
+function intervalToMs(it: CoberturaHuecoInterval, now: number): MsInterval | null {
+  const end = it.open ? now : (it.endMs ?? now);
+  return end > it.startMs ? { start: it.startMs, end } : null;
+}
+
+function planElapsedWindows(plan: MsInterval[], now: number): MsInterval[] {
+  const out: MsInterval[] = [];
+  for (let i = 0; i < plan.length; i++) {
+    const clipped = clipInterval(plan[i]!, plan[i]!.start, now);
+    if (clipped) out.push(clipped);
+  }
+  return out;
+}
+
+export function nowInsidePlan(plan: MsInterval[], now: number): boolean {
+  for (let i = 0; i < plan.length; i++) {
+    const w = plan[i]!;
+    if (now >= w.start && now < w.end) return true;
+  }
+  return false;
+}
+
+/** Ventanas del plan del día-jornada. Vacío = no hay hueco que medir. */
+export function resolveHuecoPlanWindows(params: {
+  segmentos?: HuecoPlanSegmento[];
+  now?: number;
+}): MsInterval[] {
+  const now = params.now ?? Date.now();
+  const fecha = getJournalDateString(now);
+  const segs = params.segmentos ?? readLocalPlanillaSegmentos(fecha);
+  if (segs.length === 0) return [];
+  return plannedWindowsMs(segs, getSegmentCalendarDayStartMs(now));
+}
+
+function closeTimeAtPlanEnd(
+  openAt: number,
+  plan: MsInterval[],
+  now: number
+): number | null {
+  let closeAt: number | null = null;
+  for (let i = 0; i < plan.length; i++) {
+    const w = plan[i]!;
+    if (w.end <= openAt) continue;
+    const candidate = Math.min(w.end, now);
+    if (candidate > openAt) {
+      closeAt = closeAt == null ? candidate : Math.max(closeAt, candidate);
+    }
+  }
+  return closeAt;
+}
+
+function overlayHuecoMeta(
+  gap: MsInterval,
+  logged: CoberturaHuecoInterval[],
+  now: number,
+  plan: MsInterval[]
+): CoberturaHuecoInterval {
+  const open = nowInsidePlan(plan, now) && gap.end >= now - 1_000;
+  let closedByTitulo: string | undefined;
+  let reason: CoberturaHuecoReason | undefined;
+  for (let i = 0; i < logged.length; i++) {
+    const it = logged[i]!;
+    const ms = intervalToMs(it, now);
+    if (!ms || ms.end <= gap.start || ms.start >= gap.end) continue;
+    if (it.closedByTitulo && !closedByTitulo) closedByTitulo = it.closedByTitulo;
+    if (it.reason && !reason) reason = it.reason;
+  }
+  return {
+    startMs: gap.start,
+    endMs: open ? null : gap.end,
+    open,
+    ...(closedByTitulo ? { closedByTitulo } : {}),
+    reason: reason ?? "corte",
+  };
+}
+
+/**
+ * Recorta al plan ya ocurrido y fusiona solapes.
+ * Sin esto, log + idle del desglosador sumaban 30–38 h de un mismo rato.
+ */
+export function clipHuecoIntervalsToPlan(
+  intervals: CoberturaHuecoInterval[],
+  plan: MsInterval[],
+  now = Date.now()
+): CoberturaHuecoInterval[] {
+  if (plan.length === 0 || intervals.length === 0) return [];
+  const elapsed = planElapsedWindows(plan, now);
+  if (elapsed.length === 0) return [];
+
+  const pieces: MsInterval[] = [];
+  const logged: CoberturaHuecoInterval[] = [];
+  for (let i = 0; i < intervals.length; i++) {
+    const it = intervals[i]!;
+    const ms = intervalToMs(it, now);
+    if (!ms) continue;
+    const clipped = intersectIntervalsWithWindows([ms], elapsed);
+    for (let p = 0; p < clipped.length; p++) {
+      const c = clipped[p]!;
+      pieces.push(c);
+      logged.push({
+        ...it,
+        startMs: c.start,
+        endMs: c.end,
+        open: Boolean(it.open) && c.end >= now - 1_000 && nowInsidePlan(plan, now),
+      });
+    }
+  }
+  if (pieces.length === 0) return [];
+  return mergeMsIntervals(pieces).map(gap => overlayHuecoMeta(gap, logged, now, plan));
 }
 
 function safeParse(raw: string | null): CoberturaHuecoEvent[] {
@@ -95,18 +223,38 @@ function lastEventToday(
 /**
  * Reconcilia cobertura actual vs último evento del día.
  * Barato: un boolean sobre vehículos activos. Llamar tras launch/cierre (idle/sombra ok).
+ * No abre hueco si no hay plan o si ahora está fuera del horario planificado.
  */
 export function reconcileCoberturaHuecos(params: {
   vehicles: Vehicle[];
   now?: number;
   /** Título del vehículo que acaba de cubrir (opcional). */
   coverTitulo?: string;
+  /** Plan del día. Si falta, se lee la planilla local. */
+  segmentos?: HuecoPlanSegmento[];
 }): CoberturaHuecoEvent | null {
   const now = params.now ?? Date.now();
   const dayKey = dayKeyFromMs(now);
-  const covered = hasActiveConsciousCoverage(params.vehicles, now);
+  const plan = resolveHuecoPlanWindows({
+    segmentos: params.segmentos,
+    now,
+  });
   const events = readCoberturaHuecosEvents();
   const last = lastEventToday(events, dayKey);
+
+  if (plan.length === 0 || !nowInsidePlan(plan, now)) {
+    if (plan.length > 0 && last?.kind === "gap_open") {
+      const closeT = closeTimeAtPlanEnd(last.t, plan, now);
+      if (closeT != null && closeT > last.t) {
+        const next: CoberturaHuecoEvent = { t: closeT, kind: "gap_close", dayKey };
+        writeEvents([...events, next]);
+        return next;
+      }
+    }
+    return null;
+  }
+
+  const covered = hasActiveConsciousCoverage(params.vehicles, now);
 
   if (!covered) {
     if (last?.kind === "gap_open") return null;
@@ -184,27 +332,25 @@ export function huecoDurationMin(startMs: number, endMs: number): number {
 }
 
 /**
- * Suma de cortes sin vehículo hoy.
+ * Suma de cortes sin vehículo hoy, en minutos únicos (sin solapes).
  * Misma cifra que debe mostrar el Pulso como inconsciente.
+ * Nunca suma el mismo rato dos veces (log + idle) ni sale del plan.
  */
 export function sumCoberturaHuecosMinutes(
   intervals: CoberturaHuecoInterval[],
   now = Date.now()
 ): number {
+  const raw: MsInterval[] = [];
+  for (let i = 0; i < intervals.length; i++) {
+    const ms = intervalToMs(intervals[i]!, now);
+    if (ms) raw.push(ms);
+  }
+  const merged = mergeMsIntervals(raw);
   let total = 0;
-  for (const it of intervals) {
-    const end = it.open ? now : (it.endMs ?? now);
-    total += huecoDurationMin(it.startMs, end);
+  for (let i = 0; i < merged.length; i++) {
+    total += huecoDurationMin(merged[i]!.start, merged[i]!.end);
   }
   return total;
-}
-
-/**
- * Copy de cobertura (cortes sin vehículo). Distinto de puntualidad de puertas.
- */
-function intervalToMs(it: CoberturaHuecoInterval, now: number): MsInterval | null {
-  const end = it.open ? now : (it.endMs ?? now);
-  return end > it.startMs ? { start: it.startMs, end } : null;
 }
 
 /**
@@ -242,19 +388,41 @@ export function appendUnjustifiedPausasToHuecos(
   return next;
 }
 
-/** Cortes del log + pausas no justificadas + idle del desglosador (misma regla que la métrica). */
+/** Cortes del log + pausas no justificadas + idle, recortados al plan ya ocurrido. */
 export function buildMetricaHuecoIntervals(params: {
   vehicles: Vehicle[];
   now?: number;
   events?: CoberturaHuecoEvent[];
+  /** Plan del día. Si falta, se lee la planilla local. Sin plan no hay hueco. */
+  segmentos?: HuecoPlanSegmento[];
 }): CoberturaHuecoInterval[] {
   const now = params.now ?? Date.now();
+  const plan = resolveHuecoPlanWindows({
+    segmentos: params.segmentos,
+    now,
+  });
+  if (plan.length === 0) return [];
+
   const events = params.events ?? readCoberturaHuecosEvents();
-  return appendUnjustifiedPausasToHuecos(
+  const logged = appendUnjustifiedPausasToHuecos(
     buildCoberturaHuecoIntervals(events, now),
     params.vehicles,
     now
   );
+  const fecha = getJournalDateString(now);
+  const occ = computeTriadaLineaOccupancy({
+    fecha,
+    segmentos: params.segmentos ?? readLocalPlanillaSegmentos(fecha),
+    vehicles: params.vehicles,
+    now,
+  });
+  const fromPlan: CoberturaHuecoInterval[] = occ.huecosIntervals.map(g => ({
+    startMs: g.start,
+    endMs: g.end,
+    open: false,
+    reason: "corte" as const,
+  }));
+  return clipHuecoIntervalsToPlan([...logged, ...fromPlan], plan, now);
 }
 
 export function formatCoberturaHuecosSummary(

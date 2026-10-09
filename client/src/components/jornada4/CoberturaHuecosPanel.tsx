@@ -7,6 +7,7 @@ import {
   formatHuecoDuration,
   sumCoberturaHuecosMinutes,
   type CoberturaHuecoInterval,
+  type HuecoPlanSegmento,
 } from "@/jornada4/coberturaHuecosLog";
 import type { Vehicle } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
@@ -20,6 +21,8 @@ type Props = {
   refreshKey?: number;
   /** Flota del día: las pausas no justificadas entran como hueco. */
   vehicles?: Vehicle[];
+  /** Plan del día. Sin plan no hay hueco. */
+  segmentos?: HuecoPlanSegmento[];
 };
 
 function intervalLabel(it: CoberturaHuecoInterval, now: number): string {
@@ -36,7 +39,11 @@ function intervalLabel(it: CoberturaHuecoInterval, now: number): string {
  * Revisión del día: cuándo se perdió cobertura.
  * Lista estática — sin tick, sin SVG, sin anillo.
  */
-export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
+export function CoberturaHuecosPanel({
+  refreshKey = 0,
+  vehicles = [],
+  segmentos,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [intervals, setIntervals] = useState<CoberturaHuecoInterval[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -44,8 +51,8 @@ export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
   const reload = useCallback(() => {
     const t = Date.now();
     setNow(t);
-    setIntervals(buildMetricaHuecoIntervals({ vehicles, now: t }));
-  }, [vehicles]);
+    setIntervals(buildMetricaHuecoIntervals({ vehicles, now: t, segmentos }));
+  }, [vehicles, segmentos]);
 
   useEffect(() => {
     reload();
@@ -99,15 +106,17 @@ export function CoberturaHuecosPanel({ refreshKey = 0, vehicles = [] }: Props) {
           >
             {intervals.length === 0 ? (
               <p className="pt-2 text-[10px] leading-snug" style={{ color: MUTED }}>
-                Aquí verás cortes entre bloques: ratos sin vehículo consciente.
-                No es impuntualidad de puerta — eso vive en Puertas del día.
+                {(segmentos?.length ?? 0) === 0
+                  ? "Sin plan no hay hueco. El hueco solo existe dentro del horario planificado."
+                  : "Aquí verás cortes dentro del plan: ratos sin vehículo consciente. Fuera del horario planificado no se mide, aunque la jornada esté abierta."}
               </p>
             ) : (
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
-                  Hueco = Inconsciente: plan ya ocurrido sin vehículo. Idle del
-                  desglosador (sin unidad/fila) y una pausa sin otro hilo cuentan
-                  igual. La tardanza de puerta no entra.
+                  Hueco = Inconsciente: se cuenta desde el horario del plan, no
+                  desde que se abre la jornada, y termina cuando termina la
+                  planificación. Idle del desglosador y una pausa sin otro hilo
+                  cuentan igual, solo dentro del plan.
                 </p>
                 {totalLabel ? (
                   <p

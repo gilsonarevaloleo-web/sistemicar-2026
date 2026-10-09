@@ -7,6 +7,7 @@ import {
   isSituacionListaLibre,
   isSituacionRing,
 } from "@/jornada4/filters";
+import { findOtraConquistaPausa } from "@/lib/conquistaPausa";
 import { isPausedPresence } from "@/lib/vehiculoPausa";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import type { DestinoCierre } from "@/lib/destinoCierre";
@@ -117,8 +118,12 @@ type Props = {
 
 const CYAN = "#00FFC3";
 
-function renderVehicleCard(v: Vehicle, ops: Ops) {
+function renderVehicleCard(v: Vehicle, ops: Ops, pausaOcupadaPor?: Vehicle) {
   if (isConquistaDesglosador(v)) {
+    const bloqueadaPor =
+      pausaOcupadaPor && pausaOcupadaPor.id !== v.id
+        ? (pausaOcupadaPor.titulo ?? "").trim() || "la otra conquista"
+        : undefined;
     return (
       <ConquistaCard
         key={v.id}
@@ -132,6 +137,7 @@ function renderVehicleCard(v: Vehicle, ops: Ops) {
         onAddSub={form => void ops.addConquistaSub(v.id, form)}
         onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
         onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+        pausaBloqueadaPor={bloqueadaPor}
         onLabelPausa={
           ops.labelPausaConquista
             ? titulo => void ops.labelPausaConquista!(v.id, titulo)
@@ -249,6 +255,7 @@ export function Jornada4VehicleList({
 
   const paused = vehicles.filter(isPausedPresence);
   const live = vehicles.filter(v => !isPausedPresence(v));
+  const pausaOcupadaPor = findOtraConquistaPausa(vehicles);
 
   return (
     <div className="px-3 pb-24 sm:px-4 space-y-2" data-testid="jornada4-list">
@@ -275,12 +282,12 @@ export function Jornada4VehicleList({
               className="px-0.5 text-[8px] font-black uppercase tracking-widest"
               style={{ color: CYAN }}
             >
-              En pausa · reanuda cuando termines el otro desglosador
+              Una sola pausa · reanuda o cierra antes de congelar otra
             </p>
-            {paused.map(v => renderVehicleCard(v, ops))}
+            {paused.map(v => renderVehicleCard(v, ops, pausaOcupadaPor))}
           </div>
         ) : null}
-        {live.map(v => renderVehicleCard(v, ops))}
+        {live.map(v => renderVehicleCard(v, ops, pausaOcupadaPor))}
         <p
           className="pt-1 text-center text-[8px] uppercase tracking-wider"
           style={{ color: GOLD }}

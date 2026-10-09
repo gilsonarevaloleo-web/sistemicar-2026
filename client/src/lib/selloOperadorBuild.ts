@@ -35,7 +35,11 @@ function resolveSelloTriada(params: {
   const huecosLog =
     params.huecosLog ??
     huecosLogToIntervals(
-      buildMetricaHuecoIntervals({ vehicles: params.vehicles, now: params.nowMs })
+      buildMetricaHuecoIntervals({
+        vehicles: params.vehicles,
+        now: params.nowMs,
+        segmentos: params.segmentos,
+      })
     );
   return buildConcienciaTriadaFromVehicles({
     fecha: params.fecha,

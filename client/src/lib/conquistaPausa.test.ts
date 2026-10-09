@@ -4,6 +4,9 @@ import type { Vehicle } from "./persistence.ts";
 import {
   buildConquistaPauseLabelPatch,
   buildConquistaPausePatch,
+  canOpenConquistaPausa,
+  findOtraConquistaPausa,
+  isConquistaPausaAbierta,
 } from "./conquistaPausa.ts";
 import { PAUSA_INTERRUPCION_TITULO, pausaAbiertaSinNombrar } from "./vehiculoPausa.ts";
 
@@ -61,5 +64,26 @@ describe("conquista pausa — sello en el padre, sin vehículo hijo", () => {
       subVehiculos: [{ id: "s1", titulo: "Pretina", status: "pendiente" }],
     } as Vehicle;
     assert.equal(buildConquistaPausePatch(v, "llamada"), null);
+  });
+
+  it("dos conquistas sí; dos pausas no", () => {
+    const now = Date.now();
+    const a = conquistaActiva(now);
+    const b = { ...conquistaActiva(now), id: "c2", titulo: "Buso" } as Vehicle;
+    assert.equal(canOpenConquistaPausa([a, b], a.id).ok, true);
+    assert.equal(findOtraConquistaPausa([a, b], a.id), undefined);
+
+    const pausedA = { ...a, ...buildConquistaPausePatch(a) } as Vehicle;
+    assert.equal(isConquistaPausaAbierta(pausedA), true);
+    const gate = canOpenConquistaPausa([pausedA, b], b.id);
+    assert.equal(gate.ok, false);
+    if (!gate.ok) assert.equal(gate.occupiedBy.id, "c1");
+  });
+
+  it("la conquista ya pausada puede seguir en pausa; no se bloquea a sí misma", () => {
+    const now = Date.now();
+    const a = { ...conquistaActiva(now), ...buildConquistaPausePatch(conquistaActiva(now)) } as Vehicle;
+    const b = { ...conquistaActiva(now), id: "c2" } as Vehicle;
+    assert.equal(canOpenConquistaPausa([a, b], a.id).ok, true);
   });
 });
