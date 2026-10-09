@@ -14,7 +14,7 @@ import {
   sumCoberturaHuecosMinutes,
   COBERTURA_HUECOS_KEY,
 } from "./coberturaHuecosLog.ts";
-import { plannedWindowsMs } from "../lib/concienciaTriadaLinea.ts";
+import { routineWindowsMs } from "../lib/concienciaTriadaLinea.ts";
 import { hasActiveConsciousCoverage } from "../lib/entropyTimePolicy.ts";
 import type { Vehicle } from "../lib/persistence.ts";
 import { getLimaDayStartMs, getSegmentCalendarDayStartMs } from "../lib/segmentTime.ts";
@@ -278,8 +278,7 @@ describe("coberturaHuecosLog", () => {
       now: t0 + 60 * 60_000,
       segmentos: segs,
     });
-    assert.equal(sumCoberturaHuecosMinutes(intervals, t0 + 60 * 60_000), 17);
-    assert.ok(intervals.some(it => it.closedByTitulo === "Prueba"));
+    assert.equal(sumCoberturaHuecosMinutes(intervals, t0 + 60 * 60_000), 12);
     assert.ok(intervals.some(it => it.reason === "pausa_no_justificada"));
   });
 
@@ -414,6 +413,46 @@ describe("coberturaHuecosLog", () => {
     }
   });
 
+  it("un gap_open de jornada no borra la unidad viva de la rutina", () => {
+    const t0 = Date.parse("2026-08-19T05:00:00-05:00");
+    const unitStart = Date.parse("2026-08-19T05:30:00-05:00");
+    const now = Date.parse("2026-08-19T08:14:00-05:00");
+    const dayKey = String(getLimaDayStartMs(now));
+    localStorage.setItem(
+      COBERTURA_HUECOS_KEY,
+      JSON.stringify([{ t: t0, kind: "gap_open", dayKey }])
+    );
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles: [
+        vehicle({
+          id: "costura",
+          status: "activo",
+          tipoReloj: "desglosador",
+          tipoFlota: "tiempo",
+          aperturaAt: unitStart,
+          destinoCierre: "peldano",
+          proyectoId: "n1",
+          subVehiculos: [
+            {
+              id: "u1",
+              titulo: "Corte",
+              status: "activo",
+              aperturaAt: unitStart,
+            },
+          ],
+        }),
+      ],
+      now,
+      segmentos: [
+        { horaInicio: "05:30", horaFin: "08:00" },
+        { horaInicio: "08:00", horaFin: "12:00" },
+        { horaInicio: "14:00", horaFin: "23:00" },
+      ],
+    });
+    const total = sumCoberturaHuecosMinutes(intervals, now);
+    assert.ok(total < 30, `trabajo de la mañana, no 2h 45 de inconsciente: ${total}`);
+  });
+
   it("plan corto no deja pintar 38 h de hueco", () => {
     const t0 = Date.parse("2026-08-19T05:00:00-05:00");
     const now = Date.parse("2026-08-19T23:00:00-05:00");
@@ -448,7 +487,7 @@ describe("coberturaHuecosLog", () => {
     assert.ok(total <= 3 * 60, `hueco ≤ plan 3 h, no 38 h: ${total}`);
     const plan = resolveHuecoPlanWindows({ segmentos: segs, now });
     const midnight = getSegmentCalendarDayStartMs(now);
-    assert.equal(plannedWindowsMs(segs, midnight).length, plan.length);
+    assert.equal(routineWindowsMs(segs, midnight).length, plan.length);
     const clipped = clipHuecoIntervalsToPlan(
       [
         { startMs: t0, endMs: now, open: true },

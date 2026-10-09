@@ -107,16 +107,16 @@ export function CoberturaHuecosPanel({
             {intervals.length === 0 ? (
               <p className="pt-2 text-[10px] leading-snug" style={{ color: MUTED }}>
                 {(segmentos?.length ?? 0) === 0
-                  ? "Sin plan no hay hueco. El hueco solo existe dentro del horario planificado."
-                  : "Aquí verás cortes dentro del plan: ratos sin vehículo consciente. Fuera del horario planificado no se mide, aunque la jornada esté abierta."}
+                  ? "Sin rutina no hay hueco. El hueco cubre la rutina del día, no un segmento suelto."
+                  : "Aquí verás cortes dentro de la rutina del día (primera hora → última). Entre segmentos también cuenta. Fuera de esa rutina, aunque la jornada esté abierta, no se mide."}
               </p>
             ) : (
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
-                  Hueco = Inconsciente: se cuenta desde el horario del plan, no
-                  desde que se abre la jornada, y termina cuando termina la
-                  planificación. Idle del desglosador y una pausa sin otro hilo
-                  cuentan igual, solo dentro del plan.
+                  Hueco = Inconsciente: la rutina del día ya ocurrida sin
+                  vehículo. No es un segmento suelto ni el momento en que se
+                  abre la jornada. Idle del desglosador y una pausa sin otro
+                  hilo cuentan igual, solo dentro de esa rutina.
                 </p>
                 {totalLabel ? (
                   <p

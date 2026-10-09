@@ -1,9 +1,9 @@
 /**
  * Historial liviano de huecos de cobertura.
  *
- * Regla: no hay plan → no hay hueco. El hueco nace en el horario del plan,
- * no al abrir la jornada, y muere cuando termina la planificación.
- * Fuera del plan, aunque la jornada esté abierta, no se mide.
+ * Regla: no hay rutina → no hay hueco. El hueco nace en la rutina del día
+ * (primera hora → última hora), no en un segmento suelto ni al abrir la jornada,
+ * y muere cuando termina esa rutina. Fuera de ella no se mide.
  *
  * Solo escribe en transiciones (hay / no hay vehículo consciente).
  * Sin timeline, sin anillo, sin computeLiveEntropy, sin tick 1s.
@@ -13,7 +13,7 @@ import {
   computeTriadaLineaOccupancy,
   intersectIntervalsWithWindows,
   mergeMsIntervals,
-  plannedWindowsMs,
+  routineWindowsMs,
   subtractMsIntervals,
   unjustifiedPauseIntervals,
   type MsInterval,
@@ -89,7 +89,7 @@ export function resolveHuecoPlanWindows(params: {
   const fecha = getJournalDateString(now);
   const segs = params.segmentos ?? readLocalPlanillaSegmentos(fecha);
   if (segs.length === 0) return [];
-  return plannedWindowsMs(segs, getSegmentCalendarDayStartMs(now));
+  return routineWindowsMs(segs, getSegmentCalendarDayStartMs(now));
 }
 
 function closeTimeAtPlanEnd(
@@ -388,12 +388,15 @@ export function appendUnjustifiedPausasToHuecos(
   return next;
 }
 
-/** Cortes del log + pausas no justificadas + idle, recortados al plan ya ocurrido. */
+/**
+ * Huecos de la rutina ya ocurrida (ocupación − trabajo).
+ * El log solo nombra cortes; no tapa un vehículo que sí avanzó.
+ */
 export function buildMetricaHuecoIntervals(params: {
   vehicles: Vehicle[];
   now?: number;
   events?: CoberturaHuecoEvent[];
-  /** Plan del día. Si falta, se lee la planilla local. Sin plan no hay hueco. */
+  /** Rutina del día. Si falta, se lee la planilla local. Sin rutina no hay hueco. */
   segmentos?: HuecoPlanSegmento[];
 }): CoberturaHuecoInterval[] {
   const now = params.now ?? Date.now();
@@ -403,26 +406,27 @@ export function buildMetricaHuecoIntervals(params: {
   });
   if (plan.length === 0) return [];
 
-  const events = params.events ?? readCoberturaHuecosEvents();
-  const logged = appendUnjustifiedPausasToHuecos(
-    buildCoberturaHuecoIntervals(events, now),
-    params.vehicles,
-    now
-  );
   const fecha = getJournalDateString(now);
+  const segs = params.segmentos ?? readLocalPlanillaSegmentos(fecha);
   const occ = computeTriadaLineaOccupancy({
     fecha,
-    segmentos: params.segmentos ?? readLocalPlanillaSegmentos(fecha),
+    segmentos: segs,
     vehicles: params.vehicles,
     now,
   });
-  const fromPlan: CoberturaHuecoInterval[] = occ.huecosIntervals.map(g => ({
-    startMs: g.start,
-    endMs: g.end,
-    open: false,
-    reason: "corte" as const,
-  }));
-  return clipHuecoIntervalsToPlan([...logged, ...fromPlan], plan, now);
+  if (occ.huecosIntervals.length === 0) return [];
+
+  const events = params.events ?? readCoberturaHuecosEvents();
+  const logged = clipHuecoIntervalsToPlan(
+    appendUnjustifiedPausasToHuecos(
+      buildCoberturaHuecoIntervals(events, now),
+      params.vehicles,
+      now
+    ),
+    plan,
+    now
+  );
+  return occ.huecosIntervals.map(g => overlayHuecoMeta(g, logged, now, plan));
 }
 
 export function formatCoberturaHuecosSummary(

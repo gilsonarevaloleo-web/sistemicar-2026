@@ -7,7 +7,6 @@ import { NO_CONQUISTADO_META, TRIADA_META } from "@/lib/concienciaTriadaOperador
 import {
   computeGastoConcienciaDia,
   formatDuracionTimon,
-  huecosLogToIntervals,
   MINUTOS_DIA_JORNADA,
   readLocalPlanillaSegmentos,
   type GastoVehiculoRegistro,
@@ -29,9 +28,6 @@ import {
   hydratePresenciaEpisodio,
   type TimonEpisodio,
 } from "@/lib/timonHoras";
-import {
-  buildMetricaHuecoIntervals,
-} from "@/jornada4/coberturaHuecosLog";
 import type { Vehicle } from "@/lib/persistence";
 
 const PIZARRA = "#0a0a0a";
@@ -102,13 +98,6 @@ export function ProyectoGastoConcienciaCard({
   const [horizon, setHorizon] = useState<Horizon>("dia");
   const fecha = getJournalDateString();
   const segmentos = useMemo(() => readLocalPlanillaSegmentos(fecha), [fecha]);
-  const huecosLog = useMemo(
-    () =>
-      huecosLogToIntervals(
-        buildMetricaHuecoIntervals({ vehicles, segmentos })
-      ),
-    [vehicles, segmentos]
-  );
   const delProyecto = useMemo(
     () => vehicles.filter(v => (v.proyectoId ?? "").trim() === proyectoId),
     [vehicles, proyectoId]
@@ -120,10 +109,9 @@ export function ProyectoGastoConcienciaCard({
         fecha,
         segmentos,
         vehicles,
-        huecosLog,
         proyectoId,
       }),
-    [fecha, segmentos, vehicles, huecosLog, proyectoId]
+    [fecha, segmentos, vehicles, proyectoId]
   );
 
   const presencia = useMemo(

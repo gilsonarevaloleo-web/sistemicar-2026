@@ -17,7 +17,7 @@ import {
   intersectIntervalsWithWindows,
   limaMidnightFromJournalFecha,
   mergeMsIntervals,
-  plannedWindowsMs,
+  routineWindowsMs,
   subtractMsIntervals,
   sumIntervalMinutes,
   type MsInterval,
@@ -200,7 +200,7 @@ export function computeGastoConcienciaDia(params: {
       return { start, end: start + MINUTOS_DIA_JORNADA * 60_000, midnight };
     })();
 
-  const plan = plannedWindowsMs(params.segmentos, journal.midnight);
+  const plan = routineWindowsMs(params.segmentos, journal.midnight);
   const minutosPlan = round1(sumIntervalMinutes(plan));
   const minutosNoConquistado = round1(
     Math.max(0, MINUTOS_DIA_JORNADA - minutosPlan)

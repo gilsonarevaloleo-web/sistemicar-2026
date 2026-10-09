@@ -99,11 +99,11 @@ describe("revelacionPlanDia", () => {
       now: lima("23:05"),
     });
     assert.ok(r);
-    assert.equal(r.minutosPlan, 360);
+    assert.equal(r.minutosPlan, 14 * 60);
     assert.equal(r.minutosDireccion, 60);
     assert.equal(r.minutosPresencia, 60);
-    assert.equal(r.minutosPorConquistar, 24 * 60 - 360);
-    assert.equal(r.minutosInconsciente, 240);
+    assert.equal(r.minutosPorConquistar, 24 * 60 - 14 * 60);
+    assert.equal(r.minutosInconsciente, 12 * 60);
     assert.equal(r.minutosDia, 24 * 60);
     assert.match(r.headline, /inconsciencia|Dirección|Presencia|día/);
     assert.equal(r.planEndLabel, "23:00");

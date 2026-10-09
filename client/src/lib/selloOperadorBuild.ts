@@ -7,7 +7,6 @@ import {
   buildConcienciaTriadaFromVehicles,
   type ConcienciaTriadaModel,
 } from "@/lib/concienciaTriadaOperador";
-import { huecosLogToIntervals } from "@/lib/gastoConcienciaEngine";
 import { filterVehiclesForAnilloCoverage } from "@/lib/ghostVehicleEngine";
 import { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
 import {
@@ -18,7 +17,6 @@ import {
 } from "@/lib/persistence";
 import { conteoRecintosDelDia } from "@/lib/recintoMinimoStore";
 import { getJournalDateString } from "@/lib/segmentTime";
-import { buildMetricaHuecoIntervals } from "@/jornada4/coberturaHuecosLog";
 import type { MsInterval } from "@/lib/concienciaTriadaLinea";
 
 export { selloTiempoDesdeTriada } from "@/lib/selloTiempoTriada";
@@ -32,21 +30,12 @@ function resolveSelloTriada(params: {
   huecosLog?: MsInterval[];
 }): ConcienciaTriadaModel {
   if (params.triada) return params.triada;
-  const huecosLog =
-    params.huecosLog ??
-    huecosLogToIntervals(
-      buildMetricaHuecoIntervals({
-        vehicles: params.vehicles,
-        now: params.nowMs,
-        segmentos: params.segmentos,
-      })
-    );
   return buildConcienciaTriadaFromVehicles({
     fecha: params.fecha,
     segmentos: params.segmentos,
     vehicles: params.vehicles,
     now: params.nowMs,
-    huecosLog,
+    huecosLog: params.huecosLog,
   });
 }
 
