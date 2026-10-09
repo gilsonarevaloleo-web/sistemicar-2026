@@ -31,7 +31,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/espejo", nombre: "Espejo Soberano", desc: "Vaciado mental · Doctor IA", icon: Heart, color: "#ef4444", acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
-      { path: "/esperanza", nombre: "Depósito V2", desc: "Universidad — 1 volcado G1 de prueba, después Matrícula", icon: Star, color: EMERALD, acceso: "usuario" },
+      { path: "/esperanza", nombre: "Depósito V3", desc: "Universidad — óptica + carácter + Δ", icon: Star, color: EMERALD, acceso: "usuario" },
     ]
   },
   {

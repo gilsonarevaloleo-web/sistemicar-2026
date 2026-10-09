@@ -106,6 +106,7 @@ import { buildDialogTurns, parseGatherChoice } from "../shared/vendedor/dialogoG
 import { registerEspejoV2Routes } from "./espejoV2Routes";
 import { registerUmbralV2Routes } from "./umbralV2Routes";
 import { registerDepositoV2Routes } from "./depositoV2Routes";
+import { registerDepositoV3Routes } from "./depositoV3Routes";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -2302,6 +2303,7 @@ registerUmbralV2Routes(app, {
   sessionStore: umbralSessionStore,
 });
 registerDepositoV2Routes(app, { callGemini });
+registerDepositoV3Routes(app, { callGemini });
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
   try {

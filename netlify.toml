@@ -30,6 +30,13 @@
   status = 200
   force = true
 
+# Depósito V3 — auditoría óptica-sintaxis (función dedicada)
+[[redirects]]
+  from = "/api/deposito/v3/audit"
+  to = "/.netlify/functions/deposito-v3-audit"
+  status = 200
+  force = true
+
 # API Express → función serverless
 [[redirects]]
   from = "/api/*"
