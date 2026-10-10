@@ -57,6 +57,7 @@ import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { CardLeyCaracterCodigo } from "./CardLeyCaracterCodigo";
 import { CardMaestroCodigo } from "./CardMaestroCodigo";
+import { CardCartaCruce } from "./CardCartaCruce";
 import { CardOfertaArena } from "./CardOfertaArena";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
@@ -704,6 +705,10 @@ export function ConsolaUmbral({
           )}
         </motion.section>
 
+        {modo === "EXTERNO_VENTAS" && ofertaActiva && (
+          <CardCartaCruce oferta={ofertaActiva} variante="completa" />
+        )}
+
         <div className="border border-white/10 bg-black/40 p-4">
           <p className="mb-3 text-[10px] tracking-widest text-white/40">
             RESUMEN DE SESIÓN
@@ -999,6 +1004,18 @@ export function ConsolaUmbral({
           onActivar={activarOferta}
         />
       )}
+
+      {modo === "EXTERNO_VENTAS" &&
+        ofertaActiva &&
+        progresoOferta &&
+        progresoOferta.sellosCount > 0 && (
+          <CardCartaCruce
+            oferta={ofertaActiva}
+            variante={
+              progresoOferta.sellosCount >= 10 ? "completa" : "compacta"
+            }
+          />
+        )}
 
       {/* PANEL CENTRAL */}
       <AnimatePresence mode="wait">

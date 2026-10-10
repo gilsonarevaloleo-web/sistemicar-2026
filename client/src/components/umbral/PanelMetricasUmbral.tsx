@@ -556,7 +556,7 @@ export function PanelMetricasUmbral({
                         <p className="mt-0.5 text-[11px] text-white/40">
                           {p.siguiente
                             ? `Pendiente C${p.siguiente}`
-                            : "10/10 · oferta cerrada"}
+                            : "10/10 · carta lista"}
                           {o.fraseUtilidad ? ` · ${o.fraseUtilidad}` : ""}
                         </p>
                       </div>

@@ -216,6 +216,7 @@ export function CardOfertaArena({
           data-testid="umbral-v2-oferta-sellos"
         >
           {progreso.sellosCount}/10
+          {progreso.sellosCount >= 10 ? " · CARTA" : ""}
         </p>
       </div>
 

@@ -40,6 +40,7 @@ describe("Umbral v2 anti-freeze nav", () => {
     assert.match(src, /codigoTrasAprobar/);
     assert.match(src, /HISTORIAL DE ESTE CÓDIGO/);
     assert.match(src, /CardOfertaArena/);
+    assert.match(src, /CardCartaCruce/);
     assert.match(src, /ofertaNombre/);
     assert.match(src, /Sin nombre no hay Arena|arenaSinOferta/);
   });
