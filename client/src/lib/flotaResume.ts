@@ -12,7 +12,10 @@ import {
 import { getJournalDayStartMs } from "./segmentTime";
 import { ringSessionOperable } from "./ringEnfoqueReal";
 import { mergeActiveVehicleSessionState } from "./situacionSessionMerge";
-import { conquistaSessionPauseRank } from "./vehiculoPausa";
+import {
+  conquistaPauseAction,
+  conquistaPauseActionIsNewer,
+} from "./vehiculoPausa";
 import {
   applyVehicleSessionSeal,
   isVehicleSessionSealed,
@@ -55,8 +58,8 @@ function conquistaSessionRichness(v: Vehicle): number {
   if ((v.desglosadorBloqueDepthPsGranted ?? 0) > 0) {
     score += v.desglosadorBloqueDepthPsGranted!;
   }
-  // Pausa abierta pesa más que un snapshot «en curso» sin sello de reanudación.
-  score += conquistaSessionPauseRank(v) * 40;
+  // Pausa o resume pesan igual frente a «en curso». Quién gana se decide por timestamp.
+  if (conquistaPauseAction(v).kind !== "running") score += 40;
   return score;
 }
 
@@ -70,9 +73,8 @@ export function diskSessionRicherThanMemory(memory: Vehicle, disk: Vehicle): boo
   const dCon = conquistaSessionRichness(disk);
   const mCon = conquistaSessionRichness(memory);
   if (dCon !== mCon) return dCon > mCon;
-  const dPause = conquistaSessionPauseRank(disk);
-  const mPause = conquistaSessionPauseRank(memory);
-  if (dPause !== mPause) return dPause > mPause;
+  if (conquistaPauseActionIsNewer(disk, memory)) return true;
+  if (conquistaPauseActionIsNewer(memory, disk)) return false;
   return false;
 }
 

@@ -373,6 +373,32 @@ describe("flotaResume", () => {
     });
     assert.equal(keepResume.next[0]!.subVehiculos?.[0]?.status, "activo");
     assert.equal(keepResume.next[0]!.interrupcionActiva, undefined);
+
+    const pausedAgain = v({
+      id: "c1",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { pausadoAt: 800, subActivoId: "u1", elapsedSecSnapshot: 10 },
+      pausas: [
+        { pausadoAt: 150, reanudadoAt: 400 },
+        { pausadoAt: 800 },
+      ],
+      subVehiculos: [
+        { id: "u1", titulo: "Unidad 1", status: "nested_paused", aperturaAt: 400 },
+        { id: "u2", titulo: "Unidad 2", status: "pendiente" },
+      ],
+    });
+    assert.equal(diskSessionRicherThanMemory(pausedAgain, resumed), false);
+    const keepSecondPause = rehydrateFlotaFromDiskSources({
+      memory: [pausedAgain],
+      local: [resumed],
+      parked: [resumed],
+      nowMs: Date.now(),
+      dayStartMs: 0,
+    });
+    assert.equal(keepSecondPause.next[0]!.interrupcionActiva, true);
+    assert.equal(keepSecondPause.next[0]!.subVehiculos?.[0]?.status, "nested_paused");
   });
 
   it("rehydrate no resucita parked sellado ni cubre huecos posteriores", () => {

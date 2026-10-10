@@ -123,30 +123,82 @@ export function isPausedPresence(v: PausedPresenceVehicle): boolean {
   return (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
 }
 
-/**
- * Quién gana en un merge de conquista: reanudar explícito > pausa abierta >
- * en curso sin sello (snapshot viejo que aún no vio el Pause).
- *
- * 2 = el operador ya reanudó (sello cerrado + sub activo)
- * 1 = pausa abierta — debe sobrevivir a un eco Firebase en curso
- * 0 = en curso sin sello de reanudación (puede ser el snapshot previo a pausar)
- */
-export function conquistaSessionPauseRank(v: {
+export type ConquistaPauseSnapshot = {
   tipoReloj?: string;
   interrupcionActiva?: boolean;
-  desglosadorPausa?: { subActivoId?: string } | null;
+  desglosadorPausa?: { subActivoId?: string; pausadoAt?: number } | null;
   subVehiculos?: Array<{ status?: string }>;
   pausas?: VehiculoPausaStamp[];
-}): number {
-  if (v.tipoReloj !== "desglosador") return 0;
+};
+
+export type ConquistaPauseActionKind = "pause" | "resume" | "running";
+
+export type ConquistaPauseAction = {
+  kind: ConquistaPauseActionKind;
+  at: number;
+};
+
+/**
+ * Última acción del operador sobre la pausa de conquista.
+ * No es un ranking total: un resume viejo no vence a una pausa más nueva.
+ */
+export function conquistaPauseAction(v: ConquistaPauseSnapshot): ConquistaPauseAction {
+  if (v.tipoReloj !== "desglosador") return { kind: "running", at: 0 };
   const paused =
     v.interrupcionActiva === true ||
     !!v.desglosadorPausa?.subActivoId ||
     (v.subVehiculos ?? []).some(s => s.status === "nested_paused");
-  if (paused) return 1;
-  const resumed = (v.pausas ?? []).some(p => p.reanudadoAt != null);
+  if (paused) {
+    const open = (v.pausas ?? []).find(p => p.reanudadoAt == null);
+    const at = v.desglosadorPausa?.pausadoAt ?? open?.pausadoAt ?? 0;
+    return { kind: "pause", at };
+  }
+  let lastResume = 0;
+  for (const p of v.pausas ?? []) {
+    if (p.reanudadoAt != null && p.reanudadoAt > lastResume) lastResume = p.reanudadoAt;
+  }
   const hasActive = (v.subVehiculos ?? []).some(s => s.status === "activo");
-  if (resumed && hasActive) return 2;
+  if (lastResume > 0 && hasActive) return { kind: "resume", at: lastResume };
+  return { kind: "running", at: 0 };
+}
+
+/**
+ * True si `candidate` tiene una pausa/reanudación más reciente que `incumbent`.
+ * Empate o sin reloj comparable: no pisa. Pausa sin timestamp no se rinde a un resume.
+ */
+export function conquistaPauseActionIsNewer(
+  candidate: ConquistaPauseSnapshot,
+  incumbent: ConquistaPauseSnapshot
+): boolean {
+  const c = conquistaPauseAction(candidate);
+  const i = conquistaPauseAction(incumbent);
+  if (c.kind === "running") return false;
+  if (i.kind === "running") return true;
+  if (c.at === 0 || i.at === 0) {
+    if (c.kind === i.kind) return c.at > i.at;
+    return c.kind === "pause";
+  }
+  return c.at > i.at;
+}
+
+/** En merge: la acción más reciente gana; empate se queda con `local`. */
+export function pickConquistaSessionPauseSource<T extends ConquistaPauseSnapshot>(
+  local: T,
+  remote: T
+): T {
+  return conquistaPauseActionIsNewer(remote, local) ? remote : local;
+}
+
+/**
+ * Estado puntual de un snapshot (no comparar dos lados con esto).
+ * 2 = resume cerrado + sub activo
+ * 1 = pausa abierta
+ * 0 = en curso sin sello
+ */
+export function conquistaSessionPauseRank(v: ConquistaPauseSnapshot): number {
+  const action = conquistaPauseAction(v);
+  if (action.kind === "resume") return 2;
+  if (action.kind === "pause") return 1;
   return 0;
 }
 
