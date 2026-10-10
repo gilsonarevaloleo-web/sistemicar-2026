@@ -133,7 +133,7 @@ export function registerUmbralV2Routes(
 
   app.get("/api/umbral/meta", (_req: Request, res: Response) => {
     res.json({
-      version: "2.2.0-historial-logros",
+      version: "2.3.0-oferta-arena",
       endpoint: "POST /api/umbral/evaluar",
       sesiones: ["GET /api/umbral/sesiones", "GET /api/umbral/sesion/:id"],
       modos: ["INTERNO_HABILIDAD", "EXTERNO_VENTAS"],
@@ -266,11 +266,16 @@ export function registerUmbralV2Routes(
         return fallback(400, "respuestaUsuario es requerida");
       }
 
+      const ofertaNombre = String(req.body?.ofertaNombre ?? "").trim();
+      const fraseUtilidad = String(req.body?.fraseUtilidad ?? "").trim();
+
       const promptInput = {
         codigo: codigoActual,
         modo,
         respuestaUsuario,
         historialPrevio,
+        ...(ofertaNombre ? { ofertaNombre } : {}),
+        ...(fraseUtilidad ? { fraseUtilidad } : {}),
       };
       const prompt = obtenerPromptEvaluacion(promptInput);
 

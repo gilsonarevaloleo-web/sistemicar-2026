@@ -30,6 +30,15 @@ import {
   cargarLogrosFirestore,
   persistirLogrosFusionados,
 } from "@/lib/umbral/logrosStore";
+import {
+  cargarOfertasFirestore,
+  loadUmbralOfertasLocal,
+  persistirOfertasFusionadas,
+} from "@/lib/umbral/ofertasStore";
+import {
+  calcularProgresoOferta,
+  type OfertaArena,
+} from "@shared/umbral/ofertaArena";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -321,6 +330,7 @@ export function PanelMetricasUmbral({
     null,
   );
   const [progreso, setProgreso] = useState<ProgresoCarreraUmbral | null>(null);
+  const [ofertas, setOfertas] = useState<OfertaArena[]>([]);
 
   async function cargar() {
     setLoading(true);
@@ -342,6 +352,19 @@ export function PanelMetricasUmbral({
       setSesiones(data.sesiones);
       setMetricas(data.metricas);
       setProgreso(fused);
+      const localOfertas = loadUmbralOfertasLocal(userId);
+      let remoteOfertas;
+      try {
+        remoteOfertas = await cargarOfertasFirestore(userId);
+      } catch {
+        remoteOfertas = undefined;
+      }
+      const fusedOfertas = persistirOfertasFusionadas(
+        userId,
+        localOfertas,
+        remoteOfertas,
+      );
+      setOfertas(fusedOfertas.ofertas);
     } catch (e: any) {
       setError(e?.message || "No se pudieron cargar las métricas.");
     } finally {
@@ -371,7 +394,7 @@ export function PanelMetricasUmbral({
             MÉTRICAS DIAGNÓSTICAS · UMBRAL V2
           </p>
           <p className="mt-1 text-[11px] text-white/40">
-            Historial de logros por código, cuellos de botella y fricción
+            Historial de logros, ofertas de La Arena y fricción
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -504,6 +527,51 @@ export function PanelMetricasUmbral({
                 : ""}
             </p>
           </section>
+
+          {ofertas.length > 0 && (
+            <section
+              className="border border-white/12 bg-black/45 p-5"
+              data-testid="umbral-metricas-ofertas"
+            >
+              <p
+                className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
+                style={{ color: WARN }}
+              >
+                <Target size={14} />
+                OFERTAS EN LA ARENA
+              </p>
+              <ul className="mt-3 space-y-2">
+                {ofertas.map((o) => {
+                  const p = calcularProgresoOferta(o);
+                  return (
+                    <li
+                      key={o.id}
+                      className="flex items-start justify-between gap-3 border border-white/8 bg-black/30 px-3 py-2.5"
+                      data-testid={`umbral-metricas-oferta-${o.id}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-white/85">
+                          {o.nombre}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-white/40">
+                          {p.siguiente
+                            ? `Pendiente C${p.siguiente}`
+                            : "10/10 · carta lista"}
+                          {o.fraseUtilidad ? ` · ${o.fraseUtilidad}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 text-sm font-bold"
+                        style={{ color: GOLD }}
+                      >
+                        {p.sellosCount}/10
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           {/* Distribución de fricción */}
           <section

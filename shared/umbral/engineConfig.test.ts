@@ -110,6 +110,33 @@ describe("Umbral v2 — engineConfig", () => {
     assert.match(prompt.system, /utilidad/i);
     assert.match(prompt.system, /Cortador de Niebla/);
     assert.match(prompt.system, /La Arena/);
+    assert.doesNotMatch(prompt.system, /OFERTA EN JUICIO/);
+  });
+
+  it("Arena con oferta nombra el producto en el prompt y ancla la objeción", () => {
+    const prompt = obtenerPromptEvaluacion({
+      codigo: 1,
+      modo: "EXTERNO_VENTAS",
+      respuestaUsuario: "Corte Limpio te nombra el crack en una frase.",
+      ofertaNombre: "Corte Limpio",
+      fraseUtilidad: "Nombra el crack y lo corta hoy.",
+    });
+    assert.match(prompt.system, /OFERTA EN JUICIO/);
+    assert.match(prompt.system, /Corte Limpio/);
+    assert.match(prompt.system, /Nombra el crack y lo corta hoy/);
+    assert.match(prompt.system, /no veo para qué me sirve Corte Limpio/i);
+  });
+
+  it("Forja ignora ofertaNombre: no es sujeto del modo interno", () => {
+    const prompt = obtenerPromptEvaluacion({
+      codigo: 1,
+      modo: "INTERNO_HABILIDAD",
+      respuestaUsuario: "La excusa puntual es abrir el celular al vender.",
+      ofertaNombre: "Corte Limpio",
+      fraseUtilidad: "No debería aparecer.",
+    });
+    assert.doesNotMatch(prompt.system, /OFERTA EN JUICIO/);
+    assert.doesNotMatch(prompt.system, /Corte Limpio/);
   });
 
   it("en código 10 el prompt indica codigoSiguiente null al aprobar", () => {

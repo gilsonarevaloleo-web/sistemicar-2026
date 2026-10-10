@@ -16,6 +16,10 @@ import {
   armarBloqueMaestro,
   feedbackMaestroLocal,
 } from "./maestroConfig.ts";
+import {
+  anclarTextoAOferta,
+  bloquePromptOferta,
+} from "./ofertaArenaTexto.ts";
 
 export type ModoUmbral = "INTERNO_HABILIDAD" | "EXTERNO_VENTAS";
 
@@ -62,6 +66,10 @@ export interface PromptEvaluacionInput {
   respuestaUsuario: string;
   /** Contexto opcional de turnos previos (Umbral v2 parte 2). */
   historialPrevio?: HistorialUmbralItem[];
+  /** Nombre de la oferta en juicio (solo La Arena). */
+  ofertaNombre?: string;
+  /** Frase de utilidad C1 de la oferta nombrada. */
+  fraseUtilidad?: string;
 }
 
 export interface EvaluacionGeminiJson {
@@ -489,6 +497,19 @@ export function obtenerPromptEvaluacion(
   const modoMeta = MODOS_UMBRAL[modo];
   const next = siguienteCodigo(codigo);
   const bloqueMaestro = armarBloqueMaestro(codigo, modo);
+  const ofertaNombre = String(input.ofertaNombre ?? "").trim();
+  const fraseUtilidad = String(input.fraseUtilidad ?? "").trim();
+  const ofertaActiva = modo === "EXTERNO_VENTAS" && ofertaNombre.length > 0;
+  const bloqueOferta = ofertaActiva
+    ? bloquePromptOferta({ nombre: ofertaNombre, fraseUtilidad })
+    : "";
+
+  const objecionAnclada = ofertaActiva
+    ? anclarTextoAOferta(cfg.modoExterno.objecionCliente, ofertaNombre)
+    : cfg.modoExterno.objecionCliente;
+  const estadoAnclado = ofertaActiva
+    ? anclarTextoAOferta(cfg.modoExterno.estadoMentalCliente, ofertaNombre)
+    : cfg.modoExterno.estadoMentalCliente;
 
   const bloqueModo =
     modo === "INTERNO_HABILIDAD"
@@ -501,8 +522,8 @@ export function obtenerPromptEvaluacion(
         ].join("\n")
       : [
           `MODO: EXTERNO_VENTAS ("${modoMeta.label}" / ${modoMeta.alias})`,
-          `Objeción típica del cliente: ${cfg.modoExterno.objecionCliente}`,
-          `Estado mental del cliente: ${cfg.modoExterno.estadoMentalCliente}`,
+          `Objeción típica del cliente: ${objecionAnclada}`,
+          `Estado mental del cliente: ${estadoAnclado}`,
           `Criterio de aprobación del vendedor: ${cfg.modoExterno.criterioAprobacionVendedor}`,
           `Instrucción de evaluación: ${cfg.modoExterno.instruccionEvaluadorGemini}`,
         ].join("\n");
@@ -537,6 +558,7 @@ export function obtenerPromptEvaluacion(
     "",
     `CÓDIGO EN EVALUACIÓN: ${cfg.nombre}`,
     `Concepto clave: ${cfg.conceptoClave}`,
+    bloqueOferta,
     bloqueModo,
   ].join("\n");
 
