@@ -12,7 +12,10 @@ import {
   pausaAbiertaSinNombrar,
   tituloPausaAbierta,
   tituloPausaInterrupcion,
+  conquistaPauseAction,
+  conquistaPauseActionIsNewer,
   conquistaSessionPauseRank,
+  pickConquistaSessionPauseSource,
 } from "./vehiculoPausa.ts";
 
 describe("vehiculoPausa — historia de presencia", () => {
@@ -109,5 +112,47 @@ describe("vehiculoPausa — historia de presencia", () => {
       }),
       2
     );
+  });
+
+  it("un resume viejo no vence a una pausa más nueva", () => {
+    const paused = {
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { subActivoId: "s1", pausadoAt: 500 },
+      subVehiculos: [{ status: "nested_paused" }],
+      pausas: [
+        { pausadoAt: 150, reanudadoAt: 400 },
+        { pausadoAt: 500 },
+      ],
+    };
+    const staleResume = {
+      tipoReloj: "desglosador",
+      pausas: [{ pausadoAt: 150, reanudadoAt: 400 }],
+      subVehiculos: [{ status: "activo" }],
+    };
+    assert.equal(conquistaPauseAction(paused).kind, "pause");
+    assert.equal(conquistaPauseAction(staleResume).kind, "resume");
+    assert.equal(conquistaPauseActionIsNewer(staleResume, paused), false);
+    assert.equal(conquistaPauseActionIsNewer(paused, staleResume), true);
+    assert.equal(pickConquistaSessionPauseSource(paused, staleResume), paused);
+    assert.equal(pickConquistaSessionPauseSource(staleResume, paused), paused);
+  });
+
+  it("un reanudar explícito más nuevo sí vence a la pausa anterior", () => {
+    const paused = {
+      tipoReloj: "desglosador",
+      interrupcionActiva: true,
+      desglosadorPausa: { subActivoId: "s1", pausadoAt: 150 },
+      subVehiculos: [{ status: "nested_paused" }],
+      pausas: [{ pausadoAt: 150 }],
+    };
+    const resumed = {
+      tipoReloj: "desglosador",
+      pausas: [{ pausadoAt: 150, reanudadoAt: 400 }],
+      subVehiculos: [{ status: "activo" }],
+    };
+    assert.equal(conquistaPauseActionIsNewer(resumed, paused), true);
+    assert.equal(pickConquistaSessionPauseSource(resumed, paused), resumed);
+    assert.equal(pickConquistaSessionPauseSource(paused, resumed), resumed);
   });
 });

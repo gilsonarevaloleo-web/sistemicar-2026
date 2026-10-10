@@ -1,6 +1,9 @@
 import type { DetalleSubTarea, SubTarea, SubVehiculo, Vehicle } from "./persistence";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
-import { conquistaSessionPauseRank, isPausedPresence } from "./vehiculoPausa";
+import {
+  conquistaPauseAction,
+  pickConquistaSessionPauseSource,
+} from "./vehiculoPausa";
 
 function countSubTareasEnCronometro(v: Vehicle): number {
   return v.subTareas?.filter(st => st.enDesgloseCronometro).length ?? 0;
@@ -243,8 +246,10 @@ export function preferLocalSubVehiculosInVehicleList(
     const local = localSources.find(l => l.id === m.id);
     if (!local) return m;
     const preferSubs = shouldPreferLocalSubVehiculos(m, local);
-    const localPauseWins = conquistaSessionPauseRank(local) > conquistaSessionPauseRank(m);
-    if (!preferSubs && !localPauseWins) return m;
+    const localAction = conquistaPauseAction(local);
+    const localIsPauseSource =
+      pickConquistaSessionPauseSource(local, m) === local && localAction.kind !== "running";
+    if (!preferSubs && !localIsPauseSource) return m;
     changed = true;
     const next: Vehicle = preferSubs
       ? {
@@ -252,7 +257,7 @@ export function preferLocalSubVehiculosInVehicleList(
           subVehiculos: mergeSubVehiculosById(m.subVehiculos, local.subVehiculos),
         }
       : m;
-    if (localPauseWins || isPausedPresence(local)) {
+    if (localIsPauseSource) {
       return {
         ...next,
         interrupcionActiva: local.interrupcionActiva,
@@ -421,10 +426,8 @@ export function mergeActiveVehicleSessionState(firebaseV: Vehicle, localV: Vehic
       (localV.subVehiculos?.length ?? 0) > 0 &&
       localV.subVehiculos!.every(s => s.status === "cumplido" || s.status === "fallado");
     const localClosed = localV.status !== "activo" || localV.cierreAt != null;
-    const localRank = conquistaSessionPauseRank(localV);
-    const remoteRank = conquistaSessionPauseRank(sealedRemote);
-    const pauseSrc = localRank >= remoteRank ? localV : sealedRemote;
-    const keepPause = conquistaSessionPauseRank(pauseSrc) === 1;
+    const pauseSrc = pickConquistaSessionPauseSource(localV, sealedRemote);
+    const keepPause = conquistaPauseAction(pauseSrc).kind === "pause";
     merged = {
       ...merged,
       ...(localSubsDone && localClosed
