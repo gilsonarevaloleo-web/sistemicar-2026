@@ -47,13 +47,28 @@ import {
   loadUmbralLogrosLocal,
   persistirLogrosFusionados,
 } from "@/lib/umbral/logrosStore";
+import {
+  cargarOfertasFirestore,
+  loadUmbralOfertasLocal,
+  persistirOfertasFusionadas,
+  saveUmbralOfertasLocal,
+} from "@/lib/umbral/ofertasStore";
 import { awardUmbralV2PsForEvaluation } from "@/lib/umbral/psLedger";
 import { NavTransitionLink } from "@/components/NavTransitionLink";
 import { CardLeyCaracterCodigo } from "./CardLeyCaracterCodigo";
 import { CardMaestroCodigo } from "./CardMaestroCodigo";
+import { CardOfertaArena } from "./CardOfertaArena";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import { PLANETA_UMBRAL } from "@shared/planetas/leyCasasUmbral";
+import {
+  anclarTextoAOferta,
+  aplicarSelloOferta,
+  calcularProgresoOferta,
+  crearOfertaArena,
+  resolverOfertaPorNombre,
+  type OfertaArena,
+} from "@shared/umbral/ofertaArena";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -138,6 +153,8 @@ export function ConsolaUmbral({
   const [psSesion, setPsSesion] = useState(0);
   /** Paywall tras aprobar C1 en trial, o al intentar C2+. */
   const [mostrarPaywall, setMostrarPaywall] = useState(false);
+  const [ofertas, setOfertas] = useState<OfertaArena[]>([]);
+  const [ofertaActivaId, setOfertaActivaId] = useState<string | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const aprobados = superadosPorModo[modo];
@@ -160,6 +177,34 @@ export function ConsolaUmbral({
     () => logrosDeCodigo(logros, modo, codigoActual),
     [logros, modo, codigoActual],
   );
+  const ofertaActiva = useMemo(
+    () => ofertas.find((o) => o.id === ofertaActivaId) ?? null,
+    [ofertas, ofertaActivaId],
+  );
+  const progresoOferta = useMemo(
+    () => (ofertaActiva ? calcularProgresoOferta(ofertaActiva) : null),
+    [ofertaActiva],
+  );
+  const progresoVisible = useMemo<ProgresoModoUmbral>(() => {
+    if (modo !== "EXTERNO_VENTAS") return progresoModo;
+    if (!progresoOferta) {
+      return {
+        modo,
+        superados: [],
+        siguiente: null,
+        codigoPorDefecto: 1,
+        elegibles: [],
+      };
+    }
+    return {
+      modo,
+      superados: progresoOferta.superados,
+      siguiente: progresoOferta.siguiente,
+      codigoPorDefecto: progresoOferta.codigoPorDefecto,
+      elegibles: progresoOferta.elegibles,
+    };
+  }, [modo, progresoModo, progresoOferta]);
+  const arenaSinOferta = modo === "EXTERNO_VENTAS" && !ofertaActiva;
 
   function aplicarProgreso(
     p: ProgresoCarreraUmbral,
@@ -191,6 +236,11 @@ export function ConsolaUmbral({
         if (!cancelled && local.length > 0) {
           aplicarProgreso(calcularProgresoCarrera(local), { posicionar: true });
         }
+        const localOfertas = loadUmbralOfertasLocal(userId);
+        if (!cancelled && localOfertas.ofertas.length > 0) {
+          setOfertas(localOfertas.ofertas);
+          setOfertaActivaId(localOfertas.ofertaActivaId);
+        }
 
         const data = await listarSesionesUmbral(userId);
         if (cancelled) return;
@@ -217,6 +267,19 @@ export function ConsolaUmbral({
           }
         }
         setSesionIdPorModo(ids);
+        try {
+          const remoteOfertas = await cargarOfertasFirestore(userId);
+          if (!cancelled) {
+            const fusedOfertas = persistirOfertasFusionadas(
+              userId,
+              remoteOfertas,
+            );
+            setOfertas(fusedOfertas.ofertas);
+            setOfertaActivaId(fusedOfertas.ofertaActivaId);
+          }
+        } catch {
+          /* local ya cargó */
+        }
       } catch (e) {
         console.warn("[ConsolaUmbral] No se pudo hidratar progreso:", e);
       } finally {
@@ -243,13 +306,18 @@ export function ConsolaUmbral({
         postura: cfg.modoInterno.estadoMentalUsuario,
       };
     }
+    const nombre = ofertaActiva?.nombre ?? "";
     return {
       etiqueta: "Objeción del cliente",
-      texto: cfg.modoExterno.objecionCliente,
+      texto: nombre
+        ? anclarTextoAOferta(cfg.modoExterno.objecionCliente, nombre)
+        : cfg.modoExterno.objecionCliente,
       posturaLabel: "Estado mental (cliente)",
-      postura: cfg.modoExterno.estadoMentalCliente,
+      postura: nombre
+        ? anclarTextoAOferta(cfg.modoExterno.estadoMentalCliente, nombre)
+        : cfg.modoExterno.estadoMentalCliente,
     };
-  }, [cfg, modo]);
+  }, [cfg, modo, ofertaActiva?.nombre]);
 
   function resetIntentoLocal() {
     setRespuesta("");
@@ -259,15 +327,77 @@ export function ConsolaUmbral({
     setHistorialCodigoAbierto(false);
   }
 
+  function persistirOfertas(
+    nextOfertas: OfertaArena[],
+    activaId: string | null,
+  ) {
+    const saved = saveUmbralOfertasLocal(userId, {
+      ofertas: nextOfertas,
+      ofertaActivaId: activaId,
+    });
+    setOfertas(saved.ofertas);
+    setOfertaActivaId(saved.ofertaActivaId);
+    return saved;
+  }
+
+  function posicionarPorOferta(oferta: OfertaArena | null) {
+    if (!oferta) {
+      setCodigoActual(1);
+      return;
+    }
+    setCodigoActual(calcularProgresoOferta(oferta).codigoPorDefecto);
+  }
+
   function cambiarModo(next: ModoUmbral) {
     if (next === modo) return;
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     setModo(next);
-    setCodigoActual(primerCodigoPendiente(superadosPorModo[next]) ?? 1);
+    if (next === "EXTERNO_VENTAS") {
+      const activa = ofertas.find((o) => o.id === ofertaActivaId) ?? null;
+      posicionarPorOferta(activa);
+    } else {
+      setCodigoActual(primerCodigoPendiente(superadosPorModo[next]) ?? 1);
+    }
     resetIntentoLocal();
     setModuloCompletado(false);
     setResumenSesion([]);
     setPsSesion(0);
+    setMostrarPaywall(false);
+  }
+
+  function nombrarOferta(nombre: string, fraseUtilidad: string) {
+    const existing = resolverOfertaPorNombre(ofertas, nombre);
+    const now = new Date().toISOString();
+    const next = existing
+      ? {
+          ...existing,
+          nombre,
+          fraseUtilidad,
+          updatedAt: now,
+        }
+      : crearOfertaArena({ userId, nombre, fraseUtilidad, nowIso: now });
+    persistirOfertas(
+      existing
+        ? ofertas.map((o) => (o.id === next.id ? next : o))
+        : [next, ...ofertas],
+      next.id,
+    );
+    setSesionIdPorModo((prev) => ({ ...prev, EXTERNO_VENTAS: null }));
+    posicionarPorOferta(next);
+    resetIntentoLocal();
+    setModuloCompletado(false);
+    setResumenSesion([]);
+    setMostrarPaywall(false);
+  }
+
+  function activarOferta(ofertaId: string) {
+    const found = ofertas.find((o) => o.id === ofertaId) ?? null;
+    persistirOfertas(ofertas, ofertaId);
+    setSesionIdPorModo((prev) => ({ ...prev, EXTERNO_VENTAS: null }));
+    posicionarPorOferta(found);
+    resetIntentoLocal();
+    setModuloCompletado(false);
+    setResumenSesion([]);
     setMostrarPaywall(false);
   }
 
@@ -280,7 +410,12 @@ export function ConsolaUmbral({
         : "INTERNO_HABILIDAD";
     setSesionIdPorModo((prev) => ({ ...prev, [nextModo]: null }));
     if (!mismoModo) setModo(nextModo);
-    setCodigoActual(primerCodigoPendiente(superadosPorModo[nextModo]) ?? 1);
+    if (nextModo === "EXTERNO_VENTAS") {
+      const activa = ofertas.find((o) => o.id === ofertaActivaId) ?? null;
+      posicionarPorOferta(activa);
+    } else {
+      setCodigoActual(primerCodigoPendiente(superadosPorModo[nextModo]) ?? 1);
+    }
     resetIntentoLocal();
     setModuloCompletado(false);
     setResumenSesion([]);
@@ -291,6 +426,10 @@ export function ConsolaUmbral({
   async function someter() {
     const texto = respuesta.trim();
     if (texto.length < 2 || loading || moduloCompletado) return;
+    if (modo === "EXTERNO_VENTAS" && !ofertaActiva) {
+      setError("Sin nombre no hay Arena. Nombra el producto primero.");
+      return;
+    }
     if (requierePagoUmbral(codigoActual, hasPaidAccess)) {
       setMostrarPaywall(true);
       return;
@@ -306,6 +445,12 @@ export function ConsolaUmbral({
         respuestaUsuario: texto,
         historialPrevio: historial,
         sesionId: sesionId ?? undefined,
+        ...(modo === "EXTERNO_VENTAS" && ofertaActiva
+          ? {
+              ofertaNombre: ofertaActiva.nombre,
+              fraseUtilidad: ofertaActiva.fraseUtilidad,
+            }
+          : {}),
       });
 
       if (data.sesionId) {
@@ -377,25 +522,60 @@ export function ConsolaUmbral({
           }
         }
 
-        const siguiente = codigoTrasAprobar(aprobados, codigoActual);
+        let ofertaTrasPase: OfertaArena | null = null;
+        if (modo === "EXTERNO_VENTAS" && ofertaActiva) {
+          ofertaTrasPase = aplicarSelloOferta(ofertaActiva, {
+            codigo: codigoActual,
+            respuestaAprobada: texto,
+            feedbackGemini: data.feedbackConfrontativo,
+            intentos: lastHist?.intentos ?? 1,
+            fechaAprobacion:
+              lastHist?.fechaAprobacion ?? new Date().toISOString(),
+            sesionId: data.sesionId,
+          });
+          persistirOfertas(
+            ofertas.map((o) =>
+              o.id === ofertaTrasPase!.id ? ofertaTrasPase! : o,
+            ),
+            ofertaTrasPase.id,
+          );
+        }
+
+        const siguiente =
+          ofertaTrasPase != null
+            ? (calcularProgresoOferta(ofertaTrasPase).siguiente ?? 1)
+            : codigoTrasAprobar(aprobados, codigoActual);
         setResumenSesion((prev) =>
           prev.includes(cfg.nombre) ? prev : [...prev, cfg.nombre],
         );
         setVeredicto({
           kind: "aprobado",
           feedback: data.feedbackConfrontativo,
-          siguiente,
+          siguiente:
+            ofertaTrasPase != null
+              ? calcularProgresoOferta(ofertaTrasPase).siguiente
+              : siguiente,
           psAwards,
           psTotal,
         });
         setRespuesta("");
         setHistorial([]);
-        const superadosTrasPase: CodigoNumero[] = [];
-        aprobados.forEach((n) => superadosTrasPase.push(n));
-        superadosTrasPase.push(codigoActual);
+        const superadosTrasPase: CodigoNumero[] =
+          ofertaTrasPase != null
+            ? calcularProgresoOferta(ofertaTrasPase).superados
+            : (() => {
+                const list: CodigoNumero[] = [];
+                aprobados.forEach((n) => list.push(n));
+                list.push(codigoActual);
+                return list;
+              })();
+        const ofertaCerrada =
+          ofertaTrasPase != null &&
+          calcularProgresoOferta(ofertaTrasPase).siguiente == null;
         if (
-          (data.moduloCompletado || codigoActual === 10) &&
-          primerCodigoPendiente(superadosTrasPase) == null
+          ofertaCerrada ||
+          ((data.moduloCompletado || codigoActual === 10) &&
+            primerCodigoPendiente(superadosTrasPase) == null)
         ) {
           setModuloCompletado(true);
         } else if (requierePagoUmbral(siguiente, hasPaidAccess)) {
@@ -509,8 +689,9 @@ export function ConsolaUmbral({
             Dominio Total alcanzado
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-white/60">
-            Completaste los 10 Códigos en modo {modoMeta.label}. La secuencia
-            cerró con autoría — no con pose.
+            {modo === "EXTERNO_VENTAS" && ofertaActiva
+              ? `«${ofertaActiva.nombre}» atravesó los 10 Códigos en La Arena. La oferta cerró con autoría — no con pose.`
+              : `Completaste los 10 Códigos en modo ${modoMeta.label}. La secuencia cerró con autoría — no con pose.`}
           </p>
           {psSesion > 0 && (
             <p
@@ -712,9 +893,15 @@ export function ConsolaUmbral({
             <span>
               {hidratando
                 ? "CARGANDO PROGRESO…"
-                : progresoModo.siguiente
-                  ? `PENDIENTE · CÓDIGO ${progresoModo.siguiente}`
-                  : "MODO SUPERADO · ELIGE CUALQUIER CÓDIGO"}
+                : modo === "EXTERNO_VENTAS" && !ofertaActiva
+                  ? "SIN NOMBRE · NO HAY ARENA"
+                  : modo === "EXTERNO_VENTAS" && progresoVisible.siguiente
+                    ? `OFERTA · PENDIENTE CÓDIGO ${progresoVisible.siguiente}`
+                    : progresoVisible.siguiente
+                      ? `PENDIENTE · CÓDIGO ${progresoVisible.siguiente}`
+                      : modo === "EXTERNO_VENTAS"
+                        ? "OFERTA 10/10 · ELIGE CUALQUIER CÓDIGO"
+                        : "MODO SUPERADO · ELIGE CUALQUIER CÓDIGO"}
             </span>
             <span className="flex items-center gap-3">
               {psSesion > 0 && (
@@ -722,15 +909,22 @@ export function ConsolaUmbral({
                   +{psSesion} PS
                 </span>
               )}
-              <span style={{ color: GOLD }}>{aprobados.size}/10</span>
+              <span
+                style={{ color: GOLD }}
+                data-testid="umbral-v2-progreso-count"
+              >
+                {modo === "EXTERNO_VENTAS"
+                  ? `${progresoVisible.superados.length}/10`
+                  : `${aprobados.size}/10`}
+              </span>
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {CODIGOS_NUMERO.map((n) => {
-              const done = aprobados.has(n);
+              const done = progresoVisible.superados.includes(n);
               const active = n === codigoActual && !mostrarPaywall;
               const paidLock = requierePagoUmbral(n, hasPaidAccess);
-              const elegible = esCodigoElegible(progresoModo, n);
+              const elegible = esCodigoElegible(progresoVisible, n);
               const seqLocked = !elegible;
               const locked = paidLock || seqLocked;
               return (
@@ -795,6 +989,17 @@ export function ConsolaUmbral({
         </div>
       </header>
 
+      {modo === "EXTERNO_VENTAS" && (
+        <CardOfertaArena
+          oferta={ofertaActiva}
+          ofertas={ofertas}
+          hidratando={hidratando}
+          onNombrar={nombrarOferta}
+          onNueva={() => undefined}
+          onActivar={activarOferta}
+        />
+      )}
+
       {/* PANEL CENTRAL */}
       <AnimatePresence mode="wait">
         <motion.section
@@ -813,7 +1018,7 @@ export function ConsolaUmbral({
             />
           )}
 
-          {!mostrarPaywall && !codigoBloqueadoPorPago && (
+          {!mostrarPaywall && !codigoBloqueadoPorPago && !arenaSinOferta && (
             <>
               <CardLeyCasasUmbral planetaActivo={PLANETA_UMBRAL} />
               <CardLeyCaracterCodigo />
@@ -821,14 +1026,16 @@ export function ConsolaUmbral({
             </>
           )}
 
-          {!mostrarPaywall && !codigoBloqueadoPorPago && modo === "EXTERNO_VENTAS" && (
+          {!mostrarPaywall && !codigoBloqueadoPorPago && !arenaSinOferta && modo === "EXTERNO_VENTAS" && (
             <CardPerfilCliente
               codigoNumero={cfg.numero}
               perfil={cfg.modoExterno}
+              nombreOferta={ofertaActiva?.nombre}
+              sellosCount={progresoOferta?.sellosCount}
             />
           )}
 
-          {!mostrarPaywall && !codigoBloqueadoPorPago && (
+          {!mostrarPaywall && !codigoBloqueadoPorPago && !arenaSinOferta && (
             <>
               <div className="border border-white/12 bg-black/45 p-5">
                 <p className="text-[10px] tracking-[0.2em] text-white/40">
@@ -880,7 +1087,12 @@ export function ConsolaUmbral({
                   <p className="mt-1.5 text-sm leading-relaxed text-white/85">
                     {modo === "INTERNO_HABILIDAD"
                       ? cfg.modoInterno.criterioAprobacion
-                      : cfg.modoExterno.criterioAprobacionVendedor}
+                      : ofertaActiva
+                        ? anclarTextoAOferta(
+                            cfg.modoExterno.criterioAprobacionVendedor,
+                            ofertaActiva.nombre,
+                          )
+                        : cfg.modoExterno.criterioAprobacionVendedor}
                   </p>
                 </div>
 
@@ -952,9 +1164,13 @@ export function ConsolaUmbral({
                     placeholder={
                       modo === "INTERNO_HABILIDAD"
                         ? "Habla en el idioma de este código: el crack y el corte de hoy..."
-                        : codigoActual === 3
-                          ? "Al Postergador: un primer paso en X minutos. Cero «después» ni revelación."
-                          : "Responde al cliente en el idioma de este código — una frase que sostenga la 2ª resistencia..."
+                        : ofertaActiva && codigoActual === 3
+                          ? `Al Postergador, sobre «${ofertaActiva.nombre}»: un primer paso en X minutos. Cero «después» ni revelación.`
+                          : ofertaActiva
+                            ? `Responde sobre «${ofertaActiva.nombre}» en el idioma de este código — una frase que sostenga la 2ª resistencia...`
+                            : codigoActual === 3
+                              ? "Al Postergador: un primer paso en X minutos. Cero «después» ni revelación."
+                              : "Responde al cliente en el idioma de este código — una frase que sostenga la 2ª resistencia..."
                     }
                     className="w-full resize-y border border-white/15 bg-black/50 px-4 py-3 text-[15px] leading-relaxed text-white/90 outline-none placeholder:text-white/25 focus:border-[#00FFC3]/50"
                     style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', sans-serif" }}

@@ -18,6 +18,9 @@ export interface UmbralEvaluarRequest {
   sesionId?: string;
   /** PS reales otorgados en cliente tras aprobar (opcional). */
   psGanados?: number;
+  /** Oferta en juicio (La Arena). El evaluador ancla el nombre. */
+  ofertaNombre?: string;
+  fraseUtilidad?: string;
 }
 
 export interface UmbralEvaluarSuccess {

@@ -39,6 +39,9 @@ describe("Umbral v2 anti-freeze nav", () => {
     assert.match(src, /esCodigoElegible/);
     assert.match(src, /codigoTrasAprobar/);
     assert.match(src, /HISTORIAL DE ESTE CÓDIGO/);
+    assert.match(src, /CardOfertaArena/);
+    assert.match(src, /ofertaNombre/);
+    assert.match(src, /Sin nombre no hay Arena|arenaSinOferta/);
   });
 
   it("Métricas muestran historial de logros por código", () => {
@@ -49,6 +52,7 @@ describe("Umbral v2 anti-freeze nav", () => {
     assert.match(src, /HISTORIAL DE LOGROS POR CÓDIGO/);
     assert.match(src, /persistirLogrosFusionados/);
     assert.match(src, /umbral-metricas-logros/);
+    assert.match(src, /umbral-metricas-ofertas|OFERTAS EN LA ARENA/);
   });
 
   it("Doctor IA no monta FAB en consola Umbral", () => {

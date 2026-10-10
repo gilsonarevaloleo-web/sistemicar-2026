@@ -1,5 +1,7 @@
+import React from "react";
 import { Crosshair, UserRound } from "lucide-react";
 import type { ModoExternoConfig } from "@shared/umbral/engineConfig";
+import { anclarTextoAOferta } from "@shared/umbral/ofertaArena";
 
 const GOLD = "#D4AF37";
 const CYAN = "#00FFC3";
@@ -11,6 +13,9 @@ export interface CardPerfilClienteProps {
     "arquetipoNombre" | "actitudCliente" | "fraseTipica" | "misionVendedor"
   >;
   codigoNumero: number;
+  /** Oferta en juicio: el cliente objeta este nombre. */
+  nombreOferta?: string;
+  sellosCount?: number;
 }
 
 /**
@@ -20,7 +25,15 @@ export interface CardPerfilClienteProps {
 export function CardPerfilCliente({
   perfil,
   codigoNumero,
+  nombreOferta,
+  sellosCount,
 }: CardPerfilClienteProps) {
+  const frase = nombreOferta
+    ? anclarTextoAOferta(perfil.fraseTipica, nombreOferta)
+    : perfil.fraseTipica;
+  const mision = nombreOferta
+    ? anclarTextoAOferta(perfil.misionVendedor, nombreOferta)
+    : perfil.misionVendedor;
   return (
     <aside
       className="relative overflow-hidden border-2 bg-black/55 p-4 sm:p-5"
@@ -54,6 +67,11 @@ export function CardPerfilCliente({
         <div className="min-w-0 flex-1">
           <p className="text-[10px] tracking-[0.22em] text-white/40">
             FICHA DE OBJETIVO · CÓDIGO {codigoNumero}
+            {nombreOferta
+              ? ` · ${nombreOferta}${
+                  typeof sellosCount === "number" ? ` · ${sellosCount}/10` : ""
+                }`
+              : ""}
           </p>
           <span
             className="mt-2 inline-block border px-2.5 py-1 text-[11px] font-bold tracking-wide"
@@ -89,7 +107,7 @@ export function CardPerfilCliente({
             1ª RESISTENCIA · EL CLIENTE
           </p>
           <p className="mt-1 text-[15px] leading-relaxed text-white/90 italic">
-            «{perfil.fraseTipica}»
+            «{frase}»
           </p>
         </blockquote>
 
@@ -109,7 +127,7 @@ export function CardPerfilCliente({
             OBJETIVO DE DESBLOQUEO
           </p>
           <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-            {perfil.misionVendedor}
+            {mision}
           </p>
         </div>
       </div>

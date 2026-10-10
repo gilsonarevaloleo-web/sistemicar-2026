@@ -81,6 +81,39 @@ describe("Umbral v2 — POST /api/umbral/evaluar", () => {
     );
   });
 
+  it("inyecta el nombre de la oferta en el prompt de Arena", async () => {
+    let seen = "";
+    await withServer(
+      async (prompt) => {
+        seen = prompt;
+        return JSON.stringify({
+          aprobado: true,
+          feedbackConfrontativo: "Utilidad anclada a Corte Limpio.",
+          codigoSiguiente: 2,
+        });
+      },
+      async (base) => {
+        const res = await fetch(`${base}/api/umbral/evaluar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: "u-oferta",
+            modo: "EXTERNO_VENTAS",
+            codigoActual: 1,
+            respuestaUsuario:
+              "Corte Limpio te nombra el crack de hoy y lo corta en una frase, sin flor.",
+            ofertaNombre: "Corte Limpio",
+            fraseUtilidad: "Nombra el crack y lo corta hoy.",
+          }),
+        });
+        assert.equal(res.status, 200);
+        assert.match(seen, /OFERTA EN JUICIO/);
+        assert.match(seen, /Corte Limpio/);
+        assert.match(seen, /Nombra el crack y lo corta hoy/);
+      },
+    );
+  });
+
   it("tolera alias feedback y aún aprueba/rechaza", async () => {
     await withServer(
       async () =>

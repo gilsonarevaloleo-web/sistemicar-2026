@@ -197,7 +197,7 @@ export function calcularProgresoDesdeSesiones(
 }
 
 export function esCodigoElegible(
-  progreso: ProgresoModoUmbral,
+  progreso: { elegibles: readonly CodigoNumero[] },
   codigo: CodigoNumero,
 ): boolean {
   return progreso.elegibles.includes(codigo);
