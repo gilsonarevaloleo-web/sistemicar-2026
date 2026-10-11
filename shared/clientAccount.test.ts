@@ -8,6 +8,7 @@ import {
   buildGrantDeliveryId,
   displayNameForPlan,
   moduleGrantAdminMessage,
+  resolveClientAccountWhatsappKind,
   safePostLoginPath,
 } from "./clientAccount.ts";
 
@@ -48,9 +49,40 @@ describe("clientAccount — dónde se crea la cuenta", () => {
     assert.match(text, /Continuar con Google/);
     assert.match(text, /tinapinocarrera@gmail\.com/);
     assert.match(text, /Norte/);
+    assert.match(text, /crear tu cuenta/);
   });
 
-  it("mensaje admin: pendiente vs activado", () => {
+  it("elige el WhatsApp según si la cuenta ya existe", () => {
+    assert.equal(resolveClientAccountWhatsappKind({ granted: true }), "existing_granted");
+    assert.equal(
+      resolveClientAccountWhatsappKind({ accountExists: true }),
+      "existing_pending",
+    );
+    assert.equal(resolveClientAccountWhatsappKind({}), "new");
+  });
+
+  it("si la cuenta ya existe, no le pide crear otra", () => {
+    const granted = buildClientAccountWhatsapp(
+      "tina@gmail.com",
+      "Jornada Base",
+      "existing_granted",
+    );
+    assert.match(granted, /ya está en tu cuenta/);
+    assert.match(granted, /NO crees otra cuenta/);
+    assert.match(granted, /jornada/);
+    assert.equal(granted.includes("Para crear tu cuenta"), false);
+
+    const pending = buildClientAccountWhatsapp(
+      "tina@gmail.com",
+      "Jornada Base",
+      "existing_pending",
+    );
+    assert.match(pending, /YA existe/);
+    assert.match(pending, /No crees otra/);
+    assert.match(pending, /trial/);
+  });
+
+  it("mensaje admin: pendiente vs activado vs cuenta existente", () => {
     const pending = moduleGrantAdminMessage({
       email: "tina@gmail.com",
       planId: "soberania_dia",
@@ -60,6 +92,17 @@ describe("clientAccount — dónde se crea la cuenta", () => {
     assert.match(pending, /acceso/);
     assert.match(pending, /tina@gmail.com/);
     assert.match(pending, /Norte/);
+    assert.match(pending, /Aún no tiene cuenta/);
+
+    const existingPending = moduleGrantAdminMessage({
+      email: "tina@gmail.com",
+      planId: "planificacion_base",
+      granted: false,
+      pending: true,
+      accountExists: true,
+    });
+    assert.match(existingPending, /cuenta ya existe/);
+    assert.match(existingPending, /no cree otra/i);
 
     const granted = moduleGrantAdminMessage({
       email: "tina@gmail.com",
@@ -68,5 +111,6 @@ describe("clientAccount — dónde se crea la cuenta", () => {
       pending: false,
     });
     assert.match(granted, /activado/);
+    assert.match(granted, /No cree otra cuenta/);
   });
 });

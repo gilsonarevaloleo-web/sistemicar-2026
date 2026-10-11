@@ -86,6 +86,7 @@ import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess"
 import {
   buildClientAccountWhatsapp,
   displayNameForPlan,
+  resolveClientAccountWhatsappKind,
 } from "../shared/clientAccount";
 import { recordSellerSale, listSellerSales, markSellerCommissionPaid } from "./sellerSales";
 import {
@@ -5344,7 +5345,14 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
     }
 
     const planName = displayNameForPlan(pid);
-    const clientWhatsapp = buildClientAccountWhatsapp(email.trim().toLowerCase(), planName);
+    const clientWhatsapp = buildClientAccountWhatsapp(
+      email.trim().toLowerCase(),
+      planName,
+      resolveClientAccountWhatsappKind({
+        granted: result.granted,
+        accountExists: Boolean(result.uid || result.granted),
+      }),
+    );
 
     if (result.granted || result.pending) {
       try {

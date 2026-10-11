@@ -1,7 +1,7 @@
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "./components/layout";
-import { createContext, useContext, useState, useEffect, useMemo, type ReactNode, Suspense } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useRef, type ReactNode, Suspense } from "react";
 import { lazyWithRetry, lazyJornadaWithRetry } from "@/lib/lazyWithRetry";
 import { HouseRouteFallback } from "@/components/HouseRouteFallback";
 import { SellerRefCapture } from "./components/seller-ref-capture";
@@ -11,7 +11,7 @@ import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary"
 import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import { isFirebaseConfigured, isUserAnonymous } from "@/lib/firebase";
-import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial } from "@/lib/persistence";
+import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial, mergeModuleIds, modulesGrantedByPlan } from "@/lib/persistence";
 import { identifyMetaUser, trackCompleteRegistration, trackJornadaStartTrial } from "@/lib/metaPixel";
 import {
   consumePreviewOpsQueryUnlock,
@@ -223,6 +223,7 @@ function ModuleRoute({
   const [checkingTier, setCheckingTier] = useState(true);
   const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
   const [startingTrial, setStartingTrial] = useState(false);
+  const claimedModulesRef = useRef<string[]>([]);
 
   const ownerBypass = isOwnerEmail(user?.email);
   const previewBypass = previewOps || isPreviewOpsUnlocked();
@@ -301,14 +302,18 @@ function ModuleRoute({
       const unsub = subscribeToProgression(
         user.uid,
         (prog) => {
-          setProgression(prog);
+          const merged: UserProgression = {
+            ...prog,
+            activeModules: mergeModuleIds(prog.activeModules, claimedModulesRef.current as ModuleId[]),
+          };
+          setProgression(merged);
           if (requiredModule === "planificacion_base") {
             const regStep = resolveJornadaBaseRegistroStep({
               firebaseConfigured: isFirebaseConfigured(),
               isOwner: ownerBypass,
               isAnonymous: isUserAnonymous() || !user?.email,
               email: user?.email,
-              whatsapp: prog?.whatsapp,
+              whatsapp: merged?.whatsapp,
               progressionReady: true,
             });
             if (regStep === "google") {
@@ -325,13 +330,13 @@ function ModuleRoute({
             }
           }
           firstProgressionEmit = false;
-          if (requiredModule === "planificacion_base" && !hasAccess(prog)) {
+          if (requiredModule === "planificacion_base" && !hasAccess(merged)) {
             const grant = resolveUserJornadaBaseAccess(
-              prog?.subscriptionPlan,
+              merged?.subscriptionPlan,
               user.email,
-              prog?.rank,
-              prog?.activeModules,
-              extrasFromProgression(prog),
+              merged?.rank,
+              merged?.activeModules,
+              extrasFromProgression(merged),
             );
             if (grant.kind === "eligible_trial") {
               setStartingTrial(true);
@@ -349,16 +354,65 @@ function ModuleRoute({
               return;
             }
           }
-          setCheckingTier(false);
-          if (!isPreviewOpsUnlocked() && !hasAccess(prog)) {
-            navigate(pagosHrefForDeny(prog));
+          if (!isPreviewOpsUnlocked() && !hasAccess(merged)) {
+            setCheckingTier(true);
+            void claimPendingPurchases()
+              .then(({ grantedPlans }) => {
+                if (grantedPlans.length > 0) {
+                  const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
+                  claimedModulesRef.current = mergeModuleIds(
+                    claimedModulesRef.current,
+                    unlocked,
+                  );
+                  setProgression((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          activeModules: mergeModuleIds(prev.activeModules, unlocked),
+                          subscriptionPlan: grantedPlans[0] ?? prev.subscriptionPlan,
+                        }
+                      : prev,
+                  );
+                  setCheckingTier(false);
+                  return;
+                }
+                setCheckingTier(false);
+                if (!hasAccess(merged)) {
+                  navigate(pagosHrefForDeny(merged));
+                }
+              })
+              .catch(() => {
+                setCheckingTier(false);
+                navigate(pagosHrefForDeny(merged));
+              });
+            return;
           }
+          setCheckingTier(false);
         },
         () => {
-          setCheckingTier(false);
-          if (!ownerBypass && !isPreviewOpsUnlocked()) {
-            navigate(pagosHrefForDeny(null));
-          }
+          setCheckingTier(true);
+          void claimPendingPurchases()
+            .then(({ grantedPlans }) => {
+              if (grantedPlans.length > 0) {
+                const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
+                claimedModulesRef.current = mergeModuleIds(
+                  claimedModulesRef.current,
+                  unlocked,
+                );
+                setCheckingTier(false);
+                return;
+              }
+              setCheckingTier(false);
+              if (!ownerBypass && !isPreviewOpsUnlocked()) {
+                navigate(pagosHrefForDeny(null));
+              }
+            })
+            .catch(() => {
+              setCheckingTier(false);
+              if (!ownerBypass && !isPreviewOpsUnlocked()) {
+                navigate(pagosHrefForDeny(null));
+              }
+            });
         }
       );
       return () => unsub();

@@ -1,7 +1,9 @@
 /**
  * La cuenta del cliente NO se crea al pagar (Yape / PayPal / MP).
- * Se crea en /acceso al pulsar «Continuar con Google» con el mismo correo del pago.
- * Para entrar a Jornada Base también deja su WhatsApp en ese mismo paso.
+ * Se crea en /acceso al pulsar «Continuar con Google» con el mismo correo
+ * del trial / del pago. Si ya entró gratis, NO debe crear otra cuenta:
+ * el pago se pega a esa misma. Para entrar a Jornada Base también deja
+ * su WhatsApp en ese mismo paso.
  */
 
 export const CLIENT_ACCESO_PATH = "/acceso";
@@ -48,8 +50,47 @@ export function buildGrantDeliveryId(
   return `${src}:${nowMs}`;
 }
 
-export function buildClientAccountWhatsapp(email: string, planName: string): string {
+export type ClientAccountWhatsappKind = "new" | "existing_pending" | "existing_granted";
+
+export function resolveClientAccountWhatsappKind(opts: {
+  granted?: boolean;
+  accountExists?: boolean;
+}): ClientAccountWhatsappKind {
+  if (opts.granted) return "existing_granted";
+  if (opts.accountExists) return "existing_pending";
+  return "new";
+}
+
+export function buildClientAccountWhatsapp(
+  email: string,
+  planName: string,
+  kind: ClientAccountWhatsappKind = "new",
+): string {
   const e = email.trim().toLowerCase();
+  if (kind === "existing_granted") {
+    return [
+      `Hola, tu pago de ${planName} ya está en tu cuenta.`,
+      ``,
+      `NO crees otra cuenta. Tu jornada sigue en el mismo Gmail.`,
+      `1. Abre ${CLIENT_ACCESO_PUBLIC_URL}`,
+      `2. Pulsa «Continuar con Google»`,
+      `3. Entra con ESTE correo (el de siempre): ${e}`,
+      ``,
+      `Si usas otro Gmail, no verás tu jornada y el sistema te manda otra vez a pagos.`,
+    ].join("\n");
+  }
+  if (kind === "existing_pending") {
+    return [
+      `Hola, tu pago de ${planName} ya está registrado.`,
+      ``,
+      `Tu cuenta YA existe. No crees otra.`,
+      `1. Abre ${CLIENT_ACCESO_PUBLIC_URL}`,
+      `2. Pulsa «Continuar con Google»`,
+      `3. Entra con ESTE correo (el mismo del trial): ${e}`,
+      ``,
+      `Al entrar, el plan se enciende solo. Si usas otro Gmail, te manda a pagos.`,
+    ].join("\n");
+  }
   return [
     `Hola, tu pago de ${planName} ya está registrado.`,
     ``,
@@ -67,11 +108,15 @@ export function moduleGrantAdminMessage(opts: {
   planId: string;
   granted: boolean;
   pending: boolean;
+  accountExists?: boolean;
 }): string {
   const planName = displayNameForPlan(opts.planId);
   const email = opts.email.trim().toLowerCase();
   if (opts.granted) {
-    return `Módulo ${planName} activado para ${email}.`;
+    return `Módulo ${planName} activado para ${email}. La cuenta ya existía: dile que entre en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail. No cree otra cuenta.`;
+  }
+  if (opts.pending && opts.accountExists) {
+    return `Pago de ${planName} registrado para ${email}. La cuenta ya existe: debe entrar en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail (no cree otra). Al entrar, el plan se activa solo.`;
   }
   if (opts.pending) {
     return `Pago de ${planName} registrado para ${email}. Aún no tiene cuenta: debe entrar en ${CLIENT_ACCESO_PUBLIC_URL} con Google usando ese mismo correo. Al entrar, el plan se activa solo.`;

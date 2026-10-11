@@ -197,7 +197,7 @@ const paymentConfirmationTemplate = (userName: string, planName: string, amount:
               </div>
               
               <p style="color: #a1a1aa; font-size: 15px; line-height: 1.8; text-align: center; margin: 24px 0;">
-                Tu cuenta se crea en <strong style="color:#ffffff">sistemicar.app/acceso</strong> con Google, usando este mismo correo. Si ya pagaste, el plan se enciende al entrar.
+                Si ya entraste gratis, usa el <strong style="color:#ffffff">mismo Gmail</strong> — no crees otra cuenta. Entra en <strong style="color:#ffffff">sistemicar.app/acceso</strong> con Google; el plan se enciende al entrar.
               </p>
             </td>
           </tr>
@@ -205,7 +205,7 @@ const paymentConfirmationTemplate = (userName: string, planName: string, amount:
           <tr>
             <td align="center" style="padding: 0 40px 40px 40px;">
               <a href="https://sistemicar.app/acceso" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">
-                CREAR CUENTA / ENTRAR
+                ENTRAR A MI CUENTA
               </a>
             </td>
           </tr>

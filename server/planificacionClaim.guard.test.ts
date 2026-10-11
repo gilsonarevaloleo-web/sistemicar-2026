@@ -23,4 +23,18 @@ describe("activación de módulos — no hay cuenta hasta /acceso", () => {
     assert.match(src, /clientWhatsapp/);
     assert.match(src, /sistemicar\.app\/acceso/);
   });
+
+  it("el WhatsApp de admin distingue cuenta existente vs nueva", () => {
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /resolveClientAccountWhatsappKind/);
+    assert.match(src, /accountExists/);
+  });
+});
+
+describe("claim de compras — aliases de Gmail", () => {
+  it("lista grants pendientes por aliases, no solo el string exacto", () => {
+    const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
+    assert.match(grants, /emailMatchKeys/);
+    assert.match(grants, /buyer_email = ANY/);
+  });
 });

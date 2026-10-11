@@ -70,8 +70,14 @@ export default function Acceso() {
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
     if (step !== "ready") return;
-    void claimPendingPurchases();
-    navigate(nextPath);
+    let cancelled = false;
+    void (async () => {
+      await claimPendingPurchases();
+      if (!cancelled) navigate(nextPath);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [step, navigate, nextPath]);
 
   const handleGoogleLogin = async () => {
@@ -139,7 +145,7 @@ export default function Acceso() {
       setWhatsappSaved(saved);
       trackJornadaLead("acceso-registro");
       toast.success("Listo. Ya puedes entrar.");
-      void claimPendingPurchases();
+      await claimPendingPurchases();
       navigate(nextPath);
     } catch {
       toast.error("No se pudo guardar el número. Intenta de nuevo.");
@@ -212,12 +218,12 @@ export default function Acceso() {
           <p className="text-gray-400 text-lg">
             {askingPhone
               ? JORNADA_BASE_TRIAL_COPY.register
-              : "Aquí se crea tu cuenta: Continuar con Google"}
+              : "Continuar con Google. Si ya entraste gratis, usa el mismo Gmail."}
           </p>
           <p className="text-gray-500 text-sm mt-2">
             {askingPhone
               ? "Así te avisamos y el vendedor te encuentra."
-              : "Usa el mismo Gmail del pago (Yape / PayPal). No hay usuario y contraseña."}
+              : "No crees otra cuenta. El pago se pega al Gmail del trial. Si usas otro, te manda a pagos."}
           </p>
         </motion.div>
 

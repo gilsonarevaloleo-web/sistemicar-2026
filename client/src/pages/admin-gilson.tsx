@@ -12,6 +12,7 @@ import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import {
   buildClientAccountWhatsapp,
   displayNameForPlan,
+  resolveClientAccountWhatsappKind,
 } from "@shared/clientAccount";
 
 const ADMIN_PASSWORD = "sistemicar2025";
@@ -364,9 +365,17 @@ export default function AdminGilson() {
           : buildClientAccountWhatsapp(
               targetEmail.trim(),
               displayNameForPlan(modulePlanId),
+              resolveClientAccountWhatsappKind({
+                granted: Boolean(data.activated || data.granted),
+                accountExists: Boolean(data.uid || data.activated || data.granted),
+              }),
             );
       setModuleClientWhatsapp(whatsapp);
-      if (data.pending) {
+      if (data.activated || data.granted) {
+        toast.success(data.message || "Módulo activado. Dile que entre con el mismo Gmail — no cree otra cuenta.");
+      } else if (data.pending && (data.uid || moduleSearchResult?.uid)) {
+        toast.success("Pago registrado. La cuenta ya existe: dile que entre en /acceso con el mismo Gmail.");
+      } else if (data.pending) {
         toast.success("Pago registrado. El cliente aún debe crear su cuenta en /acceso.");
       } else {
         toast.success(data.message || "Módulo activado");
@@ -1638,7 +1647,14 @@ export default function AdminGilson() {
                       if (result?.found && result.uid) {
                         setModuleSearchResult(result);
                         setModuleNotFound(false);
-                        toast.success("Usuario encontrado en Firebase Auth");
+                        setModuleClientWhatsapp(
+                          buildClientAccountWhatsapp(
+                            result.email || moduleEmail.trim(),
+                            displayNameForPlan(modulePlanId),
+                            "existing_pending",
+                          ),
+                        );
+                        toast.success("Usuario encontrado. No le pidas crear otra cuenta: que entre con ese Gmail.");
                       } else {
                         setModuleSearchResult(null);
                         setModuleNotFound(true);
@@ -1646,6 +1662,7 @@ export default function AdminGilson() {
                           buildClientAccountWhatsapp(
                             moduleEmail.trim(),
                             displayNameForPlan(modulePlanId),
+                            "new",
                           ),
                         );
                         toast.info(
