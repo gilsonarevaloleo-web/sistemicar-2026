@@ -8,6 +8,11 @@ import {
   CANON_TEN_EYES,
   DEPOSITO_V3_RITUAL,
   DEPOSITO_V3_VERSION,
+  DUAL_CARRERA_MIN_SAMPLE,
+  DUAL_CARRERA_RATE,
+  DUAL_TITULO_MIN_SAMPLE,
+  DUAL_TITULO_RATE,
+  DUAL_WINDOW_SIZE,
   EYE_CODES,
   TIER_MAX_EYE,
   GRADO_CARRERA_RATE,
@@ -61,6 +66,15 @@ export function registerDepositoV3Routes(
         tituloMinSample: GRADO_TITULO_MIN_SAMPLE,
         carreraRate: GRADO_CARRERA_RATE,
         estable: "isFullyGrounded && perceptionEye >= 7",
+      },
+      dobleCanal: {
+        windowSize: DUAL_WINDOW_SIZE,
+        tituloRate: DUAL_TITULO_RATE,
+        tituloMinSample: DUAL_TITULO_MIN_SAMPLE,
+        carreraRate: DUAL_CARRERA_RATE,
+        carreraMinSample: DUAL_CARRERA_MIN_SAMPLE,
+        opticaValida: "isFullyGrounded && deltaGap <= 4",
+        sintaxisValida: "isCableadoConnected && syntacticVacios.length <= 4",
       },
       ojos: EYE_CODES.map((n) => {
         const o = CANON_TEN_EYES[n];

@@ -45,9 +45,9 @@ export const CANON_TEN_EYES: Record<EyeCode, EyeDefinition> = {
     tierRequired: "MATRICULA",
     planeta: "Ritmo",
     planetaOjo: "El Ojo del Ritmo y la Repetición",
-    syntaxLabel: "Secuencial",
+    syntaxLabel: "Secuencia Vectorial",
     syntaxCharacteristics:
-      "Paso a paso, marcas de hora, cadencia, orden de pistón.",
+      "Cadena antecedente → consecuente → resultado. No exige escala de reloj.",
   },
   4: {
     id: 4,
@@ -203,4 +203,27 @@ export function computeDeltaGap(
   characterSignedCode: EyeCode,
 ): number {
   return Math.abs(perceptionEye - characterSignedCode);
+}
+
+/** Códigos apagados en el mapa = vacíos sintácticos. */
+export function vaciosDesdeActiveMap(
+  map: Record<EyeCode, boolean> | null | undefined,
+): EyeCode[] {
+  if (!map) return [...EYE_CODES];
+  return EYE_CODES.filter((n) => !map[n]);
+}
+
+export function normalizarVaciosSintacticos(
+  raw: unknown,
+  fallbackMap?: Record<EyeCode, boolean> | null,
+): EyeCode[] {
+  if (Array.isArray(raw)) {
+    const seen = new Set<EyeCode>();
+    for (const item of raw) {
+      const code = parseEyeCode(item);
+      if (code) seen.add(code);
+    }
+    return EYE_CODES.filter((n) => seen.has(n));
+  }
+  return vaciosDesdeActiveMap(fallbackMap);
 }

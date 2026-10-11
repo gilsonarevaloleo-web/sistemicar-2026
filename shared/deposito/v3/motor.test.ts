@@ -22,6 +22,11 @@ describe("Depósito V3 — prompt", () => {
     assert.match(system, /cablea/i);
     assert.match(system, /FIRMA SINTÁCTICA/i);
     assert.match(system, /auditoría de título|título\/hipótesis/i);
+    assert.match(system, /FORMA \(SINTAXIS\) VS FONDO \(ÓPTICA\)/i);
+    assert.match(system, /Secuencia Vectorial/i);
+    assert.match(system, /NO busques reloj/i);
+    assert.match(system, /syntacticVacios/);
+    assert.match(system, /isCableadoConnected/);
     assert.match(system, /perceptionEye/);
     assert.match(system, /characterSignedCode/);
     assert.doesNotMatch(system, /UN solo Código Dominante/);
@@ -53,6 +58,20 @@ describe("Depósito V3 — fallback local", () => {
     assert.match(r.groundingStatus.diagnosticMessage, /no se invalida/i);
     assert.equal(r.activeEyeMap[7], true);
     assert.equal(r.activeEyeMap[3], true);
+    assert.equal(r.syntaxDiagnostic.detectedSyntaxCode, 3);
+    assert.equal(r.syntaxDiagnostic.isCableadoConnected, true);
+    assert.ok(r.syntacticVacios.includes(1));
+    assert.equal(r.syntacticVacios.includes(3), false);
+  });
+
+  it("C3 se activa por secuencia vectorial, no por reloj", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Vi el patrón. Primero aislé el territorio, entonces ocurrió el atasco, me llevó a cortar el segundo paso. El modelo se repite.",
+      userTier: "MATRICULA",
+    });
+    assert.equal(r.perceptionEye, 7);
+    assert.equal(r.characterSignedCode, 3);
     assert.equal(r.syntaxDiagnostic.detectedSyntaxCode, 3);
   });
 
@@ -96,6 +115,7 @@ describe("Depósito V3 — fallback local", () => {
     assert.match(r.groundingStatus.diagnosticMessage, /impronta|no se invalida/i);
     assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flor moral|evasión/i);
     assert.equal(r.eyeAudits[7].isBlindSpot, false);
+    assert.equal(r.syntaxDiagnostic.isCableadoConnected, true);
   });
 
   it("evasión intelectual: título C10 que flota sobre energía/culpa", () => {
