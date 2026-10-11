@@ -9,6 +9,7 @@ import {
   buildGrantDeliveryId,
   moduleGrantAdminMessage,
 } from "../shared/clientAccount";
+import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
 
 const { Pool } = pkg;
 
@@ -76,11 +77,12 @@ export async function listPendingModuleGrantsForEmail(
   email: string,
 ): Promise<Array<{ deliveryId: string; planId: string }>> {
   if (!process.env.DATABASE_URL) return [];
-  const normalized = email.trim().toLowerCase();
+  const keys = emailMatchKeys(email);
+  if (keys.length === 0) return [];
   const result = await pool.query(
     `SELECT delivery_id, plan_id FROM planificacion_module_grants
-     WHERE buyer_email = $1 AND status = 'pending'`,
-    [normalized],
+     WHERE buyer_email = ANY($1::text[]) AND status = 'pending'`,
+    [keys],
   );
   return result.rows.map((row) => ({
     deliveryId: row.delivery_id as string,
@@ -128,7 +130,7 @@ export async function processPlanificacionModulePayment(params: {
   note?: string;
   grantedBy?: string;
 }): Promise<{ granted: boolean; pending: boolean; uid?: string }> {
-  const email = params.buyerEmail.trim().toLowerCase();
+  const email = normalizeBuyerEmail(params.buyerEmail);
   const planId = params.planId.trim();
   if (!email || modulesGrantedByPlan(planId).length === 0) {
     return { granted: false, pending: false };
@@ -215,7 +217,7 @@ export async function adminGrantPlanificacionModule(params: {
   uid?: string;
   message: string;
 }> {
-  const email = params.buyerEmail.trim().toLowerCase();
+  const email = normalizeBuyerEmail(params.buyerEmail);
   const planId = params.planId.trim();
   if (!email || !email.includes("@")) {
     throw new Error("Email válido requerido.");
@@ -247,7 +249,13 @@ export async function adminGrantPlanificacionModule(params: {
         granted: false,
         pending: false,
         duplicate: false,
-        message: moduleGrantAdminMessage({ email, planId, granted: false, pending: true }),
+        message: moduleGrantAdminMessage({
+          email,
+          planId,
+          granted: false,
+          pending: true,
+          accountExists: false,
+        }),
       };
     }
     const ok = await activateModulesForUserById(uid, planId);
@@ -257,7 +265,13 @@ export async function adminGrantPlanificacionModule(params: {
       pending: !ok,
       duplicate: false,
       uid,
-      message: moduleGrantAdminMessage({ email, planId, granted: ok, pending: !ok }),
+      message: moduleGrantAdminMessage({
+        email,
+        planId,
+        granted: ok,
+        pending: !ok,
+        accountExists: true,
+      }),
     };
   }
 
@@ -281,6 +295,7 @@ export async function adminGrantPlanificacionModule(params: {
       planId,
       granted: result.granted,
       pending: result.pending && !result.granted,
+      accountExists: Boolean(result.uid || result.granted),
     }),
   };
 }

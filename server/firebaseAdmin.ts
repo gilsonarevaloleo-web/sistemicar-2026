@@ -2,6 +2,7 @@ import { initializeApp, cert, getApps, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getPrivatePath } from "../shared/firebasePaths";
+import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
 import {
   type ModuleId,
   mergeModuleIds,
@@ -41,17 +42,21 @@ export function getAdminApp(): App | null {
 }
 
 export async function lookupUidByEmail(email: string): Promise<string | null> {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return null;
+  const keys = emailMatchKeys(email);
+  if (keys.length === 0) return null;
 
   const adminApp = getAdminApp();
   if (adminApp) {
-    try {
-      const user = await getAuth(adminApp).getUserByEmail(normalized);
-      return user.uid;
-    } catch {
-      return null;
+    const auth = getAuth(adminApp);
+    for (const key of keys) {
+      try {
+        const user = await auth.getUserByEmail(key);
+        return user.uid;
+      } catch {
+        // probar alias (puntos / +tag de Gmail)
+      }
     }
+    return null;
   }
 
   const apiKey = process.env.VITE_FIREBASE_API_KEY;
@@ -62,7 +67,7 @@ export async function lookupUidByEmail(email: string): Promise<string | null> {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: [normalized] }),
+        body: JSON.stringify({ email: keys }),
       }
     );
     if (!r.ok) return null;
@@ -215,7 +220,7 @@ export type AdminUserLookupResult = {
 
 /** Busca usuario en Firebase Auth (fuente de verdad) + progresión si Admin SDK está listo. */
 export async function adminLookupUserByEmail(email: string): Promise<AdminUserLookupResult> {
-  const normalized = email.trim().toLowerCase();
+  const normalized = normalizeBuyerEmail(email);
   if (!normalized) return { found: false, adminReady: isFirebaseAdminReady() };
 
   const adminReady = isFirebaseAdminReady();
@@ -228,16 +233,21 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
   let providers: string[] | undefined;
 
   if (adminApp) {
-    try {
-      const user = await getAuth(adminApp).getUserByEmail(normalized);
-      uid = user.uid;
-      authEmail = (user.email ?? normalized).toLowerCase();
-      emailVerified = user.emailVerified;
-      displayName = user.displayName ?? null;
-      providers = user.providerData.map(p => p.providerId);
-    } catch {
-      return { found: false, adminReady };
+    const auth = getAuth(adminApp);
+    for (const key of emailMatchKeys(normalized)) {
+      try {
+        const user = await auth.getUserByEmail(key);
+        uid = user.uid;
+        authEmail = (user.email ?? key).toLowerCase();
+        emailVerified = user.emailVerified;
+        displayName = user.displayName ?? null;
+        providers = user.providerData.map(p => p.providerId);
+        break;
+      } catch {
+        // alias Gmail
+      }
     }
+    if (!uid) return { found: false, adminReady };
   } else {
     uid = await lookupUidByEmail(normalized);
     if (!uid) return { found: false, adminReady };

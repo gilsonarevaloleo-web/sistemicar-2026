@@ -1,10 +1,27 @@
 import { auth } from "@/lib/firebase";
 
+let claimInFlight: Promise<{
+  grantedPlans: string[];
+  grantedCredits: number;
+}> | null = null;
+
 /**
- * Al primer login con Google, aplica Yape/MP pendientes
- * (módulos de planificación y créditos Espejo) al uid nuevo.
+ * Aplica Yape/MP pendientes (módulos y créditos Espejo) a la cuenta
+ * Google ya abierta. Si la clienta pagó después del trial, esto tiene
+ * que terminar ANTES de mandarla a /pagos.
  */
 export async function claimPendingPurchases(): Promise<{
+  grantedPlans: string[];
+  grantedCredits: number;
+}> {
+  if (claimInFlight) return claimInFlight;
+  claimInFlight = claimPendingPurchasesOnce().finally(() => {
+    claimInFlight = null;
+  });
+  return claimInFlight;
+}
+
+async function claimPendingPurchasesOnce(): Promise<{
   grantedPlans: string[];
   grantedCredits: number;
 }> {
