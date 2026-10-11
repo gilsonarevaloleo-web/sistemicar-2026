@@ -43,7 +43,12 @@ import { StatusAlianza } from "@/components/status-alianza";
 import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
-import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, extrasFromProgression, canEnterJornadaBaseMenu } from "@/lib/persistence";
+import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, extrasFromProgression, canEnterJornadaBaseMenu, resolveUserJornadaBaseAccess } from "@/lib/persistence";
+import { claimPendingPurchases } from "@/lib/claimPurchases";
+import {
+  jornadaMenuTileSubtitle,
+  shouldShowJornadaMenuTile,
+} from "@shared/jornadaBaseAccess";
 import {
   armDualKernelExitSoftStart,
   useDualKernelMotorsQuiet,
@@ -151,11 +156,12 @@ function buildMenuItems(
     },
   ];
 
-  if (previewOps || canEnterJornadaBaseMenu(...accessArgs, extras)) {
+  if (previewOps || shouldShowJornadaMenuTile()) {
+    const access = resolveUserJornadaBaseAccess(...accessArgs, extras);
     items.push({
       id: "planificacion",
       title: JORNADA_MODULE.titleUpper,
-      subtitle: JORNADA_MODULE.tagline,
+      subtitle: jornadaMenuTileSubtitle(access, JORNADA_MODULE.tagline),
       icon: Heart,
       route: JORNADA_V4_PATH,
       color: SPECTRUM.VERDE,
@@ -234,6 +240,11 @@ export default function MenuPrincipal() {
       setUserEmail(getUserEmail());
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.uid || !user.email || isUserAnonymous()) return;
+    void claimPendingPurchases();
+  }, [user?.uid, user?.email]);
 
   useEffect(() => {
     resetVoicePlaybackCache();
@@ -1154,17 +1165,10 @@ export default function MenuPrincipal() {
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
           }}
         >
-          {(() => {
-            const extras = extrasFromProgression(progression);
-            const accessArgs = [progression?.subscriptionPlan, userEmail, progression?.rank, progression?.activeModules] as const;
-            const navItems = [
-              { icon: Terminal, color: "#00FFC3", route: "/espejo/v2", label: "Espejo" },
-              ...(previewUnlocked || canEnterJornadaBaseMenu(...accessArgs, extras)
-                ? [{ icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title }]
-                : [{ icon: CreditCard, color: GOLD, route: "/pagos", label: "Módulos" }]),
-            ];
-
-            return navItems.map((item) => (
+          {([
+            { icon: Terminal, color: "#00FFC3", route: "/espejo/v2", label: "Espejo" },
+            { icon: Heart, color: SPECTRUM.VERDE, route: JORNADA_V4_PATH, label: JORNADA_MODULE.title },
+          ] as const).map((item) => (
               <button
                 key={item.label}
                 onClick={() => navigate(item.route)}
@@ -1176,8 +1180,7 @@ export default function MenuPrincipal() {
                   {item.label}
                 </span>
               </button>
-            ));
-          })()}
+          ))}
         </div>
       </motion.div>
 
