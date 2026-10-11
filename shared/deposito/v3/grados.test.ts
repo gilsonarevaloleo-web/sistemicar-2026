@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { scaffoldAnalysisResult } from "./validar.ts";
 import {
   esVolcadoEstableAlto,
+  evaluateDualTrackPromotion,
   evaluateStudentTierPromotion,
   medirGradoConsistencia,
   medirGradoConsistenciaDesdeVolcados,
@@ -15,11 +16,21 @@ function entry(
     characterSignedCode: DepotAnalysisResult["characterSignedCode"];
     grounded: boolean;
     timestamp?: number;
+    cableado?: boolean;
+    vacios?: DepotAnalysisResult["syntacticVacios"];
+    deltaGap?: number;
   },
 ): DepotAnalysisResult {
   const result = scaffoldAnalysisResult({
     perceptionEye: opts.perceptionEye,
     characterSignedCode: opts.characterSignedCode,
+    deltaGap: opts.deltaGap,
+    syntacticVacios: opts.vacios,
+    syntaxDiagnostic: {
+      detectedSyntaxCode: opts.characterSignedCode,
+      isCableadoConnected: opts.cableado ?? false,
+      syntaxCharacteristics: "Firma de prueba.",
+    },
     groundingStatus: {
       isFullyGrounded: opts.grounded,
       diagnosticMessage: opts.grounded
@@ -206,5 +217,95 @@ describe("Depósito V3 — grado por consistencia", () => {
     assert.equal(medido.sampleSize, 2);
     assert.equal(medido.stableCount, 1);
     assert.equal(medido.recommendedTier, "CARRERA");
+  });
+});
+
+describe("Depósito V3 — doble canal de promoción", () => {
+  it("sin volcados no pisa el peldaño de partida y no promociona", () => {
+    const r = evaluateDualTrackPromotion([], "MATRICULA");
+    assert.equal(r.currentTier, "MATRICULA");
+    assert.equal(r.recommendedTier, "FREE");
+    assert.equal(r.promotionStatus, "MAINTAINED");
+    assert.equal(r.opticaConsistencyRate, 0);
+    assert.equal(r.sintaxisConsistencyRate, 0);
+    assert.match(r.message, /sin registros/i);
+  });
+
+  it("7/10 en ambas vías → TITULO; no altera el grado óptico sellado", () => {
+    const sample = [
+      ...repeat(7, (i) =>
+        entry({
+          perceptionEye: 7,
+          characterSignedCode: 7,
+          grounded: true,
+          cableado: true,
+          vacios: [2, 4, 9],
+          timestamp: i + 1,
+        }),
+      ),
+      ...repeat(3, (i) =>
+        entry({
+          perceptionEye: 3,
+          characterSignedCode: 1,
+          grounded: false,
+          cableado: false,
+          vacios: [4, 5, 6, 7, 8, 9, 10],
+          timestamp: i + 20,
+        }),
+      ),
+    ];
+    const dual = evaluateDualTrackPromotion(sample, "CARRERA");
+    assert.equal(dual.currentTier, "CARRERA");
+    assert.equal(dual.recommendedTier, "TITULO");
+    assert.equal(dual.promotionStatus, "PROMOTED");
+    assert.equal(dual.opticaConsistencyRate, 70);
+    assert.equal(dual.sintaxisConsistencyRate, 70);
+    assert.equal(evaluateStudentTierPromotion(sample), "TITULO");
+  });
+
+  it("óptica alta sin cableado no promociona por doble canal", () => {
+    const soloOptica = repeat(10, (i) =>
+      entry({
+        perceptionEye: 7,
+        characterSignedCode: 7,
+        grounded: true,
+        cableado: false,
+        vacios: [1, 2, 3, 4, 5, 6, 8, 9, 10],
+        timestamp: i,
+      }),
+    );
+    const dual = evaluateDualTrackPromotion(soloOptica);
+    assert.equal(dual.recommendedTier, "MATRICULA");
+    assert.equal(dual.promotionStatus, "NEEDS_GROUNDING");
+    assert.equal(dual.sintaxisConsistencyRate, 0);
+    assert.equal(evaluateStudentTierPromotion(soloOptica), "TITULO");
+  });
+
+  it("5/10 en ambas vías → CARRERA", () => {
+    const mitad = [
+      ...repeat(5, (i) =>
+        entry({
+          perceptionEye: 8,
+          characterSignedCode: 8,
+          grounded: true,
+          cableado: true,
+          vacios: [1, 2],
+          timestamp: i,
+        }),
+      ),
+      ...repeat(5, (i) =>
+        entry({
+          perceptionEye: 2,
+          characterSignedCode: 1,
+          grounded: false,
+          cableado: false,
+          vacios: [3, 4, 5, 6, 7, 8, 9, 10],
+          timestamp: i + 50,
+        }),
+      ),
+    ];
+    const dual = evaluateDualTrackPromotion(mitad);
+    assert.equal(dual.recommendedTier, "CARRERA");
+    assert.equal(dual.promotionStatus, "PROMOTED");
   });
 });

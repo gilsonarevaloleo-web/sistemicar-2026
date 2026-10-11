@@ -34,9 +34,11 @@ function fixture(): DepotAnalysisResult {
     characterSignedCode: 3,
     activeEyeMap: buildActiveEyeMap([3, 7]),
     eyeAudits: audits,
+    syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
     deltaGap: 4,
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
+      isCableadoConnected: true,
       syntaxCharacteristics: "Paso a paso, marcas de hora.",
     },
     groundingStatus: {
@@ -159,6 +161,7 @@ describe("GradoConsistenciaV3", () => {
     assert.match(html, /deposito-v3-grado/);
     assert.match(html, />TITULO</);
     assert.match(html, /7 de 7 volcados estables/);
+    assert.match(html, /deposito-v3-grado-dual/);
     assert.doesNotMatch(html, /OJO DOMINANTE/);
   });
 
@@ -183,5 +186,9 @@ describe("DictamenCardV3", () => {
     assert.match(html, /Ritmo/);
     assert.match(html, /no se invalida|fricciona en C3/i);
     assert.match(html, /Tres pasos con hora de corte/);
+    assert.match(html, /deposito-v3-cableado/);
+    assert.match(html, /Cableado título↔materia: conectado/);
+    assert.match(html, /deposito-v3-vacios/);
+    assert.match(html, /C1 · C2 · C4/);
   });
 });

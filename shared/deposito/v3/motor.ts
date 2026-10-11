@@ -8,6 +8,7 @@ import {
   buildActiveEyeMap,
   computeDeltaGap,
   emptyEyeAudits,
+  vaciosDesdeActiveMap,
 } from "./ojos.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
 import {
@@ -49,7 +50,19 @@ const PERCEPCION: Record<EyeCode, RegExp[]> = {
 const SINTAXIS: Record<EyeCode, RegExp[]> = {
   1: [/cansad/, /fatiga/, /no conect/, /suelto/, /materia prima/],
   2: [/entonces/, /despues me/, /después me/, /entro y/, /sali[oó]/],
-  3: [/\d{1,2}:\d{2}/, /a las \d/, /minutos/, /pasos?/, /secuencia/, /primero [\s\S]+ segundo/],
+  3: [
+    /me llevo a/,
+    /entonces ocurrio/,
+    /entonces /,
+    /antes [\s\S]+ despues/,
+    /luego /,
+    /a partir de/,
+    /pasos?/,
+    /secuencia/,
+    /primero [\s\S]+ segundo/,
+    /antecedente/,
+    /consecuente/,
+  ],
   4: [/¿[^?]{6,}\?/, /por que la regla/, /por qué la regla/, /el muro/, /la norma/],
   5: [/\bcort[eé]\b/, /\bno\.\b/, /cero excusa/, /dispar[eé]/, /decid[ií]/],
   6: [/"[^"]{4,}"/, /me dijo/, /le dije/, /con ella/, /con él/, /cliente/],
@@ -319,8 +332,10 @@ export function diagnosticarAuditoriaLocal(
           "Volcá UN hecho físico: hora, lugar, verbo. Cero clima.",
         syntaxDiagnostic: {
           detectedSyntaxCode: 1,
+          isCableadoConnected: false,
           syntaxCharacteristics: CANON_TEN_EYES[1].syntaxCharacteristics,
         },
+        syntacticVacios: vaciosDesdeActiveMap(buildActiveEyeMap([1])),
       }),
     );
   }
@@ -404,9 +419,14 @@ export function diagnosticarAuditoriaLocal(
         hayHechoFrio,
       }),
       deltaGap,
+      syntacticVacios: EYE_CODES.filter(
+        (n) => syn[n] <= 0 && n !== characterSignedCode,
+      ),
       syntaxDiagnostic: {
         detectedSyntaxCode: characterSignedCode,
-        syntaxCharacteristics: CANON_TEN_EYES[characterSignedCode].syntaxCharacteristics,
+        isCableadoConnected: cableada,
+        syntaxCharacteristics:
+          CANON_TEN_EYES[characterSignedCode].syntaxCharacteristics,
       },
       groundingStatus: {
         isFullyGrounded: grounded,
@@ -427,23 +447,33 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
   return {
     ...result,
     deltaGap: computeDeltaGap(result.perceptionEye, result.characterSignedCode),
+    syntacticVacios:
+      result.syntacticVacios ?? vaciosDesdeActiveMap(result.activeEyeMap),
     syntaxDiagnostic: {
       ...result.syntaxDiagnostic,
       detectedSyntaxCode:
         result.syntaxDiagnostic.detectedSyntaxCode || result.characterSignedCode,
+      isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
     },
   };
 }
 
 function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
+  const activeEyeMap = {
+    ...buildActiveEyeMap([]),
+    ...result.activeEyeMap,
+    [result.perceptionEye]: true,
+    [result.characterSignedCode]: true,
+  };
   return {
     ...result,
     deltaGap: computeDeltaGap(result.perceptionEye, result.characterSignedCode),
-    activeEyeMap: {
-      ...buildActiveEyeMap([]),
-      ...result.activeEyeMap,
-      [result.perceptionEye]: true,
-      [result.characterSignedCode]: true,
+    activeEyeMap,
+    syntacticVacios:
+      result.syntacticVacios ?? vaciosDesdeActiveMap(activeEyeMap),
+    syntaxDiagnostic: {
+      ...result.syntaxDiagnostic,
+      isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
     },
     eyeAudits: {
       ...emptyEyeAudits(),
@@ -470,7 +500,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con perceptionEye, characterSignedCode, deltaGap, syntaxDiagnostic, groundingStatus, systemicAnalysis, immediateAdjustment.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con perceptionEye, characterSignedCode, deltaGap, syntacticVacios, syntaxDiagnostic (incluye isCableadoConnected), groundingStatus, systemicAnalysis, immediateAdjustment.`,
         2048,
         false,
       );

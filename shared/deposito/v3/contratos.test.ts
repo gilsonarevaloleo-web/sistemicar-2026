@@ -27,7 +27,7 @@ import {
 
 describe("Depósito V3 — contratos", () => {
   it("expone versión y los 10 canales sin repetir id", () => {
-    assert.equal(DEPOSITO_V3_VERSION, "3.1.0-optica-sintaxis");
+    assert.equal(DEPOSITO_V3_VERSION, "3.2.0-optica-sintaxis");
     assert.deepEqual([...EYE_CODES], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const ids = EYE_CODES.map((n) => CANON_TEN_EYES[n].id);
     assert.deepEqual(ids, [...EYE_CODES]);
@@ -176,9 +176,11 @@ describe("Depósito V3 — dictamen", () => {
         isBlindSpot: false,
       },
     },
+    syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
     deltaGap: 4,
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
+      isCableadoConnected: true,
       syntaxCharacteristics: "Paso a paso, marcas de hora.",
     },
     groundingStatus: {
@@ -209,7 +211,40 @@ describe("Depósito V3 — dictamen", () => {
     assert.equal(parsed.result.activeEyeMap[1], false);
     assert.equal(parsed.result.eyeAudits[3].hasRealVision, true);
     assert.equal(parsed.result.eyeAudits[1].hasIntention, false);
+    assert.deepEqual(parsed.result.syntacticVacios, [1, 2, 4, 5, 6, 8, 9, 10]);
+    assert.equal(parsed.result.syntaxDiagnostic.isCableadoConnected, true);
     assert.equal(isDepotAnalysisResult(parsed.result), true);
+  });
+
+  it("JSON legado sin vacíos ni cableado sigue parseando", () => {
+    const legado = {
+      perceptionEye: 7,
+      characterSignedCode: 3,
+      activeEyeMap: { "3": true, "7": true },
+      deltaGap: 4,
+      syntaxDiagnostic: {
+        detectedSyntaxCode: 3,
+        syntaxCharacteristics: "Paso a paso, marcas de hora.",
+      },
+      groundingStatus: {
+        isFullyGrounded: false,
+        frictionPoint: 3,
+        diagnosticMessage: "Impronta de madurez: el título se cablea con la materia.",
+      },
+      systemicAnalysis: {
+        isLatencyEvent: false,
+        isSystemicConflict: false,
+        realEngineeringCause: "El corte se narra como visión y se ejecuta como pistón.",
+      },
+      immediateAdjustment: "Mañana, una secuencia de tres pasos.",
+    };
+    const parsed = parseDepotAnalysisResult(legado);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.result.syntaxDiagnostic.isCableadoConnected, true);
+    assert.ok(parsed.result.syntacticVacios.includes(1));
+    assert.equal(parsed.result.syntacticVacios.includes(3), false);
+    assert.equal(parsed.result.syntacticVacios.includes(7), false);
   });
 
   it("recalcula Δ si el modelo la omite o la miente en signo", () => {

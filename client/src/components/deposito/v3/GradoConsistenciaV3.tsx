@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  evaluateDualTrackPromotionDesdeVolcados,
   medirGradoConsistenciaDesdeVolcados,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
@@ -15,6 +16,7 @@ export function GradoConsistenciaV3({
   if (entries.length === 0) return null;
 
   const grado = medirGradoConsistenciaDesdeVolcados(entries);
+  const dual = evaluateDualTrackPromotionDesdeVolcados(entries);
   const pct = Math.round(grado.consistencyRate * 100);
 
   return (
@@ -49,6 +51,13 @@ export function GradoConsistenciaV3({
       <p className="mt-2 text-[11px] text-white/40">
         7 de 10 con óptica ≥ C7 y chasis sustentado otorga Título. No abre el
         candado comercial.
+      </p>
+      <p
+        className="mt-3 text-[10px] font-mono text-white/40"
+        data-testid="deposito-v3-grado-dual"
+      >
+        Doble canal · óptica {dual.opticaConsistencyRate}% · sintaxis{" "}
+        {dual.sintaxisConsistencyRate}% · {dual.promotionStatus}
       </p>
     </section>
   );

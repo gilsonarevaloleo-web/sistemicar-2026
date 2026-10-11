@@ -55,6 +55,6 @@ describe("Netlify Function deposito-v3-audit", () => {
     assert.equal(body.result.perceptionEye, 7);
     assert.equal(body.result.characterSignedCode, 3);
     assert.equal(body.result.deltaGap, 4);
-    assert.equal(body.version, "3.1.0-optica-sintaxis");
+    assert.equal(body.version, "3.2.0-optica-sintaxis");
   });
 });

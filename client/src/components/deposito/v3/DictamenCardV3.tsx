@@ -69,7 +69,26 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
         <p className="mt-1 text-xs leading-relaxed text-white/70">
           {result.syntaxDiagnostic.syntaxCharacteristics}
         </p>
+        <p
+          className="mt-2 text-[10px] font-mono uppercase tracking-wider text-white/40"
+          data-testid="deposito-v3-cableado"
+        >
+          {result.syntaxDiagnostic.isCableadoConnected
+            ? "Cableado título↔materia: conectado"
+            : "Cableado título↔materia: abierto"}
+        </p>
       </div>
+
+      {(result.syntacticVacios?.length ?? 0) > 0 && (
+        <div data-testid="deposito-v3-vacios">
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+            Vacíos sintácticos
+          </h4>
+          <p className="mt-1 font-mono text-xs text-white/55">
+            {result.syntacticVacios!.map((n) => `C${n}`).join(" · ")}
+          </p>
+        </div>
+      )}
 
       <div className="border-l-2 pl-4" style={{ borderColor: GOLD }}>
         <h4 className="text-[10px] font-bold uppercase tracking-wider" style={{ color: GOLD }}>

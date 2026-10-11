@@ -38,13 +38,16 @@ describe("Depósito V3 — GET /api/deposito/v3/meta", () => {
       const res = await fetch(`${base}/api/deposito/v3/meta`);
       assert.equal(res.status, 200);
       const body = await res.json();
-      assert.equal(body.version, "3.1.0-optica-sintaxis");
+      assert.equal(body.version, "3.2.0-optica-sintaxis");
       assert.equal(body.endpoint, "POST /api/deposito/v3/audit");
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.muroDeDominancia, false);
       assert.equal(body.fallbackLocal, true);
       assert.equal(body.gradoConsistencia.windowSize, 10);
       assert.equal(body.gradoConsistencia.tituloRate, 0.7);
+      assert.equal(body.dobleCanal.windowSize, 10);
+      assert.equal(body.dobleCanal.tituloMinSample, 7);
+      assert.match(body.dobleCanal.sintaxisValida, /isCableadoConnected/);
       assert.equal(body.gemini, false);
       assert.equal(body.ojos.length, 10);
       assert.equal(body.ojos[0].canon, "Cimiento");
@@ -120,7 +123,7 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.equal(body.result.characterSignedCode, 3);
         assert.equal(body.result.deltaGap, 4);
         assert.equal(body.userTier, "MATRICULA");
-        assert.equal(body.version, "3.1.0-optica-sintaxis");
+        assert.equal(body.version, "3.2.0-optica-sintaxis");
       },
     );
   });

@@ -38,8 +38,10 @@ export {
   etiquetaCodigoOjo,
   etiquetaOjo,
   isEyeCode,
+  normalizarVaciosSintacticos,
   obtenerOjoV3,
   parseEyeCode,
+  vaciosDesdeActiveMap,
 } from "./ojos.ts";
 
 export {
@@ -85,13 +87,31 @@ export type {
 } from "./evaluar.ts";
 
 export {
+  DUAL_CARRERA_MIN_SAMPLE,
+  DUAL_CARRERA_RATE,
+  DUAL_GROUNDING_FLOOR,
+  DUAL_OPTICA_MAX_DELTA,
+  DUAL_SINTAXIS_MAX_VACIOS,
+  DUAL_TITULO_MIN_SAMPLE,
+  DUAL_TITULO_RATE,
+  DUAL_WINDOW_SIZE,
   GRADO_CARRERA_RATE,
   GRADO_TITULO_MIN_SAMPLE,
   GRADO_TITULO_RATE,
   GRADO_WINDOW_SIZE,
   esVolcadoEstableAlto,
+  esVolcadoOpticaDual,
+  esVolcadoSintaxisDual,
+  evaluateDualTrackPromotion,
+  evaluateDualTrackPromotionDesdeVolcados,
   evaluateStudentTierPromotion,
   medirGradoConsistencia,
   medirGradoConsistenciaDesdeVolcados,
+  syntacticVaciosDe,
 } from "./grados.ts";
-export type { GradoConsistencia, VolcadoConResultado } from "./grados.ts";
+export type {
+  GradoConsistencia,
+  PromotionStatus,
+  TierEvaluationReport,
+  VolcadoConResultado,
+} from "./grados.ts";

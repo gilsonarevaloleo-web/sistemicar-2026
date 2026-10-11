@@ -61,8 +61,9 @@ export default function DepositoV3Page() {
             {DEPOSITO_V3_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El dictamen es óptica + carácter + Δ. El grado se mide por
-            consistencia, no por una foto fija. V2 queda en su recinto.
+            El dictamen es óptica (fondo) + carácter (forma) + Δ. La sintaxis
+            mide geometría, no verdad. El grado óptico 7/10 no se toca. V2
+            queda en su recinto.
           </p>
           <Link
             href="/deposito-v2"

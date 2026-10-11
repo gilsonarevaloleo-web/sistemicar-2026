@@ -8,7 +8,7 @@
  * son alias del mismo EyeCode. La esencia es el número 1–10.
  */
 
-export const DEPOSITO_V3_VERSION = "3.1.0-optica-sintaxis" as const;
+export const DEPOSITO_V3_VERSION = "3.2.0-optica-sintaxis" as const;
 
 export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -65,6 +65,8 @@ export interface DepotEntryPayload {
 
 export interface CharacterSyntaxDiagnostic {
   detectedSyntaxCode: EyeCode;
+  /** Continuidad título → cuerpo → cierre. No es juicio moral. */
+  isCableadoConnected: boolean;
   syntaxCharacteristics: string;
 }
 
@@ -92,6 +94,8 @@ export interface DepotAnalysisResult {
   characterSignedCode: EyeCode;
   activeEyeMap: Record<EyeCode, boolean>;
   eyeAudits: Record<EyeCode, EyeAudit>;
+  /** Códigos C1–C10 ausentes en la geometría de redacción. */
+  syntacticVacios: EyeCode[];
   /** | perceptionEye - characterSignedCode | */
   deltaGap: number;
   syntaxDiagnostic: CharacterSyntaxDiagnostic;

@@ -8,7 +8,9 @@ import {
   computeDeltaGap,
   emptyEyeAudits,
   isEyeCode,
+  normalizarVaciosSintacticos,
   parseEyeCode,
+  vaciosDesdeActiveMap,
 } from "./ojos.ts";
 import {
   camposObligatoriosPorTier,
@@ -235,6 +237,15 @@ export function parseDepotAnalysisResult(
     return { ok: false, error: "groundingStatus.diagnosticMessage es requerido" };
   }
 
+  const cableadoDeclarado =
+    syntaxRec &&
+    ("isCableadoConnected" in syntaxRec || "is_cableado_connected" in syntaxRec);
+  const isCableadoConnected = cableadoDeclarado
+    ? parseBooleanLoose(
+        syntaxRec.isCableadoConnected ?? syntaxRec.is_cableado_connected,
+      )
+    : /impronta de madurez/i.test(grounding.diagnosticMessage);
+
   const systemic = leerSistemico(obj.systemicAnalysis ?? obj.systemic_analysis);
   if (!systemic) {
     return { ok: false, error: "systemicAnalysis.realEngineeringCause es requerido" };
@@ -261,16 +272,23 @@ export function parseDepotAnalysisResult(
     : computeDeltaGap(perceptionEye, characterSignedCode);
 
   const timestamp = opts.timestamp ?? Date.now();
+  const activeEyeMap = leerEyeMap(obj.activeEyeMap ?? obj.active_eye_map);
+  const syntacticVacios = normalizarVaciosSintacticos(
+    obj.syntacticVacios ?? obj.syntactic_vacios,
+    activeEyeMap,
+  );
   const result: DepotAnalysisResult = {
     id: opts.id ?? `depot_${timestamp}`,
     timestamp,
     perceptionEye,
     characterSignedCode,
-    activeEyeMap: leerEyeMap(obj.activeEyeMap ?? obj.active_eye_map),
+    activeEyeMap,
     eyeAudits: leerEyeAudits(obj.eyeAudits ?? obj.eye_audits),
+    syntacticVacios,
     deltaGap,
     syntaxDiagnostic: {
       detectedSyntaxCode,
+      isCableadoConnected,
       syntaxCharacteristics,
     },
     groundingStatus: grounding,
@@ -288,19 +306,30 @@ export function scaffoldAnalysisResult(
   const timestamp = Date.now();
   const perceptionEye = partial.perceptionEye;
   const characterSignedCode = partial.characterSignedCode;
+  const activeEyeMap =
+    partial.activeEyeMap ??
+    buildActiveEyeMap([perceptionEye, characterSignedCode]);
+  const syntaxDiagnostic = {
+    detectedSyntaxCode:
+      partial.syntaxDiagnostic?.detectedSyntaxCode ?? characterSignedCode,
+    isCableadoConnected:
+      partial.syntaxDiagnostic?.isCableadoConnected ?? false,
+    syntaxCharacteristics:
+      partial.syntaxDiagnostic?.syntaxCharacteristics ??
+      "Firma sintáctica pendiente de auditoría.",
+  };
   return {
     id: `depot_${timestamp}`,
     timestamp,
     perceptionEye,
     characterSignedCode,
-    activeEyeMap: partial.activeEyeMap ?? buildActiveEyeMap([perceptionEye, characterSignedCode]),
+    activeEyeMap,
     eyeAudits: partial.eyeAudits ?? emptyEyeAudits(),
+    syntacticVacios:
+      partial.syntacticVacios ?? vaciosDesdeActiveMap(activeEyeMap),
     deltaGap:
       partial.deltaGap ?? computeDeltaGap(perceptionEye, characterSignedCode),
-    syntaxDiagnostic: partial.syntaxDiagnostic ?? {
-      detectedSyntaxCode: characterSignedCode,
-      syntaxCharacteristics: "Firma sintáctica pendiente de auditoría.",
-    },
+    syntaxDiagnostic,
     groundingStatus: partial.groundingStatus ?? {
       isFullyGrounded: false,
       diagnosticMessage: "Sustentación de chasis pendiente de auditoría.",

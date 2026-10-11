@@ -42,6 +42,7 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
           const isPerception = result.perceptionEye === eyeId;
           const isCharacter = result.characterSignedCode === eyeId;
           const isFriction = result.groundingStatus.frictionPoint === eyeId;
+          const isVacio = Boolean(result.syntacticVacios?.includes(eyeId));
           const vision = audit?.hasRealVision;
           const intention = audit?.hasIntention || result.activeEyeMap[eyeId];
 
@@ -72,6 +73,7 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
               data-locked={locked ? "1" : "0"}
               data-optica={isPerception ? "1" : "0"}
               data-caracter={isCharacter ? "1" : "0"}
+              data-vacio={isVacio ? "1" : "0"}
             >
               <div className="flex items-center justify-between gap-1">
                 <span className="font-mono text-[10px] font-bold">C{eyeId}</span>
