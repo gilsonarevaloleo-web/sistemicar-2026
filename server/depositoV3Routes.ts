@@ -10,6 +10,10 @@ import {
   DEPOSITO_V3_VERSION,
   EYE_CODES,
   TIER_MAX_EYE,
+  GRADO_CARRERA_RATE,
+  GRADO_TITULO_MIN_SAMPLE,
+  GRADO_TITULO_RATE,
+  GRADO_WINDOW_SIZE,
   evaluarDepositoV3,
   type DepotAnalysisResult,
   type GeminiAuditCaller,
@@ -51,6 +55,13 @@ export function registerDepositoV3Routes(
       gemini: Boolean(callGemini),
       fallbackLocal: true,
       tiers: TIER_MAX_EYE,
+      gradoConsistencia: {
+        windowSize: GRADO_WINDOW_SIZE,
+        tituloRate: GRADO_TITULO_RATE,
+        tituloMinSample: GRADO_TITULO_MIN_SAMPLE,
+        carreraRate: GRADO_CARRERA_RATE,
+        estable: "isFullyGrounded && perceptionEye >= 7",
+      },
       ojos: EYE_CODES.map((n) => {
         const o = CANON_TEN_EYES[n];
         return {

@@ -8,7 +8,7 @@
  * son alias del mismo EyeCode. La esencia es el número 1–10.
  */
 
-export const DEPOSITO_V3_VERSION = "3.0.0-optica-sintaxis" as const;
+export const DEPOSITO_V3_VERSION = "3.1.0-optica-sintaxis" as const;
 
 export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 

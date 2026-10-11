@@ -11,6 +11,7 @@ import { FormularioAuditoriaV3 } from "./FormularioAuditoriaV3.tsx";
 import { MapaCalorV3 } from "./MapaCalorV3.tsx";
 import { DictamenCardV3 } from "./DictamenCardV3.tsx";
 import { HistorialV3 } from "./HistorialV3.tsx";
+import { GradoConsistenciaV3 } from "./GradoConsistenciaV3.tsx";
 
 function fixture(): DepotAnalysisResult {
   const audits = emptyEyeAudits();
@@ -63,6 +64,7 @@ describe("FormularioAuditoriaV3", () => {
     assert.match(html, /deposito-v3-form/);
     assert.match(html, /deposito-v3-rawfact/);
     assert.match(html, /deposito-v3-hypothesis/);
+    assert.match(html, /Título sistémico/);
     assert.match(html, />MATRICULA</);
     assert.doesNotMatch(html, /deposito-v3-noise/);
     assert.doesNotMatch(html, /deposito-v3-shadow/);
@@ -127,6 +129,44 @@ describe("HistorialV3", () => {
     assert.match(html, /Δ 4/);
     assert.doesNotMatch(html, /OJO DOMINANTE/);
     assert.doesNotMatch(html, /sistemicar_volcados[^\-_]/);
+  });
+});
+
+describe("GradoConsistenciaV3", () => {
+  it("muestra Título cuando 7 de 10 están estables y no toca V2", () => {
+    const estable = {
+      ...fixture(),
+      perceptionEye: 7 as const,
+      characterSignedCode: 7 as const,
+      deltaGap: 0,
+      groundingStatus: {
+        isFullyGrounded: true,
+        diagnosticMessage: "Chasis sostiene.",
+      },
+    };
+    const entries = Array.from({ length: 7 }, (_, i) => ({
+      id: `e${i}`,
+      userId: "u1",
+      createdAt: new Date(2026, 0, i + 1),
+      rawFact: "patrón medido",
+      userTier: "CARRERA" as const,
+      result: { ...estable, id: `depot_${i}`, timestamp: i + 1 },
+      source: "local_fallback" as const,
+    }));
+    const html = renderToStaticMarkup(
+      createElement(GradoConsistenciaV3, { entries }),
+    );
+    assert.match(html, /deposito-v3-grado/);
+    assert.match(html, />TITULO</);
+    assert.match(html, /7 de 7 volcados estables/);
+    assert.doesNotMatch(html, /OJO DOMINANTE/);
+  });
+
+  it("no rendera sin historial", () => {
+    const html = renderToStaticMarkup(
+      createElement(GradoConsistenciaV3, { entries: [] }),
+    );
+    assert.equal(html, "");
   });
 });
 

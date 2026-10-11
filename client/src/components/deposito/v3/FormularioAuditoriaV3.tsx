@@ -133,14 +133,14 @@ export function FormularioAuditoriaV3({
               htmlFor="deposito-v3-hypothesis"
               className="mb-2 block text-[10px] tracking-[0.22em] text-white/45"
             >
-              2. Ley / hipótesis descubierta (opcional)
+              2. Título sistémico / hipótesis (opcional)
             </label>
             <input
               id="deposito-v3-hypothesis"
               type="text"
               value={studentHypothesis}
               onChange={(e) => setStudentHypothesis(e.target.value)}
-              placeholder="¿Qué ley o código creés que apareció?"
+              placeholder="¿Qué ley, título o código creés que apareció?"
               disabled={disabled || isLoading}
               className="w-full px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/25"
               style={fieldStyle}

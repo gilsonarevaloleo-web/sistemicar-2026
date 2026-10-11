@@ -133,31 +133,154 @@ function hipotesisComoOjo(value?: string): EyeCode | null {
   return Number(m[1]) as EyeCode;
 }
 
+const STOP_CABLE = new Set([
+  "este",
+  "esta",
+  "esto",
+  "estos",
+  "estas",
+  "para",
+  "como",
+  "cuando",
+  "donde",
+  "porque",
+  "desde",
+  "hasta",
+  "entre",
+  "sobre",
+  "tiene",
+  "cada",
+  "vez",
+  "los",
+  "las",
+  "del",
+  "una",
+  "uno",
+  "con",
+  "por",
+  "sin",
+  "muy",
+  "mas",
+  "hoy",
+  "ayer",
+  "todo",
+  "toda",
+  "solo",
+  "mismo",
+  "misma",
+  "aqui",
+  "alla",
+  "entonces",
+  "despues",
+]);
+
+const CONCEPTO_ALTO =
+  /patron|ley|sistema|origen|ciclo|modelo|matriz|axioma|vision|carga|multihilo/;
+
+function extraerTituloSistemico(payload: DepotEntryPayload): string {
+  const hipotesis = payload.studentHypothesis?.trim() ?? "";
+  if (hipotesis) return hipotesis;
+
+  const first = (payload.rawFact.split(/\n/)[0] ?? "").trim();
+  if (first.length < 8 || first.length > 90) return "";
+  if (/\d{1,2}:\d{2}/.test(first)) return "";
+  if (
+    /^(c\s*(?:[1-9]|10)\b|ley\b|patron\b|t[ií]tulo\b|el patron\b|la ley\b|el sistema\b|el origen\b|el modelo\b)/i.test(
+      first,
+    )
+  ) {
+    return first;
+  }
+  return "";
+}
+
+function tokensCable(norm: string): string[] {
+  return norm
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4 && !STOP_CABLE.has(t));
+}
+
+function hipotesisCableada(
+  payload: DepotEntryPayload,
+  perc: Record<EyeCode, number>,
+  syn: Record<EyeCode, number>,
+  norm: string,
+): boolean {
+  const techo = elegirGanador(perc, "alto");
+  const cuerpoSostiene =
+    techo >= 7 &&
+    perc[techo] > 0 &&
+    (syn[3] > 0 ||
+      syn[4] > 0 ||
+      syn[8] > 0 ||
+      syn[9] > 0 ||
+      HECHO_FRIO.test(payload.rawFact));
+
+  const titulo = extraerTituloSistemico(payload);
+  if (!titulo) return cuerpoSostiene;
+
+  const normTitulo = normalizar(titulo);
+  const ojoTitulo = hipotesisComoOjo(titulo);
+  if (
+    ojoTitulo &&
+    ojoTitulo >= 7 &&
+    (perc[ojoTitulo] > 0 || syn[ojoTitulo] > 0 || cuerpoSostiene)
+  ) {
+    return true;
+  }
+  if (
+    ojoTitulo &&
+    ojoTitulo >= 7 &&
+    !cuerpoSostiene &&
+    !HECHO_FRIO.test(payload.rawFact)
+  ) {
+    return false;
+  }
+
+  const tituloTokens = tokensCable(normTitulo);
+  const hits = tituloTokens.filter((t) => norm.includes(t)).length;
+  if (
+    tituloTokens.length > 0 &&
+    hits / tituloTokens.length >= 0.4 &&
+    (cuerpoSostiene || HECHO_FRIO.test(payload.rawFact))
+  ) {
+    return true;
+  }
+  if (CONCEPTO_ALTO.test(normTitulo) && CONCEPTO_ALTO.test(norm) && cuerpoSostiene) {
+    return true;
+  }
+  return cuerpoSostiene;
+}
+
 function auditarOjos(opts: {
   perc: Record<EyeCode, number>;
   syn: Record<EyeCode, number>;
   perceptionEye: EyeCode;
   characterSignedCode: EyeCode;
-  hayFlor: boolean;
+  evasionIntelectual: boolean;
   hayHechoFrio: boolean;
 }): Record<EyeCode, EyeAudit> {
   const audits = emptyEyeAudits();
   for (const n of EYE_CODES) {
     const intencion = opts.perc[n] > 0 || opts.syn[n] > 0;
     const vision =
-      intencion && opts.hayHechoFrio && !(opts.hayFlor && n >= 7 && opts.characterSignedCode <= 4);
+      intencion &&
+      opts.hayHechoFrio &&
+      !(opts.evasionIntelectual && n >= 7 && opts.characterSignedCode <= 3);
     const puntoCiego =
-      (n === opts.perceptionEye &&
+      opts.evasionIntelectual &&
+      ((n === opts.perceptionEye &&
         opts.perceptionEye >= 7 &&
-        opts.characterSignedCode <= 4 &&
-        opts.hayFlor) ||
-      (n === opts.characterSignedCode &&
-        opts.perceptionEye >= 7 &&
-        n <= 4);
+        opts.characterSignedCode <= 3) ||
+        (n === opts.characterSignedCode &&
+          opts.perceptionEye >= 7 &&
+          n <= 3));
     audits[n] = {
       eyeId: n,
       hasIntention: intencion || n === opts.perceptionEye || n === opts.characterSignedCode,
-      hasRealVision: vision || (n === opts.perceptionEye && opts.hayHechoFrio && !opts.hayFlor),
+      hasRealVision:
+        vision ||
+        (n === opts.perceptionEye && opts.hayHechoFrio && !opts.evasionIntelectual),
       isBlindSpot: puntoCiego,
     };
   }
@@ -204,15 +327,16 @@ export function diagnosticarAuditoriaLocal(
 
   const perc = puntuar(norm, PERCEPCION);
   const syn = puntuar(norm, SINTAXIS);
+  const normCuerpo = normalizar(payload.rawFact);
+  const percCuerpo = puntuar(normCuerpo, PERCEPCION);
+  const synCuerpo = puntuar(normCuerpo, SINTAXIS);
   const hipotesis = hipotesisComoOjo(payload.studentHypothesis);
 
   let perceptionEye = elegirGanador(perc, "alto");
   let characterSignedCode = elegirGanador(syn, "bajo");
 
-  if (hipotesis && hipotesis >= 7 && perc[hipotesis] >= 0) {
-    if (perc[hipotesis] > 0 || /patron|patrón|ley|sistema|origen/.test(norm)) {
-      perceptionEye = hipotesis;
-    }
+  if (hipotesis && hipotesis >= 7 && hipotesis > perceptionEye) {
+    perceptionEye = hipotesis;
   }
 
   // Luz de arriba: si hay señal alta, no bajarla al código de fricción.
@@ -230,28 +354,39 @@ export function diagnosticarAuditoriaLocal(
     characterSignedCode = 3;
   }
 
-  const hayFlor = FLOR_MORAL.test(texto) || Boolean(payload.detectedNoise);
-  const hayHechoFrio = HECHO_FRIO.test(texto);
+  const hayHechoFrio = HECHO_FRIO.test(payload.rawFact);
+  const florEnTerritorio = FLOR_MORAL.test(payload.rawFact);
+  const cableada = hipotesisCableada(payload, percCuerpo, synCuerpo, normCuerpo);
+  const evasionIntelectual =
+    perceptionEye >= 7 && characterSignedCode <= 3 && !cableada;
+  const hayFlor = evasionIntelectual || (florEnTerritorio && !cableada);
   const isLatencyEvent = LATENCIA.test(norm);
   const isSystemicConflict = SISTEMICO.test(norm) || perc[9] > 0 && syn[3] > 0;
   const deltaGap = computeDeltaGap(perceptionEye, characterSignedCode);
-  const grounded = deltaGap === 0 && hayHechoFrio && !hayFlor;
+  const grounded =
+    deltaGap === 0 && hayHechoFrio && !hayFlor && !evasionIntelectual;
   const frictionPoint =
     !grounded && characterSignedCode <= 4 ? characterSignedCode : undefined;
 
   const percepName = CANON_TEN_EYES[perceptionEye].name;
   const charName = CANON_TEN_EYES[characterSignedCode].name;
-  const diagnosticMessage = grounded
-    ? `Óptica y carácter coinciden en C${perceptionEye} ${percepName}. El chasis sostiene la visión.`
-    : `La visión opera en C${perceptionEye} ${percepName}. El chasis fricciona en C${characterSignedCode} ${charName}. No se invalida la óptica.`;
+  const diagnosticMessage = evasionIntelectual
+    ? `Evasión intelectual: la premisa C${perceptionEye} ${percepName} no se cablea con la materia. El chasis está en C${characterSignedCode} ${charName}. Delta alta. No es impronta de madurez.`
+    : grounded
+      ? `Óptica y carácter coinciden en C${perceptionEye} ${percepName}. El chasis sostiene la visión.`
+      : `${cableada ? "Impronta de madurez: el título se cablea con la materia. " : ""}La visión opera en C${perceptionEye} ${percepName}. El chasis fricciona en C${characterSignedCode} ${charName}. No se invalida la óptica.`;
 
-  const causa = hayFlor
-    ? `La flor moral tapa ingeniería: se narra ${percepName.toLowerCase()} y se ejecuta ${charName.toLowerCase()}.`
-    : `El corte se lee como ${percepName.toLowerCase()} y se firma como ${charName.toLowerCase()}.`;
+  const causa = evasionIntelectual
+    ? `Evasión intelectual: se narra ${percepName.toLowerCase()} para tapar ${charName.toLowerCase()} sin cablear la premisa a los hechos.`
+    : hayFlor
+      ? `La flor moral tapa ingeniería: se narra ${percepName.toLowerCase()} y se ejecuta ${charName.toLowerCase()}.`
+      : `El corte se lee como ${percepName.toLowerCase()} y se firma como ${charName.toLowerCase()}.`;
 
-  const ajuste = frictionPoint
-    ? `Mañana, un solo gesto de ${CANON_TEN_EYES[frictionPoint].concept.toLowerCase()} en la escena de hoy. Cero sermón.`
-    : `Mañana, repetí el mismo canal C${perceptionEye} con un hecho medible. Cero inventario.`;
+  const ajuste = evasionIntelectual
+    ? `Desinfección: bajá el título. Nombrá UN hecho físico de C${characterSignedCode} con hora. Cero filosofía.`
+    : frictionPoint
+      ? `Mañana, un solo gesto de ${CANON_TEN_EYES[frictionPoint].concept.toLowerCase()} en la escena de hoy. Cero sermón.`
+      : `Mañana, repetí el mismo canal C${perceptionEye} con un hecho medible. Cero inventario.`;
 
   return sellarLocal(
     scaffoldAnalysisResult({
@@ -265,7 +400,7 @@ export function diagnosticarAuditoriaLocal(
         syn,
         perceptionEye,
         characterSignedCode,
-        hayFlor,
+        evasionIntelectual,
         hayHechoFrio,
       }),
       deltaGap,

@@ -73,7 +73,19 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
    Retrasos de 24/48h, ansiedad que vuelve, loops: son latencia C8, no flojera.
    systemicAnalysis.isLatencyEvent = true cuando el hecho llega con retraso de onda.
 
-4. FIRMA SINTÁCTICA.
+4. EVASIÓN INTELECTUAL vs IMPRONTA DE MADUREZ (TÍTULO).
+   EVASIÓN INTELECTUAL (falso C7–C10): el alumno usa palabras grandilocuentes o filosóficas
+   solo para justificar o esconder un desorden operativo en la materia (C1–C3) sin comprensión real.
+   Aquí SÍ aplica brecha Δ alta y desinfección severa.
+   IMPRONTA DE MADUREZ (verdadero C7–C10): el alumno (sobre todo Carrera/Título) inicia con un
+   TÍTULO SISTÉMICO o una hipótesis estructurada porque su mente ya digirió el patrón.
+   REGLA DE CABLEADO: evaluá si el título/hipótesis se «cablea» lógicamente con el cuerpo.
+   Si hay continuidad estructural entre la premisa superior y la materia descrita,
+   NO penalices con una Δ masiva ni lo tildes de «flor moral».
+   Reconocé que la óptica alta está conectada con la estructura del relato.
+   detectedNoise declarado por el alumno es desinfección, no prueba de flor.
+
+5. FIRMA SINTÁCTICA.
    Medí la ESTRUCTURA de la redacción, no el tema:
    C1 Disperso — frases sueltas, fatiga, materia prima.
    C2 Relacional — entradas/salidas, estímulo.
@@ -88,7 +100,7 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 
 ═══ EXTRACCIÓN EN 4 CAPAS ═══
 1. Territorio: hechos físicos vs opinión/moral.
-2. Hipótesis: ¿la conclusión del alumno es ingeniería o escudo moral?
+2. Hipótesis y auditoría de título: ¿el título/hipótesis se cablea con los hechos o flota como abstracción sin tierra?
 3. Firma: ojo dominante de la SINTAXIS de las frases.
 4. Esencia: ajuste frío, geométrico, ejecutable mañana.
 
@@ -135,9 +147,15 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
     );
   }
   if (payload.studentHypothesis) {
-    lines.push(`Hipótesis del alumno: ${payload.studentHypothesis}`);
+    lines.push(
+      "Título sistémico / hipótesis del alumno:",
+      "---",
+      payload.studentHypothesis,
+      "---",
+    );
   }
   lines.push(
+    "Auditar cableado título↔materia: si la premisa superior se conecta con los hechos, NO la tildes de flor moral ni inflés Δ. Si flota, evasión intelectual (desinfección severa).",
     "Diagnosticá óptica, sintaxis y Δ. Respondé solo el JSON.",
   );
   return lines.join("\n");
