@@ -83,3 +83,15 @@ export type {
   EvaluarDepositoV3Ok,
   EvaluarDepositoV3Result,
 } from "./evaluar.ts";
+
+export {
+  GRADO_CARRERA_RATE,
+  GRADO_TITULO_MIN_SAMPLE,
+  GRADO_TITULO_RATE,
+  GRADO_WINDOW_SIZE,
+  esVolcadoEstableAlto,
+  evaluateStudentTierPromotion,
+  medirGradoConsistencia,
+  medirGradoConsistenciaDesdeVolcados,
+} from "./grados.ts";
+export type { GradoConsistencia, VolcadoConResultado } from "./grados.ts";

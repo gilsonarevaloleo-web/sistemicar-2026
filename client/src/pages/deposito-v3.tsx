@@ -8,6 +8,7 @@ import { FormularioAuditoriaV3 } from "@/components/deposito/v3/FormularioAudito
 import { MapaCalorV3 } from "@/components/deposito/v3/MapaCalorV3";
 import { DictamenCardV3 } from "@/components/deposito/v3/DictamenCardV3";
 import { HistorialV3 } from "@/components/deposito/v3/HistorialV3";
+import { GradoConsistenciaV3 } from "@/components/deposito/v3/GradoConsistenciaV3";
 import {
   addVolcadoV3Entry,
   listVolcadosV3Local,
@@ -60,7 +61,8 @@ export default function DepositoV3Page() {
             {DEPOSITO_V3_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El dictamen es óptica + carácter + Δ. V2 queda en su recinto.
+            El dictamen es óptica + carácter + Δ. El grado se mide por
+            consistencia, no por una foto fija. V2 queda en su recinto.
           </p>
           <Link
             href="/deposito-v2"
@@ -70,6 +72,8 @@ export default function DepositoV3Page() {
             Volver a Depósito V2
           </Link>
         </header>
+
+        <GradoConsistenciaV3 entries={historial} />
 
         <FormularioAuditoriaV3
           userTier={userTier}

@@ -12,12 +12,16 @@ const PATRON_PISTON =
   "Vi el patrón: cada vez que salteo la secuencia a las 9:00, 9:20, 9:40 el pistón se atasca. El modelo se repite. No es que deba ser más productivo.";
 
 describe("Depósito V3 — prompt", () => {
-  it("exige luz de arriba, desinfección, C8 diferido y firma sintáctica", () => {
+  it("exige luz de arriba, desinfección, C8 diferido, impronta y firma sintáctica", () => {
     const system = buildDepositoV3SystemPrompt();
     assert.match(system, /LUZ VIENE DE ARRIBA/i);
     assert.match(system, /DESINFECTAR LA MORAL/i);
     assert.match(system, /EFECTOS DIFERIDOS/i);
+    assert.match(system, /EVASI[OÓ]N INTELECTUAL/i);
+    assert.match(system, /IMPRONTA DE MADUREZ/i);
+    assert.match(system, /cablea/i);
     assert.match(system, /FIRMA SINTÁCTICA/i);
+    assert.match(system, /auditoría de título|título\/hipótesis/i);
     assert.match(system, /perceptionEye/);
     assert.match(system, /characterSignedCode/);
     assert.doesNotMatch(system, /UN solo Código Dominante/);
@@ -31,6 +35,7 @@ describe("Depósito V3 — prompt", () => {
     assert.match(user, /MATRICULA/);
     assert.match(user, /orden real/);
     assert.match(user, /hoy corté a las 14:00/);
+    assert.match(user, /cableado título/i);
   });
 });
 
@@ -73,6 +78,53 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.characterSignedCode, 1);
     assert.equal(r.deltaGap, 0);
     assert.equal(r.groundingStatus.frictionPoint, 1);
+  });
+
+  it("impronta: título C7 cableado al pistón no es flor moral ni Δ inflada", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "A las 9:00 arranqué. A las 9:20 el segundo paso. A las 9:40 el pistón se atasca. El modelo se repite.",
+      studentHypothesis: "C7 El patrón del pistón",
+      userTier: "TITULO",
+      detectedNoise: "culpa de productividad",
+      omittedShadow: "no nombré el atasco de las 9:40",
+    });
+    assert.equal(r.perceptionEye, 7);
+    assert.equal(r.characterSignedCode, 3);
+    assert.equal(r.deltaGap, 4);
+    assert.equal(r.groundingStatus.isFullyGrounded, false);
+    assert.match(r.groundingStatus.diagnosticMessage, /impronta|no se invalida/i);
+    assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flor moral|evasión/i);
+    assert.equal(r.eyeAudits[7].isBlindSpot, false);
+  });
+
+  it("evasión intelectual: título C10 que flota sobre energía/culpa", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Hoy no hice nada. Me sentí con poca energía. Debo ser más productivo. Ya veré.",
+      studentHypothesis: "C10 La matriz de mi abundancia cuántica",
+      userTier: "CARRERA",
+      detectedNoise: "energía y culpa",
+      omittedShadow: "no nombré que no arranqué",
+    });
+    assert.equal(r.perceptionEye, 10);
+    assert.ok(r.characterSignedCode <= 3);
+    assert.ok(r.deltaGap >= 7);
+    assert.match(r.groundingStatus.diagnosticMessage, /evasi[oó]n intelectual/i);
+    assert.match(r.systemicAnalysis.realEngineeringCause, /evasi[oó]n/i);
+    assert.equal(r.eyeAudits[10].isBlindSpot, true);
+  });
+
+  it("detectedNoise declarado no marca flor si el patrón se cablea", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: PATRON_PISTON,
+      userTier: "CARRERA",
+      detectedNoise: "me sentí flojo",
+      omittedShadow: "el atasco de las 9:40",
+    });
+    assert.equal(r.perceptionEye, 7);
+    assert.equal(r.characterSignedCode, 3);
+    assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flor moral/i);
   });
 });
 
