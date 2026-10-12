@@ -188,6 +188,25 @@ export function canEnterJornadaBase(
   return access.allowed || access.kind === "eligible_trial";
 }
 
+/**
+ * El menú nunca esconde Jornada. Si el trial venció y el pago aún no
+ * está en activeModules, esconder el tile la manda solo a /pagos
+ * (“se perdió la jornada”). Al tocarla, ModuleRoute reclama el pago.
+ */
+export function shouldShowJornadaMenuTile(): boolean {
+  return true;
+}
+
+export function jornadaMenuTileSubtitle(
+  access: JornadaBaseAccess,
+  openTagline: string,
+): string {
+  if (access.kind === "expired") {
+    return "Si ya pagaste, entra con el mismo Gmail";
+  }
+  return openTagline;
+}
+
 export function jornadaBaseAccessFromProgression(
   input: JornadaBaseAccessInput,
   now = Date.now(),

@@ -9,7 +9,8 @@ import {
   buildGrantDeliveryId,
   moduleGrantAdminMessage,
 } from "../shared/clientAccount";
-import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
+import { emailMatchKeys, emailsLikelySameMailbox, normalizeBuyerEmail } from "../shared/emailAliases";
+import { gmailLocalAnagram } from "../shared/firebaseServiceAccount";
 
 const { Pool } = pkg;
 
@@ -80,14 +81,38 @@ export async function listPendingModuleGrantsForEmail(
   const keys = emailMatchKeys(email);
   if (keys.length === 0) return [];
   const result = await pool.query(
-    `SELECT delivery_id, plan_id FROM planificacion_module_grants
+    `SELECT delivery_id, plan_id, buyer_email FROM planificacion_module_grants
      WHERE buyer_email = ANY($1::text[]) AND status = 'pending'`,
     [keys],
   );
-  return result.rows.map((row) => ({
-    deliveryId: row.delivery_id as string,
-    planId: row.plan_id as string,
-  }));
+  const found = new Map<string, { deliveryId: string; planId: string }>();
+  for (const row of result.rows) {
+    found.set(row.delivery_id as string, {
+      deliveryId: row.delivery_id as string,
+      planId: row.plan_id as string,
+    });
+  }
+  if (found.size === 0) {
+    const recent = await pool.query(
+      `SELECT delivery_id, plan_id, buyer_email FROM planificacion_module_grants
+       WHERE status = 'pending' ORDER BY created_at DESC LIMIT 80`,
+    );
+    const local = normalizeBuyerEmail(email).split("@")[0] ?? "";
+    for (const row of recent.rows) {
+      const buyer = String(row.buyer_email || "");
+      const otherLocal = buyer.split("@")[0] ?? "";
+      if (
+        emailsLikelySameMailbox(email, buyer) ||
+        gmailLocalAnagram(local, otherLocal)
+      ) {
+        found.set(row.delivery_id as string, {
+          deliveryId: row.delivery_id as string,
+          planId: row.plan_id as string,
+        });
+      }
+    }
+  }
+  return [...found.values()];
 }
 
 export async function markModuleGrantGranted(
@@ -106,10 +131,17 @@ export async function markModuleGrantGranted(
 export async function grantPendingModulesForEmail(
   email: string,
   firebaseUid: string,
-): Promise<{ grantedPlans: string[]; deliveryIds: string[] }> {
+): Promise<{
+  grantedPlans: string[];
+  deliveryIds: string[];
+  clientApplyPlans: string[];
+  clientApplyDeliveryIds: string[];
+}> {
   const pending = await listPendingModuleGrantsForEmail(email);
   const grantedPlans: string[] = [];
   const deliveryIds: string[] = [];
+  const clientApplyPlans: string[] = [];
+  const clientApplyDeliveryIds: string[] = [];
   for (const row of pending) {
     if (modulesGrantedByPlan(row.planId).length === 0) continue;
     const ok = await activateModulesForUserById(firebaseUid, row.planId);
@@ -117,9 +149,14 @@ export async function grantPendingModulesForEmail(
       await markModuleGrantGranted(row.deliveryId, firebaseUid);
       grantedPlans.push(row.planId);
       deliveryIds.push(row.deliveryId);
+    } else {
+      // Sin FIREBASE_SERVICE_ACCOUNT_JSON el Admin no escribe Firestore.
+      // El claim autorizado le pasa el plan al celular para que lo encienda.
+      clientApplyPlans.push(row.planId);
+      clientApplyDeliveryIds.push(row.deliveryId);
     }
   }
-  return { grantedPlans, deliveryIds };
+  return { grantedPlans, deliveryIds, clientApplyPlans, clientApplyDeliveryIds };
 }
 
 export async function processPlanificacionModulePayment(params: {

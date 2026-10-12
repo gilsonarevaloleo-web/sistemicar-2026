@@ -43,6 +43,15 @@ describe("clientAccount — dónde se crea la cuenta", () => {
     assert.equal(buildGrantDeliveryId("manual", undefined, 100), "manual:100");
   });
 
+  it("WhatsApp corrige gamail.com al Gmail real", () => {
+    const text = buildClientAccountWhatsapp(
+      "tinapinocarrera@gamail.com",
+      "Jornada Base",
+    );
+    assert.match(text, /tinapinocarrera@gmail\.com/);
+    assert.equal(text.includes("gamail"), false);
+  });
+
   it("WhatsApp le dice al cliente dónde crear la cuenta", () => {
     const text = buildClientAccountWhatsapp("TinaPinoCarrera@gmail.com", "Norte");
     assert.match(text, /sistemicar\.app\/acceso/);

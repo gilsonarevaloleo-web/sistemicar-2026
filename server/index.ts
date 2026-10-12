@@ -75,13 +75,14 @@ import {
   initPlanificacionModuleGrantsTable,
   grantPendingModulesForEmail,
   listPendingModuleGrantsForEmail,
+  markModuleGrantGranted,
   adminGrantPlanificacionModule,
   processPlanificacionModulePayment,
   listModuleGrants,
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus, listAuthClientsWithProgression } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5114,18 +5115,26 @@ async function claimPlanificacionPurchasesHandler(req: any, res: any) {
         message: "No hay compras pendientes. Si acabas de pagar, entra con el mismo Gmail del pago.",
       });
     }
-    const { grantedPlans, deliveryIds } = await grantPendingModulesForEmail(
+    const {
+      grantedPlans,
+      deliveryIds,
+      clientApplyPlans,
+      clientApplyDeliveryIds,
+    } = await grantPendingModulesForEmail(
       verified.email,
       verified.uid,
     );
+    const plans = [...grantedPlans, ...clientApplyPlans];
     res.json({
-      grantedPlans,
+      grantedPlans: plans,
       deliveryIds,
+      applyOnClient: clientApplyPlans.length > 0,
+      deliveryIdsToConfirm: clientApplyDeliveryIds,
       activated: grantedPlans.length > 0,
       message:
-        grantedPlans.length > 0
-          ? `Se activó ${grantedPlans.map(displayNameForPlan).join(", ")} en tu cuenta.`
-          : "Tu pago está registrado; configura FIREBASE_SERVICE_ACCOUNT_JSON en el servidor para activar automáticamente.",
+        plans.length > 0
+          ? `Se activó ${plans.map(displayNameForPlan).join(", ")} en tu cuenta.`
+          : "No hay compras pendientes. Si acabas de pagar, entra con el mismo Gmail del pago.",
     });
   } catch (error) {
     console.error("[planificacion/claim-purchases]", error);
@@ -5136,6 +5145,28 @@ async function claimPlanificacionPurchasesHandler(req: any, res: any) {
 app.post("/api/planificacion/claim-purchases", claimPlanificacionPurchasesHandler);
 /** Compat: ya no activa un planId arbitrario — solo compras pendientes de ese correo. */
 app.post("/api/planificacion/claim-module", claimPlanificacionPurchasesHandler);
+
+app.post("/api/planificacion/confirm-client-apply", async (req, res) => {
+  try {
+    const verified = await verifyFirebaseJwt(req.headers.authorization);
+    if (!verified?.uid || !verified.email) {
+      return res.status(401).json({ error: "Inicia sesión para confirmar tu plan." });
+    }
+    const rawIds = Array.isArray(req.body?.deliveryIds) ? req.body.deliveryIds : [];
+    const pending = await listPendingModuleGrantsForEmail(verified.email);
+    const allowed = new Set(pending.map((row) => row.deliveryId));
+    const confirmed: string[] = [];
+    for (const id of rawIds) {
+      if (typeof id !== "string" || !allowed.has(id)) continue;
+      await markModuleGrantGranted(id, verified.uid);
+      confirmed.push(id);
+    }
+    res.json({ confirmed });
+  } catch (error) {
+    console.error("[planificacion/confirm-client-apply]", error);
+    res.status(500).json({ error: "No se pudo confirmar el plan." });
+  }
+});
 
 app.post("/api/espejo/claim-purchase-credits", async (req, res) => {
   try {
@@ -5280,18 +5311,46 @@ app.get("/api/admin/users/lookup", requireAdminToken, async (req, res) => {
     }
     const result = await adminLookupUserByEmail(emailRaw);
     if (!result.found) {
+      const suggested = result.suggestions?.[0]?.email;
       return res.status(404).json({
+        ...result,
         found: false,
-        adminReady: result.adminReady,
         accesoUrl: "https://sistemicar.app/acceso",
-        error:
-          "No hay cuenta en Firebase Auth con ese correo. La cuenta se crea en sistemicar.app/acceso (Continuar con Google) con ese email exacto. Mientras tanto puedes registrar la activación pendiente.",
+        error: suggested
+          ? `No está como ${emailRaw.trim().toLowerCase()}. ¿Es ${suggested}?`
+          : result.adminReady
+            ? "No hay cuenta en Firebase Auth con ese correo. La cuenta se crea en sistemicar.app/acceso (Continuar con Google) con ese email exacto. Mientras tanto puedes registrar la activación pendiente."
+            : "El servidor no puede buscar en Firebase (FIREBASE_SERVICE_ACCOUNT_JSON falta o está mal pegada). Si la clienta ya usa la app, registra el pago pendiente.",
       });
     }
     res.json(result);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error buscando usuario.";
     console.error("[admin/users/lookup]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/firebase-status", requireAdminToken, async (_req, res) => {
+  try {
+    res.json(firebaseAdminStatus());
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error leyendo Firebase Admin.";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/users/clients", requireAdminToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "40";
+    const clients = await listAuthClientsWithProgression(parseInt(limitStr, 10) || 40);
+    res.json({
+      ...firebaseAdminStatus(),
+      clients,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error listando clientes.";
+    console.error("[admin/users/clients]", error);
     res.status(500).json({ error: message });
   }
 });

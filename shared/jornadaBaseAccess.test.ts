@@ -6,9 +6,11 @@ import {
   JORNADA_BASE_TRIAL_DAYS,
   JORNADA_BASE_TRIAL_MS,
   canEnterJornadaBase,
+  jornadaMenuTileSubtitle,
   resolveJornadaBaseAccess,
   resolveJornadaBaseRegistroStep,
   shouldKeepLocalProgressionWhenRemoteEmpty,
+  shouldShowJornadaMenuTile,
   toEpochMs,
   trialBannerText,
 } from "./jornadaBaseAccess.ts";
@@ -66,6 +68,11 @@ describe("jornadaBaseAccess", () => {
     assert.equal(a.kind, "expired");
     assert.equal(a.allowed, false);
     assert.equal(canEnterJornadaBase({ jornadaBaseTrialStartedAt: startedAt }, NOW), false);
+    assert.equal(shouldShowJornadaMenuTile(), true);
+    assert.match(
+      jornadaMenuTileSubtitle(a, "Jornada"),
+      /mismo Gmail/,
+    );
   });
 
   it("500 PS desbloquean Base gratis (gancho)", () => {

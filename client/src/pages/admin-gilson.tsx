@@ -14,6 +14,7 @@ import {
   displayNameForPlan,
   resolveClientAccountWhatsappKind,
 } from "@shared/clientAccount";
+import { gmailTypoCorrection } from "@shared/emailAliases";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -57,6 +58,11 @@ interface AccountData {
 type AdminUserLookup = {
   found: boolean;
   adminReady: boolean;
+  parseError?: string | null;
+  initError?: string | null;
+  projectId?: string | null;
+  suggestions?: Array<{ email: string; uid: string; reason: string }>;
+  error?: string;
   uid?: string;
   email?: string;
   emailVerified?: boolean;
@@ -158,6 +164,7 @@ export default function AdminGilson() {
   const [moduleSearchResult, setModuleSearchResult] = useState<AdminUserLookup | null>(null);
   const [moduleSearching, setModuleSearching] = useState(false);
   const [moduleNotFound, setModuleNotFound] = useState(false);
+  const [moduleServerBlind, setModuleServerBlind] = useState(false);
   const [moduleClientWhatsapp, setModuleClientWhatsapp] = useState("");
   const [moduleGrants, setModuleGrants] = useState<Array<{
     id: number;
@@ -168,6 +175,16 @@ export default function AdminGilson() {
     createdAt: string;
   }>>([]);
   const [moduleGrantsLoading, setModuleGrantsLoading] = useState(false);
+  const [authClients, setAuthClients] = useState<Array<{
+    uid: string;
+    email: string;
+    displayName: string | null;
+    totalCP: number;
+    rank: string;
+    activeModules: string[];
+  }>>([]);
+  const [authClientsLoading, setAuthClientsLoading] = useState(false);
+  const [authClientsError, setAuthClientsError] = useState<string | null>(null);
   const [sellerSales, setSellerSales] = useState<Array<{
     id: string;
     sellerRef: string;
@@ -295,7 +312,15 @@ export default function AdminGilson() {
     );
     const data = (await res.json()) as AdminUserLookup & { error?: string };
     if (res.status === 404) {
-      return { found: false, adminReady: data.adminReady ?? false };
+      return {
+        found: false,
+        adminReady: data.adminReady ?? false,
+        parseError: data.parseError,
+        initError: data.initError,
+        projectId: data.projectId,
+        suggestions: data.suggestions,
+        error: data.error,
+      };
     }
     if (!res.ok) {
       throw new Error(data.error || "Error buscando usuario");
@@ -332,6 +357,29 @@ export default function AdminGilson() {
       toast.error(msg);
     } finally {
       setModuleGrantsLoading(false);
+    }
+  };
+
+  const loadAuthClients = async () => {
+    setAuthClientsLoading(true);
+    setAuthClientsError(null);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch("/api/admin/users/clients?limit=40", { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error listando cuentas");
+      setAuthClients(data.clients || []);
+      if (data.adminReady === false) {
+        setAuthClientsError(
+          data.parseError
+            ? `JSON de Firebase: ${data.parseError}. Revisa FIREBASE_SERVICE_ACCOUNT_JSON y redeploy.`
+            : "El servidor aún no lee Firebase Auth. Variable en Functions + redeploy.",
+        );
+      }
+    } catch (e: unknown) {
+      setAuthClientsError(e instanceof Error ? e.message : "Error listando cuentas");
+    } finally {
+      setAuthClientsLoading(false);
     }
   };
 
@@ -373,8 +421,8 @@ export default function AdminGilson() {
       setModuleClientWhatsapp(whatsapp);
       if (data.activated || data.granted) {
         toast.success(data.message || "Módulo activado. Dile que entre con el mismo Gmail — no cree otra cuenta.");
-      } else if (data.pending && (data.uid || moduleSearchResult?.uid)) {
-        toast.success("Pago registrado. La cuenta ya existe: dile que entre en /acceso con el mismo Gmail.");
+      } else if (data.pending && (data.uid || moduleSearchResult?.uid || moduleServerBlind)) {
+        toast.success("Pago registrado. Dile que abra Jornada en su celular — el plan se enciende ahí.");
       } else if (data.pending) {
         toast.success("Pago registrado. El cliente aún debe crear su cuenta en /acceso.");
       } else {
@@ -447,6 +495,7 @@ export default function AdminGilson() {
     }
     if (activeTab === "modulos" && isAuthenticated) {
       void loadModuleGrants();
+      void loadAuthClients();
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
@@ -1587,6 +1636,51 @@ export default function AdminGilson() {
               <p className="text-xs text-slate-400 mb-4">
                 La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Ahí también deja su WhatsApp. Si aún no entró, registra la activación pendiente y mándale el mensaje: al entrar con ese mismo Gmail el plan se enciende solo.
               </p>
+              <div className="mb-4 p-3 rounded-lg bg-black/30 border border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                    Cuentas reales en Firebase (elige la de 56 pts)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void loadAuthClients()}
+                    className="text-xs text-sky-400"
+                    disabled={authClientsLoading}
+                  >
+                    {authClientsLoading ? "…" : "Actualizar"}
+                  </button>
+                </div>
+                {authClientsError ? (
+                  <p className="text-xs text-amber-300">{authClientsError}</p>
+                ) : authClients.length === 0 && !authClientsLoading ? (
+                  <p className="text-xs text-slate-500">
+                    Vacío. Si ya pegaste la variable, falta redeploy de Functions o el JSON está mal.
+                  </p>
+                ) : (
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {authClients.map((c) => (
+                      <button
+                        key={c.uid}
+                        type="button"
+                        data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
+                        onClick={() => {
+                          setModuleEmail(c.email);
+                          setModuleNotFound(false);
+                          setModuleServerBlind(false);
+                          toast.success(`Elegida ${c.email} · ${c.totalCP} pts`);
+                        }}
+                        className="w-full text-left px-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs"
+                      >
+                        <span className="text-white font-bold">{c.email}</span>
+                        <span className="text-slate-400"> · {c.totalCP} pts · {c.rank}</span>
+                        {c.activeModules?.includes("planificacion_base") ? (
+                          <span className="text-emerald-400"> · Jornada on</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
                   <button
@@ -1631,6 +1725,7 @@ export default function AdminGilson() {
                   onChange={(e) => {
                     setModuleEmail(e.target.value);
                     setModuleNotFound(false);
+                    setModuleServerBlind(false);
                   }}
                   placeholder="Email del comprador"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
@@ -1647,6 +1742,7 @@ export default function AdminGilson() {
                       if (result?.found && result.uid) {
                         setModuleSearchResult(result);
                         setModuleNotFound(false);
+                        setModuleServerBlind(false);
                         setModuleClientWhatsapp(
                           buildClientAccountWhatsapp(
                             result.email || moduleEmail.trim(),
@@ -1656,19 +1752,25 @@ export default function AdminGilson() {
                         );
                         toast.success("Usuario encontrado. No le pidas crear otra cuenta: que entre con ese Gmail.");
                       } else {
-                        setModuleSearchResult(null);
+                        const blind = result?.adminReady === false;
+                        setModuleSearchResult(result);
                         setModuleNotFound(true);
+                        setModuleServerBlind(blind);
                         setModuleClientWhatsapp(
                           buildClientAccountWhatsapp(
                             moduleEmail.trim(),
                             displayNameForPlan(modulePlanId),
-                            "new",
+                            blind ? "existing_pending" : "new",
                           ),
                         );
+                        const suggested = result?.suggestions?.[0]?.email;
                         toast.info(
-                          result?.adminReady === false
-                            ? "No encontrado. Configura FIREBASE_SERVICE_ACCOUNT_JSON en el servidor para activar módulos."
-                            : "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
+                          suggested
+                            ? `No está como lo escribiste. ¿Es ${suggested}?`
+                            : blind
+                            ? "El servidor no puede buscar en Firebase. Revisa FIREBASE_SERVICE_ACCOUNT_JSON (Functions + redeploy)."
+                            : result?.error ||
+                              "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
                         );
                       }
                     } catch {
@@ -1683,6 +1785,47 @@ export default function AdminGilson() {
                   {moduleSearching ? "..." : "Buscar"}
                 </button>
               </div>
+              {moduleSearchResult?.suggestions && moduleSearchResult.suggestions.length > 0 && (
+                <div className="text-xs text-emerald-200 mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                  <p className="font-bold">Ese orden del nombre no está en Firebase. ¿Es este?</p>
+                  {moduleSearchResult.suggestions.map((s) => (
+                    <button
+                      key={s.uid}
+                      type="button"
+                      className="block w-full text-left text-white font-bold underline"
+                      data-testid="button-use-suggested-email"
+                      onClick={() => {
+                        setModuleEmail(s.email);
+                        setModuleNotFound(false);
+                        setModuleServerBlind(false);
+                        void lookupUserAdmin(s.email).then((again) => {
+                          if (again?.found && again.uid) {
+                            setModuleSearchResult(again);
+                            toast.success(`Encontrada: ${s.email}`);
+                          }
+                        });
+                      }}
+                    >
+                      {s.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {moduleSearchResult && !moduleSearchResult.found && moduleSearchResult.parseError && (
+                <p className="text-xs text-amber-300 mb-3">
+                  JSON de Firebase: {moduleSearchResult.parseError}. En Netlify debe ser
+                  FIREBASE_SERVICE_ACCOUNT_JSON, ámbito Functions, una línea, y luego Redeploy.
+                </p>
+              )}
+              {gmailTypoCorrection(moduleEmail) && (
+                <p className="text-xs text-amber-300 mb-3" data-testid="admin-gmail-typo">
+                  Ese dominio no es Gmail. Se activará en{" "}
+                  <span className="text-white font-bold">
+                    {gmailTypoCorrection(moduleEmail)}
+                  </span>
+                  .
+                </p>
+              )}
               {moduleSearchResult?.found && moduleSearchResult.uid && (
                 <div className="text-xs text-slate-400 mb-3 space-y-1">
                   <p>
@@ -1708,7 +1851,17 @@ export default function AdminGilson() {
                   )}
                 </div>
               )}
-              {moduleNotFound && (
+              {moduleServerBlind && (
+                <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
+                  <p className="font-bold">El servidor no puede ver Firebase Auth.</p>
+                  <p>
+                    Falta <span className="text-white">FIREBASE_SERVICE_ACCOUNT_JSON</span> en Netlify.
+                    Eso no significa que ella no tenga cuenta — si ya usa la app, la tiene.
+                    Pulsa registrar pendiente. Al abrir Jornada en su celular, el plan se enciende.
+                  </p>
+                </div>
+              )}
+              {moduleNotFound && !moduleServerBlind && (
                 <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
                   <p className="font-bold">No está en Firebase Auth todavía.</p>
                   <p>

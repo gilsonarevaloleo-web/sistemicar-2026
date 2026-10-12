@@ -4,22 +4,50 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getPrivatePath } from "../shared/firebasePaths";
 import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
 import {
+  gmailLocalAnagram,
+  parseFirebaseServiceAccountJson,
+  serviceAccountPublicMeta,
+} from "../shared/firebaseServiceAccount";
+import {
   type ModuleId,
   mergeModuleIds,
   modulesGrantedByPlan,
 } from "../shared/moduleAccess";
 
 let app: App | null = null;
+let initError: string | null = null;
 
 function parseServiceAccount(): Record<string, unknown> | null {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!raw?.trim()) return null;
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    console.warn("[firebaseAdmin] FIREBASE_SERVICE_ACCOUNT_JSON inv�lido");
-    return null;
+  const parsed = parseFirebaseServiceAccountJson(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!parsed.ok) return null;
+  return parsed.value;
+}
+
+export function firebaseAdminStatus(): {
+  adminReady: boolean;
+  parseError: string | null;
+  initError: string | null;
+  projectId: string | null;
+  clientEmail: string | null;
+} {
+  const parsed = parseFirebaseServiceAccountJson(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  if (!parsed.ok) {
+    return {
+      adminReady: false,
+      parseError: parsed.error,
+      initError: null,
+      projectId: null,
+      clientEmail: null,
+    };
   }
+  const meta = serviceAccountPublicMeta(parsed.value);
+  return {
+    adminReady: Boolean(getAdminApp()),
+    parseError: null,
+    initError,
+    projectId: meta.projectId,
+    clientEmail: meta.clientEmail,
+  };
 }
 
 export function isFirebaseAdminReady(): boolean {
@@ -34,8 +62,10 @@ export function getAdminApp(): App | null {
     app = getApps().length
       ? getApps()[0]!
       : initializeApp({ credential: cert(sa as Parameters<typeof cert>[0]) });
+    initError = null;
     return app;
   } catch (err) {
+    initError = err instanceof Error ? err.message : "init_failed";
     console.warn("[firebaseAdmin] No se pudo inicializar:", err);
     return null;
   }
@@ -56,7 +86,8 @@ export async function lookupUidByEmail(email: string): Promise<string | null> {
         // probar alias (puntos / +tag de Gmail)
       }
     }
-    return null;
+    const swapped = await suggestUsersForEmail(email);
+    return swapped[0]?.uid ?? null;
   }
 
   const apiKey = process.env.VITE_FIREBASE_API_KEY;
@@ -203,9 +234,19 @@ export async function activateModulesForEmail(email: string, planId: string): Pr
   return activateModulesForUserById(uid, planId);
 }
 
+export type AdminUserSuggestion = {
+  email: string;
+  uid: string;
+  reason: "alias" | "mismo_nombre_otro_orden";
+};
+
 export type AdminUserLookupResult = {
   found: boolean;
   adminReady: boolean;
+  parseError?: string | null;
+  initError?: string | null;
+  projectId?: string | null;
+  suggestions?: AdminUserSuggestion[];
   uid?: string;
   email?: string;
   emailVerified?: boolean;
@@ -218,12 +259,48 @@ export type AdminUserLookupResult = {
   whatsapp?: string | null;
 };
 
+async function suggestUsersForEmail(email: string): Promise<AdminUserSuggestion[]> {
+  const adminApp = getAdminApp();
+  if (!adminApp) return [];
+  const target = normalizeBuyerEmail(email);
+  const [local] = target.split("@");
+  if (!local) return [];
+  const keys = new Set(emailMatchKeys(target));
+  const suggestions: AdminUserSuggestion[] = [];
+  try {
+    let pageToken: string | undefined;
+    let pages = 0;
+    do {
+      const page = await getAuth(adminApp).listUsers(100, pageToken);
+      for (const user of page.users) {
+        const authEmail = user.email?.toLowerCase();
+        if (!authEmail) continue;
+        const [ulocal] = authEmail.split("@");
+        if (keys.has(authEmail)) {
+          suggestions.push({ email: authEmail, uid: user.uid, reason: "alias" });
+        } else if (ulocal && gmailLocalAnagram(local, ulocal)) {
+          suggestions.push({
+            email: authEmail,
+            uid: user.uid,
+            reason: "mismo_nombre_otro_orden",
+          });
+        }
+      }
+      pageToken = page.pageToken;
+      pages += 1;
+    } while (pageToken && pages < 8 && suggestions.length === 0);
+  } catch (err) {
+    console.warn("[firebaseAdmin] listUsers:", err);
+  }
+  return suggestions;
+}
+
 /** Busca usuario en Firebase Auth (fuente de verdad) + progresión si Admin SDK está listo. */
 export async function adminLookupUserByEmail(email: string): Promise<AdminUserLookupResult> {
   const normalized = normalizeBuyerEmail(email);
-  if (!normalized) return { found: false, adminReady: isFirebaseAdminReady() };
+  const status = firebaseAdminStatus();
+  if (!normalized) return { found: false, ...status };
 
-  const adminReady = isFirebaseAdminReady();
   const adminApp = getAdminApp();
 
   let uid: string | null = null;
@@ -247,10 +324,13 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
         // alias Gmail
       }
     }
-    if (!uid) return { found: false, adminReady };
+    if (!uid) {
+      const suggestions = await suggestUsersForEmail(normalized);
+      return { found: false, ...status, suggestions };
+    }
   } else {
     uid = await lookupUidByEmail(normalized);
-    if (!uid) return { found: false, adminReady };
+    if (!uid) return { found: false, ...status };
   }
 
   let rank = "iniciado";
@@ -276,7 +356,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
 
   return {
     found: true,
-    adminReady,
+    ...status,
     uid,
     email: authEmail,
     emailVerified,
@@ -288,4 +368,48 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     subscriptionPlan,
     whatsapp,
   };
+}
+
+export type AdminAuthClient = {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  totalCP: number;
+  rank: string;
+  activeModules: string[];
+};
+
+/** Lista cuentas reales de Firebase Auth + PS, para no adivinar el Gmail. */
+export async function listAuthClientsWithProgression(
+  limit = 40,
+): Promise<AdminAuthClient[]> {
+  const adminApp = getAdminApp();
+  if (!adminApp) return [];
+  const auth = getAuth(adminApp);
+  const db = getFirestore(adminApp);
+  const out: AdminAuthClient[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  do {
+    const page = await auth.listUsers(100, pageToken);
+    for (const user of page.users) {
+      const email = user.email?.toLowerCase();
+      if (!email) continue;
+      const prog = await getLatestProgressionRef(db, user.uid);
+      const totalCP = prog
+        ? Number(prog.data.totalCP || prog.data.points || 0)
+        : 0;
+      out.push({
+        uid: user.uid,
+        email,
+        displayName: user.displayName ?? null,
+        totalCP,
+        rank: (prog?.data.rank as string) || "iniciado",
+        activeModules: (prog?.data.activeModules as string[]) ?? [],
+      });
+    }
+    pageToken = page.pageToken;
+    pages += 1;
+  } while (pageToken && pages < 5);
+  return out.sort((a, b) => b.totalCP - a.totalCP).slice(0, Math.min(100, Math.max(1, limit)));
 }
