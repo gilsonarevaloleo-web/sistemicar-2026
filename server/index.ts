@@ -82,7 +82,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5311,19 +5311,31 @@ app.get("/api/admin/users/lookup", requireAdminToken, async (req, res) => {
     }
     const result = await adminLookupUserByEmail(emailRaw);
     if (!result.found) {
+      const suggested = result.suggestions?.[0]?.email;
       return res.status(404).json({
+        ...result,
         found: false,
-        adminReady: result.adminReady,
         accesoUrl: "https://sistemicar.app/acceso",
-        error: result.adminReady
-          ? "No hay cuenta en Firebase Auth con ese correo. La cuenta se crea en sistemicar.app/acceso (Continuar con Google) con ese email exacto. Mientras tanto puedes registrar la activación pendiente."
-          : "El servidor no puede buscar en Firebase (falta FIREBASE_SERVICE_ACCOUNT_JSON). Si la clienta ya usa la app, registra el pago pendiente: se enciende en su teléfono al abrir Jornada.",
+        error: suggested
+          ? `No está como ${emailRaw.trim().toLowerCase()}. ¿Es ${suggested}?`
+          : result.adminReady
+            ? "No hay cuenta en Firebase Auth con ese correo. La cuenta se crea en sistemicar.app/acceso (Continuar con Google) con ese email exacto. Mientras tanto puedes registrar la activación pendiente."
+            : "El servidor no puede buscar en Firebase (FIREBASE_SERVICE_ACCOUNT_JSON falta o está mal pegada). Si la clienta ya usa la app, registra el pago pendiente.",
       });
     }
     res.json(result);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error buscando usuario.";
     console.error("[admin/users/lookup]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/firebase-status", requireAdminToken, async (_req, res) => {
+  try {
+    res.json(firebaseAdminStatus());
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error leyendo Firebase Admin.";
     res.status(500).json({ error: message });
   }
 });

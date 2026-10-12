@@ -58,6 +58,11 @@ interface AccountData {
 type AdminUserLookup = {
   found: boolean;
   adminReady: boolean;
+  parseError?: string | null;
+  initError?: string | null;
+  projectId?: string | null;
+  suggestions?: Array<{ email: string; uid: string; reason: string }>;
+  error?: string;
   uid?: string;
   email?: string;
   emailVerified?: boolean;
@@ -297,7 +302,15 @@ export default function AdminGilson() {
     );
     const data = (await res.json()) as AdminUserLookup & { error?: string };
     if (res.status === 404) {
-      return { found: false, adminReady: data.adminReady ?? false };
+      return {
+        found: false,
+        adminReady: data.adminReady ?? false,
+        parseError: data.parseError,
+        initError: data.initError,
+        projectId: data.projectId,
+        suggestions: data.suggestions,
+        error: data.error,
+      };
     }
     if (!res.ok) {
       throw new Error(data.error || "Error buscando usuario");
@@ -1661,7 +1674,7 @@ export default function AdminGilson() {
                         toast.success("Usuario encontrado. No le pidas crear otra cuenta: que entre con ese Gmail.");
                       } else {
                         const blind = result?.adminReady === false;
-                        setModuleSearchResult(null);
+                        setModuleSearchResult(result);
                         setModuleNotFound(true);
                         setModuleServerBlind(blind);
                         setModuleClientWhatsapp(
@@ -1671,10 +1684,14 @@ export default function AdminGilson() {
                             blind ? "existing_pending" : "new",
                           ),
                         );
+                        const suggested = result?.suggestions?.[0]?.email;
                         toast.info(
-                          blind
-                            ? "El servidor no puede buscar en Firebase. Si ella ya usa la app, registra el pago: se enciende en su celular."
-                            : "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
+                          suggested
+                            ? `No está como lo escribiste. ¿Es ${suggested}?`
+                            : blind
+                            ? "El servidor no puede buscar en Firebase. Revisa FIREBASE_SERVICE_ACCOUNT_JSON (Functions + redeploy)."
+                            : result?.error ||
+                              "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
                         );
                       }
                     } catch {
@@ -1689,6 +1706,38 @@ export default function AdminGilson() {
                   {moduleSearching ? "..." : "Buscar"}
                 </button>
               </div>
+              {moduleSearchResult?.suggestions && moduleSearchResult.suggestions.length > 0 && (
+                <div className="text-xs text-emerald-200 mb-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                  <p className="font-bold">Ese orden del nombre no está en Firebase. ¿Es este?</p>
+                  {moduleSearchResult.suggestions.map((s) => (
+                    <button
+                      key={s.uid}
+                      type="button"
+                      className="block w-full text-left text-white font-bold underline"
+                      data-testid="button-use-suggested-email"
+                      onClick={() => {
+                        setModuleEmail(s.email);
+                        setModuleNotFound(false);
+                        setModuleServerBlind(false);
+                        void lookupUserAdmin(s.email).then((again) => {
+                          if (again?.found && again.uid) {
+                            setModuleSearchResult(again);
+                            toast.success(`Encontrada: ${s.email}`);
+                          }
+                        });
+                      }}
+                    >
+                      {s.email}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {moduleSearchResult && !moduleSearchResult.found && moduleSearchResult.parseError && (
+                <p className="text-xs text-amber-300 mb-3">
+                  JSON de Firebase: {moduleSearchResult.parseError}. En Netlify debe ser
+                  FIREBASE_SERVICE_ACCOUNT_JSON, ámbito Functions, una línea, y luego Redeploy.
+                </p>
+              )}
               {gmailTypoCorrection(moduleEmail) && (
                 <p className="text-xs text-amber-300 mb-3" data-testid="admin-gmail-typo">
                   Ese dominio no es Gmail. Se activará en{" "}
