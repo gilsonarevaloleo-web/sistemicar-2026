@@ -82,7 +82,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail, firebaseAdminStatus } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus, listAuthClientsWithProgression } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5336,6 +5336,21 @@ app.get("/api/admin/firebase-status", requireAdminToken, async (_req, res) => {
     res.json(firebaseAdminStatus());
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error leyendo Firebase Admin.";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/users/clients", requireAdminToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "40";
+    const clients = await listAuthClientsWithProgression(parseInt(limitStr, 10) || 40);
+    res.json({
+      ...firebaseAdminStatus(),
+      clients,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error listando clientes.";
+    console.error("[admin/users/clients]", error);
     res.status(500).json({ error: message });
   }
 });

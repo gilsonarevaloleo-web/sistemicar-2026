@@ -175,6 +175,16 @@ export default function AdminGilson() {
     createdAt: string;
   }>>([]);
   const [moduleGrantsLoading, setModuleGrantsLoading] = useState(false);
+  const [authClients, setAuthClients] = useState<Array<{
+    uid: string;
+    email: string;
+    displayName: string | null;
+    totalCP: number;
+    rank: string;
+    activeModules: string[];
+  }>>([]);
+  const [authClientsLoading, setAuthClientsLoading] = useState(false);
+  const [authClientsError, setAuthClientsError] = useState<string | null>(null);
   const [sellerSales, setSellerSales] = useState<Array<{
     id: string;
     sellerRef: string;
@@ -350,6 +360,29 @@ export default function AdminGilson() {
     }
   };
 
+  const loadAuthClients = async () => {
+    setAuthClientsLoading(true);
+    setAuthClientsError(null);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch("/api/admin/users/clients?limit=40", { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error listando cuentas");
+      setAuthClients(data.clients || []);
+      if (data.adminReady === false) {
+        setAuthClientsError(
+          data.parseError
+            ? `JSON de Firebase: ${data.parseError}. Revisa FIREBASE_SERVICE_ACCOUNT_JSON y redeploy.`
+            : "El servidor aún no lee Firebase Auth. Variable en Functions + redeploy.",
+        );
+      }
+    } catch (e: unknown) {
+      setAuthClientsError(e instanceof Error ? e.message : "Error listando cuentas");
+    } finally {
+      setAuthClientsLoading(false);
+    }
+  };
+
   const grantModuleAdmin = async (targetEmail: string) => {
     if (!targetEmail.trim()) {
       toast.error("Ingresa el email del comprador");
@@ -462,6 +495,7 @@ export default function AdminGilson() {
     }
     if (activeTab === "modulos" && isAuthenticated) {
       void loadModuleGrants();
+      void loadAuthClients();
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
@@ -1602,6 +1636,51 @@ export default function AdminGilson() {
               <p className="text-xs text-slate-400 mb-4">
                 La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Ahí también deja su WhatsApp. Si aún no entró, registra la activación pendiente y mándale el mensaje: al entrar con ese mismo Gmail el plan se enciende solo.
               </p>
+              <div className="mb-4 p-3 rounded-lg bg-black/30 border border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                    Cuentas reales en Firebase (elige la de 56 pts)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void loadAuthClients()}
+                    className="text-xs text-sky-400"
+                    disabled={authClientsLoading}
+                  >
+                    {authClientsLoading ? "…" : "Actualizar"}
+                  </button>
+                </div>
+                {authClientsError ? (
+                  <p className="text-xs text-amber-300">{authClientsError}</p>
+                ) : authClients.length === 0 && !authClientsLoading ? (
+                  <p className="text-xs text-slate-500">
+                    Vacío. Si ya pegaste la variable, falta redeploy de Functions o el JSON está mal.
+                  </p>
+                ) : (
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {authClients.map((c) => (
+                      <button
+                        key={c.uid}
+                        type="button"
+                        data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
+                        onClick={() => {
+                          setModuleEmail(c.email);
+                          setModuleNotFound(false);
+                          setModuleServerBlind(false);
+                          toast.success(`Elegida ${c.email} · ${c.totalCP} pts`);
+                        }}
+                        className="w-full text-left px-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs"
+                      >
+                        <span className="text-white font-bold">{c.email}</span>
+                        <span className="text-slate-400"> · {c.totalCP} pts · {c.rank}</span>
+                        {c.activeModules?.includes("planificacion_base") ? (
+                          <span className="text-emerald-400"> · Jornada on</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
                   <button

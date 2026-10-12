@@ -9,7 +9,8 @@ import {
   buildGrantDeliveryId,
   moduleGrantAdminMessage,
 } from "../shared/clientAccount";
-import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
+import { emailMatchKeys, emailsLikelySameMailbox, normalizeBuyerEmail } from "../shared/emailAliases";
+import { gmailLocalAnagram } from "../shared/firebaseServiceAccount";
 
 const { Pool } = pkg;
 
@@ -80,14 +81,38 @@ export async function listPendingModuleGrantsForEmail(
   const keys = emailMatchKeys(email);
   if (keys.length === 0) return [];
   const result = await pool.query(
-    `SELECT delivery_id, plan_id FROM planificacion_module_grants
+    `SELECT delivery_id, plan_id, buyer_email FROM planificacion_module_grants
      WHERE buyer_email = ANY($1::text[]) AND status = 'pending'`,
     [keys],
   );
-  return result.rows.map((row) => ({
-    deliveryId: row.delivery_id as string,
-    planId: row.plan_id as string,
-  }));
+  const found = new Map<string, { deliveryId: string; planId: string }>();
+  for (const row of result.rows) {
+    found.set(row.delivery_id as string, {
+      deliveryId: row.delivery_id as string,
+      planId: row.plan_id as string,
+    });
+  }
+  if (found.size === 0) {
+    const recent = await pool.query(
+      `SELECT delivery_id, plan_id, buyer_email FROM planificacion_module_grants
+       WHERE status = 'pending' ORDER BY created_at DESC LIMIT 80`,
+    );
+    const local = normalizeBuyerEmail(email).split("@")[0] ?? "";
+    for (const row of recent.rows) {
+      const buyer = String(row.buyer_email || "");
+      const otherLocal = buyer.split("@")[0] ?? "";
+      if (
+        emailsLikelySameMailbox(email, buyer) ||
+        gmailLocalAnagram(local, otherLocal)
+      ) {
+        found.set(row.delivery_id as string, {
+          deliveryId: row.delivery_id as string,
+          planId: row.plan_id as string,
+        });
+      }
+    }
+  }
+  return [...found.values()];
 }
 
 export async function markModuleGrantGranted(

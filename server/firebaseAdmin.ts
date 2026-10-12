@@ -86,7 +86,8 @@ export async function lookupUidByEmail(email: string): Promise<string | null> {
         // probar alias (puntos / +tag de Gmail)
       }
     }
-    return null;
+    const swapped = await suggestUsersForEmail(email);
+    return swapped[0]?.uid ?? null;
   }
 
   const apiKey = process.env.VITE_FIREBASE_API_KEY;
@@ -367,4 +368,48 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     subscriptionPlan,
     whatsapp,
   };
+}
+
+export type AdminAuthClient = {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  totalCP: number;
+  rank: string;
+  activeModules: string[];
+};
+
+/** Lista cuentas reales de Firebase Auth + PS, para no adivinar el Gmail. */
+export async function listAuthClientsWithProgression(
+  limit = 40,
+): Promise<AdminAuthClient[]> {
+  const adminApp = getAdminApp();
+  if (!adminApp) return [];
+  const auth = getAuth(adminApp);
+  const db = getFirestore(adminApp);
+  const out: AdminAuthClient[] = [];
+  let pageToken: string | undefined;
+  let pages = 0;
+  do {
+    const page = await auth.listUsers(100, pageToken);
+    for (const user of page.users) {
+      const email = user.email?.toLowerCase();
+      if (!email) continue;
+      const prog = await getLatestProgressionRef(db, user.uid);
+      const totalCP = prog
+        ? Number(prog.data.totalCP || prog.data.points || 0)
+        : 0;
+      out.push({
+        uid: user.uid,
+        email,
+        displayName: user.displayName ?? null,
+        totalCP,
+        rank: (prog?.data.rank as string) || "iniciado",
+        activeModules: (prog?.data.activeModules as string[]) ?? [],
+      });
+    }
+    pageToken = page.pageToken;
+    pages += 1;
+  } while (pageToken && pages < 5);
+  return out.sort((a, b) => b.totalCP - a.totalCP).slice(0, Math.min(100, Math.max(1, limit)));
 }

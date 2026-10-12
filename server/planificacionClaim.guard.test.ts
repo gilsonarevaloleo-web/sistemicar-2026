@@ -46,4 +46,12 @@ describe("claim de compras — aliases de Gmail", () => {
     assert.match(src, /confirm-client-apply/);
     assert.match(src, /FIREBASE_SERVICE_ACCOUNT_JSON/);
   });
+
+  it("el pago pendiente de pinocarreratina se pega a tinapinocarrera", () => {
+    const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
+    assert.match(grants, /gmailLocalAnagram/);
+    const admin = readFileSync(join(dir, "firebaseAdmin.ts"), "utf8");
+    assert.match(admin, /suggestUsersForEmail/);
+    assert.match(admin, /listAuthClientsWithProgression/);
+  });
 });
