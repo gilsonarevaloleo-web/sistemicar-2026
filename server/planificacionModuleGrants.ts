@@ -106,10 +106,17 @@ export async function markModuleGrantGranted(
 export async function grantPendingModulesForEmail(
   email: string,
   firebaseUid: string,
-): Promise<{ grantedPlans: string[]; deliveryIds: string[] }> {
+): Promise<{
+  grantedPlans: string[];
+  deliveryIds: string[];
+  clientApplyPlans: string[];
+  clientApplyDeliveryIds: string[];
+}> {
   const pending = await listPendingModuleGrantsForEmail(email);
   const grantedPlans: string[] = [];
   const deliveryIds: string[] = [];
+  const clientApplyPlans: string[] = [];
+  const clientApplyDeliveryIds: string[] = [];
   for (const row of pending) {
     if (modulesGrantedByPlan(row.planId).length === 0) continue;
     const ok = await activateModulesForUserById(firebaseUid, row.planId);
@@ -117,9 +124,14 @@ export async function grantPendingModulesForEmail(
       await markModuleGrantGranted(row.deliveryId, firebaseUid);
       grantedPlans.push(row.planId);
       deliveryIds.push(row.deliveryId);
+    } else {
+      // Sin FIREBASE_SERVICE_ACCOUNT_JSON el Admin no escribe Firestore.
+      // El claim autorizado le pasa el plan al celular para que lo encienda.
+      clientApplyPlans.push(row.planId);
+      clientApplyDeliveryIds.push(row.deliveryId);
     }
   }
-  return { grantedPlans, deliveryIds };
+  return { grantedPlans, deliveryIds, clientApplyPlans, clientApplyDeliveryIds };
 }
 
 export async function processPlanificacionModulePayment(params: {

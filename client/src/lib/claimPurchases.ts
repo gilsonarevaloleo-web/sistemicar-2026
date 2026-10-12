@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase";
+import { activateModulesForUser, modulesGrantedByPlan } from "@/lib/persistence";
 
 let claimInFlight: Promise<{
   grantedPlans: string[];
@@ -52,6 +53,25 @@ async function claimPendingPurchasesOnce(): Promise<{
     : [];
   const grantedCredits =
     typeof credits.grantedCredits === "number" ? credits.grantedCredits : 0;
+
+  if (modules.applyOnClient && grantedPlans.length > 0) {
+    const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
+    if (unlocked.length > 0) {
+      await activateModulesForUser(user.uid, unlocked, {
+        subscriptionPlan: grantedPlans[0],
+      });
+    }
+    const confirmIds = Array.isArray(modules.deliveryIdsToConfirm)
+      ? modules.deliveryIdsToConfirm
+      : [];
+    if (confirmIds.length > 0) {
+      await fetch("/api/planificacion/confirm-client-apply", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryIds: confirmIds }),
+      }).catch(() => null);
+    }
+  }
 
   if (grantedPlans.length > 0) {
     window.dispatchEvent(new CustomEvent("progression-updated"));

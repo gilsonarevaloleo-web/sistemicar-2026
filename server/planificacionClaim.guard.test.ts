@@ -37,4 +37,13 @@ describe("claim de compras — aliases de Gmail", () => {
     assert.match(grants, /emailMatchKeys/);
     assert.match(grants, /buyer_email = ANY/);
   });
+
+  it("si Admin no escribe Firestore, el claim pasa el plan al celular", () => {
+    const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
+    assert.match(grants, /clientApplyPlans/);
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /applyOnClient/);
+    assert.match(src, /confirm-client-apply/);
+    assert.match(src, /FIREBASE_SERVICE_ACCOUNT_JSON/);
+  });
 });

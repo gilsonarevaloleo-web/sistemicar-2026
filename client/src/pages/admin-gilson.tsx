@@ -159,6 +159,7 @@ export default function AdminGilson() {
   const [moduleSearchResult, setModuleSearchResult] = useState<AdminUserLookup | null>(null);
   const [moduleSearching, setModuleSearching] = useState(false);
   const [moduleNotFound, setModuleNotFound] = useState(false);
+  const [moduleServerBlind, setModuleServerBlind] = useState(false);
   const [moduleClientWhatsapp, setModuleClientWhatsapp] = useState("");
   const [moduleGrants, setModuleGrants] = useState<Array<{
     id: number;
@@ -374,8 +375,8 @@ export default function AdminGilson() {
       setModuleClientWhatsapp(whatsapp);
       if (data.activated || data.granted) {
         toast.success(data.message || "Módulo activado. Dile que entre con el mismo Gmail — no cree otra cuenta.");
-      } else if (data.pending && (data.uid || moduleSearchResult?.uid)) {
-        toast.success("Pago registrado. La cuenta ya existe: dile que entre en /acceso con el mismo Gmail.");
+      } else if (data.pending && (data.uid || moduleSearchResult?.uid || moduleServerBlind)) {
+        toast.success("Pago registrado. Dile que abra Jornada en su celular — el plan se enciende ahí.");
       } else if (data.pending) {
         toast.success("Pago registrado. El cliente aún debe crear su cuenta en /acceso.");
       } else {
@@ -1632,6 +1633,7 @@ export default function AdminGilson() {
                   onChange={(e) => {
                     setModuleEmail(e.target.value);
                     setModuleNotFound(false);
+                    setModuleServerBlind(false);
                   }}
                   placeholder="Email del comprador"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm"
@@ -1648,6 +1650,7 @@ export default function AdminGilson() {
                       if (result?.found && result.uid) {
                         setModuleSearchResult(result);
                         setModuleNotFound(false);
+                        setModuleServerBlind(false);
                         setModuleClientWhatsapp(
                           buildClientAccountWhatsapp(
                             result.email || moduleEmail.trim(),
@@ -1657,18 +1660,20 @@ export default function AdminGilson() {
                         );
                         toast.success("Usuario encontrado. No le pidas crear otra cuenta: que entre con ese Gmail.");
                       } else {
+                        const blind = result?.adminReady === false;
                         setModuleSearchResult(null);
                         setModuleNotFound(true);
+                        setModuleServerBlind(blind);
                         setModuleClientWhatsapp(
                           buildClientAccountWhatsapp(
                             moduleEmail.trim(),
                             displayNameForPlan(modulePlanId),
-                            "new",
+                            blind ? "existing_pending" : "new",
                           ),
                         );
                         toast.info(
-                          result?.adminReady === false
-                            ? "No encontrado. Configura FIREBASE_SERVICE_ACCOUNT_JSON en el servidor para activar módulos."
+                          blind
+                            ? "El servidor no puede buscar en Firebase. Si ella ya usa la app, registra el pago: se enciende en su celular."
                             : "Aún no tiene cuenta. Registra el pago como pendiente y dile que entre en sistemicar.app/acceso con ese Gmail."
                         );
                       }
@@ -1718,7 +1723,17 @@ export default function AdminGilson() {
                   )}
                 </div>
               )}
-              {moduleNotFound && (
+              {moduleServerBlind && (
+                <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
+                  <p className="font-bold">El servidor no puede ver Firebase Auth.</p>
+                  <p>
+                    Falta <span className="text-white">FIREBASE_SERVICE_ACCOUNT_JSON</span> en Netlify.
+                    Eso no significa que ella no tenga cuenta — si ya usa la app, la tiene.
+                    Pulsa registrar pendiente. Al abrir Jornada en su celular, el plan se enciende.
+                  </p>
+                </div>
+              )}
+              {moduleNotFound && !moduleServerBlind && (
                 <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
                   <p className="font-bold">No está en Firebase Auth todavía.</p>
                   <p>
