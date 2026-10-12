@@ -16,4 +16,14 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /touch-manipulation/);
     assert.match(src, /unlockAdminTouches/);
   });
+
+  it("enciende Jornada Base en el UID, no migra a Gilson", () => {
+    const src = readFileSync(join(dir, "admin-gilson.tsx"), "utf8");
+    assert.match(src, /Encender Jornada Base/);
+    assert.match(src, /\/api\/admin\/modules\/grant-uid/);
+    assert.match(src, /grantModulesToUid/);
+    assert.match(src, /Copiar a tu Gilson/);
+    assert.match(src, /no copies los datos a tu cuenta Gilson/);
+    assert.match(src, /Encender \$\{displayNameForPlan\(modulePlanId\)\} en este UID/);
+  });
 });
