@@ -254,7 +254,17 @@ export function clearMigrationPending(): void {
   localStorage.removeItem("sistemicar_migration_pending");
 }
 
-export async function findAccountsWithData(): Promise<Array<{ uid: string; totalCP: number; rank: string; lastUpdated: Date | null }>> {
+export type AccountWithData = {
+  uid: string;
+  totalCP: number;
+  rank: string;
+  lastUpdated: Date | null;
+  activeModules: string[];
+  subscriptionPlan: string | null;
+  whatsapp: string | null;
+};
+
+export async function findAccountsWithData(): Promise<AccountWithData[]> {
   if (!isFirebaseConfigured() || !db) {
     return [];
   }
@@ -262,7 +272,7 @@ export async function findAccountsWithData(): Promise<Array<{ uid: string; total
   try {
     const usersRef = collection(db, "artifacts/sistemicar-v2-5/users");
     const usersSnapshot = await getDocs(usersRef);
-    const accounts: Array<{ uid: string; totalCP: number; rank: string; lastUpdated: Date | null }> = [];
+    const accounts: AccountWithData[] = [];
 
     for (const userDoc of usersSnapshot.docs) {
       const uid = userDoc.id;
@@ -271,13 +281,29 @@ export async function findAccountsWithData(): Promise<Array<{ uid: string; total
         const progressionSnapshot = await getDocs(collection(db, progressionPath));
         
         if (!progressionSnapshot.empty) {
-          const progData = progressionSnapshot.docs[0].data();
-          if (progData.totalCP > 0 || progData.points > 0) {
+          const latest = pickLatestProgressionDoc(progressionSnapshot.docs);
+          const progData = (latest?.data() ?? progressionSnapshot.docs[0].data()) as Record<string, unknown>;
+          const totalCP = Number(progData.totalCP || progData.points || 0);
+          if (totalCP > 0) {
+            const lastRaw = progData.lastUpdated as { toDate?: () => Date } | Date | undefined;
             accounts.push({
               uid,
-              totalCP: progData.totalCP || progData.points || 0,
-              rank: progData.rank || "observador",
-              lastUpdated: progData.lastUpdated?.toDate() || null
+              totalCP,
+              rank: (progData.rank as string) || "observador",
+              lastUpdated:
+                lastRaw && typeof (lastRaw as { toDate?: () => Date }).toDate === "function"
+                  ? (lastRaw as { toDate: () => Date }).toDate()
+                  : lastRaw instanceof Date
+                    ? lastRaw
+                    : null,
+              activeModules: Array.isArray(progData.activeModules)
+                ? (progData.activeModules as string[])
+                : [],
+              subscriptionPlan: (progData.subscriptionPlan as string) || null,
+              whatsapp:
+                typeof progData.whatsapp === "string" && progData.whatsapp.trim()
+                  ? progData.whatsapp.trim()
+                  : null,
             });
           }
         }
@@ -2785,6 +2811,56 @@ export async function activateModulesForUser(
     activeModules: merged,
     ...(opts?.subscriptionPlan != null ? { subscriptionPlan: opts.subscriptionPlan } : {}),
   });
+}
+
+/**
+ * Enciende módulos en el UID de Firestore de esa cuenta.
+ * No usa la progresión local de Gilson (activateModulesForUser sí lo haría).
+ */
+export async function grantModulesToUid(
+  userId: string,
+  moduleIds: ModuleId[],
+  opts?: { subscriptionPlan?: string | null }
+): Promise<{ ok: boolean; activeModules: string[] }> {
+  if (!userId || moduleIds.length === 0) {
+    return { ok: false, activeModules: [] };
+  }
+  if (!isFirebaseConfigured() || !db) {
+    return { ok: false, activeModules: [] };
+  }
+  try {
+    const path = getPrivatePath(userId, "progression");
+    const snapshot = await getDocs(collection(db, path));
+    const latest = pickLatestProgressionDoc(snapshot.docs);
+    const prev = latest
+      ? ((latest.data().activeModules as string[] | undefined) ?? [])
+      : [];
+    const merged = mergeModuleIds(prev, moduleIds);
+    const updates: Record<string, unknown> = {
+      activeModules: merged,
+      updatedAt: serverTimestamp(),
+    };
+    if (opts?.subscriptionPlan != null) {
+      updates.subscriptionPlan = opts.subscriptionPlan;
+    }
+    if (!latest) {
+      await setDoc(doc(db, path, `prog_${Date.now()}`), {
+        userId,
+        rank: "iniciado",
+        points: 0,
+        totalCP: 0,
+        sovereigntyPoints: 0,
+        createdAt: serverTimestamp(),
+        ...updates,
+      });
+    } else {
+      await updateDoc(doc(db, path, latest.id), updates);
+    }
+    return { ok: true, activeModules: merged };
+  } catch (error) {
+    console.error("Error encendiendo módulos en UID remoto:", error);
+    return { ok: false, activeModules: [] };
+  }
 }
 
 // ========== MODOS DE CLIENTE (Segmentación para Gemini) ==========

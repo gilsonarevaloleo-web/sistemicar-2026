@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import pkg from "pg";
 import {
   activateModulesForUserById,
+  lookupAuthUserByUid,
   lookupUidByEmail,
 } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
@@ -115,6 +116,33 @@ export async function listPendingModuleGrantsForEmail(
   return [...found.values()];
 }
 
+export async function listPendingModuleGrantsForUid(
+  firebaseUid: string,
+): Promise<Array<{ deliveryId: string; planId: string }>> {
+  if (!process.env.DATABASE_URL || !firebaseUid.trim()) return [];
+  const result = await pool.query(
+    `SELECT delivery_id, plan_id FROM planificacion_module_grants
+     WHERE firebase_uid = $1 AND status = 'pending'`,
+    [firebaseUid.trim()],
+  );
+  return result.rows.map((row) => ({
+    deliveryId: row.delivery_id as string,
+    planId: row.plan_id as string,
+  }));
+}
+
+function mergePendingGrants(
+  ...lists: Array<Array<{ deliveryId: string; planId: string }>>
+): Array<{ deliveryId: string; planId: string }> {
+  const found = new Map<string, { deliveryId: string; planId: string }>();
+  for (const list of lists) {
+    for (const row of list) {
+      found.set(row.deliveryId, row);
+    }
+  }
+  return [...found.values()];
+}
+
 export async function markModuleGrantGranted(
   deliveryId: string,
   firebaseUid?: string,
@@ -137,7 +165,10 @@ export async function grantPendingModulesForEmail(
   clientApplyPlans: string[];
   clientApplyDeliveryIds: string[];
 }> {
-  const pending = await listPendingModuleGrantsForEmail(email);
+  const pending = mergePendingGrants(
+    await listPendingModuleGrantsForEmail(email),
+    await listPendingModuleGrantsForUid(firebaseUid),
+  );
   const grantedPlans: string[] = [];
   const deliveryIds: string[] = [];
   const clientApplyPlans: string[] = [];
@@ -334,5 +365,105 @@ export async function adminGrantPlanificacionModule(params: {
       pending: result.pending && !result.granted,
       accountExists: Boolean(result.uid || result.granted),
     }),
+  };
+}
+
+export function isFirebaseUid(uid: string): boolean {
+  return /^[A-Za-z0-9_-]{8,128}$/.test(uid.trim());
+}
+
+function uidPlaceholderEmail(uid: string): string {
+  return `uid:${uid.trim().toLowerCase()}@sistemicar.local`;
+}
+
+/** Enciende el plan en el UID de Firestore/Auth. No hace falta acertar el Gmail. */
+export async function adminGrantPlanificacionModuleByUid(params: {
+  uid: string;
+  planId: string;
+  source: "yape" | "paypal" | "manual" | "mp";
+  reference?: string;
+  note?: string;
+  grantedBy?: string;
+  email?: string;
+}): Promise<{
+  deliveryId: string;
+  granted: boolean;
+  pending: boolean;
+  duplicate: boolean;
+  uid: string;
+  email: string | null;
+  applyOnClient: boolean;
+  message: string;
+}> {
+  const uid = params.uid.trim();
+  if (!isFirebaseUid(uid)) {
+    throw new Error("UID de Firebase inválido.");
+  }
+  const planId = params.planId.trim();
+  if (modulesGrantedByPlan(planId).length === 0) {
+    throw new Error(`Plan no válido. Usa: ${grantablePlanHint()}.`);
+  }
+
+  const authUser = await lookupAuthUserByUid(uid);
+  const email =
+    normalizeBuyerEmail(params.email || "") ||
+    authUser?.email ||
+    uidPlaceholderEmail(uid);
+
+  const deliveryId = params.reference?.trim()
+    ? buildGrantDeliveryId(params.source, params.reference)
+    : `uid:${uid}:${params.source}:${Date.now()}:${randomBytes(4).toString("hex")}`;
+
+  const existing = await getModuleGrantByDeliveryId(deliveryId);
+  if (existing.exists && existing.status === "granted") {
+    return {
+      deliveryId,
+      granted: true,
+      pending: false,
+      duplicate: true,
+      uid,
+      email: authUser?.email ?? null,
+      applyOnClient: false,
+      message: "Esta referencia de pago ya fue activada.",
+    };
+  }
+
+  if (process.env.DATABASE_URL) {
+    await pool.query(
+      `INSERT INTO planificacion_module_grants
+         (delivery_id, buyer_email, plan_id, status, source, admin_note, granted_by, firebase_uid)
+       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7)
+       ON CONFLICT (delivery_id) DO UPDATE
+         SET firebase_uid = COALESCE(planificacion_module_grants.firebase_uid, EXCLUDED.firebase_uid)`,
+      [
+        deliveryId,
+        email,
+        planId,
+        params.source,
+        params.note?.trim() || null,
+        params.grantedBy?.trim() || null,
+        uid,
+      ],
+    );
+  }
+
+  const ok = await activateModulesForUserById(uid, planId);
+  if (ok) {
+    await markModuleGrantGranted(deliveryId, uid);
+  }
+
+  return {
+    deliveryId,
+    granted: ok,
+    pending: !ok && Boolean(process.env.DATABASE_URL),
+    duplicate: false,
+    uid,
+    email: authUser?.email ?? null,
+    applyOnClient: !ok,
+    message: ok
+      ? `Jornada encendida en esa cuenta (${uid.slice(0, 8)}…). Que abra el menú — no cree otra.`
+      : process.env.DATABASE_URL
+        ? `Pago pegado a ese UID. Si el servidor no escribe Firestore, se enciende al abrir Jornada en su celular.`
+        : `No se pudo escribir Firestore. Falta FIREBASE_SERVICE_ACCOUNT_JSON (Functions + redeploy).`,
   };
 }
