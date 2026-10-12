@@ -6,6 +6,8 @@
  * su WhatsApp en ese mismo paso.
  */
 
+import { normalizeBuyerEmail } from "./emailAliases.ts";
+
 export const CLIENT_ACCESO_PATH = "/acceso";
 export const CLIENT_ACCESO_PUBLIC_URL = "https://sistemicar.app/acceso";
 
@@ -66,7 +68,7 @@ export function buildClientAccountWhatsapp(
   planName: string,
   kind: ClientAccountWhatsappKind = "new",
 ): string {
-  const e = email.trim().toLowerCase();
+  const e = normalizeBuyerEmail(email);
   if (kind === "existing_granted") {
     return [
       `Hola, tu pago de ${planName} ya está en tu cuenta.`,
@@ -111,7 +113,7 @@ export function moduleGrantAdminMessage(opts: {
   accountExists?: boolean;
 }): string {
   const planName = displayNameForPlan(opts.planId);
-  const email = opts.email.trim().toLowerCase();
+  const email = normalizeBuyerEmail(opts.email);
   if (opts.granted) {
     return `Módulo ${planName} activado para ${email}. La cuenta ya existía: dile que entre en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail. No cree otra cuenta.`;
   }

@@ -14,6 +14,7 @@ import {
   displayNameForPlan,
   resolveClientAccountWhatsappKind,
 } from "@shared/clientAccount";
+import { gmailTypoCorrection } from "@shared/emailAliases";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -1683,6 +1684,15 @@ export default function AdminGilson() {
                   {moduleSearching ? "..." : "Buscar"}
                 </button>
               </div>
+              {gmailTypoCorrection(moduleEmail) && (
+                <p className="text-xs text-amber-300 mb-3" data-testid="admin-gmail-typo">
+                  Ese dominio no es Gmail. Se activará en{" "}
+                  <span className="text-white font-bold">
+                    {gmailTypoCorrection(moduleEmail)}
+                  </span>
+                  .
+                </p>
+              )}
               {moduleSearchResult?.found && moduleSearchResult.uid && (
                 <div className="text-xs text-slate-400 mb-3 space-y-1">
                   <p>

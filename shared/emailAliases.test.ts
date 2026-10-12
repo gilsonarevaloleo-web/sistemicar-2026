@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   emailMatchKeys,
   emailsLikelySameMailbox,
+  gmailTypoCorrection,
   normalizeBuyerEmail,
 } from "./emailAliases.ts";
 
@@ -41,5 +42,25 @@ describe("emailAliases — pago y cuenta Google", () => {
     const keys = emailMatchKeys("tina.pino+yape@gmail.com");
     assert.equal(keys[0], "tina.pino+yape@gmail.com");
     assert.ok(keys.includes("tinapino@gmail.com"));
+  });
+
+  it("corrige gamail.com → gmail.com (typo de Tina / Yape / admin)", () => {
+    assert.equal(
+      normalizeBuyerEmail("TinaPinoCarrera@gamail.com"),
+      "tinapinocarrera@gmail.com",
+    );
+    assert.equal(
+      gmailTypoCorrection("tinapinocarrera@gamail.com"),
+      "tinapinocarrera@gmail.com",
+    );
+    assert.equal(
+      emailsLikelySameMailbox(
+        "tinapinocarrera@gamail.com",
+        "tinapinocarrera@gmail.com",
+      ),
+      true,
+    );
+    const keysFromGmail = emailMatchKeys("tinapinocarrera@gmail.com");
+    assert.ok(keysFromGmail.includes("tinapinocarrera@gamail.com"));
   });
 });
