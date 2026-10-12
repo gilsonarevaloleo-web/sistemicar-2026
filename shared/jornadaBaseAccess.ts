@@ -202,7 +202,7 @@ export function jornadaMenuTileSubtitle(
   openTagline: string,
 ): string {
   if (access.kind === "expired") {
-    return "Si ya pagaste, entra con el mismo Gmail";
+    return "Si ya pagaste, entra aquí";
   }
   return openTagline;
 }

@@ -377,9 +377,83 @@ export type AdminAuthClient = {
   totalCP: number;
   rank: string;
   activeModules: string[];
+  whatsapp?: string | null;
+  subscriptionPlan?: string | null;
 };
 
-/** Lista cuentas reales de Firebase Auth + PS, para no adivinar el Gmail. */
+export async function lookupAuthUserByUid(
+  uid: string,
+): Promise<{ email: string | null; displayName: string | null } | null> {
+  const adminApp = getAdminApp();
+  if (!adminApp || !uid.trim()) return null;
+  try {
+    const user = await getAuth(adminApp).getUser(uid.trim());
+    return {
+      email: user.email?.toLowerCase() ?? null,
+      displayName: user.displayName ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function uidFromProgressionPath(path: string): string | null {
+  const parts = path.split("/");
+  const i = parts.indexOf("users");
+  if (i < 0 || parts[i + 2] !== "progression") return null;
+  if (!parts.includes("sistemicar-v2-5")) return null;
+  return parts[i + 1] || null;
+}
+
+type ProgressionSummary = {
+  totalCP: number;
+  rank: string;
+  activeModules: string[];
+  whatsapp: string | null;
+  subscriptionPlan: string | null;
+  updatedAt: number;
+};
+
+async function progressionByUid(
+  db: ReturnType<typeof getFirestore>,
+): Promise<Map<string, ProgressionSummary>> {
+  const map = new Map<string, ProgressionSummary>();
+  try {
+    const snap = await db.collectionGroup("progression").get();
+    for (const docSnap of snap.docs) {
+      const uid = uidFromProgressionPath(docSnap.ref.path);
+      if (!uid) continue;
+      const data = docSnap.data() as Record<string, unknown>;
+      const updatedAt =
+        (data.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
+      const totalCP = Number(data.totalCP || data.points || 0);
+      const prev = map.get(uid);
+      if (!prev || updatedAt >= prev.updatedAt) {
+        map.set(uid, {
+          totalCP: Math.max(totalCP, prev?.totalCP ?? 0),
+          rank: (data.rank as string) || prev?.rank || "iniciado",
+          activeModules: Array.isArray(data.activeModules)
+            ? (data.activeModules as string[])
+            : prev?.activeModules ?? [],
+          whatsapp:
+            typeof data.whatsapp === "string" && data.whatsapp.trim()
+              ? data.whatsapp.trim()
+              : prev?.whatsapp ?? null,
+          subscriptionPlan:
+            (data.subscriptionPlan as string) || prev?.subscriptionPlan || null,
+          updatedAt,
+        });
+      } else {
+        prev.totalCP = Math.max(prev.totalCP, totalCP);
+      }
+    }
+  } catch (err) {
+    console.warn("[firebaseAdmin] collectionGroup progression:", err);
+  }
+  return map;
+}
+
+/** Lista cuentas reales (Auth + Firestore). El Gmail no es la llave: el UID sí. */
 export async function listAuthClientsWithProgression(
   limit = 40,
 ): Promise<AdminAuthClient[]> {
@@ -387,29 +461,56 @@ export async function listAuthClientsWithProgression(
   if (!adminApp) return [];
   const auth = getAuth(adminApp);
   const db = getFirestore(adminApp);
-  const out: AdminAuthClient[] = [];
+  const byUid = new Map<string, AdminAuthClient>();
+  const progMap = await progressionByUid(db);
+
   let pageToken: string | undefined;
   let pages = 0;
-  do {
-    const page = await auth.listUsers(100, pageToken);
-    for (const user of page.users) {
-      const email = user.email?.toLowerCase();
-      if (!email) continue;
-      const prog = await getLatestProgressionRef(db, user.uid);
-      const totalCP = prog
-        ? Number(prog.data.totalCP || prog.data.points || 0)
-        : 0;
-      out.push({
-        uid: user.uid,
-        email,
-        displayName: user.displayName ?? null,
-        totalCP,
-        rank: (prog?.data.rank as string) || "iniciado",
-        activeModules: (prog?.data.activeModules as string[]) ?? [],
-      });
+  try {
+    do {
+      const page = await auth.listUsers(100, pageToken);
+      for (const user of page.users) {
+        const email = user.email?.toLowerCase() ?? "";
+        const prog = progMap.get(user.uid);
+        byUid.set(user.uid, {
+          uid: user.uid,
+          email,
+          displayName: user.displayName ?? null,
+          totalCP: prog?.totalCP ?? 0,
+          rank: prog?.rank || "iniciado",
+          activeModules: prog?.activeModules ?? [],
+          whatsapp: prog?.whatsapp ?? null,
+          subscriptionPlan: prog?.subscriptionPlan ?? null,
+        });
+      }
+      pageToken = page.pageToken;
+      pages += 1;
+    } while (pageToken && pages < 5);
+  } catch (err) {
+    console.warn("[firebaseAdmin] listUsers:", err);
+  }
+
+  for (const [uid, prog] of progMap) {
+    const existing = byUid.get(uid);
+    if (existing) {
+      existing.totalCP = Math.max(existing.totalCP, prog.totalCP);
+      if (!existing.activeModules.length) existing.activeModules = prog.activeModules;
+      if (!existing.whatsapp) existing.whatsapp = prog.whatsapp;
+      continue;
     }
-    pageToken = page.pageToken;
-    pages += 1;
-  } while (pageToken && pages < 5);
-  return out.sort((a, b) => b.totalCP - a.totalCP).slice(0, Math.min(100, Math.max(1, limit)));
+    byUid.set(uid, {
+      uid,
+      email: "",
+      displayName: null,
+      totalCP: prog.totalCP,
+      rank: prog.rank,
+      activeModules: prog.activeModules,
+      whatsapp: prog.whatsapp,
+      subscriptionPlan: prog.subscriptionPlan,
+    });
+  }
+
+  return [...byUid.values()]
+    .sort((a, b) => b.totalCP - a.totalCP)
+    .slice(0, Math.min(100, Math.max(1, limit)));
 }

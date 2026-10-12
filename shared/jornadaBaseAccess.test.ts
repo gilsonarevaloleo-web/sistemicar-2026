@@ -71,7 +71,7 @@ describe("jornadaBaseAccess", () => {
     assert.equal(shouldShowJornadaMenuTile(), true);
     assert.match(
       jornadaMenuTileSubtitle(a, "Jornada"),
-      /mismo Gmail/,
+      /entra aquí/,
     );
   });
 

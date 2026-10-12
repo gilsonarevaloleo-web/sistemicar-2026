@@ -54,4 +54,15 @@ describe("claim de compras — aliases de Gmail", () => {
     assert.match(admin, /suggestUsersForEmail/);
     assert.match(admin, /listAuthClientsWithProgression/);
   });
+
+  it("el admin enciende el plan por UID aunque el Gmail no coincida", () => {
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /\/api\/admin\/modules\/grant-uid/);
+    assert.match(src, /adminGrantPlanificacionModuleByUid/);
+    const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
+    assert.match(grants, /adminGrantPlanificacionModuleByUid/);
+    assert.match(grants, /listPendingModuleGrantsForUid/);
+    const admin = readFileSync(join(dir, "firebaseAdmin.ts"), "utf8");
+    assert.match(admin, /collectionGroup\("progression"\)/);
+  });
 });

@@ -75,8 +75,10 @@ import {
   initPlanificacionModuleGrantsTable,
   grantPendingModulesForEmail,
   listPendingModuleGrantsForEmail,
+  listPendingModuleGrantsForUid,
   markModuleGrantGranted,
   adminGrantPlanificacionModule,
+  adminGrantPlanificacionModuleByUid,
   processPlanificacionModulePayment,
   listModuleGrants,
 } from "./planificacionModuleGrants";
@@ -5153,8 +5155,11 @@ app.post("/api/planificacion/confirm-client-apply", async (req, res) => {
       return res.status(401).json({ error: "Inicia sesión para confirmar tu plan." });
     }
     const rawIds = Array.isArray(req.body?.deliveryIds) ? req.body.deliveryIds : [];
-    const pending = await listPendingModuleGrantsForEmail(verified.email);
-    const allowed = new Set(pending.map((row) => row.deliveryId));
+    const pendingEmail = await listPendingModuleGrantsForEmail(verified.email);
+    const pendingUid = await listPendingModuleGrantsForUid(verified.uid);
+    const allowed = new Set(
+      [...pendingEmail, ...pendingUid].map((row) => row.deliveryId),
+    );
     const confirmed: string[] = [];
     for (const id of rawIds) {
       if (typeof id !== "string" || !allowed.has(id)) continue;
@@ -5444,6 +5449,65 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error activando módulo.";
     console.error("[admin/modules/grant]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/api/admin/modules/grant-uid", requireAdminToken, async (req, res) => {
+  try {
+    const adminEmail = (req as { adminEmail?: string }).adminEmail;
+    const { uid, planId, source, note, email } = req.body || {};
+    if (!uid || typeof uid !== "string") {
+      return res.status(400).json({ error: "UID de la cuenta requerido." });
+    }
+    const pid = typeof planId === "string" ? planId.trim() : "planificacion_base";
+    if (modulesGrantedByPlan(pid).length === 0) {
+      return res.status(400).json({
+        error: `Plan no válido. Usa: ${grantablePlanHint()}.`,
+      });
+    }
+
+    const validSources = new Set(["yape", "paypal", "manual", "mp"]);
+    const paymentSource =
+      typeof source === "string" && validSources.has(source)
+        ? (source as "yape" | "paypal" | "manual" | "mp")
+        : "manual";
+
+    const result = await adminGrantPlanificacionModuleByUid({
+      uid,
+      planId: pid,
+      source: paymentSource,
+      reference: typeof note === "string" ? note : undefined,
+      note: typeof note === "string" ? note : undefined,
+      grantedBy: adminEmail,
+      email: typeof email === "string" ? email : undefined,
+    });
+
+    if (result.duplicate) {
+      return res.status(409).json({
+        error: result.message,
+        ...result,
+      });
+    }
+
+    console.log(
+      `[admin/modules/grant-uid] uid=${result.uid} plan=${pid} granted=${result.granted} pending=${result.pending}`,
+    );
+    res.json({
+      success: true,
+      activated: result.granted,
+      granted: result.granted,
+      pending: result.pending,
+      applyOnClient: result.applyOnClient,
+      planId: pid,
+      uid: result.uid,
+      email: result.email,
+      modules: modulesGrantedByPlan(pid),
+      message: result.message,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error activando módulo por UID.";
+    console.error("[admin/modules/grant-uid]", error);
     res.status(500).json({ error: message });
   }
 });

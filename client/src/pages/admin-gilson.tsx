@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Shield, Users, CheckCircle, Crown, Zap, Eye, EyeOff, RefreshCw, DollarSign, AlertTriangle, Database, ArrowRight, FlaskConical, Star, Trash2, Brain, Dna, X, Sprout } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { findAccountsWithData, migrateDataToNewUid, subscribeToPrincipiosMaestros, addPrincipioMaestro, deletePrincipioMaestro, PrincipioMaestro, subscribeToEnergyLogs, EnergyLog, subscribeToVehicles, Vehicle, subscribeToGenomeLaws, saveGenomeLaw, updateGenomeLawStatus, deleteGenomeLaw, GenomeLaw, getAllProspectos } from "@/lib/persistence";
+import { findAccountsWithData, grantModulesToUid, migrateDataToNewUid, modulesGrantedByPlan, subscribeToPrincipiosMaestros, addPrincipioMaestro, deletePrincipioMaestro, PrincipioMaestro, subscribeToEnergyLogs, EnergyLog, subscribeToVehicles, Vehicle, subscribeToGenomeLaws, saveGenomeLaw, updateGenomeLawStatus, deleteGenomeLaw, GenomeLaw, getAllProspectos } from "@/lib/persistence";
 import { useAuthContext } from "@/App";
 import { isOwner } from "@/lib/owner";
 import { auth, getUserEmail } from "@/lib/firebase";
@@ -53,6 +53,9 @@ interface AccountData {
   totalCP: number;
   rank: string;
   lastUpdated: Date | null;
+  activeModules?: string[];
+  subscriptionPlan?: string | null;
+  whatsapp?: string | null;
 }
 
 type AdminUserLookup = {
@@ -122,6 +125,7 @@ export default function AdminGilson() {
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
   const [migratingUid, setMigratingUid] = useState<string | null>(null);
+  const [grantingUid, setGrantingUid] = useState<string | null>(null);
   const [creditEmail, setCreditEmail] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
   const [creditSearchResult, setCreditSearchResult] = useState<{ uid: string; email: string; rank: string; totalCP: number } | null>(null);
@@ -157,6 +161,7 @@ export default function AdminGilson() {
   }>>([]);
   const [creditDeliveriesLoading, setCreditDeliveriesLoading] = useState(false);
   const [moduleEmail, setModuleEmail] = useState("");
+  const [moduleUid, setModuleUid] = useState("");
   const [modulePlanId, setModulePlanId] = useState("planificacion_base");
   const [moduleSource, setModuleSource] = useState<"yape" | "paypal" | "manual">("yape");
   const [moduleNote, setModuleNote] = useState("");
@@ -253,18 +258,19 @@ export default function AdminGilson() {
     toast.success("¡Comisión marcada como pagada!");
   };
 
-  const searchAccounts = async () => {
+  const searchAccounts = async (opts?: { silent?: boolean }) => {
     setSearchingAccounts(true);
     try {
       const found = await findAccountsWithData();
       setAccounts(found);
+      if (opts?.silent) return;
       if (found.length === 0) {
         toast.info("No se encontraron cuentas con datos");
       } else {
         toast.success(`Se encontraron ${found.length} cuentas con datos`);
       }
     } catch (error) {
-      toast.error("Error buscando cuentas");
+      if (!opts?.silent) toast.error("Error buscando cuentas");
     } finally {
       setSearchingAccounts(false);
     }
@@ -292,6 +298,86 @@ export default function AdminGilson() {
       toast.error("Error en la migración");
     } finally {
       setMigratingUid(null);
+    }
+  };
+
+  const grantPlanOnUid = async (
+    targetUid: string,
+    planId = "planificacion_base",
+    email?: string,
+  ): Promise<boolean> => {
+    if (!targetUid.trim()) {
+      toast.error("Falta el UID de la cuenta");
+      return false;
+    }
+    setGrantingUid(targetUid);
+    try {
+      const headers = await getAdminHeaders();
+      const res = await fetch("/api/admin/modules/grant-uid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          uid: targetUid.trim(),
+          planId,
+          source: moduleSource,
+          note: moduleNote.trim() || `encender-uid:${targetUid.slice(0, 8)}`,
+          email: email?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        toast.warning(data.error || "Esta referencia ya fue activada");
+        return true;
+      }
+      if (data.granted || data.activated) {
+        toast.success(data.message || "Jornada encendida en esa cuenta. Que abra el menú.");
+        setAccounts((prev) =>
+          prev.map((a) =>
+            a.uid === targetUid
+              ? {
+                  ...a,
+                  activeModules: Array.from(
+                    new Set([...(a.activeModules || []), ...modulesGrantedByPlan(planId)]),
+                  ),
+                  subscriptionPlan: planId,
+                }
+              : a,
+          ),
+        );
+        void loadModuleGrants();
+        void loadAuthClients();
+        return true;
+      }
+      const local = await grantModulesToUid(targetUid, modulesGrantedByPlan(planId), {
+        subscriptionPlan: planId,
+      });
+      if (local.ok) {
+        toast.success("Jornada escrita en esa cuenta. Que recargue el menú — no cree otra.");
+        setAccounts((prev) =>
+          prev.map((a) =>
+            a.uid === targetUid
+              ? { ...a, activeModules: local.activeModules, subscriptionPlan: planId }
+              : a,
+          ),
+        );
+        void loadModuleGrants();
+        return true;
+      }
+      if (data.pending) {
+        toast.success(
+          "Pago pegado a ese UID. Dile que abra Jornada en su celular — el plan se enciende ahí.",
+        );
+        void loadModuleGrants();
+        return true;
+      }
+      if (!res.ok) throw new Error(data.error || "Error encendiendo el plan");
+      toast.error(data.message || "No se pudo encender Jornada en esa cuenta");
+      return false;
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Error encendiendo Jornada");
+      return false;
+    } finally {
+      setGrantingUid(null);
     }
   };
 
@@ -384,8 +470,17 @@ export default function AdminGilson() {
   };
 
   const grantModuleAdmin = async (targetEmail: string) => {
+    if (moduleUid.trim()) {
+      setModuleSaving(true);
+      try {
+        await grantPlanOnUid(moduleUid.trim(), modulePlanId, targetEmail.trim() || undefined);
+      } finally {
+        setModuleSaving(false);
+      }
+      return;
+    }
     if (!targetEmail.trim()) {
-      toast.error("Ingresa el email del comprador");
+      toast.error("Ingresa el email del comprador o elige la cuenta de la lista");
       return;
     }
     setModuleSaving(true);
@@ -496,6 +591,7 @@ export default function AdminGilson() {
     if (activeTab === "modulos" && isAuthenticated) {
       void loadModuleGrants();
       void loadAuthClients();
+      void searchAccounts({ silent: true });
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
@@ -1017,16 +1113,18 @@ export default function AdminGilson() {
               <div className="flex items-start gap-3 mb-4">
                 <Database className="text-green-400 flex-shrink-0" size={24} />
                 <div>
-                  <h3 className="text-green-400 font-bold mb-1">Recuperar Datos de Cuenta Anterior</h3>
+                  <h3 className="text-green-400 font-bold mb-1">Encender Jornada en la cuenta que ya existe</h3>
                   <p className="text-xs text-slate-400">
-                    Busca cuentas con datos y migra los registros a tu cuenta actual ({user?.email || user?.uid?.slice(0, 8) + "..."})
+                    La cuenta de 56 pts es de ella. Encender Jornada Base escribe el plan en ESE UID — no copies los datos a tu cuenta Gilson.
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={searchAccounts}
                 disabled={searchingAccounts}
                 className="w-full py-3 rounded-xl bg-green-500 text-white font-bold disabled:opacity-50"
+                data-testid="button-search-accounts"
               >
                 {searchingAccounts ? "Buscando cuentas..." : "Buscar Cuentas con Datos"}
               </button>
@@ -1035,9 +1133,11 @@ export default function AdminGilson() {
             {accounts.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs text-slate-400 mb-2">
-                  Se encontraron {accounts.length} cuentas. Tu UID actual: <span className="text-green-400 font-mono">{user?.uid?.slice(0, 12)}...</span>
+                  {accounts.length} cuentas. Tu UID Gilson: <span className="text-green-400 font-mono">{user?.uid?.slice(0, 12)}...</span>
                 </p>
-                {accounts.map((account) => (
+                {accounts.map((account) => {
+                  const jornadaOn = Boolean(account.activeModules?.includes("planificacion_base"));
+                  return (
                   <motion.div
                     key={account.uid}
                     initial={{ opacity: 0 }}
@@ -1048,17 +1148,25 @@ export default function AdminGilson() {
                         : "bg-white/5 border-white/10"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <p className="text-white font-mono text-sm">
                           {account.uid.slice(0, 20)}...
                           {account.uid === user?.uid && (
-                            <span className="ml-2 text-green-400 text-xs">(TU CUENTA ACTUAL)</span>
+                            <span className="ml-2 text-green-400 text-xs">(TU CUENTA GILSON)</span>
                           )}
                         </p>
-                        <div className="flex items-center gap-3 mt-1">
+                        <div className="flex flex-wrap items-center gap-3 mt-1">
                           <span className="text-amber-400 font-bold">{account.totalCP} pts</span>
                           <span className="text-xs text-slate-500">Rango: {account.rank.toUpperCase()}</span>
+                          {jornadaOn ? (
+                            <span className="text-xs text-emerald-400 font-bold">Jornada on</span>
+                          ) : (
+                            <span className="text-xs text-rose-400">Jornada off</span>
+                          )}
+                          {account.whatsapp && (
+                            <span className="text-xs text-slate-500">{account.whatsapp}</span>
+                          )}
                           {account.lastUpdated && (
                             <span className="text-xs text-slate-600">
                               {account.lastUpdated.toLocaleDateString()}
@@ -1067,23 +1175,44 @@ export default function AdminGilson() {
                         </div>
                       </div>
                       {account.uid !== user?.uid && (
-                        <button
-                          onClick={() => migrateFromAccount(account.uid)}
-                          disabled={migratingUid === account.uid}
-                          className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-bold disabled:opacity-50 flex items-center gap-2"
-                        >
-                          {migratingUid === account.uid ? (
-                            "Migrando..."
-                          ) : (
-                            <>
-                              Migrar <ArrowRight size={16} />
-                            </>
-                          )}
-                        </button>
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => void grantPlanOnUid(account.uid)}
+                            disabled={grantingUid === account.uid || jornadaOn}
+                            className="px-4 py-2 rounded-lg bg-sky-500 text-white text-sm font-bold disabled:opacity-50 flex items-center gap-2"
+                            data-testid={`button-encender-jornada-${account.uid.slice(0, 6)}`}
+                          >
+                            {grantingUid === account.uid ? (
+                              "Encendiendo..."
+                            ) : jornadaOn ? (
+                              "Jornada on"
+                            ) : (
+                              <>
+                                <Zap size={16} /> Encender Jornada Base
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => migrateFromAccount(account.uid)}
+                            disabled={migratingUid === account.uid}
+                            className="px-3 py-1 rounded-lg bg-white/5 text-slate-500 text-[10px] font-bold disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {migratingUid === account.uid ? (
+                              "Copiando..."
+                            ) : (
+                              <>
+                                Copiar a tu Gilson <ArrowRight size={12} />
+                              </>
+                            )}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1634,52 +1763,130 @@ export default function AdminGilson() {
             <div className="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20">
               <h3 className="text-sky-400 font-bold mb-3">Activar Planificación (Yape / manual)</h3>
               <p className="text-xs text-slate-400 mb-4">
-                La cuenta del cliente se crea en <span className="text-white font-bold">sistemicar.app/acceso</span> con Google, no al pagar. Ahí también deja su WhatsApp. Si aún no entró, registra la activación pendiente y mándale el mensaje: al entrar con ese mismo Gmail el plan se enciende solo.
+                Elige la cuenta por los puntos (56 pts), no por el Gmail. Encender Jornada escribe el plan en ese UID. Si el trial venció, eso es lo que falta — no otra cuenta.
               </p>
               <div className="mb-4 p-3 rounded-lg bg-black/30 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                    Cuentas reales en Firebase (elige la de 56 pts)
+                    Cuentas con puntos (elige la de 56 pts)
                   </p>
                   <button
                     type="button"
-                    onClick={() => void loadAuthClients()}
+                    onClick={() => {
+                      void loadAuthClients();
+                      void searchAccounts({ silent: true });
+                    }}
                     className="text-xs text-sky-400"
-                    disabled={authClientsLoading}
+                    disabled={authClientsLoading || searchingAccounts}
                   >
-                    {authClientsLoading ? "…" : "Actualizar"}
+                    {authClientsLoading || searchingAccounts ? "…" : "Actualizar"}
                   </button>
                 </div>
-                {authClientsError ? (
-                  <p className="text-xs text-amber-300">{authClientsError}</p>
-                ) : authClients.length === 0 && !authClientsLoading ? (
-                  <p className="text-xs text-slate-500">
-                    Vacío. Si ya pegaste la variable, falta redeploy de Functions o el JSON está mal.
-                  </p>
-                ) : (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {authClients.map((c) => (
-                      <button
-                        key={c.uid}
-                        type="button"
-                        data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
-                        onClick={() => {
-                          setModuleEmail(c.email);
-                          setModuleNotFound(false);
-                          setModuleServerBlind(false);
-                          toast.success(`Elegida ${c.email} · ${c.totalCP} pts`);
-                        }}
-                        className="w-full text-left px-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs"
-                      >
-                        <span className="text-white font-bold">{c.email}</span>
-                        <span className="text-slate-400"> · {c.totalCP} pts · {c.rank}</span>
-                        {c.activeModules?.includes("planificacion_base") ? (
-                          <span className="text-emerald-400"> · Jornada on</span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const byUid = new Map<
+                    string,
+                    {
+                      uid: string;
+                      email: string;
+                      totalCP: number;
+                      rank: string;
+                      activeModules: string[];
+                    }
+                  >();
+                  for (const c of authClients) {
+                    byUid.set(c.uid, {
+                      uid: c.uid,
+                      email: c.email || "",
+                      totalCP: c.totalCP,
+                      rank: c.rank,
+                      activeModules: c.activeModules || [],
+                    });
+                  }
+                  for (const a of accounts) {
+                    const prev = byUid.get(a.uid);
+                    byUid.set(a.uid, {
+                      uid: a.uid,
+                      email: prev?.email || "",
+                      totalCP: Math.max(prev?.totalCP ?? 0, a.totalCP),
+                      rank: a.rank || prev?.rank || "observador",
+                      activeModules:
+                        a.activeModules && a.activeModules.length > 0
+                          ? a.activeModules
+                          : prev?.activeModules || [],
+                    });
+                  }
+                  const list = [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
+                  return (
+                    <>
+                      {authClientsError && list.length === 0 ? (
+                        <p className="text-xs text-amber-300 mb-2">
+                          Auth no responde. Si no ves la de 56 pts, pulsa Actualizar — se lista desde Firestore.
+                        </p>
+                      ) : null}
+                      {list.length === 0 && !authClientsLoading && !searchingAccounts ? (
+                        <p className="text-xs text-slate-500">
+                          Vacío. Pulsa Actualizar. La cuenta de 56 pts vive en Firestore, no hace falta el JSON.
+                        </p>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {list.map((c) => {
+                            const jornadaOn = c.activeModules.includes("planificacion_base");
+                            const isGilson = c.uid === user?.uid;
+                            return (
+                              <div
+                                key={c.uid}
+                                className={`flex items-center gap-2 px-2 py-2 rounded-lg text-xs ${
+                                  moduleUid === c.uid
+                                    ? "bg-sky-500/20 border border-sky-500/40"
+                                    : "bg-white/5"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
+                                  onClick={() => {
+                                    setModuleUid(c.uid);
+                                    setModuleEmail(c.email);
+                                    setModuleNotFound(false);
+                                    setModuleServerBlind(false);
+                                    toast.success(
+                                      `Elegida ${c.email || c.uid.slice(0, 8) + "…"} · ${c.totalCP} pts`,
+                                    );
+                                  }}
+                                  className="flex-1 text-left min-w-0"
+                                >
+                                  <span className="text-white font-bold">
+                                    {c.email || (isGilson ? "tu Gilson" : `${c.uid.slice(0, 8)}…`)}
+                                  </span>
+                                  <span className="text-slate-400">
+                                    {" "}
+                                    · {c.totalCP} pts · {c.rank}
+                                  </span>
+                                  {jornadaOn ? (
+                                    <span className="text-emerald-400"> · Jornada on</span>
+                                  ) : (
+                                    <span className="text-rose-400"> · Jornada off</span>
+                                  )}
+                                </button>
+                                {!isGilson && !jornadaOn ? (
+                                  <button
+                                    type="button"
+                                    disabled={grantingUid === c.uid}
+                                    onClick={() => void grantPlanOnUid(c.uid, modulePlanId, c.email || undefined)}
+                                    className="shrink-0 px-2 py-1 rounded-md bg-sky-500 text-white font-bold"
+                                    data-testid={`button-encender-modulo-${c.uid.slice(0, 6)}`}
+                                  >
+                                    {grantingUid === c.uid ? "…" : "Encender"}
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
@@ -1724,6 +1931,7 @@ export default function AdminGilson() {
                   value={moduleEmail}
                   onChange={(e) => {
                     setModuleEmail(e.target.value);
+                    setModuleUid("");
                     setModuleNotFound(false);
                     setModuleServerBlind(false);
                   }}
@@ -1741,6 +1949,7 @@ export default function AdminGilson() {
                       const result = await lookupUserAdmin(moduleEmail.trim());
                       if (result?.found && result.uid) {
                         setModuleSearchResult(result);
+                        setModuleUid(result.uid);
                         setModuleNotFound(false);
                         setModuleServerBlind(false);
                         setModuleClientWhatsapp(
@@ -1796,11 +2005,13 @@ export default function AdminGilson() {
                       data-testid="button-use-suggested-email"
                       onClick={() => {
                         setModuleEmail(s.email);
+                        setModuleUid(s.uid);
                         setModuleNotFound(false);
                         setModuleServerBlind(false);
                         void lookupUserAdmin(s.email).then((again) => {
                           if (again?.found && again.uid) {
                             setModuleSearchResult(again);
+                            setModuleUid(again.uid);
                             toast.success(`Encontrada: ${s.email}`);
                           }
                         });
@@ -1852,12 +2063,10 @@ export default function AdminGilson() {
                 </div>
               )}
               {moduleServerBlind && (
-                <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
-                  <p className="font-bold">El servidor no puede ver Firebase Auth.</p>
+                <div className="text-xs text-sky-200 mb-3 p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+                  <p className="font-bold">No hace falta el JSON ni acertar el Gmail.</p>
                   <p>
-                    Falta <span className="text-white">FIREBASE_SERVICE_ACCOUNT_JSON</span> en Netlify.
-                    Eso no significa que ella no tenga cuenta — si ya usa la app, la tiene.
-                    Pulsa registrar pendiente. Al abrir Jornada en su celular, el plan se enciende.
+                    Arriba están las cuentas con puntos. Encender en la de 56 pts escribe Jornada en esa cuenta.
                   </p>
                 </div>
               )}
@@ -1871,16 +2080,24 @@ export default function AdminGilson() {
                   </p>
                 </div>
               )}
+              {moduleUid && (
+                <p className="text-xs text-sky-300 mb-3" data-testid="admin-selected-uid">
+                  UID elegido: <span className="font-mono text-white">{moduleUid.slice(0, 16)}…</span>
+                  {moduleEmail ? ` · ${moduleEmail}` : " · sin Gmail — se enciende por UID"}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => void grantModuleAdmin(moduleEmail)}
-                disabled={moduleSaving || !moduleEmail.trim()}
+                disabled={moduleSaving || (!moduleEmail.trim() && !moduleUid.trim())}
                 className="w-full px-4 py-3 rounded-lg bg-sky-500 text-white font-bold text-sm hover:bg-sky-600 disabled:opacity-50"
                 data-testid="button-grant-module"
               >
                 {moduleSaving
                   ? "Activando..."
-                  : moduleNotFound
+                  : moduleUid
+                    ? `Encender ${displayNameForPlan(modulePlanId)} en este UID`
+                    : moduleNotFound
                     ? `Registrar ${displayNameForPlan(modulePlanId)} (pendiente)`
                     : `Activar ${displayNameForPlan(modulePlanId)}`}
               </button>
