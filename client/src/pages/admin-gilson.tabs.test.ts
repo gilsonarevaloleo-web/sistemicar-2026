@@ -25,5 +25,8 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /Copiar a tu Gilson/);
     assert.match(src, /no copies los datos a tu cuenta Gilson/);
     assert.match(src, /Encender \$\{displayNameForPlan\(modulePlanId\)\} en este UID/);
+    assert.match(src, /searchAccounts\(\{ silent: true \}\)/);
+    assert.match(src, /No hace falta el JSON ni acertar el Gmail/);
+    assert.match(src, /button-encender-modulo-/);
   });
 });

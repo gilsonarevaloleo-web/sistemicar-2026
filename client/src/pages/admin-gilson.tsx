@@ -258,18 +258,19 @@ export default function AdminGilson() {
     toast.success("¡Comisión marcada como pagada!");
   };
 
-  const searchAccounts = async () => {
+  const searchAccounts = async (opts?: { silent?: boolean }) => {
     setSearchingAccounts(true);
     try {
       const found = await findAccountsWithData();
       setAccounts(found);
+      if (opts?.silent) return;
       if (found.length === 0) {
         toast.info("No se encontraron cuentas con datos");
       } else {
         toast.success(`Se encontraron ${found.length} cuentas con datos`);
       }
     } catch (error) {
-      toast.error("Error buscando cuentas");
+      if (!opts?.silent) toast.error("Error buscando cuentas");
     } finally {
       setSearchingAccounts(false);
     }
@@ -590,6 +591,7 @@ export default function AdminGilson() {
     if (activeTab === "modulos" && isAuthenticated) {
       void loadModuleGrants();
       void loadAuthClients();
+      void searchAccounts({ silent: true });
     }
     if (activeTab === "vendedores" && isAuthenticated) {
       void loadSellerSales();
@@ -1766,54 +1768,125 @@ export default function AdminGilson() {
               <div className="mb-4 p-3 rounded-lg bg-black/30 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                    Cuentas reales (elige la de 56 pts)
+                    Cuentas con puntos (elige la de 56 pts)
                   </p>
                   <button
                     type="button"
-                    onClick={() => void loadAuthClients()}
+                    onClick={() => {
+                      void loadAuthClients();
+                      void searchAccounts({ silent: true });
+                    }}
                     className="text-xs text-sky-400"
-                    disabled={authClientsLoading}
+                    disabled={authClientsLoading || searchingAccounts}
                   >
-                    {authClientsLoading ? "…" : "Actualizar"}
+                    {authClientsLoading || searchingAccounts ? "…" : "Actualizar"}
                   </button>
                 </div>
-                {authClientsError ? (
-                  <p className="text-xs text-amber-300">{authClientsError}</p>
-                ) : authClients.length === 0 && !authClientsLoading ? (
-                  <p className="text-xs text-slate-500">
-                    Vacío. Si ya pegaste la variable, falta redeploy de Functions o el JSON está mal.
-                  </p>
-                ) : (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {authClients.map((c) => (
-                      <button
-                        key={c.uid}
-                        type="button"
-                        data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
-                        onClick={() => {
-                          setModuleUid(c.uid);
-                          setModuleEmail(c.email);
-                          setModuleNotFound(false);
-                          setModuleServerBlind(false);
-                          toast.success(
-                            `Elegida ${c.email || c.uid.slice(0, 8) + "…"} · ${c.totalCP} pts`,
-                          );
-                        }}
-                        className={`w-full text-left px-2 py-2 rounded-lg text-xs ${
-                          moduleUid === c.uid ? "bg-sky-500/20 border border-sky-500/40" : "bg-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <span className="text-white font-bold">{c.email || "(sin Gmail)"}</span>
-                        <span className="text-slate-400"> · {c.totalCP} pts · {c.rank}</span>
-                        {c.activeModules?.includes("planificacion_base") ? (
-                          <span className="text-emerald-400"> · Jornada on</span>
-                        ) : (
-                          <span className="text-rose-400"> · Jornada off</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const byUid = new Map<
+                    string,
+                    {
+                      uid: string;
+                      email: string;
+                      totalCP: number;
+                      rank: string;
+                      activeModules: string[];
+                    }
+                  >();
+                  for (const c of authClients) {
+                    byUid.set(c.uid, {
+                      uid: c.uid,
+                      email: c.email || "",
+                      totalCP: c.totalCP,
+                      rank: c.rank,
+                      activeModules: c.activeModules || [],
+                    });
+                  }
+                  for (const a of accounts) {
+                    const prev = byUid.get(a.uid);
+                    byUid.set(a.uid, {
+                      uid: a.uid,
+                      email: prev?.email || "",
+                      totalCP: Math.max(prev?.totalCP ?? 0, a.totalCP),
+                      rank: a.rank || prev?.rank || "observador",
+                      activeModules:
+                        a.activeModules && a.activeModules.length > 0
+                          ? a.activeModules
+                          : prev?.activeModules || [],
+                    });
+                  }
+                  const list = [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
+                  return (
+                    <>
+                      {authClientsError && list.length === 0 ? (
+                        <p className="text-xs text-amber-300 mb-2">
+                          Auth no responde. Si no ves la de 56 pts, pulsa Actualizar — se lista desde Firestore.
+                        </p>
+                      ) : null}
+                      {list.length === 0 && !authClientsLoading && !searchingAccounts ? (
+                        <p className="text-xs text-slate-500">
+                          Vacío. Pulsa Actualizar. La cuenta de 56 pts vive en Firestore, no hace falta el JSON.
+                        </p>
+                      ) : (
+                        <div className="space-y-1 max-h-56 overflow-y-auto">
+                          {list.map((c) => {
+                            const jornadaOn = c.activeModules.includes("planificacion_base");
+                            const isGilson = c.uid === user?.uid;
+                            return (
+                              <div
+                                key={c.uid}
+                                className={`flex items-center gap-2 px-2 py-2 rounded-lg text-xs ${
+                                  moduleUid === c.uid
+                                    ? "bg-sky-500/20 border border-sky-500/40"
+                                    : "bg-white/5"
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  data-testid={`button-pick-client-${c.uid.slice(0, 6)}`}
+                                  onClick={() => {
+                                    setModuleUid(c.uid);
+                                    setModuleEmail(c.email);
+                                    setModuleNotFound(false);
+                                    setModuleServerBlind(false);
+                                    toast.success(
+                                      `Elegida ${c.email || c.uid.slice(0, 8) + "…"} · ${c.totalCP} pts`,
+                                    );
+                                  }}
+                                  className="flex-1 text-left min-w-0"
+                                >
+                                  <span className="text-white font-bold">
+                                    {c.email || (isGilson ? "tu Gilson" : `${c.uid.slice(0, 8)}…`)}
+                                  </span>
+                                  <span className="text-slate-400">
+                                    {" "}
+                                    · {c.totalCP} pts · {c.rank}
+                                  </span>
+                                  {jornadaOn ? (
+                                    <span className="text-emerald-400"> · Jornada on</span>
+                                  ) : (
+                                    <span className="text-rose-400"> · Jornada off</span>
+                                  )}
+                                </button>
+                                {!isGilson && !jornadaOn ? (
+                                  <button
+                                    type="button"
+                                    disabled={grantingUid === c.uid}
+                                    onClick={() => void grantPlanOnUid(c.uid, modulePlanId, c.email || undefined)}
+                                    className="shrink-0 px-2 py-1 rounded-md bg-sky-500 text-white font-bold"
+                                    data-testid={`button-encender-modulo-${c.uid.slice(0, 6)}`}
+                                  >
+                                    {grantingUid === c.uid ? "…" : "Encender"}
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div className="flex flex-wrap gap-2 mb-3">
                 {(["yape", "paypal", "manual"] as const).map((src) => (
@@ -1990,12 +2063,10 @@ export default function AdminGilson() {
                 </div>
               )}
               {moduleServerBlind && (
-                <div className="text-xs text-amber-300 mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1">
-                  <p className="font-bold">El servidor no puede ver Firebase Auth.</p>
+                <div className="text-xs text-sky-200 mb-3 p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+                  <p className="font-bold">No hace falta el JSON ni acertar el Gmail.</p>
                   <p>
-                    Falta <span className="text-white">FIREBASE_SERVICE_ACCOUNT_JSON</span> en Netlify.
-                    Eso no significa que ella no tenga cuenta — si ya usa la app, la tiene.
-                    Pulsa registrar pendiente. Al abrir Jornada en su celular, el plan se enciende.
+                    Arriba están las cuentas con puntos. Encender en la de 56 pts escribe Jornada en esa cuenta.
                   </p>
                 </div>
               )}
