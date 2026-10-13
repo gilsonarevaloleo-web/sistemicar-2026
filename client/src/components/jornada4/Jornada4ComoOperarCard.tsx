@@ -79,7 +79,7 @@ export function Jornada4ComoOperarCard({
         </p>
       ) : (
         <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-          Huella del desglosador: atención (no montar límites), orden (más de
+          Huella del desglosador: atención (no llegar al rojo del cupo), orden (más de
           3), certeza (editar minutos), foco (quitar, reordenar, postergar y
           cerrar el último a tiempo). Es músculo, no etiqueta.
         </p>

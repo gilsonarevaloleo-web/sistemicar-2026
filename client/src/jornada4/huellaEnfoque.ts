@@ -2,7 +2,7 @@
  * Huella del ring / desglosador.
  *
  * Diccionario (músculo que se desarrolla, no etiqueta negativa):
- * - Atención: no montar límites de tiempo.
+ * - Atención: no apilar el cupo de un vehículo hasta el rojo.
  * - Orden: listar más de 3 vehículos en el desglosador.
  * - Certeza: editar los minutos.
  * - Ganancia: recuento de vehículos frente a 2–3 horas (los PS pesan poco).
@@ -12,7 +12,11 @@
 export const HUELLA_ORDEN_UMBRAL = 3;
 
 export const HUELLA_EJES = [
-  { id: "atencion", label: "Atención", definicion: "No montar límites de tiempo." },
+  {
+    id: "atencion",
+    label: "Atención",
+    definicion: "No apilar el cupo de un vehículo hasta el rojo.",
+  },
   { id: "orden", label: "Orden", definicion: "Listar más de 3 vehículos en el desglosador." },
   { id: "certeza", label: "Certeza", definicion: "Editar los minutos." },
   { id: "ganancia", label: "Ganancia", definicion: "Vehículos del desglosador frente a 2–3 horas." },
@@ -73,6 +77,7 @@ export type HuellaEnfoqueInput = {
     completada?: boolean;
     minutosCupo?: number;
     cerradaAt?: number;
+    duracionRealSec?: number;
   }>;
   situacionCronometro?: {
     activo?: boolean;
@@ -222,11 +227,38 @@ function ultimoEnJuegoATiempo(vehicle: HuellaEnfoqueInput, nowMs: number): boole
   return nowMs <= meta;
 }
 
-function scoreAtencion(quitadas: number, selladas: number, tieneMeta: boolean): number {
-  // Músculo: no montar límites. Quitar = el tiempo no se monta en el foco.
-  let n = 28;
-  n += Math.min(5, quitadas) * 12;
-  if (tieneMeta && selladas === 0) n += 24;
+function cerroAntesDelRojo(st: {
+  minutosCupo?: number;
+  duracionRealSec?: number;
+  resultadoSituacion?: string;
+  completada?: boolean;
+}): boolean {
+  if (isPending(st)) return false;
+  const cupoSec = (st.minutosCupo ?? 0) * 60;
+  if (cupoSec <= 0 || st.duracionRealSec == null) return false;
+  return st.duracionRealSec <= cupoSec;
+}
+
+/** El reloj del vehículo en foco se pone rojo cuando el cupo ya está montado. */
+function focoMontadoEnRojo(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
+  const anchor = vehicle.situacionCupoAnchor;
+  if (!anchor?.subTareaId) return false;
+  const focal = cronRows(vehicle).find(st => st.id === anchor.subTareaId);
+  if (!focal || !isPending(focal)) return false;
+  const cupoMin = focal.minutosCupo ?? 0;
+  if (cupoMin <= 0) return false;
+  return nowMs - anchor.startedAt >= cupoMin * 60_000;
+}
+
+function scoreAtencion(opts: {
+  cerradasAntesDelRojo: number;
+  holdingFocus: boolean;
+  focoEnRojo: boolean;
+}): number {
+  // Músculo: no llegar al rojo. Cada vehículo tiene su tiempo; ahí no debe llegar.
+  let n = 26;
+  n += Math.min(5, opts.cerradasAntesDelRojo) * 12;
+  if (opts.holdingFocus && !opts.focoEnRojo) n += 22;
   return clampPct(n);
 }
 
@@ -276,8 +308,9 @@ function relatoHuella(args: {
   reorders: number;
   postergas: number;
   quitadas: number;
-  selladas: number;
   cerroUltimoATiempo: boolean;
+  cerradasAntesDelRojo: number;
+  focoEnRojo: boolean;
 }): string {
   const {
     nVeh,
@@ -286,11 +319,15 @@ function relatoHuella(args: {
     reorders,
     postergas,
     quitadas,
-    selladas,
     cerroUltimoATiempo,
+    cerradasAntesDelRojo,
+    focoEnRojo,
   } = args;
   if (cerroUltimoATiempo) {
     return "Cerraste el último a tiempo. Foco: el músculo ya está.";
+  }
+  if (!focoEnRojo && cerradasAntesDelRojo > 0) {
+    return "No montaste el límite sobre el vehículo: el reloj no llegó a rojo. Atención.";
   }
   if (nVeh > HUELLA_ORDEN_UMBRAL) {
     return `Listaste ${nVeh} vehículos en el desglosador. Orden.`;
@@ -308,12 +345,12 @@ function relatoHuella(args: {
     const cabeza = focoGestos.join(", ");
     return `${cabeza.charAt(0).toUpperCase()}${cabeza.slice(1)}: eso es foco. No hay etiqueta negativa — es músculo.`;
   }
+  if (!focoEnRojo) {
+    return "El cupo aún no está en rojo. Atención: no apilar tiempo sobre este vehículo.";
+  }
   if (horas >= 2 && nVeh >= 4) {
     const h = horas >= 10 ? Math.round(horas) : Math.round(horas * 10) / 10;
     return `${nVeh} vehículos en ${h} h. Esa es la ganancia del desglosador.`;
-  }
-  if (quitadas > 0 && selladas === 0) {
-    return "El tiempo no se montó en el foco. Atención.";
   }
   return "El desglosador entrena músculo: atención, orden, certeza, foco.";
 }
@@ -339,9 +376,21 @@ export function computeHuellaEnfoque(
   const minutosGanados = vehicle.situacionCronometro?.minutosGanadosSesion ?? 0;
   const ultimoCerrado = cerroUltimoATiempo(vehicle, nowMs);
   const ultimoEnJuego = ultimoEnJuegoATiempo(vehicle, nowMs);
+  const cerradasAntesDelRojo = rows.filter(cerroAntesDelRojo).length;
+  const focoEnRojo = focoMontadoEnRojo(vehicle, nowMs);
+  const holdingFocus = Boolean(
+    vehicle.situacionCupoAnchor &&
+      rows.some(
+        st => st.id === vehicle.situacionCupoAnchor!.subTareaId && isPending(st)
+      )
+  );
 
   const ejes: RingHuellaEjes = {
-    atencion: scoreAtencion(state.quitadas, state.selladas, state.tieneMeta),
+    atencion: scoreAtencion({
+      cerradasAntesDelRojo,
+      holdingFocus,
+      focoEnRojo,
+    }),
     orden: scoreOrden(nVeh),
     certeza: scoreCerteza(state.cupoEdits),
     ganancia: scoreGanancia(nVeh, minutosBloque, minutosGanados),
@@ -376,8 +425,9 @@ export function computeHuellaEnfoque(
       reorders: state.reorders,
       postergas: state.postergas,
       quitadas: state.quitadas,
-      selladas: state.selladas,
       cerroUltimoATiempo: ultimoCerrado,
+      cerradasAntesDelRojo,
+      focoEnRojo,
     }),
   };
 }

@@ -70,7 +70,7 @@ function sello(over: Partial<RingHuellaLectura> = {}): RingHuellaLectura {
 describe("huellaEnfoque diccionario", () => {
   it("nombra los cinco músculos sin etiqueta negativa", () => {
     assert.equal(HUELLA_ORDEN_UMBRAL, 3);
-    assert.match(HUELLA_EJES.find(e => e.id === "atencion")!.definicion, /no montar límites/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "atencion")!.definicion, /rojo/i);
     assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /más de 3/);
     assert.match(HUELLA_EJES.find(e => e.id === "certeza")!.definicion, /editar los minutos/i);
     assert.match(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /2–3 horas|2-3 horas/);
@@ -156,7 +156,51 @@ describe("huellaEnfoque diccionario", () => {
     assert.match(editado.relato, /editaste los minutos|certeza/i);
   });
 
-  it("sellar no etiqueta ni recorta foco; atención es no montar más límites", () => {
+  it("atención es no apilar el cupo hasta el rojo", () => {
+    const vivo = computeHuellaEnfoque(ring(), 1_000 + 2 * 60_000);
+    const rojo = computeHuellaEnfoque(ring(), 1_000 + 12 * 60_000);
+    assert.ok(vivo.atencion > rojo.atencion, `vivo ${vivo.atencion} vs rojo ${rojo.atencion}`);
+    assert.match(vivo.relato, /rojo|atención/i);
+
+    const antes = computeHuellaEnfoque(
+      ring({
+        subTareas: [
+          {
+            id: "a",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            minutosCupo: 10,
+            duracionRealSec: 7 * 60,
+            cerradaAt: 1_000 + 7 * 60_000,
+          },
+          { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
+        ],
+        situacionCupoAnchor: { subTareaId: "b", startedAt: 1_000 + 7 * 60_000 },
+      }),
+      1_000 + 8 * 60_000
+    );
+    const despues = computeHuellaEnfoque(
+      ring({
+        subTareas: [
+          {
+            id: "a",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            minutosCupo: 10,
+            duracionRealSec: 14 * 60,
+            cerradaAt: 1_000 + 14 * 60_000,
+          },
+          { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
+        ],
+        situacionCupoAnchor: { subTareaId: "b", startedAt: 1_000 + 14 * 60_000 },
+      }),
+      1_000 + 15 * 60_000
+    );
+    assert.ok(antes.atencion > despues.atencion, `antes ${antes.atencion} vs después ${despues.atencion}`);
+    assert.match(antes.relato, /rojo|atención/i);
+  });
+
+  it("sellar no etiqueta ni recorta foco", () => {
     const limpio = computeHuellaEnfoque(ring(), 1_000);
     const sellado = computeHuellaEnfoque(
       ring({
@@ -164,10 +208,8 @@ describe("huellaEnfoque diccionario", () => {
       }),
       1_000
     );
-    assert.ok(sellado.atencion <= limpio.atencion);
     assert.equal(sellado.foco, limpio.foco);
-    assert.doesNotMatch(sellado.relato, /roba|caos|negativa no/i);
-    assert.doesNotMatch(sellado.relato, /no se premia|etiqueta negativa$/i);
+    assert.doesNotMatch(sellado.relato, /roba|caos/i);
   });
 
   it("quitar, reordenar y postergar son foco", () => {
