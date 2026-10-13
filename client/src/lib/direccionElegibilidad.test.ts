@@ -174,21 +174,37 @@ describe("direccionElegibilidad", () => {
     assert.match(noPuedesLlegarADireccion(DIRECCION_SIN_PROYECTO), /todavía no hay un proyecto/);
   });
 
-  it("nido de darse cuenta abre Dirección sin oleada y sin peldaños", () => {
+  it("nido de descanso también exige oleada y punto", () => {
     const gate = evaluateDireccionElegibilidad(
       { id: "d1", titulo: "DESCANSO", etiqueta: "consciencia" },
       []
     );
+    assert.equal(gate.ok, false);
+    assert.equal(gate.gap, "sin_oleada");
+    assert.match(gate.riesgoEnsuciar, /escalera/);
+
+    const envio = resolveRumboTrasEnvio({ nidoProyectoId: "d1", gate });
+    assert.equal(envio.stampVehicle, false);
+    assert.equal(envio.destinoCierre, "presencia");
+  });
+
+  it("DESCANSO con punto nombrado abre Dirección como cualquier nido", () => {
+    const foco = createOleadaPunto("Primeros 7 días de medición", 1);
+    const gate = evaluateDireccionElegibilidad(
+      { id: "d1", titulo: "DESCANSO", etiqueta: "consciencia" },
+      [oleada([foco])]
+    );
     assert.equal(gate.ok, true);
-    assert.equal(gate.gap, null);
-    assert.equal(gate.puntoProduccionId, undefined);
-    assert.match(gate.riesgoEnsuciar, /no sube peldaños/i);
+    assert.equal(gate.puntoProduccionTitulo, "Primeros 7 días de medición");
+    assert.deepEqual(rumboChipLines(gate), {
+      titulo: "DESCANSO",
+      punto: "Primeros 7 días de medición",
+    });
 
     const envio = resolveRumboTrasEnvio({ nidoProyectoId: "d1", gate });
     assert.equal(envio.stampVehicle, true);
     assert.equal(envio.destinoCierre, "peldano");
-    assert.equal(envio.oleadaPuntoId, undefined);
-    assert.match(envio.copy, /información|no sube peldaños/i);
+    assert.equal(envio.oleadaPuntoId, foco.id);
   });
 
   it("crecimiento sigue exigiendo oleada", () => {

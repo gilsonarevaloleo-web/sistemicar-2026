@@ -21,23 +21,20 @@ describe("claridadDireccion", () => {
     assert.doesNotMatch(r.rutas.b.pasos[1].titulo, /columna|respiración/i);
   });
 
-  it("centro usa lenguaje de deber", () => {
-    const r = buildDefaultClaridadDireccion({
+  it("etiqueta legado no cambia el lenguaje: todo nido mide la oleada", () => {
+    const centro = buildDefaultClaridadDireccion({
       tituloProyecto: "Costura",
       etiqueta: "centro",
       focoTitulo: "Lote marzo",
     });
-    assert.match(r.rutas.a.pasos[0].titulo, /debo cumplir/i);
-  });
-
-  it("consciencia usa lenguaje de ver, no de trepar", () => {
-    const r = buildDefaultClaridadDireccion({
+    const descanso = buildDefaultClaridadDireccion({
       tituloProyecto: "DESCANSO",
       etiqueta: "consciencia",
-      focoTitulo: "Noche",
+      focoTitulo: "Primeros 7 días",
     });
-    assert.match(r.rutas.a.pasos[0].titulo, /viendo|darse cuenta|visible/i);
-    assert.doesNotMatch(r.rutas.a.pasos[1].titulo, /oleada|peldaño a peldaño/i);
+    assert.match(centro.rutas.a.pasos[0].titulo, /claro al entrar/);
+    assert.match(descanso.rutas.a.pasos[0].titulo, /claro al entrar/);
+    assert.match(descanso.rutas.a.pasos[1].titulo, /oleada/);
   });
 
   it("normalizeRutasMentales migra perfiles legacy", () => {

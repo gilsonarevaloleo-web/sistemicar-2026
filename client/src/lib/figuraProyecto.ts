@@ -5,7 +5,7 @@
  * Un paquete de 10 envíos de forma revela un miembro. La figura no pide comida:
  * muestra lo ya enviado al timón. El hueco es del operador.
  */
-import { resolveProyectoEtiqueta, type ProyectoEtiqueta } from "./nidoNaturaleza";
+import { type ProyectoEtiqueta } from "./nidoNaturaleza";
 import type { DestinoGasto } from "./gastoTiempo";
 
 export const FIGURA_PAQUETE = 10;
@@ -96,10 +96,7 @@ export const FIGURA_ANILLOS_CONTROL: readonly { id: string; label: string }[] = 
   { id: "s6", label: "la cumbre" },
 ];
 
-export function figuraModoDeEtiqueta(etiqueta?: string | null): FiguraModo {
-  const kind = resolveProyectoEtiqueta(etiqueta);
-  if (kind === "centro") return "control";
-  if (kind === "consciencia") return "consciencia";
+export function figuraModoDeEtiqueta(_etiqueta?: string | null): FiguraModo {
   return "crecimiento";
 }
 

@@ -113,23 +113,18 @@ describe("figuraProyecto — cristalización", () => {
     assert.equal(hueca.hueco.siguiente, null);
   });
 
-  it("control revela anillos, no miembros de cuerpo", () => {
+  it("etiqueta legado no cambia la figura: todo nido revela miembros", () => {
     const c = computeFiguraEstado("centro", stamps(10, 0));
-    assert.equal(c.modo, "control");
-    assert.equal(c.miembros[0]?.id, "s1");
-    assert.equal(c.miembros[0]?.label, "el cimiento");
-    assert.match(c.copyHueco, /segundo anillo/);
-  });
+    assert.equal(c.modo, "crecimiento");
+    assert.equal(c.miembros[0]?.id, "torso");
+    assert.equal(c.miembrosRevelados, 1);
 
-  it("consciencia no revela miembros: brillo de registro", () => {
     const v = computeFiguraEstado("consciencia", stamps(12, 3));
-    assert.equal(v.modo, "consciencia");
-    assert.equal(v.miembrosRevelados, 0);
-    assert.equal(v.miembros.length, 0);
-    assert.equal(v.enviosRegistro, 15);
-    assert.equal(v.deformacion, "ninguna");
-    assert.equal(v.hueco.tejido, "registro");
-    assert.match(v.copy, /no trepa|Información/i);
+    assert.equal(v.modo, "crecimiento");
+    assert.equal(v.miembrosRevelados, 1);
+    assert.equal(v.hueco.tejido, "forma");
+    assert.equal(v.enviosForma, 12);
+    assert.equal(v.enviosMasa, 3);
   });
 
   it("vehicleId duplicado cuenta una sola vez", () => {

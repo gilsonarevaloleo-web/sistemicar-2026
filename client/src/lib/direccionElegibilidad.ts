@@ -2,15 +2,15 @@
  * Presencia vs Dirección.
  *
  * Presencia cubre el día — siempre abierta, envío rápido, no ensucia la escalera.
- * Dirección es rumbo: la conciencia tiene casa. No es sinónimo de crecimiento.
+ * Dirección es rumbo: la conciencia tiene casa y un bloque nombrado.
  *
- * Crecimiento y control: Dirección abre con oleada activa y punto de producción.
- * Darse cuenta (p. ej. DESCANSO): el nido recibe rumbo sin oleada y sin peldaños.
+ * Todo nido mide producción. Dirección abre con oleada activa y punto
+ * de producción (el nombre del bloque: «primeros 7 días de medición»).
  *
  * Vincular un proyectoId no es Dirección. El ego no puede comprar Norte.
  */
 import type { DestinoCierre } from "./destinoCierre";
-import { nidoRequiereOleada, nidoRiesgoEnsuciar, type ProyectoEtiqueta } from "./nidoNaturaleza";
+import { nidoRiesgoEnsuciar, type ProyectoEtiqueta } from "./nidoNaturaleza";
 import { resolvePuntoProduccion, type OleadaPuntoStatus } from "./oleadaPuntos";
 
 export type DireccionGapId = "sin_proyecto" | "sin_oleada" | "sin_foco";
@@ -104,17 +104,6 @@ export function evaluateDireccionElegibilidad(
 ): DireccionGate {
   const titulo = proyecto.titulo.trim() || "Proyecto";
   const tint = proyecto.color?.trim() ? { color: proyecto.color } : {};
-  if (!nidoRequiereOleada(proyecto.etiqueta)) {
-    return {
-      proyectoId: proyecto.id,
-      titulo,
-      ...tint,
-      ok: true,
-      gap: null,
-      porqueTodavia: "",
-      riesgoEnsuciar: riesgoEnsuciarProyecto(titulo, proyecto.etiqueta),
-    };
-  }
   const oleada = oleadaDeDireccion(peldanos);
   if (!oleada) {
     return {

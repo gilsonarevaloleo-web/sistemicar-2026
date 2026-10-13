@@ -189,16 +189,30 @@ describe("sintonía oleada ↔ producción", () => {
     assert.ok(oleada0);
   });
 
-  it("DESCANSO (consciencia) con rumbo no sella ni sintoniza peldaños", async () => {
+  it("DESCANSO (etiqueta legado) con punto nombrado sella como cualquier nido", async () => {
     const p = await addProyecto(USER, { titulo: "DESCANSO", etiqueta: "consciencia" });
-    const idea = await addPeldanoIdea(USER, p.id, "Noche");
+    const idea = await addPeldanoIdea(USER, p.id, "Medición");
+    await setOleadaComoDireccion(USER, p.id, idea.id);
+    await addOleadaPunto(USER, idea.id, "Primeros 7 días de medición");
+    const oleada0 = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
+    const punto = oleada0.oleadaPuntos?.[0];
+    assert.ok(punto);
+
+    const gate = evaluateDireccionElegibilidad(
+      p,
+      getPeldanosByProyectoLocal(USER, p.id)
+    );
+    assert.equal(gate.ok, true);
+    assert.equal(gate.puntoProduccionTitulo, "Primeros 7 días de medición");
+
     await recordProgresoHubAlCerrarVehiculo(
       USER,
       vehicle({
         id: "v_descanso",
-        titulo: "Siesta",
+        titulo: "Videos",
         proyectoId: p.id,
         proyectoPeldanoId: idea.id,
+        oleadaPuntoId: punto.id,
         destinoCierre: "peldano",
         duracionFinal: 30,
         tipoFlota: "descanso",
@@ -206,7 +220,7 @@ describe("sintonía oleada ↔ producción", () => {
       { tipoOrigen: "tiempo", psGanados: 1, duracionMin: 30, destinoCierre: "peldano" }
     );
     const after = getPeldanosByProyectoLocal(USER, p.id).find(x => x.id === idea.id)!;
-    assert.equal(after.estado, "idea");
-    assert.equal((after.oleadaPuntos ?? []).length, 0);
+    assert.equal(after.estado, "en_curso");
+    assert.ok((after.oleadaPuntos ?? []).length >= 1);
   });
 });

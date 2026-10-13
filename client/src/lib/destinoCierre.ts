@@ -3,8 +3,9 @@
  * - presencia: cubre el día / disciplina / PS — no ensucia la escalera del Hub.
  * - peldano: Dirección (Norte / rumbo). La conciencia tiene casa.
  *
- * Dirección ≠ crecimiento. Un nido de darse cuenta (p. ej. DESCANSO) puede
- * recibir rumbo sin escribir peldaños. La escalera la decide `feedsEscaleraNido`.
+ * Todo nido mide producción. La escalera la decide el destino
+ * (`feedsEscaleraNido` = rumbo a casa). La lectura del número —darse cuenta,
+ * crecimiento, deber— vive en el operador.
  *
  * Por defecto: presencia. Dirección no se reclama con un clic de ego.
  */
@@ -20,8 +21,8 @@ export function resolveDestinoCierre(
 }
 
 /**
- * Rumbo del día (triada Dirección). No implica peldaños:
- * un nido de consciencia recibe Dirección y no trepa.
+ * Rumbo del día (triada Dirección): el cierre apunta a un nido.
+ * La escalera se sella al lanzar si hay oleada y punto.
  */
 export function feedsProyectoHub(destino: DestinoCierre): boolean {
   return destino === "peldano";
@@ -69,7 +70,7 @@ export const DESTINO_CIERRE_COPY = {
   },
   peldano: {
     label: "Dirección",
-    hint: "Rumbo a un nido. Crecimiento y control piden oleada y punto; darse cuenta se registra sin peldaños.",
+    hint: "Rumbo a un nido. Pide oleada y un punto de producción con nombre — el bloque que se mide.",
     short: "Norte",
   },
 } as const;
