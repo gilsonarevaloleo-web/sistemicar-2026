@@ -1,4 +1,5 @@
 import { computeHuellaEnfoque, HUELLA_EJES } from "@/jornada4/huellaEnfoque";
+import { RING_COPY } from "@/lib/ringEnfoqueReal";
 import type { Vehicle } from "@/lib/persistence";
 
 const INK = "#f1f5f9";
@@ -35,6 +36,7 @@ export function HuellaEnfoqueStrip({ vehicle, nowMs, emphasize = false }: Props)
         <p
           className="text-[8px] font-black uppercase tracking-widest"
           style={{ color: emphasize ? GOLD : VIOLET }}
+          title={RING_COPY.huellaHint}
         >
           Huella de enfoque
         </p>
