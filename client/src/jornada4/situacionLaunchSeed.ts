@@ -5,11 +5,13 @@
 import type { SubTarea, Vehicle } from "@/lib/persistence";
 import { normalizeSeccionTitulo } from "@/lib/desglosadorSecciones";
 import { redistribuirMinutosSituacionCronometro } from "@/lib/situacionCupoDistrib";
+import { seedRingHuella, type RingHuellaState } from "./huellaEnfoque";
 
 export type SituacionRingSeed = {
   subTareas: SubTarea[];
   situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
   situacionCupoAnchor: { subTareaId: string; startedAt: number };
+  ringHuella: RingHuellaState;
 };
 
 export function buildSituacionRingSeed(opts: {
@@ -80,5 +82,12 @@ export function buildSituacionRingSeed(opts: {
       ...(opts.modoEntrenamiento === true ? { modoEntrenamiento: true } : {}),
     },
     situacionCupoAnchor: { subTareaId: firstId, startedAt: now },
+    ringHuella: seedRingHuella({
+      launchedAt: now,
+      filasLaunch: subTareas.length,
+      minutosLaunch: minutosBloque,
+      tieneMeta: true,
+      ordenLaunchIds: subTareas.map(st => st.id),
+    }),
   };
 }

@@ -77,7 +77,13 @@ export function Jornada4ComoOperarCard({
           Enfoque (imprevistos) y Plan (segmentos) son Ritmo. Se ofrecen
           cuando ya hayas cerrado una Conquista.
         </p>
-      ) : null}
+      ) : (
+        <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+          En el ring de enfoque, reordenar, postergar y recortar deja huella
+          (atención, orden, certeza, ganancia, foco). No hace falta nombrar
+          tareas extra.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {onLaunchConquista ? (
           <button

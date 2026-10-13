@@ -17,6 +17,7 @@ import {
   injectCrisolPensamiento,
   pickSituacionVehicleTarget,
 } from "@/jornada4/crisolKernel";
+import { bumpRingHuellaOnVehicle, seedRingHuella } from "@/jornada4/huellaEnfoque";
 import {
   imanItemsParaDesglosador,
   nidoKeyFromReserva,
@@ -308,6 +309,23 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
       if (result.situacionCronometro) patch.situacionCronometro = result.situacionCronometro;
       if (result.situacionCupoAnchor !== undefined) {
         patch.situacionCupoAnchor = result.situacionCupoAnchor;
+      }
+      if (result.mode === "enqueue_ring") {
+        patch.ringHuella = bumpRingHuellaOnVehicle(vehicle, "sellar");
+      } else if (result.mode === "open_ring" && result.situacionCronometro) {
+        const cron = result.subTareas.filter(st => st.enDesgloseCronometro);
+        const start = result.situacionCronometro.bloqueInicioAt ?? Date.now();
+        const fin =
+          result.situacionCronometro.horaFinContratoMs ??
+          result.situacionCronometro.horaFinMs;
+        patch.ringHuella = seedRingHuella({
+          launchedAt: start,
+          filasLaunch: cron.length,
+          minutosLaunch:
+            fin != null && fin > start ? Math.round((fin - start) / 60_000) : 0,
+          tieneMeta: fin != null,
+          ordenLaunchIds: cron.map(st => st.id),
+        });
       }
       const nidoId = result.proyectoId?.trim() || item.proyectoId?.trim();
       let rumboCopy = "Enviado a presencia.";

@@ -26,6 +26,7 @@ import {
 import { groupSubsBySeccion } from "@/lib/desglosadorSecciones";
 import type { DestinoCierre } from "@/lib/destinoCierre";
 import { DestinoCierreToggle } from "./DestinoCierreToggle";
+import { HuellaEnfoqueStrip } from "./HuellaEnfoqueStrip";
 
 const OK = "#00C851";
 const BAD = "#FF2A2A";
@@ -188,6 +189,11 @@ export function SituacionCard({
             }}
           />
         </div>
+        {cronRows.length > 0 && !bloqueListo ? (
+          <div className="mt-2">
+            <HuellaEnfoqueStrip vehicle={vehicle} nowMs={nowMs} />
+          </div>
+        ) : null}
       </div>
 
       <div className="px-3 pb-3 space-y-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
@@ -355,6 +361,7 @@ export function SituacionCard({
             <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: GOLD }}>
               Ring de enfoque sin filas pendientes
             </p>
+            <HuellaEnfoqueStrip vehicle={vehicle} nowMs={nowMs} emphasize />
             {onDestinoChange ? (
               <DestinoCierreToggle
                 value={vehicle.destinoCierre}

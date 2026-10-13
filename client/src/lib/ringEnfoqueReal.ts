@@ -22,6 +22,8 @@ export const RING_COPY = {
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",
   ringHint:
     "El ring de enfoque es limitado — sella aquí solo lo que vas a sostener con tiempo. El resto ciérralo en Taller sin reloj.",
+  huellaHint:
+    "Reordenar, postergar y recortar ya cuenta: es la huella del ring. No hace falta nombrar tareas extra.",
 } as const;
 
 export function ringBienvenidaParts(retoNumero: number): string[] {

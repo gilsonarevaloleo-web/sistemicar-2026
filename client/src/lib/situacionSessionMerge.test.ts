@@ -237,6 +237,45 @@ describe("mergeActiveVehicleSessionState situacion", () => {
     assert.equal(merged.situacionCronometro?.activo, true);
   });
 
+  it("conserva la huella de enfoque local si tiene más gestos", () => {
+    const fb: Vehicle = {
+      ...baseVehicle(),
+      subTareas: [st("c1", { enDesgloseCronometro: true, resultadoSituacion: "pendiente", minutosCupo: 10 })],
+      situacionCronometro: { activo: true, bloqueInicioAt: 1000, horaFinMs: 2000, depthBlockPsGranted: 0 },
+      ringHuella: {
+        launchedAt: 1000,
+        filasLaunch: 2,
+        minutosLaunch: 20,
+        tieneMeta: true,
+        ordenLaunchIds: ["c1"],
+        reorders: 1,
+        postergas: 0,
+        quitadas: 0,
+        selladas: 0,
+        cupoEdits: 0,
+      },
+    };
+    const local: Vehicle = {
+      ...fb,
+      ringHuella: {
+        launchedAt: 1000,
+        filasLaunch: 2,
+        minutosLaunch: 20,
+        tieneMeta: true,
+        ordenLaunchIds: ["c1"],
+        reorders: 3,
+        postergas: 1,
+        quitadas: 1,
+        selladas: 0,
+        cupoEdits: 0,
+      },
+    };
+    const merged = mergeActiveVehicleSessionState(fb, local);
+    assert.equal(merged.ringHuella?.reorders, 3);
+    assert.equal(merged.ringHuella?.postergas, 1);
+    assert.equal(merged.ringHuella?.quitadas, 1);
+  });
+
   it("clears desglosador pause when local resumed but firebase still paused", () => {
     const fb: Vehicle = {
       ...(baseVehicle() as Vehicle),
