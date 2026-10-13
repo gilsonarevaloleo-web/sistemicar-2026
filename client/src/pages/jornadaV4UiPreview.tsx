@@ -228,6 +228,8 @@ function PreviewConquistaPausa() {
   );
 }
 
+const previewEnfoqueVehicle = previewEnfoqueSeed();
+
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
   const puertaPanorama = computePuertaPanorama(segmentos);
@@ -312,7 +314,7 @@ export default function JornadaV4UiPreview() {
                   <p className={`${J4_UI.hint} mt-0.5`}>Conquista · activo</p>
                 </div>
                 <SituacionCard
-                  vehicle={previewEnfoqueSeed()}
+                  vehicle={previewEnfoqueVehicle}
                   onCumplido={() => undefined}
                   onAvance={() => undefined}
                   onFallado={() => undefined}
@@ -356,7 +358,7 @@ export default function JornadaV4UiPreview() {
         ) : null}
         {tab === "metricas" ? (
           <div data-testid="jornada4-preview-metricas" className="space-y-1">
-            <Jornada4HuellaEnfoqueCard vehicles={[previewEnfoqueSeed()]} />
+            <Jornada4HuellaEnfoqueCard vehicles={[previewEnfoqueVehicle]} />
             <Jornada4ConcienciaTriadaCard model={triada} series={[]} />
             <SelloOperadorCard
               userId="preview"
