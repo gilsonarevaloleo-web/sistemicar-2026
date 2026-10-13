@@ -16,6 +16,14 @@ describe("situacionLaunchSeed", () => {
     assert.equal(seed!.situacionCupoAnchor.subTareaId, seed!.subTareas[0].id);
     const cupos = seed!.subTareas.reduce((s, st) => s + (st.minutosCupo ?? 0), 0);
     assert.equal(cupos, 30);
+    assert.equal(seed!.ringHuella.filasLaunch, 2);
+    assert.equal(seed!.ringHuella.minutosLaunch, 30);
+    assert.equal(seed!.ringHuella.tieneMeta, true);
+    assert.equal(seed!.ringHuella.reorders, 0);
+    assert.deepEqual(
+      seed!.ringHuella.ordenLaunchIds,
+      seed!.subTareas.map(st => st.id)
+    );
   });
 
   it("rechaza sin filas", () => {

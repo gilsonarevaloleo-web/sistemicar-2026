@@ -58,6 +58,10 @@ describe("jornadaCartaVenta", () => {
     assert.doesNotMatch(base.bullets.join(" "), /Ring de enfoque/);
     assert.match(ritmo.bullets.join(" "), /Ring de conquista/);
     assert.match(ritmo.bullets.join(" "), /Ring de enfoque/);
+    assert.match(ritmo.bullets.join(" "), /huella/i);
+    assert.match(ritmo.bullets.join(" "), /atención/i);
+    assert.match(ritmo.bullets.join(" "), /orden interno/i);
+    assert.match(ritmo.bullets.join(" "), /PS se quedan/);
   });
 });
 

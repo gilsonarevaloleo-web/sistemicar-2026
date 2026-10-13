@@ -1,3 +1,4 @@
+import { mergeRingHuella } from "../jornada4/huellaEnfoque";
 import type { DetalleSubTarea, SubTarea, SubVehiculo, Vehicle } from "./persistence";
 import { applyVehicleSessionSeal, isVehicleSessionSealed } from "./vehicleSessionSeal";
 import {
@@ -151,6 +152,7 @@ export function applySituacionDesgloseMerge(
     return merged;
   }
 
+  const ringHuella = mergeRingHuella(firebaseV.ringHuella, localV.ringHuella);
   return {
     ...merged,
     subTareas: mergeSubTareasById(firebaseV.subTareas, localV.subTareas),
@@ -162,6 +164,7 @@ export function applySituacionDesgloseMerge(
       firebaseV.situacionCupoAnchor,
       localV.situacionCupoAnchor
     ),
+    ...(ringHuella ? { ringHuella } : {}),
   };
 }
 

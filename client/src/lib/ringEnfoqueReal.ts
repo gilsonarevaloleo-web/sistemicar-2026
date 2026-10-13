@@ -22,6 +22,8 @@ export const RING_COPY = {
     "Izq. sellar en ring (con tiempo) · Der. cerrar sin reloj (+2 PS)",
   ringHint:
     "El ring de enfoque es limitado — sella aquí solo lo que vas a sostener con tiempo. El resto ciérralo en Taller sin reloj.",
+  huellaHint:
+    "Atención: no apilar el cupo hasta el rojo. Orden interno: pensar qué hacer, más de 3. Certeza: editar minutos. Ganancia: oficio del bloque; los PS se quedan. Foco: quitar, reordenar, postergar y cerrar el último a tiempo. Es músculo.",
 } as const;
 
 export function ringBienvenidaParts(retoNumero: number): string[] {

@@ -24,6 +24,12 @@ describe("ringEnfoqueReal", () => {
     expect(ringBienvenidaParts(2)[0]).toContain(RING_BRAND.enfoque);
   });
 
+  it("huellaHint nombra orden interno y deja los PS", () => {
+    expect(RING_COPY.huellaHint).toMatch(/orden interno/i);
+    expect(RING_COPY.huellaHint).toMatch(/PS se quedan/);
+    expect(RING_COPY.huellaHint).not.toMatch(/ordenar la mente/i);
+  });
+
   it("ringTiempoSobraParts menciona minutos sobrantes", () => {
     const parts = ringTiempoSobraParts(25);
     expect(parts.join(" ")).toContain("25 minutos");

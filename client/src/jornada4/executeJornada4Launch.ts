@@ -252,6 +252,7 @@ export async function executeJornada4Launch(
         subTareas: seed.subTareas,
         situacionCronometro: seed.situacionCronometro,
         situacionCupoAnchor: seed.situacionCupoAnchor,
+        ringHuella: seed.ringHuella,
       };
     }
   }
@@ -336,6 +337,7 @@ export async function executeJornada4Launch(
           subTareas: situacionLaunchSeed.subTareas,
           situacionCronometro: situacionLaunchSeed.situacionCronometro,
           situacionCupoAnchor: situacionLaunchSeed.situacionCupoAnchor!,
+          ringHuella: situacionLaunchSeed.ringHuella,
         },
         vehiclesRef,
         setVehicles
@@ -349,6 +351,9 @@ export async function executeJornada4Launch(
               subTareas: situacionLaunchSeed!.subTareas,
               situacionCronometro: situacionLaunchSeed!.situacionCronometro,
               situacionCupoAnchor: situacionLaunchSeed!.situacionCupoAnchor,
+              ...(situacionLaunchSeed!.ringHuella
+                ? { ringHuella: situacionLaunchSeed!.ringHuella }
+                : {}),
             },
             { skipLocalSync: true }
           );
@@ -392,6 +397,7 @@ function paintSituacionSeed(
     subTareas: NonNullable<Vehicle["subTareas"]>;
     situacionCronometro: NonNullable<Vehicle["situacionCronometro"]>;
     situacionCupoAnchor: NonNullable<Vehicle["situacionCupoAnchor"]>;
+    ringHuella?: Vehicle["ringHuella"];
   },
   vehiclesRef: MutableRefObject<Vehicle[]>,
   setVehicles: (update: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => void
@@ -404,6 +410,7 @@ function paintSituacionSeed(
             subTareas: seed.subTareas,
             situacionCronometro: seed.situacionCronometro,
             situacionCupoAnchor: seed.situacionCupoAnchor,
+            ...(seed.ringHuella ? { ringHuella: seed.ringHuella } : {}),
           }
         : v
     );

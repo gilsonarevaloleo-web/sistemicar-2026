@@ -26,6 +26,11 @@ import {
   postergarFilaEnFocoACola,
 } from "@/jornada4/situacionKernel";
 import {
+  bumpRingHuellaOnVehicle,
+  huellaCierreCopy,
+  sellRingHuella,
+} from "@/jornada4/huellaEnfoque";
+import {
   applySituacionDistraccionFail,
   applySituacionSustituirFoco,
   ENTRENAMIENTO_COPY,
@@ -857,6 +862,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           });
           return;
         }
+        const ringHuella = sellRingHuella(vehicle, patch.cierreAt);
+        const huellaCopy = huellaCierreCopy(ringHuella.sello!);
 
         const wallMin = resolveDuracionMinCierre(
           vehicle,
@@ -870,6 +877,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           situacionCronometro: patch.situacionCronometro,
           situacionCupoAnchor: patch.situacionCupoAnchor,
           destinoCierre: destino,
+          ringHuella,
         });
         await yieldAfterPaint();
         scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -893,15 +901,16 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             : " · presencia";
           toast.success(
             awarded > 0
-              ? `Ring de enfoque cerrado · +${awarded} PS${hubNote}`
-              : `Ring de enfoque cerrado${hubNote}`,
+              ? `Ring de enfoque cerrado · ${huellaCopy.title} · +${awarded} PS${hubNote}`
+              : `Ring de enfoque cerrado · ${huellaCopy.title}${hubNote}`,
             {
+              description: huellaCopy.description,
               style: {
                 backgroundColor: PIZARRA,
                 border: `1px solid ${feedsProyectoHub(destino) ? GOLD : EMERALD}`,
                 color: feedsProyectoHub(destino) ? GOLD : EMERALD,
               },
-              duration: 2800,
+              duration: 5200,
             }
           );
         } catch (e) {
@@ -922,6 +931,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 situacionCupoAnchor: patch.situacionCupoAnchor,
                 destinoCierre: destino,
                 proyectoId: vehicle.proyectoId,
+                ringHuella,
               },
               { skipLocalSync: true }
             );
@@ -1044,10 +1054,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           );
           return;
         }
+        const ringHuella = bumpRingHuellaOnVehicle(vehicle, "sellar");
         paintVehicle(vehicleId, {
           subTareas: result.subTareas,
           situacionCronometro: result.situacionCronometro,
           situacionCupoAnchor: result.situacionCupoAnchor,
+          ringHuella,
         });
         await yieldAfterPaint();
         void runShadowTaskAsync(async () => {
@@ -1060,6 +1072,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
                 subTareas: result.subTareas,
                 situacionCronometro: result.situacionCronometro,
                 situacionCupoAnchor: result.situacionCupoAnchor,
+                ringHuella,
               },
               { skipLocalSync: true }
             );
@@ -1420,7 +1433,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         const situacionCupoAnchor =
           resolved === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolved;
 
-        paintVehicle(vehicleId, { subTareas, situacionCupoAnchor });
+        const ringHuella = bumpRingHuellaOnVehicle(vehicle, "cupo");
+        paintVehicle(vehicleId, { subTareas, situacionCupoAnchor, ringHuella });
         await yieldAfterPaint();
         void runShadowTaskAsync(async () => {
           scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -1428,7 +1442,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             await updateVehicle(
               userId,
               vehicleId,
-              { subTareas, situacionCupoAnchor },
+              { subTareas, situacionCupoAnchor, ringHuella },
               { skipLocalSync: true }
             );
           } catch (e) {
@@ -1488,7 +1502,8 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       if (!vehicle?.subTareas || !isSituacionRing(vehicle)) return;
       const next = reorderSubTareasCronometro(vehicle.subTareas, movedId, direction);
       if (!next) return;
-      paintVehicle(vehicleId, { subTareas: next });
+      const ringHuella = bumpRingHuellaOnVehicle(vehicle, "reorder");
+      paintVehicle(vehicleId, { subTareas: next, ringHuella });
       scheduleSaveLocalVehicles(vehiclesRef.current);
       const nextTexto = firstPendingCronometroTexto(next);
       toast.info("Orden actualizado", {
@@ -1502,7 +1517,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           await updateVehicle(
             userId,
             vehicleId,
-            { subTareas: next },
+            { subTareas: next, ringHuella },
             { skipLocalSync: true }
           );
         } catch (e) {
@@ -1815,9 +1830,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         return;
       }
+      const ringHuella = bumpRingHuellaOnVehicle(vehicle, "postergar");
       paintVehicle(vehicleId, {
         subTareas: patch.subTareas,
         situacionCupoAnchor: patch.situacionCupoAnchor,
+        ringHuella,
       });
       scheduleSaveLocalVehicles(vehiclesRef.current);
       toast.success("Fila postergada a la cola", {
@@ -1834,6 +1851,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             {
               subTareas: patch.subTareas,
               situacionCupoAnchor: patch.situacionCupoAnchor,
+              ringHuella,
             },
             { skipLocalSync: true }
           );
@@ -1858,9 +1876,11 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         });
         return;
       }
+      const ringHuella = bumpRingHuellaOnVehicle(vehicle, "quitar");
       paintVehicle(vehicleId, {
         subTareas: patch.subTareas,
         situacionCupoAnchor: patch.situacionCupoAnchor,
+        ringHuella,
       });
       scheduleSaveLocalVehicles(vehiclesRef.current);
       toast.success(
@@ -1882,6 +1902,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             {
               subTareas: patch.subTareas,
               situacionCupoAnchor: patch.situacionCupoAnchor,
+              ringHuella,
             },
             { skipLocalSync: true }
           );

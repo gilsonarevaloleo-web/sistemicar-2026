@@ -120,6 +120,7 @@ export type FlotaLaunchForm = {
     subTareas: NonNullable<Vehicle["subTareas"]>;
     situacionCronometro: Vehicle["situacionCronometro"] | null;
     situacionCupoAnchor: Vehicle["situacionCupoAnchor"] | null;
+    ringHuella?: Vehicle["ringHuella"];
   };
   /** Opt-in: desglosador anclado a su segmento (planes superiores). */
   ancladoAlSegmento?: boolean;
@@ -289,6 +290,7 @@ export async function executeFlotaLaunch(params: ExecuteFlotaLaunchParams): Prom
             subTareas: situacionSeed.subTareas,
             situacionCronometro: situacionSeed.situacionCronometro,
             situacionCupoAnchor: situacionSeed.situacionCupoAnchor,
+            ...(situacionSeed.ringHuella ? { ringHuella: situacionSeed.ringHuella } : {}),
           }
         : {}),
       ...(resolvedProyectoId ? { proyectoId: resolvedProyectoId } : {}),

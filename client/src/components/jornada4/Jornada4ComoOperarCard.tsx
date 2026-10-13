@@ -77,7 +77,14 @@ export function Jornada4ComoOperarCard({
           Enfoque (imprevistos) y Plan (segmentos) son Ritmo. Se ofrecen
           cuando ya hayas cerrado una Conquista.
         </p>
-      ) : null}
+      ) : (
+        <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+          Huella del desglosador: atención (no llegar al rojo del cupo), orden interno
+          (pensar qué hacer, más de 3), certeza (editar minutos), ganancia (oficio
+          2–3 h; los PS se quedan), foco (quitar, reordenar, postergar y cerrar el
+          último a tiempo). Es músculo, no etiqueta negativa.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {onLaunchConquista ? (
           <button

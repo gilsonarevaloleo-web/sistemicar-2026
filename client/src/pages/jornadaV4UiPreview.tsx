@@ -4,6 +4,9 @@
  */
 import { useState } from "react";
 import { ConquistaCard } from "@/components/jornada4/ConquistaCard";
+import { SituacionCard } from "@/components/jornada4/SituacionCard";
+import { Jornada4HuellaEnfoqueCard } from "@/components/jornada4/Jornada4HuellaEnfoqueCard";
+import { seedRingHuella } from "@/jornada4/huellaEnfoque";
 import { Jornada4OpsToolsRail } from "@/components/jornada4/Jornada4OpsToolsRail";
 import { Jornada4CoberturaTimeline } from "@/components/jornada4/Jornada4CoberturaTimeline";
 import { Jornada4ConcienciaTriadaCard } from "@/components/jornada4/Jornada4ConcienciaTriadaCard";
@@ -114,6 +117,54 @@ const vehicles: Vehicle[] = [
 
 const noopCrisol = () => undefined;
 
+function previewEnfoqueSeed(now = Date.now()): Vehicle {
+  const filas = [
+    { id: "f1", texto: "Llamar a Tina", minutosCupo: 12 },
+    { id: "f2", texto: "Cortar pretina", minutosCupo: 10 },
+    { id: "f3", texto: "Revisar oleada", minutosCupo: 8 },
+    { id: "f4", texto: "Sellar evidencia", minutosCupo: 10 },
+  ];
+  return {
+    id: "preview-enfoque",
+    titulo: "Imprevisto de la mañana",
+    status: "activo",
+    tipoFlota: "situacion",
+    aperturaAt: now - 18 * 60_000,
+    criterioDetalle: "meta 11:30",
+    subTareas: filas.map((f, i) => ({
+      id: f.id,
+      texto: f.texto,
+      completada: false,
+      creadaAt: now - 18 * 60_000,
+      enDesgloseCronometro: true,
+      resultadoSituacion: i === 0 ? "cumplido" : "pendiente",
+      minutosCupo: f.minutosCupo,
+    })),
+    situacionCupoAnchor: { subTareaId: "f2", startedAt: now - 4 * 60_000 },
+    situacionCronometro: {
+      activo: true,
+      bloqueInicioAt: now - 18 * 60_000,
+      horaFinContratoMs: now + 22 * 60_000,
+      horaFinMs: now + 22 * 60_000,
+      minutosGanadosSesion: 7,
+      retoNumero: 1,
+    },
+    ringHuella: {
+      ...seedRingHuella({
+        launchedAt: now - 18 * 60_000,
+        filasLaunch: 4,
+        minutosLaunch: 120,
+        tieneMeta: true,
+        ordenLaunchIds: filas.map(f => f.id),
+      }),
+      reorders: 2,
+      postergas: 1,
+      quitadas: 1,
+      cupoEdits: 2,
+    },
+  } as Vehicle;
+}
+
 function previewConquistaSeed(now = Date.now()): Vehicle {
   return {
     id: "preview-conquista",
@@ -178,6 +229,8 @@ function PreviewConquistaPausa() {
     </div>
   );
 }
+
+const previewEnfoqueVehicle = previewEnfoqueSeed();
 
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
@@ -262,6 +315,18 @@ export default function JornadaV4UiPreview() {
                   <p className="text-sm font-bold text-neutral-100">{vehicles[0]?.titulo}</p>
                   <p className={`${J4_UI.hint} mt-0.5`}>Conquista · activo</p>
                 </div>
+                <SituacionCard
+                  vehicle={previewEnfoqueVehicle}
+                  onCumplido={() => undefined}
+                  onAvance={() => undefined}
+                  onFallado={() => undefined}
+                  onCerrarBloque={() => undefined}
+                  onAddFila={() => undefined}
+                  onSetCupo={() => undefined}
+                  onReorderFilas={() => undefined}
+                  onPostergarFoco={() => undefined}
+                  onQuitarFila={() => undefined}
+                />
               </div>
             ) : null}
           </div>
@@ -295,6 +360,7 @@ export default function JornadaV4UiPreview() {
         ) : null}
         {tab === "metricas" ? (
           <div data-testid="jornada4-preview-metricas" className="space-y-1">
+            <Jornada4HuellaEnfoqueCard vehicles={[previewEnfoqueVehicle]} />
             <Jornada4ConcienciaTriadaCard model={triada} series={[]} />
             <SelloOperadorCard
               userId="preview"
