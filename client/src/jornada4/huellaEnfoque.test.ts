@@ -72,8 +72,11 @@ describe("huellaEnfoque diccionario", () => {
     assert.equal(HUELLA_ORDEN_UMBRAL, 3);
     assert.match(HUELLA_EJES.find(e => e.id === "atencion")!.definicion, /rojo/i);
     assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /más de 3/);
+    assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /orden interno/i);
     assert.match(HUELLA_EJES.find(e => e.id === "certeza")!.definicion, /editar los minutos/i);
     assert.match(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /2–3 horas|2-3 horas/);
+    assert.match(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /PS se quedan/);
+    assert.doesNotMatch(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /no es etiqueta de puntos/i);
     assert.match(HUELLA_EJES.find(e => e.id === "foco")!.definicion, /último a tiempo/i);
     assert.match(HUELLA_EJES.find(e => e.id === "foco")!.definicion, /músculo/i);
   });
@@ -143,7 +146,30 @@ describe("huellaEnfoque diccionario", () => {
     );
     assert.ok(tres.orden < 70, `orden 3: ${tres.orden}`);
     assert.ok(cuatro.orden >= 78, `orden 4: ${cuatro.orden}`);
-    assert.match(cuatro.relato, /listaste 4|orden/i);
+    assert.match(cuatro.relato, /orden interno|inercia/i);
+  });
+
+  it("orden plateau: 4 y 8 valen igual — no hay beneficio superior al orden interno", () => {
+    const mk = (n: number) =>
+      computeHuellaEnfoque(
+        ring({
+          subTareas: Array.from({ length: n }, (_, i) => ({
+            id: String.fromCharCode(97 + i),
+            enDesgloseCronometro: true,
+            minutosCupo: 8,
+          })),
+          ringHuella: {
+            ...baseState(),
+            filasLaunch: n,
+            ordenLaunchIds: Array.from({ length: n }, (_, i) => String.fromCharCode(97 + i)),
+          },
+        }),
+        1_000
+      );
+    const cuatro = mk(4);
+    const ocho = mk(8);
+    assert.equal(cuatro.orden, ocho.orden);
+    assert.equal(cuatro.orden, 82);
   });
 
   it("certeza crece al editar minutos, no baja", () => {
@@ -323,6 +349,63 @@ describe("huellaEnfoque diccionario", () => {
     assert.ok(
       bloqueLargo.ganancia > pocos.ganancia,
       `6 veh ${bloqueLargo.ganancia} vs 2 veh ${pocos.ganancia}`
+    );
+  });
+
+  it("ganancia no se infla alargando la lista más allá del oficio", () => {
+    const cuatro = computeHuellaEnfoque(
+      ring({
+        ringHuella: { ...baseState(), filasLaunch: 4, minutosLaunch: 120 },
+        situacionCronometro: {
+          activo: true,
+          minutosGanadosSesion: 0,
+          horaFinContratoMs: 1_000 + 120 * 60_000,
+        },
+      }),
+      1_000
+    );
+    const veinte = computeHuellaEnfoque(
+      ring({
+        ringHuella: { ...baseState(), filasLaunch: 20, minutosLaunch: 120 },
+        situacionCronometro: {
+          activo: true,
+          minutosGanadosSesion: 0,
+          horaFinContratoMs: 1_000 + 120 * 60_000,
+        },
+      }),
+      1_000
+    );
+    assert.ok(
+      veinte.ganancia - cuatro.ganancia <= 8,
+      `lista 20 ${veinte.ganancia} vs 4 ${cuatro.ganancia}`
+    );
+  });
+
+  it("los PS de Jornada siguen contando en ganancia", () => {
+    const base4 = { ...baseState(), filasLaunch: 4, ordenLaunchIds: ["a", "b", "c", "d"] };
+    const sinPs = computeHuellaEnfoque(ring({ ringHuella: base4 }), 1_000);
+    const conMinutos = computeHuellaEnfoque(
+      ring({
+        ringHuella: base4,
+        situacionCronometro: {
+          activo: true,
+          minutosGanadosSesion: 18,
+          horaFinContratoMs: 1_000 + 30 * 60_000,
+        },
+      }),
+      1_000
+    );
+    const conSellos = computeHuellaEnfoque(
+      ring({ ringHuella: { ...base4, selladas: 3 } }),
+      1_000
+    );
+    assert.ok(
+      conMinutos.ganancia > sinPs.ganancia,
+      `minutos ${conMinutos.ganancia} vs base ${sinPs.ganancia}`
+    );
+    assert.ok(
+      conSellos.ganancia > sinPs.ganancia,
+      `sellos ${conSellos.ganancia} vs base ${sinPs.ganancia}`
     );
   });
 

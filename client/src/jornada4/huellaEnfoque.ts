@@ -3,9 +3,12 @@
  *
  * Diccionario (músculo que se desarrolla, no etiqueta negativa):
  * - Atención: no apilar el cupo de un vehículo hasta el rojo.
- * - Orden: listar más de 3 vehículos en el desglosador.
+ * - Orden: interno. Enlistar es pensar qué hacer (vencer la inercia).
+ *   Cruzar más de 3 abre el músculo; alargar la lista no suma un beneficio
+ *   superior al orden interno.
  * - Certeza: editar los minutos.
- * - Ganancia: recuento de vehículos frente a 2–3 horas (los PS pesan poco).
+ * - Ganancia: oficio (vehículos frente a 2–3 horas) vale más que la etiqueta;
+ *   los PS se quedan — son característica de Sistemicar-Jornada.
  * - Foco: cerrar el último a tiempo. Quitar, reordenar y postergar son foco.
  */
 
@@ -17,15 +20,23 @@ export const HUELLA_EJES = [
     label: "Atención",
     definicion: "No apilar el cupo de un vehículo hasta el rojo.",
   },
-  { id: "orden", label: "Orden", definicion: "Listar más de 3 vehículos en el desglosador." },
+  {
+    id: "orden",
+    label: "Orden",
+    definicion: "Desglosar más de 3: orden interno. Pensar qué hacer, no alargar la lista.",
+  },
   { id: "certeza", label: "Certeza", definicion: "Editar los minutos." },
-  { id: "ganancia", label: "Ganancia", definicion: "Vehículos del desglosador frente a 2–3 horas." },
+  {
+    id: "ganancia",
+    label: "Ganancia",
+    definicion: "Oficio: vehículos frente a 2–3 horas. Los PS se quedan: son de Jornada.",
+  },
   { id: "foco", label: "Foco", definicion: "Cerrar el último a tiempo. Quitar, reordenar y postergar son músculo." },
 ] as const;
 
 export type HuellaEjeId = (typeof HUELLA_EJES)[number]["id"];
 
-/** Ganancia pesa menos: el valor está en el recuento vs. las horas, no en los PS. */
+/** Oficio (bloque 2–3 h) pesa más que la etiqueta; los PS siguen dentro de ganancia. */
 export const HUELLA_PESOS: Record<HuellaEjeId, number> = {
   atencion: 0.22,
   orden: 0.22,
@@ -263,25 +274,37 @@ function scoreAtencion(opts: {
 }
 
 function scoreOrden(nVeh: number): number {
-  if (nVeh <= 1) return 18;
-  if (nVeh === 2) return 38;
-  if (nVeh === HUELLA_ORDEN_UMBRAL) return 58;
-  return clampPct(78 + Math.min(22, (nVeh - 4) * 7));
+  // Inercia del desglose: 1–3 es el esfuerzo de pensar. Cruzar 3 abre el músculo.
+  // Plateau: 4 y 20 valen igual. No hay beneficio superior por alargar la lista.
+  if (nVeh <= 1) return 22;
+  if (nVeh === 2) return 48;
+  if (nVeh === HUELLA_ORDEN_UMBRAL) return 62;
+  return 82;
 }
 
 function scoreCerteza(cupoEdits: number): number {
   return clampPct(24 + Math.min(8, cupoEdits) * 10);
 }
 
-function scoreGanancia(nVeh: number, minutosBloque: number, minutosGanados: number): number {
+function scoreGanancia(
+  nVeh: number,
+  minutosBloque: number,
+  minutosGanados: number,
+  selladas: number
+): number {
+  // Oficio del bloque (2–3 h) vale más que la etiqueta.
+  // Los PS no se eliminan: minutos ganados y sellos (2 PS/fila) siguen contando.
   const horas = minutosBloque / 60;
   let n = 16;
-  n += Math.min(36, Math.max(0, nVeh) * 7);
+  if (nVeh > HUELLA_ORDEN_UMBRAL) n += 20;
   if (horas >= 2 && horas <= 3.5) n += 28;
   else if (horas >= 1.5) n += 16;
   else if (horas >= 1) n += 8;
-  if (horas >= 1) n += Math.min(14, (nVeh / horas) * 4);
-  n += Math.min(6, Math.round(minutosGanados / 5));
+  if (horas >= 1 && nVeh > HUELLA_ORDEN_UMBRAL) {
+    n += Math.min(12, (Math.min(nVeh, 8) / horas) * 3);
+  }
+  n += Math.min(16, Math.round(minutosGanados / 3));
+  n += Math.min(12, Math.max(0, selladas) * 2);
   return clampPct(n);
 }
 
@@ -308,6 +331,8 @@ function relatoHuella(args: {
   reorders: number;
   postergas: number;
   quitadas: number;
+  selladas: number;
+  minutosGanados: number;
   cerroUltimoATiempo: boolean;
   cerradasAntesDelRojo: number;
   focoEnRojo: boolean;
@@ -319,6 +344,8 @@ function relatoHuella(args: {
     reorders,
     postergas,
     quitadas,
+    selladas,
+    minutosGanados,
     cerroUltimoATiempo,
     cerradasAntesDelRojo,
     focoEnRojo,
@@ -330,7 +357,7 @@ function relatoHuella(args: {
     return "No montaste el límite sobre el vehículo: el reloj no llegó a rojo. Atención.";
   }
   if (nVeh > HUELLA_ORDEN_UMBRAL) {
-    return `Listaste ${nVeh} vehículos en el desglosador. Orden.`;
+    return "Pensaste qué hacer y desglosaste. Orden interno: rompiste la inercia.";
   }
   if (cupoEdits > 0) {
     return cupoEdits === 1
@@ -350,7 +377,10 @@ function relatoHuella(args: {
   }
   if (horas >= 2 && nVeh >= 4) {
     const h = horas >= 10 ? Math.round(horas) : Math.round(horas * 10) / 10;
-    return `${nVeh} vehículos en ${h} h. Esa es la ganancia del desglosador.`;
+    return `${nVeh} vehículos en ${h} h. Oficio del bloque. Los PS de Jornada se quedan.`;
+  }
+  if (selladas > 0 || minutosGanados > 0) {
+    return "Los PS de Jornada se quedan. Oficio: el recuento frente a las horas.";
   }
   return "El desglosador entrena músculo: atención, orden, certeza, foco.";
 }
@@ -393,7 +423,7 @@ export function computeHuellaEnfoque(
     }),
     orden: scoreOrden(nVeh),
     certeza: scoreCerteza(state.cupoEdits),
-    ganancia: scoreGanancia(nVeh, minutosBloque, minutosGanados),
+    ganancia: scoreGanancia(nVeh, minutosBloque, minutosGanados, state.selladas),
     foco: scoreFoco({
       reorders: state.reorders,
       postergas: state.postergas,
@@ -425,6 +455,8 @@ export function computeHuellaEnfoque(
       reorders: state.reorders,
       postergas: state.postergas,
       quitadas: state.quitadas,
+      selladas: state.selladas,
+      minutosGanados,
       cerroUltimoATiempo: ultimoCerrado,
       cerradasAntesDelRojo,
       focoEnRojo,

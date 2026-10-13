@@ -64,8 +64,8 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
       </ul>
       {lecturas.length === 0 ? (
         <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
-          No hay etiqueta negativa. Solo músculo que se desarrolla en el
-          desglosador.
+          No hay etiqueta negativa. Los PS de Jornada se quedan. La huella lee
+          oficio y músculo.
         </p>
       ) : (
         <ul className="space-y-2">

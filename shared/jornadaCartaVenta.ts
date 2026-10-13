@@ -128,7 +128,7 @@ export const CARTA_ESCALERA: readonly EscaleraTier[] = [
     bullets: [
       "Segmentación por hábitos: contenedores claros (Desarrollo, Trabajo, Familia, Almuerzo).",
       "Ring de conquista para volumen y cantidad contable.",
-      "Ring de enfoque: huella de músculo — atención (sin llegar al rojo), orden (más de 3), certeza (editar minutos), foco (cerrar el último a tiempo).",
+      "Ring de enfoque: huella de músculo — atención (sin llegar al rojo), orden interno (pensar qué hacer, más de 3), certeza (editar minutos), ganancia (oficio 2–3 h; los PS se quedan), foco (cerrar el último a tiempo).",
     ],
   },
   {
