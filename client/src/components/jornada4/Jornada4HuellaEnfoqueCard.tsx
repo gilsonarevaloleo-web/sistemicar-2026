@@ -52,10 +52,20 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
           </p>
         </div>
       </div>
+      <ul className="space-y-0.5">
+        {HUELLA_EJES.map(eje => (
+          <li key={eje.id} className="text-[10px] leading-snug" style={{ color: MUTED }}>
+            <span className="font-bold" style={{ color: INK }}>
+              {eje.label}.
+            </span>{" "}
+            {eje.definicion}
+          </li>
+        ))}
+      </ul>
       {lecturas.length === 0 ? (
         <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
-          Reordenar, postergar y recortar en el ring deja huella. No hace falta
-          nombrar tareas extra en el desglosador.
+          No hay etiqueta negativa. Solo músculo que se desarrolla en el
+          desglosador.
         </p>
       ) : (
         <ul className="space-y-2">

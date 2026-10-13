@@ -23,7 +23,7 @@ export const RING_COPY = {
   ringHint:
     "El ring de enfoque es limitado — sella aquí solo lo que vas a sostener con tiempo. El resto ciérralo en Taller sin reloj.",
   huellaHint:
-    "Reordenar, postergar y recortar ya cuenta: es la huella del ring. No hace falta nombrar tareas extra.",
+    "Atención: no montar límites. Orden: más de 3. Certeza: editar minutos. Foco: quitar, reordenar, postergar y cerrar el último a tiempo. Es músculo.",
 } as const;
 
 export function ringBienvenidaParts(retoNumero: number): string[] {

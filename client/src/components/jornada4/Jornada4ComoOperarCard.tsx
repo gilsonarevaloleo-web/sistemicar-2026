@@ -79,9 +79,9 @@ export function Jornada4ComoOperarCard({
         </p>
       ) : (
         <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-          En el ring de enfoque, reordenar, postergar y recortar deja huella
-          (atención, orden, certeza, ganancia, foco). No hace falta nombrar
-          tareas extra.
+          Huella del desglosador: atención (no montar límites), orden (más de
+          3), certeza (editar minutos), foco (quitar, reordenar, postergar y
+          cerrar el último a tiempo). Es músculo, no etiqueta.
         </p>
       )}
       <div className="flex flex-wrap gap-2">

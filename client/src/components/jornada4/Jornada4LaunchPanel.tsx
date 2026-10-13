@@ -682,7 +682,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         {
                           id: "desglose" as const,
                           label: RING_BRAND.enfoque,
-                          hint: "Filas + meta · reordenar deja huella",
+                          hint: "Filas + meta · más de 3 es orden",
                           icon: ListTodo,
                         },
                       ] as const

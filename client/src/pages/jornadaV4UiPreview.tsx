@@ -122,6 +122,7 @@ function previewEnfoqueSeed(now = Date.now()): Vehicle {
     { id: "f1", texto: "Llamar a Tina", minutosCupo: 12 },
     { id: "f2", texto: "Cortar pretina", minutosCupo: 10 },
     { id: "f3", texto: "Revisar oleada", minutosCupo: 8 },
+    { id: "f4", texto: "Sellar evidencia", minutosCupo: 10 },
   ];
   return {
     id: "preview-enfoque",
@@ -151,14 +152,15 @@ function previewEnfoqueSeed(now = Date.now()): Vehicle {
     ringHuella: {
       ...seedRingHuella({
         launchedAt: now - 18 * 60_000,
-        filasLaunch: 3,
-        minutosLaunch: 30,
+        filasLaunch: 4,
+        minutosLaunch: 120,
         tieneMeta: true,
         ordenLaunchIds: filas.map(f => f.id),
       }),
       reorders: 2,
       postergas: 1,
       quitadas: 1,
+      cupoEdits: 2,
     },
   } as Vehicle;
 }

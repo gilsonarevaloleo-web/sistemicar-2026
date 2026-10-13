@@ -52,6 +52,7 @@ export function HuellaEnfoqueStrip({ vehicle, nowMs, emphasize = false }: Props)
             key={eje.id}
             className="text-[9px] font-bold tabular-nums"
             style={{ color: MUTED }}
+            title={eje.definicion}
             data-testid={`j4-huella-eje-${eje.id}`}
           >
             {eje.label}{" "}
@@ -62,6 +63,18 @@ export function HuellaEnfoqueStrip({ vehicle, nowMs, emphasize = false }: Props)
       <p className="text-[10px] leading-snug" style={{ color: emphasize ? INK : MUTED }}>
         {lectura.relato}
       </p>
+      {emphasize ? (
+        <ul className="space-y-0.5 pt-1">
+          {HUELLA_EJES.map(eje => (
+            <li key={eje.id} className="text-[9px] leading-snug" style={{ color: MUTED }}>
+              <span className="font-bold" style={{ color: INK }}>
+                {eje.label}.
+              </span>{" "}
+              {eje.definicion}
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
