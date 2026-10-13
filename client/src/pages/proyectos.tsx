@@ -97,7 +97,9 @@ import { formatDuracionTimon, formatHorasCerradas, hydratePresenciaEpisodio, hyd
 import { PROYECTO_PALETTE, resolveProyectoColor } from "@/lib/proyectoColor";
 import { ProyectoColorSwatches } from "@/components/ProyectoColorSwatches";
 import { ProyectoFigura } from "@/components/ProyectoFigura";
+import { ProyectoPulso } from "@/components/ProyectoPulso";
 import { computeFiguraDesdeNido } from "@/lib/figuraProyecto";
+import { computePulsoDesdeNido } from "@/lib/nidoPulso";
 
 const PIZARRA = "#0a0a0a";
 const CYAN = "#00FFC3";
@@ -397,6 +399,8 @@ export default function ProyectosPage() {
   /** Pulso breve en la flecha + tarjeta para confirmar que el orden ya se aplicó. */
   const [ordenPulse, setOrdenPulse] = useState<{ id: string; dir: "up" | "down" } | null>(null);
   const ordenPulseTimerRef = useRef<number | null>(null);
+  /** Recencia del pulso (hace N h) sin un tick por segundo. */
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const detailIdRef = useRef(detailId);
   detailIdRef.current = detailId;
   const proyectosLenRef = useRef(0);
@@ -520,6 +524,11 @@ export default function ProyectosPage() {
     return () => {
       if (ordenPulseTimerRef.current) window.clearTimeout(ordenPulseTimerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -658,22 +667,56 @@ export default function ProyectosPage() {
     ]
   );
 
-  const figurasListado = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof computeFiguraDesdeNido>>();
-    if (!user || detailId) return map;
+  const pulsoDetalle = useMemo(
+    () =>
+      computePulsoDesdeNido({
+        createdAt: proyecto?.createdAt,
+        peldanos,
+        liveTimon: timonHydrated,
+        gasto: proyecto?.gastoTiempo,
+        presenciaEpisodio: presenciaHydrated,
+        now: nowMs,
+      }),
+    [
+      proyecto?.createdAt,
+      proyecto?.gastoTiempo,
+      presenciaHydrated,
+      peldanos,
+      timonHydrated,
+      nowMs,
+    ]
+  );
+
+  const nidoVistaListado = useMemo(() => {
+    const figuras = new Map<string, ReturnType<typeof computeFiguraDesdeNido>>();
+    const pulsos = new Map<string, ReturnType<typeof computePulsoDesdeNido>>();
+    if (!user || detailId) return { figuras, pulsos };
     for (const p of proyectos) {
-      map.set(
+      const pel = getPeldanosByProyectoLocal(user.uid, p.id);
+      figuras.set(
         p.id,
         computeFiguraDesdeNido({
           etiqueta: p.etiqueta,
-          peldanos: getPeldanosByProyectoLocal(user.uid, p.id),
+          peldanos: pel,
           gasto: p.gastoTiempo,
           presenciaEpisodio: p.presenciaEpisodio,
         })
       );
+      pulsos.set(
+        p.id,
+        computePulsoDesdeNido({
+          createdAt: p.createdAt,
+          peldanos: pel,
+          gasto: p.gastoTiempo,
+          presenciaEpisodio: p.presenciaEpisodio,
+          now: nowMs,
+        })
+      );
     }
-    return map;
-  }, [user, proyectos, detailId]);
+    return { figuras, pulsos };
+  }, [user, proyectos, detailId, nowMs]);
+  const figurasListado = nidoVistaListado.figuras;
+  const pulsosListado = nidoVistaListado.pulsos;
 
   const refreshOleadaPeldanoLocal = useCallback(
     (updated: ProyectoPeldano | null) => {
@@ -996,6 +1039,10 @@ export default function ProyectosPage() {
           <ProyectoIcono etiqueta={proyecto.etiqueta} color={tint} size={24} />
         </div>
 
+        <div className="mb-3">
+          <ProyectoPulso pulso={pulsoDetalle} tint={tint} testId="hub-pulso" />
+        </div>
+
         <HubCollapsible
           title="Nido"
           tint="#64748b"
@@ -1026,8 +1073,9 @@ export default function ProyectosPage() {
             />
           </div>
 
-          <div className="mb-3">
+          <div className="mb-3 space-y-2">
             <ProyectoFigura estado={figuraDetalle} tint={tint} />
+            <ProyectoPulso pulso={pulsoDetalle} tint={tint} compact testId="hub-pulso-figura" />
           </div>
 
           <div className="flex gap-2">
@@ -1157,6 +1205,12 @@ export default function ProyectosPage() {
                   <span className="text-slate-300">Figura</span> — lo ya enviado al timón.
                   Diez envíos de enfoque revelan un miembro. La conquista da masa,
                   no contorno. El hueco es el siguiente trozo, no una mascota.
+                </li>
+                <li>
+                  <span className="text-slate-300">Pulso</span> — días desde que el nido
+                  existe, horas reales de enfoque (Dirección), y cuándo fue el último
+                  envío. La figura es el cuerpo; el pulso dice si sigue vivo. Presencia
+                  no cuenta.
                 </li>
               </ul>
             </HubCollapsible>
@@ -1889,6 +1943,16 @@ export default function ProyectosPage() {
                         tint={tintCard}
                         compact
                         testId={`hub-figura-compact-${p.id}`}
+                      />
+                    </div>
+                  ) : null}
+                  {pulsosListado.get(p.id) ? (
+                    <div className="mt-1.5">
+                      <ProyectoPulso
+                        pulso={pulsosListado.get(p.id)!}
+                        tint={tintCard}
+                        compact
+                        testId={`hub-pulso-compact-${p.id}`}
                       />
                     </div>
                   ) : null}
