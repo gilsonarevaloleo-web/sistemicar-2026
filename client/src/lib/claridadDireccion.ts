@@ -1,4 +1,4 @@
-import { resolveProyectoEtiqueta, type ProyectoEtiqueta } from "./nidoNaturaleza";
+import { type ProyectoEtiqueta } from "./nidoNaturaleza";
 
 export type { ProyectoEtiqueta };
 export type RutaMentalId = "a" | "b" | "c";
@@ -65,56 +65,11 @@ export function normalizeRutasMentales(rutas: RutasMentalesSet): RutasMentalesSe
 }
 
 function pasosClaridad(
-  etiqueta: ProyectoEtiqueta,
+  _etiqueta: ProyectoEtiqueta,
   foco: string,
   profundidad: ClaridadProfundidad
 ): RutaMental["pasos"] {
-  const kind = resolveProyectoEtiqueta(etiqueta);
-  const f =
-    foco.trim() ||
-    (kind === "centro" ? "Este centro" : kind === "consciencia" ? "Este darse cuenta" : "Este proyecto");
-  if (kind === "consciencia") {
-    if (profundidad === "ligera") {
-      return [
-        { numero: 1, titulo: `${f} — qué estoy viendo en este bloque` },
-        { numero: 2, titulo: `${f} — qué información dejo registrada` },
-        { numero: 3, titulo: `${f} — cómo cierro el darse cuenta sin convertirlo en tarea` },
-      ];
-    }
-    if (profundidad === "media") {
-      return [
-        { numero: 1, titulo: `${f} — qué se hizo visible ahora` },
-        { numero: 2, titulo: `${f} — qué registro queda (sin peldaño)` },
-        { numero: 3, titulo: `${f} — qué dejo de forzar como crecimiento` },
-      ];
-    }
-    return [
-      { numero: 1, titulo: `${f} — mapa de lo visto (no de lo conquistado)` },
-      { numero: 2, titulo: `${f} — evidencia del darse cuenta` },
-      { numero: 3, titulo: `${f} — cierre: información, no escalera` },
-    ];
-  }
-  if (kind === "centro") {
-    if (profundidad === "ligera") {
-      return [
-        { numero: 1, titulo: `${f} — qué debo cumplir en este bloque` },
-        { numero: 2, titulo: `${f} — qué cierro para no arrastrar deuda` },
-        { numero: 3, titulo: `${f} — qué dejo listo para el siguiente turno` },
-      ];
-    }
-    if (profundidad === "media") {
-      return [
-        { numero: 1, titulo: `${f} — deber concreto del bloque` },
-        { numero: 2, titulo: `${f} — entrega mínima exigible` },
-        { numero: 3, titulo: `${f} — cierre de deber sin fuga mental` },
-      ];
-    }
-    return [
-      { numero: 1, titulo: `${f} — mapa del deber (qué, cuándo, límite)` },
-      { numero: 2, titulo: `${f} — entrega verificable del bloque` },
-      { numero: 3, titulo: `${f} — handoff: qué queda resuelto` },
-    ];
-  }
+  const f = foco.trim() || "Este proyecto";
   // Ideas/oleada: horizontes que pueden abarcar varios días — no un segmento suelto.
   if (profundidad === "ligera") {
     return [
@@ -248,12 +203,7 @@ export function refreshClaridadPaso1(
     const profundidad = migrateProfundidad(r.perfil as string);
     const pasoPuerta: RutaMentalPaso = {
       numero: 1,
-      titulo:
-        resolveProyectoEtiqueta(etiqueta) === "centro"
-          ? `${puerta} — qué debo cumplir en este hueco de hoy`
-          : resolveProyectoEtiqueta(etiqueta) === "consciencia"
-            ? `${puerta} — qué me doy cuenta hoy, sin trepar`
-            : `${puerta} — qué abro hoy sobre la oleada`,
+      titulo: `${puerta} — qué abro hoy sobre la oleada`,
     };
     const freshOleada = pasosClaridad(etiqueta, oleada, profundidad);
     rutasOut[id] = {

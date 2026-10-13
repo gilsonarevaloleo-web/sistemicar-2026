@@ -5,8 +5,7 @@
  */
 import type { SegmentoV5, SubVehiculo, Vehicle } from "./persistence";
 import { feedsProyectoHub, resolveDestinoCierre } from "./destinoCierre";
-import { nidoFeedsEscalera } from "./nidoNaturaleza";
-import { getProyectosLocal, registrarPasoEjecutadoEnProyecto } from "./proyectos";
+import { registrarPasoEjecutadoEnProyecto } from "./proyectos";
 import { resolveDireccionDesdeEntidades } from "./resolveDireccionProyecto";
 
 export async function syncDesglosadorSubToProyectoHub(
@@ -26,9 +25,6 @@ export async function syncDesglosadorSubToProyectoHub(
     segmento: segmento ?? null,
   });
   if (!proyectoId) {
-    return { pasoNumero: null, proyectoId };
-  }
-  if (!nidoFeedsEscalera(getProyectosLocal(userId).find(p => p.id === proyectoId)?.etiqueta)) {
     return { pasoNumero: null, proyectoId };
   }
 

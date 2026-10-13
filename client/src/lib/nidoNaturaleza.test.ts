@@ -4,42 +4,40 @@ import {
   feedsEscaleraNido,
   filterNidosPorNaturaleza,
   nidoFeedsEscalera,
-  nidoLabel,
   nidoRequiereOleada,
   nidoRiesgoEnsuciar,
   resolveProyectoEtiqueta,
 } from "./nidoNaturaleza.ts";
 
 describe("nidoNaturaleza", () => {
-  it("ids internos se leen como crecimiento / control / darse cuenta", () => {
-    assert.equal(nidoLabel("proyecto"), "Crecimiento");
-    assert.equal(nidoLabel("centro"), "Control");
-    assert.equal(nidoLabel("consciencia"), "Darse cuenta");
+  it("ids internos se conservan; el comportamiento ya no parte por familia", () => {
+    assert.equal(resolveProyectoEtiqueta("proyecto"), "proyecto");
+    assert.equal(resolveProyectoEtiqueta("centro"), "centro");
+    assert.equal(resolveProyectoEtiqueta("consciencia"), "consciencia");
     assert.equal(resolveProyectoEtiqueta("otra"), "proyecto");
   });
 
-  it("solo crecimiento y control trepan la escalera; darse cuenta no", () => {
-    assert.equal(nidoFeedsEscalera("proyecto"), true);
-    assert.equal(nidoFeedsEscalera("centro"), true);
-    assert.equal(nidoFeedsEscalera("consciencia"), false);
-    assert.equal(nidoRequiereOleada("consciencia"), false);
-    assert.equal(nidoRequiereOleada("proyecto"), true);
+  it("todo nido exige oleada y alimenta la escalera", () => {
+    for (const e of ["proyecto", "centro", "consciencia", "otra"] as const) {
+      assert.equal(nidoFeedsEscalera(e), true);
+      assert.equal(nidoRequiereOleada(e), true);
+    }
   });
 
-  it("rumbo a DESCANSO cuenta Dirección del día pero no escribe peldaños", () => {
+  it("la escalera la decide el destino, no la etiqueta", () => {
     assert.equal(feedsEscaleraNido("peldano", "proyecto"), true);
-    assert.equal(feedsEscaleraNido("peldano", "consciencia"), false);
+    assert.equal(feedsEscaleraNido("peldano", "consciencia"), true);
     assert.equal(feedsEscaleraNido("presencia", "proyecto"), false);
     assert.equal(feedsEscaleraNido("presencia", "consciencia"), false);
   });
 
-  it("el riesgo de consciencia niega peldaños", () => {
-    assert.match(nidoRiesgoEnsuciar("DESCANSO", "consciencia"), /no sube peldaños/i);
+  it("el riesgo de cualquier nido nombra la escalera", () => {
+    assert.match(nidoRiesgoEnsuciar("DESCANSO", "consciencia"), /escalera/);
     assert.match(nidoRiesgoEnsuciar("Costura", "proyecto"), /escalera/);
-    assert.match(nidoRiesgoEnsuciar("Taller", "centro"), /deber/);
+    assert.match(nidoRiesgoEnsuciar("Taller", "centro"), /escalera/);
   });
 
-  it("el filtro del Hub parte por naturaleza", () => {
+  it("el agrupado por etiqueta guardada sigue leyendo el dato", () => {
     const list = [
       { id: "1", etiqueta: "proyecto" as const },
       { id: "2", etiqueta: "centro" as const },

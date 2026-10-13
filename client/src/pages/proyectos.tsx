@@ -11,7 +11,6 @@ import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Eye,
   Layers,
   Plus,
   ChevronDown,
@@ -21,7 +20,6 @@ import {
   ArrowLeft,
   Trash2,
   RotateCcw,
-  Sparkles,
   TrendingUp,
   Link2,
   Pencil,
@@ -59,7 +57,6 @@ import {
   formatCuandoProduccion,
   type Proyecto,
   type ProyectoPeldano,
-  type ProyectoEtiqueta,
   type OleadaPuntoStatus,
 } from "@/lib/proyectos";
 import {
@@ -83,14 +80,6 @@ import { sintetizarPasosCrisol } from "@/lib/sintetizarPasosCrisol";
 import { getJournalDateString } from "@/lib/segmentTime";
 import { getLocalVehicles } from "@/lib/persistence";
 import { JORNADA_MODULE } from "@/lib/jornadaBrand";
-import { NidoNaturalezaPicker } from "@/components/NidoNaturalezaPicker";
-import {
-  filterNidosPorNaturaleza,
-  nidoFeedsEscalera,
-  nidoLabel,
-  nidoNaturaleza,
-  type NidoFiltro,
-} from "@/lib/nidoNaturaleza";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { resolveMinutosNorteDisplay } from "@/lib/rutaMinutosSituacionProyecto";
 import { formatDuracionTimon, formatHorasCerradas, hydratePresenciaEpisodio, hydrateTimonEpisodio } from "@/lib/timonHoras";
@@ -210,20 +199,13 @@ function BotonesDireccion({
 }
 
 function ProyectoIcono({
-  etiqueta,
   color,
   size = 22,
 }: {
-  etiqueta: ProyectoEtiqueta;
   color?: string;
   size?: number;
 }) {
-  const kind = etiqueta;
-  const tint =
-    color ?? (kind === "centro" ? GOLD : kind === "consciencia" ? "#A78BFA" : CYAN);
-  if (kind === "consciencia") return <Eye size={size} style={{ color: tint }} />;
-  if (kind === "centro") return <Sparkles size={size} style={{ color: tint }} />;
-  return <TrendingUp size={size} style={{ color: tint }} />;
+  return <TrendingUp size={size} style={{ color: color ?? CYAN }} />;
 }
 
 /** Sección colapsable del detalle Hub — acorta el scroll largo. */
@@ -301,10 +283,9 @@ function NuevoProyectoForm({
 }: {
   creating: boolean;
   onCancel: () => void;
-  onCreate: (data: { titulo: string; etiqueta: ProyectoEtiqueta; nota: string }) => void | Promise<void>;
+  onCreate: (data: { titulo: string; nota: string }) => void | Promise<void>;
 }) {
   const [titulo, setTitulo] = useState("");
-  const [etiqueta, setEtiqueta] = useState<ProyectoEtiqueta>("proyecto");
   const [nota, setNota] = useState("");
 
   return (
@@ -321,7 +302,7 @@ function NuevoProyectoForm({
         onKeyDown={e => {
           if (e.key === "Enter") {
             e.preventDefault();
-            void onCreate({ titulo, etiqueta, nota });
+            void onCreate({ titulo, nota });
           }
         }}
         placeholder="Nombre (ej: Costura, Salud…)"
@@ -330,7 +311,10 @@ function NuevoProyectoForm({
         autoComplete="off"
         data-testid="input-nuevo-proyecto-titulo"
       />
-      <NidoNaturalezaPicker value={etiqueta} onChange={setEtiqueta} />
+      <p className="text-[8px] text-slate-500 leading-relaxed">
+        Todo nido mide producción. Después nombra la oleada y el bloque
+        (ej: primeros 7 días — ¿cuántas horas?).
+      </p>
       <textarea
         value={nota}
         onChange={e => setNota(e.target.value)}
@@ -349,7 +333,7 @@ function NuevoProyectoForm({
         </button>
         <button
           type="button"
-          onClick={() => void onCreate({ titulo, etiqueta, nota })}
+          onClick={() => void onCreate({ titulo, nota })}
           disabled={creating || !titulo.trim()}
           className="flex-1 py-2 rounded-lg text-[10px] font-bold uppercase disabled:opacity-50"
           style={{ backgroundColor: CYAN, color: "#000" }}
@@ -376,7 +360,6 @@ export default function ProyectosPage() {
   const [peldanos, setPeldanos] = useState<ProyectoPeldano[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [filtroNido, setFiltroNido] = useState<NidoFiltro>("todos");
   const [newIdeaTitulo, setNewIdeaTitulo] = useState("");
   const [expandedConq, setExpandedConq] = useState<string | null>(null);
   const [notaEdit, setNotaEdit] = useState("");
@@ -807,7 +790,7 @@ export default function ProyectosPage() {
   };
 
   const handleCreateProyecto = useCallback(
-    async (data: { titulo: string; etiqueta: ProyectoEtiqueta; nota: string }) => {
+    async (data: { titulo: string; nota: string }) => {
       if (!user || creatingProyecto) return;
       const titulo = data.titulo.trim();
       if (!titulo) {
@@ -819,7 +802,7 @@ export default function ProyectosPage() {
         const color = PROYECTO_PALETTE[proyectosLenRef.current % PROYECTO_PALETTE.length];
         const p = await addProyecto(user.uid, {
           titulo,
-          etiqueta: data.etiqueta,
+          etiqueta: "proyecto",
           nota: data.nota.trim() || undefined,
           color,
         });
@@ -913,22 +896,6 @@ export default function ProyectosPage() {
     }
   };
 
-  const handleSetEtiqueta = async (etiqueta: ProyectoEtiqueta) => {
-    if (!user || !detailId || !proyecto || etiqueta === proyecto.etiqueta) return;
-    const updated = await updateProyecto(user.uid, detailId, { etiqueta });
-    if (updated) {
-      setProyecto(updated);
-      setProyectos(getProyectosLocal(user.uid));
-      toast.success(
-        etiqueta === "consciencia"
-          ? "Este nido registra darse cuenta. Ya no trepa peldaños."
-          : etiqueta === "centro"
-            ? "Este nido es control: deber, no expansión."
-            : "Este nido es crecimiento: oleada y escalera."
-      );
-    }
-  };
-
   if (!user) {
     return (
       <div className="p-6 text-center text-slate-500 text-sm min-h-screen" style={{ backgroundColor: "#020202" }}>
@@ -965,16 +932,10 @@ export default function ProyectosPage() {
 
   if (detailReady && proyecto) {
     const tint = resolveProyectoColor(proyecto.id, proyecto.color);
-    const naturaleza = nidoNaturaleza(proyecto.etiqueta);
-    const trepa = nidoFeedsEscalera(proyecto.etiqueta);
     const objetivoLabel =
       oleadaTituloEdit.trim() ||
       oleadaActiva?.titulo ||
-      (naturaleza.id === "centro"
-        ? "Define el deber de esta oleada"
-        : naturaleza.id === "consciencia"
-          ? "Este nido registra lo visto — no pide oleada"
-          : "Define el objetivo de esta oleada");
+      "Define el objetivo de esta oleada";
 
     return (
       <div className="p-4 md:p-6 max-w-lg mx-auto min-h-screen pb-32" style={{ backgroundColor: "#020202" }}>
@@ -989,11 +950,11 @@ export default function ProyectosPage() {
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
             <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500">
-              {nidoLabel(proyecto.etiqueta)}
+              Nido
             </span>
             <h1 className="text-lg font-black text-white truncate leading-tight">{proyecto.titulo}</h1>
           </div>
-          <ProyectoIcono etiqueta={proyecto.etiqueta} color={tint} size={24} />
+          <ProyectoIcono color={tint} size={24} />
         </div>
 
         <HubCollapsible
@@ -1002,18 +963,6 @@ export default function ProyectosPage() {
           defaultOpen={false}
           testId="hub-nido-ajustes"
         >
-          <div className="mb-3">
-            <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
-              Naturaleza del nido
-            </p>
-            <NidoNaturalezaPicker
-              value={proyecto.etiqueta}
-              onChange={e => void handleSetEtiqueta(e)}
-              disabled={focoBusy !== null}
-              testId="hub-naturaleza"
-            />
-          </div>
-
           <div className="mb-3">
             <p className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
               Color del proyecto
@@ -1109,40 +1058,26 @@ export default function ProyectosPage() {
               testId="hub-enfoque-glosario"
             >
               <ul className="text-[9px] text-slate-500 leading-relaxed space-y-0.5">
-                {trepa ? (
-                  <>
-                    <li>
-                      <span className="text-slate-300">Oleada</span> — la campaña (acabar casacas small).
-                    </li>
-                    <li>
-                      <span className="text-slate-300">Punto de producción</span> — el timón. Suma
-                      el trabajo de cada vehículo de este enfoque (30 min + 15 min = 45 min).
-                      Cumplir el timón sella el peldaño. No copia vehículos de otro punto.
-                    </li>
-                    <li>
-                      <span className="text-slate-300">Peldaño</span> — una estancia ya caminada en un
-                      timón: las horas de ese enfoque, no cada vehículo.
-                    </li>
-                    <li>
-                      <span className="text-slate-300">Escalera</span> — peldaños sellados, lo ya
-                      caminado.
-                    </li>
-                  </>
-                ) : (
-                  <>
-                    <li>
-                      <span className="text-slate-300">Darse cuenta</span> — información, no pasos.
-                      DESCANSO o verdad viven aquí sin trepar.
-                    </li>
-                    <li>
-                      <span className="text-slate-300">Registro</span> — el tiempo se ve en el gasto
-                      de conciencia. No sella peldaños ni pide oleada.
-                    </li>
-                  </>
-                )}
+                <li>
+                  <span className="text-slate-300">Oleada</span> — la campaña (acabar casacas small,
+                  primeros 7 días de medición).
+                </li>
+                <li>
+                  <span className="text-slate-300">Punto de producción</span> — el bloque nombrado.
+                  Suma el trabajo de cada vehículo de este enfoque (30 min + 15 min = 45 min).
+                  Cumplir el timón sella el peldaño. No copia vehículos de otro punto.
+                </li>
+                <li>
+                  <span className="text-slate-300">Peldaño</span> — una estancia ya caminada en un
+                  timón: las horas de ese enfoque, no cada vehículo.
+                </li>
+                <li>
+                  <span className="text-slate-300">Escalera</span> — peldaños sellados, lo ya
+                  caminado.
+                </li>
                 <li>
                   <span className="text-slate-300">Dirección</span> — rumbo: este nido es la casa.
-                  No es sinónimo de crecimiento.
+                  El punto nombra el bloque que se mide.
                 </li>
                 <li>
                   <span className="text-slate-300">Capítulo</span> — oleada cerrada. No estorba
@@ -1187,7 +1122,7 @@ export default function ProyectosPage() {
               ) : null}
             </div>
 
-            {trepa && oleadaPeldano ? (
+            {oleadaPeldano ? (
               <OleadaDesglosePanel
                 puntos={oleadaPuntos}
                 puntoProduccionId={oleadaPeldano.puntoProduccionId}
@@ -1210,9 +1145,9 @@ export default function ProyectosPage() {
                 data-testid="hub-oleada-desglose-sin-oleada"
               >
                 <p className="text-[10px] text-slate-500 leading-relaxed">
-                  {trepa
-                    ? "Activa una idea como oleada y marca un punto de producción. Hasta entonces los vehículos no pueden llegar a Dirección: presencia cubre el día sin ensuciar el nido."
-                    : "Este nido ya recibe Dirección: el envío se registra como darse cuenta. No hace falta oleada ni punto de producción."}
+                  Activa una idea como oleada y marca un punto de producción
+                  (el bloque con nombre). Hasta entonces los vehículos no pueden
+                  llegar a Dirección: presencia cubre el día sin ensuciar el nido.
                 </p>
               </div>
             )}
@@ -1335,7 +1270,7 @@ export default function ProyectosPage() {
               </div>
             </div>
 
-            {oleadaPeldano && trepa && (
+            {oleadaPeldano && (
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -1434,13 +1369,7 @@ export default function ProyectosPage() {
                         <input
                           value={oleadaTituloEdit}
                           onChange={e => setOleadaTituloEdit(e.target.value)}
-                          placeholder={
-                            naturaleza.id === "centro"
-                              ? "Ej: Lote entrega viernes — 10 días"
-                              : naturaleza.id === "consciencia"
-                                ? "Ej: DESCANSO — lo que se ve, no se trepa"
-                                : "Ej: Módulo pagos — sprint 10 días"
-                          }
+                          placeholder="Ej: Primeros 7 días de medición"
                           className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none"
                           data-testid="input-oleada-titulo"
                         />
@@ -1448,7 +1377,6 @@ export default function ProyectosPage() {
                           <RutasMentalesEditor
                             rutas={claridadEdit}
                             onChange={setClaridadEdit}
-                            etiqueta={proyecto.etiqueta}
                             desdeProyecto
                             ocultarGrafo
                           />
@@ -1480,7 +1408,7 @@ export default function ProyectosPage() {
           {/* ——— Jornada: accesos compactos a bloques de hoy ——— */}
           <TabsContent value="jornada" className="mt-0 space-y-3 focus-visible:ring-0">
             <p className="text-[9px] text-slate-500 leading-relaxed">
-              Bloques de tiempo de hoy vinculados a este {nidoLabel(proyecto.etiqueta).toLowerCase()}. La dirección vive en Enfoque —
+              Bloques de tiempo de hoy vinculados a este nido. La dirección vive en Enfoque —
               aquí solo el acceso al hueco.
             </p>
             {enCursoPlan.length === 0 ? (
@@ -1750,9 +1678,6 @@ export default function ProyectosPage() {
     );
   }
 
-  const nidosVisibles = filterNidosPorNaturaleza(proyectos, filtroNido);
-  const filtroActivo = filtroNido !== "todos";
-
   return (
     <div className="p-4 md:p-6 max-w-lg mx-auto min-h-screen pb-32" style={{ backgroundColor: "#020202" }}>
       <header className="mb-6">
@@ -1762,33 +1687,10 @@ export default function ProyectosPage() {
           Nidos de dirección
         </h1>
         <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">
-          Dirección es rumbo — la conciencia tiene casa. No todo lo que llega es
-          crecimiento: filtra entre crecer, controlar o darse cuenta (sin peldaños).
+          Todo nido mide producción. Dirección pide oleada y un punto con nombre —
+          el bloque adonde mandas los vehículos.
         </p>
       </header>
-
-      <div className="flex gap-1.5 mb-4" data-testid="hub-filtro-naturaleza">
-        {(["todos", "proyecto", "centro", "consciencia"] as const).map(f => {
-          const on = filtroNido === f;
-          const label = f === "todos" ? "Todos" : nidoLabel(f);
-          return (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFiltroNido(f)}
-              className="flex-1 py-2 rounded-lg text-[8px] font-black uppercase tracking-wider"
-              style={
-                on
-                  ? { backgroundColor: `${CYAN}22`, color: CYAN, border: `1px solid ${CYAN}50` }
-                  : { color: "#64748b", border: "1px solid rgba(255,255,255,0.08)" }
-              }
-              data-testid={`hub-filtro-${f}`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
 
       <button
         onClick={() => setShowNew(true)}
@@ -1815,21 +1717,11 @@ export default function ProyectosPage() {
           <Layers size={32} className="mx-auto mb-3 text-slate-600" />
           <p className="text-sm text-slate-500">Sin nidos aún</p>
         </div>
-      ) : nidosVisibles.length === 0 ? (
-        <div
-          className="text-center py-12 border border-dashed border-white/10 rounded-xl"
-          data-testid="hub-filtro-vacio"
-        >
-          <p className="text-sm text-slate-500">
-            No hay nidos de {nidoLabel(filtroNido === "todos" ? "proyecto" : filtroNido).toLowerCase()}.
-          </p>
-        </div>
       ) : (
         <div className="space-y-3">
-          {nidosVisibles.map((p, idx) => {
+          {proyectos.map((p, idx) => {
             const tintCard = resolveProyectoColor(p.id, p.color);
             const pulsing = ordenPulse?.id === p.id;
-            const trepaCard = nidoFeedsEscalera(p.etiqueta);
             return (
             <motion.div
               key={p.id}
@@ -1847,8 +1739,8 @@ export default function ProyectosPage() {
                 <BotonesDireccion
                   tint={tintCard}
                   pulseDir={pulsing ? ordenPulse?.dir : null}
-                  disabledUp={filtroActivo || idx === 0}
-                  disabledDown={filtroActivo || idx === nidosVisibles.length - 1}
+                  disabledUp={idx === 0}
+                  disabledDown={idx === proyectos.length - 1}
                   onUp={() => handleReorderProyecto(p.id, "up")}
                   onDown={() => handleReorderProyecto(p.id, "down")}
                   testIdUp={`proyecto-up-${p.id}`}
@@ -1864,17 +1756,15 @@ export default function ProyectosPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="text-[8px] font-bold uppercase text-slate-500">
-                        {nidoLabel(p.etiqueta)}
+                        Nido
                       </span>
                       <p className="text-base font-black text-white">{p.titulo}</p>
                     </div>
-                    <ProyectoIcono etiqueta={p.etiqueta} color={p.color} />
+                    <ProyectoIcono color={p.color} />
                   </div>
                   <div className="flex gap-4 mt-3 text-[9px] font-bold uppercase tracking-wider">
                     <span style={{ color: GOLD }}>
-                      {trepaCard
-                        ? `${p.peldanosConquistados} peldaños`
-                        : "Registro · sin peldaños"}
+                      {p.peldanosConquistados} peldaños
                     </span>
                     {p.profundidadMaxima && (
                       <span style={{ color: RUTA_BANDA_META[p.profundidadMaxima].color }}>
