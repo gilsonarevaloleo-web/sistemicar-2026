@@ -26,6 +26,7 @@ import {
   postergarFilaEnFocoACola,
 } from "@/jornada4/situacionKernel";
 import {
+  bumpProduccionSiCabe,
   bumpRingHuellaOnVehicle,
   huellaCierreCopy,
   sellRingHuella,
@@ -1054,7 +1055,7 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           );
           return;
         }
-        const ringHuella = bumpRingHuellaOnVehicle(vehicle, "sellar");
+        const ringHuella = bumpProduccionSiCabe(vehicle);
         paintVehicle(vehicleId, {
           subTareas: result.subTareas,
           situacionCronometro: result.situacionCronometro,

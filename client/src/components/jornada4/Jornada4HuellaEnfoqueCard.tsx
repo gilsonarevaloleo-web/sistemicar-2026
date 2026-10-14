@@ -1,5 +1,5 @@
 import { Fingerprint } from "lucide-react";
-import { computeHuellaEnfoque, HUELLA_EJES } from "@/jornada4/huellaEnfoque";
+import { computeHuellaPeriodo, HUELLA_EJES } from "@/jornada4/huellaEnfoque";
 import type { Vehicle } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
 import { J4_UI } from "./jornada4Ui";
@@ -11,7 +11,7 @@ type Props = {
   vehicles: Vehicle[];
 };
 
-function ringsConHuella(vehicles: Vehicle[]): Vehicle[] {
+function ringsDelDia(vehicles: Vehicle[]): Vehicle[] {
   return vehicles.filter(
     v =>
       v.tipoFlota === "situacion" &&
@@ -21,20 +21,11 @@ function ringsConHuella(vehicles: Vehicle[]): Vehicle[] {
 }
 
 /**
- * Espejo diario de la coreografía del ring. Sin tick 1s: compute puro.
+ * Gancho de cierre del día: una lectura por la suma de los desglosadores.
  */
 export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
-  const rings = ringsConHuella(vehicles);
-  const lecturas = rings.map(v => ({
-    id: v.id,
-    titulo: v.titulo,
-    vivo: v.status === "activo",
-    lectura: computeHuellaEnfoque(v),
-  }));
-  const media =
-    lecturas.length > 0
-      ? Math.round(lecturas.reduce((s, r) => s + r.lectura.huella, 0) / lecturas.length)
-      : 0;
+  const rings = ringsDelDia(vehicles);
+  const lectura = computeHuellaPeriodo(rings);
 
   return (
     <section
@@ -45,13 +36,32 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
         <div className="min-w-0">
           <p className={`${J4_UI.label} flex items-center gap-1`}>
             <Fingerprint size={10} style={{ color: VIOLET }} />
-            Huella de enfoque
+            Huella del día
           </p>
-          <p className={`${J4_UI.value} mt-0.5`} style={{ color: media >= 60 ? GOLD : INK }}>
-            {lecturas.length === 0 ? "—" : `${media}%`}
+          <p className={`${J4_UI.value} mt-0.5`} style={{ color: rings.length ? GOLD : INK }}>
+            {rings.length === 0 ? "—" : `${lectura.huella}%`}
           </p>
         </div>
       </div>
+      {rings.length === 0 ? (
+        <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
+          El gancho es el cierre del día: la suma de los desglosadores, no cada
+          vehículo. Los PS de Jornada se quedan.
+        </p>
+      ) : (
+        <>
+          <p className="text-[13px] leading-snug font-semibold" style={{ color: INK }}>
+            {lectura.relato}
+          </p>
+          <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+            {rings.length} desglosador{rings.length === 1 ? "" : "es"} · {lectura.vehiculos}{" "}
+            filas
+          </p>
+          <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+            {HUELLA_EJES.map(e => `${e.label} ${lectura[e.id]}`).join(" · ")}
+          </p>
+        </>
+      )}
       <ul className="space-y-0.5">
         {HUELLA_EJES.map(eje => (
           <li key={eje.id} className="text-[10px] leading-snug" style={{ color: MUTED }}>
@@ -62,38 +72,6 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
           </li>
         ))}
       </ul>
-      {lecturas.length === 0 ? (
-        <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
-          No hay etiqueta negativa. Los PS de Jornada se quedan. La huella lee
-          oficio y músculo.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {lecturas.map(item => (
-            <li key={item.id} className="space-y-0.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[12px] font-bold truncate" style={{ color: INK }}>
-                  {item.titulo}
-                  {item.vivo ? (
-                    <span className="ml-1 text-[9px] font-black uppercase" style={{ color: VIOLET }}>
-                      vivo
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-[12px] font-black tabular-nums shrink-0" style={{ color: GOLD }}>
-                  {item.lectura.huella}%
-                </p>
-              </div>
-              <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-                {HUELLA_EJES.map(e => `${e.label} ${item.lectura[e.id]}`).join(" · ")}
-              </p>
-              <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-                {item.lectura.relato}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   );
 }

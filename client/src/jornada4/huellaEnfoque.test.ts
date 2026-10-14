@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  bumpProduccionSiCabe,
   bumpRingHuella,
   bumpRingHuellaOnVehicle,
   computeHuellaEnfoque,
+  computeHuellaPeriodo,
   ensureRingHuella,
+  HUELLA_DECISION_UMBRAL,
   HUELLA_EJES,
-  HUELLA_ORDEN_UMBRAL,
+  HUELLA_RADIO_MIN,
   huellaCierreCopy,
   huellaEjesLine,
   mergeRingHuella,
@@ -32,6 +35,7 @@ function baseState(over: Partial<RingHuellaState> = {}): RingHuellaState {
 
 function ring(over: Partial<HuellaEnfoqueInput> = {}): HuellaEnfoqueInput {
   return {
+    id: "d1",
     aperturaAt: 1_000,
     situacionCronometro: {
       activo: true,
@@ -52,36 +56,39 @@ function ring(over: Partial<HuellaEnfoqueInput> = {}): HuellaEnfoqueInput {
 
 function sello(over: Partial<RingHuellaLectura> = {}): RingHuellaLectura {
   return {
-    atencion: 70,
-    orden: 80,
-    certeza: 90,
-    ganancia: 40,
+    decision: 70,
+    atencion: 80,
+    produccion: 40,
     foco: 75,
-    huella: 71,
+    orden: 60,
+    huella: 65,
     relato: "sellado",
     gestos: 1,
     minutosGanados: 4,
     vehiculos: 3,
     horasBloque: 0.5,
+    desglosadores: 1,
+    anadidas: 0,
+    atencionCierres: 0,
     ...over,
   };
 }
 
 describe("huellaEnfoque diccionario", () => {
-  it("nombra los cinco músculos sin etiqueta negativa", () => {
-    assert.equal(HUELLA_ORDEN_UMBRAL, 3);
-    assert.match(HUELLA_EJES.find(e => e.id === "atencion")!.definicion, /rojo/i);
-    assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /más de 3/);
-    assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /orden interno/i);
-    assert.match(HUELLA_EJES.find(e => e.id === "certeza")!.definicion, /editar los minutos/i);
-    assert.match(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /2–3 horas|2-3 horas/);
-    assert.match(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /PS se quedan/);
-    assert.doesNotMatch(HUELLA_EJES.find(e => e.id === "ganancia")!.definicion, /no es etiqueta de puntos/i);
-    assert.match(HUELLA_EJES.find(e => e.id === "foco")!.definicion, /último a tiempo/i);
-    assert.match(HUELLA_EJES.find(e => e.id === "foco")!.definicion, /músculo/i);
+  it("nombra los cinco músculos del desglosador", () => {
+    assert.equal(HUELLA_DECISION_UMBRAL, 3);
+    assert.equal(HUELLA_RADIO_MIN, 5);
+    assert.match(HUELLA_EJES.find(e => e.id === "decision")!.definicion, /primera lista/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "decision")!.definicion, /disponibilidad/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "atencion")!.definicion, /5 minutos antes/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "produccion")!.definicion, /después del lanzamiento/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "foco")!.definicion, /radio de 5/i);
+    assert.match(HUELLA_EJES.find(e => e.id === "orden")!.definicion, /quitar/i);
+    assert.equal(HUELLA_EJES.some(e => e.id === "certeza"), false);
+    assert.equal(HUELLA_EJES.some(e => e.id === "ganancia"), false);
   });
 
-  it("siembra y acumula gestos de coreografía, no de cierre", () => {
+  it("siembra y acumula gestos de coreografía", () => {
     const seeded = seedRingHuella({
       launchedAt: 10,
       filasLaunch: 2,
@@ -89,7 +96,7 @@ describe("huellaEnfoque diccionario", () => {
       tieneMeta: true,
       ordenLaunchIds: ["x", "y"],
     });
-    assert.equal(seeded.reorders, 0);
+    assert.equal(seeded.anadidas, 0);
     const bumped = bumpRingHuella(
       bumpRingHuella(bumpRingHuella(seeded, "reorder"), "postergar"),
       "quitar"
@@ -97,7 +104,6 @@ describe("huellaEnfoque diccionario", () => {
     assert.equal(bumped.reorders, 1);
     assert.equal(bumped.postergas, 1);
     assert.equal(bumped.quitadas, 1);
-    assert.equal(bumped.selladas, 0);
   });
 
   it("ensure crea semilla de fallback sin inventar gestos", () => {
@@ -118,21 +124,23 @@ describe("huellaEnfoque diccionario", () => {
     assert.equal(h.tieneMeta, true);
     assert.deepEqual(h.ordenLaunchIds, ["1", "2"]);
     assert.equal(h.reorders, 0);
+    assert.equal(h.anadidas, 0);
   });
 
   it("merge conserva el lado con más gestos y el sello", () => {
-    const local = { ...baseState(), reorders: 3, postergas: 1 };
+    const local = { ...baseState(), reorders: 3, postergas: 1, anadidas: 2 };
     const remote = { ...baseState(), reorders: 1, sello: sello() };
     const m = mergeRingHuella(remote, local);
     assert.ok(m);
     assert.equal(m!.reorders, 3);
     assert.equal(m!.postergas, 1);
-    assert.equal(m!.sello?.huella, 71);
+    assert.equal(m!.anadidas, 2);
+    assert.equal(m!.sello?.huella, 65);
   });
 
-  it("orden se desarrolla al listar más de 3 vehículos", () => {
+  it("decisión es solo la primera lista; añadir después no la sube", () => {
     const tres = computeHuellaEnfoque(ring(), 1_000);
-    const cuatro = computeHuellaEnfoque(
+    const cuatroLaunch = computeHuellaEnfoque(
       ring({
         subTareas: [
           { id: "a", enDesgloseCronometro: true, minutosCupo: 8 },
@@ -144,12 +152,20 @@ describe("huellaEnfoque diccionario", () => {
       }),
       1_000
     );
-    assert.ok(tres.orden < 70, `orden 3: ${tres.orden}`);
-    assert.ok(cuatro.orden >= 78, `orden 4: ${cuatro.orden}`);
-    assert.match(cuatro.relato, /orden interno|inercia/i);
+    const tresMasAnadidas = computeHuellaEnfoque(
+      ring({
+        ringHuella: { ...baseState(), filasLaunch: 3, anadidas: 5 },
+      }),
+      1_000
+    );
+    assert.ok(tres.decision < 70, `decisión 3: ${tres.decision}`);
+    assert.ok(cuatroLaunch.decision >= 78, `decisión 4: ${cuatroLaunch.decision}`);
+    assert.equal(tres.decision, tresMasAnadidas.decision);
+    assert.ok(tresMasAnadidas.produccion > tres.produccion);
+    assert.match(cuatroLaunch.relato, /disponibilidad|decidiste/i);
   });
 
-  it("orden plateau: 4 y 8 valen igual — no hay beneficio superior al orden interno", () => {
+  it("decisión plateau: 4 y 8 valen igual", () => {
     const mk = (n: number) =>
       computeHuellaEnfoque(
         ring({
@@ -166,29 +182,12 @@ describe("huellaEnfoque diccionario", () => {
         }),
         1_000
       );
-    const cuatro = mk(4);
-    const ocho = mk(8);
-    assert.equal(cuatro.orden, ocho.orden);
-    assert.equal(cuatro.orden, 82);
+    assert.equal(mk(4).decision, mk(8).decision);
+    assert.equal(mk(4).decision, 82);
   });
 
-  it("certeza crece al editar minutos, no baja", () => {
-    const sinEditar = computeHuellaEnfoque(ring(), 1_000);
-    const editado = computeHuellaEnfoque(
-      ring({ ringHuella: { ...baseState(), cupoEdits: 3 } }),
-      1_000
-    );
-    assert.ok(editado.certeza > sinEditar.certeza);
-    assert.match(editado.relato, /editaste los minutos|certeza/i);
-  });
-
-  it("atención es no apilar el cupo hasta el rojo", () => {
-    const vivo = computeHuellaEnfoque(ring(), 1_000 + 2 * 60_000);
-    const rojo = computeHuellaEnfoque(ring(), 1_000 + 12 * 60_000);
-    assert.ok(vivo.atencion > rojo.atencion, `vivo ${vivo.atencion} vs rojo ${rojo.atencion}`);
-    assert.match(vivo.relato, /rojo|atención/i);
-
-    const antes = computeHuellaEnfoque(
+  it("atención es cerrar 5 minutos antes del tope, sumado en el desglosador", () => {
+    const una = computeHuellaEnfoque(
       ring({
         subTareas: [
           {
@@ -196,16 +195,16 @@ describe("huellaEnfoque diccionario", () => {
             enDesgloseCronometro: true,
             resultadoSituacion: "cumplido",
             minutosCupo: 10,
-            duracionRealSec: 7 * 60,
-            cerradaAt: 1_000 + 7 * 60_000,
+            duracionRealSec: 5 * 60,
+            cerradaAt: 1_000 + 5 * 60_000,
           },
           { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
         ],
-        situacionCupoAnchor: { subTareaId: "b", startedAt: 1_000 + 7 * 60_000 },
+        situacionCupoAnchor: { subTareaId: "b", startedAt: 1_000 + 5 * 60_000 },
       }),
-      1_000 + 8 * 60_000
+      1_000 + 6 * 60_000
     );
-    const despues = computeHuellaEnfoque(
+    const dos = computeHuellaEnfoque(
       ring({
         subTareas: [
           {
@@ -213,72 +212,21 @@ describe("huellaEnfoque diccionario", () => {
             enDesgloseCronometro: true,
             resultadoSituacion: "cumplido",
             minutosCupo: 10,
-            duracionRealSec: 14 * 60,
-            cerradaAt: 1_000 + 14 * 60_000,
-          },
-          { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
-        ],
-        situacionCupoAnchor: { subTareaId: "b", startedAt: 1_000 + 14 * 60_000 },
-      }),
-      1_000 + 15 * 60_000
-    );
-    assert.ok(antes.atencion > despues.atencion, `antes ${antes.atencion} vs después ${despues.atencion}`);
-    assert.match(antes.relato, /rojo|atención/i);
-  });
-
-  it("sellar no etiqueta ni recorta foco", () => {
-    const limpio = computeHuellaEnfoque(ring(), 1_000);
-    const sellado = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), selladas: 3 },
-      }),
-      1_000
-    );
-    assert.equal(sellado.foco, limpio.foco);
-    assert.doesNotMatch(sellado.relato, /roba|caos/i);
-  });
-
-  it("quitar, reordenar y postergar son foco", () => {
-    const base = computeHuellaEnfoque(ring(), 1_000);
-    const musculo = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), reorders: 2, postergas: 1, quitadas: 1 },
-      }),
-      1_000
-    );
-    assert.ok(musculo.foco > base.foco, `foco ${musculo.foco} vs ${base.foco}`);
-    assert.match(musculo.relato, /foco/i);
-    assert.match(musculo.relato, /músculo/i);
-  });
-
-  it("cerrar el último a tiempo desarrolla foco", () => {
-    const meta = 1_000 + 30 * 60_000;
-    const aTiempo = computeHuellaEnfoque(
-      ring({
-        subTareas: [
-          {
-            id: "a",
-            enDesgloseCronometro: true,
-            resultadoSituacion: "cumplido",
-            cerradaAt: meta - 60_000,
-            minutosCupo: 10,
+            duracionRealSec: 5 * 60,
+            cerradaAt: 1_000 + 5 * 60_000,
           },
           {
             id: "b",
             enDesgloseCronometro: true,
             resultadoSituacion: "cumplido",
-            cerradaAt: meta - 10_000,
-            minutosCupo: 10,
+            minutosCupo: 12,
+            duracionRealSec: 7 * 60,
+            cerradaAt: 1_000 + 12 * 60_000,
           },
         ],
-        situacionCronometro: {
-          activo: true,
-          bloqueInicioAt: 1_000,
-          horaFinContratoMs: meta,
-        },
         situacionCupoAnchor: null,
       }),
-      meta - 5_000
+      1_000 + 13 * 60_000
     );
     const tarde = computeHuellaEnfoque(
       ring({
@@ -287,7 +235,57 @@ describe("huellaEnfoque diccionario", () => {
             id: "a",
             enDesgloseCronometro: true,
             resultadoSituacion: "cumplido",
-            cerradaAt: meta + 120_000,
+            minutosCupo: 10,
+            duracionRealSec: 10 * 60,
+            cerradaAt: 1_000 + 10 * 60_000,
+          },
+          { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
+        ],
+      }),
+      1_000 + 11 * 60_000
+    );
+    assert.ok(una.atencion > tarde.atencion, `una ${una.atencion} vs tarde ${tarde.atencion}`);
+    assert.ok(dos.atencion >= una.atencion, `dos ${dos.atencion} vs una ${una.atencion}`);
+    assert.equal(dos.atencionCierres, 2);
+    assert.match(una.relato, /atención/i);
+  });
+
+  it("producción no cuenta si se añade en la ventana de 5 minutos", () => {
+    const lejos = bumpProduccionSiCabe(ring(), 1_000 + 2 * 60_000);
+    const ventana = bumpProduccionSiCabe(ring(), 1_000 + 6 * 60_000);
+    assert.equal(lejos.anadidas, 1);
+    assert.equal(ventana.anadidas, 0);
+  });
+
+  it("orden es quitar, reordenar y postergar", () => {
+    const base = computeHuellaEnfoque(ring(), 1_000);
+    const musculo = computeHuellaEnfoque(
+      ring({
+        ringHuella: { ...baseState(), reorders: 2, postergas: 1, quitadas: 1 },
+      }),
+      1_000
+    );
+    assert.ok(musculo.orden > base.orden, `orden ${musculo.orden} vs ${base.orden}`);
+    assert.match(musculo.relato, /orden/i);
+  });
+
+  it("foco es cerrar la última en el radio de 5 minutos del final", () => {
+    const meta = 1_000 + 30 * 60_000;
+    const enRadio = computeHuellaEnfoque(
+      ring({
+        subTareas: [
+          {
+            id: "a",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            cerradaAt: meta - 2 * 60_000,
+            minutosCupo: 10,
+          },
+          {
+            id: "b",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            cerradaAt: meta - 60_000,
             minutosCupo: 10,
           },
         ],
@@ -298,115 +296,49 @@ describe("huellaEnfoque diccionario", () => {
         },
         situacionCupoAnchor: null,
       }),
-      meta + 180_000
+      meta - 30_000
     );
-    assert.ok(aTiempo.foco > tarde.foco, `foco a tiempo ${aTiempo.foco} vs tarde ${tarde.foco}`);
-    assert.match(aTiempo.relato, /último a tiempo/i);
-  });
-
-  it("ganancia valora vehículos vs 2–3 horas más que los minutos ganados", () => {
-    const corto = computeHuellaEnfoque(
+    const lejos = computeHuellaEnfoque(
       ring({
-        ringHuella: { ...baseState(), filasLaunch: 6, minutosLaunch: 30 },
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 40,
-          horaFinContratoMs: 1_000 + 30 * 60_000,
-        },
-      }),
-      1_000
-    );
-    const bloqueLargo = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), filasLaunch: 6, minutosLaunch: 120 },
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 0,
-          horaFinContratoMs: 1_000 + 120 * 60_000,
-        },
-      }),
-      1_000
-    );
-    const pocos = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), filasLaunch: 2, minutosLaunch: 120 },
         subTareas: [
-          { id: "a", enDesgloseCronometro: true, minutosCupo: 60 },
-          { id: "b", enDesgloseCronometro: true, minutosCupo: 60 },
+          {
+            id: "a",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            cerradaAt: meta - 20 * 60_000,
+            minutosCupo: 10,
+          },
         ],
         situacionCronometro: {
           activo: true,
-          minutosGanadosSesion: 0,
-          horaFinContratoMs: 1_000 + 120 * 60_000,
+          bloqueInicioAt: 1_000,
+          horaFinContratoMs: meta,
         },
+        situacionCupoAnchor: null,
       }),
-      1_000
+      meta - 19 * 60_000
     );
-    assert.ok(
-      bloqueLargo.ganancia > corto.ganancia,
-      `2h ${bloqueLargo.ganancia} vs 30min ${corto.ganancia}`
-    );
-    assert.ok(
-      bloqueLargo.ganancia > pocos.ganancia,
-      `6 veh ${bloqueLargo.ganancia} vs 2 veh ${pocos.ganancia}`
-    );
+    assert.ok(enRadio.foco > lejos.foco, `radio ${enRadio.foco} vs lejos ${lejos.foco}`);
+    assert.match(enRadio.relato, /radio de 5|foco/i);
   });
 
-  it("ganancia no se infla alargando la lista más allá del oficio", () => {
-    const cuatro = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), filasLaunch: 4, minutosLaunch: 120 },
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 0,
-          horaFinContratoMs: 1_000 + 120 * 60_000,
-        },
-      }),
-      1_000
-    );
-    const veinte = computeHuellaEnfoque(
-      ring({
-        ringHuella: { ...baseState(), filasLaunch: 20, minutosLaunch: 120 },
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 0,
-          horaFinContratoMs: 1_000 + 120 * 60_000,
-        },
-      }),
-      1_000
-    );
-    assert.ok(
-      veinte.ganancia - cuatro.ganancia <= 8,
-      `lista 20 ${veinte.ganancia} vs 4 ${cuatro.ganancia}`
-    );
-  });
-
-  it("los PS de Jornada siguen contando en ganancia", () => {
-    const base4 = { ...baseState(), filasLaunch: 4, ordenLaunchIds: ["a", "b", "c", "d"] };
-    const sinPs = computeHuellaEnfoque(ring({ ringHuella: base4 }), 1_000);
-    const conMinutos = computeHuellaEnfoque(
-      ring({
-        ringHuella: base4,
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 18,
-          horaFinContratoMs: 1_000 + 30 * 60_000,
-        },
-      }),
-      1_000
-    );
-    const conSellos = computeHuellaEnfoque(
-      ring({ ringHuella: { ...base4, selladas: 3 } }),
-      1_000
-    );
-    assert.ok(
-      conMinutos.ganancia > sinPs.ganancia,
-      `minutos ${conMinutos.ganancia} vs base ${sinPs.ganancia}`
-    );
-    assert.ok(
-      conSellos.ganancia > sinPs.ganancia,
-      `sellos ${conSellos.ganancia} vs base ${sinPs.ganancia}`
-    );
+  it("el periodo suma desglosadores: no promedia vehículos sueltos", () => {
+    const a = ring({
+      id: "d-a",
+      ringHuella: { ...baseState(), filasLaunch: 4, anadidas: 1 },
+    });
+    const b = ring({
+      id: "d-b",
+      ringHuella: { ...baseState(), filasLaunch: 2, anadidas: 2, reorders: 1 },
+      subTareas: [
+        { id: "x", enDesgloseCronometro: true, minutosCupo: 10 },
+        { id: "y", enDesgloseCronometro: true, minutosCupo: 10 },
+      ],
+    });
+    const dia = computeHuellaPeriodo([a, b], 1_000);
+    assert.equal(dia.desglosadores, 2);
+    assert.equal(dia.anadidas, 3);
+    assert.ok(dia.produccion > computeHuellaEnfoque(a, 1_000).produccion);
   });
 
   it("sello al cierre congela la lectura aunque el cronómetro se apague", () => {
@@ -422,6 +354,7 @@ describe("huellaEnfoque diccionario", () => {
       1_000
     );
     assert.ok(sold.sello);
+    assert.equal(typeof sold.sello!.decision, "number");
     const replay = computeHuellaEnfoque(
       {
         situacionCronometro: { activo: false },
@@ -433,22 +366,20 @@ describe("huellaEnfoque diccionario", () => {
     assert.equal(replay.relato, sold.sello!.relato);
   });
 
-  it("copy de cierre nombra huella y los cinco ejes", () => {
+  it("copy de cierre engancha con el relato, no con una boleta", () => {
     const lectura = computeHuellaEnfoque(
       ring({
-        ringHuella: { ...baseState(), reorders: 2 },
-        situacionCronometro: {
-          activo: true,
-          minutosGanadosSesion: 6,
-          horaFinContratoMs: 1_000 + 30 * 60_000,
-        },
+        ringHuella: { ...baseState(), filasLaunch: 4, reorders: 2 },
       }),
       1_000
     );
     const copy = huellaCierreCopy(lectura);
-    assert.match(copy.title, /Huella \d+%/);
-    assert.match(huellaEjesLine(lectura), /Atención \d+ · Orden \d+ · Certeza \d+ · Ganancia \d+ · Foco \d+/);
-    assert.match(copy.description, /Atención/);
+    assert.match(copy.title, /disponibilidad|decidiste|orden|atención|foco|producción/i);
+    assert.match(
+      huellaEjesLine(lectura),
+      /Decisión \d+ · Atención \d+ · Producción \d+ · Foco \d+ · Orden \d+/
+    );
+    assert.match(copy.description, /PS de Jornada se quedan/);
   });
 
   it("bumpRingHuellaOnVehicle no pisa un estado existente", () => {
