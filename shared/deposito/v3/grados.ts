@@ -1,19 +1,30 @@
 /**
- * Grado académico V3 por consistencia estadística.
+ * Grado académico V3 por consistencia sintáctica.
  * No reemplaza el candado comercial (SKU Matrícula / Carrera / Título).
  * Un grado se otorga por ventana, no por una foto fija.
  *
- * El grado óptico (evaluateStudentTierPromotion) queda sellado: 7/10 C7+ y chasis.
- * El evaluador dual (evaluateDualTrackPromotion) es capa extra: óptica + sintaxis.
+ * Una sola vía: firma de carácter + cableado + vacíos contenidos.
+ * No se mide profundidad filosófica ni Óptica de verdad.
  */
 
-import { vaciosDesdeActiveMap } from "./ojos.ts";
+import { characterMapDe, vaciosDesdeActiveMap } from "./ojos.ts";
 import type { DepotAnalysisResult, EyeCode, UserTier } from "./types.ts";
 
 export const GRADO_WINDOW_SIZE = 10;
 export const GRADO_TITULO_RATE = 0.7;
 export const GRADO_TITULO_MIN_SAMPLE = 5;
 export const GRADO_CARRERA_RATE = 0.5;
+
+/** Ventana 7/10 sobre la única vía: sintaxis. */
+export const DUAL_WINDOW_SIZE = GRADO_WINDOW_SIZE;
+export const DUAL_TITULO_RATE = 0.7;
+export const DUAL_TITULO_MIN_SAMPLE = 7;
+export const DUAL_CARRERA_RATE = 0.5;
+export const DUAL_CARRERA_MIN_SAMPLE = 5;
+export const DUAL_GROUNDING_FLOOR = 0.4;
+/** @deprecated la vía óptica se retiró. Se conserva el número por compat de tests. */
+export const DUAL_OPTICA_MAX_DELTA = 4;
+export const DUAL_SINTAXIS_MAX_VACIOS = 4;
 
 export interface GradoConsistencia {
   recommendedTier: UserTier;
@@ -38,11 +49,21 @@ function vacio(): GradoConsistencia {
   };
 }
 
-/** Óptica alta (C7+) y chasis sustentado. Sin bloqueo de fricción severa. */
-export function esVolcadoEstableAlto(entry: DepotAnalysisResult): boolean {
+export function syntacticVaciosDe(entry: DepotAnalysisResult): EyeCode[] {
+  return entry.syntacticVacios ?? vaciosDesdeActiveMap(characterMapDe(entry));
+}
+
+/** Firma estable: cableado + vacíos contenidos. No mira Óptica. */
+export function esVolcadoSintaxisDual(entry: DepotAnalysisResult): boolean {
   return (
-    Boolean(entry?.groundingStatus?.isFullyGrounded) && entry.perceptionEye >= 7
+    Boolean(entry?.syntaxDiagnostic?.isCableadoConnected) &&
+    syntacticVaciosDe(entry).length <= DUAL_SINTAXIS_MAX_VACIOS
   );
+}
+
+/** Alias de la vía única: un volcado «alto» es un volcado de firma estable. */
+export function esVolcadoEstableAlto(entry: DepotAnalysisResult): boolean {
+  return esVolcadoSintaxisDual(entry);
 }
 
 function ventanaCronologica(
@@ -82,7 +103,7 @@ export function medirGradoConsistencia(
 }
 
 /**
- * Firma del especialista: 7 de cada 10 volcados estables → Título.
+ * Firma del especialista: 7 de cada 10 volcados de firma estable → Título.
  * Acepta orden cronológico o más-nuevo-primero: la ventana usa timestamp.
  */
 export function evaluateStudentTierPromotion(
@@ -104,21 +125,11 @@ export function medirGradoConsistenciaDesdeVolcados(
   );
 }
 
-/** Doble canal + ventana 7/10. No sustituye el grado óptico sellado. */
-export const DUAL_WINDOW_SIZE = GRADO_WINDOW_SIZE;
-export const DUAL_TITULO_RATE = 0.7;
-export const DUAL_TITULO_MIN_SAMPLE = 7;
-export const DUAL_CARRERA_RATE = 0.5;
-export const DUAL_CARRERA_MIN_SAMPLE = 5;
-export const DUAL_GROUNDING_FLOOR = 0.4;
-export const DUAL_OPTICA_MAX_DELTA = 4;
-export const DUAL_SINTAXIS_MAX_VACIOS = 4;
-
 export type PromotionStatus = "PROMOTED" | "MAINTAINED" | "NEEDS_GROUNDING";
 
 export interface TierEvaluationReport {
   currentTier: UserTier;
-  /** Porcentaje 0–100 de lucidez / desinfección en la ventana. */
+  /** @deprecated misma tasa que sintaxisConsistencyRate. La vía óptica se retiró. */
   opticaConsistencyRate: number;
   /** Porcentaje 0–100 de cableado / vacíos contenidos. */
   sintaxisConsistencyRate: number;
@@ -131,22 +142,9 @@ export interface TierEvaluationReport {
   sintaxisValidCount: number;
 }
 
-export function syntacticVaciosDe(entry: DepotAnalysisResult): EyeCode[] {
-  return entry.syntacticVacios ?? vaciosDesdeActiveMap(entry.activeEyeMap);
-}
-
+/** @deprecated la vía óptica se retiró: delega a la firma sintáctica. */
 export function esVolcadoOpticaDual(entry: DepotAnalysisResult): boolean {
-  return (
-    Boolean(entry?.groundingStatus?.isFullyGrounded) &&
-    entry.deltaGap <= DUAL_OPTICA_MAX_DELTA
-  );
-}
-
-export function esVolcadoSintaxisDual(entry: DepotAnalysisResult): boolean {
-  return (
-    Boolean(entry?.syntaxDiagnostic?.isCableadoConnected) &&
-    syntacticVaciosDe(entry).length <= DUAL_SINTAXIS_MAX_VACIOS
-  );
+  return esVolcadoSintaxisDual(entry);
 }
 
 function vacioDual(currentTier: UserTier): TierEvaluationReport {
@@ -165,7 +163,7 @@ function vacioDual(currentTier: UserTier): TierEvaluationReport {
 }
 
 /**
- * Promoción por doble tracción. No pisa evaluateStudentTierPromotion.
+ * Promoción por firma sintáctica. Conserva el nombre dual por compat de API.
  * currentTier es el peldaño de partida (comercial o académico previo).
  */
 export function evaluateDualTrackPromotion(
@@ -178,51 +176,40 @@ export function evaluateDualTrackPromotion(
 
   const sample = ventanaCronologica(recentEntries);
   const total = sample.length;
-  const opticaValidCount = sample.filter(esVolcadoOpticaDual).length;
   const sintaxisValidCount = sample.filter(esVolcadoSintaxisDual).length;
-  const opticaRate = opticaValidCount / total;
   const sintaxisRate = sintaxisValidCount / total;
 
   let recommendedTier: UserTier = "MATRICULA";
   let promotionStatus: PromotionStatus = "MAINTAINED";
 
-  if (
-    opticaRate >= DUAL_TITULO_RATE &&
-    sintaxisRate >= DUAL_TITULO_RATE &&
-    total >= DUAL_TITULO_MIN_SAMPLE
-  ) {
+  if (sintaxisRate >= DUAL_TITULO_RATE && total >= DUAL_TITULO_MIN_SAMPLE) {
     recommendedTier = "TITULO";
     promotionStatus = "PROMOTED";
   } else if (
-    opticaRate >= DUAL_CARRERA_RATE &&
     sintaxisRate >= DUAL_CARRERA_RATE &&
     total >= DUAL_CARRERA_MIN_SAMPLE
   ) {
     recommendedTier = "CARRERA";
     promotionStatus = "PROMOTED";
-  } else if (
-    opticaRate < DUAL_GROUNDING_FLOOR ||
-    sintaxisRate < DUAL_GROUNDING_FLOOR
-  ) {
+  } else if (sintaxisRate < DUAL_GROUNDING_FLOOR) {
     promotionStatus = "NEEDS_GROUNDING";
   }
 
-  const opticaPct = Math.round(opticaRate * 100);
   const sintaxisPct = Math.round(sintaxisRate * 100);
 
   return {
     currentTier,
-    opticaConsistencyRate: opticaPct,
+    opticaConsistencyRate: sintaxisPct,
     sintaxisConsistencyRate: sintaxisPct,
     recommendedTier,
     promotionStatus,
     message:
       promotionStatus === "PROMOTED"
-        ? `Promoción consolidada por doble tracción: Óptica (${opticaPct}%) / Sintaxis (${sintaxisPct}%).`
-        : `Sostén tu chasis. Se requiere mínimo 70% de consistencia en ambas vías para nivel Título.`,
+        ? `Promoción consolidada por firma sintáctica (${sintaxisPct}%).`
+        : `Sostén el cableado. Se requiere mínimo 70% de firma estable para nivel Título.`,
     windowSize: DUAL_WINDOW_SIZE,
     sampleSize: total,
-    opticaValidCount,
+    opticaValidCount: sintaxisValidCount,
     sintaxisValidCount,
   };
 }

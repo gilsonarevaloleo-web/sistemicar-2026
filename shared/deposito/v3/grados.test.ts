@@ -12,19 +12,15 @@ import type { DepotAnalysisResult } from "./types.ts";
 
 function entry(
   opts: {
-    perceptionEye: DepotAnalysisResult["perceptionEye"];
     characterSignedCode: DepotAnalysisResult["characterSignedCode"];
-    grounded: boolean;
+    grounded?: boolean;
     timestamp?: number;
     cableado?: boolean;
     vacios?: DepotAnalysisResult["syntacticVacios"];
-    deltaGap?: number;
   },
 ): DepotAnalysisResult {
   const result = scaffoldAnalysisResult({
-    perceptionEye: opts.perceptionEye,
     characterSignedCode: opts.characterSignedCode,
-    deltaGap: opts.deltaGap,
     syntacticVacios: opts.vacios,
     syntaxDiagnostic: {
       detectedSyntaxCode: opts.characterSignedCode,
@@ -32,10 +28,10 @@ function entry(
       syntaxCharacteristics: "Firma de prueba.",
     },
     groundingStatus: {
-      isFullyGrounded: opts.grounded,
-      diagnosticMessage: opts.grounded
-        ? "Chasis sostiene."
-        : "Fricción de chasis.",
+      isFullyGrounded: opts.grounded ?? Boolean(opts.cableado),
+      diagnosticMessage: opts.cableado
+        ? "Firma cableada."
+        : "Geometría abierta.",
     },
   });
   if (opts.timestamp != null) result.timestamp = opts.timestamp;
@@ -46,28 +42,28 @@ function repeat(n: number, factory: (i: number) => DepotAnalysisResult) {
   return Array.from({ length: n }, (_, i) => factory(i));
 }
 
-describe("Depósito V3 — grado por consistencia", () => {
+describe("Depósito V3 — grado por consistencia de firma", () => {
   it("sin volcados → FREE", () => {
     assert.equal(evaluateStudentTierPromotion([]), "FREE");
     assert.equal(medirGradoConsistencia([]).sampleSize, 0);
     assert.equal(medirGradoConsistencia(undefined).recommendedTier, "FREE");
   });
 
-  it("7 de 10 estables (C7+ y chasis) → TITULO", () => {
+  it("7 de 10 con cableado y vacíos contenidos → TITULO", () => {
     const sample = [
       ...repeat(7, (i) =>
         entry({
-          perceptionEye: 7,
-          characterSignedCode: 7,
-          grounded: true,
+          characterSignedCode: 3,
+          cableado: true,
+          vacios: [2, 4, 9],
           timestamp: i + 1,
         }),
       ),
       ...repeat(3, (i) =>
         entry({
-          perceptionEye: 3,
-          characterSignedCode: 3,
-          grounded: false,
+          characterSignedCode: 1,
+          cableado: false,
+          vacios: [4, 5, 6, 7, 8, 9, 10],
           timestamp: i + 20,
         }),
       ),
@@ -84,17 +80,17 @@ describe("Depósito V3 — grado por consistencia", () => {
     const mitad = [
       ...repeat(5, (i) =>
         entry({
-          perceptionEye: 8,
           characterSignedCode: 8,
-          grounded: true,
+          cableado: true,
+          vacios: [1, 2],
           timestamp: i,
         }),
       ),
       ...repeat(5, (i) =>
         entry({
-          perceptionEye: 2,
           characterSignedCode: 1,
-          grounded: false,
+          cableado: false,
+          vacios: [3, 4, 5, 6, 7, 8, 9, 10],
           timestamp: i + 50,
         }),
       ),
@@ -104,17 +100,17 @@ describe("Depósito V3 — grado por consistencia", () => {
     const baja = [
       ...repeat(2, (i) =>
         entry({
-          perceptionEye: 7,
-          characterSignedCode: 7,
-          grounded: true,
+          characterSignedCode: 3,
+          cableado: true,
+          vacios: [1, 2],
           timestamp: i,
         }),
       ),
       ...repeat(8, (i) =>
         entry({
-          perceptionEye: 1,
           characterSignedCode: 1,
-          grounded: false,
+          cableado: false,
+          vacios: [3, 4, 5, 6, 7, 8, 9, 10],
           timestamp: i + 10,
         }),
       ),
@@ -125,9 +121,9 @@ describe("Depósito V3 — grado por consistencia", () => {
   it("Título exige muestra mínima de 5 aunque la tasa sea 100%", () => {
     const cuatro = repeat(4, (i) =>
       entry({
-        perceptionEye: 9,
-        characterSignedCode: 9,
-        grounded: true,
+        characterSignedCode: 3,
+        cableado: true,
+        vacios: [1, 2],
         timestamp: i,
       }),
     );
@@ -135,51 +131,50 @@ describe("Depósito V3 — grado por consistencia", () => {
 
     const cinco = repeat(5, (i) =>
       entry({
-        perceptionEye: 9,
-        characterSignedCode: 9,
-        grounded: true,
+        characterSignedCode: 3,
+        cableado: true,
+        vacios: [1, 2],
         timestamp: i,
       }),
     );
     assert.equal(evaluateStudentTierPromotion(cinco), "TITULO");
   });
 
-  it("óptica alta sin chasis no cuenta como estable", () => {
+  it("firma alta sin cableado no cuenta como estable", () => {
     assert.equal(
       esVolcadoEstableAlto(
         entry({
-          perceptionEye: 7,
-          characterSignedCode: 3,
-          grounded: false,
+          characterSignedCode: 7,
+          cableado: false,
+          vacios: [1, 2, 3, 4, 5, 6, 8, 9, 10],
         }),
       ),
       false,
     );
-    const soloOptica = repeat(10, (i) =>
+    const soloTema = repeat(10, (i) =>
       entry({
-        perceptionEye: 7,
-        characterSignedCode: 3,
-        grounded: false,
+        characterSignedCode: 7,
+        cableado: false,
+        vacios: [1, 2, 3, 4, 5, 6, 8, 9, 10],
         timestamp: i,
       }),
     );
-    assert.equal(evaluateStudentTierPromotion(soloOptica), "MATRICULA");
+    assert.equal(evaluateStudentTierPromotion(soloTema), "MATRICULA");
   });
 
   it("la ventana toma los 10 más recientes aunque el array venga más-nuevo-primero", () => {
     const viejosInestables = repeat(8, (i) =>
       entry({
-        perceptionEye: 1,
         characterSignedCode: 1,
-        grounded: false,
+        cableado: false,
         timestamp: i + 1,
       }),
     );
     const recientesEstables = repeat(10, (i) =>
       entry({
-        perceptionEye: 7,
-        characterSignedCode: 7,
-        grounded: true,
+        characterSignedCode: 3,
+        cableado: true,
+        vacios: [1, 2],
         timestamp: 100 + i,
       }),
     );
@@ -197,18 +192,17 @@ describe("Depósito V3 — grado por consistencia", () => {
       {
         createdAt: new Date("2026-01-01"),
         result: entry({
-          perceptionEye: 1,
           characterSignedCode: 1,
-          grounded: false,
+          cableado: false,
           timestamp: 999,
         }),
       },
       {
         createdAt: new Date("2026-02-01"),
         result: entry({
-          perceptionEye: 7,
-          characterSignedCode: 7,
-          grounded: true,
+          characterSignedCode: 3,
+          cableado: true,
+          vacios: [1, 2],
           timestamp: 1,
         }),
       },
@@ -220,24 +214,21 @@ describe("Depósito V3 — grado por consistencia", () => {
   });
 });
 
-describe("Depósito V3 — doble canal de promoción", () => {
+describe("Depósito V3 — promoción por firma (API dual reutilizada)", () => {
   it("sin volcados no pisa el peldaño de partida y no promociona", () => {
     const r = evaluateDualTrackPromotion([], "MATRICULA");
     assert.equal(r.currentTier, "MATRICULA");
     assert.equal(r.recommendedTier, "FREE");
     assert.equal(r.promotionStatus, "MAINTAINED");
-    assert.equal(r.opticaConsistencyRate, 0);
     assert.equal(r.sintaxisConsistencyRate, 0);
     assert.match(r.message, /sin registros/i);
   });
 
-  it("7/10 en ambas vías → TITULO; no altera el grado óptico sellado", () => {
+  it("7/10 de firma estable → TITULO", () => {
     const sample = [
       ...repeat(7, (i) =>
         entry({
-          perceptionEye: 7,
-          characterSignedCode: 7,
-          grounded: true,
+          characterSignedCode: 3,
           cableado: true,
           vacios: [2, 4, 9],
           timestamp: i + 1,
@@ -245,9 +236,7 @@ describe("Depósito V3 — doble canal de promoción", () => {
       ),
       ...repeat(3, (i) =>
         entry({
-          perceptionEye: 3,
           characterSignedCode: 1,
-          grounded: false,
           cableado: false,
           vacios: [4, 5, 6, 7, 8, 9, 10],
           timestamp: i + 20,
@@ -258,36 +247,31 @@ describe("Depósito V3 — doble canal de promoción", () => {
     assert.equal(dual.currentTier, "CARRERA");
     assert.equal(dual.recommendedTier, "TITULO");
     assert.equal(dual.promotionStatus, "PROMOTED");
-    assert.equal(dual.opticaConsistencyRate, 70);
     assert.equal(dual.sintaxisConsistencyRate, 70);
     assert.equal(evaluateStudentTierPromotion(sample), "TITULO");
   });
 
-  it("óptica alta sin cableado no promociona por doble canal", () => {
-    const soloOptica = repeat(10, (i) =>
+  it("código alto sin cableado no promociona", () => {
+    const soloTema = repeat(10, (i) =>
       entry({
-        perceptionEye: 7,
         characterSignedCode: 7,
-        grounded: true,
         cableado: false,
         vacios: [1, 2, 3, 4, 5, 6, 8, 9, 10],
         timestamp: i,
       }),
     );
-    const dual = evaluateDualTrackPromotion(soloOptica);
+    const dual = evaluateDualTrackPromotion(soloTema);
     assert.equal(dual.recommendedTier, "MATRICULA");
     assert.equal(dual.promotionStatus, "NEEDS_GROUNDING");
     assert.equal(dual.sintaxisConsistencyRate, 0);
-    assert.equal(evaluateStudentTierPromotion(soloOptica), "TITULO");
+    assert.equal(evaluateStudentTierPromotion(soloTema), "MATRICULA");
   });
 
-  it("5/10 en ambas vías → CARRERA", () => {
+  it("5/10 de firma estable → CARRERA", () => {
     const mitad = [
       ...repeat(5, (i) =>
         entry({
-          perceptionEye: 8,
           characterSignedCode: 8,
-          grounded: true,
           cableado: true,
           vacios: [1, 2],
           timestamp: i,
@@ -295,9 +279,7 @@ describe("Depósito V3 — doble canal de promoción", () => {
       ),
       ...repeat(5, (i) =>
         entry({
-          perceptionEye: 2,
           characterSignedCode: 1,
-          grounded: false,
           cableado: false,
           vacios: [3, 4, 5, 6, 7, 8, 9, 10],
           timestamp: i + 50,

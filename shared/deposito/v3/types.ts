@@ -1,14 +1,15 @@
 /**
- * Depósito V3 — contratos de Óptica-Sintaxis.
+ * Depósito V3 — contratos del Motor Sintáctico de Firma.
  *
  * V2 (Muro: un ojo dominante) no se toca.
- * Aquí el dictamen ES el orden: percepción + firma de carácter + Δ.
+ * Aquí el dictamen ES la forma: firma de carácter + vacíos + cableado.
+ * No se audita profundidad filosófica ni Óptica de verdad.
  *
  * Los nombres de planeta (Claridad, Suma…) y de ley (Cimiento, Flujo…)
  * son alias del mismo EyeCode. La esencia es el número 1–10.
  */
 
-export const DEPOSITO_V3_VERSION = "3.2.0-optica-sintaxis" as const;
+export const DEPOSITO_V3_VERSION = "3.3.0-sintaxis-firma" as const;
 
 export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -72,9 +73,10 @@ export interface CharacterSyntaxDiagnostic {
 
 export interface GroundingStatus {
   isFullyGrounded: boolean;
-  /** Código inferior con fricción de chasis. */
-  frictionPoint?: EyeCode;
+  /** Evaluación estructural de la escritura. No juzga verdad filosófica. */
   diagnosticMessage: string;
+  /** @deprecated legado óptica-chasis. El motor sintáctico no lo emite. */
+  frictionPoint?: EyeCode;
 }
 
 export interface SystemicAnalysis {
@@ -88,19 +90,14 @@ export interface SystemicAnalysis {
 export interface DepotAnalysisResult {
   id: string;
   timestamp: number;
-  /** Ojo dominante en análisis (Óptica). */
-  perceptionEye: EyeCode;
-  /** Código donde se ejecutó la acción/carácter (Sintaxis). */
+  /** Código dominante de la geometría de redacción. */
   characterSignedCode: EyeCode;
-  activeEyeMap: Record<EyeCode, boolean>;
-  eyeAudits: Record<EyeCode, EyeAudit>;
+  /** Telemetría directa para el mapa de calor de los 10 códigos de carácter. */
+  activeCharacterMap: Record<EyeCode, boolean>;
   /** Códigos C1–C10 ausentes en la geometría de redacción. */
   syntacticVacios: EyeCode[];
-  /** | perceptionEye - characterSignedCode | */
-  deltaGap: number;
   syntaxDiagnostic: CharacterSyntaxDiagnostic;
   groundingStatus: GroundingStatus;
-  systemicAnalysis: SystemicAnalysis;
   immediateAdjustment: string;
 }
 

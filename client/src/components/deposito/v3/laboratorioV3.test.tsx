@@ -3,8 +3,7 @@ import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  buildActiveEyeMap,
-  emptyEyeAudits,
+  buildActiveCharacterMap,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
 import { FormularioAuditoriaV3 } from "./FormularioAuditoriaV3.tsx";
@@ -14,42 +13,20 @@ import { HistorialV3 } from "./HistorialV3.tsx";
 import { GradoConsistenciaV3 } from "./GradoConsistenciaV3.tsx";
 
 function fixture(): DepotAnalysisResult {
-  const audits = emptyEyeAudits();
-  audits[3] = {
-    eyeId: 3,
-    hasIntention: true,
-    hasRealVision: true,
-    isBlindSpot: true,
-  };
-  audits[7] = {
-    eyeId: 7,
-    hasIntention: true,
-    hasRealVision: true,
-    isBlindSpot: false,
-  };
   return {
     id: "depot_test",
     timestamp: 1,
-    perceptionEye: 7,
     characterSignedCode: 3,
-    activeEyeMap: buildActiveEyeMap([3, 7]),
-    eyeAudits: audits,
-    syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
-    deltaGap: 4,
+    activeCharacterMap: buildActiveCharacterMap([3, 7, 8]),
+    syntacticVacios: [1, 2, 4, 5, 6, 9, 10],
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
       isCableadoConnected: true,
       syntaxCharacteristics: "Paso a paso, marcas de hora.",
     },
     groundingStatus: {
-      isFullyGrounded: false,
-      frictionPoint: 3,
-      diagnosticMessage: "La visión opera en C7. El chasis fricciona en C3.",
-    },
-    systemicAnalysis: {
-      isLatencyEvent: false,
-      isSystemicConflict: false,
-      realEngineeringCause: "El corte se narra como patrón y se ejecuta como pistón.",
+      isFullyGrounded: true,
+      diagnosticMessage: "La escritura sostiene título y secuencia.",
     },
     immediateAdjustment: "Tres pasos con hora de corte.",
   };
@@ -87,7 +64,7 @@ describe("FormularioAuditoriaV3", () => {
 });
 
 describe("MapaCalorV3", () => {
-  it("marca óptica C7, carácter C3, fricción y candado de Matrícula en C5+", () => {
+  it("marca firma C3, vacíos y candado de Matrícula en C5+", () => {
     const html = renderToStaticMarkup(
       createElement(MapaCalorV3, {
         result: fixture(),
@@ -95,21 +72,20 @@ describe("MapaCalorV3", () => {
       }),
     );
     assert.match(html, /deposito-v3-mapa/);
-    assert.match(html, /ÓPTICA C7/);
-    assert.match(html, /CARÁCTER C3/);
+    assert.match(html, /FIRMA C3/);
+    assert.match(html, /VACÍOS/);
     assert.match(html, /Cimiento/);
-    assert.match(html, /Claridad/);
-    assert.match(html, /deposito-v3-eye-7/);
-    assert.match(html, /data-optica="1"/);
+    assert.match(html, /deposito-v3-eye-3/);
     assert.match(html, /data-caracter="1"/);
-    assert.match(html, /deposito-v3-friccion-3/);
     assert.match(html, /data-locked="1"/);
     assert.match(html, /BLOQ/);
+    assert.doesNotMatch(html, /ÓPTICA/);
+    assert.doesNotMatch(html, /deposito-v3-friccion/);
   });
 });
 
 describe("HistorialV3", () => {
-  it("lista óptica, carácter y Δ sin mezclar V2", () => {
+  it("lista firma de carácter sin Δ ni Óptica", () => {
     const html = renderToStaticMarkup(
       createElement(HistorialV3, {
         entries: [
@@ -127,8 +103,8 @@ describe("HistorialV3", () => {
       }),
     );
     assert.match(html, /deposito-v3-historial/);
-    assert.match(html, /C7 Cimiento|C7 Visión/);
-    assert.match(html, /Δ 4/);
+    assert.match(html, /C3 Trabajo/);
+    assert.doesNotMatch(html, /Δ 4/);
     assert.doesNotMatch(html, /OJO DOMINANTE/);
     assert.doesNotMatch(html, /sistemicar_volcados[^\-_]/);
   });
@@ -138,19 +114,23 @@ describe("GradoConsistenciaV3", () => {
   it("muestra Título cuando 7 de 10 están estables y no toca V2", () => {
     const estable = {
       ...fixture(),
-      perceptionEye: 7 as const,
-      characterSignedCode: 7 as const,
-      deltaGap: 0,
+      characterSignedCode: 3 as const,
+      syntacticVacios: [1, 2] as DepotAnalysisResult["syntacticVacios"],
+      syntaxDiagnostic: {
+        detectedSyntaxCode: 3 as const,
+        isCableadoConnected: true,
+        syntaxCharacteristics: "Firma estable.",
+      },
       groundingStatus: {
         isFullyGrounded: true,
-        diagnosticMessage: "Chasis sostiene.",
+        diagnosticMessage: "Firma cableada.",
       },
     };
     const entries = Array.from({ length: 7 }, (_, i) => ({
       id: `e${i}`,
       userId: "u1",
       createdAt: new Date(2026, 0, i + 1),
-      rawFact: "patrón medido",
+      rawFact: "secuencia medida",
       userTier: "CARRERA" as const,
       result: { ...estable, id: `depot_${i}`, timestamp: i + 1 },
       source: "local_fallback" as const,
@@ -161,8 +141,9 @@ describe("GradoConsistenciaV3", () => {
     assert.match(html, /deposito-v3-grado/);
     assert.match(html, />TITULO</);
     assert.match(html, /7 de 7 volcados estables/);
-    assert.match(html, /deposito-v3-grado-dual/);
+    assert.match(html, /deposito-v3-grado-firma/);
     assert.doesNotMatch(html, /OJO DOMINANTE/);
+    assert.doesNotMatch(html, /doble canal/i);
   });
 
   it("no rendera sin historial", () => {
@@ -174,21 +155,20 @@ describe("GradoConsistenciaV3", () => {
 });
 
 describe("DictamenCardV3", () => {
-  it("muestra Δ, alias de ojos y ajuste frío", () => {
+  it("muestra firma, vacíos y ajuste frío, sin Δ ni Óptica", () => {
     const html = renderToStaticMarkup(
       createElement(DictamenCardV3, { result: fixture() }),
     );
     assert.match(html, /deposito-v3-dictamen/);
-    assert.match(html, /Δ 4/);
-    assert.match(html, /C7 · Visión/);
-    assert.match(html, /Justicia/);
     assert.match(html, /C3 · Trabajo/);
-    assert.match(html, /Ritmo/);
-    assert.match(html, /no se invalida|fricciona en C3/i);
+    assert.match(html, /Ritmo|Secuencia Vectorial/);
     assert.match(html, /Tres pasos con hora de corte/);
     assert.match(html, /deposito-v3-cableado/);
-    assert.match(html, /Cableado título↔materia: conectado/);
+    assert.match(html, /Cableado título↔cierre: conectado/);
     assert.match(html, /deposito-v3-vacios/);
     assert.match(html, /C1 · C2 · C4/);
+    assert.doesNotMatch(html, /Δ 4/);
+    assert.doesNotMatch(html, /Ojo de percepción/);
+    assert.doesNotMatch(html, /Causa real de ingeniería/);
   });
 });
