@@ -345,13 +345,15 @@ export function diagnosticarAuditoriaLocal(
   }
   if (LATENCIA.test(norm)) {
     syn[8] += 1;
+    synCuerpo[8] += 1;
   }
 
-  let characterSignedCode = elegirPrimario(syn);
-  if (LATENCIA.test(norm) && syn[8] >= syn[characterSignedCode]) {
+  // La firma primaria sale del cuerpo. El título/hipótesis enciende el mapa, no se come el pistón.
+  let characterSignedCode = elegirPrimario(synCuerpo);
+  if (LATENCIA.test(normCuerpo) && synCuerpo[8] >= synCuerpo[characterSignedCode]) {
     characterSignedCode = 8;
   }
-  if (palabras >= 12 && characterSignedCode === 1 && syn[3] > 0) {
+  if (palabras >= 12 && characterSignedCode === 1 && synCuerpo[3] > 0) {
     characterSignedCode = 3;
   }
 

@@ -71,18 +71,19 @@ function parseLocal(): VolcadoV3Entry[] {
     const entries = JSON.parse(data) as Array<
       Omit<VolcadoV3Entry, "createdAt"> & { createdAt: string | number | Date }
     >;
-    return entries
-      .map((e) => {
-        const result = hidratarResultadoV3(e?.result);
-        if (!e || !result) return null;
-        return {
-          ...e,
-          result,
-          createdAt: new Date(e.createdAt),
-        };
-      })
-      .filter((e): e is VolcadoV3Entry => e !== null)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const hidratados: VolcadoV3Entry[] = [];
+    for (const e of entries) {
+      const result = hidratarResultadoV3(e?.result);
+      if (!e || !result) continue;
+      hidratados.push({
+        ...e,
+        result,
+        createdAt: new Date(e.createdAt),
+      });
+    }
+    return hidratados.sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
   } catch {
     return [];
   }
@@ -209,27 +210,26 @@ export function subscribeToVolcadosV3(
     unsubRemote = firebase.onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs
-          .map((d) => {
-            const raw = d.data() as Omit<VolcadoV3Entry, "id" | "createdAt"> & {
-              createdAt?: { toDate?: () => Date };
-            };
-            const result = hidratarResultadoV3(raw.result);
-            if (!result) return null;
-            return {
-              id: d.id,
-              userId: raw.userId,
-              rawFact: raw.rawFact,
-              detectedNoise: raw.detectedNoise,
-              omittedShadow: raw.omittedShadow,
-              studentHypothesis: raw.studentHypothesis,
-              userTier: raw.userTier,
-              result,
-              source: raw.source,
-              createdAt: raw.createdAt?.toDate?.() || new Date(),
-            } satisfies VolcadoV3Entry;
-          })
-          .filter((e): e is VolcadoV3Entry => e !== null);
+        const data: VolcadoV3Entry[] = [];
+        for (const d of snapshot.docs) {
+          const raw = d.data() as Omit<VolcadoV3Entry, "id" | "createdAt"> & {
+            createdAt?: { toDate?: () => Date };
+          };
+          const result = hidratarResultadoV3(raw.result);
+          if (!result) continue;
+          data.push({
+            id: d.id,
+            userId: raw.userId,
+            rawFact: raw.rawFact,
+            detectedNoise: raw.detectedNoise,
+            omittedShadow: raw.omittedShadow,
+            studentHypothesis: raw.studentHypothesis,
+            userTier: raw.userTier,
+            result,
+            source: raw.source,
+            createdAt: raw.createdAt?.toDate?.() || new Date(),
+          });
+        }
         data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         onData(data);
       },

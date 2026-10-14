@@ -230,6 +230,10 @@ describe("Depósito V3 — dictamen sintáctico", () => {
     const sinFirma = parseDepotAnalysisResult({
       ...llm,
       characterSignedCode: undefined,
+      syntaxDiagnostic: {
+        ...llm.syntaxDiagnostic,
+        detectedSyntaxCode: undefined,
+      },
     });
     assert.equal(sinFirma.ok, false);
     const sinAjuste = parseDepotAnalysisResult({
