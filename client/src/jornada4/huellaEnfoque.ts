@@ -1,58 +1,78 @@
 /**
- * Huella del ring / desglosador.
+ * Huella del desglosador (suma de todas las filas), no de cada vehículo.
  *
- * Diccionario (músculo que se desarrolla, no etiqueta negativa):
- * - Atención: no apilar el cupo de un vehículo hasta el rojo.
- * - Orden: interno. Enlistar es pensar qué hacer (vencer la inercia).
- *   Cruzar más de 3 abre el músculo; alargar la lista no suma un beneficio
- *   superior al orden interno.
- * - Certeza: editar los minutos.
- * - Ganancia: oficio (vehículos frente a 2–3 horas) vale más que la etiqueta;
- *   los PS se quedan — son característica de Sistemicar-Jornada.
- * - Foco: cerrar el último a tiempo. Quitar, reordenar y postergar son foco.
+ * Diccionario (músculo, no etiqueta negativa):
+ * - Decisión: solo la primera lista. Pensar qué vas a hacer vence la inercia;
+ *   ahí nace disponibilidad. Lo que se añade después no es decisión.
+ * - Atención: cerrar una fila 5 minutos antes del tope de su cupo.
+ * - Producción: añadir filas después del lanzamiento, antes de la ventana
+ *   de 5 minutos de atención.
+ * - Foco: cerrar la última fila del desglosador en el radio de 5 minutos
+ *   respecto al final del bloque.
+ * - Orden: quitar, reordenar, postergar.
+ *
+ * Los PS se quedan: son de Jornada. No son un eje de la huella.
  */
 
-export const HUELLA_ORDEN_UMBRAL = 3;
+export const HUELLA_DECISION_UMBRAL = 3;
+/** @deprecated usar HUELLA_DECISION_UMBRAL */
+export const HUELLA_ORDEN_UMBRAL = HUELLA_DECISION_UMBRAL;
+export const HUELLA_RADIO_MIN = 5;
 
 export const HUELLA_EJES = [
   {
+    id: "decision",
+    label: "Decisión",
+    definicion:
+      "La primera lista: pensar qué vas a hacer. Ahí nace disponibilidad. Lo que se añade después es otra habilidad.",
+  },
+  {
     id: "atencion",
     label: "Atención",
-    definicion: "No apilar el cupo de un vehículo hasta el rojo.",
+    definicion: "Cerrar una fila 5 minutos antes del tope de su cupo.",
+  },
+  {
+    id: "produccion",
+    label: "Producción",
+    definicion:
+      "Añadir filas después del lanzamiento, antes de los 5 minutos de atención.",
+  },
+  {
+    id: "foco",
+    label: "Foco",
+    definicion: "Cerrar la última fila en el radio de 5 minutos respecto al final.",
   },
   {
     id: "orden",
     label: "Orden",
-    definicion: "Desglosar más de 3: orden interno. Pensar qué hacer, no alargar la lista.",
+    definicion: "Quitar, reordenar y postergar.",
   },
-  { id: "certeza", label: "Certeza", definicion: "Editar los minutos." },
-  {
-    id: "ganancia",
-    label: "Ganancia",
-    definicion: "Oficio: vehículos frente a 2–3 horas. Los PS se quedan: son de Jornada.",
-  },
-  { id: "foco", label: "Foco", definicion: "Cerrar el último a tiempo. Quitar, reordenar y postergar son músculo." },
 ] as const;
 
 export type HuellaEjeId = (typeof HUELLA_EJES)[number]["id"];
 
-/** Oficio (bloque 2–3 h) pesa más que la etiqueta; los PS siguen dentro de ganancia. */
 export const HUELLA_PESOS: Record<HuellaEjeId, number> = {
-  atencion: 0.22,
-  orden: 0.22,
-  certeza: 0.22,
-  ganancia: 0.12,
-  foco: 0.22,
+  decision: 0.2,
+  atencion: 0.2,
+  produccion: 0.2,
+  foco: 0.2,
+  orden: 0.2,
 };
 
-export type RingHuellaKind = "reorder" | "postergar" | "quitar" | "sellar" | "cupo";
+export type RingHuellaKind =
+  | "reorder"
+  | "postergar"
+  | "quitar"
+  | "sellar"
+  | "cupo"
+  | "anadir";
 
 export type RingHuellaEjes = {
+  decision: number;
   atencion: number;
-  orden: number;
-  certeza: number;
-  ganancia: number;
+  produccion: number;
   foco: number;
+  orden: number;
 };
 
 export type RingHuellaLectura = RingHuellaEjes & {
@@ -62,6 +82,9 @@ export type RingHuellaLectura = RingHuellaEjes & {
   minutosGanados: number;
   vehiculos: number;
   horasBloque: number;
+  desglosadores: number;
+  anadidas: number;
+  atencionCierres: number;
 };
 
 export type RingHuellaState = {
@@ -75,11 +98,15 @@ export type RingHuellaState = {
   quitadas: number;
   selladas: number;
   cupoEdits: number;
+  /** Filas añadidas después del lanzamiento (producción). */
+  anadidas?: number;
   /** Snapshot sellado al cerrar el bloque. */
   sello?: RingHuellaLectura;
 };
 
 export type HuellaEnfoqueInput = {
+  id?: string;
+  titulo?: string;
   subTareas?: Array<{
     id: string;
     texto?: string;
@@ -101,6 +128,21 @@ export type HuellaEnfoqueInput = {
   situacionCupoAnchor?: { subTareaId: string; startedAt: number } | null;
   ringHuella?: RingHuellaState;
   aperturaAt?: number;
+};
+
+export type HuellaHechos = {
+  filasLaunch: number;
+  anadidas: number;
+  reorders: number;
+  postergas: number;
+  quitadas: number;
+  cerradas: number;
+  atencionHits: number;
+  desglosadores: number;
+  focoHits: number;
+  focoEnJuego: number;
+  minutosGanados: number;
+  minutosBloque: number;
 };
 
 function clampPct(n: number): number {
@@ -130,6 +172,7 @@ export function seedRingHuella(opts: {
     quitadas: 0,
     selladas: 0,
     cupoEdits: 0,
+    anadidas: 0,
   };
 }
 
@@ -138,7 +181,9 @@ export function ensureRingHuella(
   vehicle: HuellaEnfoqueInput,
   nowMs = Date.now()
 ): RingHuellaState {
-  if (vehicle.ringHuella) return vehicle.ringHuella;
+  if (vehicle.ringHuella) {
+    return { ...vehicle.ringHuella, anadidas: vehicle.ringHuella.anadidas ?? 0 };
+  }
   const rows = cronRows(vehicle);
   const sc = vehicle.situacionCronometro;
   const start = sc?.bloqueInicioAt ?? vehicle.aperturaAt ?? nowMs;
@@ -159,11 +204,12 @@ export function bumpRingHuella(
   current: RingHuellaState,
   kind: RingHuellaKind
 ): RingHuellaState {
-  const next = { ...current };
+  const next = { ...current, anadidas: current.anadidas ?? 0 };
   if (kind === "reorder") next.reorders += 1;
   else if (kind === "postergar") next.postergas += 1;
   else if (kind === "quitar") next.quitadas += 1;
   else if (kind === "sellar") next.selladas += 1;
+  else if (kind === "anadir") next.anadidas += 1;
   else next.cupoEdits += 1;
   return next;
 }
@@ -176,35 +222,54 @@ export function bumpRingHuellaOnVehicle(
   return bumpRingHuella(ensureRingHuella(vehicle, nowMs), kind);
 }
 
+/** Añadir fila cuenta como producción solo fuera de la ventana de 5 min. */
+export function bumpProduccionSiCabe(
+  vehicle: HuellaEnfoqueInput,
+  nowMs = Date.now()
+): RingHuellaState {
+  const state = ensureRingHuella(vehicle, nowMs);
+  if (enVentanaAtencion(vehicle, nowMs)) return state;
+  return bumpRingHuella(state, "anadir");
+}
+
 export function mergeRingHuella(
   a?: RingHuellaState | null,
   b?: RingHuellaState | null
 ): RingHuellaState | undefined {
   if (!a && !b) return undefined;
-  if (!a) return b ?? undefined;
-  if (!b) return a;
+  if (!a) return b ? { ...b, anadidas: b.anadidas ?? 0 } : undefined;
+  if (!b) return { ...a, anadidas: a.anadidas ?? 0 };
+  const aa = { ...a, anadidas: a.anadidas ?? 0 };
+  const bb = { ...b, anadidas: b.anadidas ?? 0 };
   const gestureScore = (h: RingHuellaState) =>
-    h.reorders + h.postergas + h.quitadas + h.selladas + h.cupoEdits + (h.sello ? 20 : 0);
-  const richer = gestureScore(a) >= gestureScore(b) ? a : b;
-  const other = richer === a ? b : a;
+    h.reorders +
+    h.postergas +
+    h.quitadas +
+    h.selladas +
+    h.cupoEdits +
+    (h.anadidas ?? 0) +
+    (h.sello ? 20 : 0);
+  const richer = gestureScore(aa) >= gestureScore(bb) ? aa : bb;
+  const other = richer === aa ? bb : aa;
   const launchedAt =
-    a.launchedAt > 0 && b.launchedAt > 0
-      ? Math.min(a.launchedAt, b.launchedAt)
-      : a.launchedAt || b.launchedAt;
+    aa.launchedAt > 0 && bb.launchedAt > 0
+      ? Math.min(aa.launchedAt, bb.launchedAt)
+      : aa.launchedAt || bb.launchedAt;
   return {
     launchedAt,
-    filasLaunch: Math.max(a.filasLaunch, b.filasLaunch),
-    minutosLaunch: Math.max(a.minutosLaunch, b.minutosLaunch),
-    tieneMeta: a.tieneMeta || b.tieneMeta,
+    filasLaunch: Math.max(aa.filasLaunch, bb.filasLaunch),
+    minutosLaunch: Math.max(aa.minutosLaunch, bb.minutosLaunch),
+    tieneMeta: aa.tieneMeta || bb.tieneMeta,
     ordenLaunchIds:
       richer.ordenLaunchIds.length >= other.ordenLaunchIds.length
         ? richer.ordenLaunchIds
         : other.ordenLaunchIds,
-    reorders: Math.max(a.reorders, b.reorders),
-    postergas: Math.max(a.postergas, b.postergas),
-    quitadas: Math.max(a.quitadas, b.quitadas),
-    selladas: Math.max(a.selladas, b.selladas),
-    cupoEdits: Math.max(a.cupoEdits, b.cupoEdits),
+    reorders: Math.max(aa.reorders, bb.reorders),
+    postergas: Math.max(aa.postergas, bb.postergas),
+    quitadas: Math.max(aa.quitadas, bb.quitadas),
+    selladas: Math.max(aa.selladas, bb.selladas),
+    cupoEdits: Math.max(aa.cupoEdits, bb.cupoEdits),
+    anadidas: Math.max(aa.anadidas, bb.anadidas),
     ...(richer.sello || other.sello ? { sello: richer.sello ?? other.sello } : {}),
   };
 }
@@ -214,175 +279,219 @@ function isPending(st: { resultadoSituacion?: string; completada?: boolean }): b
   return r === "pendiente";
 }
 
-function nVehiculosDesglosador(state: RingHuellaState, rowCount: number): number {
-  return Math.max(state.filasLaunch, rowCount, state.filasLaunch + state.selladas);
+function metaBloque(vehicle: HuellaEnfoqueInput): number | undefined {
+  return vehicle.situacionCronometro?.horaFinContratoMs ?? vehicle.situacionCronometro?.horaFinMs;
 }
 
-function cerroUltimoATiempo(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
-  const rows = cronRows(vehicle);
-  if (rows.length === 0) return false;
-  if (rows.some(isPending)) return false;
-  const meta =
-    vehicle.situacionCronometro?.horaFinContratoMs ?? vehicle.situacionCronometro?.horaFinMs;
-  if (meta == null) return false;
-  const lastAt = rows.reduce((m, r) => Math.max(m, r.cerradaAt ?? 0), 0) || nowMs;
-  return lastAt <= meta;
-}
-
-function ultimoEnJuegoATiempo(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
-  const pending = cronRows(vehicle).filter(isPending);
-  if (pending.length !== 1) return false;
-  const meta =
-    vehicle.situacionCronometro?.horaFinContratoMs ?? vehicle.situacionCronometro?.horaFinMs;
-  if (meta == null) return false;
-  return nowMs <= meta;
-}
-
-function cerroAntesDelRojo(st: {
+export function cerroCincoAntesDelTope(st: {
   minutosCupo?: number;
   duracionRealSec?: number;
   resultadoSituacion?: string;
   completada?: boolean;
 }): boolean {
   if (isPending(st)) return false;
-  const cupoSec = (st.minutosCupo ?? 0) * 60;
-  if (cupoSec <= 0 || st.duracionRealSec == null) return false;
-  return st.duracionRealSec <= cupoSec;
+  const cupoMin = st.minutosCupo ?? 0;
+  if (cupoMin < HUELLA_RADIO_MIN) return false;
+  if (st.duracionRealSec == null) return false;
+  return st.duracionRealSec <= (cupoMin - HUELLA_RADIO_MIN) * 60;
 }
 
-/** El reloj del vehículo en foco se pone rojo cuando el cupo ya está montado. */
-function focoMontadoEnRojo(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
+function restanteCupoMs(vehicle: HuellaEnfoqueInput, nowMs: number): number | null {
   const anchor = vehicle.situacionCupoAnchor;
-  if (!anchor?.subTareaId) return false;
+  if (!anchor?.subTareaId) return null;
   const focal = cronRows(vehicle).find(st => st.id === anchor.subTareaId);
-  if (!focal || !isPending(focal)) return false;
+  if (!focal || !isPending(focal)) return null;
   const cupoMin = focal.minutosCupo ?? 0;
-  if (cupoMin <= 0) return false;
-  return nowMs - anchor.startedAt >= cupoMin * 60_000;
+  if (cupoMin <= 0) return null;
+  return cupoMin * 60_000 - (nowMs - anchor.startedAt);
 }
 
-function scoreAtencion(opts: {
-  cerradasAntesDelRojo: number;
-  holdingFocus: boolean;
-  focoEnRojo: boolean;
-}): number {
-  // Músculo: no llegar al rojo. Cada vehículo tiene su tiempo; ahí no debe llegar.
-  let n = 26;
-  n += Math.min(5, opts.cerradasAntesDelRojo) * 12;
-  if (opts.holdingFocus && !opts.focoEnRojo) n += 22;
-  return clampPct(n);
+/** Ventana de 5 minutos antes del tope del cupo en foco. */
+export function enVentanaAtencion(vehicle: HuellaEnfoqueInput, nowMs = Date.now()): boolean {
+  const restante = restanteCupoMs(vehicle, nowMs);
+  if (restante == null) return false;
+  return restante > 0 && restante <= HUELLA_RADIO_MIN * 60_000;
 }
 
-function scoreOrden(nVeh: number): number {
-  // Inercia del desglose: 1–3 es el esfuerzo de pensar. Cruzar 3 abre el músculo.
-  // Plateau: 4 y 20 valen igual. No hay beneficio superior por alargar la lista.
-  if (nVeh <= 1) return 22;
-  if (nVeh === 2) return 48;
-  if (nVeh === HUELLA_ORDEN_UMBRAL) return 62;
+function ultimoCerradoEnRadio(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
+  const rows = cronRows(vehicle);
+  if (rows.length === 0 || rows.some(isPending)) return false;
+  const meta = metaBloque(vehicle);
+  if (meta == null) return false;
+  const lastAt = rows.reduce((m, r) => Math.max(m, r.cerradaAt ?? 0), 0) || nowMs;
+  return Math.abs(lastAt - meta) <= HUELLA_RADIO_MIN * 60_000;
+}
+
+function ultimoEnJuegoEnRadio(vehicle: HuellaEnfoqueInput, nowMs: number): boolean {
+  const pending = cronRows(vehicle).filter(isPending);
+  if (pending.length !== 1) return false;
+  const meta = metaBloque(vehicle);
+  if (meta == null) return false;
+  return Math.abs(nowMs - meta) <= HUELLA_RADIO_MIN * 60_000;
+}
+
+function selloVigente(s?: RingHuellaLectura): s is RingHuellaLectura {
+  return !!s && typeof s.decision === "number" && typeof s.produccion === "number";
+}
+
+export function hechosVacios(): HuellaHechos {
+  return {
+    filasLaunch: 0,
+    anadidas: 0,
+    reorders: 0,
+    postergas: 0,
+    quitadas: 0,
+    cerradas: 0,
+    atencionHits: 0,
+    desglosadores: 0,
+    focoHits: 0,
+    focoEnJuego: 0,
+    minutosGanados: 0,
+    minutosBloque: 0,
+  };
+}
+
+export function sumarHechosHuella(a: HuellaHechos, b: HuellaHechos): HuellaHechos {
+  return {
+    filasLaunch: a.filasLaunch + b.filasLaunch,
+    anadidas: a.anadidas + b.anadidas,
+    reorders: a.reorders + b.reorders,
+    postergas: a.postergas + b.postergas,
+    quitadas: a.quitadas + b.quitadas,
+    cerradas: a.cerradas + b.cerradas,
+    atencionHits: a.atencionHits + b.atencionHits,
+    desglosadores: a.desglosadores + b.desglosadores,
+    focoHits: a.focoHits + b.focoHits,
+    focoEnJuego: a.focoEnJuego + b.focoEnJuego,
+    minutosGanados: a.minutosGanados + b.minutosGanados,
+    minutosBloque: a.minutosBloque + b.minutosBloque,
+  };
+}
+
+export function hechosHuellaDesglosador(
+  vehicle: HuellaEnfoqueInput,
+  nowMs = Date.now()
+): HuellaHechos {
+  const state = ensureRingHuella(vehicle, nowMs);
+  const rows = cronRows(vehicle);
+  const cerradas = rows.filter(st => !isPending(st));
+  const anadidas =
+    state.anadidas > 0
+      ? state.anadidas
+      : Math.max(0, rows.length - state.filasLaunch);
+  return {
+    filasLaunch: state.filasLaunch,
+    anadidas,
+    reorders: state.reorders,
+    postergas: state.postergas,
+    quitadas: state.quitadas,
+    cerradas: cerradas.length,
+    atencionHits: cerradas.filter(cerroCincoAntesDelTope).length,
+    desglosadores: 1,
+    focoHits: ultimoCerradoEnRadio(vehicle, nowMs) ? 1 : 0,
+    focoEnJuego: ultimoEnJuegoEnRadio(vehicle, nowMs) ? 1 : 0,
+    minutosGanados: vehicle.situacionCronometro?.minutosGanadosSesion ?? 0,
+    minutosBloque: state.minutosLaunch,
+  };
+}
+
+function scoreDecision(filasLaunch: number): number {
+  // Solo la primera lista. Cruzar 3 abre el músculo; alargar no suma.
+  if (filasLaunch <= 1) return 22;
+  if (filasLaunch === 2) return 48;
+  if (filasLaunch === HUELLA_DECISION_UMBRAL) return 62;
   return 82;
 }
 
-function scoreCerteza(cupoEdits: number): number {
-  return clampPct(24 + Math.min(8, cupoEdits) * 10);
+function scoreAtencion(hits: number, cerradas: number): number {
+  if (cerradas <= 0) return 18;
+  return clampPct(24 + (hits / cerradas) * 76);
 }
 
-function scoreGanancia(
-  nVeh: number,
-  minutosBloque: number,
-  minutosGanados: number,
-  selladas: number
-): number {
-  // Oficio del bloque (2–3 h) vale más que la etiqueta.
-  // Los PS no se eliminan: minutos ganados y sellos (2 PS/fila) siguen contando.
-  const horas = minutosBloque / 60;
-  let n = 16;
-  if (nVeh > HUELLA_ORDEN_UMBRAL) n += 20;
-  if (horas >= 2 && horas <= 3.5) n += 28;
-  else if (horas >= 1.5) n += 16;
-  else if (horas >= 1) n += 8;
-  if (horas >= 1 && nVeh > HUELLA_ORDEN_UMBRAL) {
-    n += Math.min(12, (Math.min(nVeh, 8) / horas) * 3);
-  }
-  n += Math.min(16, Math.round(minutosGanados / 3));
-  n += Math.min(12, Math.max(0, selladas) * 2);
-  return clampPct(n);
+function scoreProduccion(anadidas: number): number {
+  if (anadidas <= 0) return 16;
+  if (anadidas === 1) return 42;
+  if (anadidas === 2) return 58;
+  return 74;
 }
 
-function scoreFoco(opts: {
-  reorders: number;
-  postergas: number;
-  quitadas: number;
-  cerroUltimoATiempo: boolean;
-  ultimoEnJuegoATiempo: boolean;
-}): number {
+function scoreFoco(hits: number, enJuego: number): number {
+  if (hits > 0) return clampPct(52 + Math.min(3, hits - 1) * 14);
+  if (enJuego > 0) return 40;
+  return 22;
+}
+
+function scoreOrden(reorders: number, postergas: number, quitadas: number): number {
   let n = 22;
-  n += Math.min(5, opts.reorders) * 8;
-  n += Math.min(4, opts.postergas) * 10;
-  n += Math.min(4, opts.quitadas) * 10;
-  if (opts.cerroUltimoATiempo) n += 28;
-  else if (opts.ultimoEnJuegoATiempo) n += 12;
+  n += Math.min(5, reorders) * 8;
+  n += Math.min(4, postergas) * 10;
+  n += Math.min(4, quitadas) * 10;
   return clampPct(n);
 }
 
-function relatoHuella(args: {
-  nVeh: number;
-  horas: number;
-  cupoEdits: number;
-  reorders: number;
-  postergas: number;
-  quitadas: number;
-  selladas: number;
-  minutosGanados: number;
-  cerroUltimoATiempo: boolean;
-  cerradasAntesDelRojo: number;
-  focoEnRojo: boolean;
-}): string {
-  const {
-    nVeh,
-    horas,
-    cupoEdits,
-    reorders,
-    postergas,
-    quitadas,
-    selladas,
-    minutosGanados,
-    cerroUltimoATiempo,
-    cerradasAntesDelRojo,
-    focoEnRojo,
-  } = args;
-  if (cerroUltimoATiempo) {
-    return "Cerraste el último a tiempo. Foco: el músculo ya está.";
+function relatoHuella(h: HuellaHechos): string {
+  if (h.focoHits > 0) {
+    return h.desglosadores > 1
+      ? `Cerraste ${h.focoHits} desglosador${h.focoHits === 1 ? "" : "es"} en el radio de 5 minutos. Foco.`
+      : "Cerraste la última fila en el radio de 5 minutos. Foco.";
   }
-  if (!focoEnRojo && cerradasAntesDelRojo > 0) {
-    return "No montaste el límite sobre el vehículo: el reloj no llegó a rojo. Atención.";
+  if (h.atencionHits > 0) {
+    return h.atencionHits === 1
+      ? "Cerraste una fila 5 minutos antes del tope. Atención."
+      : `Cerraste ${h.atencionHits} filas 5 minutos antes del tope. Atención del desglosador.`;
   }
-  if (nVeh > HUELLA_ORDEN_UMBRAL) {
-    return "Pensaste qué hacer y desglosaste. Orden interno: rompiste la inercia.";
+  if (h.filasLaunch > HUELLA_DECISION_UMBRAL) {
+    return "Decidiste qué hacer y desglosaste. Nació disponibilidad.";
   }
-  if (cupoEdits > 0) {
-    return cupoEdits === 1
-      ? "Editaste los minutos. Certeza en desarrollo."
-      : `Editaste los minutos ${cupoEdits} veces. Certeza en desarrollo.`;
+  if (h.anadidas > 0) {
+    return h.anadidas === 1
+      ? "Añadiste después del lanzamiento. Producción."
+      : `Añadiste ${h.anadidas} filas después del lanzamiento. Producción.`;
   }
-  const focoGestos: string[] = [];
-  if (reorders > 0) focoGestos.push("reordenar");
-  if (postergas > 0) focoGestos.push("postergar");
-  if (quitadas > 0) focoGestos.push("quitar");
-  if (focoGestos.length > 0) {
-    const cabeza = focoGestos.join(", ");
-    return `${cabeza.charAt(0).toUpperCase()}${cabeza.slice(1)}: eso es foco. No hay etiqueta negativa — es músculo.`;
+  const gestos: string[] = [];
+  if (h.reorders > 0) gestos.push("reordenar");
+  if (h.postergas > 0) gestos.push("postergar");
+  if (h.quitadas > 0) gestos.push("quitar");
+  if (gestos.length > 0) {
+    const cabeza = gestos.join(", ");
+    return `${cabeza.charAt(0).toUpperCase()}${cabeza.slice(1)}: eso es orden.`;
   }
-  if (!focoEnRojo) {
-    return "El cupo aún no está en rojo. Atención: no apilar tiempo sobre este vehículo.";
+  if (h.focoEnJuego > 0) {
+    return "La última fila está en el radio de 5 minutos. Foco en juego.";
   }
-  if (horas >= 2 && nVeh >= 4) {
-    const h = horas >= 10 ? Math.round(horas) : Math.round(horas * 10) / 10;
-    return `${nVeh} vehículos en ${h} h. Oficio del bloque. Los PS de Jornada se quedan.`;
+  if (h.filasLaunch > 0) {
+    return "La primera lista ya está. Decisión: pensar qué vas a hacer.";
   }
-  if (selladas > 0 || minutosGanados > 0) {
-    return "Los PS de Jornada se quedan. Oficio: el recuento frente a las horas.";
-  }
-  return "El desglosador entrena músculo: atención, orden, certeza, foco.";
+  return "El desglosador deja huella al cerrar el día.";
+}
+
+export function computeHuellaFromHechos(h: HuellaHechos): RingHuellaLectura {
+  const ejes: RingHuellaEjes = {
+    decision: scoreDecision(h.filasLaunch),
+    atencion: scoreAtencion(h.atencionHits, h.cerradas),
+    produccion: scoreProduccion(h.anadidas),
+    foco: scoreFoco(h.focoHits, h.focoEnJuego),
+    orden: scoreOrden(h.reorders, h.postergas, h.quitadas),
+  };
+  const huella = clampPct(
+    ejes.decision * HUELLA_PESOS.decision +
+      ejes.atencion * HUELLA_PESOS.atencion +
+      ejes.produccion * HUELLA_PESOS.produccion +
+      ejes.foco * HUELLA_PESOS.foco +
+      ejes.orden * HUELLA_PESOS.orden
+  );
+  return {
+    ...ejes,
+    huella,
+    gestos: h.reorders + h.postergas + h.quitadas,
+    minutosGanados: h.minutosGanados,
+    vehiculos: h.filasLaunch + h.anadidas,
+    horasBloque: h.minutosBloque / 60,
+    desglosadores: h.desglosadores,
+    anadidas: h.anadidas,
+    atencionCierres: h.atencionHits,
+    relato: relatoHuella(h),
+  };
 }
 
 export function computeHuellaEnfoque(
@@ -390,78 +499,30 @@ export function computeHuellaEnfoque(
   nowMs = Date.now()
 ): RingHuellaLectura {
   const state = ensureRingHuella(vehicle, nowMs);
-  if (state.sello && vehicle.situacionCronometro?.activo !== true) {
+  if (selloVigente(state.sello) && vehicle.situacionCronometro?.activo !== true) {
     const s = state.sello;
     return {
       ...s,
       vehiculos: s.vehiculos ?? state.filasLaunch,
       horasBloque: s.horasBloque ?? state.minutosLaunch / 60,
+      desglosadores: s.desglosadores ?? 1,
+      anadidas: s.anadidas ?? state.anadidas ?? 0,
+      atencionCierres: s.atencionCierres ?? 0,
     };
   }
+  return computeHuellaFromHechos(hechosHuellaDesglosador(vehicle, nowMs));
+}
 
-  const rows = cronRows(vehicle);
-  const nVeh = nVehiculosDesglosador(state, rows.length);
-  const minutosBloque = state.minutosLaunch;
-  const horasBloque = minutosBloque / 60;
-  const minutosGanados = vehicle.situacionCronometro?.minutosGanadosSesion ?? 0;
-  const ultimoCerrado = cerroUltimoATiempo(vehicle, nowMs);
-  const ultimoEnJuego = ultimoEnJuegoATiempo(vehicle, nowMs);
-  const cerradasAntesDelRojo = rows.filter(cerroAntesDelRojo).length;
-  const focoEnRojo = focoMontadoEnRojo(vehicle, nowMs);
-  const holdingFocus = Boolean(
-    vehicle.situacionCupoAnchor &&
-      rows.some(
-        st => st.id === vehicle.situacionCupoAnchor!.subTareaId && isPending(st)
-      )
+/** Una lectura para el día o la semana: suma de todos los desglosadores. */
+export function computeHuellaPeriodo(
+  vehicles: HuellaEnfoqueInput[],
+  nowMs = Date.now()
+): RingHuellaLectura {
+  const hechos = vehicles.reduce(
+    (acc, v) => sumarHechosHuella(acc, hechosHuellaDesglosador(v, nowMs)),
+    hechosVacios()
   );
-
-  const ejes: RingHuellaEjes = {
-    atencion: scoreAtencion({
-      cerradasAntesDelRojo,
-      holdingFocus,
-      focoEnRojo,
-    }),
-    orden: scoreOrden(nVeh),
-    certeza: scoreCerteza(state.cupoEdits),
-    ganancia: scoreGanancia(nVeh, minutosBloque, minutosGanados, state.selladas),
-    foco: scoreFoco({
-      reorders: state.reorders,
-      postergas: state.postergas,
-      quitadas: state.quitadas,
-      cerroUltimoATiempo: ultimoCerrado,
-      ultimoEnJuegoATiempo: ultimoEnJuego,
-    }),
-  };
-  const huella = clampPct(
-    ejes.atencion * HUELLA_PESOS.atencion +
-      ejes.orden * HUELLA_PESOS.orden +
-      ejes.certeza * HUELLA_PESOS.certeza +
-      ejes.ganancia * HUELLA_PESOS.ganancia +
-      ejes.foco * HUELLA_PESOS.foco
-  );
-  const gestos = state.reorders + state.postergas + state.quitadas;
-
-  return {
-    ...ejes,
-    huella,
-    gestos,
-    minutosGanados,
-    vehiculos: nVeh,
-    horasBloque,
-    relato: relatoHuella({
-      nVeh,
-      horas: horasBloque,
-      cupoEdits: state.cupoEdits,
-      reorders: state.reorders,
-      postergas: state.postergas,
-      quitadas: state.quitadas,
-      selladas: state.selladas,
-      minutosGanados,
-      cerroUltimoATiempo: ultimoCerrado,
-      cerradasAntesDelRojo,
-      focoEnRojo,
-    }),
-  };
+  return computeHuellaFromHechos(hechos);
 }
 
 export function sellRingHuella(
@@ -481,7 +542,7 @@ export function huellaCierreCopy(lectura: RingHuellaLectura): {
   description: string;
 } {
   return {
-    title: `Huella ${lectura.huella}%`,
-    description: `${lectura.relato} ${huellaEjesLine(lectura)}.`,
+    title: lectura.relato,
+    description: `${huellaEjesLine(lectura)}. Los PS de Jornada se quedan.`,
   };
 }

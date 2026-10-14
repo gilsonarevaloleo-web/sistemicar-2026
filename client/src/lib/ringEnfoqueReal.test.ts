@@ -24,8 +24,9 @@ describe("ringEnfoqueReal", () => {
     expect(ringBienvenidaParts(2)[0]).toContain(RING_BRAND.enfoque);
   });
 
-  it("huellaHint nombra orden interno y deja los PS", () => {
-    expect(RING_COPY.huellaHint).toMatch(/orden interno/i);
+  it("huellaHint nombra decisión y deja los PS", () => {
+    expect(RING_COPY.huellaHint).toMatch(/decisión/i);
+    expect(RING_COPY.huellaHint).toMatch(/primera lista/i);
     expect(RING_COPY.huellaHint).toMatch(/PS se quedan/);
     expect(RING_COPY.huellaHint).not.toMatch(/ordenar la mente/i);
   });
