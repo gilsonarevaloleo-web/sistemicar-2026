@@ -15,13 +15,13 @@ type Props = {
 };
 
 /**
- * Lectura viva de la coreografía del ring: no pide tareas extra.
+ * En vivo: solo el relato. Los cinco números son el gancho de cierre.
  */
 export function HuellaEnfoqueStrip({ vehicle, nowMs, emphasize = false }: Props) {
   const lectura = computeHuellaEnfoque(vehicle, nowMs);
   return (
     <div
-      className={emphasize ? "rounded-xl border px-3 py-2.5 space-y-1.5" : "space-y-1"}
+      className={emphasize ? "rounded-xl border px-3 py-2.5 space-y-1.5" : "space-y-0.5"}
       style={
         emphasize
           ? {
@@ -32,50 +32,43 @@ export function HuellaEnfoqueStrip({ vehicle, nowMs, emphasize = false }: Props)
       }
       data-testid="j4-huella-enfoque"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <p
-          className="text-[8px] font-black uppercase tracking-widest"
-          style={{ color: emphasize ? GOLD : VIOLET }}
-          title={RING_COPY.huellaHint}
-        >
-          Huella de enfoque
-        </p>
-        <p
-          className="text-sm font-black tabular-nums"
-          style={{ color: emphasize ? GOLD : INK, fontFamily: "ui-monospace, monospace" }}
-          data-testid="j4-huella-pct"
-        >
-          {lectura.huella}%
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-        {HUELLA_EJES.map(eje => (
-          <span
-            key={eje.id}
-            className="text-[9px] font-bold tabular-nums"
-            style={{ color: MUTED }}
-            title={eje.definicion}
-            data-testid={`j4-huella-eje-${eje.id}`}
-          >
-            {eje.label}{" "}
-            <span style={{ color: INK }}>{lectura[eje.id]}</span>
-          </span>
-        ))}
-      </div>
-      <p className="text-[10px] leading-snug" style={{ color: emphasize ? INK : MUTED }}>
+      <p
+        className="text-[8px] font-black uppercase tracking-widest"
+        style={{ color: emphasize ? GOLD : VIOLET }}
+        title={RING_COPY.huellaHint}
+      >
+        {emphasize ? "Huella del desglosador" : "Huella"}
+      </p>
+      <p
+        className="text-[11px] leading-snug"
+        style={{ color: emphasize ? INK : MUTED }}
+        data-testid="j4-huella-relato"
+      >
         {lectura.relato}
       </p>
       {emphasize ? (
-        <ul className="space-y-0.5 pt-1">
-          {HUELLA_EJES.map(eje => (
-            <li key={eje.id} className="text-[9px] leading-snug" style={{ color: MUTED }}>
-              <span className="font-bold" style={{ color: INK }}>
-                {eje.label}.
-              </span>{" "}
-              {eje.definicion}
-            </li>
-          ))}
-        </ul>
+        <>
+          <p
+            className="text-sm font-black tabular-nums"
+            style={{ color: GOLD, fontFamily: "ui-monospace, monospace" }}
+            data-testid="j4-huella-pct"
+          >
+            {lectura.huella}%
+          </p>
+          <p className="text-[9px] font-bold tabular-nums" style={{ color: MUTED }}>
+            {HUELLA_EJES.map(e => `${e.label} ${lectura[e.id]}`).join(" · ")}
+          </p>
+          <ul className="space-y-0.5 pt-1">
+            {HUELLA_EJES.map(eje => (
+              <li key={eje.id} className="text-[9px] leading-snug" style={{ color: MUTED }}>
+                <span className="font-bold" style={{ color: INK }}>
+                  {eje.label}.
+                </span>{" "}
+                {eje.definicion}
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
     </div>
   );

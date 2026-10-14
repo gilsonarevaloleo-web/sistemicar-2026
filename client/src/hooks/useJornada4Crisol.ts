@@ -17,7 +17,7 @@ import {
   injectCrisolPensamiento,
   pickSituacionVehicleTarget,
 } from "@/jornada4/crisolKernel";
-import { bumpRingHuellaOnVehicle, seedRingHuella } from "@/jornada4/huellaEnfoque";
+import { bumpProduccionSiCabe, seedRingHuella } from "@/jornada4/huellaEnfoque";
 import {
   imanItemsParaDesglosador,
   nidoKeyFromReserva,
@@ -311,7 +311,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
         patch.situacionCupoAnchor = result.situacionCupoAnchor;
       }
       if (result.mode === "enqueue_ring") {
-        patch.ringHuella = bumpRingHuellaOnVehicle(vehicle, "sellar");
+        patch.ringHuella = bumpProduccionSiCabe(vehicle);
       } else if (result.mode === "open_ring" && result.situacionCronometro) {
         const cron = result.subTareas.filter(st => st.enDesgloseCronometro);
         const start = result.situacionCronometro.bloqueInicioAt ?? Date.now();
