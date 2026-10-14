@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DEPOT_V3_SYNTAX_ONLY_PROMPT,
   buildDepositoV3SystemPrompt,
   diagnosticarAuditoriaLocal,
   evaluarDepositoV3,
@@ -12,56 +13,52 @@ const PATRON_PISTON =
   "Vi el patrón: cada vez que salteo la secuencia a las 9:00, 9:20, 9:40 el pistón se atasca. El modelo se repite. No es que deba ser más productivo.";
 
 describe("Depósito V3 — prompt", () => {
-  it("exige luz de arriba, desinfección, C8 diferido, impronta y firma sintáctica", () => {
+  it("exige motor de firma: geometría, vacíos y cableado; prohíbe Óptica y Δ", () => {
     const system = buildDepositoV3SystemPrompt();
-    assert.match(system, /LUZ VIENE DE ARRIBA/i);
-    assert.match(system, /DESINFECTAR LA MORAL/i);
-    assert.match(system, /EFECTOS DIFERIDOS/i);
-    assert.match(system, /EVASI[OÓ]N INTELECTUAL/i);
-    assert.match(system, /IMPRONTA DE MADUREZ/i);
-    assert.match(system, /cablea/i);
-    assert.match(system, /FIRMA SINTÁCTICA/i);
-    assert.match(system, /auditoría de título|título\/hipótesis/i);
-    assert.match(system, /FORMA \(SINTAXIS\) VS FONDO \(ÓPTICA\)/i);
-    assert.match(system, /Secuencia Vectorial/i);
-    assert.match(system, /NO busques reloj/i);
+    assert.match(DEPOT_V3_SYNTAX_ONLY_PROMPT, /SOLE purpose/i);
+    assert.match(system, /GEOMETRY, STRUCTURE, and CHARACTER SIGNATURE/i);
+    assert.match(system, /DO NOT evaluate moral truth|philosophical depth/i);
+    assert.match(system, /DO NOT calculate "Perception Delta/i);
     assert.match(system, /syntacticVacios/);
     assert.match(system, /isCableadoConnected/);
-    assert.match(system, /perceptionEye/);
     assert.match(system, /characterSignedCode/);
+    assert.match(system, /activeCharacterMap/);
+    assert.match(system, /Secuencia Vectorial|Antecedent/i);
+    assert.match(system, /Independent of clock time|NO EXIGE RELOJ/i);
+    assert.doesNotMatch(system, /perceptionEye/);
+    assert.doesNotMatch(system, /deltaGap/);
+    assert.doesNotMatch(system, /FORMA \(SINTAXIS\) VS FONDO \(ÓPTICA\)/);
     assert.doesNotMatch(system, /UN solo Código Dominante/);
   });
 
-  it("el user prompt manda diagnosticar el orden real, no el candado", () => {
+  it("el user prompt manda diagnosticar geometría, no verdad", () => {
     const user = serializarPromptAuditoria({
       rawFact: "hoy corté a las 14:00",
       userTier: "MATRICULA",
     });
     assert.match(user, /MATRICULA/);
-    assert.match(user, /orden real/);
+    assert.match(user, /geometría real/);
     assert.match(user, /hoy corté a las 14:00/);
-    assert.match(user, /cableado título/i);
+    assert.match(user, /Cero Óptica|Cero Δ/);
   });
 });
 
 describe("Depósito V3 — fallback local", () => {
-  it("luz de arriba: patrón + pistón = óptica C7, carácter C3, Δ 4", () => {
+  it("patrón + pistón firma C3 y enciende C7 sin inventar Óptica", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact: PATRON_PISTON,
       userTier: "MATRICULA",
     });
-    assert.equal(r.perceptionEye, 7);
     assert.equal(r.characterSignedCode, 3);
-    assert.equal(r.deltaGap, 4);
-    assert.equal(r.groundingStatus.frictionPoint, 3);
-    assert.equal(r.groundingStatus.isFullyGrounded, false);
-    assert.match(r.groundingStatus.diagnosticMessage, /no se invalida/i);
-    assert.equal(r.activeEyeMap[7], true);
-    assert.equal(r.activeEyeMap[3], true);
+    assert.equal(r.activeCharacterMap[3], true);
+    assert.equal(r.activeCharacterMap[7], true);
     assert.equal(r.syntaxDiagnostic.detectedSyntaxCode, 3);
     assert.equal(r.syntaxDiagnostic.isCableadoConnected, true);
     assert.ok(r.syntacticVacios.includes(1));
     assert.equal(r.syntacticVacios.includes(3), false);
+    assert.equal("perceptionEye" in r, false);
+    assert.equal("deltaGap" in r, false);
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /óptica|delta/i);
   });
 
   it("C3 se activa por secuencia vectorial, no por reloj", () => {
@@ -70,12 +67,12 @@ describe("Depósito V3 — fallback local", () => {
         "Vi el patrón. Primero aislé el territorio, entonces ocurrió el atasco, me llevó a cortar el segundo paso. El modelo se repite.",
       userTier: "MATRICULA",
     });
-    assert.equal(r.perceptionEye, 7);
     assert.equal(r.characterSignedCode, 3);
     assert.equal(r.syntaxDiagnostic.detectedSyntaxCode, 3);
+    assert.equal(r.activeCharacterMap[3], true);
   });
 
-  it("48h / loop marca latencia C8, no flojera moral", () => {
+  it("48h / loop marca firma C8, no flojera moral", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:
         "Anteayer corté. A las 48h me volvió la ansiedad en loop. El retorno no es flojera. El ciclo incubó.",
@@ -83,23 +80,22 @@ describe("Depósito V3 — fallback local", () => {
       detectedNoise: "me sentí flojo",
       omittedShadow: "no nombré la onda de 48h",
     });
-    assert.equal(r.systemicAnalysis.isLatencyEvent, true);
-    assert.ok(r.characterSignedCode === 8 || r.perceptionEye === 8);
-    assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flojo moral/i);
+    assert.equal(r.characterSignedCode, 8);
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /flojo moral/i);
+    assert.doesNotMatch(r.immediateAdjustment, /debo|virtud/i);
   });
 
-  it("volcado corto no inventa óptica alta", () => {
+  it("volcado corto no inventa firma alta", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact: "hoy mal",
       userTier: "FREE",
     });
-    assert.equal(r.perceptionEye, 1);
     assert.equal(r.characterSignedCode, 1);
-    assert.equal(r.deltaGap, 0);
-    assert.equal(r.groundingStatus.frictionPoint, 1);
+    assert.equal(r.syntaxDiagnostic.isCableadoConnected, false);
+    assert.equal(r.groundingStatus.isFullyGrounded, false);
   });
 
-  it("impronta: título C7 cableado al pistón no es flor moral ni Δ inflada", () => {
+  it("título C7 cableado al pistón no se juzga como idea: solo cordón", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:
         "A las 9:00 arranqué. A las 9:20 el segundo paso. A las 9:40 el pistón se atasca. El modelo se repite.",
@@ -108,17 +104,14 @@ describe("Depósito V3 — fallback local", () => {
       detectedNoise: "culpa de productividad",
       omittedShadow: "no nombré el atasco de las 9:40",
     });
-    assert.equal(r.perceptionEye, 7);
     assert.equal(r.characterSignedCode, 3);
-    assert.equal(r.deltaGap, 4);
-    assert.equal(r.groundingStatus.isFullyGrounded, false);
-    assert.match(r.groundingStatus.diagnosticMessage, /impronta|no se invalida/i);
-    assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flor moral|evasión/i);
-    assert.equal(r.eyeAudits[7].isBlindSpot, false);
+    assert.equal(r.activeCharacterMap[3], true);
+    assert.equal(r.activeCharacterMap[7], true);
     assert.equal(r.syntaxDiagnostic.isCableadoConnected, true);
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /evasi[oó]n|flor moral/i);
   });
 
-  it("evasión intelectual: título C10 que flota sobre energía/culpa", () => {
+  it("título C10 que flota no cablea: la firma baja queda y C10 es vacío o desconectado", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:
         "Hoy no hice nada. Me sentí con poca energía. Debo ser más productivo. Ya veré.",
@@ -127,67 +120,51 @@ describe("Depósito V3 — fallback local", () => {
       detectedNoise: "energía y culpa",
       omittedShadow: "no nombré que no arranqué",
     });
-    assert.equal(r.perceptionEye, 10);
     assert.ok(r.characterSignedCode <= 3);
-    assert.ok(r.deltaGap >= 7);
-    assert.match(r.groundingStatus.diagnosticMessage, /evasi[oó]n intelectual/i);
-    assert.match(r.systemicAnalysis.realEngineeringCause, /evasi[oó]n/i);
-    assert.equal(r.eyeAudits[10].isBlindSpot, true);
+    assert.equal(r.syntaxDiagnostic.isCableadoConnected, false);
+    assert.doesNotMatch(r.immediateAdjustment, /filosofía|óptica/i);
   });
 
-  it("detectedNoise declarado no marca flor si el patrón se cablea", () => {
+  it("detectedNoise declarado no altera la geometría si el cuerpo está cableado", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact: PATRON_PISTON,
       userTier: "CARRERA",
       detectedNoise: "me sentí flojo",
       omittedShadow: "el atasco de las 9:40",
     });
-    assert.equal(r.perceptionEye, 7);
     assert.equal(r.characterSignedCode, 3);
-    assert.doesNotMatch(r.systemicAnalysis.realEngineeringCause, /flor moral/i);
+    assert.equal(r.syntaxDiagnostic.isCableadoConnected, true);
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /flor moral/i);
   });
 });
 
 describe("Depósito V3 — orquestación", () => {
-  it("Gemini válido sella Δ y marca source gemini", async () => {
+  it("Gemini válido sella mapa de carácter y marca source gemini", async () => {
     const out = await procesarAuditoriaV3(
       { rawFact: PATRON_PISTON, userTier: "MATRICULA" },
       async () =>
         JSON.stringify({
-          perceptionEye: 7,
           characterSignedCode: 3,
-          activeEyeMap: { "3": true, "7": true },
-          eyeAudits: {
-            "7": {
-              eyeId: 7,
-              hasIntention: true,
-              hasRealVision: true,
-              isBlindSpot: false,
-            },
-          },
-          deltaGap: 99,
+          activeCharacterMap: { "3": true, "7": true },
+          syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
           syntaxDiagnostic: {
             detectedSyntaxCode: 3,
+            isCableadoConnected: true,
             syntaxCharacteristics: "Horas y pistón.",
           },
           groundingStatus: {
-            isFullyGrounded: false,
-            frictionPoint: 3,
-            diagnosticMessage: "Óptica C7, chasis C3.",
-          },
-          systemicAnalysis: {
-            isLatencyEvent: false,
-            isSystemicConflict: false,
-            realEngineeringCause: "Patrón narrado, secuencia rota.",
+            isFullyGrounded: true,
+            diagnosticMessage: "Secuencia cableada al patrón.",
           },
           immediateAdjustment: "Tres pasos con hora de corte.",
         }),
     );
     assert.equal(out.source, "gemini");
-    assert.equal(out.result.perceptionEye, 7);
     assert.equal(out.result.characterSignedCode, 3);
-    assert.equal(out.result.deltaGap, 4);
-    assert.equal(out.result.activeEyeMap[7], true);
+    assert.equal(out.result.activeCharacterMap[3], true);
+    assert.equal(out.result.activeCharacterMap[7], true);
+    assert.equal(out.result.syntaxDiagnostic.isCableadoConnected, true);
+    assert.equal("deltaGap" in out.result, false);
   });
 
   it("JSON roto cae a local y no tira 500", async () => {
@@ -196,7 +173,6 @@ describe("Depósito V3 — orquestación", () => {
       async () => "esto no es json",
     );
     assert.equal(out.source, "local_fallback");
-    assert.equal(out.result.perceptionEye, 7);
     assert.equal(out.result.characterSignedCode, 3);
   });
 
@@ -219,6 +195,6 @@ describe("Depósito V3 — orquestación", () => {
     if (!r.ok) return;
     assert.equal(r.source, "local_fallback");
     assert.equal(r.userTier, "MATRICULA");
-    assert.equal(r.result.perceptionEye, 7);
+    assert.equal(r.result.characterSignedCode, 3);
   });
 });

@@ -6,7 +6,6 @@ import {
 } from "@shared/deposito/v3";
 
 const GOLD = "#D4AF37";
-const AZURE = "#1E90FF";
 
 export function GradoConsistenciaV3({
   entries,
@@ -16,7 +15,7 @@ export function GradoConsistenciaV3({
   if (entries.length === 0) return null;
 
   const grado = medirGradoConsistenciaDesdeVolcados(entries);
-  const dual = evaluateDualTrackPromotionDesdeVolcados(entries);
+  const firma = evaluateDualTrackPromotionDesdeVolcados(entries);
   const pct = Math.round(grado.consistencyRate * 100);
 
   return (
@@ -29,9 +28,9 @@ export function GradoConsistenciaV3({
         <div>
           <p
             className="text-[10px] tracking-[0.22em]"
-            style={{ color: AZURE }}
+            style={{ color: GOLD }}
           >
-            GRADO POR CONSISTENCIA
+            GRADO POR FIRMA
           </p>
           <p
             className="mt-1 font-mono text-lg tracking-wide"
@@ -49,15 +48,14 @@ export function GradoConsistenciaV3({
         </p>
       </div>
       <p className="mt-2 text-[11px] text-white/40">
-        7 de 10 con óptica ≥ C7 y chasis sustentado otorga Título. No abre el
-        candado comercial.
+        7 de 10 con cableado y vacíos contenidos otorga Título. No abre el
+        candado comercial. No mide profundidad filosófica.
       </p>
       <p
         className="mt-3 text-[10px] font-mono text-white/40"
-        data-testid="deposito-v3-grado-dual"
+        data-testid="deposito-v3-grado-firma"
       >
-        Doble canal · óptica {dual.opticaConsistencyRate}% · sintaxis{" "}
-        {dual.sintaxisConsistencyRate}% · {dual.promotionStatus}
+        Firma sintáctica · {firma.sintaxisConsistencyRate}% · {firma.promotionStatus}
       </p>
     </section>
   );

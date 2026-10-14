@@ -177,6 +177,8 @@ export function emptyActiveEyeMap(): Record<EyeCode, boolean> {
   return map;
 }
 
+export const emptyActiveCharacterMap = emptyActiveEyeMap;
+
 export function emptyEyeAudits(): Record<EyeCode, EyeAudit> {
   const map = {} as Record<EyeCode, EyeAudit>;
   for (const n of EYE_CODES) {
@@ -196,6 +198,26 @@ export function buildActiveEyeMap(
   const map = emptyActiveEyeMap();
   for (const n of active) map[n] = true;
   return map;
+}
+
+export const buildActiveCharacterMap = buildActiveEyeMap;
+
+/** Telemetría de calor: mapa nuevo, mapa legado o reconstrucción desde vacíos. */
+export function characterMapDe(result: {
+  activeCharacterMap?: Record<EyeCode, boolean> | null;
+  activeEyeMap?: Record<EyeCode, boolean> | null;
+  syntacticVacios?: readonly EyeCode[] | null;
+  characterSignedCode?: EyeCode;
+}): Record<EyeCode, boolean> {
+  if (result.activeCharacterMap) return result.activeCharacterMap;
+  if (result.activeEyeMap) return result.activeEyeMap;
+  if (Array.isArray(result.syntacticVacios)) {
+    const vacios = new Set(result.syntacticVacios);
+    return buildActiveCharacterMap(EYE_CODES.filter((n) => !vacios.has(n)));
+  }
+  return result.characterSignedCode
+    ? buildActiveCharacterMap([result.characterSignedCode])
+    : emptyActiveCharacterMap();
 }
 
 export function computeDeltaGap(

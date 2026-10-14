@@ -1,13 +1,12 @@
 /**
  * Motor de auditoría V3: Gemini + fallback local.
- * El dictamen es óptica + carácter + Δ. No elige un solo ojo dominante.
+ * El dictamen es firma de carácter + vacíos + cableado.
+ * No evalúa Óptica de verdad ni calcula Δ.
  */
 
 import {
   CANON_TEN_EYES,
-  buildActiveEyeMap,
-  computeDeltaGap,
-  emptyEyeAudits,
+  buildActiveCharacterMap,
   vaciosDesdeActiveMap,
 } from "./ojos.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
@@ -19,7 +18,6 @@ import {
   EYE_CODES,
   type DepotAnalysisResult,
   type DepotEntryPayload,
-  type EyeAudit,
   type EyeCode,
 } from "./types.ts";
 
@@ -34,22 +32,27 @@ export interface ResultadoAuditoriaV3 {
   source: "gemini" | "local_fallback";
 }
 
-const PERCEPCION: Record<EyeCode, RegExp[]> = {
-  1: [/territor/, /\bsuelo\b/, /\bcuerpo\b/, /fatiga/, /\bcama\b/, /\bcasa\b/, /espacio fisico/],
-  2: [/caudal/, /\bentra\b/, /\bsale\b/, /estanc/, /rutina/, /inbox/, /flujo/],
-  3: [/secuen/, /piston/, /pistón/, /paso a paso/, /\britmo\b/, /primero/, /segundo/, /tercer/],
-  4: [/estructur/, /reten/, /limite/, /límite/, /muro/, /estandar/, /estándar/, /contenci/],
-  5: [/decid/, /corte/, /cort[eé]/, /eleg/, /evad/, /disparo/, /no lo hice/],
-  6: [/juntura/, /relacion/, /relación/, /roce/, /cliente/, /ella\b/, /esposa/, /tercero/],
-  7: [/patron/, /patrón/, /modelo/, /\bley\b/, /vision/, /visión/, /lente/, /axioma/],
-  8: [/ciclo/, /\bloop\b/, /48\s*h/, /24\s*h/, /incuba/, /volvi[oó]/, /retorno/, /latencia/],
-  9: [/sistema/, /conjunto/, /arquitect/, /carga/, /hilos/, /escala/, /multihilo/],
-  10: [/origen/, /fuente/, /matriz/, /por que existe/, /por qué existe/, /\beje\b/],
-};
-
 const SINTAXIS: Record<EyeCode, RegExp[]> = {
-  1: [/cansad/, /fatiga/, /no conect/, /suelto/, /materia prima/],
-  2: [/entonces/, /despues me/, /después me/, /entro y/, /sali[oó]/],
+  1: [
+    /cansad/,
+    /fatiga/,
+    /no conect/,
+    /suelto/,
+    /materia prima/,
+    /territorio/,
+    /\btitulo\b/,
+    /\btítulo\b/,
+  ],
+  2: [
+    /entonces/,
+    /me llevo a/,
+    /despues me/,
+    /después me/,
+    /entro y/,
+    /sali[oó]/,
+    /causa/,
+    /efecto/,
+  ],
   3: [
     /me llevo a/,
     /entonces ocurrio/,
@@ -62,26 +65,61 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /primero [\s\S]+ segundo/,
     /antecedente/,
     /consecuente/,
+    /piston/,
+    /pistón/,
   ],
-  4: [/¿[^?]{6,}\?/, /por que la regla/, /por qué la regla/, /el muro/, /la norma/],
+  4: [/¿[^?]{6,}\?/, /por que /, /por qué /, /el muro/, /la norma/, /la regla/],
   5: [/\bcort[eé]\b/, /\bno\.\b/, /cero excusa/, /dispar[eé]/, /decid[ií]/],
-  6: [/"[^"]{4,}"/, /me dijo/, /le dije/, /con ella/, /con él/, /cliente/],
-  7: [/la ley es/, /el patron/, /el patrón/, /se repite el modelo/, /en abstracto/],
-  8: [/48\s*h/, /24\s*h/, /me volvi[oó]/, /dos dias/, /dos días/, /ansiedad/],
-  9: [/al mismo tiempo/, /varios hilos/, /balance de carga/, /mientras [\s\S]+ tambien/],
-  10: [/la fuente/, /de raiz/, /de raíz/, /el origen de este/],
+  6: [
+    /"[^"]{4,}"/,
+    /me dijo/,
+    /le dije/,
+    /con ella/,
+    /con él/,
+    /cliente/,
+    /\d{1,2}:\d{2}/,
+    /herramient/,
+    /taller/,
+    /escritorio/,
+    /escena/,
+  ],
+  7: [
+    /la ley es/,
+    /el patron/,
+    /el patrón/,
+    /se repite el modelo/,
+    /el modelo se repite/,
+    /en abstracto/,
+    /hipotesis/,
+    /hipótesis/,
+    /axioma/,
+  ],
+  8: [
+    /48\s*h/,
+    /24\s*h/,
+    /me volvi[oó]/,
+    /dos dias/,
+    /dos días/,
+    /ansiedad/,
+    /\bloop\b/,
+    /ciclo/,
+    /retorno/,
+    /incuba/,
+  ],
+  9: [
+    /al mismo tiempo/,
+    /varios hilos/,
+    /balance de carga/,
+    /mientras [\s\S]+ tambien/,
+    /multihilo/,
+  ],
+  10: [/la fuente/, /de raiz/, /de raíz/, /el origen de este/, /cableado/, /matriz/],
 };
-
-const FLOR_MORAL =
-  /culpa|debo|deber[ií]a|energ[ií]a|productiv|flojo|soy malo|virtud|ya ver[eé]/i;
 
 const HECHO_FRIO =
   /\d{1,2}:\d{2}|\d+\s*(min|hora|d[ií]a)|hoy a las|ayer|anot[eé]|med[ií]|cort[eé] \d/i;
 
 const LATENCIA = /48\s*h|24\s*h|me volvi[oó]|loop|ansiedad|incuba|dos d[ií]as/i;
-
-const SISTEMICO =
-  /virtud|productiv|balance de carga|varios hilos|trampa de|multihilo|escala/i;
 
 function normalizar(texto: string): string {
   return texto
@@ -111,28 +149,21 @@ function puntuar(
   return scores;
 }
 
-function elegirGanador(
-  scores: Record<EyeCode, number>,
-  prefer: "alto" | "bajo",
-): EyeCode {
-  let mejor: EyeCode = prefer === "alto" ? 10 : 1;
+function elegirPrimario(scores: Record<EyeCode, number>): EyeCode {
+  let mejor: EyeCode = 1;
   let mejorHits = -1;
-  const orden = prefer === "alto" ? [...EYE_CODES].reverse() : EYE_CODES;
-  for (const n of orden) {
+  for (const n of EYE_CODES) {
     if (scores[n] > mejorHits) {
       mejorHits = scores[n];
       mejor = n;
     }
   }
-  if (mejorHits <= 0) return prefer === "alto" ? 1 : 1;
-  return mejor;
+  return mejorHits <= 0 ? 1 : mejor;
 }
 
 function textoCompuesto(payload: DepotEntryPayload): string {
   return [
     payload.rawFact,
-    payload.detectedNoise ? `Flor: ${payload.detectedNoise}` : "",
-    payload.omittedShadow ? `Sombra: ${payload.omittedShadow}` : "",
     payload.studentHypothesis ? `Hipotesis: ${payload.studentHypothesis}` : "",
   ]
     .filter(Boolean)
@@ -187,8 +218,8 @@ const STOP_CABLE = new Set([
   "despues",
 ]);
 
-const CONCEPTO_ALTO =
-  /patron|ley|sistema|origen|ciclo|modelo|matriz|axioma|vision|carga|multihilo/;
+const CONCEPTO_ESTRUCTURAL =
+  /patron|ley|sistema|origen|ciclo|modelo|matriz|axioma|vision|carga|multihilo|piston|secuencia/;
 
 function extraerTituloSistemico(payload: DepotEntryPayload): string {
   const hipotesis = payload.studentHypothesis?.trim() ?? "";
@@ -215,38 +246,25 @@ function tokensCable(norm: string): string[] {
 
 function hipotesisCableada(
   payload: DepotEntryPayload,
-  perc: Record<EyeCode, number>,
   syn: Record<EyeCode, number>,
   norm: string,
 ): boolean {
-  const techo = elegirGanador(perc, "alto");
   const cuerpoSostiene =
-    techo >= 7 &&
-    perc[techo] > 0 &&
-    (syn[3] > 0 ||
-      syn[4] > 0 ||
-      syn[8] > 0 ||
-      syn[9] > 0 ||
-      HECHO_FRIO.test(payload.rawFact));
+    syn[3] > 0 ||
+    syn[4] > 0 ||
+    syn[8] > 0 ||
+    syn[9] > 0 ||
+    HECHO_FRIO.test(payload.rawFact);
 
   const titulo = extraerTituloSistemico(payload);
-  if (!titulo) return cuerpoSostiene;
+  if (!titulo) {
+    return Boolean(cuerpoSostiene && (syn[7] > 0 || syn[8] > 0 || syn[10] > 0));
+  }
 
   const normTitulo = normalizar(titulo);
   const ojoTitulo = hipotesisComoOjo(titulo);
-  if (
-    ojoTitulo &&
-    ojoTitulo >= 7 &&
-    (perc[ojoTitulo] > 0 || syn[ojoTitulo] > 0 || cuerpoSostiene)
-  ) {
-    return true;
-  }
-  if (
-    ojoTitulo &&
-    ojoTitulo >= 7 &&
-    !cuerpoSostiene &&
-    !HECHO_FRIO.test(payload.rawFact)
-  ) {
+  if (ojoTitulo && cuerpoSostiene) return true;
+  if (ojoTitulo && !cuerpoSostiene && !HECHO_FRIO.test(payload.rawFact)) {
     return false;
   }
 
@@ -255,54 +273,35 @@ function hipotesisCableada(
   if (
     tituloTokens.length > 0 &&
     hits / tituloTokens.length >= 0.4 &&
-    (cuerpoSostiene || HECHO_FRIO.test(payload.rawFact))
+    cuerpoSostiene
   ) {
     return true;
   }
-  if (CONCEPTO_ALTO.test(normTitulo) && CONCEPTO_ALTO.test(norm) && cuerpoSostiene) {
+  if (
+    CONCEPTO_ESTRUCTURAL.test(normTitulo) &&
+    CONCEPTO_ESTRUCTURAL.test(norm) &&
+    cuerpoSostiene
+  ) {
     return true;
   }
-  return cuerpoSostiene;
+  return false;
 }
 
-function auditarOjos(opts: {
-  perc: Record<EyeCode, number>;
-  syn: Record<EyeCode, number>;
-  perceptionEye: EyeCode;
-  characterSignedCode: EyeCode;
-  evasionIntelectual: boolean;
-  hayHechoFrio: boolean;
-}): Record<EyeCode, EyeAudit> {
-  const audits = emptyEyeAudits();
-  for (const n of EYE_CODES) {
-    const intencion = opts.perc[n] > 0 || opts.syn[n] > 0;
-    const vision =
-      intencion &&
-      opts.hayHechoFrio &&
-      !(opts.evasionIntelectual && n >= 7 && opts.characterSignedCode <= 3);
-    const puntoCiego =
-      opts.evasionIntelectual &&
-      ((n === opts.perceptionEye &&
-        opts.perceptionEye >= 7 &&
-        opts.characterSignedCode <= 3) ||
-        (n === opts.characterSignedCode &&
-          opts.perceptionEye >= 7 &&
-          n <= 3));
-    audits[n] = {
-      eyeId: n,
-      hasIntention: intencion || n === opts.perceptionEye || n === opts.characterSignedCode,
-      hasRealVision:
-        vision ||
-        (n === opts.perceptionEye && opts.hayHechoFrio && !opts.evasionIntelectual),
-      isBlindSpot: puntoCiego,
-    };
+function ajustePorVacio(
+  vacios: readonly EyeCode[],
+  characterSignedCode: EyeCode,
+  grounded: boolean,
+): string {
+  if (grounded) {
+    return `Mañana, repetí el mismo canal C${characterSignedCode} con un hecho medible. Cero inventario.`;
   }
-  return audits;
+  const hueco = vacios.find((n) => n !== characterSignedCode) ?? characterSignedCode;
+  const ojo = CANON_TEN_EYES[hueco];
+  return `Mañana, escribí el mismo hecho con marca C${hueco} ${ojo.name}: ${ojo.syntaxCharacteristics} Cero inventario.`;
 }
 
 /**
- * Fallback local: dos ejes, no un muro.
- * Si hay señal alta (C7–C10) y fricción baja (C1–C4), la óptica se sostiene.
+ * Fallback local: una sola vía — geometría de redacción.
  */
 export function diagnosticarAuditoriaLocal(
   payload: DepotEntryPayload,
@@ -314,19 +313,11 @@ export function diagnosticarAuditoriaLocal(
   if (palabras < 6) {
     return sellarLocal(
       scaffoldAnalysisResult({
-        perceptionEye: 1,
         characterSignedCode: 1,
         groundingStatus: {
           isFullyGrounded: false,
-          frictionPoint: 1,
           diagnosticMessage:
-            "El volcado aún es clima. C1 Cimiento no tiene territorio nombrado. Sin óptica alta que sostener.",
-        },
-        systemicAnalysis: {
-          isLatencyEvent: false,
-          isSystemicConflict: false,
-          realEngineeringCause:
-            "No hay hecho frío. La moral no aplica: falta materia.",
+            "El volcado aún es clima. C1 Cimiento no tiene territorio nombrado. Falta geometría.",
         },
         immediateAdjustment:
           "Volcá UN hecho físico: hora, lugar, verbo. Cero clima.",
@@ -335,33 +326,28 @@ export function diagnosticarAuditoriaLocal(
           isCableadoConnected: false,
           syntaxCharacteristics: CANON_TEN_EYES[1].syntaxCharacteristics,
         },
-        syntacticVacios: vaciosDesdeActiveMap(buildActiveEyeMap([1])),
+        syntacticVacios: vaciosDesdeActiveMap(buildActiveCharacterMap([1])),
       }),
     );
   }
 
-  const perc = puntuar(norm, PERCEPCION);
   const syn = puntuar(norm, SINTAXIS);
   const normCuerpo = normalizar(payload.rawFact);
-  const percCuerpo = puntuar(normCuerpo, PERCEPCION);
   const synCuerpo = puntuar(normCuerpo, SINTAXIS);
   const hipotesis = hipotesisComoOjo(payload.studentHypothesis);
+  const titulo = extraerTituloSistemico(payload);
 
-  let perceptionEye = elegirGanador(perc, "alto");
-  let characterSignedCode = elegirGanador(syn, "bajo");
-
-  if (hipotesis && hipotesis >= 7 && hipotesis > perceptionEye) {
-    perceptionEye = hipotesis;
+  if (titulo || payload.studentHypothesis) {
+    syn[1] += 1;
+  }
+  if (hipotesis && hipotesis >= 7) {
+    syn[7] += 1;
+  }
+  if (LATENCIA.test(norm)) {
+    syn[8] += 1;
   }
 
-  // Luz de arriba: si hay señal alta, no bajarla al código de fricción.
-  const techoPerc = elegirGanador(perc, "alto");
-  if (techoPerc >= 7 && perc[techoPerc] > 0 && perceptionEye < techoPerc) {
-    perceptionEye = techoPerc;
-  }
-  if (perceptionEye >= 7 && characterSignedCode === perceptionEye && syn[3] > 0) {
-    characterSignedCode = 3;
-  }
+  let characterSignedCode = elegirPrimario(syn);
   if (LATENCIA.test(norm) && syn[8] >= syn[characterSignedCode]) {
     characterSignedCode = 8;
   }
@@ -369,59 +355,29 @@ export function diagnosticarAuditoriaLocal(
     characterSignedCode = 3;
   }
 
-  const hayHechoFrio = HECHO_FRIO.test(payload.rawFact);
-  const florEnTerritorio = FLOR_MORAL.test(payload.rawFact);
-  const cableada = hipotesisCableada(payload, percCuerpo, synCuerpo, normCuerpo);
-  const evasionIntelectual =
-    perceptionEye >= 7 && characterSignedCode <= 3 && !cableada;
-  const hayFlor = evasionIntelectual || (florEnTerritorio && !cableada);
-  const isLatencyEvent = LATENCIA.test(norm);
-  const isSystemicConflict = SISTEMICO.test(norm) || perc[9] > 0 && syn[3] > 0;
-  const deltaGap = computeDeltaGap(perceptionEye, characterSignedCode);
-  const grounded =
-    deltaGap === 0 && hayHechoFrio && !hayFlor && !evasionIntelectual;
-  const frictionPoint =
-    !grounded && characterSignedCode <= 4 ? characterSignedCode : undefined;
+  const cableada = hipotesisCableada(payload, synCuerpo, normCuerpo);
+  if (cableada) syn[10] += 1;
 
-  const percepName = CANON_TEN_EYES[perceptionEye].name;
+  const activos = EYE_CODES.filter(
+    (n) => syn[n] > 0 || n === characterSignedCode,
+  );
+  const activeCharacterMap = buildActiveCharacterMap(activos);
+  const syntacticVacios = EYE_CODES.filter((n) => !activeCharacterMap[n]);
+  const activeCount = activos.length;
+  const grounded = cableada && activeCount >= 3;
+
   const charName = CANON_TEN_EYES[characterSignedCode].name;
-  const diagnosticMessage = evasionIntelectual
-    ? `Evasión intelectual: la premisa C${perceptionEye} ${percepName} no se cablea con la materia. El chasis está en C${characterSignedCode} ${charName}. Delta alta. No es impronta de madurez.`
-    : grounded
-      ? `Óptica y carácter coinciden en C${perceptionEye} ${percepName}. El chasis sostiene la visión.`
-      : `${cableada ? "Impronta de madurez: el título se cablea con la materia. " : ""}La visión opera en C${perceptionEye} ${percepName}. El chasis fricciona en C${characterSignedCode} ${charName}. No se invalida la óptica.`;
-
-  const causa = evasionIntelectual
-    ? `Evasión intelectual: se narra ${percepName.toLowerCase()} para tapar ${charName.toLowerCase()} sin cablear la premisa a los hechos.`
-    : hayFlor
-      ? `La flor moral tapa ingeniería: se narra ${percepName.toLowerCase()} y se ejecuta ${charName.toLowerCase()}.`
-      : `El corte se lee como ${percepName.toLowerCase()} y se firma como ${charName.toLowerCase()}.`;
-
-  const ajuste = evasionIntelectual
-    ? `Desinfección: bajá el título. Nombrá UN hecho físico de C${characterSignedCode} con hora. Cero filosofía.`
-    : frictionPoint
-      ? `Mañana, un solo gesto de ${CANON_TEN_EYES[frictionPoint].concept.toLowerCase()} en la escena de hoy. Cero sermón.`
-      : `Mañana, repetí el mismo canal C${perceptionEye} con un hecho medible. Cero inventario.`;
+  const diagnosticMessage = grounded
+    ? `Firma estable en C${characterSignedCode} ${charName}. Título, cuerpo y cierre están cableados. ${activeCount} códigos activos.`
+    : cableada
+      ? `Hay cordón título↔cuerpo, pero la geometría aún es estrecha (${activeCount} códigos). Firma primaria: C${characterSignedCode} ${charName}.`
+      : `La escritura no cablea título/hipótesis con el cierre. Firma primaria: C${characterSignedCode} ${charName}. Vacíos: ${syntacticVacios.length}.`;
 
   return sellarLocal(
     scaffoldAnalysisResult({
-      perceptionEye,
       characterSignedCode,
-      activeEyeMap: buildActiveEyeMap(
-        EYE_CODES.filter((n) => perc[n] > 0 || syn[n] > 0 || n === perceptionEye || n === characterSignedCode),
-      ),
-      eyeAudits: auditarOjos({
-        perc,
-        syn,
-        perceptionEye,
-        characterSignedCode,
-        evasionIntelectual,
-        hayHechoFrio,
-      }),
-      deltaGap,
-      syntacticVacios: EYE_CODES.filter(
-        (n) => syn[n] <= 0 && n !== characterSignedCode,
-      ),
+      activeCharacterMap,
+      syntacticVacios,
       syntaxDiagnostic: {
         detectedSyntaxCode: characterSignedCode,
         isCableadoConnected: cableada,
@@ -430,25 +386,31 @@ export function diagnosticarAuditoriaLocal(
       },
       groundingStatus: {
         isFullyGrounded: grounded,
-        ...(frictionPoint ? { frictionPoint } : {}),
         diagnosticMessage,
       },
-      systemicAnalysis: {
-        isLatencyEvent,
-        isSystemicConflict,
-        realEngineeringCause: causa,
-      },
-      immediateAdjustment: ajuste,
+      immediateAdjustment: ajustePorVacio(
+        syntacticVacios,
+        characterSignedCode,
+        grounded,
+      ),
     }),
   );
 }
 
 function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
+  const activeCharacterMap = {
+    ...buildActiveCharacterMap([]),
+    ...result.activeCharacterMap,
+    [result.characterSignedCode]: true,
+  };
+  if (result.syntaxDiagnostic.isCableadoConnected) {
+    activeCharacterMap[10] = true;
+  }
   return {
     ...result,
-    deltaGap: computeDeltaGap(result.perceptionEye, result.characterSignedCode),
+    activeCharacterMap,
     syntacticVacios:
-      result.syntacticVacios ?? vaciosDesdeActiveMap(result.activeEyeMap),
+      result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
     syntaxDiagnostic: {
       ...result.syntaxDiagnostic,
       detectedSyntaxCode:
@@ -459,25 +421,22 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
 }
 
 function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
-  const activeEyeMap = {
-    ...buildActiveEyeMap([]),
-    ...result.activeEyeMap,
-    [result.perceptionEye]: true,
+  const activeCharacterMap = {
+    ...buildActiveCharacterMap([]),
+    ...result.activeCharacterMap,
     [result.characterSignedCode]: true,
   };
+  if (result.syntaxDiagnostic.isCableadoConnected) {
+    activeCharacterMap[10] = true;
+  }
   return {
     ...result,
-    deltaGap: computeDeltaGap(result.perceptionEye, result.characterSignedCode),
-    activeEyeMap,
+    activeCharacterMap,
     syntacticVacios:
-      result.syntacticVacios ?? vaciosDesdeActiveMap(activeEyeMap),
+      result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
     syntaxDiagnostic: {
       ...result.syntaxDiagnostic,
       isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
-    },
-    eyeAudits: {
-      ...emptyEyeAudits(),
-      ...result.eyeAudits,
     },
   };
 }
@@ -500,7 +459,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con perceptionEye, characterSignedCode, deltaGap, syntacticVacios, syntaxDiagnostic (incluye isCableadoConnected), groundingStatus, systemicAnalysis, immediateAdjustment.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye isCableadoConnected), groundingStatus, immediateAdjustment. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

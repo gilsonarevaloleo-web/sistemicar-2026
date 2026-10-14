@@ -89,7 +89,7 @@ export function FormularioAuditoriaV3({
             Laboratorio de Volcado
           </h2>
           <p className="mt-1 text-[11px] text-white/40">
-            Óptica-Código: hecho frío. La moral no elige canal.
+            Firma de carácter: geometría del texto. No se juzga la profundidad de la idea.
           </p>
         </div>
         <span
@@ -210,7 +210,7 @@ export function FormularioAuditoriaV3({
           style={{ backgroundColor: GOLD, color: "#111" }}
           data-testid="deposito-v3-submit"
         >
-          {isLoading ? "Auditando óptica y sintaxis…" : "Auditar volcado"}
+          {isLoading ? "Auditando firma sintáctica…" : "Auditar firma"}
         </button>
       </form>
     </div>

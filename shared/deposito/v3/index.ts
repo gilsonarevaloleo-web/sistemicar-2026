@@ -31,8 +31,11 @@ export { EYE_CODES, USER_TIERS } from "./types.ts";
 
 export {
   CANON_TEN_EYES,
+  buildActiveCharacterMap,
   buildActiveEyeMap,
+  characterMapDe,
   computeDeltaGap,
+  emptyActiveCharacterMap,
   emptyActiveEyeMap,
   emptyEyeAudits,
   etiquetaCodigoOjo,
@@ -58,6 +61,7 @@ export {
 } from "./tiers.ts";
 
 export {
+  hidratarResultadoV3,
   isDepotAnalysisResult,
   normalizarPayload,
   parseDepotAnalysisResult,
@@ -66,6 +70,7 @@ export {
 } from "./validar.ts";
 
 export {
+  DEPOT_V3_SYNTAX_ONLY_PROMPT,
   DEPOSITO_V3_RITUAL,
   buildDepositoV3SystemPrompt,
   buildDepositoV3UserPrompt,

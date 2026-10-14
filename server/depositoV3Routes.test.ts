@@ -38,16 +38,17 @@ describe("Depósito V3 — GET /api/deposito/v3/meta", () => {
       const res = await fetch(`${base}/api/deposito/v3/meta`);
       assert.equal(res.status, 200);
       const body = await res.json();
-      assert.equal(body.version, "3.2.0-optica-sintaxis");
+      assert.equal(body.version, "3.3.0-sintaxis-firma");
       assert.equal(body.endpoint, "POST /api/deposito/v3/audit");
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.muroDeDominancia, false);
+      assert.equal(body.viaUnica, "sintaxis");
       assert.equal(body.fallbackLocal, true);
       assert.equal(body.gradoConsistencia.windowSize, 10);
       assert.equal(body.gradoConsistencia.tituloRate, 0.7);
-      assert.equal(body.dobleCanal.windowSize, 10);
-      assert.equal(body.dobleCanal.tituloMinSample, 7);
-      assert.match(body.dobleCanal.sintaxisValida, /isCableadoConnected/);
+      assert.equal(body.firmaSintactica.windowSize, 10);
+      assert.equal(body.firmaSintactica.tituloMinSample, 7);
+      assert.match(body.firmaSintactica.sintaxisValida, /isCableadoConnected/);
       assert.equal(body.gemini, false);
       assert.equal(body.ojos.length, 10);
       assert.equal(body.ojos[0].canon, "Cimiento");
@@ -72,36 +73,23 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
     });
   });
 
-  it("devuelve óptica + carácter + Δ desde Gemini", async () => {
+  it("devuelve firma + mapa de carácter desde Gemini", async () => {
     await withServer(
       async (prompt) => {
-        assert.match(String(prompt), /LUZ VIENE DE ARRIBA/);
+        assert.match(String(prompt), /CHARACTER SIGNATURE/);
+        assert.doesNotMatch(String(prompt), /perceptionEye/);
         return JSON.stringify({
-          perceptionEye: 7,
           characterSignedCode: 3,
-          activeEyeMap: { "3": true, "7": true },
-          eyeAudits: {
-            "3": {
-              eyeId: 3,
-              hasIntention: true,
-              hasRealVision: true,
-              isBlindSpot: true,
-            },
-          },
-          deltaGap: 4,
+          activeCharacterMap: { "3": true, "7": true },
+          syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
           syntaxDiagnostic: {
             detectedSyntaxCode: 3,
+            isCableadoConnected: true,
             syntaxCharacteristics: "Horas y pistón.",
           },
           groundingStatus: {
-            isFullyGrounded: false,
-            frictionPoint: 3,
-            diagnosticMessage: "Óptica C7, chasis C3.",
-          },
-          systemicAnalysis: {
-            isLatencyEvent: false,
-            isSystemicConflict: false,
-            realEngineeringCause: "Patrón narrado, secuencia rota.",
+            isFullyGrounded: true,
+            diagnosticMessage: "Secuencia cableada al patrón.",
           },
           immediateAdjustment: "Tres pasos con hora de corte.",
         });
@@ -119,11 +107,13 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         const body = await res.json();
         assert.equal(body.success, true);
         assert.equal(body.source, "gemini");
-        assert.equal(body.result.perceptionEye, 7);
         assert.equal(body.result.characterSignedCode, 3);
-        assert.equal(body.result.deltaGap, 4);
+        assert.equal(body.result.activeCharacterMap[3], true);
+        assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, true);
         assert.equal(body.userTier, "MATRICULA");
-        assert.equal(body.version, "3.2.0-optica-sintaxis");
+        assert.equal(body.version, "3.3.0-sintaxis-firma");
+        assert.equal(body.result.perceptionEye, undefined);
+        assert.equal(body.result.deltaGap, undefined);
       },
     );
   });
@@ -139,8 +129,8 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
       const body = await res.json();
       assert.equal(body.success, true);
       assert.equal(body.source, "local_fallback");
-      assert.equal(body.result.perceptionEye, 7);
       assert.equal(body.result.characterSignedCode, 3);
+      assert.equal(body.result.activeCharacterMap[3], true);
     });
   });
 

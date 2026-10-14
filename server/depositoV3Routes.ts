@@ -1,6 +1,6 @@
 /**
  * Depósito V3 — POST /api/deposito/v3/audit
- * Dictamen de Óptica-Sintaxis. V2 no se toca.
+ * Dictamen de Firma Sintáctica. V2 no se toca.
  */
 
 import type { Express, Request, Response } from "express";
@@ -55,8 +55,9 @@ export function registerDepositoV3Routes(
       version: DEPOSITO_V3_VERSION,
       endpoint: "POST /api/deposito/v3/audit",
       ritual: DEPOSITO_V3_RITUAL,
-      orden: "perceptionEye + characterSignedCode + deltaGap",
+      orden: "characterSignedCode + activeCharacterMap + syntacticVacios",
       muroDeDominancia: false,
+      viaUnica: "sintaxis",
       gemini: Boolean(callGemini),
       fallbackLocal: true,
       tiers: TIER_MAX_EYE,
@@ -65,15 +66,14 @@ export function registerDepositoV3Routes(
         tituloRate: GRADO_TITULO_RATE,
         tituloMinSample: GRADO_TITULO_MIN_SAMPLE,
         carreraRate: GRADO_CARRERA_RATE,
-        estable: "isFullyGrounded && perceptionEye >= 7",
+        estable: "isCableadoConnected && syntacticVacios.length <= 4",
       },
-      dobleCanal: {
+      firmaSintactica: {
         windowSize: DUAL_WINDOW_SIZE,
         tituloRate: DUAL_TITULO_RATE,
         tituloMinSample: DUAL_TITULO_MIN_SAMPLE,
         carreraRate: DUAL_CARRERA_RATE,
         carreraMinSample: DUAL_CARRERA_MIN_SAMPLE,
-        opticaValida: "isFullyGrounded && deltaGap <= 4",
         sintaxisValida: "isCableadoConnected && syntacticVacios.length <= 4",
       },
       ojos: EYE_CODES.map((n) => {

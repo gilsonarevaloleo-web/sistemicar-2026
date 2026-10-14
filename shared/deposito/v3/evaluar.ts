@@ -1,5 +1,5 @@
 /**
- * Orquestación V3: payload → validar → motor → dictamen.
+ * Orquestación V3: payload → validar → motor de firma → dictamen.
  * La usan Express (`/api/deposito/v3/audit`) y la Netlify Function.
  */
 

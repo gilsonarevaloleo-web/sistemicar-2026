@@ -3,12 +3,12 @@
  * Nunca escribe en sistemicar_volcados ni en la colección "volcados" (V2).
  */
 
-import type {
-  DepotAnalysisResult,
-  DepotEntryPayload,
-  UserTier,
+import {
+  hidratarResultadoV3,
+  type DepotAnalysisResult,
+  type DepotEntryPayload,
+  type UserTier,
 } from "@shared/deposito/v3";
-import { isDepotAnalysisResult } from "@shared/deposito/v3";
 
 export const DEPOSITO_V3_STORAGE_KEY = "sistemicar_volcados_v3";
 export const DEPOSITO_V3_FIRESTORE_COLLECTION = "volcados_v3";
@@ -72,11 +72,16 @@ function parseLocal(): VolcadoV3Entry[] {
       Omit<VolcadoV3Entry, "createdAt"> & { createdAt: string | number | Date }
     >;
     return entries
-      .filter((e) => e && isDepotAnalysisResult(e.result))
-      .map((e) => ({
-        ...e,
-        createdAt: new Date(e.createdAt),
-      }))
+      .map((e) => {
+        const result = hidratarResultadoV3(e?.result);
+        if (!e || !result) return null;
+        return {
+          ...e,
+          result,
+          createdAt: new Date(e.createdAt),
+        };
+      })
+      .filter((e): e is VolcadoV3Entry => e !== null)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   } catch {
     return [];
@@ -209,7 +214,8 @@ export function subscribeToVolcadosV3(
             const raw = d.data() as Omit<VolcadoV3Entry, "id" | "createdAt"> & {
               createdAt?: { toDate?: () => Date };
             };
-            if (!isDepotAnalysisResult(raw.result)) return null;
+            const result = hidratarResultadoV3(raw.result);
+            if (!result) return null;
             return {
               id: d.id,
               userId: raw.userId,
@@ -218,7 +224,7 @@ export function subscribeToVolcadosV3(
               omittedShadow: raw.omittedShadow,
               studentHypothesis: raw.studentHypothesis,
               userTier: raw.userTier,
-              result: raw.result,
+              result,
               source: raw.source,
               createdAt: raw.createdAt?.toDate?.() || new Date(),
             } satisfies VolcadoV3Entry;

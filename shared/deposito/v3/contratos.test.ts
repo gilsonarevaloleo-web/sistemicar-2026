@@ -7,10 +7,9 @@ import {
   DEPOSITO_V3_VERSION,
   EYE_CODES,
   TIER_MAX_EYE,
-  buildActiveEyeMap,
+  buildActiveCharacterMap,
   camposObligatoriosPorTier,
   camposVisiblesPorTier,
-  computeDeltaGap,
   etiquetaCodigoOjo,
   etiquetaOjo,
   isAdvancedTier,
@@ -27,7 +26,7 @@ import {
 
 describe("Depósito V3 — contratos", () => {
   it("expone versión y los 10 canales sin repetir id", () => {
-    assert.equal(DEPOSITO_V3_VERSION, "3.2.0-optica-sintaxis");
+    assert.equal(DEPOSITO_V3_VERSION, "3.3.0-sintaxis-firma");
     assert.deepEqual([...EYE_CODES], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const ids = EYE_CODES.map((n) => CANON_TEN_EYES[n].id);
     assert.deepEqual(ids, [...EYE_CODES]);
@@ -57,12 +56,6 @@ describe("Depósito V3 — contratos", () => {
     assert.equal(parseEyeCode("c9"), 9);
     assert.equal(parseEyeCode(0), null);
     assert.equal(parseEyeCode("C11"), null);
-  });
-
-  it("Δ es la distancia absoluta entre óptica y carácter", () => {
-    assert.equal(computeDeltaGap(7, 3), 4);
-    assert.equal(computeDeltaGap(1, 1), 0);
-    assert.equal(computeDeltaGap(2, 9), 7);
   });
 });
 
@@ -163,35 +156,19 @@ describe("Depósito V3 — payload", () => {
   });
 });
 
-describe("Depósito V3 — dictamen", () => {
+describe("Depósito V3 — dictamen sintáctico", () => {
   const llm = {
-    perceptionEye: 7,
     characterSignedCode: 3,
-    activeEyeMap: { "3": true, "7": true },
-    eyeAudits: {
-      "3": {
-        eyeId: 3,
-        hasIntention: true,
-        hasRealVision: true,
-        isBlindSpot: false,
-      },
-    },
-    syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
-    deltaGap: 4,
+    activeCharacterMap: { "3": true, "7": true, "8": true },
+    syntacticVacios: [1, 2, 4, 5, 6, 9, 10],
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
       isCableadoConnected: true,
       syntaxCharacteristics: "Paso a paso, marcas de hora.",
     },
     groundingStatus: {
-      isFullyGrounded: false,
-      frictionPoint: 3,
-      diagnosticMessage: "El chasis fricciona en la secuencia.",
-    },
-    systemicAnalysis: {
-      isLatencyEvent: false,
-      isSystemicConflict: false,
-      realEngineeringCause: "El corte se narra como visión y se ejecuta como pistón.",
+      isFullyGrounded: true,
+      diagnosticMessage: "La escritura sostiene título y secuencia.",
     },
     immediateAdjustment: "Mañana, una secuencia de tres pasos con hora de corte.",
   };
@@ -204,31 +181,31 @@ describe("Depósito V3 — dictamen", () => {
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
     assert.equal(parsed.result.id, "depot_test");
-    assert.equal(parsed.result.perceptionEye, 7);
     assert.equal(parsed.result.characterSignedCode, 3);
-    assert.equal(parsed.result.deltaGap, 4);
-    assert.equal(parsed.result.activeEyeMap[3], true);
-    assert.equal(parsed.result.activeEyeMap[1], false);
-    assert.equal(parsed.result.eyeAudits[3].hasRealVision, true);
-    assert.equal(parsed.result.eyeAudits[1].hasIntention, false);
-    assert.deepEqual(parsed.result.syntacticVacios, [1, 2, 4, 5, 6, 8, 9, 10]);
+    assert.equal(parsed.result.activeCharacterMap[3], true);
+    assert.equal(parsed.result.activeCharacterMap[1], false);
+    assert.deepEqual(parsed.result.syntacticVacios, [1, 2, 4, 5, 6, 9, 10]);
     assert.equal(parsed.result.syntaxDiagnostic.isCableadoConnected, true);
     assert.equal(isDepotAnalysisResult(parsed.result), true);
+    assert.equal(
+      "perceptionEye" in parsed.result || parsed.result.characterSignedCode === 3,
+      true,
+    );
+    assert.equal("deltaGap" in parsed.result, false);
+    assert.equal("systemicAnalysis" in parsed.result, false);
   });
 
-  it("JSON legado sin vacíos ni cableado sigue parseando", () => {
+  it("acepta JSON legado con activeEyeMap y sin cableado declarado", () => {
     const legado = {
       perceptionEye: 7,
       characterSignedCode: 3,
       activeEyeMap: { "3": true, "7": true },
-      deltaGap: 4,
       syntaxDiagnostic: {
         detectedSyntaxCode: 3,
         syntaxCharacteristics: "Paso a paso, marcas de hora.",
       },
       groundingStatus: {
         isFullyGrounded: false,
-        frictionPoint: 3,
         diagnosticMessage: "Impronta de madurez: el título se cablea con la materia.",
       },
       systemicAnalysis: {
@@ -242,35 +219,19 @@ describe("Depósito V3 — dictamen", () => {
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
     assert.equal(parsed.result.syntaxDiagnostic.isCableadoConnected, true);
+    assert.equal(parsed.result.activeCharacterMap[3], true);
+    assert.equal(parsed.result.activeCharacterMap[7], true);
     assert.ok(parsed.result.syntacticVacios.includes(1));
     assert.equal(parsed.result.syntacticVacios.includes(3), false);
-    assert.equal(parsed.result.syntacticVacios.includes(7), false);
+    assert.equal("perceptionEye" in parsed.result, false);
   });
 
-  it("recalcula Δ si el modelo la omite o la miente en signo", () => {
-    const sinDelta = parseDepotAnalysisResult({
+  it("rechaza dictamen sin firma o sin ajuste", () => {
+    const sinFirma = parseDepotAnalysisResult({
       ...llm,
-      deltaGap: undefined,
+      characterSignedCode: undefined,
     });
-    assert.equal(sinDelta.ok, true);
-    if (sinDelta.ok) assert.equal(sinDelta.result.deltaGap, 4);
-
-    const negativa = parseDepotAnalysisResult({
-      ...llm,
-      perceptionEye: "C8",
-      characterSignedCode: "C2",
-      deltaGap: -6,
-    });
-    assert.equal(negativa.ok, true);
-    if (negativa.ok) assert.equal(negativa.result.deltaGap, 6);
-  });
-
-  it("rechaza dictamen sin causa o sin ajuste", () => {
-    const sinCausa = parseDepotAnalysisResult({
-      ...llm,
-      systemicAnalysis: { isLatencyEvent: false, isSystemicConflict: false },
-    });
-    assert.equal(sinCausa.ok, false);
+    assert.equal(sinFirma.ok, false);
     const sinAjuste = parseDepotAnalysisResult({
       ...llm,
       immediateAdjustment: "",
@@ -278,19 +239,19 @@ describe("Depósito V3 — dictamen", () => {
     assert.equal(sinAjuste.ok, false);
   });
 
-  it("el andamio local deja óptica, carácter y Δ coherentes", () => {
+  it("el andamio local deja firma y vacíos coherentes", () => {
     const draft = scaffoldAnalysisResult({
-      perceptionEye: 9,
-      characterSignedCode: 1,
+      characterSignedCode: 3,
     });
-    assert.equal(draft.deltaGap, 8);
-    assert.equal(draft.activeEyeMap[9], true);
-    assert.equal(draft.activeEyeMap[1], true);
+    assert.equal(draft.characterSignedCode, 3);
+    assert.equal(draft.activeCharacterMap[3], true);
+    assert.equal(draft.activeCharacterMap[1], false);
+    assert.ok(draft.syntacticVacios.includes(1));
     assert.equal(isDepotAnalysisResult(draft), true);
   });
 
   it("mapa de calor vacío cubre C1–C10", () => {
-    const map = buildActiveEyeMap([5]);
+    const map = buildActiveCharacterMap([5]);
     assert.equal(Object.keys(map).length, 10);
     assert.equal(map[5], true);
     assert.equal(map[10], false);

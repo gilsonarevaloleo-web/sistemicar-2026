@@ -57,7 +57,6 @@ describe("Depósito V3 — persistencia aislada", () => {
       JSON.stringify([{ id: "v2_keep", texto: "volcado v2" }]),
     );
     const result = scaffoldAnalysisResult({
-      perceptionEye: 7,
       characterSignedCode: 3,
     });
     const id = await addVolcadoV3Entry({
@@ -73,9 +72,8 @@ describe("Depósito V3 — persistencia aislada", () => {
     assert.match(id, /^local_v3_/);
     const listed = listVolcadosV3Local("u1");
     assert.equal(listed.length, 1);
-    assert.equal(listed[0].result.perceptionEye, 7);
     assert.equal(listed[0].result.characterSignedCode, 3);
-    assert.equal(listed[0].result.deltaGap, 4);
+    assert.equal(listed[0].result.activeCharacterMap[3], true);
     assert.equal(listed[0].rawFact.includes("patrón"), true);
     assert.equal(
       store.get(DEPOSITO_V2_STORAGE_KEY_FORBIDDEN),
@@ -90,7 +88,6 @@ describe("Depósito V3 — persistencia aislada", () => {
 
   it("filtra por usuario y borra solo V3", async () => {
     const result = scaffoldAnalysisResult({
-      perceptionEye: 1,
       characterSignedCode: 1,
     });
     await addVolcadoV3Entry({

@@ -2,13 +2,14 @@ import React from "react";
 import {
   CANON_TEN_EYES,
   EYE_CODES,
+  characterMapDe,
   isEyeLocked,
+  syntacticVaciosDe,
   type DepotAnalysisResult,
   type UserTier,
 } from "@shared/deposito/v3";
 
 const GOLD = "#D4AF37";
-const AZURE = "#1E90FF";
 
 export interface MapaCalorV3Props {
   result: DepotAnalysisResult;
@@ -16,6 +17,9 @@ export interface MapaCalorV3Props {
 }
 
 export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
+  const mapa = characterMapDe(result);
+  const vacios = syntacticVaciosDe(result);
+
   return (
     <div
       className="border px-5 py-5"
@@ -27,10 +31,10 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
           className="text-[10px] font-bold uppercase tracking-[0.22em]"
           style={{ color: GOLD }}
         >
-          Mapa de calor · los 10 ojos
+          Mapa de calor · 10 códigos de carácter
         </h3>
         <span className="text-[10px] font-mono text-white/45" data-testid="deposito-v3-mapa-ejes">
-          ÓPTICA C{result.perceptionEye} · CARÁCTER C{result.characterSignedCode}
+          FIRMA C{result.characterSignedCode} · {vacios.length} VACÍOS
         </span>
       </div>
 
@@ -38,30 +42,23 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
         {EYE_CODES.map((eyeId) => {
           const eye = CANON_TEN_EYES[eyeId];
           const locked = isEyeLocked(eyeId, userTier);
-          const audit = result.eyeAudits[eyeId];
-          const isPerception = result.perceptionEye === eyeId;
           const isCharacter = result.characterSignedCode === eyeId;
-          const isFriction = result.groundingStatus.frictionPoint === eyeId;
-          const isVacio = Boolean(result.syntacticVacios?.includes(eyeId));
-          const vision = audit?.hasRealVision;
-          const intention = audit?.hasIntention || result.activeEyeMap[eyeId];
+          const isVacio = vacios.includes(eyeId);
+          const activo = Boolean(mapa[eyeId]);
 
           let border = "rgba(255,255,255,0.08)";
           let bg = "transparent";
           let fg = "rgba(255,255,255,0.35)";
-          if (locked && !isPerception && !isCharacter) {
+          if (locked && !isCharacter) {
             border = "rgba(255,255,255,0.05)";
             fg = "rgba(255,255,255,0.22)";
-          } else if (vision) {
+          } else if (activo) {
             border = `${GOLD}80`;
             bg = `${GOLD}14`;
             fg = GOLD;
-          } else if (intention) {
-            border = `${GOLD}40`;
-            fg = `${GOLD}cc`;
-          }
-          if (isPerception) {
-            border = `${AZURE}99`;
+          } else if (isVacio) {
+            border = "rgba(255,255,255,0.06)";
+            fg = "rgba(255,255,255,0.28)";
           }
 
           return (
@@ -71,9 +68,9 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
               style={{ border: `1px solid ${border}`, backgroundColor: bg, color: fg }}
               data-testid={`deposito-v3-eye-${eyeId}`}
               data-locked={locked ? "1" : "0"}
-              data-optica={isPerception ? "1" : "0"}
               data-caracter={isCharacter ? "1" : "0"}
               data-vacio={isVacio ? "1" : "0"}
+              data-activo={activo ? "1" : "0"}
             >
               <div className="flex items-center justify-between gap-1">
                 <span className="font-mono text-[10px] font-bold">C{eyeId}</span>
@@ -81,36 +78,23 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
                   {locked && (
                     <span className="text-[8px] tracking-widest text-white/30">BLOQ</span>
                   )}
-                  {isFriction && (
-                    <span
-                      className="inline-block h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: "#F97316" }}
-                      title="Fricción de chasis"
-                      data-testid={`deposito-v3-friccion-${eyeId}`}
-                    />
-                  )}
-                  {isPerception && (
-                    <span
-                      className="px-1 text-[8px] font-mono"
-                      style={{ color: AZURE, border: `1px solid ${AZURE}55` }}
-                    >
-                      ÓPTICA
-                    </span>
-                  )}
                   {isCharacter && (
                     <span
                       className="px-1 text-[8px] font-mono"
                       style={{ color: GOLD, border: `1px solid ${GOLD}55` }}
                     >
-                      CARÁCTER
+                      FIRMA
                     </span>
+                  )}
+                  {isVacio && !isCharacter && (
+                    <span className="text-[8px] tracking-widest text-white/25">VACÍO</span>
                   )}
                 </div>
               </div>
               <div>
                 <p className="truncate text-xs font-bold text-white/80">{eye.name}</p>
                 <p className="truncate text-[10px] font-mono text-white/35">
-                  {eye.planeta} · {eye.concept}
+                  {eye.syntaxLabel} · {eye.concept}
                 </p>
               </div>
             </li>

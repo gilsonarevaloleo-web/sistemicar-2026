@@ -1,12 +1,11 @@
 /**
  * Validación y normalización de contratos V3.
- * Sin motor LLM: solo forma, candados de tier y parseo de dictamen.
+ * Sin motor LLM: solo forma, candados de tier y parseo de dictamen sintáctico.
  */
 
 import {
-  buildActiveEyeMap,
-  computeDeltaGap,
-  emptyEyeAudits,
+  buildActiveCharacterMap,
+  characterMapDe,
   isEyeCode,
   normalizarVaciosSintacticos,
   parseEyeCode,
@@ -25,10 +24,8 @@ import {
   type DepotEntryInput,
   type DepotEntryPayload,
   type DepotPayloadResult,
-  type EyeAudit,
   type EyeCode,
   type GroundingStatus,
-  type SystemicAnalysis,
 } from "./types.ts";
 
 function trimText(value: unknown): string {
@@ -117,8 +114,8 @@ function parseBooleanLoose(value: unknown): boolean {
   return false;
 }
 
-function leerEyeMap(raw: unknown): Record<EyeCode, boolean> {
-  const map = buildActiveEyeMap([]);
+function leerCharacterMap(raw: unknown): Record<EyeCode, boolean> {
+  const map = buildActiveCharacterMap([]);
   const rec = asRecord(raw);
   if (!rec) return map;
   for (const n of EYE_CODES) {
@@ -126,23 +123,6 @@ function leerEyeMap(raw: unknown): Record<EyeCode, boolean> {
     map[n] = parseBooleanLoose(hit);
   }
   return map;
-}
-
-function leerEyeAudits(raw: unknown): Record<EyeCode, EyeAudit> {
-  const audits = emptyEyeAudits();
-  const rec = asRecord(raw);
-  if (!rec) return audits;
-  for (const n of EYE_CODES) {
-    const piece = asRecord(rec[String(n)] ?? rec[n]);
-    if (!piece) continue;
-    audits[n] = {
-      eyeId: n,
-      hasIntention: parseBooleanLoose(piece.hasIntention),
-      hasRealVision: parseBooleanLoose(piece.hasRealVision),
-      isBlindSpot: parseBooleanLoose(piece.isBlindSpot),
-    };
-  }
-  return audits;
 }
 
 function leerGrounding(raw: unknown): GroundingStatus | null {
@@ -154,28 +134,9 @@ function leerGrounding(raw: unknown): GroundingStatus | null {
     "mensaje",
   ]);
   if (!diagnosticMessage) return null;
-  const grounding: GroundingStatus = {
+  return {
     isFullyGrounded: parseBooleanLoose(rec.isFullyGrounded),
     diagnosticMessage,
-  };
-  const friction = parseEyeCode(rec.frictionPoint ?? rec.friction_point);
-  if (friction) grounding.frictionPoint = friction;
-  return grounding;
-}
-
-function leerSistemico(raw: unknown): SystemicAnalysis | null {
-  const rec = asRecord(raw);
-  if (!rec) return null;
-  const realEngineeringCause = pickString(rec, [
-    "realEngineeringCause",
-    "real_engineering_cause",
-    "causa",
-  ]);
-  if (!realEngineeringCause) return null;
-  return {
-    isLatencyEvent: parseBooleanLoose(rec.isLatencyEvent),
-    isSystemicConflict: parseBooleanLoose(rec.isSystemicConflict),
-    realEngineeringCause,
   };
 }
 
@@ -204,16 +165,15 @@ export function parseDepotAnalysisResult(
     return { ok: false, error: "JSON de dictamen V3 inválido" };
   }
 
-  const perceptionEye = parseEyeCode(
-    obj.perceptionEye ?? obj.perception_eye,
-  );
   const characterSignedCode = parseEyeCode(
-    obj.characterSignedCode ?? obj.character_signed_code,
+    obj.characterSignedCode ??
+      obj.character_signed_code ??
+      asRecord(obj.syntaxDiagnostic ?? obj.syntax_diagnostic)?.detectedSyntaxCode,
   );
-  if (!perceptionEye || !characterSignedCode) {
+  if (!characterSignedCode) {
     return {
       ok: false,
-      error: "perceptionEye y characterSignedCode son requeridos (1–10)",
+      error: "characterSignedCode es requerido (1–10)",
     };
   }
 
@@ -244,12 +204,7 @@ export function parseDepotAnalysisResult(
     ? parseBooleanLoose(
         syntaxRec.isCableadoConnected ?? syntaxRec.is_cableado_connected,
       )
-    : /impronta de madurez/i.test(grounding.diagnosticMessage);
-
-  const systemic = leerSistemico(obj.systemicAnalysis ?? obj.systemic_analysis);
-  if (!systemic) {
-    return { ok: false, error: "systemicAnalysis.realEngineeringCause es requerido" };
-  }
+    : /impronta de madurez|cablea/i.test(grounding.diagnosticMessage);
 
   const immediateAdjustment = pickString(obj, [
     "immediateAdjustment",
@@ -260,39 +215,32 @@ export function parseDepotAnalysisResult(
     return { ok: false, error: "immediateAdjustment es requerido" };
   }
 
-  const deltaRaw = obj.deltaGap ?? obj.delta_gap;
-  const deltaParsed =
-    typeof deltaRaw === "number"
-      ? deltaRaw
-      : typeof deltaRaw === "string"
-        ? Number(deltaRaw)
-        : NaN;
-  const deltaGap = Number.isFinite(deltaParsed)
-    ? Math.abs(Math.round(deltaParsed))
-    : computeDeltaGap(perceptionEye, characterSignedCode);
-
   const timestamp = opts.timestamp ?? Date.now();
-  const activeEyeMap = leerEyeMap(obj.activeEyeMap ?? obj.active_eye_map);
+  const activeCharacterMap = leerCharacterMap(
+    obj.activeCharacterMap ??
+      obj.active_character_map ??
+      obj.activeEyeMap ??
+      obj.active_eye_map,
+  );
+  if (!EYE_CODES.some((n) => activeCharacterMap[n])) {
+    activeCharacterMap[characterSignedCode] = true;
+  }
   const syntacticVacios = normalizarVaciosSintacticos(
     obj.syntacticVacios ?? obj.syntactic_vacios,
-    activeEyeMap,
+    activeCharacterMap,
   );
   const result: DepotAnalysisResult = {
     id: opts.id ?? `depot_${timestamp}`,
     timestamp,
-    perceptionEye,
     characterSignedCode,
-    activeEyeMap,
-    eyeAudits: leerEyeAudits(obj.eyeAudits ?? obj.eye_audits),
+    activeCharacterMap,
     syntacticVacios,
-    deltaGap,
     syntaxDiagnostic: {
       detectedSyntaxCode,
       isCableadoConnected,
       syntaxCharacteristics,
     },
     groundingStatus: grounding,
-    systemicAnalysis: systemic,
     immediateAdjustment,
   };
 
@@ -301,14 +249,13 @@ export function parseDepotAnalysisResult(
 
 export function scaffoldAnalysisResult(
   partial: Partial<DepotAnalysisLlmShape> &
-    Pick<DepotAnalysisLlmShape, "perceptionEye" | "characterSignedCode">,
+    Pick<DepotAnalysisLlmShape, "characterSignedCode">,
 ): DepotAnalysisResult {
   const timestamp = Date.now();
-  const perceptionEye = partial.perceptionEye;
   const characterSignedCode = partial.characterSignedCode;
-  const activeEyeMap =
-    partial.activeEyeMap ??
-    buildActiveEyeMap([perceptionEye, characterSignedCode]);
+  const activeCharacterMap =
+    partial.activeCharacterMap ??
+    buildActiveCharacterMap([characterSignedCode]);
   const syntaxDiagnostic = {
     detectedSyntaxCode:
       partial.syntaxDiagnostic?.detectedSyntaxCode ?? characterSignedCode,
@@ -321,26 +268,41 @@ export function scaffoldAnalysisResult(
   return {
     id: `depot_${timestamp}`,
     timestamp,
-    perceptionEye,
     characterSignedCode,
-    activeEyeMap,
-    eyeAudits: partial.eyeAudits ?? emptyEyeAudits(),
+    activeCharacterMap,
     syntacticVacios:
-      partial.syntacticVacios ?? vaciosDesdeActiveMap(activeEyeMap),
-    deltaGap:
-      partial.deltaGap ?? computeDeltaGap(perceptionEye, characterSignedCode),
+      partial.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
     syntaxDiagnostic,
     groundingStatus: partial.groundingStatus ?? {
       isFullyGrounded: false,
-      diagnosticMessage: "Sustentación de chasis pendiente de auditoría.",
-    },
-    systemicAnalysis: partial.systemicAnalysis ?? {
-      isLatencyEvent: false,
-      isSystemicConflict: false,
-      realEngineeringCause: "Causa de ingeniería pendiente de auditoría.",
+      diagnosticMessage: "Estabilidad de escritura pendiente de auditoría.",
     },
     immediateAdjustment:
       partial.immediateAdjustment ?? "Volvé a volcar el hecho crudo. Un solo gesto.",
+  };
+}
+
+export function hidratarResultadoV3(value: unknown): DepotAnalysisResult | null {
+  if (!isDepotAnalysisResult(value)) return null;
+  const map = characterMapDe(value);
+  return {
+    id: value.id,
+    timestamp: value.timestamp,
+    characterSignedCode: value.characterSignedCode,
+    activeCharacterMap: map,
+    syntacticVacios:
+      value.syntacticVacios ?? vaciosDesdeActiveMap(map),
+    syntaxDiagnostic: {
+      detectedSyntaxCode:
+        value.syntaxDiagnostic.detectedSyntaxCode || value.characterSignedCode,
+      isCableadoConnected: Boolean(value.syntaxDiagnostic.isCableadoConnected),
+      syntaxCharacteristics: value.syntaxDiagnostic.syntaxCharacteristics,
+    },
+    groundingStatus: {
+      isFullyGrounded: Boolean(value.groundingStatus.isFullyGrounded),
+      diagnosticMessage: value.groundingStatus.diagnosticMessage,
+    },
+    immediateAdjustment: value.immediateAdjustment,
   };
 }
 
@@ -352,12 +314,9 @@ export function isDepotAnalysisResult(
   return (
     typeof v.id === "string" &&
     typeof v.timestamp === "number" &&
-    isEyeCode(v.perceptionEye) &&
     isEyeCode(v.characterSignedCode) &&
-    typeof v.deltaGap === "number" &&
     typeof v.immediateAdjustment === "string" &&
     Boolean(v.syntaxDiagnostic?.syntaxCharacteristics) &&
-    Boolean(v.groundingStatus?.diagnosticMessage) &&
-    Boolean(v.systemicAnalysis?.realEngineeringCause)
+    Boolean(v.groundingStatus?.diagnosticMessage)
   );
 }
