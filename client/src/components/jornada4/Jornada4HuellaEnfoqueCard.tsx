@@ -1,8 +1,9 @@
 import { Fingerprint } from "lucide-react";
-import { computeHuellaPeriodo, HUELLA_EJES } from "@/jornada4/huellaEnfoque";
+import { computeHuellaPeriodo } from "@/jornada4/huellaEnfoque";
 import type { Vehicle } from "@/lib/persistence";
 import { J4_COLORS } from "./Jornada4Shell";
 import { J4_UI } from "./jornada4Ui";
+import { HuellaCincoPuntos } from "./HuellaCincoPuntos";
 
 const { INK, MUTED, GOLD } = J4_COLORS;
 const VIOLET = "#8B5CF6";
@@ -22,6 +23,7 @@ function ringsDelDia(vehicles: Vehicle[]): Vehicle[] {
 
 /**
  * Gancho de cierre del día: una lectura por la suma de los desglosadores.
+ * Los 5 puntos se ven uno por uno — escalables, no amontonados.
  */
 export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
   const rings = ringsDelDia(vehicles);
@@ -29,7 +31,7 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
 
   return (
     <section
-      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-2.5`}
+      className={`mx-3 mb-3 sm:mx-4 ${J4_UI.card} space-y-3`}
       data-testid="jornada4-huella-enfoque"
     >
       <div className="flex items-start justify-between gap-2">
@@ -57,21 +59,13 @@ export function Jornada4HuellaEnfoqueCard({ vehicles }: Props) {
             {rings.length} desglosador{rings.length === 1 ? "" : "es"} · {lectura.vehiculos}{" "}
             filas
           </p>
-          <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
-            {HUELLA_EJES.map(e => `${e.label} ${lectura[e.id]}`).join(" · ")}
+          <HuellaCincoPuntos lectura={lectura} />
+          <p className="text-[9px] leading-snug" style={{ color: MUTED }}>
+            Atención y Foco: radio de 5 minutos. Decisión, Producción y Orden se
+            escalan.
           </p>
         </>
       )}
-      <ul className="space-y-0.5">
-        {HUELLA_EJES.map(eje => (
-          <li key={eje.id} className="text-[10px] leading-snug" style={{ color: MUTED }}>
-            <span className="font-bold" style={{ color: INK }}>
-              {eje.label}.
-            </span>{" "}
-            {eje.definicion}
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
