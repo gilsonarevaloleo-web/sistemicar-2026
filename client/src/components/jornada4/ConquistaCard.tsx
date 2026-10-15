@@ -309,7 +309,7 @@ export function ConquistaCard({
           </div>
         </div>
 
-        {/* FOCO unidad — cronómetro grande con Tik, sin récord (siempre disponible) */}
+        {/* Ring de conquista — overlay naranja, Tik + vueltas, sin récord */}
         {vehicle.status === "activo" ? (
           <button
             type="button"
@@ -321,10 +321,10 @@ export function ConquistaCard({
               boxShadow: `0 0 18px ${NARANJA}55`,
             }}
             data-testid="j4-conquista-foco-open"
-            title="Cronómetro de unidad — no guarda récord"
+            title={`${RING_BRAND.conquista} — no guarda récord`}
           >
             <Focus size={16} strokeWidth={2.5} />
-            Foco unidad · Tik + vueltas
+            {RING_BRAND.conquista} · Tik + vueltas
           </button>
         ) : null}
 

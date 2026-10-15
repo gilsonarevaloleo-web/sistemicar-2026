@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { RotateCcw, X, Focus, Timer, Trophy, TrendingDown, TrendingUp } from "lucide-react";
 import { NARANJA } from "@/components/flota/vehicleCardShared";
+import { RING_BRAND } from "@/lib/flotaBrand";
 import {
   buildUnitFocusLap,
   buildUnitFocusRingView,
@@ -165,7 +166,7 @@ export function ConquistaUnitFocusOverlay({
           onClick={() => handleClose()}
           data-testid="conquista-unit-focus-overlay"
           role="dialog"
-          aria-label="Cronómetro de unidad"
+          aria-label={RING_BRAND.conquista}
         >
           <button
             type="button"
@@ -173,7 +174,7 @@ export function ConquistaUnitFocusOverlay({
             className="absolute top-4 right-4 p-3 rounded-full z-10"
             style={{ backgroundColor: "rgba(0,0,0,0.25)", color: "#000" }}
             data-testid="conquista-unit-focus-close"
-            aria-label="Cerrar cronómetro"
+            aria-label={`Cerrar ${RING_BRAND.conquista.toLowerCase()}`}
           >
             <X size={22} strokeWidth={2.5} />
           </button>
@@ -187,8 +188,9 @@ export function ConquistaUnitFocusOverlay({
               <p
                 className="text-[11px] font-black uppercase tracking-[0.2em]"
                 style={{ color: "#000" }}
+                data-testid="conquista-unit-focus-title"
               >
-                Foco unidad
+                {RING_BRAND.conquista}
               </p>
             </div>
 
@@ -551,7 +553,7 @@ function RaceBar({
   );
 }
 
-/** Botón compacto para abrir el foco unidad (conquista). */
+/** Botón compacto para abrir el ring de conquista. */
 export function ConquistaUnitFocusButton({
   onOpen,
   accentColor = NARANJA,
@@ -573,10 +575,10 @@ export function ConquistaUnitFocusButton({
         border: `1px solid ${accentColor}55`,
       }}
       data-testid="conquista-unit-focus-open"
-      title="Cronómetro de unidad (no guarda récord)"
+      title={`${RING_BRAND.conquista} — no guarda récord`}
     >
       <Focus size={11} strokeWidth={2.5} />
-      Foco
+      Ring
     </button>
   );
 }
