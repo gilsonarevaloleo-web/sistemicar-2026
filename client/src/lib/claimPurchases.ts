@@ -54,7 +54,7 @@ async function claimPendingPurchasesOnce(): Promise<{
   const grantedCredits =
     typeof credits.grantedCredits === "number" ? credits.grantedCredits : 0;
 
-  if (modules.applyOnClient && grantedPlans.length > 0) {
+  if (grantedPlans.length > 0) {
     const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
     if (unlocked.length > 0) {
       await activateModulesForUser(user.uid, unlocked, {
@@ -64,7 +64,7 @@ async function claimPendingPurchasesOnce(): Promise<{
     const confirmIds = Array.isArray(modules.deliveryIdsToConfirm)
       ? modules.deliveryIdsToConfirm
       : [];
-    if (confirmIds.length > 0) {
+    if (confirmIds.length > 0 || modules.applyOnClient) {
       await fetch("/api/planificacion/confirm-client-apply", {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },

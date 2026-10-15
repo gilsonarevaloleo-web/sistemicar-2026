@@ -24,10 +24,10 @@ describe("activación de módulos — no hay cuenta hasta /acceso", () => {
     assert.match(src, /sistemicar\.app\/acceso/);
   });
 
-  it("el WhatsApp de admin distingue cuenta existente vs nueva", () => {
+  it("el WhatsApp de admin no le pide crear otra cuenta", () => {
     const src = readFileSync(join(dir, "index.ts"), "utf8");
     assert.match(src, /resolveClientAccountWhatsappKind/);
-    assert.match(src, /accountExists/);
+    assert.match(src, /accountExists: true/);
   });
 });
 
@@ -36,6 +36,12 @@ describe("claim de compras — aliases de Gmail", () => {
     const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
     assert.match(grants, /emailMatchKeys/);
     assert.match(grants, /buyer_email = ANY/);
+  });
+
+  it("el JWT del claim usa el mismo projectId que el cliente", () => {
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /sistemicar-app/);
+    assert.match(src, /FIREBASE_PROJECT_ID/);
   });
 
   it("si Admin no escribe Firestore, el claim pasa el plan al celular", () => {
@@ -53,6 +59,19 @@ describe("claim de compras — aliases de Gmail", () => {
     const admin = readFileSync(join(dir, "firebaseAdmin.ts"), "utf8");
     assert.match(admin, /suggestUsersForEmail/);
     assert.match(admin, /listAuthClientsWithProgression/);
+  });
+
+  it("el claim pega un pago huérfano si el Gmail no coincide", () => {
+    const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
+    assert.match(grants, /listOrphanPendingModuleGrants/);
+    assert.match(grants, /listClaimableModuleGrants/);
+    assert.match(grants, /listReplayableGrantedPlans/);
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /listClaimableModuleGrants/);
+    assert.doesNotMatch(
+      src,
+      /pendingBefore\.length === 0/,
+    );
   });
 
   it("el admin enciende el plan por UID aunque el Gmail no coincida", () => {
