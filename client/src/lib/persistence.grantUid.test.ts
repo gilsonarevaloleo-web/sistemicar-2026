@@ -21,10 +21,10 @@ describe("grantModulesToUid — no usa la progresión local de Gilson", () => {
 
   it("findAccountsWithData expone si Jornada ya está encendida", () => {
     const fn = src.slice(
-      src.indexOf("export async function findAccountsWithData"),
+      src.indexOf("function accountFromProgData"),
       src.indexOf("export function subscribeToAcervo"),
     );
     assert.match(fn, /activeModules/);
-    assert.match(fn, /pickLatestProgressionDoc/);
+    assert.match(fn, /collectionGroup/);
   });
 });

@@ -26,7 +26,8 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /no copies los datos a tu cuenta Gilson/);
     assert.match(src, /Encender \$\{displayNameForPlan\(modulePlanId\)\} en este UID/);
     assert.match(src, /searchAccounts\(\{ silent: true \}\)/);
-    assert.match(src, /No hace falta el JSON ni acertar el Gmail/);
-    assert.match(src, /button-encender-modulo-/);
+    assert.match(src, /Pega el correo del pago y pulsa Registrar/);
+    assert.match(src, /`Registrar \$\{displayNameForPlan\(modulePlanId\)\}`/);
+    assert.doesNotMatch(src, /El servidor no puede buscar en Firebase\. Revisa FIREBASE_SERVICE_ACCOUNT_JSON/);
   });
 });
