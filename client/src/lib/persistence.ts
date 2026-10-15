@@ -265,59 +265,97 @@ export type AccountWithData = {
   whatsapp: string | null;
 };
 
+function uidFromProgressionPath(path: string): string | null {
+  const parts = path.split("/");
+  const i = parts.indexOf("users");
+  if (i < 0 || parts[i + 2] !== "progression") return null;
+  if (!parts.includes("sistemicar-v2-5")) return null;
+  return parts[i + 1] || null;
+}
+
+function accountFromProgData(
+  uid: string,
+  progData: Record<string, unknown>,
+): AccountWithData | null {
+  const totalCP = Number(progData.totalCP || progData.points || 0);
+  const activeModules = Array.isArray(progData.activeModules)
+    ? (progData.activeModules as string[])
+    : [];
+  const whatsapp =
+    typeof progData.whatsapp === "string" && progData.whatsapp.trim()
+      ? progData.whatsapp.trim()
+      : null;
+  const hasTrial = progData.jornadaBaseTrialStartedAt != null;
+  if (totalCP <= 0 && !whatsapp && !hasTrial && activeModules.length === 0) {
+    return null;
+  }
+  const lastRaw = progData.lastUpdated as { toDate?: () => Date } | Date | undefined;
+  return {
+    uid,
+    totalCP,
+    rank: (progData.rank as string) || "observador",
+    lastUpdated:
+      lastRaw && typeof (lastRaw as { toDate?: () => Date }).toDate === "function"
+        ? (lastRaw as { toDate: () => Date }).toDate()
+        : lastRaw instanceof Date
+          ? lastRaw
+          : null,
+    activeModules,
+    subscriptionPlan: (progData.subscriptionPlan as string) || null,
+    whatsapp,
+  };
+}
+
 export async function findAccountsWithData(): Promise<AccountWithData[]> {
   if (!isFirebaseConfigured() || !db) {
     return [];
   }
 
+  const byUid = new Map<string, AccountWithData>();
+
+  try {
+    const groupSnap = await getDocs(collectionGroup(db, "progression"));
+    for (const docSnap of groupSnap.docs) {
+      const uid = uidFromProgressionPath(docSnap.ref.path);
+      if (!uid) continue;
+      const account = accountFromProgData(uid, docSnap.data() as Record<string, unknown>);
+      if (!account) continue;
+      const prev = byUid.get(uid);
+      if (!prev || account.totalCP >= prev.totalCP) {
+        byUid.set(uid, account);
+      }
+    }
+  } catch (error) {
+    console.warn("collectionGroup progression:", error);
+  }
+
+  if (byUid.size > 0) {
+    return [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
+  }
+
   try {
     const usersRef = collection(db, "artifacts/sistemicar-v2-5/users");
     const usersSnapshot = await getDocs(usersRef);
-    const accounts: AccountWithData[] = [];
 
     for (const userDoc of usersSnapshot.docs) {
       const uid = userDoc.id;
       try {
         const progressionPath = `artifacts/sistemicar-v2-5/users/${uid}/progression`;
         const progressionSnapshot = await getDocs(collection(db, progressionPath));
-        
-        if (!progressionSnapshot.empty) {
-          const latest = pickLatestProgressionDoc(progressionSnapshot.docs);
-          const progData = (latest?.data() ?? progressionSnapshot.docs[0].data()) as Record<string, unknown>;
-          const totalCP = Number(progData.totalCP || progData.points || 0);
-          if (totalCP > 0) {
-            const lastRaw = progData.lastUpdated as { toDate?: () => Date } | Date | undefined;
-            accounts.push({
-              uid,
-              totalCP,
-              rank: (progData.rank as string) || "observador",
-              lastUpdated:
-                lastRaw && typeof (lastRaw as { toDate?: () => Date }).toDate === "function"
-                  ? (lastRaw as { toDate: () => Date }).toDate()
-                  : lastRaw instanceof Date
-                    ? lastRaw
-                    : null,
-              activeModules: Array.isArray(progData.activeModules)
-                ? (progData.activeModules as string[])
-                : [],
-              subscriptionPlan: (progData.subscriptionPlan as string) || null,
-              whatsapp:
-                typeof progData.whatsapp === "string" && progData.whatsapp.trim()
-                  ? progData.whatsapp.trim()
-                  : null,
-            });
-          }
-        }
+        if (progressionSnapshot.empty) continue;
+        const latest = pickLatestProgressionDoc(progressionSnapshot.docs);
+        const progData = (latest?.data() ?? progressionSnapshot.docs[0].data()) as Record<string, unknown>;
+        const account = accountFromProgData(uid, progData);
+        if (account) byUid.set(uid, account);
       } catch {
         // Skip this user
       }
     }
-
-    return accounts.sort((a, b) => b.totalCP - a.totalCP);
   } catch (error) {
     console.error("Error finding accounts:", error);
-    return [];
   }
+
+  return [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
 }
 
 export function subscribeToAcervo(
