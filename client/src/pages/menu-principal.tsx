@@ -864,7 +864,14 @@ export default function MenuPrincipal() {
                       // Soft-start: al salir del menú los motores del shell no
                       // deben despertar en el mismo gesto que monta el destino.
                       armDualKernelExitSoftStart({ href: item.route });
-                      navigate(item.route);
+                      const dest = item.route;
+                      if (dest === JORNADA_V4_PATH) {
+                        void claimPendingPurchases().finally(() => {
+                          navigate(dest);
+                        });
+                        return;
+                      }
+                      navigate(dest);
                     }}
                     onPointerEnter={() => {
                       if (

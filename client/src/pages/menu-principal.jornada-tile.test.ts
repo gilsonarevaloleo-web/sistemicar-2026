@@ -20,6 +20,11 @@ describe("menú — Jornada no se esconde si el trial venció", () => {
     assert.match(tileBlock, /JORNADA_V4_PATH/);
   });
 
+  it("al tocar Jornada reclama el pago antes de entrar", () => {
+    assert.match(src, /dest === JORNADA_V4_PATH/);
+    assert.match(src, /claimPendingPurchases\(\)\.finally/);
+  });
+
   it("la barra inferior no cambia Jornada por el atajo a /pagos", () => {
     const nav = src.slice(src.indexOf("const navItems = ["));
     assert.match(nav, /JORNADA_MODULE.title/);

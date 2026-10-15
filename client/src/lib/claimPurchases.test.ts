@@ -13,4 +13,10 @@ describe("claimPendingPurchases — sin service account", () => {
     assert.match(src, /activateModulesForUser/);
     assert.match(src, /confirm-client-apply/);
   });
+
+  it("escribe el plan en su cuenta siempre que el claim devuelva planes", () => {
+    const fn = src.slice(src.indexOf("async function claimPendingPurchasesOnce"));
+    const grantedBlock = fn.slice(fn.indexOf("if (grantedPlans.length > 0)"));
+    assert.match(grantedBlock, /activateModulesForUser/);
+  });
 });

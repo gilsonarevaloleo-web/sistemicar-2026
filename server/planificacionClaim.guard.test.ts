@@ -38,6 +38,12 @@ describe("claim de compras — aliases de Gmail", () => {
     assert.match(grants, /buyer_email = ANY/);
   });
 
+  it("el JWT del claim usa el mismo projectId que el cliente", () => {
+    const src = readFileSync(join(dir, "index.ts"), "utf8");
+    assert.match(src, /sistemicar-app/);
+    assert.match(src, /FIREBASE_PROJECT_ID/);
+  });
+
   it("si Admin no escribe Firestore, el claim pasa el plan al celular", () => {
     const grants = readFileSync(join(dir, "planificacionModuleGrants.ts"), "utf8");
     assert.match(grants, /clientApplyPlans/);
