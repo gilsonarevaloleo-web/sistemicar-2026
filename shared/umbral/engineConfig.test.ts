@@ -6,12 +6,10 @@ import {
   MODOS_UMBRAL,
   evaluarUmbralLocal,
   obtenerCodigo,
-  obtenerPromptEvaluacion,
   parseEvaluacionGemini,
   resolverCodigoSiguiente,
   siguienteCodigo,
   type CodigoNumero,
-  type ModoUmbral,
 } from "./engineConfig.ts";
 
 describe("Umbral v2 — engineConfig", () => {
@@ -79,76 +77,6 @@ describe("Umbral v2 — engineConfig", () => {
     assert.equal(resolverCodigoSiguiente(true, 10), null);
   });
 
-  it("obtenerPromptEvaluacion (interno) incluye criterio, schema y Maestro", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 4,
-      modo: "INTERNO_HABILIDAD",
-      respuestaUsuario: "Hoy corto la flor y hago la acción mínima: una llamada.",
-      historialPrevio: [{ rol: "user", texto: "intento previo vago" }],
-    });
-    assert.equal(prompt.codigo, 4);
-    assert.equal(prompt.modo, "INTERNO_HABILIDAD");
-    assert.match(prompt.system, /INTERNO_HABILIDAD/);
-    assert.match(prompt.system, /feedbackConfrontativo/);
-    assert.match(prompt.system, /accion mínima|acción mínima|Seriedad/i);
-    assert.match(prompt.system, /Ingeniero sin Flor/);
-    assert.match(prompt.system, /segunda resistencia/i);
-    assert.doesNotMatch(prompt.system, /Evaluador Confrontativo/);
-    assert.match(prompt.user, /acción mínima: una llamada/i);
-    assert.match(prompt.user, /intento previo vago/);
-    assert.equal(prompt.responseSchema.codigoSiguiente, 4);
-  });
-
-  it("obtenerPromptEvaluacion (externo) usa objecionCliente y ficha de Arena", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 1 as CodigoNumero,
-      modo: "EXTERNO_VENTAS" as ModoUmbral,
-      respuestaUsuario: "Te sirve para cortar la estática en 15 minutos.",
-    });
-    assert.match(prompt.system, /EXTERNO_VENTAS/);
-    assert.match(prompt.system, /Objeción típica/);
-    assert.match(prompt.system, /utilidad/i);
-    assert.match(prompt.system, /Cortador de Niebla/);
-    assert.match(prompt.system, /La Arena/);
-    assert.doesNotMatch(prompt.system, /OFERTA EN JUICIO/);
-  });
-
-  it("Arena con oferta nombra el producto en el prompt y ancla la objeción", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 1,
-      modo: "EXTERNO_VENTAS",
-      respuestaUsuario: "Corte Limpio te nombra el crack en una frase.",
-      ofertaNombre: "Corte Limpio",
-      fraseUtilidad: "Nombra el crack y lo corta hoy.",
-    });
-    assert.match(prompt.system, /OFERTA EN JUICIO/);
-    assert.match(prompt.system, /Corte Limpio/);
-    assert.match(prompt.system, /Nombra el crack y lo corta hoy/);
-    assert.match(prompt.system, /no veo para qué me sirve Corte Limpio/i);
-  });
-
-  it("Forja ignora ofertaNombre: no es sujeto del modo interno", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 1,
-      modo: "INTERNO_HABILIDAD",
-      respuestaUsuario: "La excusa puntual es abrir el celular al vender.",
-      ofertaNombre: "Corte Limpio",
-      fraseUtilidad: "No debería aparecer.",
-    });
-    assert.doesNotMatch(prompt.system, /OFERTA EN JUICIO/);
-    assert.doesNotMatch(prompt.system, /Corte Limpio/);
-  });
-
-  it("en código 10 el prompt indica codigoSiguiente null al aprobar", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 10,
-      modo: "INTERNO_HABILIDAD",
-      respuestaUsuario: "Asumo el rol. Yo marco el estándar.",
-    });
-    assert.match(prompt.system, /codigoSiguiente = null/);
-    assert.match(prompt.system, /codigoSiguiente = 10/);
-  });
-
   it("parseEvaluacionGemini acepta alias feedback", () => {
     const ev = parseEvaluacionGemini(
       '```json\n{"aprobado":true,"feedback":"Listo.","codigoSiguiente":2}\n```',
@@ -157,17 +85,6 @@ describe("Umbral v2 — engineConfig", () => {
     assert.equal(ev.aprobado, true);
     assert.equal(ev.feedbackConfrontativo, "Listo.");
     assert.equal(ev.codigoSiguiente, 2);
-  });
-
-  it("prompt C3 Arena inyecta el candado de minutos + primer paso", () => {
-    const prompt = obtenerPromptEvaluacion({
-      codigo: 3,
-      modo: "EXTERNO_VENTAS",
-      respuestaUsuario: "Entrar a la jornada y nombrar el tiempo.",
-    });
-    assert.match(prompt.system, /CANDADO C3 ARENA/);
-    assert.match(prompt.system, /ocupación/);
-    assert.match(prompt.system, /Relojero Práctico/);
   });
 
   it("evaluarUmbralLocal rechaza respuestas vacías y aprueba densas", () => {

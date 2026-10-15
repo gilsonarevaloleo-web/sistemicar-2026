@@ -346,4 +346,34 @@ describe("Umbral v2 — POST /api/umbral/evaluar", () => {
       },
     );
   });
+
+  it("la respuesta HTTP no incluye el kernel del Maestro", async () => {
+    await withServer(
+      async () =>
+        JSON.stringify({
+          aprobado: true,
+          feedbackConfrontativo: "Excusa puntual. Avanzas.",
+          codigoSiguiente: 2,
+        }),
+      async (base) => {
+        const res = await fetch(`${base}/api/umbral/evaluar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: "u-vault",
+            modo: "INTERNO_HABILIDAD",
+            codigoActual: 1,
+            respuestaUsuario:
+              "La excusa puntual es revisar el celular cada vez que voy a vender.",
+          }),
+        });
+        const text = await res.text();
+        assert.equal(res.status, 200);
+        assert.doesNotMatch(text, /Eres el Maestro del código activo/);
+        assert.doesNotMatch(text, /EMPATÍA DE CÓDIGO \(no emocional\)/);
+        assert.doesNotMatch(text, /BLINDAJE DE KERNEL/);
+        assert.doesNotMatch(text, /TRES TIEMPOS en feedbackConfrontativo/);
+      },
+    );
+  });
 });

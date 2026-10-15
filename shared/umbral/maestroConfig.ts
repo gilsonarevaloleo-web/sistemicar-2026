@@ -1,17 +1,9 @@
 /**
- * Maestro del Umbral — ejecuta la Ley del Carácter del Código.
+ * Ficha pública del Maestro del Umbral — lo que el alumno ve.
  *
- * El analizador frío solo juzga la 1ª resistencia (la objeción / la excusa)
- * y eso traba al alumno. El Maestro enseña la 2ª resistencia: lo que el
- * operador hace cuando el código le pega (freeze, flor, chase, huida).
- *
- * Arquitectura anti-prompt-gigante:
- * - KERNEL compacto (ley + reglas fijas)
- * - 1 ficha activa (solo el código en juego)
- * Nunca inyectar las 10 fichas juntas.
+ * El system prompt (kernel + ensamble) vive en `server/maestro/`.
+ * Este archivo no exporta KERNEL ni arma el bloque de Gemini.
  */
-
-import { LEY_CARACTER_CODIGO_KERNEL } from "./leyCaracterCodigo.ts";
 
 /** Duplicados locales para no circular con engineConfig. */
 type CodigoNumero = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
@@ -38,33 +30,6 @@ export interface FichaMaestroCodigo {
   fraseQuiebre: string;
   fraseCruce: string;
 }
-
-/** Reglas fijas del Maestro. Quepan en un prompt. No se duplican por código. */
-export const KERNEL_MAESTRO = `
-${LEY_CARACTER_CODIGO_KERNEL}
-
-Eres el Maestro del código activo del Umbral (Sistemicar). No eres juez frío ni coach cálido.
-
-EMPATÍA DE CÓDIGO (no emocional):
-El alumno se siente acompañado cuando nombras SU crack con el idioma de ESTE código.
-No consueles. No animes. No moralices. Habla como el carácter de la ficha.
-
-DOS RESISTENCIAS:
-- R1 = el obstáculo del código (excusa interna / objeción del cliente).
-- R2 = lo que el alumno hace cuando R1 le pega (listas, flor, chase, descuento, huida, pose).
-El analizador viejo solo sentenciaba R1. Tú enseñas R2 para que termine el cruce.
-Si el historial muestra freeze repetido, nombra el patrón de R2 con más precisión — no con más dureza.
-
-TRES TIEMPOS en feedbackConfrontativo (2–5 frases, prosa, sin markdown, sin títulos):
-1) ESPEJO: nombra lo que trajo, en la metáfora del código.
-2) SEGUNDA RESISTENCIA: nombra cómo se quebró o cómo sostuvo.
-3) CORTE o CRUCE: un solo rewrite (si rechazas) o el músculo que ganó (si apruebas).
-
-REGLAS DE AVANCE:
-- No saltes de código. Rechazo = mismo código + un corte ejecutable hoy.
-- Aprueba solo si toca el criterio del código Y sostiene R2.
-- Cero New Age, cero flor, cero «ánimo», cero «yo te entiendo».
-`.trim();
 
 export const FICHAS_MAESTRO: Record<CodigoNumero, FichaMaestroCodigo> = {
   1: {
@@ -287,35 +252,6 @@ export function resistencia2De(
   return modo === "INTERNO_HABILIDAD"
     ? ficha.resistencia2Forja
     : ficha.resistencia2Arena;
-}
-
-/**
- * Bloque que se inyecta al evaluador: kernel + UNA ficha.
- * Esto reemplaza el prompt-muro que Gemini no podía pegar.
- */
-export function armarBloqueMaestro(
-  codigo: CodigoNumero,
-  modo: ModoUmbral,
-): string {
-  const f = obtenerFichaMaestro(codigo);
-  const r1 = resistencia1De(f, modo);
-  const r2 = resistencia2De(f, modo);
-  const sala = modo === "INTERNO_HABILIDAD" ? "La Forja" : "La Arena";
-
-  return [
-    KERNEL_MAESTRO,
-    "",
-    `FICHA ACTIVA — Código ${f.numero} · ${sala}`,
-    `Voz: ${f.voz}`,
-    `Carácter: ${f.caracter}`,
-    `Metáfora (tu idioma): ${f.metafora}`,
-    `R1: ${r1}`,
-    `R2 (enseña esto): ${r2}`,
-    `Empatía de código: ${f.empatiaDeCodigo}`,
-    `Gesto: ${f.gestoEnsenanza}`,
-    `Si rechazas, cierra cerca de: «${f.fraseQuiebre}»`,
-    `Si apruebas, cierra cerca de: «${f.fraseCruce}»`,
-  ].join("\n");
 }
 
 export function feedbackMaestroLocal(opts: {
