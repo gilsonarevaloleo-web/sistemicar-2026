@@ -377,7 +377,13 @@ function ModuleRoute({
                   return;
                 }
                 setCheckingTier(false);
-                if (!hasAccess(merged)) {
+                const alreadyClaimed = mergeModuleIds(
+                  merged.activeModules,
+                  claimedModulesRef.current as ModuleId[],
+                );
+                if (
+                  !hasAccess({ ...merged, activeModules: alreadyClaimed })
+                ) {
                   navigate(pagosHrefForDeny(merged));
                 }
               })

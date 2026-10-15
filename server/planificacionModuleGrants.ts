@@ -131,6 +131,46 @@ export async function listPendingModuleGrantsForUid(
   }));
 }
 
+/**
+ * Si el admin registró el pago con un Gmail y ella entra con otro,
+ * el claim por correo queda vacío y Jornada la manda a /pagos.
+ * Si en 60 días solo hay pendientes de UN comprador (el caso Tina),
+ * se pegan a quien abre Jornada.
+ */
+export async function listOrphanPendingModuleGrants(): Promise<
+  Array<{ deliveryId: string; planId: string }>
+> {
+  if (!process.env.DATABASE_URL) return [];
+  const result = await pool.query(
+    `SELECT delivery_id, plan_id, buyer_email FROM planificacion_module_grants
+     WHERE status = 'pending'
+       AND (firebase_uid IS NULL OR firebase_uid = '')
+       AND created_at > NOW() - INTERVAL '60 days'
+     ORDER BY created_at DESC
+     LIMIT 20`,
+  );
+  if (result.rows.length === 0) return [];
+  const emails = new Set(
+    result.rows.map((row) => normalizeBuyerEmail(String(row.buyer_email || ""))),
+  );
+  if (emails.size !== 1) return [];
+  return result.rows.map((row) => ({
+    deliveryId: row.delivery_id as string,
+    planId: row.plan_id as string,
+  }));
+}
+
+export async function listClaimableModuleGrants(
+  email: string,
+  firebaseUid: string,
+): Promise<Array<{ deliveryId: string; planId: string }>> {
+  return mergePendingGrants(
+    await listPendingModuleGrantsForEmail(email),
+    await listPendingModuleGrantsForUid(firebaseUid),
+    await listOrphanPendingModuleGrants(),
+  );
+}
+
 function mergePendingGrants(
   ...lists: Array<Array<{ deliveryId: string; planId: string }>>
 ): Array<{ deliveryId: string; planId: string }> {
@@ -165,10 +205,7 @@ export async function grantPendingModulesForEmail(
   clientApplyPlans: string[];
   clientApplyDeliveryIds: string[];
 }> {
-  const pending = mergePendingGrants(
-    await listPendingModuleGrantsForEmail(email),
-    await listPendingModuleGrantsForUid(firebaseUid),
-  );
+  const pending = await listClaimableModuleGrants(email, firebaseUid);
   const grantedPlans: string[] = [];
   const deliveryIds: string[] = [];
   const clientApplyPlans: string[] = [];
@@ -187,7 +224,52 @@ export async function grantPendingModulesForEmail(
       clientApplyDeliveryIds.push(row.deliveryId);
     }
   }
+  if (grantedPlans.length === 0 && clientApplyPlans.length === 0) {
+    const replay = await listReplayableGrantedPlans(email, firebaseUid);
+    for (const row of replay) {
+      if (modulesGrantedByPlan(row.planId).length === 0) continue;
+      const ok = await activateModulesForUserById(firebaseUid, row.planId);
+      if (ok) {
+        grantedPlans.push(row.planId);
+      } else {
+        clientApplyPlans.push(row.planId);
+      }
+    }
+  }
   return { grantedPlans, deliveryIds, clientApplyPlans, clientApplyDeliveryIds };
+}
+
+export async function listReplayableGrantedPlans(
+  email: string,
+  firebaseUid: string,
+): Promise<Array<{ deliveryId: string; planId: string }>> {
+  if (!process.env.DATABASE_URL) return [];
+  const result = await pool.query(
+    `SELECT delivery_id, plan_id, buyer_email, firebase_uid FROM planificacion_module_grants
+     WHERE status = 'granted' AND granted_at > NOW() - INTERVAL '60 days'
+     ORDER BY granted_at DESC
+     LIMIT 40`,
+  );
+  const keys = new Set(emailMatchKeys(email));
+  const local = normalizeBuyerEmail(email).split("@")[0] ?? "";
+  const found = new Map<string, { deliveryId: string; planId: string }>();
+  for (const row of result.rows) {
+    const buyer = String(row.buyer_email || "");
+    const otherLocal = buyer.split("@")[0] ?? "";
+    const uidMatch = Boolean(firebaseUid && row.firebase_uid === firebaseUid);
+    if (
+      uidMatch ||
+      keys.has(normalizeBuyerEmail(buyer)) ||
+      emailsLikelySameMailbox(email, buyer) ||
+      gmailLocalAnagram(local, otherLocal)
+    ) {
+      found.set(row.delivery_id as string, {
+        deliveryId: row.delivery_id as string,
+        planId: row.plan_id as string,
+      });
+    }
+  }
+  return [...found.values()];
 }
 
 export async function processPlanificacionModulePayment(params: {

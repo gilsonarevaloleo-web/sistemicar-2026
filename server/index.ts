@@ -74,8 +74,7 @@ import {
 import {
   initPlanificacionModuleGrantsTable,
   grantPendingModulesForEmail,
-  listPendingModuleGrantsForEmail,
-  listPendingModuleGrantsForUid,
+  listClaimableModuleGrants,
   markModuleGrantGranted,
   adminGrantPlanificacionModule,
   adminGrantPlanificacionModuleByUid,
@@ -5109,14 +5108,6 @@ async function claimPlanificacionPurchasesHandler(req: any, res: any) {
     if (!verified?.uid || !verified.email) {
       return res.status(401).json({ error: "Inicia sesión con Google para activar tu módulo." });
     }
-    const pendingBefore = await listPendingModuleGrantsForEmail(verified.email);
-    if (pendingBefore.length === 0) {
-      return res.json({
-        grantedPlans: [],
-        activated: false,
-        message: "No hay compras pendientes. Si acabas de pagar, entra con el mismo Gmail del pago.",
-      });
-    }
     const {
       grantedPlans,
       deliveryIds,
@@ -5155,11 +5146,8 @@ app.post("/api/planificacion/confirm-client-apply", async (req, res) => {
       return res.status(401).json({ error: "Inicia sesión para confirmar tu plan." });
     }
     const rawIds = Array.isArray(req.body?.deliveryIds) ? req.body.deliveryIds : [];
-    const pendingEmail = await listPendingModuleGrantsForEmail(verified.email);
-    const pendingUid = await listPendingModuleGrantsForUid(verified.uid);
-    const allowed = new Set(
-      [...pendingEmail, ...pendingUid].map((row) => row.deliveryId),
-    );
+    const pending = await listClaimableModuleGrants(verified.email, verified.uid);
+    const allowed = new Set(pending.map((row) => row.deliveryId));
     const confirmed: string[] = [];
     for (const id of rawIds) {
       if (typeof id !== "string" || !allowed.has(id)) continue;
@@ -5414,7 +5402,7 @@ app.post("/api/admin/modules/grant", requireAdminToken, async (req, res) => {
       planName,
       resolveClientAccountWhatsappKind({
         granted: result.granted,
-        accountExists: Boolean(result.uid || result.granted),
+        accountExists: true,
       }),
     );
 
