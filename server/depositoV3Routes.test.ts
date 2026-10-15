@@ -76,22 +76,25 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
   it("devuelve firma + mapa de carácter desde Gemini", async () => {
     await withServer(
       async (prompt) => {
-        assert.match(String(prompt), /CHARACTER SIGNATURE/);
+        assert.match(String(prompt), /FOCO DE REVELACIÓN|focoRevelacionCode/);
+        assert.match(String(prompt), /Syntax & Character Master Engine/);
         assert.doesNotMatch(String(prompt), /perceptionEye/);
         return JSON.stringify({
           characterSignedCode: 3,
+          focoRevelacionCode: 7,
           activeCharacterMap: { "3": true, "7": true },
           syntacticVacios: [1, 2, 4, 5, 6, 8, 9, 10],
           syntaxDiagnostic: {
             detectedSyntaxCode: 3,
+            focoCode: 7,
             isCableadoConnected: true,
-            syntaxCharacteristics: "Horas y pistón.",
+            syntaxCharacteristics: "Transición de C3 hacia la ley C7.",
           },
           groundingStatus: {
             isFullyGrounded: true,
             diagnosticMessage: "Secuencia cableada al patrón.",
           },
-          immediateAdjustment: "Tres pasos con hora de corte.",
+          immediateAdjustment: "Tu quiebre real está en la Ley (C7).",
         });
       },
       async (base) => {
@@ -108,6 +111,7 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.equal(body.success, true);
         assert.equal(body.source, "gemini");
         assert.equal(body.result.characterSignedCode, 3);
+        assert.equal(body.result.focoRevelacionCode, 7);
         assert.equal(body.result.activeCharacterMap[3], true);
         assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, true);
         assert.equal(body.userTier, "MATRICULA");
