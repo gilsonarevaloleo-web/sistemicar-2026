@@ -1054,6 +1054,7 @@ export function registrarCierreFalladoCronometro(
 /**
  * Reparte minutos entre filas pendientes del cronómetro.
  * Filas con `cupoFijo` conservan su minutosCupo; el resto del presupuesto va a las flexibles.
+ * Nunca inventa minutos extra: la suma no monta el tope.
  */
 export function redistribuirMinutosSituacionCronometro(subTareas: SubTarea[], remainingMin: number): SubTarea[] {
   const pendingIdx = subTareas
@@ -1061,6 +1062,7 @@ export function redistribuirMinutosSituacionCronometro(subTareas: SubTarea[], re
     .filter(({ st }) => situacionFilaCronometroPendiente(st));
   if (pendingIdx.length === 0) return subTareas;
 
+  const tope = Math.max(0, Math.round(remainingMin));
   const fixed = pendingIdx.filter(({ st }) => isCupoFijo(st));
   const flexible = pendingIdx.filter(({ st }) => !isCupoFijo(st));
 
@@ -1069,11 +1071,20 @@ export function redistribuirMinutosSituacionCronometro(subTareas: SubTarea[], re
 
   if (flexible.length === 0) return next;
 
-  const flexBudget = Math.max(flexible.length, Math.round(remainingMin) - fixedSum);
+  const flexBudget = Math.max(0, tope - fixedSum);
+  if (flexBudget <= 0) {
+    flexible.forEach(({ st, i }) => {
+      const row = { ...st, minutosCupo: 0 };
+      delete (row as { cupoFijo?: boolean }).cupoFijo;
+      next[i] = row;
+    });
+    return next;
+  }
+
   const alloc = repartirProporcional(
     flexible.map(() => 1),
     flexBudget,
-    1
+    flexBudget >= flexible.length ? 1 : 0
   );
 
   flexible.forEach(({ st, i }, k) => {
@@ -1083,28 +1094,63 @@ export function redistribuirMinutosSituacionCronometro(subTareas: SubTarea[], re
   return next;
 }
 
-/** Aplica minutos manuales (marca cupoFijo) y redistribuye el sobrante entre filas flexibles. */
+/**
+ * Aplica minutos manuales (marca cupoFijo) y acomoda las siguientes pendientes
+ * en partes iguales respecto al tope del segmento. La suma no monta el tope.
+ */
 export function applyCupoManualYRedistribuir(
   subTareas: SubTarea[],
   subTareaId: string,
   minutos: number | undefined,
   totalBudgetMin: number
 ): SubTarea[] {
-  const afterManual = subTareas.map(st => {
-    if (st.id !== subTareaId) return st;
-    if (minutos === undefined || minutos <= 0 || !Number.isFinite(minutos)) {
+  const tope = Math.max(1, Math.round(totalBudgetMin));
+
+  if (minutos === undefined || minutos <= 0 || !Number.isFinite(minutos)) {
+    const afterClear = subTareas.map(st => {
+      if (st.id !== subTareaId) return st;
       const next = { ...st };
       delete (next as { minutosCupo?: number; cupoFijo?: boolean }).minutosCupo;
       delete (next as { cupoFijo?: boolean }).cupoFijo;
       return next;
+    });
+    return redistribuirMinutosSituacionCronometro(afterClear, tope);
+  }
+
+  const pending = filasCronometroOrdenadas(subTareas).filter(situacionFilaCronometroPendiente);
+  const editedOrd = pending.findIndex(st => st.id === subTareaId);
+  const subsequent = editedOrd >= 0 ? pending.slice(editedOrd + 1) : [];
+  const priorSum =
+    editedOrd > 0
+      ? pending.slice(0, editedOrd).reduce((a, st) => a + (st.minutosCupo ?? 0), 0)
+      : 0;
+  const nSub = subsequent.length;
+  const maxEdited = Math.max(1, tope - priorSum - nSub);
+  const capped = Math.min(maxEdited, Math.round(Math.min(999, Math.max(1, minutos))));
+  const leftover = Math.max(0, tope - priorSum - capped);
+  const subIds = new Set(subsequent.map(st => st.id));
+  const alloc =
+    nSub === 0
+      ? []
+      : leftover <= 0
+        ? subsequent.map(() => 0)
+        : repartirProporcional(
+            subsequent.map(() => 1),
+            leftover,
+            leftover >= nSub ? 1 : 0
+          );
+
+  let k = 0;
+  return subTareas.map(st => {
+    if (st.id === subTareaId) {
+      return { ...st, minutosCupo: capped, cupoFijo: true };
     }
-    return {
-      ...st,
-      minutosCupo: Math.round(Math.min(999, Math.max(0, minutos))),
-      cupoFijo: true,
-    };
+    if (!subIds.has(st.id)) return st;
+    const mins = alloc[k++] ?? 0;
+    const next = { ...st, minutosCupo: mins };
+    delete (next as { cupoFijo?: boolean }).cupoFijo;
+    return next;
   });
-  return redistribuirMinutosSituacionCronometro(afterManual, totalBudgetMin);
 }
 
 /** Comprime o estira cupos pendientes para alinearse al tiempo de pared hasta la meta. */
