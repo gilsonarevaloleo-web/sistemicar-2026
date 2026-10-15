@@ -9,7 +9,7 @@
  * son alias del mismo EyeCode. La esencia es el número 1–10.
  */
 
-export const DEPOSITO_V3_VERSION = "3.3.0-sintaxis-firma" as const;
+export const DEPOSITO_V3_VERSION = "3.4.0-foco-revelacion" as const;
 
 export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -69,6 +69,8 @@ export interface CharacterSyntaxDiagnostic {
   /** Continuidad título → cuerpo → cierre. No es juicio moral. */
   isCableadoConnected: boolean;
   syntaxCharacteristics: string;
+  /** Dónde ocurrió la revelación o síntesis. Puede diferir de la firma narrativa. */
+  focoCode: EyeCode;
 }
 
 export interface GroundingStatus {
@@ -90,8 +92,13 @@ export interface SystemicAnalysis {
 export interface DepotAnalysisResult {
   id: string;
   timestamp: number;
-  /** Código dominante de la geometría de redacción. */
+  /** Código dominante de la geometría de redacción (relato / storytelling). */
   characterSignedCode: EyeCode;
+  /**
+   * Código de foco: dónde se forjó la ley o la decisión.
+   * No es el canal con más palabras. C3 puede narrar y el foco ser C5/C7/C8.
+   */
+  focoRevelacionCode: EyeCode;
   /** Telemetría directa para el mapa de calor de los 10 códigos de carácter. */
   activeCharacterMap: Record<EyeCode, boolean>;
   /** Códigos C1–C10 ausentes en la geometría de redacción. */

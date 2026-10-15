@@ -3,6 +3,7 @@ import {
   CANON_TEN_EYES,
   EYE_CODES,
   characterMapDe,
+  focoRevelacionDe,
   isEyeLocked,
   syntacticVaciosDe,
   type DepotAnalysisResult,
@@ -19,6 +20,7 @@ export interface MapaCalorV3Props {
 export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
   const mapa = characterMapDe(result);
   const vacios = syntacticVaciosDe(result);
+  const focoCode = focoRevelacionDe(result);
 
   return (
     <div
@@ -34,7 +36,7 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
           Mapa de calor · 10 códigos de carácter
         </h3>
         <span className="text-[10px] font-mono text-white/45" data-testid="deposito-v3-mapa-ejes">
-          FIRMA C{result.characterSignedCode} · {vacios.length} VACÍOS
+          FIRMA C{result.characterSignedCode} · FOCO C{focoCode} · {vacios.length} VACÍOS
         </span>
       </div>
 
@@ -43,13 +45,18 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
           const eye = CANON_TEN_EYES[eyeId];
           const locked = isEyeLocked(eyeId, userTier);
           const isCharacter = result.characterSignedCode === eyeId;
+          const isFoco = focoCode === eyeId;
           const isVacio = vacios.includes(eyeId);
           const activo = Boolean(mapa[eyeId]);
 
           let border = "rgba(255,255,255,0.08)";
           let bg = "transparent";
           let fg = "rgba(255,255,255,0.35)";
-          if (locked && !isCharacter) {
+          if (isFoco) {
+            border = GOLD;
+            bg = `${GOLD}22`;
+            fg = GOLD;
+          } else if (locked && !isCharacter) {
             border = "rgba(255,255,255,0.05)";
             fg = "rgba(255,255,255,0.22)";
           } else if (activo) {
@@ -69,6 +76,7 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
               data-testid={`deposito-v3-eye-${eyeId}`}
               data-locked={locked ? "1" : "0"}
               data-caracter={isCharacter ? "1" : "0"}
+              data-foco={isFoco ? "1" : "0"}
               data-vacio={isVacio ? "1" : "0"}
               data-activo={activo ? "1" : "0"}
             >
@@ -86,7 +94,15 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
                       FIRMA
                     </span>
                   )}
-                  {isVacio && !isCharacter && (
+                  {isFoco && (
+                    <span
+                      className="px-1 text-[8px] font-mono"
+                      style={{ color: GOLD, border: `1px solid ${GOLD}` }}
+                    >
+                      FOCO
+                    </span>
+                  )}
+                  {isVacio && !isCharacter && !isFoco && (
                     <span className="text-[8px] tracking-widest text-white/25">VACÍO</span>
                   )}
                 </div>

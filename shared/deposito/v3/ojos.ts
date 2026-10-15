@@ -202,6 +202,24 @@ export function buildActiveEyeMap(
 
 export const buildActiveCharacterMap = buildActiveEyeMap;
 
+/** Códigos de síntesis / ley / decisión. El foco no es el que más palabras tiene. */
+export const FOCO_SINTESIS_CODES: readonly EyeCode[] = [10, 9, 8, 7, 5];
+
+export function esCodigoFocoSintesis(code: EyeCode): boolean {
+  return FOCO_SINTESIS_CODES.includes(code);
+}
+
+/** Foco persistido, foco del diagnóstico, o la firma narrativa si el volcado es legado. */
+export function focoRevelacionDe(result: {
+  focoRevelacionCode?: EyeCode | null;
+  syntaxDiagnostic?: { focoCode?: EyeCode | null } | null;
+  characterSignedCode: EyeCode;
+}): EyeCode {
+  if (result.focoRevelacionCode) return result.focoRevelacionCode;
+  if (result.syntaxDiagnostic?.focoCode) return result.syntaxDiagnostic.focoCode;
+  return result.characterSignedCode;
+}
+
 /** Telemetría de calor: mapa nuevo, mapa legado o reconstrucción desde vacíos. */
 export function characterMapDe(result: {
   activeCharacterMap?: Record<EyeCode, boolean> | null;

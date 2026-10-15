@@ -26,7 +26,7 @@ import {
 
 describe("Depósito V3 — contratos", () => {
   it("expone versión y los 10 canales sin repetir id", () => {
-    assert.equal(DEPOSITO_V3_VERSION, "3.3.0-sintaxis-firma");
+    assert.equal(DEPOSITO_V3_VERSION, "3.4.0-foco-revelacion");
     assert.deepEqual([...EYE_CODES], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const ids = EYE_CODES.map((n) => CANON_TEN_EYES[n].id);
     assert.deepEqual(ids, [...EYE_CODES]);
@@ -159,18 +159,21 @@ describe("Depósito V3 — payload", () => {
 describe("Depósito V3 — dictamen sintáctico", () => {
   const llm = {
     characterSignedCode: 3,
+    focoRevelacionCode: 8,
     activeCharacterMap: { "3": true, "7": true, "8": true },
     syntacticVacios: [1, 2, 4, 5, 6, 9, 10],
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
+      focoCode: 8,
       isCableadoConnected: true,
-      syntaxCharacteristics: "Paso a paso, marcas de hora.",
+      syntaxCharacteristics: "Transición de la secuencia física C3 hacia la síntesis de polaridad C8.",
     },
     groundingStatus: {
       isFullyGrounded: true,
       diagnosticMessage: "La escritura sostiene título y secuencia.",
     },
-    immediateAdjustment: "Mañana, una secuencia de tres pasos con hora de corte.",
+    immediateAdjustment:
+      "Tu quiebre real ocurrió en la Ley de Polaridad (C8). Mañana, aplica este mismo criterio de inversión de polo a un escenario distinto.",
   };
 
   it("parsea el JSON del especialista y sella id/timestamp", () => {
@@ -182,6 +185,8 @@ describe("Depósito V3 — dictamen sintáctico", () => {
     if (!parsed.ok) return;
     assert.equal(parsed.result.id, "depot_test");
     assert.equal(parsed.result.characterSignedCode, 3);
+    assert.equal(parsed.result.focoRevelacionCode, 8);
+    assert.equal(parsed.result.syntaxDiagnostic.focoCode, 8);
     assert.equal(parsed.result.activeCharacterMap[3], true);
     assert.equal(parsed.result.activeCharacterMap[1], false);
     assert.deepEqual(parsed.result.syntacticVacios, [1, 2, 4, 5, 6, 9, 10]);
@@ -219,11 +224,38 @@ describe("Depósito V3 — dictamen sintáctico", () => {
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
     assert.equal(parsed.result.syntaxDiagnostic.isCableadoConnected, true);
+    assert.equal(parsed.result.focoRevelacionCode, 3);
+    assert.equal(parsed.result.syntaxDiagnostic.focoCode, 3);
     assert.equal(parsed.result.activeCharacterMap[3], true);
     assert.equal(parsed.result.activeCharacterMap[7], true);
     assert.ok(parsed.result.syntacticVacios.includes(1));
     assert.equal(parsed.result.syntacticVacios.includes(3), false);
     assert.equal("perceptionEye" in parsed.result, false);
+  });
+
+  it("acepta el JSON de maestría sin groundingStatus y sella el foco", () => {
+    const maestro = {
+      characterSignedCode: 3,
+      focoRevelacionCode: 5,
+      activeCharacterMap: { "3": true, "5": true },
+      syntacticVacios: [1, 2, 4, 6, 7, 8, 9, 10],
+      syntaxDiagnostic: {
+        detectedSyntaxCode: 3,
+        focoCode: 5,
+        isCableadoConnected: true,
+        syntaxCharacteristics:
+          "Transición de la secuencia física C3 hacia el corte C5.",
+      },
+      immediateAdjustment:
+        "Tu quiebre real está en el Corte (C5). Mañana, aplica el mismo criterio de límite a un escenario distinto.",
+    };
+    const parsed = parseDepotAnalysisResult(maestro);
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.result.focoRevelacionCode, 5);
+    assert.equal(parsed.result.syntaxDiagnostic.focoCode, 5);
+    assert.equal(parsed.result.groundingStatus.isFullyGrounded, true);
+    assert.match(parsed.result.groundingStatus.diagnosticMessage, /C3|C5/);
   });
 
   it("rechaza dictamen sin firma o sin ajuste", () => {
@@ -248,6 +280,8 @@ describe("Depósito V3 — dictamen sintáctico", () => {
       characterSignedCode: 3,
     });
     assert.equal(draft.characterSignedCode, 3);
+    assert.equal(draft.focoRevelacionCode, 3);
+    assert.equal(draft.syntaxDiagnostic.focoCode, 3);
     assert.equal(draft.activeCharacterMap[3], true);
     assert.equal(draft.activeCharacterMap[1], false);
     assert.ok(draft.syntacticVacios.includes(1));
