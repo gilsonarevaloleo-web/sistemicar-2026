@@ -445,6 +445,7 @@ export default function JornadaV4Session() {
             />
             <Jornada4LaunchPanel
               onLaunch={handleLaunch}
+              segmentoHoraInicio={planillaApi.segmentoActivo?.horaInicio ?? null}
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
               segmentoActivoNombre={
                 planillaApi.segmentoActivo

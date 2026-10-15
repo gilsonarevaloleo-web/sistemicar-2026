@@ -1096,7 +1096,8 @@ export function redistribuirMinutosSituacionCronometro(subTareas: SubTarea[], re
 
 /**
  * Aplica minutos manuales (marca cupoFijo) y acomoda las siguientes pendientes
- * en partes iguales respecto al tope del segmento. La suma no monta el tope.
+ * en partes iguales respecto al tope del segmento. Si el pedido monta el
+ * recinto, no aplica (el hook avisa: abre otro vehículo).
  */
 export function applyCupoManualYRedistribuir(
   subTareas: SubTarea[],
@@ -1104,7 +1105,7 @@ export function applyCupoManualYRedistribuir(
   minutos: number | undefined,
   totalBudgetMin: number
 ): SubTarea[] {
-  const tope = Math.max(1, Math.round(totalBudgetMin));
+  const tope = Math.max(0, Math.round(totalBudgetMin));
 
   if (minutos === undefined || minutos <= 0 || !Number.isFinite(minutos)) {
     const afterClear = subTareas.map(st => {
@@ -1125,9 +1126,11 @@ export function applyCupoManualYRedistribuir(
       ? pending.slice(0, editedOrd).reduce((a, st) => a + (st.minutosCupo ?? 0), 0)
       : 0;
   const nSub = subsequent.length;
-  const maxEdited = Math.max(1, tope - priorSum - nSub);
-  const capped = Math.min(maxEdited, Math.round(Math.min(999, Math.max(1, minutos))));
-  const leftover = Math.max(0, tope - priorSum - capped);
+  const pedido = Math.round(Math.min(999, Math.max(1, minutos)));
+  const maxEdited = Math.max(0, tope - priorSum);
+  // Más que el recinto: no aplicar. El hook avisa y pide otro vehículo.
+  if (pedido > maxEdited) return subTareas;
+  const leftover = Math.max(0, tope - priorSum - pedido);
   const subIds = new Set(subsequent.map(st => st.id));
   const alloc =
     nSub === 0
@@ -1143,7 +1146,7 @@ export function applyCupoManualYRedistribuir(
   let k = 0;
   return subTareas.map(st => {
     if (st.id === subTareaId) {
-      return { ...st, minutosCupo: capped, cupoFijo: true };
+      return { ...st, minutosCupo: pedido, cupoFijo: true };
     }
     if (!subIds.has(st.id)) return st;
     const mins = alloc[k++] ?? 0;

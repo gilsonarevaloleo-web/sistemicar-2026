@@ -17,6 +17,11 @@ import {
   situacionMinutosHastaObjetivoHora,
   situacionObjetivoHoraToContratoMs,
 } from "@/lib/situacionGanancia";
+import {
+  capContratoMsAlTope,
+  capMinutosAlTopeSegmento,
+  segmentoTopeFinMs,
+} from "@/lib/segmentoTopeRing";
 import { buildSituacionRingSeed } from "./situacionLaunchSeed";
 import { buildSituacionLibreSeed } from "./situacionLibreSeed";
 import { burstJornada4Tick } from "./jornada4Tick";
@@ -226,13 +231,18 @@ export async function executeJornada4Launch(
   if (baseForm.tipoFlota === "situacion" && modo === "desglose") {
     const now = Date.now();
     const hora = situacionObjetivoHora?.trim();
-    const fromHora = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;
-    const contratoMs = hora ? situacionObjetivoHoraToContratoMs(hora, now) : null;
-    const minutosBloque =
-      fromHora ??
-      (situacionMinutosBloque != null && situacionMinutosBloque > 0
-        ? Math.round(situacionMinutosBloque)
-        : 30);
+    const topeMs = segmentoTopeFinMs(rest.segmentoActivo, now);
+    const fromHoraRaw = hora ? situacionMinutosHastaObjetivoHora(hora, now) : null;
+    const contratoRaw = hora ? situacionObjetivoHoraToContratoMs(hora, now) : null;
+    const contratoMs = capContratoMsAlTope(contratoRaw, topeMs);
+    const minutosBloque = capMinutosAlTopeSegmento(
+      fromHoraRaw ??
+        (situacionMinutosBloque != null && situacionMinutosBloque > 0
+          ? Math.round(situacionMinutosBloque)
+          : 30),
+      topeMs,
+      now
+    );
     const proyectoEnfoqueId =
       baseForm.proyectoId?.trim() ||
       rest.segmentoActivo?.proyectoVinculadoId?.trim() ||

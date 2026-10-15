@@ -284,6 +284,7 @@ export function useJornada4Crisol(params: UseJornada4CrisolParams) {
 
       const result = injectCrisolPensamiento(vehicle, item, {
         segmentoHoraFin: segmentoActivo?.horaFin,
+        segmentoHoraInicio: segmentoActivo?.horaInicio,
         segmentoProyectoId: segProy,
       });
 

@@ -2,7 +2,7 @@
  * Ops Dual Kernel — gestos ms0 + PS/Firebase/disco en sombra.
  * Sin useDesglosadorManager, sin voz, sin decisiones/hub/depth.
  */
-import { useCallback, useRef, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
   notifyVehicleClosed,
@@ -59,6 +59,15 @@ import {
   resolveCronometroCupoAnchor,
   totalBudgetMinFromCronometro,
 } from "@/lib/situacionCupoDistrib";
+import {
+  CUPO_EXCEDE_TOPE_SEGMENTO_DESC,
+  CUPO_EXCEDE_TOPE_SEGMENTO_TITLE,
+  anclarContratoAlTopeSegmento,
+  clampVehicleRingAlTopeSegmento,
+  cupoManualExcedeTopeSegmento,
+  remainingTopeBudgetMin,
+  resolveVehicleSegmentoTopeFinMs,
+} from "@/lib/segmentoTopeRing";
 import {
   isConquistaDesglosador,
   isSituacionDesglosador,
@@ -177,8 +186,8 @@ export type UseJornada4OpsParams = {
   safeAwardPS: (amount: number, source: string) => Promise<boolean>;
   /** Segmento activo — fallback de dirección para peldaños/pasos. */
   segmentoActivo?: SegmentoV5 | null;
-  /** Plan del día — cierre al término y premio de carácter. */
-  segmentos?: { horaInicio?: string; horaFin?: string }[];
+  /** Plan del día — recinto/tope de cada segmento y cierre al término. */
+  segmentos?: { id?: string; horaInicio?: string; horaFin?: string }[];
 };
 
 export function useJornada4Ops(params: UseJornada4OpsParams) {
@@ -207,6 +216,32 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
     },
     [setVehicles, vehiclesRef]
   );
+
+  useEffect(() => {
+    if (!userId) return;
+    const now = Date.now();
+    const activo = segmentoRef.current;
+    const segs = segmentosRef.current;
+    const patches: Array<{ id: string; patch: Partial<Vehicle> }> = [];
+    for (const v of vehiclesRef.current) {
+      const patch = clampVehicleRingAlTopeSegmento(v, activo, segs, now);
+      if (patch) patches.push({ id: v.id, patch });
+    }
+    if (patches.length === 0) return;
+    for (const { id, patch } of patches) {
+      paintVehicle(id, patch);
+    }
+    scheduleSaveLocalVehicles(vehiclesRef.current);
+    void runShadowTaskAsync(async () => {
+      for (const { id, patch } of patches) {
+        try {
+          await updateVehicle(userId, id, patch, { skipLocalSync: true });
+        } catch (e) {
+          console.error("[jornada4.clampRingTopeSegmento]", e);
+        }
+      }
+    });
+  }, [userId, segmentoActivo?.id, segmentoActivo?.horaFin, paintVehicle, vehiclesRef]);
 
   const tryPremiarCierreConsciente = useCallback(
     (closed: Pick<Vehicle, "id" | "titulo" | "status" | "cierreAt" | "cierreManual">) => {
@@ -697,15 +732,21 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       if (inFlightRef.current.has(key)) return;
       inFlightRef.current.add(key);
       try {
-        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle) return;
-        if (status === "avance" && isRingModoEntrenamiento(vehicle)) {
+        const vehicleRaw = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicleRaw) return;
+        if (status === "avance" && isRingModoEntrenamiento(vehicleRaw)) {
           toast.info(ENTRENAMIENTO_COPY.avanceBloqueado, {
             style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
             duration: 2800,
           });
           return;
         }
+        const topePatch = clampVehicleRingAlTopeSegmento(
+          vehicleRaw,
+          segmentoRef.current,
+          segmentosRef.current
+        );
+        const vehicle = topePatch ? { ...vehicleRaw, ...topePatch } : vehicleRaw;
         const patch = applySituacionRowClose(vehicle, subTareaId, status);
         if (!patch) return;
 
@@ -1039,8 +1080,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       if (inFlightRef.current.has(key)) return;
       inFlightRef.current.add(key);
       try {
-        const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
-        if (!vehicle || !isSituacionDesglosador(vehicle)) return;
+        const vehicleRaw = vehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicleRaw || !isSituacionDesglosador(vehicleRaw)) return;
+        const topePatch = clampVehicleRingAlTopeSegmento(
+          vehicleRaw,
+          segmentoRef.current,
+          segmentosRef.current
+        );
+        const vehicle = topePatch ? { ...vehicleRaw, ...topePatch } : vehicleRaw;
         const result = buildSellarDirectoEnRingState(vehicle, texto, {
           seccionTitulo,
         });
@@ -1411,19 +1458,42 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
       try {
         const vehicle = vehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle || !isSituacionDesglosador(vehicle) || !vehicle.subTareas) return;
-        const sc = vehicle.situacionCronometro;
-        if (sc?.activo !== true) return;
+        const scRaw = vehicle.situacionCronometro;
+        if (scRaw?.activo !== true) return;
         const now = Date.now();
+        const topeMs = resolveVehicleSegmentoTopeFinMs(
+          vehicle,
+          segmentoRef.current,
+          segmentosRef.current,
+          now
+        );
+        const sc = anclarContratoAlTopeSegmento(scRaw, topeMs);
         const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
         const contratoMs = sc.horaFinContratoMs ?? sc.horaFinMs;
-        const wallTope = remainingCronometroBudgetMin(sc, vehicle.subTareas, now);
+        const wallTope = remainingTopeBudgetMin(sc, topeMs, now);
+        const contratoWall = remainingCronometroBudgetMin(sc, vehicle.subTareas, now);
         const bloqueTope = totalBudgetMinFromCronometro(
           vehicle.subTareas,
           bloqueInicio,
           contratoMs
         );
-        // Tope = pared hasta la hora del segmento; nunca más que el contrato sellado.
-        const budget = wallTope != null ? Math.min(wallTope, bloqueTope) : bloqueTope;
+        const budget = Math.min(
+          wallTope ?? contratoWall ?? bloqueTope,
+          contratoWall ?? bloqueTope,
+          bloqueTope
+        );
+        if (cupoManualExcedeTopeSegmento(minutos, budget)) {
+          toast.info(CUPO_EXCEDE_TOPE_SEGMENTO_TITLE, {
+            description: CUPO_EXCEDE_TOPE_SEGMENTO_DESC,
+            style: { backgroundColor: PIZARRA, border: `1px solid ${AMBER}`, color: AMBER },
+            duration: 3600,
+          });
+          if (sc !== scRaw) {
+            paintVehicle(vehicleId, { situacionCronometro: sc });
+            scheduleSaveLocalVehicles(vehiclesRef.current);
+          }
+          return;
+        }
         const subTareas = applyCupoManualYRedistribuir(
           vehicle.subTareas,
           subTareaId,
@@ -1437,7 +1507,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
           resolved === "unchanged" ? vehicle.situacionCupoAnchor ?? null : resolved;
 
         const ringHuella = bumpRingHuellaOnVehicle(vehicle, "cupo");
-        paintVehicle(vehicleId, { subTareas, situacionCupoAnchor, ringHuella });
+        paintVehicle(vehicleId, {
+          subTareas,
+          situacionCupoAnchor,
+          ringHuella,
+          ...(sc !== scRaw ? { situacionCronometro: sc } : {}),
+        });
         await yieldAfterPaint();
         void runShadowTaskAsync(async () => {
           scheduleSaveLocalVehicles(vehiclesRef.current);
@@ -1445,7 +1520,12 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             await updateVehicle(
               userId,
               vehicleId,
-              { subTareas, situacionCupoAnchor, ringHuella },
+              {
+                subTareas,
+                situacionCupoAnchor,
+                ringHuella,
+                ...(sc !== scRaw ? { situacionCronometro: sc } : {}),
+              },
               { skipLocalSync: true }
             );
           } catch (e) {

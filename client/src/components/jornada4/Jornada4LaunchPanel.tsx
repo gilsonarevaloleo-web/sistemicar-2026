@@ -37,6 +37,11 @@ import {
   resolveDefaultObjetivoHoraParaRing,
   situacionMinutosHastaObjetivoHora,
 } from "@/lib/situacionGanancia";
+import {
+  CUPO_EXCEDE_TOPE_SEGMENTO_DESC,
+  CUPO_EXCEDE_TOPE_SEGMENTO_TITLE,
+  capObjetivoHoraAlTopeSegmento,
+} from "@/lib/segmentoTopeRing";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { JORNADA4_OPEN_LAUNCH_EVENT } from "@/lib/pulsoCoberturaEvents";
 import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPicker";
@@ -62,7 +67,9 @@ const V4_TIPOS = ["tiempo", "situacion"] as const;
 type Props = {
   onLaunch: (form: Jornada4LaunchForm) => Promise<string | null>;
   disabled?: boolean;
-  /** Hora fin del segmento activo → meta default del ring. */
+  /** Recinto del segmento activo — tope del ring (no se monta). */
+  segmentoHoraInicio?: string | null;
+  /** Hora fin del segmento activo → meta default y tope del ring. */
   segmentoHoraFin?: string | null;
   /** Nombre del segmento activo (chip en launcher). */
   segmentoActivoNombre?: string | null;
@@ -147,6 +154,7 @@ function useKeyboardInset(): number {
 export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   onLaunch,
   disabled = false,
+  segmentoHoraInicio = null,
   segmentoHoraFin = null,
   segmentoActivoNombre = null,
   proyectosHub = [],
@@ -1539,13 +1547,28 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                             className="text-[10px] font-black uppercase tracking-wider"
                             style={{ color: CYAN }}
                           >
-                            Termina a las (meta del ring)
+                            Termina a las (tope del segmento)
                           </label>
                         </div>
                         <input
                           type="time"
                           value={situacionHoraFin}
-                          onChange={e => setSituacionHoraFin(e.target.value)}
+                          onChange={e => {
+                            const next = e.target.value;
+                            const capped = capObjetivoHoraAlTopeSegmento(next, {
+                              horaInicio: segmentoHoraInicio ?? undefined,
+                              horaFin: segmentoHoraFin ?? undefined,
+                            });
+                            if (capped !== next && segmentoHoraFin) {
+                              toast.info(CUPO_EXCEDE_TOPE_SEGMENTO_TITLE, {
+                                description: CUPO_EXCEDE_TOPE_SEGMENTO_DESC,
+                                duration: 3600,
+                              });
+                              setSituacionHoraFin(capped);
+                              return;
+                            }
+                            setSituacionHoraFin(next);
+                          }}
                           className="w-full p-3 rounded-xl bg-black/60 border-2 text-lg font-mono font-black tabular-nums focus:outline-none"
                           style={{
                             color: INK,
@@ -1555,8 +1578,8 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
                         />
                         <p className="text-[9px] font-mono" style={{ color: MUTED }}>
                           {situacionMinHasta != null
-                            ? `${situacionMinHasta} min hasta la meta · cupos se reparte al lanzar`
-                            : "Elige una hora futura (no minutos ciegos)"}
+                            ? `${situacionMinHasta} min hasta el tope del segmento · cupos se reparte al lanzar`
+                            : "Elige una hora dentro del segmento (no se monta el recinto)"}
                         </p>
                       </div>
 

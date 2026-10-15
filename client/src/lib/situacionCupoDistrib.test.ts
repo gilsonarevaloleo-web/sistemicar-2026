@@ -87,12 +87,12 @@ describe("redistribuirMinutosSituacionCronometro", () => {
     assert.equal(out.find(s => s.id === "b")!.cupoFijo, undefined);
   });
 
-  it("un cupo mayor que el tope se recorta y reserva 1 min a cada siguiente", () => {
+  it("un cupo mayor que el tope no se aplica (el sistema no monta el recinto)", () => {
     const subs = [st("a", 10), st("b", 10), st("c", 10)];
     const out = applyCupoManualYRedistribuir(subs, "a", 40, 30);
-    assert.equal(out.find(s => s.id === "a")!.minutosCupo, 28);
-    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 1);
-    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 1);
+    assert.equal(out.find(s => s.id === "a")!.minutosCupo, 10);
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 10);
+    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 10);
     assert.equal(sumMinutosCronometroPendientes(out), 30);
   });
 
@@ -107,10 +107,10 @@ describe("redistribuirMinutosSituacionCronometro", () => {
 
   it("editar una fila del medio no toca las anteriores y acomoda las siguientes", () => {
     const subs = [st("a", 10), st("b", 10), st("c", 10)];
-    const out = applyCupoManualYRedistribuir(subs, "b", 20, 30);
+    const out = applyCupoManualYRedistribuir(subs, "b", 15, 30);
     assert.equal(out.find(s => s.id === "a")!.minutosCupo, 10);
-    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 19);
-    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 1);
+    assert.equal(out.find(s => s.id === "b")!.minutosCupo, 15);
+    assert.equal(out.find(s => s.id === "c")!.minutosCupo, 5);
     assert.equal(sumMinutosCronometroPendientes(out), 30);
   });
 

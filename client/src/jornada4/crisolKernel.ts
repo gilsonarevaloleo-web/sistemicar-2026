@@ -22,6 +22,13 @@ import {
   situacionMinutosHastaObjetivoHora,
   situacionObjetivoHoraToContratoMs,
 } from "@/lib/situacionGanancia";
+import {
+  anclarContratoAlTopeSegmento,
+  capContratoMsAlTope,
+  capMinutosAlTopeSegmento,
+  remainingTopeBudgetMin,
+  segmentoTopeFinMs,
+} from "@/lib/segmentoTopeRing";
 import type { SituacionReservaItem } from "@/lib/situacionReserva";
 import { ringSessionOperable } from "@/lib/ringEnfoqueReal";
 import { isSituacionDesglosador } from "@/jornada4/filters";
@@ -115,7 +122,11 @@ export function injectCrisolToListaLibre(
 export function injectCrisolToActiveRing(
   vehicle: Vehicle,
   item: SituacionReservaItem,
-  opts?: { segmentoProyectoId?: string }
+  opts?: {
+    segmentoProyectoId?: string;
+    segmentoHoraFin?: string | null;
+    segmentoHoraInicio?: string | null;
+  }
 ): CrisolInjectResult {
   if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
     return { ok: false, reason: "no_vehicle" };
@@ -136,8 +147,18 @@ export function injectCrisolToActiveRing(
 
   const newSub = liftToCron(subTareaFromImanItem(item), enfoqueHeredado);
   let subTareas = [...subs, newSub];
+  const now = Date.now();
+  const topeMs = segmentoTopeFinMs(
+    {
+      horaInicio: opts?.segmentoHoraInicio ?? undefined,
+      horaFin: opts?.segmentoHoraFin ?? undefined,
+    },
+    now
+  );
+  const scAnclado = anclarContratoAlTopeSegmento(sc, topeMs);
   const budgetMin =
-    remainingCronometroBudgetMin(sc, subTareas) ??
+    remainingTopeBudgetMin(scAnclado, topeMs, now) ??
+    remainingCronometroBudgetMin(scAnclado, subTareas, now) ??
     Math.max(1, sumMinutosCronometroPendientes(subTareas));
   if (budgetMin == null || !Number.isFinite(budgetMin)) {
     return { ok: false, reason: "invalid_budget" };
@@ -153,7 +174,7 @@ export function injectCrisolToActiveRing(
     opts?.segmentoProyectoId?.trim();
 
   const situacionCronometro = {
-    ...sc,
+    ...scAnclado,
     ...(proyectoEnfoqueId
       ? {
           // Si el Crisol trae nido, actualiza el rumbo aunque el ring ya tuviera otro.
@@ -193,7 +214,11 @@ export function injectCrisolToActiveRing(
 export function injectCrisolOpeningRing(
   vehicle: Vehicle,
   item: SituacionReservaItem,
-  opts?: { segmentoHoraFin?: string | null; segmentoProyectoId?: string }
+  opts?: {
+    segmentoHoraFin?: string | null;
+    segmentoHoraInicio?: string | null;
+    segmentoProyectoId?: string;
+  }
 ): CrisolInjectResult {
   if (vehicle.tipoFlota !== "situacion" || vehicle.status !== "activo") {
     return { ok: false, reason: "no_vehicle" };
@@ -209,9 +234,22 @@ export function injectCrisolOpeningRing(
 
   const objetivoHora =
     resolveDefaultObjetivoHoraParaRing(opts?.segmentoHoraFin ?? undefined) || "";
-  const contratoMs = situacionObjetivoHoraToContratoMs(objetivoHora);
+  const now = Date.now();
+  const topeMs = segmentoTopeFinMs(
+    {
+      horaInicio: opts?.segmentoHoraInicio ?? undefined,
+      horaFin: opts?.segmentoHoraFin ?? undefined,
+    },
+    now
+  );
+  const contratoRaw = situacionObjetivoHoraToContratoMs(objetivoHora, now);
+  const contratoMs = capContratoMsAlTope(contratoRaw, topeMs);
+  const sumRaw =
+    contratoRaw != null ? situacionMinutosHastaObjetivoHora(objetivoHora, now) : null;
   const sum =
-    contratoMs != null ? situacionMinutosHastaObjetivoHora(objetivoHora) : null;
+    contratoMs != null
+      ? capMinutosAlTopeSegmento(sumRaw ?? 30, topeMs, now)
+      : null;
   if (sum == null || contratoMs == null) {
     return { ok: false, reason: "invalid_objetivo" };
   }
@@ -260,6 +298,7 @@ export function injectCrisolOpeningRing(
 
 export type InjectCrisolPensamientoOpts = {
   segmentoHoraFin?: string | null;
+  segmentoHoraInicio?: string | null;
   segmentoProyectoId?: string;
 };
 
@@ -279,6 +318,8 @@ export function injectCrisolPensamiento(
   if (ringAbierto) {
     return injectCrisolToActiveRing(vehicle, item, {
       segmentoProyectoId: opts?.segmentoProyectoId,
+      segmentoHoraFin: opts?.segmentoHoraFin,
+      segmentoHoraInicio: opts?.segmentoHoraInicio,
     });
   }
 
