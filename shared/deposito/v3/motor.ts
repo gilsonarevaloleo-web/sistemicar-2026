@@ -6,7 +6,9 @@
 
 import {
   CANON_TEN_EYES,
+  FOCO_SINTESIS_CODES,
   buildActiveCharacterMap,
+  esCodigoFocoSintesis,
   vaciosDesdeActiveMap,
 } from "./ojos.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
@@ -105,6 +107,10 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /ciclo/,
     /retorno/,
     /incuba/,
+    /polaridad/,
+    /\bpolos?\b/,
+    /inversion/,
+    /inversión/,
   ],
   9: [
     /al mismo tiempo/,
@@ -287,17 +293,60 @@ function hipotesisCableada(
   return false;
 }
 
-function ajustePorVacio(
-  vacios: readonly EyeCode[],
+function elegirFocoRevelacion(
+  synCuerpo: Record<EyeCode, number>,
+  synCierre: Record<EyeCode, number>,
   characterSignedCode: EyeCode,
-  grounded: boolean,
-): string {
-  if (grounded) {
-    return `Mañana, repetí el mismo canal C${characterSignedCode} con un hecho medible. Cero inventario.`;
+  hipotesis: EyeCode | null,
+  cableada: boolean,
+): EyeCode {
+  for (const n of FOCO_SINTESIS_CODES) {
+    if (synCierre[n] > 0) return n;
   }
-  const hueco = vacios.find((n) => n !== characterSignedCode) ?? characterSignedCode;
-  const ojo = CANON_TEN_EYES[hueco];
-  return `Mañana, escribí el mismo hecho con marca C${hueco} ${ojo.name}: ${ojo.syntaxCharacteristics} Cero inventario.`;
+  for (const n of FOCO_SINTESIS_CODES) {
+    if (synCuerpo[n] > 0) return n;
+  }
+  if (cableada && hipotesis && esCodigoFocoSintesis(hipotesis)) {
+    return hipotesis;
+  }
+  return characterSignedCode;
+}
+
+function rutaGeometrica(characterSignedCode: EyeCode, foco: EyeCode): string {
+  if (characterSignedCode === foco) {
+    return CANON_TEN_EYES[foco].syntaxCharacteristics;
+  }
+  return `Transición de ${CANON_TEN_EYES[characterSignedCode].name} C${characterSignedCode} hacia la síntesis de ${CANON_TEN_EYES[foco].name} C${foco}.`;
+}
+
+function ajustePorFoco(foco: EyeCode): string {
+  switch (foco) {
+    case 1:
+      return "Tu foco está en el Cimiento (C1). Mañana, nombrá territorio, hora y verbo. Cero clima.";
+    case 2:
+      return "Tu foco está en el Flujo (C2). Mañana, escribí la causa y el efecto con un conector medible, no con estado de ánimo.";
+    case 3:
+      return "Tu foco está en la Secuencia (C3). Mañana, nombrá el paso que se rompe y el consecuente, sin repetir el mismo pistón.";
+    case 4:
+      return "Tu foco está en la Estructura (C4). Mañana, formulá UNA pregunta que quiebre la regla que diste por sentada.";
+    case 5:
+      return "Tu quiebre real está en el Corte (C5). Mañana, aplica el mismo criterio de límite a un escenario distinto: un sí o un no sin explicación.";
+    case 6:
+      return "Tu foco está en la Convivencia (C6). Mañana, anotá la escena física —herramienta, roce, frase textual— sin interpretarla.";
+    case 7:
+      return "Tu quiebre real está en la Ley (C7). Mañana, llevá ese mismo axioma a un hecho crudo distinto y verificá si el patrón sostiene.";
+    case 8:
+      return "Tu quiebre real ocurrió en el Ciclo (C8). Mañana, aplica este mismo criterio de inversión de polo a un escenario distinto para verificar la universalidad del patrón.";
+    case 9:
+      return "Tu quiebre real está en el Sistema (C9). Mañana, nombrá los dos hilos que se trenzan y el punto exacto donde se cargan uno al otro.";
+    case 10:
+      return "Tu quiebre real está en el Origen (C10). Mañana, escribí el mismo título y el mismo cierre con un cuerpo que pruebe el cordón, no el tema.";
+  }
+}
+
+function scoreCierre(norm: string): Record<EyeCode, number> {
+  const cut = Math.floor(norm.length * 0.55);
+  return puntuar(norm.slice(Math.max(0, cut)), SINTAXIS);
 }
 
 /**
@@ -314,15 +363,17 @@ export function diagnosticarAuditoriaLocal(
     return sellarLocal(
       scaffoldAnalysisResult({
         characterSignedCode: 1,
+        focoRevelacionCode: 1,
         groundingStatus: {
           isFullyGrounded: false,
           diagnosticMessage:
             "El volcado aún es clima. C1 Cimiento no tiene territorio nombrado. Falta geometría.",
         },
         immediateAdjustment:
-          "Volcá UN hecho físico: hora, lugar, verbo. Cero clima.",
+          "Tu foco está en el Cimiento (C1). Volcá UN hecho físico: hora, lugar, verbo. Cero clima.",
         syntaxDiagnostic: {
           detectedSyntaxCode: 1,
+          focoCode: 1,
           isCableadoConnected: false,
           syntaxCharacteristics: CANON_TEN_EYES[1].syntaxCharacteristics,
         },
@@ -360,8 +411,17 @@ export function diagnosticarAuditoriaLocal(
   const cableada = hipotesisCableada(payload, synCuerpo, normCuerpo);
   if (cableada) syn[10] += 1;
 
+  const synCierre = scoreCierre(normCuerpo);
+  const focoRevelacionCode = elegirFocoRevelacion(
+    synCuerpo,
+    synCierre,
+    characterSignedCode,
+    hipotesis,
+    cableada,
+  );
+
   const activos = EYE_CODES.filter(
-    (n) => syn[n] > 0 || n === characterSignedCode,
+    (n) => syn[n] > 0 || n === characterSignedCode || n === focoRevelacionCode,
   );
   const activeCharacterMap = buildActiveCharacterMap(activos);
   const syntacticVacios = EYE_CODES.filter((n) => !activeCharacterMap[n]);
@@ -369,47 +429,52 @@ export function diagnosticarAuditoriaLocal(
   const grounded = cableada && activeCount >= 3;
 
   const charName = CANON_TEN_EYES[characterSignedCode].name;
+  const focoName = CANON_TEN_EYES[focoRevelacionCode].name;
   const diagnosticMessage = grounded
-    ? `Firma estable en C${characterSignedCode} ${charName}. Título, cuerpo y cierre están cableados. ${activeCount} códigos activos.`
+    ? `Firma estable en C${characterSignedCode} ${charName}. Foco de revelación: C${focoRevelacionCode} ${focoName}. Título, cuerpo y cierre están cableados. ${activeCount} códigos activos.`
     : cableada
-      ? `Hay cordón título↔cuerpo, pero la geometría aún es estrecha (${activeCount} códigos). Firma primaria: C${characterSignedCode} ${charName}.`
-      : `La escritura no cablea título/hipótesis con el cierre. Firma primaria: C${characterSignedCode} ${charName}. Vacíos: ${syntacticVacios.length}.`;
+      ? `Hay cordón título↔cuerpo, pero la geometría aún es estrecha (${activeCount} códigos). Firma: C${characterSignedCode} ${charName}. Foco: C${focoRevelacionCode} ${focoName}.`
+      : `La escritura no cablea título/hipótesis con el cierre. Firma: C${characterSignedCode} ${charName}. Foco: C${focoRevelacionCode} ${focoName}. Vacíos: ${syntacticVacios.length}.`;
 
   return sellarLocal(
     scaffoldAnalysisResult({
       characterSignedCode,
+      focoRevelacionCode,
       activeCharacterMap,
       syntacticVacios,
       syntaxDiagnostic: {
         detectedSyntaxCode: characterSignedCode,
+        focoCode: focoRevelacionCode,
         isCableadoConnected: cableada,
-        syntaxCharacteristics:
-          CANON_TEN_EYES[characterSignedCode].syntaxCharacteristics,
+        syntaxCharacteristics: rutaGeometrica(
+          characterSignedCode,
+          focoRevelacionCode,
+        ),
       },
       groundingStatus: {
         isFullyGrounded: grounded,
         diagnosticMessage,
       },
-      immediateAdjustment: ajustePorVacio(
-        syntacticVacios,
-        characterSignedCode,
-        grounded,
-      ),
+      immediateAdjustment: ajustePorFoco(focoRevelacionCode),
     }),
   );
 }
 
 function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
+  const focoRevelacionCode =
+    result.focoRevelacionCode ?? result.syntaxDiagnostic.focoCode ?? result.characterSignedCode;
   const activeCharacterMap = {
     ...buildActiveCharacterMap([]),
     ...result.activeCharacterMap,
     [result.characterSignedCode]: true,
+    [focoRevelacionCode]: true,
   };
   if (result.syntaxDiagnostic.isCableadoConnected) {
     activeCharacterMap[10] = true;
   }
   return {
     ...result,
+    focoRevelacionCode,
     activeCharacterMap,
     syntacticVacios:
       result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
@@ -417,27 +482,33 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
       ...result.syntaxDiagnostic,
       detectedSyntaxCode:
         result.syntaxDiagnostic.detectedSyntaxCode || result.characterSignedCode,
+      focoCode: result.syntaxDiagnostic.focoCode ?? focoRevelacionCode,
       isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
     },
   };
 }
 
 function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
+  const focoRevelacionCode =
+    result.focoRevelacionCode ?? result.syntaxDiagnostic.focoCode ?? result.characterSignedCode;
   const activeCharacterMap = {
     ...buildActiveCharacterMap([]),
     ...result.activeCharacterMap,
     [result.characterSignedCode]: true,
+    [focoRevelacionCode]: true,
   };
   if (result.syntaxDiagnostic.isCableadoConnected) {
     activeCharacterMap[10] = true;
   }
   return {
     ...result,
+    focoRevelacionCode,
     activeCharacterMap,
     syntacticVacios:
       result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
     syntaxDiagnostic: {
       ...result.syntaxDiagnostic,
+      focoCode: result.syntaxDiagnostic.focoCode ?? focoRevelacionCode,
       isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
     },
   };
@@ -461,7 +532,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye isCableadoConnected), groundingStatus, immediateAdjustment. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

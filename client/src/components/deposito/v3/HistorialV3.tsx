@@ -1,5 +1,10 @@
 import React from "react";
-import { CANON_TEN_EYES, etiquetaCodigoOjo, type DepotAnalysisResult } from "@shared/deposito/v3";
+import {
+  CANON_TEN_EYES,
+  etiquetaCodigoOjo,
+  focoRevelacionDe,
+  type DepotAnalysisResult,
+} from "@shared/deposito/v3";
 import type { VolcadoV3Entry } from "@/lib/deposito/v3/volcados";
 
 const GOLD = "#D4AF37";
@@ -24,6 +29,7 @@ export function HistorialV3({
       <ul className="space-y-3">
         {entries.slice(0, 12).map((v) => {
           const firma = CANON_TEN_EYES[v.result.characterSignedCode];
+          const focoCode = focoRevelacionDe(v.result);
           return (
             <li key={v.id}>
               <button
@@ -36,6 +42,11 @@ export function HistorialV3({
                 <p className="mb-1 text-[10px] text-white/40">
                   {etiquetaCodigoOjo(v.result.characterSignedCode, "canon")} ·{" "}
                   {firma.syntaxLabel}
+                  {focoCode !== v.result.characterSignedCode && (
+                    <span className="ml-2" style={{ color: GOLD }}>
+                      FOCO C{focoCode}
+                    </span>
+                  )}
                   <span className="ml-2" style={{ color: GOLD }}>
                     {v.userTier}
                   </span>
@@ -52,7 +63,11 @@ export function HistorialV3({
 
 export function resumenHistorial(result: DepotAnalysisResult): string {
   const firma = CANON_TEN_EYES[result.characterSignedCode];
-  return `C${result.characterSignedCode} ${firma.name} · ${firma.syntaxLabel}`;
+  const focoCode = focoRevelacionDe(result);
+  if (focoCode === result.characterSignedCode) {
+    return `C${result.characterSignedCode} ${firma.name} · ${firma.syntaxLabel}`;
+  }
+  return `C${result.characterSignedCode} ${firma.name} · FOCO C${focoCode}`;
 }
 
 export default HistorialV3;

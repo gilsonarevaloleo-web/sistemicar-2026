@@ -6,6 +6,7 @@
 import {
   buildActiveCharacterMap,
   characterMapDe,
+  focoRevelacionDe,
   isEyeCode,
   normalizarVaciosSintacticos,
   parseEyeCode,
@@ -181,6 +182,13 @@ export function parseDepotAnalysisResult(
   const detectedSyntaxCode =
     parseEyeCode(syntaxRec?.detectedSyntaxCode ?? syntaxRec?.detected_syntax_code) ??
     characterSignedCode;
+  const focoRevelacionCode =
+    parseEyeCode(
+      obj.focoRevelacionCode ??
+        obj.foco_revelacion_code ??
+        syntaxRec?.focoCode ??
+        syntaxRec?.foco_code,
+    ) ?? characterSignedCode;
   const syntaxCharacteristics = syntaxRec
     ? pickString(syntaxRec, [
         "syntaxCharacteristics",
@@ -192,19 +200,9 @@ export function parseDepotAnalysisResult(
     return { ok: false, error: "syntaxDiagnostic.syntaxCharacteristics es requerido" };
   }
 
-  const grounding = leerGrounding(obj.groundingStatus ?? obj.grounding_status);
-  if (!grounding) {
-    return { ok: false, error: "groundingStatus.diagnosticMessage es requerido" };
-  }
-
   const cableadoDeclarado =
     syntaxRec &&
     ("isCableadoConnected" in syntaxRec || "is_cableado_connected" in syntaxRec);
-  const isCableadoConnected = cableadoDeclarado
-    ? parseBooleanLoose(
-        syntaxRec.isCableadoConnected ?? syntaxRec.is_cableado_connected,
-      )
-    : /impronta de madurez|cablea/i.test(grounding.diagnosticMessage);
 
   const immediateAdjustment = pickString(obj, [
     "immediateAdjustment",
@@ -214,6 +212,19 @@ export function parseDepotAnalysisResult(
   if (!immediateAdjustment) {
     return { ok: false, error: "immediateAdjustment es requerido" };
   }
+
+  const groundingLeido = leerGrounding(obj.groundingStatus ?? obj.grounding_status);
+  const isCableadoConnected = cableadoDeclarado
+    ? parseBooleanLoose(
+        syntaxRec.isCableadoConnected ?? syntaxRec.is_cableado_connected,
+      )
+    : groundingLeido
+      ? /impronta de madurez|cablea/i.test(groundingLeido.diagnosticMessage)
+      : false;
+  const grounding = groundingLeido ?? {
+    isFullyGrounded: isCableadoConnected,
+    diagnosticMessage: syntaxCharacteristics,
+  };
 
   const timestamp = opts.timestamp ?? Date.now();
   const activeCharacterMap = leerCharacterMap(
@@ -225,6 +236,7 @@ export function parseDepotAnalysisResult(
   if (!EYE_CODES.some((n) => activeCharacterMap[n])) {
     activeCharacterMap[characterSignedCode] = true;
   }
+  activeCharacterMap[focoRevelacionCode] = true;
   const syntacticVacios = normalizarVaciosSintacticos(
     obj.syntacticVacios ?? obj.syntactic_vacios,
     activeCharacterMap,
@@ -233,10 +245,12 @@ export function parseDepotAnalysisResult(
     id: opts.id ?? `depot_${timestamp}`,
     timestamp,
     characterSignedCode,
+    focoRevelacionCode,
     activeCharacterMap,
     syntacticVacios,
     syntaxDiagnostic: {
       detectedSyntaxCode,
+      focoCode: focoRevelacionCode,
       isCableadoConnected,
       syntaxCharacteristics,
     },
@@ -253,12 +267,17 @@ export function scaffoldAnalysisResult(
 ): DepotAnalysisResult {
   const timestamp = Date.now();
   const characterSignedCode = partial.characterSignedCode;
+  const focoRevelacionCode =
+    partial.focoRevelacionCode ??
+    partial.syntaxDiagnostic?.focoCode ??
+    characterSignedCode;
   const activeCharacterMap =
     partial.activeCharacterMap ??
-    buildActiveCharacterMap([characterSignedCode]);
+    buildActiveCharacterMap([characterSignedCode, focoRevelacionCode]);
   const syntaxDiagnostic = {
     detectedSyntaxCode:
       partial.syntaxDiagnostic?.detectedSyntaxCode ?? characterSignedCode,
+    focoCode: partial.syntaxDiagnostic?.focoCode ?? focoRevelacionCode,
     isCableadoConnected:
       partial.syntaxDiagnostic?.isCableadoConnected ?? false,
     syntaxCharacteristics:
@@ -269,6 +288,7 @@ export function scaffoldAnalysisResult(
     id: `depot_${timestamp}`,
     timestamp,
     characterSignedCode,
+    focoRevelacionCode,
     activeCharacterMap,
     syntacticVacios:
       partial.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
@@ -285,16 +305,19 @@ export function scaffoldAnalysisResult(
 export function hidratarResultadoV3(value: unknown): DepotAnalysisResult | null {
   if (!isDepotAnalysisResult(value)) return null;
   const map = characterMapDe(value);
+  const focoRevelacionCode = focoRevelacionDe(value);
   return {
     id: value.id,
     timestamp: value.timestamp,
     characterSignedCode: value.characterSignedCode,
+    focoRevelacionCode,
     activeCharacterMap: map,
     syntacticVacios:
       value.syntacticVacios ?? vaciosDesdeActiveMap(map),
     syntaxDiagnostic: {
       detectedSyntaxCode:
         value.syntaxDiagnostic.detectedSyntaxCode || value.characterSignedCode,
+      focoCode: value.syntaxDiagnostic.focoCode ?? focoRevelacionCode,
       isCableadoConnected: Boolean(value.syntaxDiagnostic.isCableadoConnected),
       syntaxCharacteristics: value.syntaxDiagnostic.syntaxCharacteristics,
     },

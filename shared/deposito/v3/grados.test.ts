@@ -24,6 +24,7 @@ function entry(
     syntacticVacios: opts.vacios,
     syntaxDiagnostic: {
       detectedSyntaxCode: opts.characterSignedCode,
+      focoCode: opts.characterSignedCode,
       isCableadoConnected: opts.cableado ?? false,
       syntaxCharacteristics: "Firma de prueba.",
     },

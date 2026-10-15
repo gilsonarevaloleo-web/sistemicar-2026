@@ -1,10 +1,16 @@
 import React from "react";
-import { CANON_TEN_EYES, type DepotAnalysisResult } from "@shared/deposito/v3";
+import {
+  CANON_TEN_EYES,
+  focoRevelacionDe,
+  type DepotAnalysisResult,
+} from "@shared/deposito/v3";
 
 const GOLD = "#D4AF37";
 
 export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
   const character = CANON_TEN_EYES[result.characterSignedCode];
+  const focoCode = focoRevelacionDe(result);
+  const foco = CANON_TEN_EYES[focoCode];
 
   return (
     <section
@@ -21,17 +27,31 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
             Dictamen de Firma Sintáctica
           </h2>
         </div>
-        <div
-          className="px-4 py-2 text-right"
-          style={{ border: `1px solid ${GOLD}33` }}
-          data-testid="deposito-v3-caracter"
-        >
-          <span className="block text-[10px] font-mono uppercase text-white/40">
-            Firma
-          </span>
-          <span className="font-mono text-xl font-bold" style={{ color: GOLD }}>
-            C{result.characterSignedCode}
-          </span>
+        <div className="flex items-start gap-2">
+          <div
+            className="px-4 py-2 text-right"
+            style={{ border: `1px solid ${GOLD}33` }}
+            data-testid="deposito-v3-caracter"
+          >
+            <span className="block text-[10px] font-mono uppercase text-white/40">
+              Firma
+            </span>
+            <span className="font-mono text-xl font-bold" style={{ color: GOLD }}>
+              C{result.characterSignedCode}
+            </span>
+          </div>
+          <div
+            className="px-4 py-2 text-right"
+            style={{ border: `1px solid ${GOLD}88`, backgroundColor: `${GOLD}14` }}
+            data-testid="deposito-v3-foco"
+          >
+            <span className="block text-[10px] font-mono uppercase text-white/40">
+              Foco
+            </span>
+            <span className="font-mono text-xl font-bold" style={{ color: GOLD }}>
+              C{focoCode}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -43,6 +63,18 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
           C{result.characterSignedCode} · {character.name}
           <span className="ml-2 text-[10px] font-normal text-white/40">
             {character.syntaxLabel} · {character.planeta}
+          </span>
+        </p>
+      </div>
+
+      <div data-testid="deposito-v3-foco-detalle">
+        <span className="block text-[10px] uppercase tracking-wider" style={{ color: GOLD }}>
+          Foco de revelación
+        </span>
+        <p className="mt-1 text-sm font-bold text-white/90">
+          C{focoCode} · {foco.name}
+          <span className="ml-2 text-[10px] font-normal text-white/40">
+            {foco.syntaxLabel} · {foco.concept}
           </span>
         </p>
       </div>
@@ -86,7 +118,7 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
 
       <div className="p-4" style={{ border: `1px solid ${GOLD}44`, backgroundColor: `${GOLD}10` }}>
         <span className="block text-[10px] font-bold uppercase tracking-widest" style={{ color: GOLD }}>
-          Ajuste técnico inmediato
+          Ajuste técnico inmediato · C{focoCode}
         </span>
         <p className="mt-1 text-xs font-semibold leading-relaxed" style={{ color: `${GOLD}ee` }}>
           {result.immediateAdjustment}

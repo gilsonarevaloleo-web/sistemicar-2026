@@ -17,18 +17,21 @@ function fixture(): DepotAnalysisResult {
     id: "depot_test",
     timestamp: 1,
     characterSignedCode: 3,
+    focoRevelacionCode: 8,
     activeCharacterMap: buildActiveCharacterMap([3, 7, 8]),
     syntacticVacios: [1, 2, 4, 5, 6, 9, 10],
     syntaxDiagnostic: {
       detectedSyntaxCode: 3,
+      focoCode: 8,
       isCableadoConnected: true,
-      syntaxCharacteristics: "Paso a paso, marcas de hora.",
+      syntaxCharacteristics: "Transición de la secuencia física C3 hacia la síntesis de polaridad C8.",
     },
     groundingStatus: {
       isFullyGrounded: true,
       diagnosticMessage: "La escritura sostiene título y secuencia.",
     },
-    immediateAdjustment: "Tres pasos con hora de corte.",
+    immediateAdjustment:
+      "Tu quiebre real ocurrió en la Ley de Polaridad (C8). Mañana, aplica este mismo criterio de inversión de polo a un escenario distinto.",
   };
 }
 
@@ -73,10 +76,13 @@ describe("MapaCalorV3", () => {
     );
     assert.match(html, /deposito-v3-mapa/);
     assert.match(html, /FIRMA C3/);
+    assert.match(html, /FOCO C8/);
     assert.match(html, /VACÍOS/);
     assert.match(html, /Cimiento/);
     assert.match(html, /deposito-v3-eye-3/);
     assert.match(html, /data-caracter="1"/);
+    assert.match(html, /data-foco="1"/);
+    assert.match(html, /deposito-v3-eye-8/);
     assert.match(html, /data-locked="1"/);
     assert.match(html, /BLOQ/);
     assert.doesNotMatch(html, /ÓPTICA/);
@@ -118,6 +124,7 @@ describe("GradoConsistenciaV3", () => {
       syntacticVacios: [1, 2] as DepotAnalysisResult["syntacticVacios"],
       syntaxDiagnostic: {
         detectedSyntaxCode: 3 as const,
+        focoCode: 3 as const,
         isCableadoConnected: true,
         syntaxCharacteristics: "Firma estable.",
       },
@@ -161,8 +168,12 @@ describe("DictamenCardV3", () => {
     );
     assert.match(html, /deposito-v3-dictamen/);
     assert.match(html, /C3 · Trabajo/);
+    assert.match(html, /deposito-v3-foco/);
+    assert.match(html, /Foco de revelación/);
+    assert.match(html, /C8 · Ciclos/);
     assert.match(html, /Ritmo|Secuencia Vectorial/);
-    assert.match(html, /Tres pasos con hora de corte/);
+    assert.match(html, /Ley de Polaridad \(C8\)/);
+    assert.match(html, /Ajuste técnico inmediato · C8/);
     assert.match(html, /deposito-v3-cableado/);
     assert.match(html, /Cableado título↔cierre: conectado/);
     assert.match(html, /deposito-v3-vacios/);

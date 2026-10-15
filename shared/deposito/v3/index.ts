@@ -31,6 +31,7 @@ export { EYE_CODES, USER_TIERS } from "./types.ts";
 
 export {
   CANON_TEN_EYES,
+  FOCO_SINTESIS_CODES,
   buildActiveCharacterMap,
   buildActiveEyeMap,
   characterMapDe,
@@ -38,8 +39,10 @@ export {
   emptyActiveCharacterMap,
   emptyActiveEyeMap,
   emptyEyeAudits,
+  esCodigoFocoSintesis,
   etiquetaCodigoOjo,
   etiquetaOjo,
+  focoRevelacionDe,
   isEyeCode,
   normalizarVaciosSintacticos,
   obtenerOjoV3,
@@ -70,6 +73,7 @@ export {
 } from "./validar.ts";
 
 export {
+  DEPOT_V3_MASTER_PROMPT,
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
   DEPOSITO_V3_RITUAL,
   buildDepositoV3SystemPrompt,

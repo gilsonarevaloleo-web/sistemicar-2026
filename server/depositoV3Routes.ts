@@ -55,7 +55,7 @@ export function registerDepositoV3Routes(
       version: DEPOSITO_V3_VERSION,
       endpoint: "POST /api/deposito/v3/audit",
       ritual: DEPOSITO_V3_RITUAL,
-      orden: "characterSignedCode + activeCharacterMap + syntacticVacios",
+      orden: "characterSignedCode + focoRevelacionCode + activeCharacterMap + syntacticVacios",
       muroDeDominancia: false,
       viaUnica: "sintaxis",
       gemini: Boolean(callGemini),
