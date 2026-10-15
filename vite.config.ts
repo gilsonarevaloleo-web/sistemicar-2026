@@ -48,7 +48,7 @@ export default defineConfig(async ({ command }) => {
       allowedHosts: true,
       fs: {
         strict: true,
-        deny: ["**/.*"],
+        deny: ["**/.*", "**/server/maestro/**"],
       },
     },
   };

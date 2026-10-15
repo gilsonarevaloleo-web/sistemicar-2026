@@ -10,9 +10,7 @@ import {
   evaluarUmbralLocal,
   isCodigoNumero,
   isModoUmbral,
-  obtenerPromptEvaluacion,
   parseEvaluacionGemini,
-  serializarPromptEvaluacion,
   type CodigoNumero,
   type EvaluacionGeminiJson,
   type HistorialUmbralItem,
@@ -33,6 +31,10 @@ import {
   newSesionId,
   type UmbralSessionStore,
 } from "./umbralSessionStore";
+import {
+  afirmarCuerpoSinPrompt,
+  sellarPromptEvaluacion,
+} from "./maestro/vault";
 
 export type GeminiCaller = (
   prompt: string,
@@ -277,7 +279,7 @@ export function registerUmbralV2Routes(
         ...(ofertaNombre ? { ofertaNombre } : {}),
         ...(fraseUtilidad ? { fraseUtilidad } : {}),
       };
-      const prompt = obtenerPromptEvaluacion(promptInput);
+      const sellado = sellarPromptEvaluacion(promptInput);
 
       let evaluacion: EvaluacionGeminiJson | null = null;
       let source: "gemini" | "local_fallback" = "local_fallback";
@@ -285,11 +287,7 @@ export function registerUmbralV2Routes(
       if (callGemini) {
         try {
           // 2.5 Flash usa tokens de pensamiento: 700 suele truncar el JSON.
-          const raw = await callGemini(
-            serializarPromptEvaluacion(prompt),
-            2048,
-            true,
-          );
+          const raw = await callGemini(sellado.paraGemini, 2048, true);
           try {
             evaluacion = parseEvaluacionGemini(raw, codigoActual);
             source = "gemini";
@@ -302,7 +300,7 @@ export function registerUmbralV2Routes(
               String(raw).slice(0, 240),
             );
             const raw2 = await callGemini(
-              serializarPromptEvaluacion(prompt) +
+              sellado.paraGemini +
                 "\n\nIMPORTANTE: responde SOLO un objeto JSON con claves aprobado, feedbackConfrontativo, codigoSiguiente.",
               2048,
               false,
@@ -361,7 +359,7 @@ export function registerUmbralV2Routes(
         feedbackConfrontativo: evaluacion.feedbackConfrontativo,
         codigoSiguiente,
         moduloCompletado,
-        nombreCodigo: prompt.nombreCodigo,
+        nombreCodigo: sellado.nombreCodigo,
         userId,
         source,
         sesionId: sesion.id,
@@ -370,6 +368,7 @@ export function registerUmbralV2Routes(
         codigoRecomendado,
       };
 
+      afirmarCuerpoSinPrompt(body);
       return res.status(200).json(body);
     } catch (error) {
       console.error("[umbral/evaluar]", error);

@@ -3,8 +3,6 @@ import { describe, it } from "node:test";
 import { CODIGOS_NUMERO } from "./engineConfig.ts";
 import {
   FICHAS_MAESTRO,
-  KERNEL_MAESTRO,
-  armarBloqueMaestro,
   feedbackMaestroLocal,
   obtenerFichaMaestro,
 } from "./maestroConfig.ts";
@@ -29,24 +27,10 @@ describe("Umbral — Maestro de códigos", () => {
     }
   });
 
-  it("el bloque inyecta solo la ficha activa + kernel compacto", () => {
-    const bloque = armarBloqueMaestro(4, "EXTERNO_VENTAS");
-    assert.match(bloque, /Ingeniero sin Flor/);
-    assert.match(bloque, /La Arena/);
-    assert.match(bloque, /Cínico|trauma/i);
-    assert.match(bloque, /Carácter-Código|EMPATÍA DE CÓDIGO|DOS RESISTENCIAS/);
-    assert.doesNotMatch(bloque, /Cortador de Niebla/);
-    assert.doesNotMatch(bloque, /El Autor/);
-    assert.ok(bloque.length < 3200);
-    assert.ok(KERNEL_MAESTRO.length < 2000);
-  });
-
-  it("Forja y Arena no mezclan R1", () => {
-    const forja = armarBloqueMaestro(3, "INTERNO_HABILIDAD");
-    const arena = armarBloqueMaestro(3, "EXTERNO_VENTAS");
-    assert.match(forja, /La Forja/);
-    assert.match(arena, /Postergador|agenda/i);
-    assert.doesNotMatch(forja, /Postergador/);
+  it("no exporta el kernel ni el ensamble de Gemini", async () => {
+    const src = await import("./maestroConfig.ts");
+    assert.equal("KERNEL_MAESTRO" in src, false);
+    assert.equal("armarBloqueMaestro" in src, false);
   });
 
   it("feedback local nombra segunda resistencia", () => {
