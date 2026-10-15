@@ -654,8 +654,8 @@ export function SituacionCard({
                           }}
                           title={
                             row.cupoFijo
-                              ? "Fijado: el sobrante se reparte entre las demás filas"
-                              : "Fija minutos; el resto se reparte automáticamente"
+                              ? "Fijado: el sobrante se reparte en partes iguales hasta el tope del segmento"
+                              : "Fija minutos; las demás se acomodan en partes iguales sin montar el tope"
                           }
                           data-testid={`j4-situacion-cupo-${row.id}`}
                         />

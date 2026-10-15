@@ -85,7 +85,155 @@ export type RingHuellaLectura = RingHuellaEjes & {
   desglosadores: number;
   anadidas: number;
   atencionCierres: number;
+  filasLaunch?: number;
+  cerradas?: number;
+  focoHits?: number;
+  focoEnJuego?: number;
 };
+
+/** Escala visible de cada músculo: 5 peldaños. */
+export const HUELLA_NIVELES = 5;
+
+export type HuellaEjeMedida = {
+  id: HuellaEjeId;
+  label: string;
+  definicion: string;
+  /** 0–5. Vacío = no hay dopamina falsa. */
+  nivel: number;
+  score: number;
+  /** Atención y Foco: radio de 5 minutos. */
+  puntual: boolean;
+  /** Marca corta: "3" · "2×" · "5′" · "—" */
+  marca: string;
+};
+
+function clampNivel(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(HUELLA_NIVELES, Math.round(n)));
+}
+
+function nivelDecision(filasLaunch: number): number {
+  if (filasLaunch <= 0) return 0;
+  if (filasLaunch === 1) return 1;
+  if (filasLaunch === 2) return 2;
+  if (filasLaunch === HUELLA_DECISION_UMBRAL) return 3;
+  return HUELLA_NIVELES;
+}
+
+function nivelAtencion(hits: number, cerradas: number): number {
+  if (hits <= 0 || cerradas <= 0) return 0;
+  return clampNivel(Math.max(1, (hits / cerradas) * HUELLA_NIVELES));
+}
+
+function nivelProduccion(anadidas: number): number {
+  if (anadidas <= 0) return 0;
+  if (anadidas === 1) return 2;
+  if (anadidas === 2) return 3;
+  if (anadidas === 3) return 4;
+  return HUELLA_NIVELES;
+}
+
+function nivelFoco(hits: number, enJuego: number): number {
+  if (hits > 0) return HUELLA_NIVELES;
+  if (enJuego > 0) return 2;
+  return 0;
+}
+
+function nivelOrden(gestos: number): number {
+  if (gestos <= 0) return 0;
+  if (gestos === 1) return 2;
+  if (gestos === 2) return 3;
+  if (gestos === 3) return 4;
+  return HUELLA_NIVELES;
+}
+
+/** Medición de los 5 puntos: escalable (peldaños) y puntual (radio 5′). */
+export function medirHuellaEjes(h: HuellaHechos, ejes: RingHuellaEjes): HuellaEjeMedida[] {
+  const gestos = h.reorders + h.postergas + h.quitadas;
+  const decisionN = nivelDecision(h.filasLaunch);
+  const atencionN = nivelAtencion(h.atencionHits, h.cerradas);
+  const produccionN = nivelProduccion(h.anadidas);
+  const focoN = nivelFoco(h.focoHits, h.focoEnJuego);
+  const ordenN = nivelOrden(gestos);
+  return HUELLA_EJES.map(meta => {
+    if (meta.id === "decision") {
+      return {
+        ...meta,
+        nivel: decisionN,
+        score: ejes.decision,
+        puntual: false,
+        marca: h.filasLaunch > 0 ? String(h.filasLaunch) : "—",
+      };
+    }
+    if (meta.id === "atencion") {
+      return {
+        ...meta,
+        nivel: atencionN,
+        score: ejes.atencion,
+        puntual: true,
+        marca: h.atencionHits > 0 ? `${h.atencionHits}×` : "—",
+      };
+    }
+    if (meta.id === "produccion") {
+      return {
+        ...meta,
+        nivel: produccionN,
+        score: ejes.produccion,
+        puntual: false,
+        marca: h.anadidas > 0 ? String(h.anadidas) : "—",
+      };
+    }
+    if (meta.id === "foco") {
+      return {
+        ...meta,
+        nivel: focoN,
+        score: ejes.foco,
+        puntual: true,
+        marca: h.focoHits > 0 ? "5′" : h.focoEnJuego > 0 ? "ahora" : "—",
+      };
+    }
+    return {
+      ...meta,
+      nivel: ordenN,
+      score: ejes.orden,
+      puntual: false,
+      marca: gestos > 0 ? String(gestos) : "—",
+    };
+  });
+}
+
+export function hechosFromLectura(l: RingHuellaLectura): HuellaHechos {
+  const anadidas = l.anadidas ?? 0;
+  const filasLaunch = l.filasLaunch ?? Math.max(0, (l.vehiculos ?? 0) - anadidas);
+  const atencionHits = l.atencionCierres ?? 0;
+  return {
+    filasLaunch,
+    anadidas,
+    reorders: 0,
+    postergas: 0,
+    quitadas: 0,
+    cerradas: l.cerradas ?? atencionHits,
+    atencionHits,
+    desglosadores: l.desglosadores ?? 1,
+    focoHits: l.focoHits ?? (l.foco >= 50 ? 1 : 0),
+    focoEnJuego: l.focoEnJuego ?? (l.foco >= 35 && l.foco < 50 ? 1 : 0),
+    minutosGanados: l.minutosGanados ?? 0,
+    minutosBloque: Math.round((l.horasBloque ?? 0) * 60),
+  };
+}
+
+/** Relee los 5 puntos de una lectura sellada (cierre). */
+export function medirHuellaEjesFromLectura(l: RingHuellaLectura): HuellaEjeMedida[] {
+  const h = hechosFromLectura(l);
+  h.reorders = l.gestos ?? 0;
+  return medirHuellaEjes(h, {
+    decision: l.decision,
+    atencion: l.atencion,
+    produccion: l.produccion,
+    foco: l.foco,
+    orden: l.orden,
+  });
+}
 
 export type RingHuellaState = {
   launchedAt: number;
@@ -397,36 +545,35 @@ export function hechosHuellaDesglosador(
 
 function scoreDecision(filasLaunch: number): number {
   // Solo la primera lista. Cruzar 3 abre el músculo; alargar no suma.
-  if (filasLaunch <= 1) return 22;
+  if (filasLaunch <= 0) return 0;
+  if (filasLaunch === 1) return 22;
   if (filasLaunch === 2) return 48;
   if (filasLaunch === HUELLA_DECISION_UMBRAL) return 62;
   return 82;
 }
 
 function scoreAtencion(hits: number, cerradas: number): number {
-  if (cerradas <= 0) return 18;
-  return clampPct(24 + (hits / cerradas) * 76);
+  if (hits <= 0 || cerradas <= 0) return 0;
+  return clampPct((hits / cerradas) * 100);
 }
 
 function scoreProduccion(anadidas: number): number {
-  if (anadidas <= 0) return 16;
+  if (anadidas <= 0) return 0;
   if (anadidas === 1) return 42;
   if (anadidas === 2) return 58;
   return 74;
 }
 
 function scoreFoco(hits: number, enJuego: number): number {
-  if (hits > 0) return clampPct(52 + Math.min(3, hits - 1) * 14);
+  if (hits > 0) return clampPct(70 + Math.min(3, hits - 1) * 10);
   if (enJuego > 0) return 40;
-  return 22;
+  return 0;
 }
 
 function scoreOrden(reorders: number, postergas: number, quitadas: number): number {
-  let n = 22;
-  n += Math.min(5, reorders) * 8;
-  n += Math.min(4, postergas) * 10;
-  n += Math.min(4, quitadas) * 10;
-  return clampPct(n);
+  const gestos = Math.min(5, reorders) + Math.min(4, postergas) + Math.min(4, quitadas);
+  if (gestos <= 0) return 0;
+  return clampPct(20 + Math.min(5, reorders) * 8 + Math.min(4, postergas) * 10 + Math.min(4, quitadas) * 10);
 }
 
 function relatoHuella(h: HuellaHechos): string {
@@ -490,6 +637,10 @@ export function computeHuellaFromHechos(h: HuellaHechos): RingHuellaLectura {
     desglosadores: h.desglosadores,
     anadidas: h.anadidas,
     atencionCierres: h.atencionHits,
+    filasLaunch: h.filasLaunch,
+    cerradas: h.cerradas,
+    focoHits: h.focoHits,
+    focoEnJuego: h.focoEnJuego,
     relato: relatoHuella(h),
   };
 }
@@ -534,15 +685,21 @@ export function sellRingHuella(
 }
 
 export function huellaEjesLine(lectura: RingHuellaLectura): string {
-  return HUELLA_EJES.map(e => `${e.label} ${lectura[e.id]}`).join(" · ");
+  return medirHuellaEjesFromLectura(lectura)
+    .map(e => `${e.label} ${e.marca}`)
+    .join(" · ");
 }
 
 export function huellaCierreCopy(lectura: RingHuellaLectura): {
   title: string;
   description: string;
 } {
+  const puntuales = medirHuellaEjesFromLectura(lectura).filter(e => e.puntual && e.nivel > 0);
+  const marca = puntuales.length > 0
+    ? puntuales.map(e => `${e.label} ${e.marca}`).join(" · ")
+    : huellaEjesLine(lectura);
   return {
     title: lectura.relato,
-    description: `${huellaEjesLine(lectura)}. Los PS de Jornada se quedan.`,
+    description: `${marca}. Los PS de Jornada se quedan.`,
   };
 }

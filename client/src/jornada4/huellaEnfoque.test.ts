@@ -12,6 +12,7 @@ import {
   HUELLA_RADIO_MIN,
   huellaCierreCopy,
   huellaEjesLine,
+  medirHuellaEjesFromLectura,
   mergeRingHuella,
   seedRingHuella,
   sellRingHuella,
@@ -377,9 +378,64 @@ describe("huellaEnfoque diccionario", () => {
     assert.match(copy.title, /disponibilidad|decidiste|orden|atención|foco|producción/i);
     assert.match(
       huellaEjesLine(lectura),
-      /Decisión \d+ · Atención \d+ · Producción \d+ · Foco \d+ · Orden \d+/
+      /Decisión .+ · Atención .+ · Producción .+ · Foco .+ · Orden .+/
     );
+    assert.equal(huellaEjesLine(lectura).includes("%"), false);
     assert.match(copy.description, /PS de Jornada se quedan/);
+  });
+
+  it("los 5 puntos se miden: escalables o puntuales, sin amontonar %", () => {
+    const lectura = computeHuellaEnfoque(
+      ring({
+        ringHuella: { ...baseState(), filasLaunch: 4, anadidas: 2, reorders: 1, quitadas: 1 },
+        subTareas: [
+          {
+            id: "a",
+            enDesgloseCronometro: true,
+            resultadoSituacion: "cumplido",
+            minutosCupo: 10,
+            duracionRealSec: 5 * 60,
+            cerradaAt: 1_000 + 5 * 60_000,
+          },
+          { id: "b", enDesgloseCronometro: true, minutosCupo: 10 },
+          { id: "c", enDesgloseCronometro: true, minutosCupo: 10 },
+          { id: "d", enDesgloseCronometro: true, minutosCupo: 10 },
+        ],
+      }),
+      1_000 + 6 * 60_000
+    );
+    const medidas = medirHuellaEjesFromLectura(lectura);
+    assert.equal(medidas.length, 5);
+    const decision = medidas.find(e => e.id === "decision")!;
+    const atencion = medidas.find(e => e.id === "atencion")!;
+    const foco = medidas.find(e => e.id === "foco")!;
+    const produccion = medidas.find(e => e.id === "produccion")!;
+    const orden = medidas.find(e => e.id === "orden")!;
+    assert.equal(decision.puntual, false);
+    assert.ok(decision.nivel >= 3, `decisión nivel ${decision.nivel}`);
+    assert.equal(atencion.puntual, true);
+    assert.ok(atencion.nivel >= 1);
+    assert.match(atencion.marca, /×/);
+    assert.equal(foco.puntual, true);
+    assert.ok(produccion.nivel >= 2);
+    assert.ok(orden.nivel >= 2);
+    assert.equal(medidas.every(e => e.nivel >= 0 && e.nivel <= 5), true);
+  });
+
+  it("músculo vacío arranca en 0 — la escala se gana", () => {
+    const vacio = computeHuellaEnfoque(
+      ring({
+        subTareas: [],
+        ringHuella: { ...baseState(), filasLaunch: 0, ordenLaunchIds: [] },
+      }),
+      1_000
+    );
+    const medidas = medirHuellaEjesFromLectura(vacio);
+    assert.equal(medidas.every(e => e.nivel === 0), true);
+    assert.equal(vacio.atencion, 0);
+    assert.equal(vacio.produccion, 0);
+    assert.equal(vacio.foco, 0);
+    assert.equal(vacio.orden, 0);
   });
 
   it("bumpRingHuellaOnVehicle no pisa un estado existente", () => {

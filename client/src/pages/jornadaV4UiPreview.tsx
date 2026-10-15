@@ -117,6 +117,32 @@ const vehicles: Vehicle[] = [
 
 const noopCrisol = () => undefined;
 
+function previewEnfoqueCierreSeed(now = Date.now()): Vehicle {
+  const live = previewEnfoqueSeed(now);
+  const meta = live.situacionCronometro?.horaFinContratoMs ?? now;
+  const filas = (live.subTareas ?? []).map((st, i) => ({
+    ...st,
+    completada: true,
+    resultadoSituacion: "cumplido" as const,
+    duracionRealSec: i === 0 || i === 2 ? 5 * 60 : 9 * 60,
+    cerradaAt: i === 3 ? meta - 90_000 : now - (12 - i * 3) * 60_000,
+  }));
+  const closed: Vehicle = {
+    ...live,
+    subTareas: filas,
+    situacionCupoAnchor: null,
+    situacionCronometro: {
+      ...live.situacionCronometro!,
+      activo: false,
+    },
+    ringHuella: {
+      ...live.ringHuella!,
+      anadidas: 1,
+    },
+  };
+  return { ...closed, ringHuella: { ...closed.ringHuella!, sello: undefined } };
+}
+
 function previewEnfoqueSeed(now = Date.now()): Vehicle {
   const filas = [
     { id: "f1", texto: "Llamar a Tina", minutosCupo: 12 },
@@ -231,6 +257,7 @@ function PreviewConquistaPausa() {
 }
 
 const previewEnfoqueVehicle = previewEnfoqueSeed();
+const previewEnfoqueCierreVehicle = previewEnfoqueCierreSeed();
 
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
@@ -241,6 +268,9 @@ export default function JornadaV4UiPreview() {
   const pausaPreview =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("pausa") === "1";
+  const cierrePreview =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("cierre") === "1";
   const [showTutorial, setShowTutorial] = useState(primer);
 
   return (
@@ -316,7 +346,7 @@ export default function JornadaV4UiPreview() {
                   <p className={`${J4_UI.hint} mt-0.5`}>Conquista · activo</p>
                 </div>
                 <SituacionCard
-                  vehicle={previewEnfoqueVehicle}
+                  vehicle={cierrePreview ? previewEnfoqueCierreVehicle : previewEnfoqueVehicle}
                   onCumplido={() => undefined}
                   onAvance={() => undefined}
                   onFallado={() => undefined}
@@ -360,7 +390,7 @@ export default function JornadaV4UiPreview() {
         ) : null}
         {tab === "metricas" ? (
           <div data-testid="jornada4-preview-metricas" className="space-y-1">
-            <Jornada4HuellaEnfoqueCard vehicles={[previewEnfoqueVehicle]} />
+            <Jornada4HuellaEnfoqueCard vehicles={[previewEnfoqueCierreVehicle]} />
             <Jornada4ConcienciaTriadaCard model={triada} series={[]} />
             <SelloOperadorCard
               userId="preview"

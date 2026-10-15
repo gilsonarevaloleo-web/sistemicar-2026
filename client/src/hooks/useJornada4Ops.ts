@@ -1415,13 +1415,15 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         if (sc?.activo !== true) return;
         const now = Date.now();
         const bloqueInicio = sc.bloqueInicioAt ?? vehicle.aperturaAt ?? now;
-        const budget =
-          remainingCronometroBudgetMin(sc, vehicle.subTareas, now) ??
-          totalBudgetMinFromCronometro(
-            vehicle.subTareas,
-            bloqueInicio,
-            sc.horaFinContratoMs ?? sc.horaFinMs
-          );
+        const contratoMs = sc.horaFinContratoMs ?? sc.horaFinMs;
+        const wallTope = remainingCronometroBudgetMin(sc, vehicle.subTareas, now);
+        const bloqueTope = totalBudgetMinFromCronometro(
+          vehicle.subTareas,
+          bloqueInicio,
+          contratoMs
+        );
+        // Tope = pared hasta la hora del segmento; nunca más que el contrato sellado.
+        const budget = wallTope != null ? Math.min(wallTope, bloqueTope) : bloqueTope;
         const subTareas = applyCupoManualYRedistribuir(
           vehicle.subTareas,
           subTareaId,
