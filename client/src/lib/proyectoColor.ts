@@ -47,12 +47,23 @@ export function proyectoColorAlpha(color: string, alpha: string): string {
 
 /** Con 1 rumbo no hace falta lista. Con varios, el resumen cubre el envío. */
 export function rumboPickerListVisible(
-  abiertasCount: number,
+  listedCount: number,
   expanded: boolean
 ): boolean {
-  return abiertasCount > 1 && expanded;
+  return listedCount > 1 && expanded;
 }
 
-export function rumboPickerToggleEnabled(abiertasCount: number): boolean {
-  return abiertasCount > 1;
+export function rumboPickerToggleEnabled(listedCount: number): boolean {
+  return listedCount > 1;
+}
+
+/**
+ * En el lanzador, chips abiertos + huecos cerrados pintan como la lista del Hub.
+ * El resumen cubre ambos; la lista solo se abre para cambiar.
+ */
+export function rumboLaunchListedCount(
+  abiertasCount: number,
+  cerradasCount: number
+): number {
+  return Math.max(0, abiertasCount) + Math.max(0, cerradasCount);
 }
