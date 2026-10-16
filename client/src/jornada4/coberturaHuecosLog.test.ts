@@ -8,11 +8,13 @@ import {
   clipHuecoIntervalsToPlan,
   formatHuecoDuration,
   formatCoberturaHuecosSummary,
+  listCoberturaHuecos,
   reconcileCoberturaHuecos,
   readCoberturaHuecosEvents,
   resolveHuecoPlanWindows,
   sumCoberturaHuecosMinutes,
   COBERTURA_HUECOS_KEY,
+  HUECO_LIST_MIN,
 } from "./coberturaHuecosLog.ts";
 import { routineWindowsMs } from "../lib/concienciaTriadaLinea.ts";
 import { hasActiveConsciousCoverage } from "../lib/entropyTimePolicy.ts";
@@ -144,13 +146,13 @@ describe("coberturaHuecosLog", () => {
   it("summary habla de cortes sin vehículo, no de impuntualidad", () => {
     assert.equal(formatCoberturaHuecosSummary([]), "Sin cortes de cobertura hoy");
     const closed = [
-      { startMs: 1, endMs: 2, open: false as const },
-      { startMs: 3, endMs: 4, open: false as const },
+      { startMs: 0, endMs: 2 * 60_000, open: false as const },
+      { startMs: 3 * 60_000, endMs: 5 * 60_000, open: false as const },
     ];
-    assert.equal(formatCoberturaHuecosSummary(closed), "2 cortes sin vehículo");
+    assert.match(formatCoberturaHuecosSummary(closed), /2 cortes sin vehículo/);
     const open = [{ startMs: 1, endMs: null, open: true as const }];
     assert.match(formatCoberturaHuecosSummary(open), /sin vehículo/);
-    assert.doesNotMatch(formatCoberturaHuecosSummary(closed), /hueco|puntual/i);
+    assert.doesNotMatch(formatCoberturaHuecosSummary(closed), /puntual/i);
     const withMinutes = [
       { startMs: 0, endMs: 25 * 60_000, open: false as const },
     ];
@@ -279,7 +281,7 @@ describe("coberturaHuecosLog", () => {
       segmentos: segs,
     });
     assert.equal(sumCoberturaHuecosMinutes(intervals, t0 + 60 * 60_000), 12);
-    assert.ok(intervals.some(it => it.reason === "pausa_no_justificada"));
+    assert.ok(intervals.every(it => it.reason !== "pausa_no_justificada"));
   });
 
   it("idle del desglosador conquista entra como hueco, recortado al plan", () => {
@@ -497,5 +499,155 @@ describe("coberturaHuecosLog", () => {
       now
     );
     assert.equal(sumCoberturaHuecosMinutes(clipped, now), 3 * 60);
+  });
+
+  it("lista a partir de 2 min; el total incluye cortes ciegos de 1 min", () => {
+    const t0 = Date.parse("2026-08-19T10:00:00-05:00");
+    const intervals = [
+      { startMs: t0, endMs: t0 + 2 * 60_000, open: false as const },
+      { startMs: t0 + 10 * 60_000, endMs: t0 + 12 * 60_000, open: false as const },
+      { startMs: t0 + 20 * 60_000, endMs: t0 + 22 * 60_000, open: false as const },
+      { startMs: t0 + 30 * 60_000, endMs: t0 + 31 * 60_000, open: false as const },
+      { startMs: t0 + 40 * 60_000, endMs: t0 + 40 * 60_000 + 20_000, open: false as const },
+    ];
+    const listed = listCoberturaHuecos(intervals, t0 + 60 * 60_000);
+    assert.equal(HUECO_LIST_MIN, 2);
+    assert.equal(listed.length, 3);
+    assert.equal(sumCoberturaHuecosMinutes(listed, t0), 6);
+    assert.equal(sumCoberturaHuecosMinutes(intervals, t0), 7);
+    assert.match(formatCoberturaHuecosSummary(intervals, t0), /3 cortes/);
+    assert.match(formatCoberturaHuecosSummary(intervals, t0), /7 min/);
+  });
+
+  it("Cubierto por nombra el vehículo que cerró el corte, no idle adivinado", () => {
+    const t0 = Date.parse("2026-08-19T10:00:00-05:00");
+    const dayKey = String(getLimaDayStartMs(t0));
+    const segs = [{ horaInicio: "09:00", horaFin: "12:00" }];
+    localStorage.setItem(
+      COBERTURA_HUECOS_KEY,
+      JSON.stringify([
+        { t: t0, kind: "gap_open", dayKey },
+        { t: t0 + 20 * 60_000, kind: "gap_close", dayKey, titulo: "Costura" },
+      ])
+    );
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles: [
+        vehicle({
+          id: "v1",
+          titulo: "Costura",
+          status: "archivado",
+          aperturaAt: t0 + 20 * 60_000,
+          cierreAt: t0 + 80 * 60_000,
+        }),
+      ],
+      now: t0 + 2 * 60 * 60_000,
+      segmentos: segs,
+    });
+    const listed = listCoberturaHuecos(intervals, t0 + 2 * 60 * 60_000);
+    assert.ok(listed.length >= 1);
+    const named = listed.find(it => it.closedByTitulo === "Costura");
+    assert.ok(named, "la historia del día enseña Cubierto por · Costura");
+    assert.notEqual(named?.reason, "pausa_no_justificada");
+  });
+
+  it("pausas de conquista no se pintan como idle inventado", () => {
+    const t0 = Date.parse("2026-08-19T10:00:00-05:00");
+    const pauseEnd = t0 + 20 * 60_000;
+    const segs = [{ horaInicio: "09:00", horaFin: "12:00" }];
+    const vehicles = [
+      vehicle({
+        id: "costura",
+        titulo: "Costura",
+        status: "archivado",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        aperturaAt: t0 - 60 * 60_000,
+        cierreAt: t0 + 60 * 60_000,
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "Corte",
+            status: "cumplido",
+            aperturaAt: t0 - 60 * 60_000,
+            cierreAt: t0,
+            duracionFinal: 60 * 60,
+          },
+          {
+            id: "u2",
+            titulo: "Acabado",
+            status: "cumplido",
+            aperturaAt: pauseEnd,
+            cierreAt: t0 + 60 * 60_000,
+            duracionFinal: 40 * 60,
+          },
+        ],
+        pausas: [{ pausadoAt: t0, reanudadoAt: pauseEnd, titulo: "llamada" }],
+      }),
+    ];
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles,
+      now: t0 + 2 * 60 * 60_000,
+      events: [],
+      segmentos: segs,
+    });
+    const listed = listCoberturaHuecos(intervals, t0 + 2 * 60 * 60_000);
+    const pauseRow = listed.find(
+      it => it.startMs === t0 && (it.endMs ?? 0) === pauseEnd
+    );
+    assert.ok(pauseRow, "el corte de 20 min de la pausa figura en la lista");
+    assert.equal(pauseRow!.pausedTitulo, "llamada");
+    assert.equal(pauseRow!.reason, "pausa_conquista");
+    assert.notEqual(pauseRow!.reason, "pausa_no_justificada");
+  });
+
+  it("cortes de 0 min en cambios de unidad no ensucian la lista", () => {
+    const t0 = Date.parse("2026-08-19T16:53:00-05:00");
+    const segs = [{ horaInicio: "16:00", horaFin: "23:00" }];
+    const vehicles = [
+      vehicle({
+        id: "costura",
+        status: "activo",
+        tipoReloj: "desglosador",
+        tipoFlota: "tiempo",
+        aperturaAt: t0,
+        subVehiculos: [
+          {
+            id: "u1",
+            titulo: "A",
+            status: "cumplido",
+            aperturaAt: t0,
+            cierreAt: t0 + 20_000,
+            duracionFinal: 20,
+          },
+          {
+            id: "u2",
+            titulo: "B",
+            status: "cumplido",
+            aperturaAt: t0 + 20_000 + 15_000,
+            cierreAt: t0 + 10 * 60_000,
+            duracionFinal: 9 * 60 + 25,
+          },
+          {
+            id: "u3",
+            titulo: "C",
+            status: "activo",
+            aperturaAt: t0 + 12 * 60_000,
+          },
+        ],
+      }),
+    ];
+    const now = t0 + 20 * 60_000;
+    const intervals = buildMetricaHuecoIntervals({
+      vehicles,
+      now,
+      events: [],
+      segmentos: segs,
+    });
+    const listed = listCoberturaHuecos(intervals, now);
+    assert.ok(
+      listed.every(it => (it.endMs ?? now) - it.startMs >= 2 * 60_000),
+      "ningún corte de 0–1 min en la lista"
+    );
+    assert.ok(sumCoberturaHuecosMinutes(intervals, now) >= sumCoberturaHuecosMinutes(listed, now));
   });
 });

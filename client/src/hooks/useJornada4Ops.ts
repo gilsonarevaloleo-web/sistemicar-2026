@@ -152,10 +152,15 @@ function destinoCierreVivo(
 
 function noteHuecoAfterClose(
   vehicles: Vehicle[],
-  segmentos?: { horaInicio?: string; horaFin?: string }[]
+  segmentos?: { horaInicio?: string; horaFin?: string }[],
+  coverTitulo?: string
 ): void {
   try {
-    reconcileCoberturaHuecos({ vehicles, segmentos });
+    reconcileCoberturaHuecos({
+      vehicles,
+      segmentos,
+      ...(coverTitulo?.trim() ? { coverTitulo: coverTitulo.trim() } : {}),
+    });
   } catch {
     /* non-fatal */
   }
@@ -480,6 +485,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         }
 
         const remoteSubs = subsForRemote;
+        const nextSub = patch.nextActiveSubId
+          ? remoteSubs.find(s => s.id === patch.nextActiveSubId)
+          : undefined;
+        noteHuecoAfterClose(
+          vehiclesRef.current,
+          segmentosRef.current,
+          nextSub?.titulo
+        );
         void runShadowTaskAsync(async () => {
           try {
             await updateVehicle(
@@ -1802,7 +1815,14 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
 
       paintVehicle(parentId, patch);
       scheduleSaveLocalVehicles(vehiclesRef.current);
-      noteHuecoAfterClose(vehiclesRef.current, segmentosRef.current);
+      const resumed =
+        (patch.subVehiculos ?? parent.subVehiculos)?.find(s => s.status === "activo") ??
+        parent;
+      noteHuecoAfterClose(
+        vehiclesRef.current,
+        segmentosRef.current,
+        resumed.titulo
+      );
       toast.info("Desglosador reanudado", {
         description: "Tiempo recuperado tras la interrupción.",
         style: { backgroundColor: PIZARRA, border: `1px solid ${VIOLET}`, color: VIOLET },
