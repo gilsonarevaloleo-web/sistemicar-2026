@@ -213,6 +213,30 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(preview, /Jornada4OpsToolsRail/);
   });
 
+  it("lanzador: rumbo plegado por defecto en Conquista y Enfoque", () => {
+    const picker = readFileSync(
+      join(clientSrc, "components/jornada4/DireccionDestinoPicker.tsx"),
+      "utf8"
+    );
+    const launch = readFileSync(
+      join(clientSrc, "components/jornada4/Jornada4LaunchPanel.tsx"),
+      "utf8"
+    );
+    assert.match(picker, /useState\(false\)/);
+    assert.match(picker, /rumboLaunchListedCount/);
+    assert.match(picker, /rumboPickerListVisible/);
+    assert.match(launch, /DireccionDestinoPicker/);
+    assert.match(launch, /jornada4-launch-dir-vehiculo/);
+    assert.match(launch, /jornada4-launch-sub-dir/);
+    assert.match(launch, /jornada4-launch-ring-dir/);
+    const preview = readFileSync(
+      join(clientSrc, "pages/jornadaV4UiPreview.tsx"),
+      "utf8"
+    );
+    assert.match(preview, /rumboPreview/);
+    assert.match(preview, /PreviewRumboLanzador/);
+  });
+
   it("Ley del Freno: card en Métricas, pista en el lanzador, no en sesión", () => {
     const session = readFileSync(join(clientSrc, "pages/jornadaV4Session.tsx"), "utf8");
     const metricas = readFileSync(

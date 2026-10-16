@@ -6,6 +6,7 @@ import {
   normalizeProyectoHex,
   proyectoColorAlpha,
   resolveProyectoColor,
+  rumboLaunchListedCount,
   rumboPickerListVisible,
   rumboPickerToggleEnabled,
 } from "./proyectoColor.ts";
@@ -37,5 +38,16 @@ describe("proyectoColor", () => {
     assert.equal(rumboPickerListVisible(7, true), true);
     assert.equal(rumboPickerToggleEnabled(1), false);
     assert.equal(rumboPickerToggleEnabled(2), true);
+  });
+
+  it("lanzador: abiertas + cerradas pintan como lista del Hub y salen plegadas", () => {
+    const listed = rumboLaunchListedCount(2, 6);
+    assert.equal(listed, 8);
+    assert.equal(rumboPickerToggleEnabled(listed), true);
+    assert.equal(rumboPickerListVisible(listed, false), false);
+    assert.equal(rumboPickerListVisible(listed, true), true);
+    assert.equal(rumboLaunchListedCount(0, 7), 7);
+    assert.equal(rumboLaunchListedCount(1, 0), 1);
+    assert.equal(rumboPickerToggleEnabled(rumboLaunchListedCount(1, 0)), false);
   });
 });
