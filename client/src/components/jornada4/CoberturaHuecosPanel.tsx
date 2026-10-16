@@ -5,6 +5,7 @@ import {
   formatCoberturaHuecosSummary,
   formatHuecoClock,
   formatHuecoDuration,
+  listCoberturaHuecos,
   sumCoberturaHuecosMinutes,
   type CoberturaHuecoInterval,
   type HuecoPlanSegmento,
@@ -19,7 +20,7 @@ const EMERALD = "#50C878";
 type Props = {
   /** Bump para releer localStorage tras launch/cierre. */
   refreshKey?: number;
-  /** Flota del día: las pausas no justificadas entran como hueco. */
+  /** Flota del día: nombra Cubierto por y la pausa de conquista. */
   vehicles?: Vehicle[];
   /** Plan del día. Sin plan no hay hueco. */
   segmentos?: HuecoPlanSegmento[];
@@ -58,7 +59,8 @@ export function CoberturaHuecosPanel({
     reload();
   }, [reload, refreshKey]);
 
-  const openCount = intervals.filter(i => i.open).length;
+  const listed = listCoberturaHuecos(intervals, now);
+  const openCount = listed.filter(i => i.open).length;
   const summary = formatCoberturaHuecosSummary(intervals, now);
   const totalMin = sumCoberturaHuecosMinutes(intervals, now);
   const totalLabel =
@@ -113,10 +115,9 @@ export function CoberturaHuecosPanel({
             ) : (
               <>
                 <p className="pt-2 text-[9px] leading-snug" style={{ color: MUTED }}>
-                  Hueco = Inconsciente: la rutina del día ya ocurrida sin
-                  vehículo. No es un segmento suelto ni el momento en que se
-                  abre la jornada. Idle del desglosador y una pausa sin otro
-                  hilo cuentan igual, solo dentro de esa rutina.
+                  Hueco = corte sin vehículo en la rutina ya ocurrida. La lista
+                  es la historia del día (Cubierto por), a partir de 2 min. Los
+                  cortes ciegos de 0–1 min entran en el total, no en la lista.
                 </p>
                 {totalLabel ? (
                   <p
@@ -127,7 +128,13 @@ export function CoberturaHuecosPanel({
                     Total · {totalLabel} inconsciente
                   </p>
                 ) : null}
-                {intervals
+                {listed.length === 0 ? (
+                  <p className="text-[10px] leading-snug" style={{ color: MUTED }}>
+                    No hay cortes de 2 min o más. El total sí cuenta los cortes
+                    ciegos de menos de 2 min.
+                  </p>
+                ) : null}
+                {listed
                 .slice()
                 .reverse()
                 .map((it, idx) => (
@@ -151,11 +158,9 @@ export function CoberturaHuecosPanel({
                         <p className="text-[9px] mt-0.5 truncate" style={{ color: MUTED }}>
                           Cubierto por · {it.closedByTitulo}
                         </p>
-                      ) : it.reason === "pausa_no_justificada" ? (
-                        <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
-                          {it.open
-                            ? "Sin unidad/fila ahora · idle o pausa"
-                            : "Idle del desglosador o pausa no justificada"}
+                      ) : it.pausedTitulo || it.reason === "pausa_conquista" ? (
+                        <p className="text-[9px] mt-0.5 truncate" style={{ color: MUTED }}>
+                          Pausa de conquista · {it.pausedTitulo || "Pausa"}
                         </p>
                       ) : it.open ? (
                         <p className="text-[9px] mt-0.5" style={{ color: MUTED }}>
