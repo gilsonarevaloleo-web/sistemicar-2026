@@ -27,6 +27,8 @@ import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
 import { Clock, Flag } from "lucide-react";
 import { PlanificacionTutorial } from "@/components/planificacion/PlanificacionTutorial";
+import { DireccionDestinoPicker } from "@/components/jornada4/DireccionDestinoPicker";
+import type { DireccionGate } from "@/lib/direccionElegibilidad";
 
 const revelacion: RevelacionPlanDia = {
   fecha: "2026-09-23",
@@ -259,6 +261,104 @@ function PreviewConquistaPausa() {
 const previewEnfoqueVehicle = previewEnfoqueSeed();
 const previewEnfoqueCierreVehicle = previewEnfoqueCierreSeed();
 
+const PREVIEW_RUMBOS: DireccionGate[] = [
+  {
+    proyectoId: "dopamina",
+    titulo: "Buscando Dopamina",
+    ok: true,
+    gap: null,
+    porqueTodavia: "",
+    riesgoEnsuciar: "Los envíos se suman en horas enumeradas.",
+    puntoProduccionTitulo: "Videos — empezando un nuevo bloque",
+    color: "#38BDF8",
+  },
+  {
+    proyectoId: "costura",
+    titulo: "Costura",
+    ok: true,
+    gap: null,
+    porqueTodavia: "",
+    riesgoEnsuciar: "Los envíos se suman en horas enumeradas.",
+    puntoProduccionTitulo: "Hacer 100 bolsillos",
+    color: "#F97316",
+  },
+  {
+    proyectoId: "familia",
+    titulo: "Familia",
+    ok: true,
+    gap: null,
+    porqueTodavia: "",
+    riesgoEnsuciar: "Los envíos se suman en horas enumeradas.",
+    puntoProduccionTitulo: "Cuántas horas en invierno",
+    color: "#A855F7",
+  },
+  {
+    proyectoId: "salud",
+    titulo: "Salud",
+    ok: false,
+    gap: "sin_foco",
+    porqueTodavia: "todavía no hay punto de producción",
+    riesgoEnsuciar: "",
+    color: "#10b981",
+  },
+  {
+    proyectoId: "jornada",
+    titulo: "Jornada en progreso",
+    ok: false,
+    gap: "sin_foco",
+    porqueTodavia: "todavía no hay punto de producción",
+    riesgoEnsuciar: "",
+    color: "#D4AF37",
+  },
+  {
+    proyectoId: "descanso",
+    titulo: "Descansando",
+    ok: false,
+    gap: "sin_oleada",
+    porqueTodavia: "todavía no hay oleada activa",
+    riesgoEnsuciar: "",
+    color: "#22d3ee",
+  },
+];
+
+function PreviewRumboLanzador() {
+  const [vehiculo, setVehiculo] = useState("");
+  const [fila, setFila] = useState("");
+  return (
+    <div
+      className="mx-3 sm:mx-4 mb-3 p-3 rounded-xl border space-y-3"
+      style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.03)" }}
+      data-testid="jornada4-preview-rumbo-lanzador"
+    >
+      <p className="text-[10px] font-black uppercase tracking-widest text-cyan-300">
+        Preview rumbo · lanzador plegado
+      </p>
+      <DireccionDestinoPicker
+        value={vehiculo}
+        onChange={setVehiculo}
+        proyectos={[]}
+        compact
+        label="Rumbo del vehículo"
+        emptyLabel="Presencia — no toca el proyecto"
+        testId="jornada4-preview-dir-vehiculo"
+        hubHref={null}
+        previewGates={PREVIEW_RUMBOS}
+      />
+      <DireccionDestinoPicker
+        value={fila}
+        onChange={setFila}
+        proyectos={[]}
+        compact
+        label="Rumbo de esta fila"
+        emptyLabel="Heredar del vehículo"
+        testId="jornada4-preview-dir-fila"
+        hubHref={null}
+        previewGates={PREVIEW_RUMBOS}
+      />
+    </div>
+  );
+}
+
 export default function JornadaV4UiPreview() {
   const [tab, setTab] = useState<Jornada4MobileTab>("operar");
   const puertaPanorama = computePuertaPanorama(segmentos);
@@ -271,6 +371,9 @@ export default function JornadaV4UiPreview() {
   const cierrePreview =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("cierre") === "1";
+  const rumboPreview =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("rumbo") === "1";
   const [showTutorial, setShowTutorial] = useState(primer);
 
   return (
@@ -285,6 +388,7 @@ export default function JornadaV4UiPreview() {
         {tab === "operar" ? (
           <div data-testid="jornada4-preview-operar">
             {pausaPreview ? <PreviewConquistaPausa /> : null}
+            {rumboPreview ? <PreviewRumboLanzador /> : null}
             <Jornada4OpsToolsRail
               onOpenTutorial={() => setShowTutorial(true)}
               showRecinto={!primer}

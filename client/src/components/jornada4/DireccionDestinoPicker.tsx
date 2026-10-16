@@ -35,6 +35,8 @@ type Props = {
   lockedCta?: string;
   hubHref?: string | null;
   onBeforeHubNavigate?: () => void;
+  /** Preview / test: lista de rumbos sin pasar por el Hub local. */
+  previewGates?: DireccionGate[];
 };
 
 /**
@@ -56,9 +58,11 @@ export function DireccionDestinoPicker({
   lockedCta = "Activar Norte →",
   hubHref = "/proyectos",
   onBeforeHubNavigate,
+  previewGates,
 }: Props) {
   const { user } = useAuthContext();
-  const { gates } = useDireccionGates(user?.uid);
+  const { gates: liveGates } = useDireccionGates(user?.uid);
+  const gates = previewGates ?? liveGates;
   const [expanded, setExpanded] = useState(false);
   const labelCls = compact
     ? "text-[8px] text-gray-500 uppercase tracking-wider mb-1 block"
