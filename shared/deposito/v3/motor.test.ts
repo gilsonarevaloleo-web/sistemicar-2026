@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   DEPOT_V3_MASTER_PROMPT,
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
+  INTENT_AWARE_SYNTAX_PROMPT,
   buildDepositoV3SystemPrompt,
   diagnosticarAuditoriaLocal,
   evaluarDepositoV3,
@@ -24,6 +25,12 @@ describe("Depósito V3 — prompt", () => {
     assert.match(system, /DO NOT calculate "Perception Delta/i);
     assert.match(system, /Do NOT just pick the code with the most words/i);
     assert.match(system, /NEVER give generic advice like "repeat C3 with a number"/i);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /dejé el trabajo|puse pausa al desglosador/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /el deber es el enemigo instalado/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /entonces.*después.*luego|narrative vessels/i);
+    assert.match(system, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
+    assert.match(system, /Deep Intent Syntax Auditor/);
     assert.match(system, /syntacticVacios/);
     assert.match(system, /isCableadoConnected/);
     assert.match(system, /characterSignedCode/);
@@ -46,6 +53,7 @@ describe("Depósito V3 — prompt", () => {
     assert.match(user, /hoy corté a las 14:00/);
     assert.match(user, /FOCO DE REVELACIÓN/);
     assert.match(user, /Cero Óptica|Cero Δ/);
+    assert.match(user, /lenguaje natural|INTENCIÓN/);
   });
 });
 
@@ -155,6 +163,51 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.focoRevelacionCode, 8);
     assert.match(r.immediateAdjustment, /C8|Ciclo|polo/i);
     assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|hecho medible/i);
+  });
+
+  it("lenguaje natural: conectores C2 no tapan el axioma C7 del cierre", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Hoy dejé el trabajo. Puse pausa al desglosador: el cuerpo pedía parar y yo le dije no al deber. El deber es el enemigo instalado. Entonces me fui a Facebook, puse un audio y descansé. Después volví a producir con la energía cargada. Donde está tu atención está tu energía.",
+      userTier: "CARRERA",
+      detectedNoise: "culpa de productividad",
+      omittedShadow: "el deber automático",
+    });
+    assert.equal(r.focoRevelacionCode, 7);
+    assert.equal(r.syntaxDiagnostic.focoCode, 7);
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.activeCharacterMap[7], true);
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.notEqual(r.focoRevelacionCode, 2);
+    assert.match(r.immediateAdjustment, /C7|Ley|axioma|patr[oó]n/i);
+    assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|conector medible/i);
+  });
+
+  it("lenguaje natural: parar el desglosador para proteger el cuerpo es foco C5, no jerga de corte", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Hoy paré. Dejé el trabajo y puse pausa al desglosador para proteger el cuerpo. Le dije no al deber, sin explicación.",
+      userTier: "CARRERA",
+      detectedNoise: "el deber",
+      omittedShadow: "el cuerpo",
+    });
+    assert.equal(r.focoRevelacionCode, 5);
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.match(r.immediateAdjustment, /C5|Corte|límite/i);
+  });
+
+  it("lenguaje natural: Facebook/audio y volver con energía es foco C8, no flojera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Salí del trabajo, me fui a Facebook, escuché un audio y descansé. Después volví a producir refrescado, con la energía de vuelta.",
+      userTier: "CARRERA",
+      detectedNoise: "pérdida de tiempo",
+      omittedShadow: "el descanso",
+    });
+    assert.equal(r.focoRevelacionCode, 8);
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.match(r.immediateAdjustment, /C8|Ciclo|polo/i);
+    assert.doesNotMatch(r.immediateAdjustment, /flojo|debo|virtud/i);
   });
 
   it("detectedNoise declarado no altera la geometría si el cuerpo está cableado", () => {
