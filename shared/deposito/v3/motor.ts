@@ -6,7 +6,6 @@
 
 import {
   CANON_TEN_EYES,
-  FOCO_SINTESIS_CODES,
   buildActiveCharacterMap,
   esCodigoFocoSintesis,
   vaciosDesdeActiveMap,
@@ -71,7 +70,25 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /pistón/,
   ],
   4: [/¿[^?]{6,}\?/, /por que /, /por qué /, /el muro/, /la norma/, /la regla/],
-  5: [/\bcort[eé]\b/, /\bno\.\b/, /cero excusa/, /dispar[eé]/, /decid[ií]/],
+  5: [
+    /\bcort[eé]\b/,
+    /\bno\.\b/,
+    /cero excusa/,
+    /dispar[eé]/,
+    /decid[ií]/,
+    /deje (el trabajo|de trabajar|el desglosador|de hacer|de seguir|de empujar)/,
+    /puse pausa/,
+    /pause (el |al |la )/,
+    /pausa (al |el |del )desglosador/,
+    /dije (que )?no/,
+    /no al deber/,
+    /proteger (el |mi )?cuerpo/,
+    /para no romper (el |mi )?cuerpo/,
+    /el cuerpo pedia/,
+    /el cuerpo pidio/,
+    /cambie (el |mi )?foco/,
+    /a proposito/,
+  ],
   6: [
     /"[^"]{4,}"/,
     /me dijo/,
@@ -95,6 +112,14 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /hipotesis/,
     /hipótesis/,
     /axioma/,
+    /el deber es/,
+    /enemigo instalado/,
+    /donde esta (tu |la )?atencion/,
+    /atencion[\s\S]{0,48}energia/,
+    /energia[\s\S]{0,48}atencion/,
+    /me di cuenta (de )?que/,
+    /asi funcion/,
+    /la regla (es|que)/,
   ],
   8: [
     /48\s*h/,
@@ -126,6 +151,26 @@ const HECHO_FRIO =
   /\d{1,2}:\d{2}|\d+\s*(min|hora|d[ií]a)|hoy a las|ayer|anot[eé]|med[ií]|cort[eé] \d/i;
 
 const LATENCIA = /48\s*h|24\s*h|me volvi[oó]|loop|ansiedad|incuba|dos d[ií]as/i;
+
+/** C8 técnico: ciclo, polo, latencia. Gana al C7 en el cierre si está explícito. */
+const C8_TECNICO =
+  /48\s*h|24\s*h|\bloop\b|ciclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
+
+/** Polo opuesto en lenguaje natural (ocio / red / audio / descanso). */
+const C8_POLO_NATURAL =
+  /facebook|instagram|whatsapp|tiktok|redes sociales|\baudio\b|descans|siesta|\bocio\b|me recost|a descansar/;
+
+/** Retorno al polo de producción, con energía restaurada. */
+const C8_RETORNO_NATURAL =
+  /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc/;
+
+function tieneCicloNatural(norm: string): boolean {
+  return C8_POLO_NATURAL.test(norm) && C8_RETORNO_NATURAL.test(norm);
+}
+
+function esC8Tecnico(norm: string): boolean {
+  return C8_TECNICO.test(norm);
+}
 
 function normalizar(texto: string): string {
   return texto
@@ -293,19 +338,35 @@ function hipotesisCableada(
   return false;
 }
 
+function primerFocoEn(
+  scores: Record<EyeCode, number>,
+  sliceNorm: string,
+): EyeCode | null {
+  if (scores[10] > 0) return 10;
+  if (scores[9] > 0) return 9;
+  // Polo/ciclo técnico en el cierre gana. El C8 narrativo (Facebook → volver)
+  // no le roba el axioma C7 si el usuario acaba de forjar una ley.
+  if (scores[8] > 0 && esC8Tecnico(sliceNorm)) return 8;
+  if (scores[7] > 0) return 7;
+  if (scores[5] > 0) return 5;
+  if (scores[8] > 0) return 8;
+  return null;
+}
+
 function elegirFocoRevelacion(
   synCuerpo: Record<EyeCode, number>,
   synCierre: Record<EyeCode, number>,
   characterSignedCode: EyeCode,
   hipotesis: EyeCode | null,
   cableada: boolean,
+  normCuerpo: string,
 ): EyeCode {
-  for (const n of FOCO_SINTESIS_CODES) {
-    if (synCierre[n] > 0) return n;
-  }
-  for (const n of FOCO_SINTESIS_CODES) {
-    if (synCuerpo[n] > 0) return n;
-  }
+  const cut = Math.floor(normCuerpo.length * 0.55);
+  const normCierre = normCuerpo.slice(Math.max(0, cut));
+  const focoCierre = primerFocoEn(synCierre, normCierre);
+  if (focoCierre) return focoCierre;
+  const focoCuerpo = primerFocoEn(synCuerpo, normCuerpo);
+  if (focoCuerpo) return focoCuerpo;
   if (cableada && hipotesis && esCodigoFocoSintesis(hipotesis)) {
     return hipotesis;
   }
@@ -398,6 +459,10 @@ export function diagnosticarAuditoriaLocal(
     syn[8] += 1;
     synCuerpo[8] += 1;
   }
+  if (tieneCicloNatural(normCuerpo)) {
+    syn[8] += 2;
+    synCuerpo[8] += 2;
+  }
 
   // La firma primaria sale del cuerpo. El título/hipótesis enciende el mapa, no se come el pistón.
   let characterSignedCode = elegirPrimario(synCuerpo);
@@ -412,12 +477,17 @@ export function diagnosticarAuditoriaLocal(
   if (cableada) syn[10] += 1;
 
   const synCierre = scoreCierre(normCuerpo);
+  const cutCierre = Math.floor(normCuerpo.length * 0.55);
+  if (tieneCicloNatural(normCuerpo.slice(Math.max(0, cutCierre)))) {
+    synCierre[8] += 2;
+  }
   const focoRevelacionCode = elegirFocoRevelacion(
     synCuerpo,
     synCierre,
     characterSignedCode,
     hipotesis,
     cableada,
+    normCuerpo,
   );
 
   const activos = EYE_CODES.filter(
@@ -532,7 +602,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El FOCO es la INTENCIÓN real (C5/C7/C8), no la frecuencia de «entonces/después». El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

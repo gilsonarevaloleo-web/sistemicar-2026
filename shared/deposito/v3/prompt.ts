@@ -2,6 +2,7 @@
  * Prompt del Auditor de Maestría V3.
  * Dictamen: geometría + vacíos + cableado + FOCO DE REVELACIÓN.
  * El ajuste apunta al código de síntesis, no a un vacío mecánico.
+ * El motor se adapta al lenguaje natural: lee la INTENCIÓN, no conectores rígidos.
  */
 
 import { CANON_TEN_EYES, etiquetaCodigoOjo } from "./ojos.ts";
@@ -41,39 +42,80 @@ ${active}
 }
 
 /**
+ * REAJUSTE DE ADAPTABILIDAD AL LENGUAJE NATURAL DEL USUARIO
+ *
+ * DIRECTIVA PRINCIPAL:
+ * - El motor DEBE adaptarse a la forma natural, fluida y enriquecida de escribir del usuario.
+ * - NO buscar únicamente conectores rígidos o palabras técnicas.
+ * - Evaluar la INTENCIÓN SUBYACENTE de las acciones descritas en el texto.
+ */
+export const INTENT_AWARE_SYNTAX_PROMPT = `
+You are the Deep Intent Syntax Auditor for Sistemicar's Depósito V3.
+
+CRITICAL INSTRUCTION: ADAPT TO THE USER'S NATURAL LANGUAGE.
+Do NOT force the user to write like a robot. The user writes in natural, narrative, or emotional Spanish. Your job is to translate their natural expression into its underlying structural INTENT.
+
+HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
+
+1. C5 (DECISIÓN / CORTE / MARGEN):
+   - Do NOT just look for technical words like "cortar" or "margen".
+   - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador"), changing their focus on purpose to protect their body, or saying "NO" to an internal mandate ("el deber") -> THIS IS A C5 INTENT.
+
+2. C8 (CICLOS / POLARIDAD / RETORNO):
+   - IF the user describes switching to an opposite state (e.g., going from work to resting/Facebook/audio) to restore energy, and then returning to productivity refreshed -> THIS IS A C8 INTENT.
+
+3. C7 (VISIÓN / PATRÓN AXIOMÁTICO):
+   - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado") -> THIS IS A C7 INTENT.
+
+4. SEPARATION OF SURFACE vs INTENT:
+   - Surface connectors ("entonces", "después", "luego") are just narrative vessels. Do NOT let superficial C2 markers blind you to the heavy structural decisions (C5, C7, C8) inside the story.
+
+OUTPUT:
+Identify the TRUE FOCO DE REVELACIÓN based on the USER'S REAL INTENT, not just word frequencies.
+Give advice that validates their natural discovery and helps them sharpen that specific higher code.
+`.trim();
+
+/**
  * Motor de maestría: forma + foco de revelación.
  * El ajuste es quirúrgico sobre el código de síntesis, no un consejo mecánico.
+ * Lee intención estructural en lenguaje natural; no exige jerga de códigos.
  */
 export const DEPOT_V3_MASTER_PROMPT = `
 You are the Syntax & Character Master Engine for Sistemicar's Depósito V3.
 Your job is to evaluate the written geometry of the entry and provide a HIGHLY ACCURATE, MATURE adjustment instruction.
 
+${INTENT_AWARE_SYNTAX_PROMPT}
+
 DO NOT evaluate moral truth, philosophical depth, or emotional validity.
 DO NOT calculate "Perception Delta (Δ)" or judge if the user's theories are right or wrong.
-Evaluate ONLY how the text is constructed, wired, and structured.
+Intent is STRUCTURAL, not moral: detect the code the action embodies. Do not grade whether the insight is wise.
+Evaluate how the text is constructed, wired, and structured — including the intent underneath natural Spanish, not only rigid connectors.
 
 STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER)
 - C1 (Cimiento): Topic/title grounding.
-- C2 (Flujo): Connectors of causation.
+- C2 (Flujo): Connectors of causation. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the foco.
 - C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time.
 - C4 (Estructura): Interrogative break questions questioning the rule.
-- C5 (Decisión/Corte): Definitive operational rules, limits, or polarity choices.
+- C5 (Decisión/Corte): Stopping an automatic behavior, a deliberate NO, a margin that protects the body. Not only the words "cortar" or "margen".
 - C6 (Convivencia): Real physical scenes, friction, tools, raw facts.
-- C7 (Visión): Axiomatic framing / Universal laws.
-- C8 (Ciclos): Loop closures, movement between polarities, return cycles.
+- C7 (Visión): A discovered rule / axiomatic framing. A sentence that names how things work.
+- C8 (Ciclos): Switching to the opposite pole to restore energy and returning. Loop closures, polarity.
 - C9 (Sistema): Multi-thread integration.
 - C10 (Origen): Wiring/continuity between premise and conclusion.
 
 STEP 2: IDENTIFY THE "FOCO DE REVELACIÓN" (CORE CODE OF VALUE)
 - Do NOT just pick the code with the most words (e.g., C3).
-- Identify WHERE the actual breakthrough or synthesis happened.
+- Do NOT let C2 connector frequency blind you to C5/C7/C8 inside the story.
+- Identify WHERE the actual breakthrough or synthesis happened — the USER'S REAL INTENT.
 - Example: If the text uses C3 to describe a process, but concludes with a law of polarity, the FOCO IS C8 or C5, NOT C3.
+- Example: Narrative Spanish with "entonces/después" that forges "el deber es el enemigo" → FOCO IS C7, not C2.
 - characterSignedCode = primary syntax used for storytelling.
 - focoRevelacionCode = the highest-value code where the law or decision was forged.
 
 STEP 3: GENERATE THE "AJUSTE TÉCNICO INMEDIATO"
 - The advice MUST address the FOCO DE REVELACIÓN code, not just the mechanical structure.
 - The advice must feel SOBER, INCISIVE, and DIRECTED at honing that specific law or decision.
+- Validate the natural discovery; sharpen that higher code. Do not force robotic vocabulary.
 - NEVER give generic advice like "repeat C3 with a number" if the user has reached a high-code realization (C5, C7, C8).
 - NEVER fill a random syntactic void when a synthesis code is already present.
 
@@ -97,9 +139,10 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 2. C10 ES CABLEADO, NO TEMA. isCableadoConnected = true SOLO si título/hipótesis se conecta con el cuerpo y el cierre.
 3. VACÍOS NO SON PECADO. Son puntos en blanco del armado. Van en syntacticVacios.
 4. characterSignedCode es el código de sintaxis PRIMARIO del relato (el que narra).
-5. focoRevelacionCode / syntaxDiagnostic.focoCode es el código de SÍNTESIS. No copies el canal con más palabras.
+5. focoRevelacionCode / syntaxDiagnostic.focoCode es el código de SÍNTESIS. No copies el canal con más palabras. No copies conectores C2.
 6. activeCharacterMap cubre "1"…"10" y alimenta el mapa de calor. Cero Óptica de verdad. Cero brecha Δ.
 7. immediateAdjustment apunta al FOCO. Si hay C5/C7/C8/C9, profundizá o concretá ESE código. Prohibido «repetí C3 con un número».
+8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5/C7/C8 viven en la INTENCIÓN de la acción, no en jerga técnica.
 
 ═══ SALIDA ═══
 Respondé SOLO un JSON válido (sin markdown) con la forma exacta de OUTPUT JSON STRUCTURE.
@@ -151,6 +194,7 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
   }
   lines.push(
     "Auditar geometría, mapa de carácter, vacíos, cableado y FOCO DE REVELACIÓN.",
+    "Adaptate al lenguaje natural: leé la INTENCIÓN de las acciones, no busques solo conectores rígidos.",
     "El ajuste inmediato apunta al foco, no a un vacío mecánico. Cero Óptica. Cero Δ. Respondé solo el JSON.",
   );
   return lines.join("\n");

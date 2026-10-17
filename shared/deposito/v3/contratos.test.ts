@@ -26,7 +26,7 @@ import {
 
 describe("Depósito V3 — contratos", () => {
   it("expone versión y los 10 canales sin repetir id", () => {
-    assert.equal(DEPOSITO_V3_VERSION, "3.4.0-foco-revelacion");
+    assert.equal(DEPOSITO_V3_VERSION, "3.5.0-lenguaje-natural");
     assert.deepEqual([...EYE_CODES], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const ids = EYE_CODES.map((n) => CANON_TEN_EYES[n].id);
     assert.deepEqual(ids, [...EYE_CODES]);

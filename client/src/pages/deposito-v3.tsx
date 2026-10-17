@@ -61,9 +61,9 @@ export default function DepositoV3Page() {
             {DEPOSITO_V3_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El dictamen es firma + foco de revelación + vacíos. El ajuste
-            profundiza el código de síntesis, no un vacío mecánico. V2 queda
-            en su recinto.
+            El dictamen es firma + foco de revelación + vacíos. El motor lee
+            la intención del lenguaje natural, no los conectores rígidos. V2
+            queda en su recinto.
           </p>
           <Link
             href="/deposito-v2"
