@@ -16,6 +16,7 @@ import {
   resolveClientAccountWhatsappKind,
 } from "@shared/clientAccount";
 import { gmailTypoCorrection } from "@shared/emailAliases";
+import { explainFirebaseAdminError } from "@shared/firebaseServiceAccount";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -302,7 +303,7 @@ export default function AdminGilson() {
       }
       if (data.adminReady === false) {
         setRecoverySearchHint(
-          data.parseError || data.initError ||
+          explainFirebaseAdminError(data.parseError, data.initError) ||
             "El servidor no tiene FIREBASE_SERVICE_ACCOUNT_JSON. Sin eso no lista las cuentas viejas.",
         );
       }
@@ -1303,9 +1304,9 @@ export default function AdminGilson() {
 
         {activeTab === "recovery" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 break-words">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 break-words font-sans">
               <h3 className="text-amber-300 font-bold mb-1">Si limpiaste el teléfono</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed whitespace-normal">
                 La clave del panel no alcanza. Primero entra con Google
                 (gilsonarevalo.leo@gmail.com). Después busca ese mismo Gmail.
                 El botón de antes miraba solo el teléfono y por eso decía que no había cuentas.
@@ -1365,7 +1366,9 @@ export default function AdminGilson() {
                 Listar todas las cuentas con datos
               </button>
               {recoverySearchHint && (
-                <p className="mt-3 text-xs text-amber-300 break-words">{recoverySearchHint}</p>
+                <p className="mt-3 text-xs text-amber-300 break-words whitespace-normal font-sans">
+                  {recoverySearchHint}
+                </p>
               )}
               <button
                 type="button"

@@ -28,6 +28,30 @@ function escapePrivateKeyNewlines(json: string): string {
   );
 }
 
+/**
+ * OpenSSL 3 (Node 20) falla con
+ * `error:1E08010C:DECODER routines::unsupported` si el PEM sigue
+ * con `\n` literales o el cuerpo va en una sola línea.
+ */
+export function normalizeServiceAccountPrivateKey(key: string): string {
+  let k = key.trim().replace(/^\uFEFF/, "");
+  if (
+    (k.startsWith('"') && k.endsWith('"')) ||
+    (k.startsWith("'") && k.endsWith("'"))
+  ) {
+    k = k.slice(1, -1).trim();
+  }
+  k = k.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+  const pem = k.match(
+    /-----BEGIN ([A-Z ]+)-----([A-Za-z0-9+/=\s]+)-----END \1-----/,
+  );
+  if (!pem) return k;
+  const type = pem[1];
+  const body = pem[2].replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [body];
+  return `-----BEGIN ${type}-----\n${lines.join("\n")}\n-----END ${type}-----\n`;
+}
+
 export function parseFirebaseServiceAccountJson(raw: string | undefined | null): ParsedServiceAccount {
   if (!raw?.trim()) {
     return { ok: false, error: "missing" };
@@ -53,12 +77,36 @@ export function parseFirebaseServiceAccountJson(raw: string | undefined | null):
         lastError = "private_key_rota";
         continue;
       }
+      value.private_key = normalizeServiceAccountPrivateKey(value.private_key);
+      if (!value.private_key.includes("\n")) {
+        lastError = "private_key_sin_saltos";
+        continue;
+      }
       return { ok: true, value };
     } catch {
       lastError = "invalid_json";
     }
   }
   return { ok: false, error: lastError };
+}
+
+export function explainFirebaseAdminError(
+  parseError?: string | null,
+  initError?: string | null,
+): string | null {
+  const raw = `${parseError || ""} ${initError || ""}`.trim();
+  if (!raw) return null;
+  if (
+    /llave_pem_rota|private_key|DECODER|unsupported|private_key_rota|private_key_sin_saltos/i.test(
+      raw,
+    )
+  ) {
+    return "La llave de Firebase en Netlify está rota. Por eso no se abre la cuenta de 9000. En Netlify → Environment variables pega de nuevo FIREBASE_SERVICE_ACCOUNT_JSON (el JSON de una línea que baja Firebase) y vuelve a publicar.";
+  }
+  if (raw === "missing") {
+    return "Falta FIREBASE_SERVICE_ACCOUNT_JSON en Netlify. Sin esa variable el servidor no ve las cuentas viejas.";
+  }
+  return raw;
 }
 
 export function serviceAccountPublicMeta(value: Record<string, unknown>): {
