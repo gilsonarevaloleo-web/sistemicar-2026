@@ -6,6 +6,8 @@ import {
   featureCountsFromCollections,
   LEGACY_ALIAS_COLLECTIONS,
   RECOVERY_FEATURE_COLLECTIONS,
+  RECOVERY_SCAN_COLLECTIONS,
+  uidFromPrivateCollectionPath,
   USER_PRIVATE_COLLECTIONS,
 } from "./userDataCollections.ts";
 
@@ -54,6 +56,19 @@ describe("userDataCollections — recuperación tras limpieza del dispositivo", 
     assert.equal(out.userId, "google-2");
     assert.equal(out.migratedFrom, "anon-1");
     assert.equal(out.texto, "paso");
+  });
+
+  it("el escaneo no depende de tener puntos en progression", () => {
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("situacionReserva"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("vehicleHistory"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("plantillasRutina"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("volcados_v3"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("umbralLogros"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("sovereigntyPointsLog"));
+    assert.equal(uidFromPrivateCollectionPath(
+      "artifacts/sistemicar-v2-5/users/abc123/situacionReserva/x",
+      "situacionReserva",
+    ), "abc123");
   });
 
   it("la lista a migrar cubre canónicas + alias", () => {

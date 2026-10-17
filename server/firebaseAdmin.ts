@@ -18,7 +18,9 @@ import {
   collectionsToMigrate,
   featureCountsFromCollections,
   RECOVERY_FEATURE_LABELS,
+  RECOVERY_SCAN_COLLECTIONS,
   totalDocs,
+  uidFromPrivateCollectionPath,
   type RecoveryFeature,
 } from "../shared/userDataCollections";
 
@@ -262,6 +264,7 @@ export type AdminUserLookupResult = {
   providers?: string[];
   rank?: string;
   totalCP?: number;
+  sovereigntyPoints?: number;
   activeModules?: string[];
   subscriptionPlan?: string | null;
   whatsapp?: string | null;
@@ -343,6 +346,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
 
   let rank = "iniciado";
   let totalCP = 0;
+  let sovereigntyPoints = 0;
   let activeModules: string[] | undefined;
   let subscriptionPlan: string | null | undefined;
   let whatsapp: string | null | undefined;
@@ -350,9 +354,14 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
   if (adminApp && uid) {
     const db = getFirestore(adminApp);
     const prog = await getLatestProgressionRef(db, uid);
+    const allProg = await db.collection(getPrivatePath(uid, "progression")).get();
+    for (const docSnap of allProg.docs) {
+      const data = docSnap.data() as Record<string, unknown>;
+      totalCP = Math.max(totalCP, Number(data.totalCP || data.points || 0));
+      sovereigntyPoints = Math.max(sovereigntyPoints, Number(data.sovereigntyPoints || 0));
+    }
     if (prog) {
       rank = (prog.data.rank as string) || "iniciado";
-      totalCP = (prog.data.totalCP as number) || (prog.data.points as number) || 0;
       activeModules = prog.data.activeModules as string[] | undefined;
       subscriptionPlan = (prog.data.subscriptionPlan as string) || null;
       whatsapp =
@@ -372,6 +381,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     providers,
     rank,
     totalCP,
+    sovereigntyPoints,
     activeModules,
     subscriptionPlan,
     whatsapp,
@@ -415,6 +425,7 @@ function uidFromProgressionPath(path: string): string | null {
 
 type ProgressionSummary = {
   totalCP: number;
+  sovereigntyPoints: number;
   rank: string;
   activeModules: string[];
   whatsapp: string | null;
@@ -435,10 +446,12 @@ async function progressionByUid(
       const updatedAt =
         (data.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
       const totalCP = Number(data.totalCP || data.points || 0);
+      const sovereigntyPoints = Number(data.sovereigntyPoints || 0);
       const prev = map.get(uid);
       if (!prev || updatedAt >= prev.updatedAt) {
         map.set(uid, {
           totalCP: Math.max(totalCP, prev?.totalCP ?? 0),
+          sovereigntyPoints: Math.max(sovereigntyPoints, prev?.sovereigntyPoints ?? 0),
           rank: (data.rank as string) || prev?.rank || "iniciado",
           activeModules: Array.isArray(data.activeModules)
             ? (data.activeModules as string[])
@@ -453,6 +466,7 @@ async function progressionByUid(
         });
       } else {
         prev.totalCP = Math.max(prev.totalCP, totalCP);
+        prev.sovereigntyPoints = Math.max(prev.sovereigntyPoints, sovereigntyPoints);
       }
     }
   } catch (err) {
@@ -597,4 +611,180 @@ export async function restoreUserData(
   }
 
   return { migrated, errors, fromUid: source, toUid: dest };
+}
+
+export type RecoveryAccount = {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  totalCP: number;
+  sovereigntyPoints: number;
+  rank: string;
+  activeModules: string[];
+  whatsapp: string | null;
+  subscriptionPlan: string | null;
+  features: Record<RecoveryFeature, number>;
+  totalDocs: number;
+};
+
+export function recoveryAccountScore(account: Pick<RecoveryAccount, "sovereigntyPoints" | "totalCP" | "totalDocs">): number {
+  return Math.max(account.sovereigntyPoints || 0, account.totalCP || 0, account.totalDocs || 0);
+}
+
+async function scanRecoveryCollectionGroups(
+  db: ReturnType<typeof getFirestore>,
+): Promise<Map<string, Record<string, number>>> {
+  const byUid = new Map<string, Record<string, number>>();
+  for (const name of RECOVERY_SCAN_COLLECTIONS) {
+    try {
+      const snap = await db.collectionGroup(name).get();
+      for (const docSnap of snap.docs) {
+        const uid = uidFromPrivateCollectionPath(docSnap.ref.path, name);
+        if (!uid) continue;
+        const counts = byUid.get(uid) ?? {};
+        counts[name] = (counts[name] ?? 0) + 1;
+        byUid.set(uid, counts);
+      }
+    } catch (err) {
+      console.warn(`[firebaseAdmin] collectionGroup ${name}:`, err);
+    }
+  }
+  return byUid;
+}
+
+function recoveryAccountFromParts(
+  uid: string,
+  opts: {
+    email?: string;
+    displayName?: string | null;
+    prog?: ProgressionSummary;
+    counts?: Record<string, number>;
+  },
+): RecoveryAccount {
+  const counts = opts.counts ?? {};
+  const features = featureCountsFromCollections(counts);
+  return {
+    uid,
+    email: opts.email || "",
+    displayName: opts.displayName ?? null,
+    totalCP: opts.prog?.totalCP ?? 0,
+    sovereigntyPoints: opts.prog?.sovereigntyPoints ?? 0,
+    rank: opts.prog?.rank || "iniciado",
+    activeModules: opts.prog?.activeModules ?? [],
+    whatsapp: opts.prog?.whatsapp ?? null,
+    subscriptionPlan: opts.prog?.subscriptionPlan ?? null,
+    features,
+    totalDocs: totalDocs(counts),
+  };
+}
+
+/** Lista cuentas con data real (Auth + progression + Crisol/Récord/Rutina/Depósito/Umbral). */
+export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[]> {
+  const adminApp = getAdminApp();
+  if (!adminApp) return [];
+  const auth = getAuth(adminApp);
+  const db = getFirestore(adminApp);
+  const byUid = new Map<string, RecoveryAccount>();
+  const progMap = await progressionByUid(db);
+  const scanMap = await scanRecoveryCollectionGroups(db);
+
+  let pageToken: string | undefined;
+  let pages = 0;
+  try {
+    do {
+      const page = await auth.listUsers(100, pageToken);
+      for (const user of page.users) {
+        byUid.set(
+          user.uid,
+          recoveryAccountFromParts(user.uid, {
+            email: user.email?.toLowerCase() ?? "",
+            displayName: user.displayName ?? null,
+            prog: progMap.get(user.uid),
+            counts: scanMap.get(user.uid),
+          }),
+        );
+      }
+      pageToken = page.pageToken;
+      pages += 1;
+    } while (pageToken && pages < 8);
+  } catch (err) {
+    console.warn("[firebaseAdmin] listUsers recovery:", err);
+  }
+
+  for (const [uid, counts] of scanMap) {
+    if (byUid.has(uid)) continue;
+    byUid.set(
+      uid,
+      recoveryAccountFromParts(uid, {
+        prog: progMap.get(uid),
+        counts,
+      }),
+    );
+  }
+
+  try {
+    const owner = await adminLookupUserByEmail("gilsonarevalo.leo@gmail.com");
+    if (owner.found && owner.uid && !byUid.has(owner.uid)) {
+      byUid.set(
+        owner.uid,
+        recoveryAccountFromParts(owner.uid, {
+          email: owner.email || "gilsonarevalo.leo@gmail.com",
+          displayName: owner.displayName ?? null,
+          prog: progMap.get(owner.uid),
+          counts: scanMap.get(owner.uid),
+        }),
+      );
+    } else if (owner.found && owner.uid) {
+      const current = byUid.get(owner.uid);
+      if (current && !current.email) current.email = owner.email || "gilsonarevalo.leo@gmail.com";
+    }
+  } catch (err) {
+    console.warn("[firebaseAdmin] owner lookup recovery:", err);
+  }
+
+  return [...byUid.values()]
+    .filter((a) =>
+      a.email ||
+      a.totalCP > 0 ||
+      a.sovereigntyPoints > 0 ||
+      a.totalDocs > 0 ||
+      a.activeModules.length > 0
+    )
+    .sort((a, b) => recoveryAccountScore(b) - recoveryAccountScore(a))
+    .slice(0, Math.min(120, Math.max(1, limit)));
+}
+
+export async function findRichestRecoveryAccount(): Promise<RecoveryAccount | null> {
+  const accounts = await listRecoveryAccounts(120);
+  return accounts[0] ?? null;
+}
+
+export async function restoreHighestToUid(toUid: string): Promise<{
+  migrated: number;
+  errors: number;
+  fromUid: string;
+  toUid: string;
+  sovereigntyPoints: number;
+  alreadyCurrent: boolean;
+}> {
+  const richest = await findRichestRecoveryAccount();
+  if (!richest) {
+    throw new Error("No hay ninguna cuenta con datos en Firebase.");
+  }
+  if (richest.uid === toUid) {
+    return {
+      migrated: 0,
+      errors: 0,
+      fromUid: richest.uid,
+      toUid,
+      sovereigntyPoints: richest.sovereigntyPoints,
+      alreadyCurrent: true,
+    };
+  }
+  const result = await restoreUserData(richest.uid, toUid);
+  return {
+    ...result,
+    sovereigntyPoints: richest.sovereigntyPoints,
+    alreadyCurrent: false,
+  };
 }

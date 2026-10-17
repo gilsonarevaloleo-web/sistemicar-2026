@@ -76,8 +76,9 @@ export default function Recuperar() {
             Tus datos no se fueron de la nube
           </h1>
           <p className="text-sm leading-relaxed text-zinc-400">
-            Limpiar el teléfono borra la copia local (Crisol, Récord, Rutina, aprendizaje y Umbral).
-            En Firebase siguen bajo tu mismo Gmail. Entra otra vez con esa cuenta — no uses la sesión vacía que se crea sola.
+            Limpiar el teléfono abre una sesión nueva. Si ves 12 puntos y antes tenías 9000,
+            ese Gmail no es el UID viejo. Entra con Google y en el panel pulsa
+            «Traer mis 9000 puntos a este Gmail».
           </p>
         </motion.div>
 

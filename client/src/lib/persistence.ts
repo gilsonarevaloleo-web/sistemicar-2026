@@ -338,6 +338,7 @@ export function clearMigrationPending(): void {
 export type AccountWithData = {
   uid: string;
   totalCP: number;
+  sovereigntyPoints?: number;
   rank: string;
   lastUpdated: Date | null;
   activeModules: string[];
@@ -358,6 +359,7 @@ function accountFromProgData(
   progData: Record<string, unknown>,
 ): AccountWithData | null {
   const totalCP = Number(progData.totalCP || progData.points || 0);
+  const sovereigntyPoints = Number(progData.sovereigntyPoints || 0);
   const activeModules = Array.isArray(progData.activeModules)
     ? (progData.activeModules as string[])
     : [];
@@ -366,13 +368,14 @@ function accountFromProgData(
       ? progData.whatsapp.trim()
       : null;
   const hasTrial = progData.jornadaBaseTrialStartedAt != null;
-  if (totalCP <= 0 && !whatsapp && !hasTrial && activeModules.length === 0) {
+  if (totalCP <= 0 && sovereigntyPoints <= 0 && !whatsapp && !hasTrial && activeModules.length === 0) {
     return null;
   }
   const lastRaw = progData.lastUpdated as { toDate?: () => Date } | Date | undefined;
   return {
     uid,
     totalCP,
+    sovereigntyPoints,
     rank: (progData.rank as string) || "observador",
     lastUpdated:
       lastRaw && typeof (lastRaw as { toDate?: () => Date }).toDate === "function"
@@ -401,8 +404,12 @@ export async function findAccountsWithData(): Promise<AccountWithData[]> {
       const account = accountFromProgData(uid, docSnap.data() as Record<string, unknown>);
       if (!account) continue;
       const prev = byUid.get(uid);
-      if (!prev || account.totalCP >= prev.totalCP) {
-        byUid.set(uid, account);
+      if (!prev || Math.max(account.sovereigntyPoints ?? 0, account.totalCP) >= Math.max(prev.sovereigntyPoints ?? 0, prev.totalCP)) {
+        byUid.set(uid, {
+          ...account,
+          sovereigntyPoints: Math.max(account.sovereigntyPoints ?? 0, prev.sovereigntyPoints ?? 0),
+          totalCP: Math.max(account.totalCP, prev.totalCP),
+        });
       }
     }
   } catch (error) {
@@ -410,7 +417,9 @@ export async function findAccountsWithData(): Promise<AccountWithData[]> {
   }
 
   if (byUid.size > 0) {
-    return [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
+    return [...byUid.values()].sort((a, b) =>
+      Math.max(b.sovereigntyPoints ?? 0, b.totalCP) - Math.max(a.sovereigntyPoints ?? 0, a.totalCP)
+    );
   }
 
   try {
@@ -3307,10 +3316,15 @@ export async function updateProgression(
             updatedAt: serverTimestamp()
           });
         } else {
-          await updateDoc(doc(db, path, latest.id), {
-            ...updates,
-            updatedAt: serverTimestamp()
-          });
+          const remoteMax = maxSovereigntyAcrossRemoteDocs(snapshot.docs);
+          const safeUpdates: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
+          if (typeof updates.sovereigntyPoints === "number") {
+            safeUpdates.sovereigntyPoints = Math.max(updates.sovereigntyPoints, remoteMax.sovereignty);
+          }
+          if (typeof updates.totalCP === "number") {
+            safeUpdates.totalCP = Math.max(updates.totalCP, remoteMax.totalCP);
+          }
+          await updateDoc(doc(db, path, latest.id), safeUpdates);
         }
       }
       saveLocally();

@@ -72,6 +72,28 @@ export const RECOVERY_FEATURE_LABELS: Record<RecoveryFeature, string> = {
   umbral: "Umbral",
 };
 
+/** Collection groups que delatan una cuenta aunque progression esté en 0. */
+export const RECOVERY_SCAN_COLLECTIONS = [
+  "progression",
+  "sovereigntyPointsLog",
+  ...new Set(Object.values(RECOVERY_FEATURE_COLLECTIONS).flat()),
+] as const;
+
+export function emptyFeatureCounts(): Record<RecoveryFeature, number> {
+  return { crisol: 0, record: 0, rutina: 0, deposito: 0, umbral: 0 };
+}
+
+export function uidFromPrivateCollectionPath(
+  path: string,
+  collectionName: string,
+): string | null {
+  const parts = path.split("/");
+  const i = parts.indexOf("users");
+  if (i < 0 || parts[i + 2] !== collectionName) return null;
+  if (!parts.includes("sistemicar-v2-5")) return null;
+  return parts[i + 1] || null;
+}
+
 export function collectionsToMigrate(): readonly string[] {
   return [...USER_PRIVATE_COLLECTIONS, ...LEGACY_ALIAS_COLLECTIONS];
 }
