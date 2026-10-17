@@ -75,6 +75,7 @@ export const RECOVERY_FEATURE_LABELS: Record<RecoveryFeature, string> = {
 /** Collection groups que delatan una cuenta aunque progression esté en 0. */
 export const RECOVERY_SCAN_COLLECTIONS = [
   "progression",
+  "sovereigntyPointsLog",
   ...new Set(Object.values(RECOVERY_FEATURE_COLLECTIONS).flat()),
 ] as const;
 

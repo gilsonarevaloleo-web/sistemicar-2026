@@ -264,6 +264,7 @@ export type AdminUserLookupResult = {
   providers?: string[];
   rank?: string;
   totalCP?: number;
+  sovereigntyPoints?: number;
   activeModules?: string[];
   subscriptionPlan?: string | null;
   whatsapp?: string | null;
@@ -345,6 +346,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
 
   let rank = "iniciado";
   let totalCP = 0;
+  let sovereigntyPoints = 0;
   let activeModules: string[] | undefined;
   let subscriptionPlan: string | null | undefined;
   let whatsapp: string | null | undefined;
@@ -352,9 +354,14 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
   if (adminApp && uid) {
     const db = getFirestore(adminApp);
     const prog = await getLatestProgressionRef(db, uid);
+    const allProg = await db.collection(getPrivatePath(uid, "progression")).get();
+    for (const docSnap of allProg.docs) {
+      const data = docSnap.data() as Record<string, unknown>;
+      totalCP = Math.max(totalCP, Number(data.totalCP || data.points || 0));
+      sovereigntyPoints = Math.max(sovereigntyPoints, Number(data.sovereigntyPoints || 0));
+    }
     if (prog) {
       rank = (prog.data.rank as string) || "iniciado";
-      totalCP = (prog.data.totalCP as number) || (prog.data.points as number) || 0;
       activeModules = prog.data.activeModules as string[] | undefined;
       subscriptionPlan = (prog.data.subscriptionPlan as string) || null;
       whatsapp =
@@ -374,6 +381,7 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     providers,
     rank,
     totalCP,
+    sovereigntyPoints,
     activeModules,
     subscriptionPlan,
     whatsapp,
@@ -417,6 +425,7 @@ function uidFromProgressionPath(path: string): string | null {
 
 type ProgressionSummary = {
   totalCP: number;
+  sovereigntyPoints: number;
   rank: string;
   activeModules: string[];
   whatsapp: string | null;
@@ -437,10 +446,12 @@ async function progressionByUid(
       const updatedAt =
         (data.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
       const totalCP = Number(data.totalCP || data.points || 0);
+      const sovereigntyPoints = Number(data.sovereigntyPoints || 0);
       const prev = map.get(uid);
       if (!prev || updatedAt >= prev.updatedAt) {
         map.set(uid, {
           totalCP: Math.max(totalCP, prev?.totalCP ?? 0),
+          sovereigntyPoints: Math.max(sovereigntyPoints, prev?.sovereigntyPoints ?? 0),
           rank: (data.rank as string) || prev?.rank || "iniciado",
           activeModules: Array.isArray(data.activeModules)
             ? (data.activeModules as string[])
@@ -455,6 +466,7 @@ async function progressionByUid(
         });
       } else {
         prev.totalCP = Math.max(prev.totalCP, totalCP);
+        prev.sovereigntyPoints = Math.max(prev.sovereigntyPoints, sovereigntyPoints);
       }
     }
   } catch (err) {
@@ -606,6 +618,7 @@ export type RecoveryAccount = {
   email: string;
   displayName: string | null;
   totalCP: number;
+  sovereigntyPoints: number;
   rank: string;
   activeModules: string[];
   whatsapp: string | null;
@@ -613,6 +626,10 @@ export type RecoveryAccount = {
   features: Record<RecoveryFeature, number>;
   totalDocs: number;
 };
+
+export function recoveryAccountScore(account: Pick<RecoveryAccount, "sovereigntyPoints" | "totalCP" | "totalDocs">): number {
+  return Math.max(account.sovereigntyPoints || 0, account.totalCP || 0, account.totalDocs || 0);
+}
 
 async function scanRecoveryCollectionGroups(
   db: ReturnType<typeof getFirestore>,
@@ -651,6 +668,7 @@ function recoveryAccountFromParts(
     email: opts.email || "",
     displayName: opts.displayName ?? null,
     totalCP: opts.prog?.totalCP ?? 0,
+    sovereigntyPoints: opts.prog?.sovereigntyPoints ?? 0,
     rank: opts.prog?.rank || "iniciado",
     activeModules: opts.prog?.activeModules ?? [],
     whatsapp: opts.prog?.whatsapp ?? null,
@@ -725,7 +743,48 @@ export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[
   }
 
   return [...byUid.values()]
-    .filter((a) => a.email || a.totalCP > 0 || a.totalDocs > 0 || a.activeModules.length > 0)
-    .sort((a, b) => b.totalDocs - a.totalDocs || b.totalCP - a.totalCP)
+    .filter((a) =>
+      a.email ||
+      a.totalCP > 0 ||
+      a.sovereigntyPoints > 0 ||
+      a.totalDocs > 0 ||
+      a.activeModules.length > 0
+    )
+    .sort((a, b) => recoveryAccountScore(b) - recoveryAccountScore(a))
     .slice(0, Math.min(120, Math.max(1, limit)));
+}
+
+export async function findRichestRecoveryAccount(): Promise<RecoveryAccount | null> {
+  const accounts = await listRecoveryAccounts(120);
+  return accounts[0] ?? null;
+}
+
+export async function restoreHighestToUid(toUid: string): Promise<{
+  migrated: number;
+  errors: number;
+  fromUid: string;
+  toUid: string;
+  sovereigntyPoints: number;
+  alreadyCurrent: boolean;
+}> {
+  const richest = await findRichestRecoveryAccount();
+  if (!richest) {
+    throw new Error("No hay ninguna cuenta con datos en Firebase.");
+  }
+  if (richest.uid === toUid) {
+    return {
+      migrated: 0,
+      errors: 0,
+      fromUid: richest.uid,
+      toUid,
+      sovereigntyPoints: richest.sovereigntyPoints,
+      alreadyCurrent: true,
+    };
+  }
+  const result = await restoreUserData(richest.uid, toUid);
+  return {
+    ...result,
+    sovereigntyPoints: richest.sovereigntyPoints,
+    alreadyCurrent: false,
+  };
 }

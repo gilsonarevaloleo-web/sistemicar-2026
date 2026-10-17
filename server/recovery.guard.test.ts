@@ -12,9 +12,11 @@ describe("recuperación de cuenta — admin", () => {
     assert.match(src, /\/api\/admin\/recovery\/inventory/);
     assert.match(src, /\/api\/admin\/recovery\/restore/);
     assert.match(src, /\/api\/admin\/recovery\/accounts/);
+    assert.match(src, /\/api\/admin\/recovery\/restore-highest/);
     assert.match(src, /inventoryUserCollections/);
     assert.match(src, /restoreUserData/);
     assert.match(src, /listRecoveryAccounts/);
+    assert.match(src, /restoreHighestToUid/);
   });
 
   it("el admin SDK copia la lista canónica con merge", () => {
@@ -25,6 +27,8 @@ describe("recuperación de cuenta — admin", () => {
     assert.match(src, /buildMigratedDocData/);
     assert.match(src, /\{ merge: true \}/);
     assert.match(src, /export async function listRecoveryAccounts/);
+    assert.match(src, /export async function restoreHighestToUid/);
+    assert.match(src, /sovereigntyPoints/);
     assert.match(src, /RECOVERY_SCAN_COLLECTIONS/);
     assert.match(src, /gilsonarevalo.leo@gmail.com/);
   });

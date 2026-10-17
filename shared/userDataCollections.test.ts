@@ -64,6 +64,7 @@ describe("userDataCollections — recuperación tras limpieza del dispositivo", 
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("plantillasRutina"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("volcados_v3"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("umbralLogros"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("sovereigntyPointsLog"));
     assert.equal(uidFromPrivateCollectionPath(
       "artifacts/sistemicar-v2-5/users/abc123/situacionReserva/x",
       "situacionReserva",

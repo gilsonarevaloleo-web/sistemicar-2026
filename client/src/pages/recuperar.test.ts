@@ -30,5 +30,7 @@ describe("página /recuperar", () => {
     assert.match(admin, /Entra con Google/);
     assert.match(admin, /button-recovery-google/);
     assert.match(admin, /input-recovery-query/);
+    assert.match(admin, /\/api\/admin\/recovery\/restore-highest/);
+    assert.match(admin, /button-restore-highest/);
   });
 });

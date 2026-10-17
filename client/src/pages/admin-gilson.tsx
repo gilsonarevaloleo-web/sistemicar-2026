@@ -59,6 +59,7 @@ interface AccountData {
   whatsapp?: string | null;
   email?: string;
   totalDocs?: number;
+  sovereigntyPoints?: number;
   features?: Record<RecoveryFeature, number>;
 }
 
@@ -130,9 +131,10 @@ export default function AdminGilson() {
   const [searchingAccounts, setSearchingAccounts] = useState(false);
   const [migratingUid, setMigratingUid] = useState<string | null>(null);
   const [inspectingUid, setInspectingUid] = useState<string | null>(null);
-  const [recoveryQuery, setRecoveryQuery] = useState("gilsonarevalo.leo@gmail.com");
+  const [recoveryQuery, setRecoveryQuery] = useState("");
   const [recoverySearchHint, setRecoverySearchHint] = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
+  const [restoringHighest, setRestoringHighest] = useState(false);
   const [inventories, setInventories] = useState<Record<string, {
     features: Record<RecoveryFeature, number>;
     total: number;
@@ -342,6 +344,44 @@ export default function AdminGilson() {
       }
     } finally {
       setSearchingAccounts(false);
+    }
+  };
+
+  const restoreHighestAccount = async () => {
+    if (!user?.uid) {
+      toast.error("Entra con Google primero");
+      return;
+    }
+    const confirmed = confirm(
+      "Esto busca la cuenta con MÁS puntos (la de ~9000 PS) y la copia a ESTE Gmail. No borra el origen. ¿Seguir?"
+    );
+    if (!confirmed) return;
+    setRestoringHighest(true);
+    try {
+      const headers = await getAdminHeaders();
+      if (!headers.Authorization) {
+        toast.error("Entra con Google (gilsonarevalo.leo@gmail.com).");
+        return;
+      }
+      const res = await fetch("/api/admin/recovery/restore-highest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ toUid: user.uid }),
+      });
+      const data = await res.json();
+      if (res.status === 403) {
+        toast.error("Entra con tu Google gilsonarevalo.leo@gmail.com");
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "No se pudo restaurar");
+      toast.success(data.message || "Restauración lista. Recarga Crisol y Récord.");
+      if (data.migrated > 0) {
+        window.location.reload();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error restaurando la cuenta de 9000");
+    } finally {
+      setRestoringHighest(false);
     }
   };
 
@@ -1327,6 +1367,15 @@ export default function AdminGilson() {
               {recoverySearchHint && (
                 <p className="mt-3 text-xs text-amber-300 break-words">{recoverySearchHint}</p>
               )}
+              <button
+                type="button"
+                onClick={() => void restoreHighestAccount()}
+                disabled={restoringHighest}
+                className="mt-3 w-full py-3 rounded-xl bg-amber-500 text-black font-bold disabled:opacity-50"
+                data-testid="button-restore-highest"
+              >
+                {restoringHighest ? "Copiando la cuenta de 9000..." : "Traer mis 9000 puntos a este Gmail"}
+              </button>
             </div>
 
             {accounts.length > 0 && (
@@ -1359,7 +1408,9 @@ export default function AdminGilson() {
                           <p className="text-[10px] text-slate-500 font-mono break-all">{account.uid}</p>
                         )}
                         <div className="flex flex-wrap items-center gap-3 mt-1">
-                          <span className="text-amber-400 font-bold">{account.totalCP} pts</span>
+                          <span className="text-amber-400 font-bold">
+                            {account.sovereigntyPoints ?? 0} PS · {account.totalCP} CP
+                          </span>
                           <span className="text-xs text-slate-500">Rango: {account.rank.toUpperCase()}</span>
                           {jornadaOn ? (
                             <span className="text-xs text-emerald-400 font-bold">Jornada on</span>

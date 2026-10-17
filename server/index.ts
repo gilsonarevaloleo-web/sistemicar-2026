@@ -83,7 +83,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, listRecoveryAccounts, lookupAuthUserByUid, restoreUserData } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, listRecoveryAccounts, lookupAuthUserByUid, restoreHighestToUid, restoreUserData } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5194,11 +5194,12 @@ app.post("/api/espejo/claim-purchase-credits", async (req, res) => {
 });
 
 async function requireAdminToken(req: any, res: any, next: any) {
-  const email = await verifyFirebaseIdToken(req.headers.authorization || "");
-  if (email !== OWNER_EMAIL) {
+  const verified = await verifyFirebaseJwt(req.headers.authorization || "");
+  if (!verified?.email || verified.email !== OWNER_EMAIL) {
     return res.status(403).json({ error: "Acceso restringido al propietario." });
   }
-  (req as { adminEmail?: string }).adminEmail = email ?? undefined;
+  (req as { adminEmail?: string; adminUid?: string }).adminEmail = verified.email;
+  (req as { adminEmail?: string; adminUid?: string }).adminUid = verified.uid ?? undefined;
   next();
 }
 
@@ -5373,6 +5374,7 @@ app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
             email: lookup.email || q.toLowerCase(),
             displayName: lookup.displayName ?? null,
             totalCP: lookup.totalCP ?? 0,
+            sovereigntyPoints: lookup.sovereigntyPoints ?? 0,
             rank: lookup.rank || "iniciado",
             activeModules: lookup.activeModules ?? [],
             whatsapp: lookup.whatsapp ?? null,
@@ -5395,6 +5397,7 @@ app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
             email: authUser?.email || "",
             displayName: authUser?.displayName ?? null,
             totalCP: 0,
+            sovereigntyPoints: 0,
             rank: "iniciado",
             activeModules: [],
             whatsapp: null,
@@ -5454,6 +5457,38 @@ app.post("/api/admin/recovery/restore", requireAdminToken, async (req, res) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error restaurando datos.";
     console.error("[admin/recovery/restore]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/api/admin/recovery/restore-highest", requireAdminToken, async (req, res) => {
+  try {
+    const toUid =
+      (typeof req.body?.toUid === "string" && req.body.toUid.trim()) ||
+      (req as { adminUid?: string }).adminUid ||
+      "";
+    if (!toUid) {
+      return res.status(400).json({ error: "No hay UID destino. Entra con Google." });
+    }
+    const result = await restoreHighestToUid(toUid);
+    if (result.alreadyCurrent) {
+      return res.json({
+        ok: true,
+        message: `Esta sesión ya es la cuenta más llena (${result.sovereigntyPoints} PS).`,
+        ...result,
+      });
+    }
+    res.json({
+      ok: result.migrated > 0,
+      message:
+        result.migrated > 0
+          ? `Se copiaron ${result.migrated} registros (${result.sovereigntyPoints} PS) a tu Gmail actual.`
+          : "La cuenta más llena no tenía documentos que copiar.",
+      ...result,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error restaurando la cuenta más llena.";
+    console.error("[admin/recovery/restore-highest]", error);
     res.status(500).json({ error: message });
   }
 });
