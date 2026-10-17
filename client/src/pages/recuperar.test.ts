@@ -23,4 +23,12 @@ describe("página /recuperar", () => {
     assert.match(menu, /href="\/recuperar"/);
     assert.match(menu, /limpiaste el teléfono/);
   });
+
+  it("el admin busca en la nube, no solo en el teléfono", () => {
+    const admin = readFileSync(join(dir, "admin-gilson.tsx"), "utf8");
+    assert.match(admin, /\/api\/admin\/recovery\/accounts/);
+    assert.match(admin, /Entra con Google/);
+    assert.match(admin, /button-recovery-google/);
+    assert.match(admin, /input-recovery-query/);
+  });
 });
