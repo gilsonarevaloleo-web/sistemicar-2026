@@ -7,7 +7,7 @@ import { findAccountsWithData, grantModulesToUid, migrateDataToNewUid, modulesGr
 import { RECOVERY_FEATURE_LABELS, type RecoveryFeature } from "@shared/userDataCollections";
 import { useAuthContext } from "@/App";
 import { isOwner } from "@/lib/owner";
-import { auth, getUserEmail } from "@/lib/firebase";
+import { auth, getUserEmail, isFirebaseConfigured, isUserAnonymous, signInWithGoogle } from "@/lib/firebase";
 import { getIdToken } from "firebase/auth";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import {
@@ -57,6 +57,9 @@ interface AccountData {
   activeModules?: string[];
   subscriptionPlan?: string | null;
   whatsapp?: string | null;
+  email?: string;
+  totalDocs?: number;
+  features?: Record<RecoveryFeature, number>;
 }
 
 type AdminUserLookup = {
@@ -127,6 +130,9 @@ export default function AdminGilson() {
   const [searchingAccounts, setSearchingAccounts] = useState(false);
   const [migratingUid, setMigratingUid] = useState<string | null>(null);
   const [inspectingUid, setInspectingUid] = useState<string | null>(null);
+  const [recoveryQuery, setRecoveryQuery] = useState("gilsonarevalo.leo@gmail.com");
+  const [recoverySearchHint, setRecoverySearchHint] = useState<string | null>(null);
+  const [googleLinking, setGoogleLinking] = useState(false);
   const [inventories, setInventories] = useState<Record<string, {
     features: Record<RecoveryFeature, number>;
     total: number;
@@ -264,21 +270,95 @@ export default function AdminGilson() {
     toast.success("¡Comisión marcada como pagada!");
   };
 
-  const searchAccounts = async (opts?: { silent?: boolean }) => {
+  const searchAccounts = async (opts?: { silent?: boolean; query?: string }) => {
     setSearchingAccounts(true);
+    setRecoverySearchHint(null);
     try {
-      const found = await findAccountsWithData();
+      const headers = await getAdminHeaders();
+      if (!headers.Authorization) {
+        if (!opts?.silent) {
+          toast.error("Entra con Google (gilsonarevalo.leo@gmail.com). La clave del panel no ve Firebase.");
+        }
+        setRecoverySearchHint("Sin Google el botón no puede listar cuentas. Entra con el mismo Gmail.");
+        return;
+      }
+      const q = (opts?.query ?? recoveryQuery).trim();
+      const url = q
+        ? `/api/admin/recovery/accounts?q=${encodeURIComponent(q)}`
+        : "/api/admin/recovery/accounts";
+      const res = await fetch(url, { headers });
+      const data = await res.json();
+      if (res.status === 403) {
+        if (!opts?.silent) {
+          toast.error("Entra con tu Google gilsonarevalo.leo@gmail.com. Este anónimo no es tu cuenta.");
+        }
+        setRecoverySearchHint("La sesión actual no es el Gmail del arquitecto. Entra con Google y busca otra vez.");
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.error || "Error buscando cuentas");
+      }
+      if (data.adminReady === false) {
+        setRecoverySearchHint(
+          data.parseError || data.initError ||
+            "El servidor no tiene FIREBASE_SERVICE_ACCOUNT_JSON. Sin eso no lista las cuentas viejas.",
+        );
+      }
+      const found: AccountData[] = (data.accounts || []).map((a: AccountData & { totalDocs?: number }) => ({
+        ...a,
+        lastUpdated: a.lastUpdated ? new Date(a.lastUpdated) : null,
+      }));
+      if (found.length === 0 && !q) {
+        const fallback = await findAccountsWithData();
+        setAccounts(fallback);
+        if (!opts?.silent) {
+          toast.info(
+            fallback.length === 0
+              ? "Firebase no devolvió cuentas. Entra con Google y busca tu Gmail, no dejes el recuadro vacío."
+              : `Se encontraron ${fallback.length} cuentas (búsqueda local)`,
+          );
+        }
+        return;
+      }
       setAccounts(found);
+      const inventoriesFromSearch: Record<string, { features: Record<RecoveryFeature, number>; total: number }> = {};
+      for (const a of found) {
+        if (a.features && typeof a.totalDocs === "number") {
+          inventoriesFromSearch[a.uid] = { features: a.features, total: a.totalDocs };
+        }
+      }
+      if (Object.keys(inventoriesFromSearch).length > 0) {
+        setInventories((prev) => ({ ...prev, ...inventoriesFromSearch }));
+      }
       if (opts?.silent) return;
       if (found.length === 0) {
-        toast.info("No se encontraron cuentas con datos");
+        toast.info("Ese Gmail o UID no tiene documentos. Prueba el Gmail de siempre o deja el recuadro y busca todas.");
       } else {
-        toast.success(`Se encontraron ${found.length} cuentas con datos`);
+        toast.success(`Se encontraron ${found.length} cuentas`);
       }
     } catch (error) {
-      if (!opts?.silent) toast.error("Error buscando cuentas");
+      if (!opts?.silent) {
+        toast.error(error instanceof Error ? error.message : "Error buscando cuentas");
+      }
     } finally {
       setSearchingAccounts(false);
+    }
+  };
+
+  const handleAdminGoogle = async () => {
+    if (!isFirebaseConfigured()) {
+      toast.error("Firebase no está configurado");
+      return;
+    }
+    setGoogleLinking(true);
+    try {
+      await signInWithGoogle();
+      toast.success("Google conectado. Ahora busca cuentas.");
+    } catch (error) {
+      toast.error("No se pudo entrar con Google");
+      console.error(error);
+    } finally {
+      setGoogleLinking(false);
     }
   };
 
@@ -1183,13 +1263,27 @@ export default function AdminGilson() {
 
         {activeTab === "recovery" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 break-words">
               <h3 className="text-amber-300 font-bold mb-1">Si limpiaste el teléfono</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Primero entra con el mismo Google en <span className="text-amber-200">/recuperar</span>.
-                La nube no se borra al limpiar el dispositivo. Si ya estás con Gmail y sigue vacío,
-                busca el UID viejo, inspecciona Crisol / Récord / Rutina / Depósito / Umbral y cópialo a tu sesión actual.
+                La clave del panel no alcanza. Primero entra con Google
+                (gilsonarevalo.leo@gmail.com). Después busca ese mismo Gmail.
+                El botón de antes miraba solo el teléfono y por eso decía que no había cuentas.
               </p>
+              <p className="mt-2 text-[11px] text-slate-500">
+                Sesión ahora: {user?.email || getUserEmail() || "anónima / vacía"} · UID {user?.uid?.slice(0, 10) || "—"}
+              </p>
+              {(!user?.email || isUserAnonymous()) && (
+                <button
+                  type="button"
+                  onClick={() => void handleAdminGoogle()}
+                  disabled={googleLinking}
+                  className="mt-3 w-full py-3 rounded-xl bg-blue-600 text-white font-bold disabled:opacity-50"
+                  data-testid="button-recovery-google"
+                >
+                  {googleLinking ? "Conectando..." : "Entrar con Google para ver Firebase"}
+                </button>
+              )}
             </div>
             <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
               <div className="flex items-start gap-3 mb-4">
@@ -1197,19 +1291,42 @@ export default function AdminGilson() {
                 <div>
                   <h3 className="text-green-400 font-bold mb-1">Cuentas con datos en Firebase</h3>
                   <p className="text-xs text-slate-400">
-                    Encender Jornada escribe el plan en ESE UID. Copiar a tu Gilson restaura Crisol, Récord, Rutina, Depósito y Umbral a tu sesión actual.
+                    Pega tu Gmail o un UID. Vacío = lista todas las que tengan Crisol, Récord, Rutina, Depósito o Umbral.
                   </p>
                 </div>
               </div>
+              <input
+                type="text"
+                value={recoveryQuery}
+                onChange={(e) => setRecoveryQuery(e.target.value)}
+                placeholder="gilsonarevalo.leo@gmail.com o UID"
+                className="mb-3 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm text-white"
+                data-testid="input-recovery-query"
+              />
               <button
                 type="button"
-                onClick={searchAccounts}
+                onClick={() => void searchAccounts()}
                 disabled={searchingAccounts}
                 className="w-full py-3 rounded-xl bg-green-500 text-white font-bold disabled:opacity-50"
                 data-testid="button-search-accounts"
               >
-                {searchingAccounts ? "Buscando cuentas..." : "Buscar Cuentas con Datos"}
+                {searchingAccounts ? "Buscando cuentas..." : "Buscar en la nube"}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryQuery("");
+                  void searchAccounts({ query: "" });
+                }}
+                disabled={searchingAccounts}
+                className="mt-2 w-full py-2 rounded-xl bg-white/5 text-slate-300 text-sm font-bold disabled:opacity-50"
+                data-testid="button-search-all-accounts"
+              >
+                Listar todas las cuentas con datos
+              </button>
+              {recoverySearchHint && (
+                <p className="mt-3 text-xs text-amber-300 break-words">{recoverySearchHint}</p>
+              )}
             </div>
 
             {accounts.length > 0 && (
@@ -1232,12 +1349,15 @@ export default function AdminGilson() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-white font-mono text-sm">
-                          {account.uid.slice(0, 20)}...
+                        <p className="text-white font-mono text-sm break-all">
+                          {account.email || account.uid.slice(0, 20) + "..."}
                           {account.uid === user?.uid && (
-                            <span className="ml-2 text-green-400 text-xs">(TU CUENTA GILSON)</span>
+                            <span className="ml-2 text-green-400 text-xs">(TU SESIÓN)</span>
                           )}
                         </p>
+                        {account.email && (
+                          <p className="text-[10px] text-slate-500 font-mono break-all">{account.uid}</p>
+                        )}
                         <div className="flex flex-wrap items-center gap-3 mt-1">
                           <span className="text-amber-400 font-bold">{account.totalCP} pts</span>
                           <span className="text-xs text-slate-500">Rango: {account.rank.toUpperCase()}</span>

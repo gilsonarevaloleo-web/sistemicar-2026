@@ -83,7 +83,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, restoreUserData } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, listRecoveryAccounts, lookupAuthUserByUid, restoreUserData } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5347,6 +5347,72 @@ app.get("/api/admin/users/clients", requireAdminToken, async (req, res) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error listando clientes.";
     console.error("[admin/users/clients]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
+  try {
+    const limitStr = typeof req.query.limit === "string" ? req.query.limit : "80";
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (q.includes("@")) {
+      const lookup = await adminLookupUserByEmail(q);
+      if (!lookup.found || !lookup.uid) {
+        return res.json({
+          ...firebaseAdminStatus(),
+          accounts: [],
+          lookup,
+        });
+      }
+      const inventory = await inventoryUserCollections(lookup.uid);
+      return res.json({
+        ...firebaseAdminStatus(),
+        accounts: [
+          {
+            uid: lookup.uid,
+            email: lookup.email || q.toLowerCase(),
+            displayName: lookup.displayName ?? null,
+            totalCP: lookup.totalCP ?? 0,
+            rank: lookup.rank || "iniciado",
+            activeModules: lookup.activeModules ?? [],
+            whatsapp: lookup.whatsapp ?? null,
+            subscriptionPlan: lookup.subscriptionPlan ?? null,
+            features: inventory.features,
+            totalDocs: inventory.total,
+          },
+        ],
+        lookup,
+      });
+    }
+    if (q) {
+      const inventory = await inventoryUserCollections(q);
+      const authUser = await lookupAuthUserByUid(q);
+      return res.json({
+        ...firebaseAdminStatus(),
+        accounts: [
+          {
+            uid: q,
+            email: authUser?.email || "",
+            displayName: authUser?.displayName ?? null,
+            totalCP: 0,
+            rank: "iniciado",
+            activeModules: [],
+            whatsapp: null,
+            subscriptionPlan: null,
+            features: inventory.features,
+            totalDocs: inventory.total,
+          },
+        ],
+      });
+    }
+    const accounts = await listRecoveryAccounts(parseInt(limitStr, 10) || 80);
+    res.json({
+      ...firebaseAdminStatus(),
+      accounts,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error listando cuentas para recuperar.";
+    console.error("[admin/recovery/accounts]", error);
     res.status(500).json({ error: message });
   }
 });
