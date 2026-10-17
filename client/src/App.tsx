@@ -62,6 +62,7 @@ const TerminosCondiciones = lazyWithRetry(() => import("@/pages/terminos-condici
 const LibroReclamaciones = lazyWithRetry(() => import("@/pages/libro-reclamaciones"));
 const EmbudoSistemicar = lazyWithRetry(() => import("@/pages/embudo-sistemicar"));
 const Acceso = lazyWithRetry(() => import("@/pages/acceso"));
+const Recuperar = lazyWithRetry(() => import("@/pages/recuperar"));
 const Documentos = lazyWithRetry(() => import("@/pages/documentos"));
 const EspejoV2 = lazyWithRetry(() => import("@/pages/espejo-v2"));
 const EspejoExpedientes = lazyWithRetry(() => import("@/pages/espejo-expedientes"));
@@ -689,6 +690,7 @@ function Router() {
         </Route>
         <Route path="/bienvenida" component={Bienvenida} />
         <Route path="/acceso" component={Acceso} />
+        <Route path="/recuperar" component={Recuperar} />
         <Route path="/terminos-condiciones" component={TerminosCondiciones} />
         <Route path="/libro-reclamaciones" component={LibroReclamaciones} />
         <Route path="/embudo" component={EmbudoSistemicar} />

@@ -28,3 +28,24 @@ describe("grantModulesToUid — no usa la progresión local de Gilson", () => {
     assert.match(fn, /collectionGroup/);
   });
 });
+
+describe("migrateDataToNewUid — recuperación completa", () => {
+  const fn = src.slice(
+    src.indexOf("export async function migrateDataToNewUid"),
+    src.indexOf("const LOCAL_RECOVERY_KEYS"),
+  );
+
+  it("copia con setDoc y la lista canónica, no los nombres viejos sueltos", () => {
+    assert.match(fn, /collectionsToMigrate/);
+    assert.match(fn, /setDoc/);
+    assert.match(fn, /buildMigratedDocData/);
+    assert.doesNotMatch(fn, /hopeLog", "bossSteps/);
+    assert.doesNotMatch(fn, /addDoc\(collection\(db, newPath\)/);
+  });
+
+  it("detecta sesión local vacía para no migrar el anónimo nuevo", () => {
+    assert.match(src, /export function localAccountLooksEmpty/);
+    assert.match(src, /sistemicar_situacion_reserva/);
+    assert.match(src, /sistemicar_volcados_v3/);
+  });
+});
