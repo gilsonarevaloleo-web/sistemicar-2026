@@ -85,6 +85,14 @@ import {
 } from "@shared/jornadaBaseAccess";
 import { normalizeClientPhone, pickClientPhoneFromSources } from "@shared/phone";
 import { isPreviewOpsUnlocked } from "./previewOps";
+import {
+  buildMigratedDocData,
+  collectionsToMigrate,
+  featureCountsFromCollections,
+  RECOVERY_FEATURE_LABELS,
+  totalDocs,
+  type RecoveryFeature,
+} from "@shared/userDataCollections";
 
 export interface AcervoEntry {
   id: string;
@@ -196,31 +204,74 @@ export async function syncLocalDataToFirebase(userId: string): Promise<{ synced:
   return { synced, errors };
 }
 
+export async function countAccountCollections(
+  userId: string
+): Promise<{
+  collections: Record<string, number>;
+  features: Record<RecoveryFeature, number>;
+  labels: typeof RECOVERY_FEATURE_LABELS;
+  total: number;
+}> {
+  const collections: Record<string, number> = {};
+  if (!isFirebaseConfigured() || !db || !userId) {
+    return {
+      collections,
+      features: featureCountsFromCollections(collections),
+      labels: RECOVERY_FEATURE_LABELS,
+      total: 0,
+    };
+  }
+
+  for (const collName of collectionsToMigrate()) {
+    try {
+      const snapshot = await getDocs(collection(db, getPrivatePath(userId, collName)));
+      if (snapshot.size > 0) collections[collName] = snapshot.size;
+    } catch {
+      // Sin permiso o colección vacía: se omite.
+    }
+  }
+
+  return {
+    collections,
+    features: featureCountsFromCollections(collections),
+    labels: RECOVERY_FEATURE_LABELS,
+    total: totalDocs(collections),
+  };
+}
+
+/**
+ * Copia Crisol, Récord, Rutina, Depósito, Umbral y el resto de colecciones
+ * privadas. Conserva el id del documento (setDoc) para no duplicar.
+ */
 export async function migrateDataToNewUid(oldUid: string, newUid: string): Promise<{ migrated: number; errors: number }> {
   if (!isFirebaseConfigured() || !db) {
+    return { migrated: 0, errors: 0 };
+  }
+  if (!oldUid || !newUid || oldUid === newUid) {
     return { migrated: 0, errors: 0 };
   }
 
   let migrated = 0;
   let errors = 0;
 
-  const collections = ["energyLogs", "vehicles", "progression", "acervo", "codices", "hopeLog", "bossSteps"];
-
-  for (const collName of collections) {
+  for (const collName of collectionsToMigrate()) {
     try {
       const oldPath = getPrivatePath(oldUid, collName);
       const newPath = getPrivatePath(newUid, collName);
       const snapshot = await getDocs(collection(db, oldPath));
-      
+
       for (const docSnap of snapshot.docs) {
         try {
-          const data = docSnap.data();
-          await addDoc(collection(db, newPath), {
-            ...data,
-            userId: newUid,
-            migratedFrom: oldUid,
-            migratedAt: serverTimestamp()
-          });
+          const payload = buildMigratedDocData(
+            docSnap.data() as Record<string, unknown>,
+            newUid,
+            oldUid
+          );
+          await setDoc(
+            doc(db, newPath, docSnap.id),
+            { ...payload, migratedAt: serverTimestamp() },
+            { merge: true }
+          );
           migrated++;
         } catch {
           errors++;
@@ -232,6 +283,35 @@ export async function migrateDataToNewUid(oldUid: string, newUid: string): Promi
   }
 
   return { migrated, errors };
+}
+
+const LOCAL_RECOVERY_KEYS = [
+  "sistemicar_vehicles",
+  "sistemicar_progression",
+  "sistemicar_volcados",
+  "sistemicar_volcados_v3",
+  "sistemicar_situacion_reserva",
+  "sistemicar_acervo",
+];
+
+/** Tras limpiar el teléfono la sesión anónima nueva está vacía: no hay que migrarla. */
+export function localAccountLooksEmpty(userId?: string | null): boolean {
+  if (typeof localStorage === "undefined") return true;
+  try {
+    for (const key of LOCAL_RECOVERY_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw && raw !== "[]" && raw !== "{}") return false;
+    }
+    if (userId) {
+      const plantillas = localStorage.getItem(`sistemicar_plantillas_rutina_${userId}`);
+      if (plantillas && plantillas !== "[]") return false;
+      const umbral = localStorage.getItem(`umbral_v2_logros_${userId}`);
+      if (umbral && umbral !== "[]") return false;
+    }
+  } catch {
+    return true;
+  }
+  return true;
 }
 
 export function saveMigrationPending(oldUid: string): void {

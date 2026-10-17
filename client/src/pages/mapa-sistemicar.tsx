@@ -86,6 +86,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/socios", nombre: "Alianza (Socios)", desc: "Panel de socios y colaboradores", icon: Users, color: "#6b7280", acceso: "en_camino" },
       { path: "/admin-gilson", nombre: "Admin Gilson", desc: "Panel de administración exclusivo", icon: Settings, color: "#6b7280", acceso: "usuario" },
       { path: "/acceso", nombre: "Acceso / Login", desc: "Inicio de sesión con Google", icon: Lock, color: "#6b7280", acceso: "libre" },
+      { path: "/recuperar", nombre: "Recuperar datos", desc: "Si limpiaste el teléfono: entrar con el mismo Google", icon: Lock, color: "#6b7280", acceso: "libre" },
       { path: "/bienvenida", nombre: "Bienvenida", desc: "Pantalla de bienvenida inicial", icon: Home, color: "#6b7280", acceso: "libre" },
       { path: "/terminos-condiciones", nombre: "Términos y Condiciones", desc: "Marco legal del servicio", icon: FileText, color: "#6b7280", acceso: "libre" },
       { path: "/libro-reclamaciones", nombre: "Libro de Reclamaciones", desc: "Canal de quejas oficial", icon: FileText, color: "#6b7280", acceso: "libre" },

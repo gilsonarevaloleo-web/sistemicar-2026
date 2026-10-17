@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Shield, Users, CheckCircle, Crown, Zap, Eye, EyeOff, RefreshCw, DollarSign, AlertTriangle, Database, ArrowRight, FlaskConical, Star, Trash2, Brain, Dna, X, Sprout } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { findAccountsWithData, grantModulesToUid, migrateDataToNewUid, modulesGrantedByPlan, subscribeToPrincipiosMaestros, addPrincipioMaestro, deletePrincipioMaestro, PrincipioMaestro, subscribeToEnergyLogs, EnergyLog, subscribeToVehicles, Vehicle, subscribeToGenomeLaws, saveGenomeLaw, updateGenomeLawStatus, deleteGenomeLaw, GenomeLaw, getAllProspectos } from "@/lib/persistence";
+import { findAccountsWithData, grantModulesToUid, migrateDataToNewUid, modulesGrantedByPlan, subscribeToPrincipiosMaestros, addPrincipioMaestro, deletePrincipioMaestro, PrincipioMaestro, subscribeToEnergyLogs, EnergyLog, subscribeToVehicles, Vehicle, subscribeToGenomeLaws, saveGenomeLaw, updateGenomeLawStatus, deleteGenomeLaw, GenomeLaw, getAllProspectos, countAccountCollections } from "@/lib/persistence";
+import { RECOVERY_FEATURE_LABELS, type RecoveryFeature } from "@shared/userDataCollections";
 import { useAuthContext } from "@/App";
 import { isOwner } from "@/lib/owner";
 import { auth, getUserEmail } from "@/lib/firebase";
@@ -125,6 +126,11 @@ export default function AdminGilson() {
   const [accounts, setAccounts] = useState<AccountData[]>([]);
   const [searchingAccounts, setSearchingAccounts] = useState(false);
   const [migratingUid, setMigratingUid] = useState<string | null>(null);
+  const [inspectingUid, setInspectingUid] = useState<string | null>(null);
+  const [inventories, setInventories] = useState<Record<string, {
+    features: Record<RecoveryFeature, number>;
+    total: number;
+  }>>({});
   const [grantingUid, setGrantingUid] = useState<string | null>(null);
   const [creditEmail, setCreditEmail] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
@@ -285,8 +291,30 @@ export default function AdminGilson() {
       toast.info("Esta ya es tu cuenta actual");
       return;
     }
+    const confirmed = confirm(
+      "Esto copia Crisol, Récord, Rutina, Depósito y Umbral de esa cuenta a TU sesión actual. No borra el origen. ¿Seguir?"
+    );
+    if (!confirmed) return;
     setMigratingUid(oldUid);
     try {
+      const headers = await getAdminHeaders();
+      if (headers.Authorization) {
+        const res = await fetch("/api/admin/recovery/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({ fromUid: oldUid, toUid: user.uid }),
+        });
+        const data = await res.json();
+        if (res.ok && typeof data.migrated === "number") {
+          if (data.migrated > 0) {
+            toast.success(data.message || `Se copiaron ${data.migrated} registros`);
+            window.location.reload();
+            return;
+          }
+          toast.info(data.message || "No se encontraron datos para migrar");
+          return;
+        }
+      }
       const result = await migrateDataToNewUid(oldUid, user.uid);
       if (result.migrated > 0) {
         toast.success(`¡Migración exitosa! ${result.migrated} registros transferidos`);
@@ -298,6 +326,44 @@ export default function AdminGilson() {
       toast.error("Error en la migración");
     } finally {
       setMigratingUid(null);
+    }
+  };
+
+  const inspectAccount = async (uid: string) => {
+    setInspectingUid(uid);
+    try {
+      const headers = await getAdminHeaders();
+      if (headers.Authorization) {
+        const res = await fetch(
+          `/api/admin/recovery/inventory?uid=${encodeURIComponent(uid)}`,
+          { headers },
+        );
+        const data = await res.json();
+        if (res.ok && data.inventory) {
+          setInventories((prev) => ({
+            ...prev,
+            [uid]: {
+              features: data.inventory.features,
+              total: data.inventory.total,
+            },
+          }));
+          toast.success(
+            data.inventory.total > 0
+              ? `${data.inventory.total} documentos en esa cuenta`
+              : "Esa cuenta no tiene documentos",
+          );
+          return;
+        }
+      }
+      const local = await countAccountCollections(uid);
+      setInventories((prev) => ({
+        ...prev,
+        [uid]: { features: local.features, total: local.total },
+      }));
+    } catch {
+      toast.error("No se pudo inspeccionar esa cuenta");
+    } finally {
+      setInspectingUid(null);
     }
   };
 
@@ -1117,13 +1183,21 @@ export default function AdminGilson() {
 
         {activeTab === "recovery" && (
           <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <h3 className="text-amber-300 font-bold mb-1">Si limpiaste el teléfono</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Primero entra con el mismo Google en <span className="text-amber-200">/recuperar</span>.
+                La nube no se borra al limpiar el dispositivo. Si ya estás con Gmail y sigue vacío,
+                busca el UID viejo, inspecciona Crisol / Récord / Rutina / Depósito / Umbral y cópialo a tu sesión actual.
+              </p>
+            </div>
             <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
               <div className="flex items-start gap-3 mb-4">
                 <Database className="text-green-400 flex-shrink-0" size={24} />
                 <div>
-                  <h3 className="text-green-400 font-bold mb-1">Encender Jornada en la cuenta que ya existe</h3>
+                  <h3 className="text-green-400 font-bold mb-1">Cuentas con datos en Firebase</h3>
                   <p className="text-xs text-slate-400">
-                    La cuenta de 56 pts es de ella. Encender Jornada Base escribe el plan en ESE UID — no copies los datos a tu cuenta Gilson.
+                    Encender Jornada escribe el plan en ESE UID. Copiar a tu Gilson restaura Crisol, Récord, Rutina, Depósito y Umbral a tu sesión actual.
                   </p>
                 </div>
               </div>
@@ -1181,9 +1255,27 @@ export default function AdminGilson() {
                             </span>
                           )}
                         </div>
+                        {inventories[account.uid] && (
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            {inventories[account.uid].total} docs ·{" "}
+                            {(Object.keys(RECOVERY_FEATURE_LABELS) as RecoveryFeature[])
+                              .map((key) => `${RECOVERY_FEATURE_LABELS[key]} ${inventories[account.uid].features[key]}`)
+                              .join(" · ")}
+                          </p>
+                        )}
                       </div>
+                      <div className="flex flex-col gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => void inspectAccount(account.uid)}
+                            disabled={inspectingUid === account.uid}
+                            className="px-3 py-1 rounded-lg bg-white/10 text-slate-200 text-[10px] font-bold disabled:opacity-50"
+                            data-testid={`button-inspeccionar-${account.uid.slice(0, 6)}`}
+                          >
+                            {inspectingUid === account.uid ? "Contando..." : "Ver Crisol / Récord / Rutina"}
+                          </button>
                       {account.uid !== user?.uid && (
-                        <div className="flex flex-col gap-2 shrink-0">
+                        <>
                           <button
                             type="button"
                             onClick={() => void grantPlanOnUid(account.uid)}
@@ -1215,8 +1307,9 @@ export default function AdminGilson() {
                               </>
                             )}
                           </button>
-                        </div>
+                        </>
                       )}
+                      </div>
                     </div>
                   </motion.div>
                   );

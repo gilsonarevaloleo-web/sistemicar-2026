@@ -83,7 +83,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail, firebaseAdminStatus, listAuthClientsWithProgression } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, restoreUserData } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5347,6 +5347,47 @@ app.get("/api/admin/users/clients", requireAdminToken, async (req, res) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error listando clientes.";
     console.error("[admin/users/clients]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get("/api/admin/recovery/inventory", requireAdminToken, async (req, res) => {
+  try {
+    const uid = typeof req.query.uid === "string" ? req.query.uid : "";
+    if (!uid.trim()) {
+      return res.status(400).json({ error: "Falta el UID a inspeccionar." });
+    }
+    const inventory = await inventoryUserCollections(uid);
+    res.json({
+      ...firebaseAdminStatus(),
+      inventory,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error inspeccionando la cuenta.";
+    console.error("[admin/recovery/inventory]", error);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/api/admin/recovery/restore", requireAdminToken, async (req, res) => {
+  try {
+    const fromUid = typeof req.body?.fromUid === "string" ? req.body.fromUid : "";
+    const toUid = typeof req.body?.toUid === "string" ? req.body.toUid : "";
+    if (!fromUid.trim() || !toUid.trim()) {
+      return res.status(400).json({ error: "Faltan fromUid o toUid." });
+    }
+    const result = await restoreUserData(fromUid, toUid);
+    res.json({
+      ok: result.migrated > 0,
+      message:
+        result.migrated > 0
+          ? `Se copiaron ${result.migrated} registros a tu cuenta actual.`
+          : "No había documentos que copiar en esa cuenta.",
+      ...result,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error restaurando datos.";
+    console.error("[admin/recovery/restore]", error);
     res.status(500).json({ error: message });
   }
 });

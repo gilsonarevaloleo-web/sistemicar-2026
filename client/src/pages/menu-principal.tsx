@@ -43,7 +43,7 @@ import { StatusAlianza } from "@/components/status-alianza";
 import { ResumenDiario } from "@/components/resumen-diario";
 import { TooltipOrientacion } from "@/components/tooltip-orientacion";
 import { Onboarding } from "@/components/onboarding";
-import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, extrasFromProgression, canEnterJornadaBaseMenu, resolveUserJornadaBaseAccess } from "@/lib/persistence";
+import { clearAllLocalData, subscribeToProgression, UserProgression, updateProgression, subscribeToCodices, SavedCodice, migrateDataToNewUid, saveMigrationPending, getMigrationPending, clearMigrationPending, subscribeToManualProgress, UserCertification, CERTIFICATION_LEVELS, extrasFromProgression, canEnterJornadaBaseMenu, resolveUserJornadaBaseAccess, localAccountLooksEmpty } from "@/lib/persistence";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
 import {
   jornadaMenuTileSubtitle,
@@ -399,9 +399,13 @@ export default function MenuPrincipal() {
       }
 
       const anonUid = auth.currentUser.uid;
-      saveMigrationPending(anonUid);
+      if (localAccountLooksEmpty(anonUid)) {
+        clearMigrationPending();
+      } else {
+        saveMigrationPending(anonUid);
+      }
       toast.info(
-        "Te llevamos a Google en esta misma ventana (sin popup bloqueado). Al volver, tu cuenta quedará conectada y tus datos se sincronizarán.",
+        "Te llevamos a Google en esta misma ventana. Si limpiaste el teléfono, entra con el mismo Gmail: la nube aún tiene Crisol, Récord, Rutina y Depósito.",
         { duration: 9000 }
       );
       await logOut();
@@ -580,7 +584,7 @@ export default function MenuPrincipal() {
               </div>
               <h3 className="text-lg font-bold text-white mb-2">Accede con tu Cuenta</h3>
               <p className="text-sm text-zinc-400 mb-4">
-                Inicia sesión con Google para ver todos tus puntos y progreso
+                Si limpiaste el teléfono, esta sesión vacía no es tu cuenta. Entra con el mismo Google: Crisol, Récord, Rutina, aprendizaje y Umbral siguen en la nube.
               </p>
               <button
                 onClick={handleLinkGoogle}
@@ -600,6 +604,13 @@ export default function MenuPrincipal() {
                 </svg>
                 {linking ? "Conectando..." : "Entrar con Google"}
               </button>
+              <Link
+                href="/recuperar"
+                className="mt-3 inline-block text-xs font-bold uppercase tracking-wider text-blue-300"
+                data-testid="link-recuperar-datos"
+              >
+                ¿Borraste todo al limpiar el dispositivo? Recuperar datos
+              </Link>
             </div>
           </motion.div>
         )}
@@ -634,6 +645,13 @@ export default function MenuPrincipal() {
               </div>
               {(
                 <div className="flex gap-2">
+                  <Link
+                    href="/recuperar"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-[10px] font-bold uppercase tracking-wider"
+                    data-testid="link-recuperar-datos-cuenta"
+                  >
+                    Recuperar
+                  </Link>
                   <button
                     onClick={handleMigrateToGoogle}
                     disabled={migrating}

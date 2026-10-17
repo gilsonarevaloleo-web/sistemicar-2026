@@ -13,6 +13,14 @@ import {
   mergeModuleIds,
   modulesGrantedByPlan,
 } from "../shared/moduleAccess";
+import {
+  buildMigratedDocData,
+  collectionsToMigrate,
+  featureCountsFromCollections,
+  RECOVERY_FEATURE_LABELS,
+  totalDocs,
+  type RecoveryFeature,
+} from "../shared/userDataCollections";
 
 let app: App | null = null;
 let initError: string | null = null;
@@ -513,4 +521,80 @@ export async function listAuthClientsWithProgression(
   return [...byUid.values()]
     .sort((a, b) => b.totalCP - a.totalCP)
     .slice(0, Math.min(100, Math.max(1, limit)));
+}
+
+export type RecoveryInventory = {
+  uid: string;
+  collections: Record<string, number>;
+  features: Record<RecoveryFeature, number>;
+  labels: typeof RECOVERY_FEATURE_LABELS;
+  total: number;
+};
+
+export async function inventoryUserCollections(uid: string): Promise<RecoveryInventory> {
+  const adminApp = getAdminApp();
+  if (!adminApp) {
+    throw new Error("Firebase Admin no está listo. Revisa FIREBASE_SERVICE_ACCOUNT_JSON.");
+  }
+  const trimmed = uid.trim();
+  if (!trimmed) {
+    throw new Error("Falta el UID.");
+  }
+  const db = getFirestore(adminApp);
+  const collections: Record<string, number> = {};
+  for (const name of collectionsToMigrate()) {
+    const snap = await db.collection(getPrivatePath(trimmed, name)).limit(400).get();
+    if (!snap.empty) collections[name] = snap.size;
+  }
+  return {
+    uid: trimmed,
+    collections,
+    features: featureCountsFromCollections(collections),
+    labels: RECOVERY_FEATURE_LABELS,
+    total: totalDocs(collections),
+  };
+}
+
+export async function restoreUserData(
+  fromUid: string,
+  toUid: string,
+): Promise<{ migrated: number; errors: number; fromUid: string; toUid: string }> {
+  const adminApp = getAdminApp();
+  if (!adminApp) {
+    throw new Error("Firebase Admin no está listo. Revisa FIREBASE_SERVICE_ACCOUNT_JSON.");
+  }
+  const source = fromUid.trim();
+  const dest = toUid.trim();
+  if (!source || !dest) {
+    throw new Error("Faltan UID de origen o destino.");
+  }
+  if (source === dest) {
+    return { migrated: 0, errors: 0, fromUid: source, toUid: dest };
+  }
+
+  const db = getFirestore(adminApp);
+  let migrated = 0;
+  let errors = 0;
+
+  for (const name of collectionsToMigrate()) {
+    const snap = await db.collection(getPrivatePath(source, name)).get();
+    for (const docSnap of snap.docs) {
+      try {
+        const payload = buildMigratedDocData(
+          docSnap.data() as Record<string, unknown>,
+          dest,
+          source,
+        );
+        await db
+          .collection(getPrivatePath(dest, name))
+          .doc(docSnap.id)
+          .set({ ...payload, migratedAt: FieldValue.serverTimestamp() }, { merge: true });
+        migrated += 1;
+      } catch {
+        errors += 1;
+      }
+    }
+  }
+
+  return { migrated, errors, fromUid: source, toUid: dest };
 }
