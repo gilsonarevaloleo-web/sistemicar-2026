@@ -5,6 +5,7 @@ import { getPrivatePath } from "../shared/firebasePaths";
 import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
 import {
   gmailLocalAnagram,
+  normalizeServiceAccountPrivateKey,
   parseFirebaseServiceAccountJson,
   serviceAccountPublicMeta,
 } from "../shared/firebaseServiceAccount";
@@ -30,7 +31,11 @@ let initError: string | null = null;
 function parseServiceAccount(): Record<string, unknown> | null {
   const parsed = parseFirebaseServiceAccountJson(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (!parsed.ok) return null;
-  return parsed.value;
+  const value = { ...parsed.value };
+  if (typeof value.private_key === "string") {
+    value.private_key = normalizeServiceAccountPrivateKey(value.private_key);
+  }
+  return value;
 }
 
 export function firebaseAdminStatus(): {
@@ -75,7 +80,10 @@ export function getAdminApp(): App | null {
     initError = null;
     return app;
   } catch (err) {
-    initError = err instanceof Error ? err.message : "init_failed";
+    const raw = err instanceof Error ? err.message : "init_failed";
+    initError = /private key|DECODER|unsupported/i.test(raw)
+      ? "llave_pem_rota"
+      : raw;
     console.warn("[firebaseAdmin] No se pudo inicializar:", err);
     return null;
   }

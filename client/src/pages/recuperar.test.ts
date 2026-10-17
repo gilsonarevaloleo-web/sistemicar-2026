@@ -32,5 +32,6 @@ describe("página /recuperar", () => {
     assert.match(admin, /input-recovery-query/);
     assert.match(admin, /\/api\/admin\/recovery\/restore-highest/);
     assert.match(admin, /button-restore-highest/);
+    assert.match(admin, /explainFirebaseAdminError/);
   });
 });

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  explainFirebaseAdminError,
   gmailLocalAnagram,
+  normalizeServiceAccountPrivateKey,
   parseFirebaseServiceAccountJson,
 } from "./firebaseServiceAccount.ts";
 
@@ -16,6 +18,10 @@ describe("FIREBASE_SERVICE_ACCOUNT_JSON — pegado en Netlify", () => {
   it("acepta JSON de una línea", () => {
     const r = parseFirebaseServiceAccountJson(JSON.stringify(VALID));
     assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.ok(String(r.value.private_key).includes("\n"));
+      assert.equal(String(r.value.private_key).includes("\\n"), false);
+    }
   });
 
   it("acepta el JSON envuelto en comillas extra (Netlify)", () => {
@@ -37,9 +43,26 @@ ABC
     assert.equal(r.ok, true);
   });
 
+  it("convierte \\n literales en saltos reales del PEM", () => {
+    const raw = "-----BEGIN PRIVATE KEY-----\\nABCDEFGHIJKLMNOP\\n-----END PRIVATE KEY-----\\n";
+    const pem = normalizeServiceAccountPrivateKey(raw);
+    assert.equal(pem.includes("\\n"), false);
+    assert.ok(pem.startsWith("-----BEGIN PRIVATE KEY-----\n"));
+    assert.ok(pem.includes("\nABCDEFGHIJKLMNOP\n"));
+  });
+
   it("falla si está vacía", () => {
     assert.equal(parseFirebaseServiceAccountJson("").ok, false);
     assert.equal(parseFirebaseServiceAccountJson("  ").error, "missing");
+  });
+
+  it("traduce el error de OpenSSL a una instrucción", () => {
+    const msg = explainFirebaseAdminError(
+      null,
+      "Failed to parse private key: Error: error:1E08010C:DECODER routines::unsupported",
+    );
+    assert.match(msg ?? "", /llave de Firebase en Netlify/);
+    assert.match(msg ?? "", /9000/);
   });
 
   it("reconoce Tina vs PinoCarreraTina", () => {
