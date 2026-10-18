@@ -30,4 +30,13 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /`Registrar \$\{displayNameForPlan\(modulePlanId\)\}`/);
     assert.doesNotMatch(src, /El servidor no puede buscar en Firebase\. Revisa FIREBASE_SERVICE_ACCOUNT_JSON/);
   });
+
+  it("muestra PS (no solo CP) y marca la cuenta llena para no apretar Encender a ciegas", () => {
+    const src = readFileSync(join(dir, "admin-gilson.tsx"), "utf8");
+    assert.match(src, /c\.sovereigntyPoints\} PS · \{c\.totalCP\} CP/);
+    assert.match(src, /ESTA ES LA LLENA/);
+    assert.match(src, /button-restore-highest-modulos/);
+    assert.match(src, /Encender no recupera datos/);
+    assert.match(src, /Los 9000 están en PS/);
+  });
 });

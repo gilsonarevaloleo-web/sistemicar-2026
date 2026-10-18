@@ -31,5 +31,8 @@ describe("recuperación de cuenta — admin", () => {
     assert.match(src, /sovereigntyPoints/);
     assert.match(src, /RECOVERY_SCAN_COLLECTIONS/);
     assert.match(src, /gilsonarevalo.leo@gmail.com/);
+    assert.match(src, /sovereigntyFromLogs/);
+    assert.match(src, /mergeSovereignty/);
+    assert.match(src, /sovereigntyPoints: mergeSovereignty/);
   });
 });

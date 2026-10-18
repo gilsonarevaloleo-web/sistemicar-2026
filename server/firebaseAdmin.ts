@@ -366,7 +366,13 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
     for (const docSnap of allProg.docs) {
       const data = docSnap.data() as Record<string, unknown>;
       totalCP = Math.max(totalCP, Number(data.totalCP || data.points || 0));
-      sovereigntyPoints = Math.max(sovereigntyPoints, Number(data.sovereigntyPoints || 0));
+      sovereigntyPoints = Math.max(
+        sovereigntyPoints,
+        Number(data.sovereigntyPoints || 0),
+        Number(data.ptsEspejo || 0) +
+          Number(data.ptsPlanificacion || 0) +
+          Number(data.ptsDeposito || 0),
+      );
     }
     if (prog) {
       rank = (prog.data.rank as string) || "iniciado";
@@ -401,6 +407,7 @@ export type AdminAuthClient = {
   email: string;
   displayName: string | null;
   totalCP: number;
+  sovereigntyPoints: number;
   rank: string;
   activeModules: string[];
   whatsapp?: string | null;
@@ -454,7 +461,12 @@ async function progressionByUid(
       const updatedAt =
         (data.updatedAt as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
       const totalCP = Number(data.totalCP || data.points || 0);
-      const sovereigntyPoints = Number(data.sovereigntyPoints || 0);
+      const sovereigntyPoints = Math.max(
+        Number(data.sovereigntyPoints || 0),
+        Number(data.ptsEspejo || 0) +
+          Number(data.ptsPlanificacion || 0) +
+          Number(data.ptsDeposito || 0),
+      );
       const prev = map.get(uid);
       if (!prev || updatedAt >= prev.updatedAt) {
         map.set(uid, {
@@ -483,6 +495,29 @@ async function progressionByUid(
   return map;
 }
 
+async function sovereigntyFromLogs(
+  db: ReturnType<typeof getFirestore>,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const snap = await db.collectionGroup("sovereigntyPointsLog").get();
+    for (const docSnap of snap.docs) {
+      const uid = uidFromPrivateCollectionPath(docSnap.ref.path, "sovereigntyPointsLog");
+      if (!uid) continue;
+      const amount = Number((docSnap.data() as { amount?: number }).amount || 0);
+      if (!Number.isFinite(amount)) continue;
+      map.set(uid, (map.get(uid) ?? 0) + amount);
+    }
+  } catch (err) {
+    console.warn("[firebaseAdmin] collectionGroup sovereigntyPointsLog:", err);
+  }
+  return map;
+}
+
+function mergeSovereignty(prog: number, logged: number): number {
+  return Math.max(0, Math.max(prog || 0, logged || 0));
+}
+
 /** Lista cuentas reales (Auth + Firestore). El Gmail no es la llave: el UID sí. */
 export async function listAuthClientsWithProgression(
   limit = 40,
@@ -493,6 +528,7 @@ export async function listAuthClientsWithProgression(
   const db = getFirestore(adminApp);
   const byUid = new Map<string, AdminAuthClient>();
   const progMap = await progressionByUid(db);
+  const logPs = await sovereigntyFromLogs(db);
 
   let pageToken: string | undefined;
   let pages = 0;
@@ -507,6 +543,7 @@ export async function listAuthClientsWithProgression(
           email,
           displayName: user.displayName ?? null,
           totalCP: prog?.totalCP ?? 0,
+          sovereigntyPoints: mergeSovereignty(prog?.sovereigntyPoints ?? 0, logPs.get(user.uid) ?? 0),
           rank: prog?.rank || "iniciado",
           activeModules: prog?.activeModules ?? [],
           whatsapp: prog?.whatsapp ?? null,
@@ -522,8 +559,10 @@ export async function listAuthClientsWithProgression(
 
   for (const [uid, prog] of progMap) {
     const existing = byUid.get(uid);
+    const sovereigntyPoints = mergeSovereignty(prog.sovereigntyPoints, logPs.get(uid) ?? 0);
     if (existing) {
       existing.totalCP = Math.max(existing.totalCP, prog.totalCP);
+      existing.sovereigntyPoints = Math.max(existing.sovereigntyPoints, sovereigntyPoints);
       if (!existing.activeModules.length) existing.activeModules = prog.activeModules;
       if (!existing.whatsapp) existing.whatsapp = prog.whatsapp;
       continue;
@@ -533,6 +572,7 @@ export async function listAuthClientsWithProgression(
       email: "",
       displayName: null,
       totalCP: prog.totalCP,
+      sovereigntyPoints,
       rank: prog.rank,
       activeModules: prog.activeModules,
       whatsapp: prog.whatsapp,
@@ -540,8 +580,27 @@ export async function listAuthClientsWithProgression(
     });
   }
 
+  for (const [uid, logged] of logPs) {
+    const existing = byUid.get(uid);
+    if (existing) {
+      existing.sovereigntyPoints = Math.max(existing.sovereigntyPoints, logged);
+      continue;
+    }
+    byUid.set(uid, {
+      uid,
+      email: "",
+      displayName: null,
+      totalCP: 0,
+      sovereigntyPoints: logged,
+      rank: "iniciado",
+      activeModules: [],
+      whatsapp: null,
+      subscriptionPlan: null,
+    });
+  }
+
   return [...byUid.values()]
-    .sort((a, b) => b.totalCP - a.totalCP)
+    .sort((a, b) => (b.sovereigntyPoints - a.sovereigntyPoints) || (b.totalCP - a.totalCP))
     .slice(0, Math.min(100, Math.max(1, limit)));
 }
 
@@ -667,6 +726,7 @@ function recoveryAccountFromParts(
     displayName?: string | null;
     prog?: ProgressionSummary;
     counts?: Record<string, number>;
+    loggedPs?: number;
   },
 ): RecoveryAccount {
   const counts = opts.counts ?? {};
@@ -676,7 +736,7 @@ function recoveryAccountFromParts(
     email: opts.email || "",
     displayName: opts.displayName ?? null,
     totalCP: opts.prog?.totalCP ?? 0,
-    sovereigntyPoints: opts.prog?.sovereigntyPoints ?? 0,
+    sovereigntyPoints: mergeSovereignty(opts.prog?.sovereigntyPoints ?? 0, opts.loggedPs ?? 0),
     rank: opts.prog?.rank || "iniciado",
     activeModules: opts.prog?.activeModules ?? [],
     whatsapp: opts.prog?.whatsapp ?? null,
@@ -695,6 +755,7 @@ export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[
   const byUid = new Map<string, RecoveryAccount>();
   const progMap = await progressionByUid(db);
   const scanMap = await scanRecoveryCollectionGroups(db);
+  const logPs = await sovereigntyFromLogs(db);
 
   let pageToken: string | undefined;
   let pages = 0;
@@ -709,6 +770,7 @@ export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[
             displayName: user.displayName ?? null,
             prog: progMap.get(user.uid),
             counts: scanMap.get(user.uid),
+            loggedPs: logPs.get(user.uid),
           }),
         );
       }
@@ -726,6 +788,18 @@ export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[
       recoveryAccountFromParts(uid, {
         prog: progMap.get(uid),
         counts,
+        loggedPs: logPs.get(uid),
+      }),
+    );
+  }
+
+  for (const [uid, logged] of logPs) {
+    if (byUid.has(uid)) continue;
+    byUid.set(
+      uid,
+      recoveryAccountFromParts(uid, {
+        prog: progMap.get(uid),
+        loggedPs: logged,
       }),
     );
   }
@@ -740,6 +814,7 @@ export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[
           displayName: owner.displayName ?? null,
           prog: progMap.get(owner.uid),
           counts: scanMap.get(owner.uid),
+          loggedPs: logPs.get(owner.uid),
         }),
       );
     } else if (owner.found && owner.uid) {
