@@ -137,8 +137,6 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /\bpolos?\b/,
     /inversion/,
     /inversión/,
-    /catarsis/,
-    /recarg/,
   ],
   9: [
     /al mismo tiempo/,
@@ -146,15 +144,6 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /balance de carga/,
     /mientras [\s\S]+ tambien/,
     /multihilo/,
-    /manera sistemica/,
-    /sistemicamente/,
-    /monohilo/,
-    /nutricion/,
-    /alimentar.{0,40}codigos?/,
-    /inanicion/,
-    /hambre de codigo/,
-    /gustos personales/,
-    /combustible/,
   ],
   10: [/la fuente/, /de raiz/, /de raíz/, /el origen de este/, /cableado/, /matriz/],
 };
@@ -168,51 +157,16 @@ const LATENCIA = /48\s*h|24\s*h|me volvi[oó]|loop|ansiedad|incuba|dos d[ií]as/
 const C8_TECNICO =
   /48\s*h|24\s*h|\bloop\b|ciclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
 
-/** Polo opuesto en lenguaje natural (ocio / drama / catarsis / frecuencia). */
+/** Polo opuesto en lenguaje natural (ocio / red / audio / descanso). */
 const C8_POLO_NATURAL =
-  /facebook|instagram|whatsapp|tiktok|redes sociales|\baudio\b|descans|siesta|\bocio\b|me recost|a descansar|\bdrama\b|catarsis|cambiar (de |la )?frecuencia|me aleje|paso atras|estado opuesto|cambio de (estado|polo)|serie|pelicula|netflix/;
+  /facebook|instagram|whatsapp|tiktok|redes sociales|\baudio\b|descans|siesta|\bocio\b|me recost|a descansar/;
 
 /** Retorno al polo de producción, con energía restaurada. */
 const C8_RETORNO_NATURAL =
-  /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta|para)|refresc|recarg/;
-
-/** Fatiga / estancamiento que pide recarga de polo. */
-const C8_FATIGA_ESTANCO =
-  /fatiga|cansad|estancad|sin energia|agotad|no daba mas|vaci[oa] de energia/;
+  /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc/;
 
 function tieneCicloNatural(norm: string): boolean {
-  const polo = C8_POLO_NATURAL.test(norm);
-  const retorno = C8_RETORNO_NATURAL.test(norm);
-  const fatiga = C8_FATIGA_ESTANCO.test(norm);
-  if (polo && retorno) return true;
-  if (fatiga && polo && /energia|recarg|catarsis|ciclo|siguiente ciclo/.test(norm)) {
-    return true;
-  }
-  return false;
-}
-
-/** C9 natural: nutrición de códigos, no-monohilo, manera sistémica. */
-const C9_NATURAL =
-  /manera sistemica|sistemicamente|\bsistemic[oa]\b|no (es |fue )?(un )?monohilo|no monohilo|\bmonohilo\b|multihilo|varios (codigos|hilos)|alimentar.{0,48}codigos?|nutr[ie].{0,48}codigos?|nutricion (integral|de (los )?codigos)|combustible.{0,48}(motor|produc|codigo)|insumos?.{0,40}(motor|produc)|gustos personales|catalizador(es)? emocion|actividades secundarias|inanicion (de )?codigos?|hambre de codigo|procrastinacion.{0,80}(codigo|inanicion|hambre)/;
-
-function tieneSistemaNatural(norm: string): boolean {
-  return C9_NATURAL.test(norm);
-}
-
-function tieneCalorC8(norm: string): boolean {
-  return esC8Tecnico(norm) || tieneCicloNatural(norm) || LATENCIA.test(norm);
-}
-
-/** Evita falsos vacíos C8/C9 en el mapa de calor cuando la intención está en el relato. */
-function iluminarCalorC8C9(
-  payload: DepotEntryPayload,
-  map: Record<EyeCode, boolean>,
-): Record<EyeCode, boolean> {
-  const norm = normalizar(textoCompuesto(payload));
-  const next = { ...map };
-  if (tieneCalorC8(norm)) next[8] = true;
-  if (tieneSistemaNatural(norm)) next[9] = true;
-  return next;
+  return C8_POLO_NATURAL.test(norm) && C8_RETORNO_NATURAL.test(norm);
 }
 
 function esC8Tecnico(norm: string): boolean {
@@ -510,10 +464,6 @@ export function diagnosticarAuditoriaLocal(
     syn[8] += 2;
     synCuerpo[8] += 2;
   }
-  if (tieneSistemaNatural(normCuerpo) || tieneSistemaNatural(norm)) {
-    syn[9] += 2;
-    synCuerpo[9] += 2;
-  }
 
   // La firma primaria sale del cuerpo. El título/hipótesis enciende el mapa, no se come el pistón.
   let characterSignedCode = elegirPrimario(synCuerpo);
@@ -529,12 +479,8 @@ export function diagnosticarAuditoriaLocal(
 
   const synCierre = scoreCierre(normCuerpo);
   const cutCierre = Math.floor(normCuerpo.length * 0.55);
-  const sliceCierre = normCuerpo.slice(Math.max(0, cutCierre));
-  if (tieneCicloNatural(sliceCierre)) {
+  if (tieneCicloNatural(normCuerpo.slice(Math.max(0, cutCierre)))) {
     synCierre[8] += 2;
-  }
-  if (tieneSistemaNatural(sliceCierre)) {
-    synCierre[9] += 2;
   }
   const focoRevelacionCode = elegirFocoRevelacion(
     synCuerpo,
@@ -544,6 +490,17 @@ export function diagnosticarAuditoriaLocal(
     cableada,
     normCuerpo,
   );
+
+  // Transición pura C2→C7: los conectores firman Flujo; la ley es el foco.
+  // No recategorizar la Firma como C7 solo porque el cierre forja el axioma.
+  if (
+    characterSignedCode === 7 &&
+    synCuerpo[2] > 0 &&
+    synCuerpo[3] <= 1 &&
+    !/secuencia|piston/.test(normCuerpo)
+  ) {
+    characterSignedCode = 2;
+  }
 
   const activos = EYE_CODES.filter(
     (n) => syn[n] > 0 || n === characterSignedCode || n === focoRevelacionCode,
@@ -556,9 +513,9 @@ export function diagnosticarAuditoriaLocal(
   const charName = CANON_TEN_EYES[characterSignedCode].name;
   const focoName = CANON_TEN_EYES[focoRevelacionCode].name;
   const diagnosticMessage = grounded
-    ? `GROUNDED STABLE. Cableado C10 Conectado. Firma estable en C${characterSignedCode} ${charName}. Foco de revelación: C${focoRevelacionCode} ${focoName}. Título, cuerpo y cierre están cableados. ${activeCount} códigos activos.`
+    ? `Firma estable en C${characterSignedCode} ${charName}. Foco de revelación: C${focoRevelacionCode} ${focoName}. Título, cuerpo y cierre están cableados. ${activeCount} códigos activos.`
     : cableada
-      ? `Cableado C10 Conectado. Hay cordón título↔cuerpo, pero la geometría aún es estrecha (${activeCount} códigos). Firma: C${characterSignedCode} ${charName}. Foco: C${focoRevelacionCode} ${focoName}.`
+      ? `Hay cordón título↔cuerpo, pero la geometría aún es estrecha (${activeCount} códigos). Firma: C${characterSignedCode} ${charName}. Foco: C${focoRevelacionCode} ${focoName}.`
       : `La escritura no cablea título/hipótesis con el cierre. Firma: C${characterSignedCode} ${charName}. Foco: C${focoRevelacionCode} ${focoName}. Vacíos: ${syntacticVacios.length}.`;
 
   return sellarLocal(
@@ -582,17 +539,13 @@ export function diagnosticarAuditoriaLocal(
       },
       immediateAdjustment: ajustePorFoco(focoRevelacionCode),
     }),
-    payload,
   );
 }
 
-function sellarMapaCalor(
-  result: DepotAnalysisResult,
-  payload?: DepotEntryPayload,
-): DepotAnalysisResult {
+function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
   const focoRevelacionCode =
     result.focoRevelacionCode ?? result.syntaxDiagnostic.focoCode ?? result.characterSignedCode;
-  let activeCharacterMap = {
+  const activeCharacterMap = {
     ...buildActiveCharacterMap([]),
     ...result.activeCharacterMap,
     [result.characterSignedCode]: true,
@@ -601,14 +554,12 @@ function sellarMapaCalor(
   if (result.syntaxDiagnostic.isCableadoConnected) {
     activeCharacterMap[10] = true;
   }
-  if (payload) {
-    activeCharacterMap = iluminarCalorC8C9(payload, activeCharacterMap);
-  }
   return {
     ...result,
     focoRevelacionCode,
     activeCharacterMap,
-    syntacticVacios: vaciosDesdeActiveMap(activeCharacterMap),
+    syntacticVacios:
+      result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
     syntaxDiagnostic: {
       ...result.syntaxDiagnostic,
       detectedSyntaxCode:
@@ -619,18 +570,30 @@ function sellarMapaCalor(
   };
 }
 
-function sellarLocal(
-  result: DepotAnalysisResult,
-  payload?: DepotEntryPayload,
-): DepotAnalysisResult {
-  return sellarMapaCalor(result, payload);
-}
-
-function sellarGemini(
-  result: DepotAnalysisResult,
-  payload?: DepotEntryPayload,
-): DepotAnalysisResult {
-  return sellarMapaCalor(result, payload);
+function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
+  const focoRevelacionCode =
+    result.focoRevelacionCode ?? result.syntaxDiagnostic.focoCode ?? result.characterSignedCode;
+  const activeCharacterMap = {
+    ...buildActiveCharacterMap([]),
+    ...result.activeCharacterMap,
+    [result.characterSignedCode]: true,
+    [focoRevelacionCode]: true,
+  };
+  if (result.syntaxDiagnostic.isCableadoConnected) {
+    activeCharacterMap[10] = true;
+  }
+  return {
+    ...result,
+    focoRevelacionCode,
+    activeCharacterMap,
+    syntacticVacios:
+      result.syntacticVacios ?? vaciosDesdeActiveMap(activeCharacterMap),
+    syntaxDiagnostic: {
+      ...result.syntaxDiagnostic,
+      focoCode: result.syntaxDiagnostic.focoCode ?? focoRevelacionCode,
+      isCableadoConnected: Boolean(result.syntaxDiagnostic.isCableadoConnected),
+    },
+  };
 }
 
 export async function procesarAuditoriaV3(
@@ -644,20 +607,20 @@ export async function procesarAuditoriaV3(
       const raw = await callGemini(serialized, 2048, true);
       const parsed = parseDepotAnalysisResult(raw);
       if (parsed.ok) {
-        return { result: sellarGemini(parsed.result, payload), source: "gemini" };
+        return { result: sellarGemini(parsed.result), source: "gemini" };
       }
     } catch {
       // reintento abajo
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El FOCO es la INTENCIÓN real (C5/C7/C8/C9), no la frecuencia de «entonces/después». C8 (recarga/catarsis) y C9 (nutrición sistémica) NO van en syntacticVacios si están en el relato. El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El FOCO es la INTENCIÓN real (C5/C7/C8), no la frecuencia de «entonces/después». El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );
       const parsed2 = parseDepotAnalysisResult(raw2);
       if (parsed2.ok) {
-        return { result: sellarGemini(parsed2.result, payload), source: "gemini" };
+        return { result: sellarGemini(parsed2.result), source: "gemini" };
       }
     } catch (err) {
       console.warn(
