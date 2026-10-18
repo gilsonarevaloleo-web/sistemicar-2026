@@ -73,7 +73,7 @@ ABC
     const msg = explainFirestoreAccessError(raw);
     assert.match(msg ?? "", /Firestore está apagado/);
     assert.match(msg ?? "", /9000/);
-    assert.match(msg ?? "", /sistemicar-app/);
+    assert.match(msg ?? "", /Realtime Database/);
     assert.equal(
       firestoreEnableUrl("sistemicar-app"),
       "https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=sistemicar-app",

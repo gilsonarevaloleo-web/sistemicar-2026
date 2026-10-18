@@ -12,7 +12,7 @@ const menu = readFileSync(join(dir, "menu-principal.tsx"), "utf8");
 describe("página /recuperar", () => {
   it("está cableada y pide el mismo Google", () => {
     assert.match(app, /path="\/recuperar"/);
-    assert.match(src, /Tus datos no se fueron de la nube/);
+    assert.match(src, /Esta nube nunca guardó los 9000/);
     assert.match(src, /button-recuperar-google/);
     assert.match(src, /clearMigrationPending/);
     assert.match(src, /gilsonarevalo.leo@gmail.com/);

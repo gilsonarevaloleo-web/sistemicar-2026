@@ -73,12 +73,12 @@ export default function Recuperar() {
             className="text-3xl font-bold"
             style={{ fontFamily: "'Playfair Display', serif", color: GOLD }}
           >
-            Tus datos no se fueron de la nube
+            Esta nube nunca guardó los 9000
           </h1>
           <p className="text-sm leading-relaxed text-zinc-400">
-            Limpiar el teléfono abre una sesión nueva. Si ves 12 puntos y antes tenías 9000,
-            ese Gmail no es el UID viejo. Entra con Google y en el panel pulsa
-            «Traer mis 9000 puntos a este Gmail».
+            En sistemicar-app no hay Cloud Firestore. Los 9000, Crisol, Récord y Rutina
+            estaban en el teléfono. Crear la base ahora no los trae: queda vacía y sirve
+            para no perder lo que hagas de hoy en adelante.
           </p>
         </motion.div>
 
@@ -86,10 +86,10 @@ export default function Recuperar() {
           <div className="flex items-start gap-3">
             <Cloud className="mt-0.5 shrink-0 text-sky-400" size={22} />
             <ol className="space-y-2 text-sm text-zinc-200">
-              <li>1. Pulsa <span className="font-bold">Entrar con Google</span>.</li>
-              <li>2. Elige el mismo correo de siempre. Si eres Gilson: gilsonarevalo.leo@gmail.com.</li>
-              <li>3. Abre Crisol, Récord, Rutina y Depósito. La nube vuelve a pintar.</li>
-              <li>4. Si ya estás con Google y sigue vacío, usa el panel de recuperación.</li>
+              <li>1. En Firebase, solo Cloud Firestore → Crear base. No toques Realtime Database.</li>
+              <li>2. Modo Native / estándar. Ubicación la que ofrezca (nam5 o southamerica).</li>
+              <li>3. Arriba a la izquierda, cambia de proyecto (misma cuenta gilsonarevalo.leo@gmail.com): busca si existe otro con datos, p. ej. sistemicar-8375c.</li>
+              <li>4. Si otro celular o computadora todavía tiene Sistemicar abierto, no lo limpies: ahí sí están los 9000.</li>
             </ol>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default function Recuperar() {
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 space-y-3">
             <p className="text-sm text-emerald-300">
               Ya estás con <span className="font-bold">{user?.email}</span>.
-              Recarga Crisol, Récord, Rutina y Depósito. Si siguen vacíos, esa data está en otro UID.
+              Recarga Crisol, Récord, Rutina y Depósito. Si siguen vacíos, no están en esta nube.
             </p>
             <button
               type="button"

@@ -1337,9 +1337,10 @@ export default function AdminGilson() {
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 break-words font-sans">
               <h3 className="text-amber-300 font-bold mb-1">Si limpiaste el teléfono</h3>
               <p className="text-xs text-slate-400 leading-relaxed whitespace-normal">
-                La clave del panel no alcanza. Primero entra con Google
-                (gilsonarevalo.leo@gmail.com). Después busca ese mismo Gmail.
-                El botón de antes miraba solo el teléfono y por eso decía que no había cuentas.
+                sistemicar-app no tiene Cloud Firestore. Por eso ves 0 puntos: Auth sí,
+                la base no. Crear Firestore ahora no trae los 9000; sirve para guardar
+                lo nuevo. No crees Realtime Database. Si otro proyecto Firebase o
+                otro celular todavía tiene Sistemicar, ahí está la cuenta vieja.
               </p>
               <p className="mt-2 text-[11px] text-slate-500">
                 Sesión ahora: {user?.email || getUserEmail() || "anónima / vacía"} · UID {user?.uid?.slice(0, 10) || "—"}

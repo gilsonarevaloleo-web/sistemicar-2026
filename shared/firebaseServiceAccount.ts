@@ -121,9 +121,10 @@ export function explainFirestoreAccessError(raw?: string | null): string | null 
     "sistemicar-app";
   if (FIRESTORE_API_DISABLED.test(raw)) {
     return (
-      `Firestore está apagado en ${project}. Por eso ves 2 cuentas en 0 puntos: el servidor ve el Gmail (Auth) pero no puede leer los 9000 PS ni Crisol/Récord. ` +
-      `Abre https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${project} y pulsa Enable. ` +
-      `Luego entra a https://console.firebase.google.com/project/${project}/firestore : si dice «Create database», los 9000 nunca se guardaron en esta nube (estaban en el teléfono). Si ya ves artifacts/sistemicar-v2-5, espera 5 minutos y busca otra vez.`
+      `Firestore está apagado en ${project}. Auth ve el Gmail, la base no. ` +
+      `Si la consola dice «Crear base de datos», esta nube nunca tuvo los 9000 (estaban en el teléfono). ` +
+      `Puedes crear Cloud Firestore (Native, no Realtime Database) para guardar lo de hoy en adelante: no van a aparecer Crisol ni los 9000. ` +
+      `Mira si arriba hay otro proyecto Firebase con datos, o otro celular que aún tenga Sistemicar.`
     );
   }
   if (/PERMISSION_DENIED/i.test(raw)) {
