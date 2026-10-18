@@ -77,6 +77,7 @@ export {
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
   DEPOSITO_V3_RITUAL,
   INTENT_AWARE_SYNTAX_PROMPT,
+  UPDATED_DEPOT_ENGINE_PROMPT,
   buildDepositoV3SystemPrompt,
   buildDepositoV3UserPrompt,
   serializarPromptAuditoria,

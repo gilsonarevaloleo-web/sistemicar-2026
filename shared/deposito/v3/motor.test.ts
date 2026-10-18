@@ -4,6 +4,7 @@ import {
   DEPOT_V3_MASTER_PROMPT,
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
   INTENT_AWARE_SYNTAX_PROMPT,
+  UPDATED_DEPOT_ENGINE_PROMPT,
   buildDepositoV3SystemPrompt,
   diagnosticarAuditoriaLocal,
   evaluarDepositoV3,
@@ -29,8 +30,17 @@ describe("Depósito V3 — prompt", () => {
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /dejé el trabajo|puse pausa al desglosador/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /el deber es el enemigo instalado/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /entonces.*después.*luego|narrative vessels/i);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /manera sistémica/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Deep Intent & Heatmap Auditor/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /DO NOT mark C8 as "Vacío"/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /C9 MUST BE ACTIVATED/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /GROUNDED STABLE/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Cableado C10 Conectado/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /code starvation/);
     assert.match(system, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
     assert.match(system, /Deep Intent Syntax Auditor/);
+    assert.match(system, /Deep Intent & Heatmap Auditor/);
+    assert.match(system, /MAPA DE CALOR C8\/C9/);
     assert.match(system, /syntacticVacios/);
     assert.match(system, /isCableadoConnected/);
     assert.match(system, /characterSignedCode/);
@@ -54,6 +64,7 @@ describe("Depósito V3 — prompt", () => {
     assert.match(user, /FOCO DE REVELACIÓN/);
     assert.match(user, /Cero Óptica|Cero Δ/);
     assert.match(user, /lenguaje natural|INTENCIÓN/);
+    assert.match(user, /C8\/C9 en el mapa de calor/);
   });
 });
 
@@ -206,8 +217,51 @@ describe("Depósito V3 — fallback local", () => {
     });
     assert.equal(r.focoRevelacionCode, 8);
     assert.equal(r.activeCharacterMap[8], true);
+    assert.equal(r.syntacticVacios.includes(8), false);
     assert.match(r.immediateAdjustment, /C8|Ciclo|polo/i);
     assert.doesNotMatch(r.immediateAdjustment, /flojo|debo|virtud/i);
+  });
+
+  it("mapa de calor: fatiga + drama/catarsis que recarga el ciclo enciende C8, no lo deja Vacío", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Estaba estancado y agotado, sin energía. Vi un drama, busqué catarsis y cambié de frecuencia. Esa recarga me devolvió energía para el siguiente ciclo de producción.",
+      userTier: "CARRERA",
+      detectedNoise: "pérdida de tiempo",
+      omittedShadow: "la recarga",
+    });
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.equal(r.syntacticVacios.includes(8), false);
+    assert.match(r.immediateAdjustment, /C8|Ciclo|polo/i);
+  });
+
+  it("mapa de calor: nutrición sistémica de códigos enciende C9, no lo deja Vacío", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "La productividad no es monohilo. Trabajo de manera sistémica: mis gustos personales, el catalizador emocional y las actividades secundarias son el combustible que nutre los códigos para sostener el motor de producción.",
+      userTier: "TITULO",
+      detectedNoise: "culpa de ocio",
+      omittedShadow: "los gustos como insumo",
+    });
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
+    assert.equal(r.focoRevelacionCode, 9);
+    assert.match(r.immediateAdjustment, /C9|Sistema|hilos/i);
+  });
+
+  it("firma C2 de conectores no tapa el foco C7/C9 de la inanición de códigos", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Después salí. Entonces al día siguiente vi la ley: la procrastinación nace de la inanición de códigos. El motor se alimenta de varios hilos, no de un solo canal.",
+      userTier: "TITULO",
+      detectedNoise: "flojo",
+      omittedShadow: "el hambre de código",
+    });
+    assert.ok(r.focoRevelacionCode === 7 || r.focoRevelacionCode === 9);
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
+    assert.notEqual(r.focoRevelacionCode, 2);
+    assert.match(r.immediateAdjustment, /C7|C9|Ley|Sistema|axioma|hilos/i);
   });
 
   it("detectedNoise declarado no altera la geometría si el cuerpo está cableado", () => {
@@ -253,6 +307,39 @@ describe("Depósito V3 — orquestación", () => {
     assert.equal(out.result.activeCharacterMap[7], true);
     assert.equal(out.result.syntaxDiagnostic.isCableadoConnected, true);
     assert.equal("deltaGap" in out.result, false);
+  });
+
+  it("Gemini que deja C8/C9 vacíos no apaga el mapa si el relato tiene recarga y nutrición", async () => {
+    const out = await procesarAuditoriaV3(
+      {
+        rawFact:
+          "Estaba estancado. Vi un drama, busqué catarsis y recargué energía para el siguiente ciclo. Trabajo de manera sistémica: mis gustos nutren los códigos del motor de producción.",
+        userTier: "TITULO",
+      },
+      async () =>
+        JSON.stringify({
+          characterSignedCode: 2,
+          focoRevelacionCode: 7,
+          activeCharacterMap: { "2": true, "7": true },
+          syntacticVacios: [1, 3, 4, 5, 6, 8, 9, 10],
+          syntaxDiagnostic: {
+            detectedSyntaxCode: 2,
+            focoCode: 7,
+            isCableadoConnected: true,
+            syntaxCharacteristics: "Firma C2 hacia la ley C7.",
+          },
+          groundingStatus: {
+            isFullyGrounded: true,
+            diagnosticMessage: "GROUNDED STABLE. Cableado C10 Conectado.",
+          },
+          immediateAdjustment: "Tu quiebre real está en la Ley (C7).",
+        }),
+    );
+    assert.equal(out.source, "gemini");
+    assert.equal(out.result.activeCharacterMap[8], true);
+    assert.equal(out.result.activeCharacterMap[9], true);
+    assert.equal(out.result.syntacticVacios.includes(8), false);
+    assert.equal(out.result.syntacticVacios.includes(9), false);
   });
 
   it("JSON roto cae a local y no tira 500", async () => {
