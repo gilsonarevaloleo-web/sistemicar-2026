@@ -38,5 +38,7 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /button-restore-highest-modulos/);
     assert.match(src, /Encender no recupera datos/);
     assert.match(src, /Los 9000 están en PS/);
+    assert.match(src, /link-enable-firestore/);
+    assert.match(src, /explainFirestoreAccessError/);
   });
 });

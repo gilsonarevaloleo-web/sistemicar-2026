@@ -106,7 +106,35 @@ export function explainFirebaseAdminError(
   if (raw === "missing") {
     return "Falta FIREBASE_SERVICE_ACCOUNT_JSON en Netlify. Sin esa variable el servidor no ve las cuentas viejas.";
   }
-  return raw;
+  return explainFirestoreAccessError(raw) ?? raw;
+}
+
+const FIRESTORE_API_DISABLED =
+  /Cloud Firestore API has not been used|firestore\.googleapis\.com\/overview|SERVICE_DISABLED/i;
+
+/** Auth puede listar Gmail y aun así Firestore estar apagado: las cuentas salen en 0 PS. */
+export function explainFirestoreAccessError(raw?: string | null): string | null {
+  if (!raw?.trim()) return null;
+  const project =
+    raw.match(/project[_ ](?:id[": ]+)?([a-z0-9-]+)/i)?.[1] ||
+    raw.match(/project ([a-z0-9-]+)/i)?.[1] ||
+    "sistemicar-app";
+  if (FIRESTORE_API_DISABLED.test(raw)) {
+    return (
+      `Firestore está apagado en ${project}. Por eso ves 2 cuentas en 0 puntos: el servidor ve el Gmail (Auth) pero no puede leer los 9000 PS ni Crisol/Récord. ` +
+      `Abre https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${project} y pulsa Enable. ` +
+      `Luego entra a https://console.firebase.google.com/project/${project}/firestore : si dice «Create database», los 9000 nunca se guardaron en esta nube (estaban en el teléfono). Si ya ves artifacts/sistemicar-v2-5, espera 5 minutos y busca otra vez.`
+    );
+  }
+  if (/PERMISSION_DENIED/i.test(raw)) {
+    return `Firebase negó leer Firestore en ${project}. La llave de Netlify tiene que ser de ese mismo proyecto y Firestore tiene que estar encendido.`;
+  }
+  return null;
+}
+
+export function firestoreEnableUrl(projectId?: string | null): string {
+  const project = projectId || "sistemicar-app";
+  return `https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=${project}`;
 }
 
 export function serviceAccountPublicMeta(value: Record<string, unknown>): {

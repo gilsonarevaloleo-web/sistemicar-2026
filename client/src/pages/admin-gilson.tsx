@@ -16,7 +16,11 @@ import {
   resolveClientAccountWhatsappKind,
 } from "@shared/clientAccount";
 import { gmailTypoCorrection } from "@shared/emailAliases";
-import { explainFirebaseAdminError } from "@shared/firebaseServiceAccount";
+import {
+  explainFirebaseAdminError,
+  explainFirestoreAccessError,
+  firestoreEnableUrl,
+} from "@shared/firebaseServiceAccount";
 
 const ADMIN_PASSWORD = "sistemicar2025";
 
@@ -134,6 +138,7 @@ export default function AdminGilson() {
   const [inspectingUid, setInspectingUid] = useState<string | null>(null);
   const [recoveryQuery, setRecoveryQuery] = useState("");
   const [recoverySearchHint, setRecoverySearchHint] = useState<string | null>(null);
+  const [firestoreEnableLink, setFirestoreEnableLink] = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
   const [restoringHighest, setRestoringHighest] = useState(false);
   const [inventories, setInventories] = useState<Record<string, {
@@ -302,6 +307,24 @@ export default function AdminGilson() {
       if (!res.ok) {
         throw new Error(data.error || "Error buscando cuentas");
       }
+      const firestoreHint =
+        (typeof data.firestoreHint === "string" && data.firestoreHint) ||
+        explainFirestoreAccessError(data.firestoreError || data.error) ||
+        null;
+      if (data.firestoreOk === false || firestoreHint) {
+        setRecoverySearchHint(
+          firestoreHint ||
+            explainFirebaseAdminError(data.parseError, data.initError) ||
+            "Firestore está apagado. Por eso las cuentas salen en 0 puntos.",
+        );
+        setFirestoreEnableLink(firestoreEnableUrl(data.projectId));
+        setAccounts([]);
+        if (!opts?.silent) {
+          toast.error("Firestore está apagado. Por eso no aparecen los 9000 puntos.");
+        }
+        return;
+      }
+      setFirestoreEnableLink(null);
       if (data.adminReady === false) {
         setRecoverySearchHint(
           explainFirebaseAdminError(data.parseError, data.initError) ||
@@ -341,8 +364,14 @@ export default function AdminGilson() {
         toast.success(`Se encontraron ${found.length} cuentas`);
       }
     } catch (error) {
+      const raw = error instanceof Error ? error.message : "Error buscando cuentas";
+      const hint = explainFirestoreAccessError(raw) || raw;
+      setRecoverySearchHint(hint);
+      if (/firestore\.googleapis|PERMISSION_DENIED|apagado/i.test(raw)) {
+        setFirestoreEnableLink(firestoreEnableUrl("sistemicar-app"));
+      }
       if (!opts?.silent) {
-        toast.error(error instanceof Error ? error.message : "Error buscando cuentas");
+        toast.error(hint);
       }
     } finally {
       setSearchingAccounts(false);
@@ -1370,6 +1399,17 @@ export default function AdminGilson() {
                 <p className="mt-3 text-xs text-amber-300 break-words whitespace-normal font-sans">
                   {recoverySearchHint}
                 </p>
+              )}
+              {firestoreEnableLink && (
+                <a
+                  href={firestoreEnableLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 block w-full py-3 rounded-xl bg-amber-500 text-black text-center text-sm font-bold"
+                  data-testid="link-enable-firestore"
+                >
+                  Encender Firestore en Google (después espera 5 min)
+                </a>
               )}
               <button
                 type="button"

@@ -17,6 +17,7 @@ describe("recuperación de cuenta — admin", () => {
     assert.match(src, /restoreUserData/);
     assert.match(src, /listRecoveryAccounts/);
     assert.match(src, /restoreHighestToUid/);
+    assert.match(src, /firebaseAdminRuntimeStatus/);
   });
 
   it("el admin SDK copia la lista canónica con merge", () => {
@@ -34,5 +35,7 @@ describe("recuperación de cuenta — admin", () => {
     assert.match(src, /sovereigntyFromLogs/);
     assert.match(src, /mergeSovereignty/);
     assert.match(src, /sovereigntyPoints: mergeSovereignty/);
+    assert.match(src, /probeFirestore/);
+    assert.match(src, /firebaseAdminRuntimeStatus/);
   });
 });

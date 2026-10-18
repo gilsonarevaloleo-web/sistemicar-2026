@@ -83,7 +83,7 @@ import {
 } from "./planificacionModuleGrants";
 import { deliverEspejoCreditsIfNeeded, parseMpExternalRef } from "./mercadopagoEspejo";
 import { isEspejoSkuId } from "../shared/espejoPricing";
-import { adminLookupUserByEmail, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, listRecoveryAccounts, lookupAuthUserByUid, restoreHighestToUid, restoreUserData } from "./firebaseAdmin";
+import { adminLookupUserByEmail, firebaseAdminRuntimeStatus, firebaseAdminStatus, inventoryUserCollections, listAuthClientsWithProgression, listRecoveryAccounts, lookupAuthUserByUid, restoreHighestToUid, restoreUserData } from "./firebaseAdmin";
 import { modulesGrantedByPlan, grantablePlanHint } from "../shared/moduleAccess";
 import {
   buildClientAccountWhatsapp,
@@ -5356,18 +5356,26 @@ app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
   try {
     const limitStr = typeof req.query.limit === "string" ? req.query.limit : "80";
     const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const status = await firebaseAdminRuntimeStatus();
     if (q.includes("@")) {
       const lookup = await adminLookupUserByEmail(q);
       if (!lookup.found || !lookup.uid) {
         return res.json({
-          ...firebaseAdminStatus(),
+          ...status,
+          accounts: [],
+          lookup,
+        });
+      }
+      if (status.firestoreOk === false) {
+        return res.json({
+          ...status,
           accounts: [],
           lookup,
         });
       }
       const inventory = await inventoryUserCollections(lookup.uid);
       return res.json({
-        ...firebaseAdminStatus(),
+        ...status,
         accounts: [
           {
             uid: lookup.uid,
@@ -5387,10 +5395,16 @@ app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
       });
     }
     if (q) {
+      if (status.firestoreOk === false) {
+        return res.json({
+          ...status,
+          accounts: [],
+        });
+      }
       const inventory = await inventoryUserCollections(q);
       const authUser = await lookupAuthUserByUid(q);
       return res.json({
-        ...firebaseAdminStatus(),
+        ...status,
         accounts: [
           {
             uid: q,
@@ -5410,13 +5424,17 @@ app.get("/api/admin/recovery/accounts", requireAdminToken, async (req, res) => {
     }
     const accounts = await listRecoveryAccounts(parseInt(limitStr, 10) || 80);
     res.json({
-      ...firebaseAdminStatus(),
+      ...status,
       accounts,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error listando cuentas para recuperar.";
     console.error("[admin/recovery/accounts]", error);
-    res.status(500).json({ error: message });
+    const status = await firebaseAdminRuntimeStatus().catch(() => firebaseAdminStatus());
+    res.status(500).json({
+      ...status,
+      error: status.firestoreHint || message,
+    });
   }
 });
 
@@ -5469,6 +5487,13 @@ app.post("/api/admin/recovery/restore-highest", requireAdminToken, async (req, r
       "";
     if (!toUid) {
       return res.status(400).json({ error: "No hay UID destino. Entra con Google." });
+    }
+    const status = await firebaseAdminRuntimeStatus();
+    if (status.firestoreOk === false) {
+      return res.status(503).json({
+        ...status,
+        error: status.firestoreHint || "Firestore está apagado. No se pueden copiar los 9000 puntos.",
+      });
     }
     const result = await restoreHighestToUid(toUid);
     if (result.alreadyCurrent) {

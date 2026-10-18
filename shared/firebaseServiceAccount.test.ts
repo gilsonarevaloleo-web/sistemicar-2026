@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   explainFirebaseAdminError,
+  explainFirestoreAccessError,
+  firestoreEnableUrl,
   gmailLocalAnagram,
   normalizeServiceAccountPrivateKey,
   parseFirebaseServiceAccountJson,
@@ -63,6 +65,20 @@ ABC
     );
     assert.match(msg ?? "", /llave de Firebase en Netlify/);
     assert.match(msg ?? "", /9000/);
+  });
+
+  it("traduce Firestore apagado a una instrucción, no al error de Google", () => {
+    const raw =
+      "7 PERMISSION_DENIED: Cloud Firestore API has not been used in project sistemicar-app before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=sistemicar-app then retry.";
+    const msg = explainFirestoreAccessError(raw);
+    assert.match(msg ?? "", /Firestore está apagado/);
+    assert.match(msg ?? "", /9000/);
+    assert.match(msg ?? "", /sistemicar-app/);
+    assert.equal(
+      firestoreEnableUrl("sistemicar-app"),
+      "https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=sistemicar-app",
+    );
+    assert.match(explainFirebaseAdminError(null, raw) ?? "", /Firestore está apagado/);
   });
 
   it("reconoce Tina vs PinoCarreraTina", () => {

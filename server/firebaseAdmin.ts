@@ -4,6 +4,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getPrivatePath } from "../shared/firebasePaths";
 import { emailMatchKeys, normalizeBuyerEmail } from "../shared/emailAliases";
 import {
+  explainFirestoreAccessError,
   gmailLocalAnagram,
   normalizeServiceAccountPrivateKey,
   parseFirebaseServiceAccountJson,
@@ -27,6 +28,16 @@ import {
 
 let app: App | null = null;
 let initError: string | null = null;
+let lastFirestoreError: string | null = null;
+let firestoreProbe:
+  | { ok: boolean; error: string | null; at: number }
+  | null = null;
+
+function rememberFirestoreError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  lastFirestoreError = message;
+  return message;
+}
 
 function parseServiceAccount(): Record<string, unknown> | null {
   const parsed = parseFirebaseServiceAccountJson(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
@@ -44,6 +55,9 @@ export function firebaseAdminStatus(): {
   initError: string | null;
   projectId: string | null;
   clientEmail: string | null;
+  firestoreOk: boolean | null;
+  firestoreError: string | null;
+  firestoreHint: string | null;
 } {
   const parsed = parseFirebaseServiceAccountJson(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (!parsed.ok) {
@@ -53,15 +67,61 @@ export function firebaseAdminStatus(): {
       initError: null,
       projectId: null,
       clientEmail: null,
+      firestoreOk: null,
+      firestoreError: null,
+      firestoreHint: null,
     };
   }
   const meta = serviceAccountPublicMeta(parsed.value);
+  const firestoreError = firestoreProbe?.error ?? lastFirestoreError;
   return {
     adminReady: Boolean(getAdminApp()),
     parseError: null,
     initError,
     projectId: meta.projectId,
     clientEmail: meta.clientEmail,
+    firestoreOk: firestoreProbe ? firestoreProbe.ok : null,
+    firestoreError,
+    firestoreHint: explainFirestoreAccessError(firestoreError),
+  };
+}
+
+export async function probeFirestore(): Promise<{
+  ok: boolean;
+  error: string | null;
+  hint: string | null;
+}> {
+  if (firestoreProbe && Date.now() - firestoreProbe.at < 20_000) {
+    return {
+      ok: firestoreProbe.ok,
+      error: firestoreProbe.error,
+      hint: explainFirestoreAccessError(firestoreProbe.error),
+    };
+  }
+  const adminApp = getAdminApp();
+  if (!adminApp) {
+    firestoreProbe = { ok: false, error: "admin_not_ready", at: Date.now() };
+    return { ok: false, error: "admin_not_ready", hint: null };
+  }
+  try {
+    await getFirestore(adminApp).collection("artifacts/sistemicar-v2-5/users").limit(1).get();
+    firestoreProbe = { ok: true, error: null, at: Date.now() };
+    lastFirestoreError = null;
+    return { ok: true, error: null, hint: null };
+  } catch (err) {
+    const error = rememberFirestoreError(err);
+    firestoreProbe = { ok: false, error, at: Date.now() };
+    return { ok: false, error, hint: explainFirestoreAccessError(error) };
+  }
+}
+
+export async function firebaseAdminRuntimeStatus() {
+  const probe = await probeFirestore();
+  return {
+    ...firebaseAdminStatus(),
+    firestoreOk: probe.ok,
+    firestoreError: probe.error,
+    firestoreHint: probe.hint,
   };
 }
 
@@ -360,28 +420,32 @@ export async function adminLookupUserByEmail(email: string): Promise<AdminUserLo
   let whatsapp: string | null | undefined;
 
   if (adminApp && uid) {
-    const db = getFirestore(adminApp);
-    const prog = await getLatestProgressionRef(db, uid);
-    const allProg = await db.collection(getPrivatePath(uid, "progression")).get();
-    for (const docSnap of allProg.docs) {
-      const data = docSnap.data() as Record<string, unknown>;
-      totalCP = Math.max(totalCP, Number(data.totalCP || data.points || 0));
-      sovereigntyPoints = Math.max(
-        sovereigntyPoints,
-        Number(data.sovereigntyPoints || 0),
-        Number(data.ptsEspejo || 0) +
-          Number(data.ptsPlanificacion || 0) +
-          Number(data.ptsDeposito || 0),
-      );
-    }
-    if (prog) {
-      rank = (prog.data.rank as string) || "iniciado";
-      activeModules = prog.data.activeModules as string[] | undefined;
-      subscriptionPlan = (prog.data.subscriptionPlan as string) || null;
-      whatsapp =
-        typeof prog.data.whatsapp === "string" && prog.data.whatsapp.trim()
-          ? prog.data.whatsapp.trim()
-          : null;
+    try {
+      const db = getFirestore(adminApp);
+      const prog = await getLatestProgressionRef(db, uid);
+      const allProg = await db.collection(getPrivatePath(uid, "progression")).get();
+      for (const docSnap of allProg.docs) {
+        const data = docSnap.data() as Record<string, unknown>;
+        totalCP = Math.max(totalCP, Number(data.totalCP || data.points || 0));
+        sovereigntyPoints = Math.max(
+          sovereigntyPoints,
+          Number(data.sovereigntyPoints || 0),
+          Number(data.ptsEspejo || 0) +
+            Number(data.ptsPlanificacion || 0) +
+            Number(data.ptsDeposito || 0),
+        );
+      }
+      if (prog) {
+        rank = (prog.data.rank as string) || "iniciado";
+        activeModules = prog.data.activeModules as string[] | undefined;
+        subscriptionPlan = (prog.data.subscriptionPlan as string) || null;
+        whatsapp =
+          typeof prog.data.whatsapp === "string" && prog.data.whatsapp.trim()
+            ? prog.data.whatsapp.trim()
+            : null;
+      }
+    } catch (err) {
+      rememberFirestoreError(err);
     }
   }
 
@@ -490,6 +554,7 @@ async function progressionByUid(
       }
     }
   } catch (err) {
+    rememberFirestoreError(err);
     console.warn("[firebaseAdmin] collectionGroup progression:", err);
   }
   return map;
@@ -509,6 +574,7 @@ async function sovereigntyFromLogs(
       map.set(uid, (map.get(uid) ?? 0) + amount);
     }
   } catch (err) {
+    rememberFirestoreError(err);
     console.warn("[firebaseAdmin] collectionGroup sovereigntyPointsLog:", err);
   }
   return map;
@@ -623,9 +689,17 @@ export async function inventoryUserCollections(uid: string): Promise<RecoveryInv
   }
   const db = getFirestore(adminApp);
   const collections: Record<string, number> = {};
-  for (const name of collectionsToMigrate()) {
-    const snap = await db.collection(getPrivatePath(trimmed, name)).limit(400).get();
-    if (!snap.empty) collections[name] = snap.size;
+  try {
+    for (const name of collectionsToMigrate()) {
+      const snap = await db.collection(getPrivatePath(trimmed, name)).limit(400).get();
+      if (!snap.empty) collections[name] = snap.size;
+    }
+  } catch (err) {
+    rememberFirestoreError(err);
+    throw new Error(
+      explainFirestoreAccessError(err instanceof Error ? err.message : String(err)) ||
+        (err instanceof Error ? err.message : "No se pudo leer Firestore."),
+    );
   }
   return {
     uid: trimmed,
@@ -713,6 +787,7 @@ async function scanRecoveryCollectionGroups(
         byUid.set(uid, counts);
       }
     } catch (err) {
+      rememberFirestoreError(err);
       console.warn(`[firebaseAdmin] collectionGroup ${name}:`, err);
     }
   }
@@ -750,6 +825,8 @@ function recoveryAccountFromParts(
 export async function listRecoveryAccounts(limit = 80): Promise<RecoveryAccount[]> {
   const adminApp = getAdminApp();
   if (!adminApp) return [];
+  const firestore = await probeFirestore();
+  if (!firestore.ok) return [];
   const auth = getAuth(adminApp);
   const db = getFirestore(adminApp);
   const byUid = new Map<string, RecoveryAccount>();
