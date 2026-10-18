@@ -200,6 +200,7 @@ export default function AdminGilson() {
     email: string;
     displayName: string | null;
     totalCP: number;
+    sovereigntyPoints?: number;
     rank: string;
     activeModules: string[];
   }>>([]);
@@ -638,7 +639,7 @@ export default function AdminGilson() {
     setAuthClientsError(null);
     try {
       const headers = await getAdminHeaders();
-      const res = await fetch("/api/admin/users/clients?limit=40", { headers });
+      const res = await fetch("/api/admin/users/clients?limit=80", { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error listando cuentas");
       setAuthClients(data.clients || []);
@@ -1384,17 +1385,28 @@ export default function AdminGilson() {
             {accounts.length > 0 && (
               <div className="space-y-3">
                 <p className="text-xs text-slate-400 mb-2">
-                  {accounts.length} cuentas. Tu UID Gilson: <span className="text-green-400 font-mono">{user?.uid?.slice(0, 12)}...</span>
+                  {accounts.length} cuentas. Los 9000 están en PS (puntos de soberanía), no en CP. La tarjeta amarilla es la llena. Tu UID: <span className="text-green-400 font-mono">{user?.uid?.slice(0, 12)}...</span>
                 </p>
-                {accounts.map((account) => {
+                {(() => {
+                  const richest = accounts.reduce((best, a) => {
+                    const score = Math.max(a.sovereigntyPoints ?? 0, a.totalCP, a.totalDocs ?? 0);
+                    const bestScore = Math.max(best.sovereigntyPoints ?? 0, best.totalCP, best.totalDocs ?? 0);
+                    return score > bestScore ? a : best;
+                  });
+                  const richestHasData =
+                    (richest.sovereigntyPoints ?? 0) + richest.totalCP + (richest.totalDocs ?? 0) > 0;
+                  return accounts.map((account) => {
                   const jornadaOn = Boolean(account.activeModules?.includes("planificacion_base"));
+                  const isRichest = richestHasData && account.uid === richest.uid;
                   return (
                   <motion.div
                     key={account.uid}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className={`p-4 rounded-xl border ${
-                      account.uid === user?.uid 
+                      isRichest
+                        ? "bg-amber-500/15 border-amber-400/50"
+                        : account.uid === user?.uid 
                         ? "bg-green-500/10 border-green-500/30" 
                         : "bg-white/5 border-white/10"
                     }`}
@@ -1405,6 +1417,9 @@ export default function AdminGilson() {
                           {account.email || account.uid.slice(0, 20) + "..."}
                           {account.uid === user?.uid && (
                             <span className="ml-2 text-green-400 text-xs">(TU SESIÓN)</span>
+                          )}
+                          {isRichest && (
+                            <span className="ml-2 text-amber-300 text-xs font-bold">← ESTA ES LA LLENA</span>
                           )}
                         </p>
                         {account.email && (
@@ -1429,11 +1444,11 @@ export default function AdminGilson() {
                             </span>
                           )}
                         </div>
-                        {inventories[account.uid] && (
+                        {(inventories[account.uid] || account.features) && (
                           <p className="mt-2 text-[11px] text-slate-400">
-                            {inventories[account.uid].total} docs ·{" "}
+                            {(inventories[account.uid]?.total ?? account.totalDocs ?? 0)} docs ·{" "}
                             {(Object.keys(RECOVERY_FEATURE_LABELS) as RecoveryFeature[])
-                              .map((key) => `${RECOVERY_FEATURE_LABELS[key]} ${inventories[account.uid].features[key]}`)
+                              .map((key) => `${RECOVERY_FEATURE_LABELS[key]} ${(inventories[account.uid]?.features ?? account.features)?.[key] ?? 0}`)
                               .join(" · ")}
                           </p>
                         )}
@@ -1467,6 +1482,9 @@ export default function AdminGilson() {
                               </>
                             )}
                           </button>
+                          <p className="text-[10px] text-slate-500 max-w-[9rem]">
+                            Encender no copies los datos a tu cuenta Gilson. Para los 9000 usa Copiar o Traer.
+                          </p>
                           <button
                             type="button"
                             onClick={() => migrateFromAccount(account.uid)}
@@ -1487,7 +1505,8 @@ export default function AdminGilson() {
                     </div>
                   </motion.div>
                   );
-                })}
+                });
+                })()}
               </div>
             )}
           </div>
@@ -2044,7 +2063,7 @@ export default function AdminGilson() {
               <div className="mb-4 p-3 rounded-lg bg-black/30 border border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                    Cuentas con puntos
+                    Cuentas — busca ~9000 PS, no CP
                   </p>
                   <button
                     type="button"
@@ -2065,6 +2084,8 @@ export default function AdminGilson() {
                       uid: string;
                       email: string;
                       totalCP: number;
+                      sovereigntyPoints: number;
+                      totalDocs: number;
                       rank: string;
                       activeModules: string[];
                     }
@@ -2074,6 +2095,8 @@ export default function AdminGilson() {
                       uid: c.uid,
                       email: c.email || "",
                       totalCP: c.totalCP,
+                      sovereigntyPoints: c.sovereigntyPoints ?? 0,
+                      totalDocs: 0,
                       rank: c.rank,
                       activeModules: c.activeModules || [],
                     });
@@ -2082,8 +2105,10 @@ export default function AdminGilson() {
                     const prev = byUid.get(a.uid);
                     byUid.set(a.uid, {
                       uid: a.uid,
-                      email: prev?.email || "",
+                      email: prev?.email || a.email || "",
                       totalCP: Math.max(prev?.totalCP ?? 0, a.totalCP),
+                      sovereigntyPoints: Math.max(prev?.sovereigntyPoints ?? 0, a.sovereigntyPoints ?? 0),
+                      totalDocs: Math.max(prev?.totalDocs ?? 0, a.totalDocs ?? 0),
                       rank: a.rank || prev?.rank || "observador",
                       activeModules:
                         a.activeModules && a.activeModules.length > 0
@@ -2091,7 +2116,16 @@ export default function AdminGilson() {
                           : prev?.activeModules || [],
                     });
                   }
-                  const list = [...byUid.values()].sort((a, b) => b.totalCP - a.totalCP);
+                  const list = [...byUid.values()].sort(
+                    (a, b) =>
+                      (b.sovereigntyPoints - a.sovereigntyPoints) ||
+                      (b.totalDocs - a.totalDocs) ||
+                      (b.totalCP - a.totalCP),
+                  );
+                  const richest = list[0];
+                  const richestHasData =
+                    richest &&
+                    (richest.sovereigntyPoints > 0 || richest.totalDocs > 0 || richest.totalCP > 0);
                   return (
                     <>
                       {list.length === 0 ? (
@@ -2101,15 +2135,31 @@ export default function AdminGilson() {
                             : "La lista es extra. Abajo registras con el correo."}
                         </p>
                       ) : (
+                        <>
+                        <p className="text-[11px] text-amber-200 mb-2">
+                          Encender no recupera datos. Si ves ~9000 PS, esa es la cuenta vieja. Si todas siguen en 0, abre la pestaña Recuperar Datos.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void restoreHighestAccount()}
+                          disabled={restoringHighest}
+                          className="mb-2 w-full py-2 rounded-lg bg-amber-500 text-black text-xs font-bold disabled:opacity-50"
+                          data-testid="button-restore-highest-modulos"
+                        >
+                          {restoringHighest ? "Copiando la cuenta llena…" : "Traer los 9000 PS a este Gmail"}
+                        </button>
                         <div className="space-y-1 max-h-56 overflow-y-auto">
                           {list.map((c) => {
                             const jornadaOn = c.activeModules.includes("planificacion_base");
                             const isGilson = c.uid === user?.uid;
+                            const isRichest = richestHasData && c.uid === richest.uid;
                             return (
                               <div
                                 key={c.uid}
                                 className={`flex items-center gap-2 px-2 py-2 rounded-lg text-xs ${
-                                  moduleUid === c.uid
+                                  isRichest
+                                    ? "bg-amber-500/20 border border-amber-400/50"
+                                    : moduleUid === c.uid
                                     ? "bg-sky-500/20 border border-sky-500/40"
                                     : "bg-white/5"
                                 }`}
@@ -2123,7 +2173,7 @@ export default function AdminGilson() {
                                     setModuleNotFound(false);
                                     setModuleServerBlind(false);
                                     toast.success(
-                                      `Elegida ${c.email || c.uid.slice(0, 8) + "…"} · ${c.totalCP} pts`,
+                                      `Elegida ${c.email || c.uid.slice(0, 8) + "…"} · ${c.sovereigntyPoints} PS`,
                                     );
                                   }}
                                   className="flex-1 text-left min-w-0"
@@ -2131,10 +2181,16 @@ export default function AdminGilson() {
                                   <span className="text-white font-bold">
                                     {c.email || (isGilson ? "tu Gilson" : `${c.uid.slice(0, 8)}…`)}
                                   </span>
-                                  <span className="text-slate-400">
+                                  <span className={isRichest ? "text-amber-300 font-bold" : "text-slate-400"}>
                                     {" "}
-                                    · {c.totalCP} pts · {c.rank}
+                                    · {c.sovereigntyPoints} PS · {c.totalCP} CP · {c.rank}
                                   </span>
+                                  {isRichest ? (
+                                    <span className="text-amber-300 font-bold"> · ESTA ES LA LLENA</span>
+                                  ) : null}
+                                  {c.totalDocs > 0 ? (
+                                    <span className="text-slate-400"> · {c.totalDocs} docs</span>
+                                  ) : null}
                                   {jornadaOn ? (
                                     <span className="text-emerald-400"> · Jornada on</span>
                                   ) : (
@@ -2156,6 +2212,7 @@ export default function AdminGilson() {
                             );
                           })}
                         </div>
+                        </>
                       )}
                     </>
                   );
