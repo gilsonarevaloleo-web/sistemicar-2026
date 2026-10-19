@@ -2,18 +2,35 @@
  * Depósito V3 — contratos del Motor Sintáctico de Firma.
  *
  * V2 (Muro: un ojo dominante) no se toca.
- * Aquí el dictamen ES la forma: firma de carácter + vacíos + cableado.
+ * Aquí el dictamen ES la forma: firma de carácter + vacíos + cascada.
  * No se audita profundidad filosófica ni Óptica de verdad.
+ *
+ * El Título es C1 (Vector Cero). C10 solo abrocha si C1 existe
+ * y el cierre responde a ese vector. Sin título, C10 es vacío.
  *
  * Los nombres de planeta (Claridad, Suma…) y de ley (Cimiento, Flujo…)
  * son alias del mismo EyeCode. La esencia es el número 1–10.
  */
 
-export const DEPOSITO_V3_VERSION = "3.9.0-acomodo-medida" as const;
+export const DEPOSITO_V3_VERSION = "3.10.0-geometria-cascada" as const;
 
 export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export const EYE_CODES: readonly EyeCode[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+/** Escalera pedagógica: C1 → C2 → C4 → C5 → C7 → C10. */
+export type CascadeCode = 1 | 2 | 4 | 5 | 7 | 10;
+
+export const CASCADE_CODES: readonly CascadeCode[] = [1, 2, 4, 5, 7, 10];
+
+export type EstadoAlumnoCascada =
+  | "PRINCIPIANTE_SIN_ANCLA"
+  | "EXPLORADOR_NARRATIVO"
+  | "ENLACE_EN_TRANSMUTACION"
+  | "ARQUITECTO_GROUNDED";
+
+/** Tonos del Maestro. C6 existe como diccionario; la cascada no lo exige. */
+export type MasterToneCode = 1 | 2 | 4 | 5 | 6 | 7 | 10;
 
 export type UserTier = "FREE" | "MATRICULA" | "CARRERA" | "TITULO";
 
@@ -37,7 +54,7 @@ export interface EyeDefinition {
   /** Universidad / motor V2: Claridad, Suma, Ritmo… */
   planeta: string;
   planetaOjo: string;
-  /** Firma sintáctica de redacción (C1 Disperso, C3 Secuencial…). */
+  /** Firma sintáctica de redacción (C1 Ancla, C3 Secuencia Vectorial…). */
   syntaxLabel: string;
   syntaxCharacteristics: string;
 }
@@ -66,10 +83,13 @@ export interface DepotEntryPayload {
 
 export interface CharacterSyntaxDiagnostic {
   detectedSyntaxCode: EyeCode;
-  /** Continuidad título → cuerpo → cierre. No es juicio moral. */
+  /** Continuidad título → cierre. Es geometría C10, no juicio moral. */
   isCableadoConnected: boolean;
   syntaxCharacteristics: string;
-  /** Dónde ocurrió la revelación o síntesis. Puede diferir de la firma narrativa. */
+  /**
+   * Escalón de enseñanza: código pendiente de la cascada,
+   * o C10 si el circuito está abrochado.
+   */
   focoCode: EyeCode;
 }
 
@@ -95,8 +115,8 @@ export interface DepotAnalysisResult {
   /** Código dominante de la geometría de redacción (relato / storytelling). */
   characterSignedCode: EyeCode;
   /**
-   * Código de foco: dónde se forjó la ley o la decisión.
-   * No es el canal con más palabras. C3 puede narrar y el foco ser C5/C7/C8.
+   * Código de enseñanza: el primer peldaño pendiente de la cascada.
+   * Si el circuito está abrochado, queda en C10.
    */
   focoRevelacionCode: EyeCode;
   /** Telemetría directa para el mapa de calor de los 10 códigos de carácter. */
@@ -106,6 +126,18 @@ export interface DepotAnalysisResult {
   syntaxDiagnostic: CharacterSyntaxDiagnostic;
   groundingStatus: GroundingStatus;
   immediateAdjustment: string;
+  /** Códigos encendidos por marcadores de estructura, no por juicio. */
+  activeCodes?: EyeCode[];
+  /** Primer código pendiente en C1 → C2 → C4 → C5 → C7 → C10. Null si cierra. */
+  lowestMissingCascadeCode?: CascadeCode | null;
+  /** C1 presente Y la última oración responde al vector del título. */
+  titleConnectedToClose?: boolean;
+  /** Tono del Maestro usado en el dictamen. */
+  masterTone?: MasterToneCode;
+  /** Texto breve, frío, geométrico. Mismo contenido que immediateAdjustment. */
+  pedagogicalFeedback?: string;
+  /** Estado del alumno según el escalón pendiente. */
+  estadoAlumno?: EstadoAlumnoCascada;
 }
 
 export type DepotAnalysisLlmShape = Omit<

@@ -3,11 +3,12 @@
  * No reexporta el motor V2. No pinta UI.
  */
 
-export { DEPOSITO_V3_VERSION } from "./types.ts";
+export { CASCADE_CODES, DEPOSITO_V3_VERSION } from "./types.ts";
 export type {
   CampoCapturaV3,
 } from "./tiers.ts";
 export type {
+  CascadeCode,
   CharacterSyntaxDiagnostic,
   DepotAnalysisLlmShape,
   DepotAnalysisOk,
@@ -19,11 +20,13 @@ export type {
   DepotPayloadOk,
   DepotPayloadResult,
   DepotValidationError,
+  EstadoAlumnoCascada,
   EyeAudit,
   EyeCode,
   EyeDefinition,
   EyeDialect,
   GroundingStatus,
+  MasterToneCode,
   SystemicAnalysis,
   UserTier,
 } from "./types.ts";
@@ -84,8 +87,27 @@ export {
 } from "./prompt.ts";
 
 export {
+  TONOS_MAESTRO,
+  TONO_ARQUITECTO_GROUNDED,
+  estadoAlumnoDe,
+  etiquetaEstado,
+  masterToneDe,
+  mensajeDiagnosticoCascada,
+  pedagogicalFeedbackDe,
+  primerPendienteCascada,
+} from "./cascada.ts";
+
+export {
+  auditarGeometriaSintactica,
+  extraerCierre,
+  extraerTitulo,
+  titleConnectedToClose,
+} from "./geometria.ts";
+
+export {
   PUENTES_ESCRITURA,
   TEMPERAMENTO_V3,
+  ajusteCascada,
   ajustePedagogico,
   gradoPedagogicoDe,
   nucleoAjuste,

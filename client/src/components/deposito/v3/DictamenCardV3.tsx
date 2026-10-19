@@ -1,6 +1,7 @@
 import React from "react";
 import {
   CANON_TEN_EYES,
+  etiquetaEstado,
   focoRevelacionDe,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
@@ -69,7 +70,7 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
 
       <div data-testid="deposito-v3-foco-detalle">
         <span className="block text-[10px] uppercase tracking-wider" style={{ color: GOLD }}>
-          Foco de revelación
+          Escalón de la cascada
         </span>
         <p className="mt-1 text-sm font-bold text-white/90">
           C{focoCode} · {foco.name}
@@ -77,6 +78,15 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
             {foco.syntaxLabel} · {foco.concept}
           </span>
         </p>
+        {result.estadoAlumno && (
+          <p
+            className="mt-2 text-[10px] font-mono uppercase tracking-wider text-white/45"
+            data-testid="deposito-v3-estado"
+          >
+            Estado · {etiquetaEstado(result.estadoAlumno)}
+            {result.masterTone ? ` · Tono C${result.masterTone}` : ""}
+          </p>
+        )}
       </div>
 
       <div className="border-l-2 pl-4" style={{ borderColor: GOLD }}>
@@ -90,7 +100,7 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
           className="mt-2 text-[10px] font-mono uppercase tracking-wider text-white/40"
           data-testid="deposito-v3-cableado"
         >
-          {result.syntaxDiagnostic.isCableadoConnected
+          {result.titleConnectedToClose ?? result.syntaxDiagnostic.isCableadoConnected
             ? "Cableado título↔cierre: conectado"
             : "Cableado título↔cierre: abierto"}
         </p>
@@ -121,7 +131,7 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
           Ajuste de percepción · C{focoCode}
         </span>
         <p className="mt-1 text-xs font-semibold leading-relaxed" style={{ color: `${GOLD}ee` }}>
-          {result.immediateAdjustment}
+          {result.pedagogicalFeedback ?? result.immediateAdjustment}
         </p>
       </div>
     </section>

@@ -173,7 +173,7 @@ describe("DictamenCardV3", () => {
     assert.match(html, /deposito-v3-dictamen/);
     assert.match(html, /C3 · Trabajo/);
     assert.match(html, /deposito-v3-foco/);
-    assert.match(html, /Foco de revelación/);
+    assert.match(html, /Escalón de la cascada/);
     assert.match(html, /C8 · Ciclos/);
     assert.match(html, /Ritmo|Secuencia Vectorial/);
     assert.match(html, /Ley de Polaridad \(C8\)/);

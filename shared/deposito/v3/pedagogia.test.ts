@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { EYE_CODES } from "./types.ts";
+import { TONOS_MAESTRO, pedagogicalFeedbackDe } from "./cascada.ts";
 import {
   PUENTES_ESCRITURA,
   ajustePedagogico,
@@ -16,29 +17,21 @@ describe("Depósito V3 — pedagogía de escritura", () => {
       [...EYE_CODES],
     );
     assert.match(PUENTES_ESCRITURA[1].escritura, /título/i);
-    assert.match(PUENTES_ESCRITURA[2].escritura, /C3|puntos/i);
-    assert.match(PUENTES_ESCRITURA[4].escritura, /inflexión|paradigma|seriedad/i);
-    assert.match(PUENTES_ESCRITURA[10].escritura, /título.*fin|cordón/i);
+    assert.match(PUENTES_ESCRITURA[2].escritura, /hechos|puntos/i);
+    assert.match(PUENTES_ESCRITURA[4].escritura, /inflexión|detrás/i);
+    assert.match(PUENTES_ESCRITURA[10].escritura, /título|última oración/i);
   });
 
-  it("el núcleo enseña percepción del foco, no un consejo de vida", () => {
-    const c2 = nucleoAjuste(2);
-    assert.match(c2, /percepción de C2/i);
-    assert.match(c2, /C3|puntos/i);
-    assert.doesNotMatch(c2, /mañana.*escenario|aplicá este mismo criterio/i);
-
-    const c4 = nucleoAjuste(4);
-    assert.match(c4, /percepción de C4/i);
-    assert.match(c4, /inflexión|paradigma/i);
-    assert.match(c4, /seriedad|profundidad/i);
-
-    const c10 = nucleoAjuste(10);
-    assert.match(c10, /percepción de C10/i);
-    assert.match(c10, /título/i);
-    assert.match(c10, /fin|cordón/i);
+  it("el núcleo usa el Tono del Maestro, no un consejo de vida", () => {
+    assert.equal(nucleoAjuste(1), TONOS_MAESTRO[1]);
+    assert.equal(nucleoAjuste(2), TONOS_MAESTRO[2]);
+    assert.equal(nucleoAjuste(4), TONOS_MAESTRO[4]);
+    assert.equal(nucleoAjuste(10), TONOS_MAESTRO[10]);
+    assert.doesNotMatch(nucleoAjuste(2), /mañana.*escenario|aplicá este mismo criterio/i);
+    assert.doesNotMatch(nucleoAjuste(4), /calidad de vida|debes ser/i);
   });
 
-  it("el tono sigue al grado: G1 nutritivo, Carrera rigor, Título seco", () => {
+  it("el dictamen ignora el grado: G1 y Título reciben el mismo tono de cascada", () => {
     assert.equal(gradoPedagogicoDe("FREE"), 1);
     assert.equal(gradoPedagogicoDe("MATRICULA"), 1);
     assert.equal(gradoPedagogicoDe("CARRERA"), 3);
@@ -49,9 +42,13 @@ describe("Depósito V3 — pedagogía de escritura", () => {
 
     const g1 = ajustePedagogico(1, "MATRICULA");
     const g4 = ajustePedagogico(1, "TITULO");
-    assert.match(g1, /No se tapa la entrada/);
-    assert.doesNotMatch(g4, /No se tapa la entrada/);
-    assert.match(g4, /percepción de C1/i);
-    assert.match(ajustePedagogico(7, "CARRERA"), /Cero autoengaño/);
+    assert.equal(g1, TONOS_MAESTRO[1]);
+    assert.equal(g4, TONOS_MAESTRO[1]);
+    assert.equal(ajustePedagogico(7, "CARRERA"), TONOS_MAESTRO[7]);
+  });
+
+  it("circuito cerrado no usa el tono de abroche pendiente", () => {
+    assert.match(pedagogicalFeedbackDe(null), /abrochado|C1→C10/i);
+    assert.equal(pedagogicalFeedbackDe(10), TONOS_MAESTRO[10]);
   });
 });

@@ -38,7 +38,7 @@ describe("Depósito V3 — GET /api/deposito/v3/meta", () => {
       const res = await fetch(`${base}/api/deposito/v3/meta`);
       assert.equal(res.status, 200);
       const body = await res.json();
-      assert.equal(body.version, "3.9.0-acomodo-medida");
+      assert.equal(body.version, "3.10.0-geometria-cascada");
       assert.equal(body.endpoint, "POST /api/deposito/v3/audit");
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.muroDeDominancia, false);
@@ -115,11 +115,13 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.equal(body.success, true);
         assert.equal(body.source, "gemini");
         assert.equal(body.result.characterSignedCode, 3);
-        assert.equal(body.result.focoRevelacionCode, 7);
+        assert.equal(body.result.focoRevelacionCode, 1);
+        assert.equal(body.result.lowestMissingCascadeCode, 1);
         assert.equal(body.result.activeCharacterMap[3], true);
-        assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, true);
+        assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, false);
+        assert.equal(body.result.titleConnectedToClose, false);
         assert.equal(body.userTier, "MATRICULA");
-        assert.equal(body.version, "3.9.0-acomodo-medida");
+        assert.equal(body.version, "3.10.0-geometria-cascada");
         assert.equal(body.result.perceptionEye, undefined);
         assert.equal(body.result.deltaGap, undefined);
       },
