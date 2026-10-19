@@ -2,13 +2,14 @@
  * Cerebro Madre — recinto de casa de Depósito V3.
  *
  * Candidato → filtro → ley. No publica sola.
- * createdAt nace con el principio y no se toca: ni al reforzar, ni al filtrar, ni al promover.
- * La sabiduría privada del alumno (V2 axiomas / Criterio Vivo) no entra aquí.
- * El enunciado es pedagogía de escritura, no el diario del volcado.
+ * createdAt nace con el principio y no se toca.
+ * El enunciado es el alma del código (puente). El acomodo es lo que ESTE
+ * volcado enseñó sobre cómo escribir ese ojo — geometría, no diario.
+ * El próximo volcado se mide: ¿construyó el C pedido?
  */
 
+import { CANON_TEN_EYES, isEyeCode } from "./ojos.ts";
 import { PUENTES_ESCRITURA } from "./pedagogia.ts";
-import { isEyeCode } from "./ojos.ts";
 import type {
   DepotAnalysisResult,
   DepotEntryPayload,
@@ -23,6 +24,7 @@ export const CEREBRO_MADRE_NO_ES = [
   "No es el diario del alumno.",
   "No mezcla axiomas privados (V2) con ley de casa.",
   "No asciende un candidato a ley sin filtro.",
+  "El acomodo es geometría de escritura, no el episodio.",
 ] as const;
 
 export type EstadoPrincipio = "candidato" | "filtro" | "ley" | "rechazado";
@@ -33,6 +35,18 @@ export const ESTADOS_PRINCIPIO: readonly EstadoPrincipio[] = [
   "ley",
   "rechazado",
 ];
+
+export interface PedidoPercepcion {
+  codigo: EyeCode;
+  principioId: string;
+  at: number;
+}
+
+export interface MedidaProximo {
+  codigo: EyeCode;
+  construyo: boolean;
+  at: number;
+}
 
 export interface PrincipioAprendizaje {
   id: string;
@@ -46,13 +60,22 @@ export interface PrincipioAprendizaje {
   firma: EyeCode;
   percepcion: string;
   escritura: string;
+  /** Alma del código: puente percepción → geometría. No cambia con el tema. */
   enunciado: string;
+  /** Acomodo de ESTE volcado. Sigue el tema. No copia el diario. */
+  acomodo: string;
   anclas: string[];
   usos: number;
+  /** Veces que el siguiente volcado fue medido contra este pedido. */
+  pedidos: number;
+  /** Veces que ese siguiente volcado construyó el C pedido. */
+  confirmados: number;
+  ultimaMedida?: MedidaProximo;
 }
 
 export interface CerebroMadre {
   principios: PrincipioAprendizaje[];
+  pedidoPendiente?: PedidoPercepcion;
 }
 
 export type EvolucionPrincipio = "nuevo" | "reforzado" | "sin-cambio";
@@ -73,8 +96,8 @@ export interface ExtraerPrincipioInput {
 const MIN_PALABRAS = 18;
 const UMBRAL_CLIMA_CORTO = 40;
 const MAX_ENUNCIADO = 280;
+const MAX_ACOMODO = 360;
 const MAX_ANCLAS = 6;
-const UMBRAL_DEDUPE = 0.72;
 const MAX_CANDIDATOS = 40;
 const MAX_LEYES = 12;
 
@@ -139,14 +162,113 @@ export function contarPalabrasVolcado(texto: string): number {
   return t.split(/\s+/).filter(Boolean).length;
 }
 
-export function enunciadoPrincipio(foco: EyeCode, firma: EyeCode): string {
+/** Alma del código. El acomodo va aparte. */
+export function enunciadoPrincipio(foco: EyeCode, _firma?: EyeCode): string {
   const puente = PUENTES_ESCRITURA[foco];
-  const nucleo = `Para que tu percepción de C${foco} (${puente.percepcion}) se desarrolle, ${puente.escritura}.`;
-  if (firma === foco) return clampFrase(nucleo, MAX_ENUNCIADO);
   return clampFrase(
-    `${nucleo} Geometría observada: firma C${firma} → foco C${foco}.`,
+    `Para que tu percepción de C${foco} (${puente.percepcion}) se desarrolle, ${puente.escritura}.`,
     MAX_ENUNCIADO,
   );
+}
+
+interface FormasEscritura {
+  preguntaInflexion: boolean;
+  frasePatron: boolean;
+  cadena: boolean;
+  corte: boolean;
+  loop: boolean;
+  escena: boolean;
+  tituloPresente: boolean;
+}
+
+function detectarFormas(
+  payload: DepotEntryPayload,
+): FormasEscritura {
+  const t = `${payload.rawFact ?? ""} ${payload.studentHypothesis ?? ""}`;
+  return {
+    preguntaInflexion: /¿[^?]{6,}\?/.test(t) || /por qu[eé] (el muro|la norma|la regla)/i.test(t),
+    frasePatron:
+      /el patr[oó]n|la ley es|el modelo se repite|c[oó]mo funciona/i.test(t),
+    cadena:
+      /entonces|despu[eé]s|luego |primero[\s\S]{0,40}segundo|pist[oó]n|secuencia|a partir de/i.test(
+        t,
+      ),
+    corte:
+      /\bno\.\b|cero excusa|decid[ií]|cort[eé]|puse pausa|dije (que )?no/i.test(t),
+    loop: /volv[ií]|48\s*h|al d[ií]a siguiente|ciclo|ida y vuelta/i.test(t),
+    escena: /"[^"]{4,}"|me dijo|herramient|taller|escritorio/i.test(t),
+    tituloPresente: Boolean((payload.studentHypothesis ?? "").trim()),
+  };
+}
+
+/**
+ * Acomodo de este volcado: cómo se acomodó el alma del código en la geometría.
+ * Prohibido copiar el diario, la hora o la pelea.
+ */
+export function destilarAcomodo(
+  foco: EyeCode,
+  firma: EyeCode,
+  result: DepotAnalysisResult,
+  payload: DepotEntryPayload,
+): string {
+  const puente = PUENTES_ESCRITURA[foco];
+  const formas = detectarFormas(payload);
+  const cableado = Boolean(result.syntaxDiagnostic?.isCableadoConnected);
+  const vacios = result.syntacticVacios ?? [];
+  const piezas: string[] = [];
+
+  if (firma !== foco) {
+    piezas.push(
+      `Acomodo: el relato narra en C${firma} (${CANON_TEN_EYES[firma].name}) y la revelación se forja en C${foco} (${CANON_TEN_EYES[foco].name}).`,
+    );
+  } else {
+    piezas.push(
+      `Acomodo: firma y foco coinciden en C${foco} (${CANON_TEN_EYES[foco].name}). El tema ya está en el mismo canal.`,
+    );
+  }
+
+  if (formas.preguntaInflexion) {
+    piezas.push("Este tema se acomodó con pregunta de inflexión.");
+  } else if (vacios.includes(4) && foco !== 4) {
+    piezas.push("C4 sigue vacío: sin inflexión el tema no gana seriedad.");
+  }
+
+  if (formas.frasePatron) {
+    piezas.push("El patrón quedó como frase, no como episodio.");
+  }
+  if (formas.cadena && (firma === 3 || foco === 3 || firma === 2)) {
+    piezas.push("Hay cadena de pasos; el acomodo no es clima.");
+  }
+  if (formas.corte && (foco === 5 || firma === 5)) {
+    piezas.push("El corte está escrito, no insinuado.");
+  }
+  if (formas.loop && (foco === 8 || firma === 8)) {
+    piezas.push("El ir y el volver están en el texto.");
+  }
+  if (formas.escena && (foco === 6 || firma === 6)) {
+    piezas.push("La escena física sostiene C6.");
+  }
+
+  if (cableado) {
+    piezas.push("Título y cierre van por el mismo cordón (C10).");
+  } else if (formas.tituloPresente) {
+    piezas.push("Hay título, pero el cierre no lo cablea: C10 queda abierto.");
+  }
+
+  piezas.push(`Próximo volcado: construir C${foco} — ${puente.escritura}.`);
+  return clampFrase(piezas.join(" "), MAX_ACOMODO);
+}
+
+export function volcadoConstruyeCodigo(
+  result: DepotAnalysisResult,
+  codigo: EyeCode,
+): boolean {
+  if (result.focoRevelacionCode === codigo) return true;
+  if (result.characterSignedCode === codigo) return true;
+  if (result.syntaxDiagnostic?.focoCode === codigo) return true;
+  if (result.activeCharacterMap?.[codigo]) return true;
+  if (codigo === 10 && result.syntaxDiagnostic?.isCableadoConnected) return true;
+  return false;
 }
 
 const MESES_ES = [
@@ -195,14 +317,6 @@ function tokensDe(texto: string): Set<string> {
   return out;
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 && b.size === 0) return 1;
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  for (const t of a) if (b.has(t)) inter += 1;
-  return inter / (a.size + b.size - inter);
-}
-
 function esClimaCorto(texto: string): boolean {
   const palabras = contarPalabrasVolcado(texto);
   if (palabras < MIN_PALABRAS) return true;
@@ -238,6 +352,7 @@ export function extraerPrincipioAprendizaje(
 
   const puente = PUENTES_ESCRITURA[foco];
   const now = input.now ?? Date.now();
+  const acomodo = destilarAcomodo(foco, firma, input.result, input.payload);
   return {
     id: input.id ?? `cm_${now}_C${foco}_C${firma}`,
     createdAt: now,
@@ -246,9 +361,12 @@ export function extraerPrincipioAprendizaje(
     firma,
     percepcion: puente.percepcion,
     escritura: puente.escritura,
-    enunciado: enunciadoPrincipio(foco, firma),
+    enunciado: enunciadoPrincipio(foco),
+    acomodo,
     anclas: extraerAnclasGeometricas(crudo),
     usos: 1,
+    pedidos: 0,
+    confirmados: 0,
   };
 }
 
@@ -260,9 +378,7 @@ function extraerAnclasGeometricas(texto: string): string[] {
 }
 
 function esDuplicado(a: PrincipioAprendizaje, b: PrincipioAprendizaje): boolean {
-  if (a.foco !== b.foco) return false;
-  if (a.firma === b.firma && a.enunciado === b.enunciado) return true;
-  return jaccard(tokensDe(a.enunciado), tokensDe(b.enunciado)) >= UMBRAL_DEDUPE;
+  return a.foco === b.foco && a.firma === b.firma;
 }
 
 function preservarCreatedAt(
@@ -273,6 +389,12 @@ function preservarCreatedAt(
   for (const a of incoming.anclas) {
     if (!anclas.includes(a) && anclas.length < MAX_ANCLAS) anclas.push(a);
   }
+  const acomodo =
+    existente.estado === "ley"
+      ? existente.acomodo
+      : incoming.acomodo.length > existente.acomodo.length
+        ? incoming.acomodo
+        : existente.acomodo;
   return {
     ...existente,
     createdAt: existente.createdAt,
@@ -283,22 +405,26 @@ function preservarCreatedAt(
     enunciado: existente.enunciado,
     percepcion: existente.percepcion,
     escritura: existente.escritura,
+    acomodo,
     usos: existente.usos + 1,
     anclas,
   };
 }
 
 /**
- * Incorpora un candidato. Si ya existe (foco + enunciado), suma usos
- * y deja createdAt exactamente como nació.
- * Nunca asciende de bandeja. Nunca reescribe una ley.
+ * Incorpora un candidato. Si ya existe (foco + firma), suma usos
+ * y deja createdAt y el alma (enunciado) exactamente como nacieron.
+ * El acomodo puede enriquecerse. Nunca asciende de bandeja.
  */
 export function absorbPrincipio(
   cerebro: CerebroMadre,
   candidato: PrincipioAprendizaje | null,
 ): AbsorbPrincipioResult {
   const principios = [...(cerebro.principios ?? [])];
-  if (!candidato) return { cerebro: { principios }, evolucion: "sin-cambio" };
+  const pedidoPendiente = cerebro.pedidoPendiente;
+  if (!candidato) {
+    return { cerebro: { principios, pedidoPendiente }, evolucion: "sin-cambio" };
+  }
 
   const gemelo = principios.find((p) => esDuplicado(p, candidato));
   if (gemelo) {
@@ -307,7 +433,7 @@ export function absorbPrincipio(
     );
     const actualizado = siguiente.find((p) => p.id === gemelo.id);
     return {
-      cerebro: { principios: siguiente },
+      cerebro: { principios: siguiente, pedidoPendiente },
       evolucion: "reforzado",
       principio: actualizado,
     };
@@ -317,6 +443,8 @@ export function absorbPrincipio(
     ...candidato,
     estado: "candidato",
     usos: Math.max(1, candidato.usos || 1),
+    pedidos: candidato.pedidos ?? 0,
+    confirmados: candidato.confirmados ?? 0,
     evaluatedAt: undefined,
     promotedAt: undefined,
     rejectedAt: undefined,
@@ -328,9 +456,31 @@ export function absorbPrincipio(
     siguiente = siguiente.filter((p) => p.id !== masViejo.id);
   }
   return {
-    cerebro: { principios: siguiente },
+    cerebro: { principios: siguiente, pedidoPendiente },
     evolucion: "nuevo",
     principio: nuevo,
+  };
+}
+
+export function medirPedidoPendiente(
+  cerebro: CerebroMadre,
+  result: DepotAnalysisResult,
+  now = Date.now(),
+): CerebroMadre {
+  const pedido = cerebro.pedidoPendiente;
+  if (!pedido) return cerebro;
+  const construyo = volcadoConstruyeCodigo(result, pedido.codigo);
+  return {
+    principios: cerebro.principios.map((p) => {
+      if (p.id !== pedido.principioId) return p;
+      return {
+        ...p,
+        createdAt: p.createdAt,
+        pedidos: (p.pedidos ?? 0) + 1,
+        confirmados: (p.confirmados ?? 0) + (construyo ? 1 : 0),
+        ultimaMedida: { codigo: pedido.codigo, construyo, at: now },
+      };
+    }),
   };
 }
 
@@ -338,7 +488,21 @@ export function absorbPrincipioDesdeVolcado(
   cerebro: CerebroMadre,
   input: ExtraerPrincipioInput,
 ): AbsorbPrincipioResult {
-  return absorbPrincipio(cerebro, extraerPrincipioAprendizaje(input));
+  const now = input.now ?? Date.now();
+  const medido = medirPedidoPendiente(cerebro, input.result, now);
+  const absorbido = absorbPrincipio(medido, extraerPrincipioAprendizaje(input));
+  if (!absorbido.principio) return absorbido;
+  return {
+    ...absorbido,
+    cerebro: {
+      principios: absorbido.cerebro.principios,
+      pedidoPendiente: {
+        codigo: absorbido.principio.foco,
+        principioId: absorbido.principio.id,
+        at: now,
+      },
+    },
+  };
 }
 
 function mapPrincipio(
@@ -348,6 +512,7 @@ function mapPrincipio(
 ): CerebroMadre {
   return {
     principios: cerebro.principios.map((p) => (p.id === id ? fn(p) : p)),
+    pedidoPendiente: cerebro.pedidoPendiente,
   };
 }
 
@@ -423,7 +588,11 @@ export function resumenCerebroMadre(cerebro: CerebroMadre): string {
   const nF = principiosPorEstado(cerebro, "filtro").length;
   const nL = principiosPorEstado(cerebro, "ley").length;
   if (nC + nF + nL === 0) return CEREBRO_MADRE_FIRMA;
-  return `${nC} candidato${nC === 1 ? "" : "s"} · ${nF} en filtro · ${nL} ley${nL === 1 ? "" : "es"} de casa`;
+  const pedidos = cerebro.principios.reduce((s, p) => s + (p.pedidos ?? 0), 0);
+  const ok = cerebro.principios.reduce((s, p) => s + (p.confirmados ?? 0), 0);
+  const bandejas = `${nC} candidato${nC === 1 ? "" : "s"} · ${nF} en filtro · ${nL} ley${nL === 1 ? "" : "es"} de casa`;
+  if (pedidos === 0) return bandejas;
+  return `${bandejas} · próximo ${ok}/${pedidos}`;
 }
 
 /**
@@ -437,11 +606,16 @@ export function bloqueLeyesCasaPrompt(
   const lineas = [
     "═══ LEYES DE CASA (CEREBRO MADRE) ═══",
     "Solo leyes selladas a mano. Prohibido citar un candidato o un ítem de filtro.",
-    "La sabiduría privada del alumno no está aquí.",
+    "La sabiduría privada del alumno no está aquí. El acomodo es geometría, no diario.",
   ];
   for (const p of selladas.slice(0, MAX_LEYES)) {
+    const medida =
+      (p.pedidos ?? 0) > 0
+        ? ` Próximo: ${p.confirmados ?? 0}/${p.pedidos} construyeron C${p.foco}.`
+        : "";
+    const acomodo = p.acomodo ? ` Acomodo: ${p.acomodo}` : "";
     lineas.push(
-      `- C${p.foco} ${p.percepcion} · creado ${formatFechaPrincipio(p.createdAt)}: ${p.enunciado}`,
+      `- C${p.foco} ${p.percepcion} · creado ${formatFechaPrincipio(p.createdAt)}: ${p.enunciado}.${acomodo}${medida}`,
     );
   }
   return lineas.join("\n");
@@ -496,10 +670,16 @@ export function normalizarPrincipio(
         ? v.escritura
         : puente.escritura,
     enunciado: clampFrase(String(v.enunciado), MAX_ENUNCIADO),
+    acomodo:
+      typeof v.acomodo === "string"
+        ? clampFrase(v.acomodo, MAX_ACOMODO)
+        : "",
     anclas: Array.isArray(v.anclas)
       ? v.anclas.filter((a): a is string => typeof a === "string").slice(0, MAX_ANCLAS)
       : [],
     usos: Math.max(1, Number(v.usos) || 1),
+    pedidos: Math.max(0, Number(v.pedidos) || 0),
+    confirmados: Math.max(0, Number(v.confirmados) || 0),
   };
   if (Number.isFinite(Number(v.evaluatedAt))) {
     principio.evaluatedAt = Number(v.evaluatedAt);
@@ -509,6 +689,16 @@ export function normalizarPrincipio(
   }
   if (Number.isFinite(Number(v.rejectedAt))) {
     principio.rejectedAt = Number(v.rejectedAt);
+  }
+  if (v.ultimaMedida && typeof v.ultimaMedida === "object") {
+    const m = v.ultimaMedida as Record<string, unknown>;
+    if (isEyeCode(m.codigo)) {
+      principio.ultimaMedida = {
+        codigo: m.codigo as EyeCode,
+        construyo: Boolean(m.construyo),
+        at: Number(m.at) || createdAt,
+      };
+    }
   }
   return principio;
 }
@@ -527,7 +717,23 @@ export function normalizarCerebroMadre(raw: unknown): CerebroMadre {
     const p = normalizarPrincipio(item);
     if (p) principios.push(p);
   }
-  return { principios };
+  const cerebro: CerebroMadre = { principios };
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const pend = (raw as CerebroMadre).pedidoPendiente;
+    if (
+      pend &&
+      isEyeCode(pend.codigo) &&
+      typeof pend.principioId === "string" &&
+      pend.principioId
+    ) {
+      cerebro.pedidoPendiente = {
+        codigo: pend.codigo,
+        principioId: pend.principioId,
+        at: Number(pend.at) || 0,
+      };
+    }
+  }
+  return cerebro;
 }
 
 export function normalizarLeyesCasa(

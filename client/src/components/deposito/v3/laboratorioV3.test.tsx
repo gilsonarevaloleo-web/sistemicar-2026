@@ -203,9 +203,13 @@ describe("CerebroMadreV3", () => {
           percepcion: "Visión",
           escritura: "escribí el patrón en una frase",
           enunciado:
-            "Para que tu percepción de C7 (Visión) se desarrolle, escribí el patrón en una frase. Geometría observada: firma C2 → foco C7.",
+            "Para que tu percepción de C7 (Visión) se desarrolle, escribí el patrón en una frase.",
+          acomodo:
+            "Acomodo: el relato narra en C2 (Flujo) y la revelación se forja en C7 (Visión).",
           anclas: ["patron"],
           usos: 1,
+          pedidos: 1,
+          confirmados: 1,
         },
       ],
     };
@@ -230,6 +234,10 @@ describe("CerebroMadreV3", () => {
     assert.ok(html.includes(formatFechaPrincipio(nacimiento)));
     assert.match(html, /18 oct 2026/);
     assert.match(html, /Enviar a filtro/);
+    assert.match(html, /deposito-v3-cm-acomodo-cm_test/);
+    assert.match(html, /narra en C2/);
+    assert.match(html, /deposito-v3-cm-medida-cm_test/);
+    assert.match(html, /Próximo · 1\/1 construyeron C7/);
     assert.doesNotMatch(html, /Promover a ley/);
     assert.doesNotMatch(html, /axioma del operador|Criterio Vivo/i);
   });

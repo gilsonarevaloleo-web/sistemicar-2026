@@ -165,6 +165,28 @@ function PrincipioCard({
         )}
       </p>
       <p className="text-xs leading-relaxed text-white/75">{principio.enunciado}</p>
+      {principio.acomodo && (
+        <p
+          className="text-[11px] leading-relaxed text-white/50"
+          data-testid={`deposito-v3-cm-acomodo-${principio.id}`}
+        >
+          {principio.acomodo}
+        </p>
+      )}
+      {(principio.pedidos ?? 0) > 0 && (
+        <p
+          className="text-[10px] font-mono text-white/40"
+          data-testid={`deposito-v3-cm-medida-${principio.id}`}
+        >
+          Próximo · {principio.confirmados ?? 0}/{principio.pedidos} construyeron C
+          {principio.foco}
+          {principio.ultimaMedida
+            ? principio.ultimaMedida.construyo
+              ? " · último: sí"
+              : " · último: no"
+            : ""}
+        </p>
+      )}
       <p
         className="text-[10px] font-mono tracking-wide"
         style={{ color: GOLD }}

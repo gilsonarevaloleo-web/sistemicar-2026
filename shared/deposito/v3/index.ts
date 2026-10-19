@@ -103,11 +103,13 @@ export {
   bloqueLeyesCasaPrompt,
   cerebroVacio,
   contarPalabrasVolcado,
+  destilarAcomodo,
   enviarAFiltro,
   enunciadoPrincipio,
   extraerPrincipioAprendizaje,
   formatFechaPrincipio,
   leyesDeCasa,
+  medirPedidoPendiente,
   normalizarCerebroMadre,
   normalizarLeyesCasa,
   normalizarPrincipio,
@@ -115,6 +117,7 @@ export {
   promoverALey,
   rechazarPrincipio,
   resumenCerebroMadre,
+  volcadoConstruyeCodigo,
 } from "./cerebroMadre.ts";
 export type {
   AbsorbPrincipioResult,
@@ -122,6 +125,8 @@ export type {
   EstadoPrincipio,
   EvolucionPrincipio,
   ExtraerPrincipioInput,
+  MedidaProximo,
+  PedidoPercepcion,
   PrincipioAprendizaje,
 } from "./cerebroMadre.ts";
 

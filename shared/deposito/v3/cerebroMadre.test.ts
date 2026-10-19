@@ -71,9 +71,13 @@ describe("Depósito V3 — Cerebro Madre", () => {
     assert.equal(p.createdAt, NACIMIENTO);
     assert.match(p.enunciado, /percepción de C7/i);
     assert.match(p.enunciado, /patrón|frase/i);
-    assert.match(p.enunciado, /firma C2/i);
+    assert.doesNotMatch(p.enunciado, /firma C2/i);
+    assert.match(p.acomodo, /firma C2|narra en C2/i);
+    assert.match(p.acomodo, /C7/);
     assert.doesNotMatch(p.enunciado, /pelea con el cliente|culpa de nadie/i);
+    assert.doesNotMatch(p.acomodo, /pelea con el cliente|culpa de nadie/i);
     assert.doesNotMatch(p.enunciado, /9:00|pistón se atasca/i);
+    assert.doesNotMatch(p.acomodo, /9:00|pistón se atasca/i);
   });
 
   it("createdAt no se toca al reforzar, filtrar ni promover", () => {
@@ -168,5 +172,52 @@ describe("Depósito V3 — Cerebro Madre", () => {
     const cerebro = absorbPrincipio(cerebroVacio(), p).cerebro;
     assert.match(resumenCerebroMadre(cerebro), /1 candidato/);
     assert.doesNotMatch(resumenCerebroMadre(cerebro), /axioma del operador|Criterio Vivo/i);
+  });
+
+  it("el próximo volcado se mide: ¿construyó el C pedido?", () => {
+    const primero = absorbPrincipioDesdeVolcado(cerebroVacio(), {
+      payload: payload(VOLCADO_LARGO),
+      result: resultC2C7(),
+      now: NACIMIENTO,
+    });
+    assert.equal(primero.principio!.pedidos, 0);
+    assert.equal(primero.cerebro.pedidoPendiente?.codigo, 7);
+
+    const confirma = absorbPrincipioDesdeVolcado(primero.cerebro, {
+      payload: payload(
+        `${VOLCADO_LARGO} Otra vez el modelo se repite: el patrón se nombra en una frase.`,
+      ),
+      result: resultC2C7(),
+      now: NACIMIENTO + 86_400_000,
+    });
+    assert.equal(confirma.evolucion, "reforzado");
+    assert.equal(confirma.principio!.createdAt, NACIMIENTO);
+    assert.equal(confirma.principio!.pedidos, 1);
+    assert.equal(confirma.principio!.confirmados, 1);
+    assert.equal(confirma.principio!.ultimaMedida?.construyo, true);
+    assert.equal(confirma.principio!.ultimaMedida?.codigo, 7);
+    assert.match(resumenCerebroMadre(confirma.cerebro), /próximo 1\/1/);
+
+    const falla = absorbPrincipioDesdeVolcado(confirma.cerebro, {
+      payload: payload(
+        "Primero abrí el taller. Después armé el pistón. Luego salió el primer turno. La secuencia A B C se sostiene y no nombra ninguna ley.",
+      ),
+      result: scaffoldAnalysisResult({
+        characterSignedCode: 3,
+        focoRevelacionCode: 3,
+        groundingStatus: {
+          isFullyGrounded: true,
+          diagnosticMessage: "Secuencia C3 sin axioma.",
+        },
+      }),
+      now: NACIMIENTO + 2 * 86_400_000,
+    });
+    const c7 = falla.cerebro.principios.find((p) => p.foco === 7);
+    assert.ok(c7);
+    assert.equal(c7.pedidos, 2);
+    assert.equal(c7.confirmados, 1);
+    assert.equal(c7.ultimaMedida?.construyo, false);
+    assert.equal(c7.createdAt, NACIMIENTO);
+    assert.equal(falla.cerebro.pedidoPendiente?.codigo, 3);
   });
 });
