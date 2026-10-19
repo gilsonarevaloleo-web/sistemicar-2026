@@ -38,7 +38,7 @@ describe("Depósito V3 — GET /api/deposito/v3/meta", () => {
       const res = await fetch(`${base}/api/deposito/v3/meta`);
       assert.equal(res.status, 200);
       const body = await res.json();
-      assert.equal(body.version, "3.7.0-pedagogia-escritura");
+      assert.equal(body.version, "3.8.0-cerebro-madre");
       assert.equal(body.endpoint, "POST /api/deposito/v3/audit");
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.muroDeDominancia, false);
@@ -119,7 +119,7 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.equal(body.result.activeCharacterMap[3], true);
         assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, true);
         assert.equal(body.userTier, "MATRICULA");
-        assert.equal(body.version, "3.7.0-pedagogia-escritura");
+        assert.equal(body.version, "3.8.0-cerebro-madre");
         assert.equal(body.result.perceptionEye, undefined);
         assert.equal(body.result.deltaGap, undefined);
       },

@@ -11,6 +11,7 @@ import {
   vaciosDesdeActiveMap,
 } from "./ojos.ts";
 import { ajustePedagogico } from "./pedagogia.ts";
+import type { PrincipioAprendizaje } from "./cerebroMadre.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
 import {
   parseDepotAnalysisResult,
@@ -578,8 +579,9 @@ function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
 export async function procesarAuditoriaV3(
   payload: DepotEntryPayload,
   callGemini?: GeminiAuditCaller,
+  leyesCasa: readonly PrincipioAprendizaje[] = [],
 ): Promise<ResultadoAuditoriaV3> {
-  const serialized = serializarPromptAuditoria(payload);
+  const serialized = serializarPromptAuditoria(payload, leyesCasa);
 
   if (callGemini) {
     try {

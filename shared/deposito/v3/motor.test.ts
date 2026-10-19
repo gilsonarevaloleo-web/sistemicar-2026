@@ -86,6 +86,46 @@ describe("Depósito V3 — prompt", () => {
     assert.match(carrera, /TEMPERAMENTO DE RIGOR QUIRÚRGICO \(G3\)/);
     assert.match(titulo, /TEMPERAMENTO DE MATEMÁTICA PURA \(G4\)/);
   });
+
+  it("las leyes de casa viajan al prompt; un candidato no", () => {
+    const nacimiento = Date.UTC(2026, 9, 18, 12, 0, 0);
+    const candidato = {
+      id: "cm_c",
+      createdAt: nacimiento,
+      estado: "candidato" as const,
+      foco: 7 as const,
+      firma: 2 as const,
+      percepcion: "Visión",
+      escritura: "escribí el patrón",
+      enunciado: "candidato que no debe citarse",
+      anclas: [],
+      usos: 1,
+    };
+    const ley = {
+      ...candidato,
+      id: "cm_l",
+      estado: "ley" as const,
+      enunciado: "Para que tu percepción de C7 se desarrolle, escribí el patrón.",
+      promotedAt: nacimiento,
+    };
+    const sinLeyes = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "MATRICULA",
+    });
+    assert.doesNotMatch(sinLeyes, /LEYES DE CASA/);
+    const conCandidato = serializarPromptAuditoria(
+      { rawFact: "hoy corté a las 14:00", userTier: "MATRICULA" },
+      [candidato],
+    );
+    assert.doesNotMatch(conCandidato, /LEYES DE CASA|candidato que no debe citarse/);
+    const conLey = serializarPromptAuditoria(
+      { rawFact: "hoy corté a las 14:00", userTier: "MATRICULA" },
+      [ley],
+    );
+    assert.match(conLey, /LEYES DE CASA/);
+    assert.match(conLey, /percepción de C7/);
+    assert.match(conLey, /18.*oct.*2026/i);
+  });
 });
 
 describe("Depósito V3 — fallback local", () => {

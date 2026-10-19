@@ -4,6 +4,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildActiveCharacterMap,
+  cerebroVacio,
+  formatFechaPrincipio,
+  type CerebroMadre,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
 import { FormularioAuditoriaV3 } from "./FormularioAuditoriaV3.tsx";
@@ -11,6 +14,7 @@ import { MapaCalorV3 } from "./MapaCalorV3.tsx";
 import { DictamenCardV3 } from "./DictamenCardV3.tsx";
 import { HistorialV3 } from "./HistorialV3.tsx";
 import { GradoConsistenciaV3 } from "./GradoConsistenciaV3.tsx";
+import { CerebroMadreV3 } from "./CerebroMadreV3.tsx";
 
 function fixture(): DepotAnalysisResult {
   return {
@@ -181,5 +185,65 @@ describe("DictamenCardV3", () => {
     assert.doesNotMatch(html, /Δ 4/);
     assert.doesNotMatch(html, /Ojo de percepción/);
     assert.doesNotMatch(html, /Causa real de ingeniería/);
+  });
+});
+
+describe("CerebroMadreV3", () => {
+  const nacimiento = Date.UTC(2026, 9, 18, 12, 0, 0);
+
+  function cerebroConCandidato(): CerebroMadre {
+    return {
+      principios: [
+        {
+          id: "cm_test",
+          createdAt: nacimiento,
+          estado: "candidato",
+          foco: 7,
+          firma: 2,
+          percepcion: "Visión",
+          escritura: "escribí el patrón en una frase",
+          enunciado:
+            "Para que tu percepción de C7 (Visión) se desarrolle, escribí el patrón en una frase. Geometría observada: firma C2 → foco C7.",
+          anclas: ["patron"],
+          usos: 1,
+        },
+      ],
+    };
+  }
+
+  it("muestra las tres bandejas, la fecha de creación y no publica sola", () => {
+    const html = renderToStaticMarkup(
+      createElement(CerebroMadreV3, {
+        cerebro: cerebroConCandidato(),
+        onEnviarAFiltro: () => {},
+        onPromover: () => {},
+        onRechazar: () => {},
+      }),
+    );
+    assert.match(html, /deposito-v3-cerebro-madre/);
+    assert.match(html, /CEREBRO MADRE|Recinto de casa/i);
+    assert.match(html, /deposito-v3-cm-candidatos/);
+    assert.match(html, /deposito-v3-cm-filtro/);
+    assert.match(html, /deposito-v3-cm-leyes/);
+    assert.match(html, /No publica sola/);
+    assert.match(html, /Creado · /);
+    assert.ok(html.includes(formatFechaPrincipio(nacimiento)));
+    assert.match(html, /18 oct 2026/);
+    assert.match(html, /Enviar a filtro/);
+    assert.doesNotMatch(html, /Promover a ley/);
+    assert.doesNotMatch(html, /axioma del operador|Criterio Vivo/i);
+  });
+
+  it("vacío cita la firma de casa", () => {
+    const html = renderToStaticMarkup(
+      createElement(CerebroMadreV3, {
+        cerebro: cerebroVacio(),
+        onEnviarAFiltro: () => {},
+        onPromover: () => {},
+        onRechazar: () => {},
+      }),
+    );
+    assert.match(html, /No publica sola/);
+    assert.match(html, /Bandeja vacía/);
   });
 });

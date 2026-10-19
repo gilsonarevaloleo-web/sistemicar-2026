@@ -94,6 +94,38 @@ export {
 export type { GradoPedagogico, PuenteEscritura, TemperamentoV3 } from "./pedagogia.ts";
 
 export {
+  CEREBRO_MADRE_FIRMA,
+  CEREBRO_MADRE_MARCA,
+  CEREBRO_MADRE_NOMBRE,
+  CEREBRO_MADRE_NO_ES,
+  absorbPrincipio,
+  absorbPrincipioDesdeVolcado,
+  bloqueLeyesCasaPrompt,
+  cerebroVacio,
+  contarPalabrasVolcado,
+  enviarAFiltro,
+  enunciadoPrincipio,
+  extraerPrincipioAprendizaje,
+  formatFechaPrincipio,
+  leyesDeCasa,
+  normalizarCerebroMadre,
+  normalizarLeyesCasa,
+  normalizarPrincipio,
+  principiosPorEstado,
+  promoverALey,
+  rechazarPrincipio,
+  resumenCerebroMadre,
+} from "./cerebroMadre.ts";
+export type {
+  AbsorbPrincipioResult,
+  CerebroMadre,
+  EstadoPrincipio,
+  EvolucionPrincipio,
+  ExtraerPrincipioInput,
+  PrincipioAprendizaje,
+} from "./cerebroMadre.ts";
+
+export {
   diagnosticarAuditoriaLocal,
   procesarAuditoriaV3,
 } from "./motor.ts";

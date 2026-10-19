@@ -6,6 +6,10 @@
  * Telemetría fría: no fuerza C8/C9/C10 si el volcado no los construye en pantalla.
  */
 
+import {
+  bloqueLeyesCasaPrompt,
+  type PrincipioAprendizaje,
+} from "./cerebroMadre.ts";
 import { CANON_TEN_EYES, etiquetaCodigoOjo } from "./ojos.ts";
 import {
   bloquePuentesPrompt,
@@ -172,8 +176,11 @@ ${jsonSchemaEjemplo()}
 /** Alias: el motor de firma ahora es el prompt de maestría. */
 export const DEPOT_V3_SYNTAX_ONLY_PROMPT = DEPOT_V3_MASTER_PROMPT;
 
-export function buildDepositoV3SystemPrompt(): string {
-  return `
+export function buildDepositoV3SystemPrompt(
+  leyesCasa: readonly PrincipioAprendizaje[] = [],
+): string {
+  const leyes = bloqueLeyesCasaPrompt(leyesCasa);
+  const cuerpo = `
 ${DEPOT_V3_MASTER_PROMPT}
 
 Ritual: ${DEPOSITO_V3_RITUAL}
@@ -207,6 +214,7 @@ ${bloquePuentesPrompt()}
 LOS 10 CÓDIGOS DE CARÁCTER:
 ${diccionarioCanales()}
 `.trim();
+  return leyes ? `${cuerpo}\n\n${leyes}` : cuerpo;
 }
 
 export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
@@ -253,8 +261,11 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
   return lines.join("\n");
 }
 
-export function serializarPromptAuditoria(payload: DepotEntryPayload): string {
-  return `${buildDepositoV3SystemPrompt()}\n\n${buildDepositoV3UserPrompt(payload)}`;
+export function serializarPromptAuditoria(
+  payload: DepotEntryPayload,
+  leyesCasa: readonly PrincipioAprendizaje[] = [],
+): string {
+  return `${buildDepositoV3SystemPrompt(leyesCasa)}\n\n${buildDepositoV3UserPrompt(payload)}`;
 }
 
 export function etiquetaCanalPrompt(codigo: EyeCode, dialect: "canon" | "planeta" = "canon"): string {
