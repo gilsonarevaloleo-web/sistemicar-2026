@@ -10,6 +10,8 @@ import {
   esCodigoFocoSintesis,
   vaciosDesdeActiveMap,
 } from "./ojos.ts";
+import { ajustePedagogico } from "./pedagogia.ts";
+import type { PrincipioAprendizaje } from "./cerebroMadre.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
 import {
   parseDepotAnalysisResult,
@@ -49,6 +51,7 @@ const SINTAXIS: Record<EyeCode, RegExp[]> = {
     /me llevo a/,
     /despues me/,
     /después me/,
+    /al dia siguiente/,
     /entro y/,
     /sali[oó]/,
     /causa/,
@@ -380,29 +383,8 @@ function rutaGeometrica(characterSignedCode: EyeCode, foco: EyeCode): string {
   return `Transición de ${CANON_TEN_EYES[characterSignedCode].name} C${characterSignedCode} hacia la síntesis de ${CANON_TEN_EYES[foco].name} C${foco}.`;
 }
 
-function ajustePorFoco(foco: EyeCode): string {
-  switch (foco) {
-    case 1:
-      return "Tu foco está en el Cimiento (C1). Mañana, nombrá territorio, hora y verbo. Cero clima.";
-    case 2:
-      return "Tu foco está en el Flujo (C2). Mañana, escribí la causa y el efecto con un conector medible, no con estado de ánimo.";
-    case 3:
-      return "Tu foco está en la Secuencia (C3). Mañana, nombrá el paso que se rompe y el consecuente, sin repetir el mismo pistón.";
-    case 4:
-      return "Tu foco está en la Estructura (C4). Mañana, formulá UNA pregunta que quiebre la regla que diste por sentada.";
-    case 5:
-      return "Tu quiebre real está en el Corte (C5). Mañana, aplica el mismo criterio de límite a un escenario distinto: un sí o un no sin explicación.";
-    case 6:
-      return "Tu foco está en la Convivencia (C6). Mañana, anotá la escena física —herramienta, roce, frase textual— sin interpretarla.";
-    case 7:
-      return "Tu quiebre real está en la Ley (C7). Mañana, llevá ese mismo axioma a un hecho crudo distinto y verificá si el patrón sostiene.";
-    case 8:
-      return "Tu quiebre real ocurrió en el Ciclo (C8). Mañana, aplica este mismo criterio de inversión de polo a un escenario distinto para verificar la universalidad del patrón.";
-    case 9:
-      return "Tu quiebre real está en el Sistema (C9). Mañana, nombrá los dos hilos que se trenzan y el punto exacto donde se cargan uno al otro.";
-    case 10:
-      return "Tu quiebre real está en el Origen (C10). Mañana, escribí el mismo título y el mismo cierre con un cuerpo que pruebe el cordón, no el tema.";
-  }
+function ajustePorFoco(foco: EyeCode, tier: DepotEntryPayload["userTier"]): string {
+  return ajustePedagogico(foco, tier);
 }
 
 function scoreCierre(norm: string): Record<EyeCode, number> {
@@ -430,8 +412,7 @@ export function diagnosticarAuditoriaLocal(
           diagnosticMessage:
             "El volcado aún es clima. C1 Cimiento no tiene territorio nombrado. Falta geometría.",
         },
-        immediateAdjustment:
-          "Tu foco está en el Cimiento (C1). Volcá UN hecho físico: hora, lugar, verbo. Cero clima.",
+        immediateAdjustment: ajustePorFoco(1, payload.userTier),
         syntaxDiagnostic: {
           detectedSyntaxCode: 1,
           focoCode: 1,
@@ -490,6 +471,17 @@ export function diagnosticarAuditoriaLocal(
     normCuerpo,
   );
 
+  // Transición pura C2→C7: los conectores firman Flujo; la ley es el foco.
+  // No recategorizar la Firma como C7 solo porque el cierre forja el axioma.
+  if (
+    characterSignedCode === 7 &&
+    synCuerpo[2] > 0 &&
+    synCuerpo[3] <= 1 &&
+    !/secuencia|piston/.test(normCuerpo)
+  ) {
+    characterSignedCode = 2;
+  }
+
   const activos = EYE_CODES.filter(
     (n) => syn[n] > 0 || n === characterSignedCode || n === focoRevelacionCode,
   );
@@ -525,7 +517,7 @@ export function diagnosticarAuditoriaLocal(
         isFullyGrounded: grounded,
         diagnosticMessage,
       },
-      immediateAdjustment: ajustePorFoco(focoRevelacionCode),
+      immediateAdjustment: ajustePorFoco(focoRevelacionCode, payload.userTier),
     }),
   );
 }
@@ -587,8 +579,9 @@ function sellarGemini(result: DepotAnalysisResult): DepotAnalysisResult {
 export async function procesarAuditoriaV3(
   payload: DepotEntryPayload,
   callGemini?: GeminiAuditCaller,
+  leyesCasa: readonly PrincipioAprendizaje[] = [],
 ): Promise<ResultadoAuditoriaV3> {
-  const serialized = serializarPromptAuditoria(payload);
+  const serialized = serializarPromptAuditoria(payload, leyesCasa);
 
   if (callGemini) {
     try {
@@ -602,7 +595,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El FOCO es la INTENCIÓN real (C5/C7/C8), no la frecuencia de «entonces/después». El ajuste apunta al FOCO, no a un vacío mecánico. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El FOCO es la INTENCIÓN real (C5/C7/C8), no la frecuencia de «entonces/después». El ajuste enseña el próximo volcado: «Para que tu percepción de C[n] se desarrolle, escribí [geometría]». Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

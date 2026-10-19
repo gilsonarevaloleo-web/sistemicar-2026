@@ -4,6 +4,7 @@ import {
   DEPOT_V3_MASTER_PROMPT,
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
   INTENT_AWARE_SYNTAX_PROMPT,
+  UPDATED_DEPOT_ENGINE_PROMPT,
   buildDepositoV3SystemPrompt,
   diagnosticarAuditoriaLocal,
   evaluarDepositoV3,
@@ -29,8 +30,18 @@ describe("Depósito V3 — prompt", () => {
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /dejé el trabajo|puse pausa al desglosador/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /el deber es el enemigo instalado/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /entonces.*después.*luego|narrative vessels/i);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Cold Telemetry Auditor/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Do NOT force or simulate activation of higher codes/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /pure transition from Flujo \(C2\) to Axiomatic Vision \(C7\)/);
+    assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /RESPECT SYNTACTIC VOIDS/);
     assert.match(system, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
     assert.match(system, /Deep Intent Syntax Auditor/);
+    assert.match(system, /Cold Telemetry Auditor/);
+    assert.match(system, /TELEMETRÍA FRÍA/);
+    assert.match(system, /PUENTES DE ESCRITURA|percepción de C\[n\]/i);
+    assert.match(system, /pregunta de inflexión|Inflection question/i);
+    assert.match(system, /alma del código no cambia/i);
+    assert.match(system, /TEMPERAMENTO/);
     assert.match(system, /syntacticVacios/);
     assert.match(system, /isCableadoConnected/);
     assert.match(system, /characterSignedCode/);
@@ -54,6 +65,66 @@ describe("Depósito V3 — prompt", () => {
     assert.match(user, /FOCO DE REVELACIÓN/);
     assert.match(user, /Cero Óptica|Cero Δ/);
     assert.match(user, /lenguaje natural|INTENCIÓN/);
+    assert.match(user, /Telemetría fría|no fuerces C8\/C9\/C10/);
+    assert.match(user, /TEMPERAMENTO NUTRITIVO \(G1\)/);
+    assert.match(user, /próximo volcado|percepción del FOCO/i);
+  });
+
+  it("Carrera y Título cambian el temperamento del ajuste, no el alma del código", () => {
+    const carrera = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "CARRERA",
+      detectedNoise: "flor",
+      omittedShadow: "sombra",
+    });
+    const titulo = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "TITULO",
+      detectedNoise: "flor",
+      omittedShadow: "sombra",
+    });
+    assert.match(carrera, /TEMPERAMENTO DE RIGOR QUIRÚRGICO \(G3\)/);
+    assert.match(titulo, /TEMPERAMENTO DE MATEMÁTICA PURA \(G4\)/);
+  });
+
+  it("las leyes de casa viajan al prompt; un candidato no", () => {
+    const nacimiento = Date.UTC(2026, 9, 18, 12, 0, 0);
+    const candidato = {
+      id: "cm_c",
+      createdAt: nacimiento,
+      estado: "candidato" as const,
+      foco: 7 as const,
+      firma: 2 as const,
+      percepcion: "Visión",
+      escritura: "escribí el patrón",
+      enunciado: "candidato que no debe citarse",
+      anclas: [],
+      usos: 1,
+    };
+    const ley = {
+      ...candidato,
+      id: "cm_l",
+      estado: "ley" as const,
+      enunciado: "Para que tu percepción de C7 se desarrolle, escribí el patrón.",
+      promotedAt: nacimiento,
+    };
+    const sinLeyes = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "MATRICULA",
+    });
+    assert.doesNotMatch(sinLeyes, /LEYES DE CASA/);
+    const conCandidato = serializarPromptAuditoria(
+      { rawFact: "hoy corté a las 14:00", userTier: "MATRICULA" },
+      [candidato],
+    );
+    assert.doesNotMatch(conCandidato, /LEYES DE CASA|candidato que no debe citarse/);
+    const conLey = serializarPromptAuditoria(
+      { rawFact: "hoy corté a las 14:00", userTier: "MATRICULA" },
+      [ley],
+    );
+    assert.match(conLey, /LEYES DE CASA/);
+    assert.match(conLey, /percepción de C7/);
+    assert.match(conLey, /18.*oct.*2026/i);
   });
 });
 
@@ -116,7 +187,7 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.focoRevelacionCode, 1);
     assert.equal(r.syntaxDiagnostic.isCableadoConnected, false);
     assert.equal(r.groundingStatus.isFullyGrounded, false);
-    assert.match(r.immediateAdjustment, /C1|Cimiento|hecho físico/i);
+    assert.match(r.immediateAdjustment, /percepción de C1|Cimiento|título/i);
   });
 
   it("título C7 cableado al pistón no se juzga como idea: solo cordón", () => {
@@ -179,8 +250,19 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.activeCharacterMap[7], true);
     assert.equal(r.activeCharacterMap[8], true);
     assert.notEqual(r.focoRevelacionCode, 2);
-    assert.match(r.immediateAdjustment, /C7|Ley|axioma|patr[oó]n/i);
-    assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|conector medible/i);
+    assert.match(r.immediateAdjustment, /percepción de C7|patr[oó]n/i);
+    assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|escenario distinto/i);
+  });
+
+  it("C4 es pregunta de inflexión: seriedad y profundidad, no una pregunta genérica", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "¿El atasco es el paso o el muro que di por sentado? El muro se cayó. La norma ya no sostiene.",
+      userTier: "MATRICULA",
+    });
+    assert.equal(r.focoRevelacionCode, 4);
+    assert.match(r.immediateAdjustment, /percepción de C4/i);
+    assert.match(r.immediateAdjustment, /inflexión|paradigma|seriedad/i);
   });
 
   it("lenguaje natural: parar el desglosador para proteger el cuerpo es foco C5, no jerga de corte", () => {
@@ -208,6 +290,25 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.activeCharacterMap[8], true);
     assert.match(r.immediateAdjustment, /C8|Ciclo|polo/i);
     assert.doesNotMatch(r.immediateAdjustment, /flojo|debo|virtud/i);
+  });
+
+  it("transición pura C2→C7 no inventa C8/C9 en el mapa de calor", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "Entonces me fui. Al día siguiente vi la ley: el deber es el enemigo instalado. Donde está tu atención está tu energía.",
+      userTier: "CARRERA",
+      detectedNoise: "culpa de ocio",
+      omittedShadow: "el descanso",
+    });
+    assert.equal(r.characterSignedCode, 2);
+    assert.equal(r.focoRevelacionCode, 7);
+    assert.equal(r.activeCharacterMap[2], true);
+    assert.equal(r.activeCharacterMap[7], true);
+    assert.equal(r.syntacticVacios.includes(8), true);
+    assert.equal(r.syntacticVacios.includes(9), true);
+    assert.match(r.immediateAdjustment, /percepción de C7/i);
+    assert.match(r.immediateAdjustment, /patr[oó]n|frase/i);
+    assert.doesNotMatch(r.immediateAdjustment, /escenario distinto|mañana, aplica/i);
   });
 
   it("detectedNoise declarado no altera la geometría si el cuerpo está cableado", () => {
@@ -253,6 +354,39 @@ describe("Depósito V3 — orquestación", () => {
     assert.equal(out.result.activeCharacterMap[7], true);
     assert.equal(out.result.syntaxDiagnostic.isCableadoConnected, true);
     assert.equal("deltaGap" in out.result, false);
+  });
+
+  it("Gemini que deja C8/C9 vacíos en una firma C2→C7 no se rellena por inferencia", async () => {
+    const out = await procesarAuditoriaV3(
+      {
+        rawFact:
+          "Entonces me fui. Al día siguiente vi la ley: el deber es el enemigo instalado. Donde está tu atención está tu energía.",
+        userTier: "CARRERA",
+      },
+      async () =>
+        JSON.stringify({
+          characterSignedCode: 2,
+          focoRevelacionCode: 7,
+          activeCharacterMap: { "2": true, "7": true },
+          syntacticVacios: [1, 3, 4, 5, 6, 8, 9, 10],
+          syntaxDiagnostic: {
+            detectedSyntaxCode: 2,
+            focoCode: 7,
+            isCableadoConnected: true,
+            syntaxCharacteristics: "Firma C2 hacia la ley C7.",
+          },
+          groundingStatus: {
+            isFullyGrounded: true,
+            diagnosticMessage: "Transición C2 hacia C7.",
+          },
+          immediateAdjustment: "Tu quiebre real está en la Ley (C7).",
+        }),
+    );
+    assert.equal(out.source, "gemini");
+    assert.equal(out.result.characterSignedCode, 2);
+    assert.equal(out.result.focoRevelacionCode, 7);
+    assert.equal(out.result.activeCharacterMap[8] ?? false, false);
+    assert.equal(out.result.activeCharacterMap[9] ?? false, false);
   });
 
   it("JSON roto cae a local y no tira 500", async () => {

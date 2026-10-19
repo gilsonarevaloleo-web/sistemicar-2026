@@ -77,10 +77,58 @@ export {
   DEPOT_V3_SYNTAX_ONLY_PROMPT,
   DEPOSITO_V3_RITUAL,
   INTENT_AWARE_SYNTAX_PROMPT,
+  UPDATED_DEPOT_ENGINE_PROMPT,
   buildDepositoV3SystemPrompt,
   buildDepositoV3UserPrompt,
   serializarPromptAuditoria,
 } from "./prompt.ts";
+
+export {
+  PUENTES_ESCRITURA,
+  TEMPERAMENTO_V3,
+  ajustePedagogico,
+  gradoPedagogicoDe,
+  nucleoAjuste,
+  temperamentoDe,
+} from "./pedagogia.ts";
+export type { GradoPedagogico, PuenteEscritura, TemperamentoV3 } from "./pedagogia.ts";
+
+export {
+  CEREBRO_MADRE_FIRMA,
+  CEREBRO_MADRE_MARCA,
+  CEREBRO_MADRE_NOMBRE,
+  CEREBRO_MADRE_NO_ES,
+  absorbPrincipio,
+  absorbPrincipioDesdeVolcado,
+  bloqueLeyesCasaPrompt,
+  cerebroVacio,
+  contarPalabrasVolcado,
+  destilarAcomodo,
+  enviarAFiltro,
+  enunciadoPrincipio,
+  extraerPrincipioAprendizaje,
+  formatFechaPrincipio,
+  leyesDeCasa,
+  medirPedidoPendiente,
+  normalizarCerebroMadre,
+  normalizarLeyesCasa,
+  normalizarPrincipio,
+  principiosPorEstado,
+  promoverALey,
+  rechazarPrincipio,
+  resumenCerebroMadre,
+  volcadoConstruyeCodigo,
+} from "./cerebroMadre.ts";
+export type {
+  AbsorbPrincipioResult,
+  CerebroMadre,
+  EstadoPrincipio,
+  EvolucionPrincipio,
+  ExtraerPrincipioInput,
+  MedidaProximo,
+  PedidoPercepcion,
+  PrincipioAprendizaje,
+} from "./cerebroMadre.ts";
 
 export {
   diagnosticarAuditoriaLocal,

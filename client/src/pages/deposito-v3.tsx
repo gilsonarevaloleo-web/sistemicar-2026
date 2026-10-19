@@ -9,6 +9,7 @@ import { MapaCalorV3 } from "@/components/deposito/v3/MapaCalorV3";
 import { DictamenCardV3 } from "@/components/deposito/v3/DictamenCardV3";
 import { HistorialV3 } from "@/components/deposito/v3/HistorialV3";
 import { GradoConsistenciaV3 } from "@/components/deposito/v3/GradoConsistenciaV3";
+import { CerebroMadreV3 } from "@/components/deposito/v3/CerebroMadreV3";
 import {
   addVolcadoV3Entry,
   listVolcadosV3Local,
@@ -16,8 +17,18 @@ import {
   type VolcadoV3Entry,
 } from "@/lib/deposito/v3/volcados";
 import {
+  enviarCandidatoAFiltro,
+  loadCerebroMadre,
+  promoverFiltroALey,
+  rechazarCandidatoOFiltro,
+  registrarAuditoriaEnCerebroMadre,
+  subscribeToCerebroMadre,
+} from "@/lib/deposito/v3/cerebroMadre";
+import {
   DEPOSITO_V3_RITUAL,
+  cerebroVacio,
   userTierFromEntitlements,
+  type CerebroMadre,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
 
@@ -33,13 +44,24 @@ export default function DepositoV3Page() {
   const [analysis, setAnalysis] = useState<DepotAnalysisResult | null>(null);
   const [source, setSource] = useState<"gemini" | "local_fallback" | null>(null);
   const [historial, setHistorial] = useState<VolcadoV3Entry[]>([]);
+  const [cerebro, setCerebro] = useState<CerebroMadre>(cerebroVacio);
 
   useEffect(() => {
     setHistorial(listVolcadosV3Local(uid));
-    if (motorsQuiet) return;
-    return subscribeToVolcadosV3(uid, setHistorial, () => {
+    setCerebro(loadCerebroMadre());
+    const unsubCasa = subscribeToCerebroMadre(setCerebro);
+    if (motorsQuiet) {
+      return () => {
+        unsubCasa();
+      };
+    }
+    const unsubVolcados = subscribeToVolcadosV3(uid, setHistorial, () => {
       setHistorial(listVolcadosV3Local(uid));
     });
+    return () => {
+      unsubCasa();
+      unsubVolcados();
+    };
   }, [uid, motorsQuiet]);
 
   return (
@@ -76,12 +98,20 @@ export default function DepositoV3Page() {
 
         <GradoConsistenciaV3 entries={historial} />
 
+        <CerebroMadreV3
+          cerebro={cerebro}
+          onEnviarAFiltro={(id) => setCerebro(enviarCandidatoAFiltro(id))}
+          onPromover={(id) => setCerebro(promoverFiltroALey(id))}
+          onRechazar={(id) => setCerebro(rechazarCandidatoOFiltro(id))}
+        />
+
         <FormularioAuditoriaV3
           userTier={userTier}
           disabled={!entitlements.ready}
           onAnalysisComplete={async (result, origen, payload) => {
             setAnalysis(result);
             setSource(origen);
+            setCerebro(registrarAuditoriaEnCerebroMadre(payload, result));
             await addVolcadoV3Entry({
               userId: uid,
               payload,

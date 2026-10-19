@@ -38,7 +38,7 @@ describe("Depósito V3 — GET /api/deposito/v3/meta", () => {
       const res = await fetch(`${base}/api/deposito/v3/meta`);
       assert.equal(res.status, 200);
       const body = await res.json();
-      assert.equal(body.version, "3.5.0-lenguaje-natural");
+      assert.equal(body.version, "3.9.0-acomodo-medida");
       assert.equal(body.endpoint, "POST /api/deposito/v3/audit");
       assert.equal(body.ritual, "¿Qué aprendí hoy?");
       assert.equal(body.muroDeDominancia, false);
@@ -80,6 +80,8 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.match(String(prompt), /Syntax & Character Master Engine/);
         assert.match(String(prompt), /ADAPT TO THE USER'S NATURAL LANGUAGE/);
         assert.match(String(prompt), /Deep Intent Syntax Auditor/);
+        assert.match(String(prompt), /Cold Telemetry Auditor/);
+        assert.match(String(prompt), /Do NOT force or simulate activation of higher codes/);
         assert.doesNotMatch(String(prompt), /perceptionEye/);
         return JSON.stringify({
           characterSignedCode: 3,
@@ -117,7 +119,7 @@ describe("Depósito V3 — POST /api/deposito/v3/audit", () => {
         assert.equal(body.result.activeCharacterMap[3], true);
         assert.equal(body.result.syntaxDiagnostic.isCableadoConnected, true);
         assert.equal(body.userTier, "MATRICULA");
-        assert.equal(body.version, "3.5.0-lenguaje-natural");
+        assert.equal(body.version, "3.9.0-acomodo-medida");
         assert.equal(body.result.perceptionEye, undefined);
         assert.equal(body.result.deltaGap, undefined);
       },
