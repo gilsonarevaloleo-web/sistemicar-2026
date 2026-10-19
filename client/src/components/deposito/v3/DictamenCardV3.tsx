@@ -118,7 +118,7 @@ export function DictamenCardV3({ result }: { result: DepotAnalysisResult }) {
 
       <div className="p-4" style={{ border: `1px solid ${GOLD}44`, backgroundColor: `${GOLD}10` }}>
         <span className="block text-[10px] font-bold uppercase tracking-widest" style={{ color: GOLD }}>
-          Ajuste técnico inmediato · C{focoCode}
+          Ajuste de percepción · C{focoCode}
         </span>
         <p className="mt-1 text-xs font-semibold leading-relaxed" style={{ color: `${GOLD}ee` }}>
           {result.immediateAdjustment}

@@ -38,6 +38,10 @@ describe("Depósito V3 — prompt", () => {
     assert.match(system, /Deep Intent Syntax Auditor/);
     assert.match(system, /Cold Telemetry Auditor/);
     assert.match(system, /TELEMETRÍA FRÍA/);
+    assert.match(system, /PUENTES DE ESCRITURA|percepción de C\[n\]/i);
+    assert.match(system, /pregunta de inflexión|Inflection question/i);
+    assert.match(system, /alma del código no cambia/i);
+    assert.match(system, /TEMPERAMENTO/);
     assert.match(system, /syntacticVacios/);
     assert.match(system, /isCableadoConnected/);
     assert.match(system, /characterSignedCode/);
@@ -62,6 +66,25 @@ describe("Depósito V3 — prompt", () => {
     assert.match(user, /Cero Óptica|Cero Δ/);
     assert.match(user, /lenguaje natural|INTENCIÓN/);
     assert.match(user, /Telemetría fría|no fuerces C8\/C9\/C10/);
+    assert.match(user, /TEMPERAMENTO NUTRITIVO \(G1\)/);
+    assert.match(user, /próximo volcado|percepción del FOCO/i);
+  });
+
+  it("Carrera y Título cambian el temperamento del ajuste, no el alma del código", () => {
+    const carrera = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "CARRERA",
+      detectedNoise: "flor",
+      omittedShadow: "sombra",
+    });
+    const titulo = serializarPromptAuditoria({
+      rawFact: "hoy corté a las 14:00",
+      userTier: "TITULO",
+      detectedNoise: "flor",
+      omittedShadow: "sombra",
+    });
+    assert.match(carrera, /TEMPERAMENTO DE RIGOR QUIRÚRGICO \(G3\)/);
+    assert.match(titulo, /TEMPERAMENTO DE MATEMÁTICA PURA \(G4\)/);
   });
 });
 
@@ -124,7 +147,7 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.focoRevelacionCode, 1);
     assert.equal(r.syntaxDiagnostic.isCableadoConnected, false);
     assert.equal(r.groundingStatus.isFullyGrounded, false);
-    assert.match(r.immediateAdjustment, /C1|Cimiento|hecho físico/i);
+    assert.match(r.immediateAdjustment, /percepción de C1|Cimiento|título/i);
   });
 
   it("título C7 cableado al pistón no se juzga como idea: solo cordón", () => {
@@ -187,8 +210,19 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.activeCharacterMap[7], true);
     assert.equal(r.activeCharacterMap[8], true);
     assert.notEqual(r.focoRevelacionCode, 2);
-    assert.match(r.immediateAdjustment, /C7|Ley|axioma|patr[oó]n/i);
-    assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|conector medible/i);
+    assert.match(r.immediateAdjustment, /percepción de C7|patr[oó]n/i);
+    assert.doesNotMatch(r.immediateAdjustment, /repet[ií].*C3|escenario distinto/i);
+  });
+
+  it("C4 es pregunta de inflexión: seriedad y profundidad, no una pregunta genérica", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact:
+        "¿El atasco es el paso o el muro que di por sentado? El muro se cayó. La norma ya no sostiene.",
+      userTier: "MATRICULA",
+    });
+    assert.equal(r.focoRevelacionCode, 4);
+    assert.match(r.immediateAdjustment, /percepción de C4/i);
+    assert.match(r.immediateAdjustment, /inflexión|paradigma|seriedad/i);
   });
 
   it("lenguaje natural: parar el desglosador para proteger el cuerpo es foco C5, no jerga de corte", () => {
@@ -232,7 +266,9 @@ describe("Depósito V3 — fallback local", () => {
     assert.equal(r.activeCharacterMap[7], true);
     assert.equal(r.syntacticVacios.includes(8), true);
     assert.equal(r.syntacticVacios.includes(9), true);
-    assert.match(r.immediateAdjustment, /C7|Ley|axioma|patr[oó]n/i);
+    assert.match(r.immediateAdjustment, /percepción de C7/i);
+    assert.match(r.immediateAdjustment, /patr[oó]n|frase/i);
+    assert.doesNotMatch(r.immediateAdjustment, /escenario distinto|mañana, aplica/i);
   });
 
   it("detectedNoise declarado no altera la geometría si el cuerpo está cableado", () => {

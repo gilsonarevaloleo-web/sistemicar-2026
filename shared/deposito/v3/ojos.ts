@@ -59,7 +59,7 @@ export const CANON_TEN_EYES: Record<EyeCode, EyeDefinition> = {
     planetaOjo: "El Ojo de la Seriedad",
     syntaxLabel: "Reflexivo",
     syntaxCharacteristics:
-      "Interrogativo: pregunta reglas, muros y contención.",
+      "Pregunta de inflexión: el paradigma se parte. Sin C4 no hay seriedad ni profundidad.",
   },
   5: {
     id: 5,

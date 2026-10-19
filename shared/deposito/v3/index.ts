@@ -84,6 +84,16 @@ export {
 } from "./prompt.ts";
 
 export {
+  PUENTES_ESCRITURA,
+  TEMPERAMENTO_V3,
+  ajustePedagogico,
+  gradoPedagogicoDe,
+  nucleoAjuste,
+  temperamentoDe,
+} from "./pedagogia.ts";
+export type { GradoPedagogico, PuenteEscritura, TemperamentoV3 } from "./pedagogia.ts";
+
+export {
   diagnosticarAuditoriaLocal,
   procesarAuditoriaV3,
 } from "./motor.ts";

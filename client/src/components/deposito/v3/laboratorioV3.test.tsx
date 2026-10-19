@@ -173,7 +173,7 @@ describe("DictamenCardV3", () => {
     assert.match(html, /C8 · Ciclos/);
     assert.match(html, /Ritmo|Secuencia Vectorial/);
     assert.match(html, /Ley de Polaridad \(C8\)/);
-    assert.match(html, /Ajuste técnico inmediato · C8/);
+    assert.match(html, /Ajuste de percepción · C8/);
     assert.match(html, /deposito-v3-cableado/);
     assert.match(html, /Cableado título↔cierre: conectado/);
     assert.match(html, /deposito-v3-vacios/);

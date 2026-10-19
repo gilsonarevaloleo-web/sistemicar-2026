@@ -7,6 +7,11 @@
  */
 
 import { CANON_TEN_EYES, etiquetaCodigoOjo } from "./ojos.ts";
+import {
+  bloquePuentesPrompt,
+  bloqueTemperamentoPrompt,
+  nucleoAjuste,
+} from "./pedagogia.ts";
 import { TIER_MAX_EYE } from "./tiers.ts";
 import { EYE_CODES, type DepotEntryPayload, type EyeCode } from "./types.ts";
 
@@ -38,7 +43,7 @@ ${active}
     "isFullyGrounded": true,
     "diagnosticMessage": "La escritura sostiene título, secuencia y cierre. Estabilidad estructural, no juicio de verdad."
   },
-  "immediateAdjustment": "Tu quiebre real ocurrió en la Ley de Polaridad (C8). Mañana, aplica este mismo criterio de inversión de polo a un escenario distinto fuera del taller para verificar la universalidad del patrón."
+  "immediateAdjustment": "${nucleoAjuste(8)}"
 }`;
 }
 
@@ -133,7 +138,7 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER)
 - C1 (Cimiento): Topic/title grounding.
 - C2 (Flujo): Connectors of causation. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the foco.
 - C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time.
-- C4 (Estructura): Interrogative break questions questioning the rule.
+- C4 (Estructura / Seriedad): Inflection question where the paradigm shifts. Without C4 there is no seriousness, therefore no depth. When the student asks themselves the question, C4 is acting. The soul of the code does not change; the arrangement follows the topic.
 - C5 (Decisión/Corte): Stopping an automatic behavior, a deliberate NO, a margin that protects the body. Not only the words "cortar" or "margen".
 - C6 (Convivencia): Real physical scenes, friction, tools, raw facts.
 - C7 (Visión): A discovered rule / axiomatic framing. A sentence that names how things work.
@@ -150,11 +155,14 @@ STEP 2: IDENTIFY THE "FOCO DE REVELACIÓN" (CORE CODE OF VALUE)
 - characterSignedCode = primary syntax used for storytelling (Firma).
 - focoRevelacionCode = the highest-value code where the law or decision was forged.
 
-STEP 3: GENERATE THE "AJUSTE TÉCNICO INMEDIATO"
-- The advice MUST address the FOCO DE REVELACIÓN code, not just the mechanical structure.
-- The advice must feel SOBER, INCISIVE, and DIRECTED at honing that specific law or decision.
-- Validate the natural discovery; sharpen that higher code. Do not force robotic vocabulary.
-- NEVER give generic advice like "repeat C3 with a number" if the user has reached a high-code realization (C5, C7, C8).
+STEP 3: GENERATE THE "AJUSTE DE PERCEPCIÓN" (immediateAdjustment)
+- Structuring the text STIMULATES perception of the eyes. Do not give life-coaching ("apply this tomorrow in another scenario").
+- Formula: "Para que tu percepción de C[n] se desarrolle, escribí [geometría del puente]."
+- The soul of the code does not change. The arrangement follows the topic of the dump.
+- C4 is the inflection question (paradigm shift). Without C4 there is no Seriedad, therefore no depth.
+- C1 = attention in the title. Connecting that title with the close is C10. C2 develops by connecting the dots (C3).
+- Match the TEMPERAMENTO of the student's grade (G1 nutritive → G4 dry).
+- NEVER give generic advice like "repeat C3 with a number".
 - NEVER fill a random syntactic void when a synthesis code is already present.
 
 OUTPUT JSON STRUCTURE:
@@ -179,9 +187,11 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 4. characterSignedCode es el código de sintaxis PRIMARIO del relato (el que narra).
 5. focoRevelacionCode / syntaxDiagnostic.focoCode es el código de SÍNTESIS. No copies el canal con más palabras. No copies conectores C2.
 6. activeCharacterMap cubre "1"…"10" y alimenta el mapa de calor. Cero Óptica de verdad. Cero brecha Δ.
-7. immediateAdjustment apunta al FOCO. Si hay C5/C7/C8/C9, profundizá o concretá ESE código. Prohibido «repetí C3 con un número».
+7. immediateAdjustment enseña el PRÓXIMO VOLCADO. Fórmula: percepción de C[n] → geometría a escribir. Cero consejo de vida. Prohibido «repetí C3 con un número».
 8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5/C7/C8 viven en la INTENCIÓN de la acción, no en jerga técnica.
 9. TELEMETRÍA FRÍA. No fuerces ni simules C8, C9 o C10 si la redacción exacta no los construye. Una transición pura C2→C7 se marca como Firma C2 y Foco C7. Los vacíos de C8/C9 se respetan.
+10. C4 ES INFLEXIÓN. Pregunta donde ocurre el cambio de paradigma. Sin C4 no hay seriedad ni profundidad. El alma del código no cambia; el acomodo sigue el tema.
+11. TEMPERAMENTO. G1 nutritivo, G2 fricción, G3 rigor, G4 matemática pura. El tono sigue al grado, no al código del mapa.
 
 ═══ SALIDA ═══
 Respondé SOLO un JSON válido (sin markdown) con la forma exacta de OUTPUT JSON STRUCTURE.
@@ -190,7 +200,9 @@ activeCharacterMap cubre las claves "1"…"10".
 syntacticVacios es un array de IDs 1–10 omitidos (puede ser []).
 syntaxDiagnostic.isCableadoConnected es boolean.
 syntaxCharacteristics, groundingStatus.diagnosticMessage e immediateAdjustment: español, cortos, estructurales.
-immediateAdjustment: UNA instrucción quirúrgica sobre el FOCO. Cero sermón. Cero juicio de ideas. Cero consejo mecánico genérico.
+immediateAdjustment: UNA instrucción de escritura sobre el FOCO. Fórmula percepción→geometría. Cero sermón. Cero consejo de vida.
+
+${bloquePuentesPrompt()}
 
 LOS 10 CÓDIGOS DE CARÁCTER:
 ${diccionarioCanales()}
@@ -202,6 +214,7 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
   const lines = [
     `Ritual: ${DEPOSITO_V3_RITUAL}`,
     `Tier del alumno: ${payload.userTier} (techo de candado UI: C${techo}; vos diagnosticás la geometría real, no el candado).`,
+    bloqueTemperamentoPrompt(payload.userTier),
     "Volcado — texto crudo a auditar por FIRMA y FOCO (no por verdad):",
     "---",
     payload.rawFact || "(vacío)",
@@ -235,7 +248,7 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
     "Auditar geometría, mapa de carácter, vacíos, cableado y FOCO DE REVELACIÓN.",
     "Adaptate al lenguaje natural: leé la INTENCIÓN de las acciones, no busques solo conectores rígidos.",
     "Telemetría fría: no fuerces C8/C9/C10 si el texto no los construye. Una transición C2→C7 se marca así. Respetá los vacíos.",
-    "El ajuste inmediato apunta al foco, no a un vacío mecánico. Cero Óptica. Cero Δ. Respondé solo el JSON.",
+    "El ajuste enseña el próximo volcado: percepción del FOCO → geometría a escribir. Cero consejo de vida. Cero Óptica. Cero Δ. Respondé solo el JSON.",
   );
   return lines.join("\n");
 }
