@@ -15,15 +15,15 @@ export const CANON_TEN_EYES: Record<EyeCode, EyeDefinition> = {
   1: {
     id: 1,
     name: "Cimiento",
-    concept: "El territorio",
+    concept: "El vector / el título",
     description:
-      "Suelo, base biológica, espacio físico donde ocurre el hecho.",
+      "Vector Cero: título o anclaje categórico. Sin C1 no hay retorno posible a C10.",
     tierRequired: "MATRICULA",
     planeta: "Claridad",
     planetaOjo: "El Ojo de la Claridad",
-    syntaxLabel: "Disperso",
+    syntaxLabel: "Ancla",
     syntaxCharacteristics:
-      "Frases sueltas, fatiga física, foco en materia prima sin conectar.",
+      "Título no vacío o afirmación de anclaje. El título es C1, no C10.",
   },
   2: {
     id: 2,
@@ -123,13 +123,15 @@ export const CANON_TEN_EYES: Record<EyeCode, EyeDefinition> = {
   10: {
     id: 10,
     name: "Origen",
-    concept: "La fuente",
-    description: "Por qué existe este hecho, el eje matriz.",
+    concept: "El abroche matriz",
+    description:
+      "Cierre que responde al vector del título. Sin C1, C10 es vacío por geometría.",
     tierRequired: "TITULO",
     planeta: "Dominio",
     planetaOjo: "El Ojo del Dominio",
     syntaxLabel: "Matriz",
-    syntaxCharacteristics: "Causa raíz, eje que sostiene el hecho.",
+    syntaxCharacteristics:
+      "C1 activo y última oración que sella la premisa del título.",
   },
 };
 
@@ -211,10 +213,14 @@ export function esCodigoFocoSintesis(code: EyeCode): boolean {
 
 /** Foco persistido, foco del diagnóstico, o la firma narrativa si el volcado es legado. */
 export function focoRevelacionDe(result: {
+  lowestMissingCascadeCode?: EyeCode | null;
   focoRevelacionCode?: EyeCode | null;
   syntaxDiagnostic?: { focoCode?: EyeCode | null } | null;
   characterSignedCode: EyeCode;
 }): EyeCode {
+  if (typeof result.lowestMissingCascadeCode === "number") {
+    return result.lowestMissingCascadeCode;
+  }
   if (result.focoRevelacionCode) return result.focoRevelacionCode;
   if (result.syntaxDiagnostic?.focoCode) return result.syntaxDiagnostic.focoCode;
   return result.characterSignedCode;

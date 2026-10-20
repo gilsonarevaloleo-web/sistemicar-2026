@@ -1,12 +1,21 @@
 /**
- * Pedagogía de escritura V3.
- * Estructurar el texto estimula la percepción del ojo.
- * El alma del código no cambia; el acomodo sigue el tema.
- * El ajuste enseña el próximo volcado, no un consejo de vida.
+ * Pedagogía de escritura V3 — Tono del Maestro por Ley de la Cascada.
+ * El ajuste enseña el escalón pendiente. Cero consejo moral de vida.
  */
 
 import { CANON_TEN_EYES } from "./ojos.ts";
-import { EYE_CODES, type EyeCode, type UserTier } from "./types.ts";
+import {
+  TONOS_MAESTRO,
+  TONO_ARQUITECTO_GROUNDED,
+  pedagogicalFeedbackDe,
+} from "./cascada.ts";
+import {
+  EYE_CODES,
+  type CascadeCode,
+  type EyeCode,
+  type MasterToneCode,
+  type UserTier,
+} from "./types.ts";
 
 export type GradoPedagogico = 1 | 2 | 3 | 4;
 
@@ -18,68 +27,62 @@ export interface PuenteEscritura {
 
 /**
  * Puente percepción → geometría a escribir.
- * C2 se desarrolla conectando puntos (C3). C1 es atención en el título;
- * conectar ese título con el fin es C10. C4 es la pregunta de inflexión.
+ * C1 es el título (Vector Cero). Conectar título con el fin es C10.
  */
 export const PUENTES_ESCRITURA: Record<EyeCode, PuenteEscritura> = {
   1: {
     codigo: 1,
     percepcion: "Cimiento",
-    escritura:
-      "nombrá el título: atención en el territorio, de qué va el volcado. Cero clima",
+    escritura: "poné un título arriba: el punto de partida, lo que sea que definas hoy",
   },
   2: {
     codigo: 2,
     percepcion: "Flujo",
-    escritura:
-      "conectá los puntos — eso es C3 (Trabajo): causa → efecto, no estado de ánimo",
+    escritura: "relatá los hechos tal como pasaron y conectá los puntos sin juzgarte",
   },
   3: {
     codigo: 3,
     percepcion: "Trabajo",
-    escritura:
-      "escribí la cadena A → B → C: el paso que se rompe y el consecuente",
+    escritura: "escribí la cadena A → B → C: primero, luego, el paso que se rompe",
   },
   4: {
     codigo: 4,
     percepcion: "Seriedad",
     escritura:
-      "escribinos la pregunta de inflexión: dónde se parte el paradigma que venías sosteniendo. Sin C4 no hay seriedad ni profundidad",
+      "hacé la pregunta de inflexión: ¿qué hay detrás de esto que escribiste?",
   },
   5: {
     codigo: 5,
     percepcion: "Decisión",
-    escritura: "escribí el corte: un sí o un no seco, sin excusa",
+    escritura: "trazá una línea: la decisión firme que corta el estado anterior",
   },
   6: {
     codigo: 6,
-    percepcion: "Convivencia",
-    escritura:
-      "escribí la escena física: herramienta, roce, frase textual",
+    percepcion: "Fuente",
+    escritura: "nombrá de dónde salió el hecho: taller, hogar, libro, persona, video",
   },
   7: {
     codigo: 7,
     percepcion: "Visión",
     escritura:
-      "escribí el patrón en una frase: cómo funciona, no el episodio",
+      "planteá tu propia solución o el patrón en una frase: cómo encajás esto en una idea tuya",
   },
   8: {
     codigo: 8,
     percepcion: "Ciclos",
-    escritura:
-      "escribí el ir y el volver: el loop en el texto, no insinuado",
+    escritura: "escribí el ir y el volver: el loop en el texto, no insinuado",
   },
   9: {
     codigo: 9,
     percepcion: "Sistema",
     escritura:
-      "nombrá los dos hilos y el punto exacto donde se cargan uno al otro",
+      "conectá tres dimensiones en el mismo escrito: fisiología + trabajo + entorno",
   },
   10: {
     codigo: 10,
     percepcion: "Origen",
     escritura:
-      "conectá el título con el fin: el mismo cordón, no el mismo tema",
+      "hacé que la última oración cierre la puerta que abrió el título",
   },
 };
 
@@ -91,38 +94,38 @@ export interface TemperamentoV3 {
   cierreAjuste: string;
 }
 
-/** El tono sigue al peldaño comercial. El alma del código no cambia. */
+/** El tono del dictamen lo marca la cascada. El grado solo informa al prompt. */
 export const TEMPERAMENTO_V3: Record<GradoPedagogico, TemperamentoV3> = {
   1: {
     grado: 1,
     codigo: "NUTRITIVO_INERCIA",
     friccion: "baja",
     instruccionPrompt:
-      "TEMPERAMENTO NUTRITIVO (G1): Tolera el ruido. No bloquees la entrada. El ajuste enseña a escribir el próximo volcado, sin juzgar la narrativa.",
-    cierreAjuste: "El próximo volcado, eso. No se tapa la entrada.",
+      "TEMPERAMENTO NUTRITIVO (G1): Tolera el ruido. No bloquees la entrada. El ajuste usa el Tono del Maestro del código pendiente de la cascada. Cero juicio moral.",
+    cierreAjuste: "",
   },
   2: {
     grado: 2,
     codigo: "FRICCION_MODERADA",
     friccion: "moderada",
     instruccionPrompt:
-      "TEMPERAMENTO DE FRICCIÓN MODERADA (G2): Señalá la flor si aparece. El ajuste es directo y constructivo: la geometría que falta, no un sermón.",
-    cierreAjuste: "La flor no sustituye esa geometría.",
+      "TEMPERAMENTO DE FRICCIÓN MODERADA (G2): El ajuste es el Tono del Maestro del peldaño pendiente. Geometría del papel, no sermón.",
+    cierreAjuste: "",
   },
   3: {
     grado: 3,
     codigo: "RIGOR_QUIRURGICO",
     friccion: "alta",
     instruccionPrompt:
-      "TEMPERAMENTO DE RIGOR QUIRÚRGICO (G3): Cero autoengaño. El ajuste exige la pregunta de inflexión y la geometría que el texto aún no sostiene.",
-    cierreAjuste: "Cero autoengaño: esa geometría, o el volcado sigue en superficie.",
+      "TEMPERAMENTO DE RIGOR QUIRÚRGICO (G3): Cero autoengaño. El ajuste exige el escalón pendiente de la cascada, no un inventario de vacíos.",
+    cierreAjuste: "",
   },
   4: {
     grado: 4,
     codigo: "MATEMATICA_PURA",
     friccion: "pura",
     instruccionPrompt:
-      "TEMPERAMENTO DE MATEMÁTICA PURA (G4): Evaluación seca. El ajuste nombra solo la geometría a escribir. Cero calor, cero adorno.",
+      "TEMPERAMENTO DE MATEMÁTICA PURA (G4): Evaluación seca. El ajuste es el Tono del Maestro, sin calor ni adorno.",
     cierreAjuste: "",
   },
 };
@@ -139,32 +142,44 @@ export function temperamentoDe(tier: UserTier): TemperamentoV3 {
 }
 
 export function nucleoAjuste(foco: EyeCode): string {
-  const puente = PUENTES_ESCRITURA[foco];
-  const ojo = CANON_TEN_EYES[foco];
-  return `Para que tu percepción de C${foco} (${ojo.name} / ${puente.percepcion}) se desarrolle, ${puente.escritura}.`;
+  if (foco === 3 || foco === 8 || foco === 9) {
+    const puente = PUENTES_ESCRITURA[foco];
+    return puente.escritura.charAt(0).toUpperCase() + puente.escritura.slice(1) + ".";
+  }
+  const tono = TONOS_MAESTRO[foco as MasterToneCode];
+  return tono ?? PUENTES_ESCRITURA[foco].escritura;
 }
 
-/** Ajuste al alumno: percepción del foco → geometría a escribir. Tono del grado. */
-export function ajustePedagogico(foco: EyeCode, tier: UserTier): string {
-  const nucleo = nucleoAjuste(foco);
-  const cierre = temperamentoDe(tier).cierreAjuste;
-  return cierre ? `${nucleo} ${cierre}` : nucleo;
+/** Ajuste al alumno: Tono del Maestro del código pendiente. Cero consejo de vida. */
+export function ajustePedagogico(foco: EyeCode, _tier: UserTier): string {
+  return nucleoAjuste(foco);
+}
+
+export function ajusteCascada(lowest: CascadeCode | null): string {
+  return pedagogicalFeedbackDe(lowest);
 }
 
 export function bloquePuentesPrompt(): string {
   const lineas = [
-    "═══ PUENTES DE ESCRITURA (PERCEPCIÓN ↔ GEOMETRÍA) ═══",
-    "El alma del código no cambia. El acomodo sigue el tema.",
-    "immediateAdjustment enseña el PRÓXIMO VOLCADO, no un consejo de vida.",
-    "Fórmula: «Para que tu percepción de C[n] se desarrolle, escribí [geometría].»",
-    "C4 es pregunta de inflexión: sin C4 no hay Seriedad ni profundidad.",
-    "C1 es atención en el título. Conectar título con el fin es C10.",
-    "C2 se desarrolla conectando los puntos: eso es C3.",
+    "═══ LEY DE LA CASCADA (C1 → C2 → C4 → C5 → C7 → C10) ═══",
+    "Enseñá SOLO el código más bajo no activado. Cero consejo de vida.",
+    "C1 es el Título (Vector Cero). C10 solo existe si C1 está y el cierre abrocha ese vector.",
+    "Sin título, C10 es VACÍO AUTOMÁTICO por imposibilidad geométrica de retorno.",
+    "immediateAdjustment / pedagogicalFeedback = Tono del Maestro del peldaño pendiente.",
   ];
   for (const n of EYE_CODES) {
     const p = PUENTES_ESCRITURA[n];
     lineas.push(`C${n} ${p.percepcion}: ${p.escritura}.`);
   }
+  lineas.push("TONOS DEL MAESTRO:");
+  lineas.push(`C1: ${TONOS_MAESTRO[1]}`);
+  lineas.push(`C2: ${TONOS_MAESTRO[2]}`);
+  lineas.push(`C4: ${TONOS_MAESTRO[4]}`);
+  lineas.push(`C5: ${TONOS_MAESTRO[5]}`);
+  lineas.push(`C6: ${TONOS_MAESTRO[6]}`);
+  lineas.push(`C7: ${TONOS_MAESTRO[7]}`);
+  lineas.push(`C10: ${TONOS_MAESTRO[10]}`);
+  lineas.push(`Circuito cerrado: ${TONO_ARQUITECTO_GROUNDED}`);
   return lineas.join("\n");
 }
 

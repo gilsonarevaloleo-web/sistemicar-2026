@@ -263,11 +263,12 @@ export function volcadoConstruyeCodigo(
   result: DepotAnalysisResult,
   codigo: EyeCode,
 ): boolean {
-  if (result.focoRevelacionCode === codigo) return true;
-  if (result.characterSignedCode === codigo) return true;
-  if (result.syntaxDiagnostic?.focoCode === codigo) return true;
+  if (result.activeCodes?.includes(codigo)) return true;
   if (result.activeCharacterMap?.[codigo]) return true;
-  if (codigo === 10 && result.syntaxDiagnostic?.isCableadoConnected) return true;
+  if (result.characterSignedCode === codigo) return true;
+  if (codigo === 10 && (result.titleConnectedToClose || result.syntaxDiagnostic?.isCableadoConnected)) {
+    return true;
+  }
   return false;
 }
 

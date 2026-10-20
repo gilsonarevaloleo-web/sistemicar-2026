@@ -83,9 +83,9 @@ export default function DepositoV3Page() {
             {DEPOSITO_V3_RITUAL}
           </h1>
           <p className="mt-3 text-sm text-white/45">
-            El dictamen es firma + foco de revelación + vacíos. El motor lee
-            la intención del lenguaje natural, no los conectores rígidos. V2
-            queda en su recinto.
+            El dictamen es firma + cascada + vacíos. El título es C1. C10
+            solo abrocha si el cierre vuelve al título. El ajuste enseña el
+            escalón pendiente, no un juicio. V2 queda en su recinto.
           </p>
           <Link
             href="/deposito-v2"
