@@ -223,7 +223,13 @@ const C5_DECISION = [
   /\bno\.\b/,
   /cero excusa/,
   /dispar[eé]/,
-  /decid[ií]/,
+  /\bdecid\w*\b/,
+  /mi decision\b/,
+  /la decision (es|fue|sera|esta|queda|que)/,
+  /tomo (la |una )?decision/,
+  /\bvoy a\b/,
+  /\belijo\b/,
+  /\bopto por\b/,
   /deje (el trabajo|de trabajar|el desglosador|de hacer|de seguir|de empujar)/,
   /puse pausa/,
   /pause (el |al |la )/,
@@ -270,6 +276,7 @@ const C6_FUENTE = [
 const C7_VISION = [
   /la ley es/,
   /el patron/,
+  /mi patron\b/,
   /se repite el modelo/,
   /el modelo se repite/,
   /en abstracto/,
@@ -283,11 +290,27 @@ const C7_VISION = [
   /asi funcion/,
   /la regla (es|que)/,
   /\bsolucion\b/,
+  /mi (propia )?solucion\b/,
+  /la solucion (es|que|propia)/,
   /\bencaje\b/,
   /mi idea/,
+  /mi vision\b/,
   /planteo/,
   /idea propia/,
   /como encaj/,
+  /encajo (esto|el|la|mi|un)/,
+  /concluyo que/,
+  /entonces (la ley|el patron|la regla|la solucion)/,
+  /como lo resuelvo/,
+  /mi respuesta (es|propia)/,
+];
+
+const C10_SELLO = [
+  /vuelvo (al |a (lo |la )?)(titulo|punto|comienzo|inicio|cimiento|vector)/,
+  /\babroch/,
+  /esto cierra/,
+  /cierra (el |la )?(puerta|vector|titulo|circulo|anillo)/,
+  /regreso (al |a )/,
 ];
 
 const C8_CICLO = [
@@ -428,7 +451,14 @@ export function auditarGeometriaSintactica(
   scores[9] = hitsDe(normCuerpo, [C9_ENLACE]) + (dims >= 3 ? 1 : 0);
   active[9] = dims >= 3 && C9_ENLACE.test(normCuerpo);
 
-  const abrocha = active[1] && titleConnectedToClose(titulo, cierre);
+  const normCierre = normalizarGeometria(cierre);
+  const selloExplicito = hitsDe(normCierre, C10_SELLO) > 0;
+  const tituloTokens = tokensCable(normalizarGeometria(titulo));
+  const selloConTitulo =
+    selloExplicito &&
+    tituloTokens.some((tok) => normCierre.includes(tok));
+  const abrocha =
+    active[1] && (titleConnectedToClose(titulo, cierre) || selloConTitulo);
   scores[10] = abrocha ? 1 : 0;
   active[10] = abrocha;
 

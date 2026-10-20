@@ -7,7 +7,7 @@ import {
   estadoAlumnoDe,
   masterToneDe,
   pedagogicalFeedbackDe,
-  primerPendienteCascada,
+  reconciliarCascada,
 } from "./cascada.ts";
 import {
   buildActiveCharacterMap,
@@ -191,41 +191,58 @@ function completarCamposCascada(
     estadoAlumno?: EstadoAlumnoCascada;
   } = {},
 ): DepotAnalysisResult {
-  const map = result.activeCharacterMap;
-  const activeCodes =
-    extras.activeCodes ??
-    result.activeCodes ??
-    EYE_CODES.filter((n) => map[n]);
+  const sync = reconciliarCascada({
+    map: result.activeCharacterMap,
+    activeCodes: extras.activeCodes ?? result.activeCodes,
+    lowestMissingCascadeCode:
+      extras.lowestMissingCascadeCode !== undefined
+        ? extras.lowestMissingCascadeCode
+        : result.lowestMissingCascadeCode,
+    focoRevelacionCode: result.focoRevelacionCode,
+    syntacticVacios: result.syntacticVacios,
+  });
   const titleConnectedToClose =
     extras.titleConnectedToClose ??
     result.titleConnectedToClose ??
     Boolean(result.syntaxDiagnostic.isCableadoConnected);
-  const lowestMissingCascadeCode =
-    extras.lowestMissingCascadeCode !== undefined
-      ? extras.lowestMissingCascadeCode
-      : result.lowestMissingCascadeCode !== undefined
-        ? result.lowestMissingCascadeCode
-        : primerPendienteCascada(map);
+  const lowestMissingCascadeCode = sync.lowestMissingCascadeCode;
   const estadoAlumno =
-    extras.estadoAlumno ?? result.estadoAlumno ?? estadoAlumnoDe(map);
+    extras.estadoAlumno ??
+    result.estadoAlumno ??
+    estadoAlumnoDe(sync.activeCharacterMap);
+  const focoPediaActivo =
+    result.focoRevelacionCode !== sync.focoRevelacionCode;
   const masterTone =
-    extras.masterTone ??
-    result.masterTone ??
-    masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback =
-    extras.pedagogicalFeedback ??
-    result.pedagogicalFeedback ??
-    result.immediateAdjustment ??
-    pedagogicalFeedbackDe(lowestMissingCascadeCode);
+    extras.masterTone && !focoPediaActivo
+      ? extras.masterTone
+      : result.masterTone && !focoPediaActivo
+        ? result.masterTone
+        : masterToneDe(lowestMissingCascadeCode);
+  const pedagogicalFeedback = focoPediaActivo
+    ? pedagogicalFeedbackDe(lowestMissingCascadeCode)
+    : extras.pedagogicalFeedback ??
+      result.pedagogicalFeedback ??
+      result.immediateAdjustment ??
+      pedagogicalFeedbackDe(lowestMissingCascadeCode);
 
   return {
     ...result,
-    activeCodes,
+    activeCharacterMap: sync.activeCharacterMap,
+    syntacticVacios: sync.syntacticVacios,
+    focoRevelacionCode: sync.focoRevelacionCode,
+    syntaxDiagnostic: {
+      ...result.syntaxDiagnostic,
+      focoCode: sync.focoRevelacionCode,
+    },
+    activeCodes: sync.activeCodes,
     lowestMissingCascadeCode,
     titleConnectedToClose,
     masterTone,
     pedagogicalFeedback,
     estadoAlumno,
+    immediateAdjustment: focoPediaActivo
+      ? pedagogicalFeedbackDe(lowestMissingCascadeCode)
+      : result.immediateAdjustment,
   };
 }
 
@@ -339,7 +356,6 @@ export function parseDepotAnalysisResult(
   if (!EYE_CODES.some((n) => activeCharacterMap[n])) {
     activeCharacterMap[characterSignedCode] = true;
   }
-  activeCharacterMap[focoRevelacionCode] = true;
   const syntacticVacios = normalizarVaciosSintacticos(
     obj.syntacticVacios ?? obj.syntactic_vacios,
     activeCharacterMap,

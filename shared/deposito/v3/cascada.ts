@@ -1,13 +1,16 @@
 /**
  * Ley de la Cascada — pedagogía progresiva de Depósito V3.
  *
- * Orden estricto: C1 → C2 → C4 → C5 → C7 → C10.
+ * Presencia: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
+ * Enseñanza: C1 → C2 → C4 → C5 → C7 → C10.
  * C3, C6, C8 y C9 viven en el mapa de calor; no abren el siguiente peldaño.
- * El dictamen usa el Tono del Maestro del código pendiente. Cero consejo de vida.
+ * Un código presente nunca es FOCO y VACÍO a la vez.
+ * El dictamen usa el Tono del Maestro del primer ausente real. Cero consejo de vida.
  */
 
 import {
   CASCADE_CODES,
+  EYE_CODES,
   type CascadeCode,
   type EstadoAlumnoCascada,
   type EyeCode,
@@ -34,13 +37,101 @@ export function mapaTiene(
   return Boolean(map?.[code]);
 }
 
-export function primerPendienteCascada(
+/**
+ * Recorre una secuencia estricta y devuelve el primer código ausente.
+ * La telemetría usa C1→C10; la enseñanza usa CASCADE_CODES.
+ */
+export function primerAusenteEnSecuencia(
   map: Record<EyeCode, boolean> | null | undefined,
-): CascadeCode | null {
-  for (const code of CASCADE_CODES) {
+  secuencia: readonly EyeCode[] = EYE_CODES,
+): EyeCode | null {
+  for (const code of secuencia) {
     if (!mapaTiene(map, code)) return code;
   }
   return null;
+}
+
+/**
+ * Escalón de enseñanza: primer código inactivo de C1→C2→C4→C5→C7→C10.
+ * Nunca devuelve un código que ya está en el mapa de activos.
+ */
+export function primerPendienteCascada(
+  map: Record<EyeCode, boolean> | null | undefined,
+): CascadeCode | null {
+  const pendiente = primerAusenteEnSecuencia(map, CASCADE_CODES);
+  return pendiente as CascadeCode | null;
+}
+
+export interface EstadoCascadaSincronizado {
+  activeCharacterMap: Record<EyeCode, boolean>;
+  activeCodes: EyeCode[];
+  syntacticVacios: EyeCode[];
+  lowestMissingCascadeCode: CascadeCode | null;
+  focoRevelacionCode: EyeCode;
+}
+
+function copiarMapa(
+  map: Record<EyeCode, boolean> | null | undefined,
+): Record<EyeCode, boolean> {
+  const out = {} as Record<EyeCode, boolean>;
+  for (const n of EYE_CODES) out[n] = Boolean(map?.[n]);
+  return out;
+}
+
+/**
+ * Sincroniza FOCO, activos y vacíos.
+ * Un código presente en el papel entra a activeCodes y NO puede ser vacío.
+ * El Tono del Maestro toma el primer ausente real; si C5 ya está, nunca se vuelve a pedir.
+ */
+export function reconciliarCascada(input: {
+  map?: Record<EyeCode, boolean> | null;
+  activeCodes?: readonly EyeCode[] | null;
+  lowestMissingCascadeCode?: CascadeCode | null;
+  focoRevelacionCode?: EyeCode | null;
+  syntacticVacios?: readonly EyeCode[] | null;
+}): EstadoCascadaSincronizado {
+  const activeCharacterMap = copiarMapa(input.map);
+  for (const n of input.activeCodes ?? []) {
+    activeCharacterMap[n] = true;
+  }
+  if (input.syntacticVacios) {
+    const vacioSet = new Set(input.syntacticVacios);
+    for (const n of EYE_CODES) {
+      if (!vacioSet.has(n)) activeCharacterMap[n] = true;
+    }
+  }
+
+  const activeCodes = EYE_CODES.filter((n) => activeCharacterMap[n]);
+  const syntacticVacios = EYE_CODES.filter((n) => !activeCharacterMap[n]);
+  const computed = primerPendienteCascada(activeCharacterMap);
+
+  const declaredLowest = input.lowestMissingCascadeCode;
+  const pediaUnActivo =
+    declaredLowest != null && activeCharacterMap[declaredLowest];
+  const hasDeclared = declaredLowest !== undefined;
+  let lowest = !hasDeclared || pediaUnActivo ? computed : declaredLowest;
+  if (lowest === null && computed !== null) lowest = computed;
+
+  const declaredFoco = input.focoRevelacionCode ?? undefined;
+  const focoContradice =
+    declaredFoco != null &&
+    (activeCharacterMap[declaredFoco] &&
+      (input.syntacticVacios?.includes(declaredFoco) ||
+        declaredLowest === declaredFoco));
+
+  const focoRevelacionCode = (
+    focoContradice || pediaUnActivo || declaredFoco == null
+      ? (lowest ?? 10)
+      : declaredFoco
+  ) as EyeCode;
+
+  return {
+    activeCharacterMap,
+    activeCodes,
+    syntacticVacios,
+    lowestMissingCascadeCode: lowest,
+    focoRevelacionCode,
+  };
 }
 
 export function estadoAlumnoDe(

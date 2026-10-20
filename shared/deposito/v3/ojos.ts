@@ -217,9 +217,32 @@ export function focoRevelacionDe(result: {
   focoRevelacionCode?: EyeCode | null;
   syntaxDiagnostic?: { focoCode?: EyeCode | null } | null;
   characterSignedCode: EyeCode;
+  activeCharacterMap?: Record<EyeCode, boolean> | null;
+  activeCodes?: readonly EyeCode[] | null;
+  syntacticVacios?: readonly EyeCode[] | null;
 }): EyeCode {
+  const isActive = (n: EyeCode) =>
+    Boolean(
+      result.activeCharacterMap?.[n] || result.activeCodes?.includes(n),
+    );
+  const teaching = [1, 2, 4, 5, 7, 10] as const;
+  const firstMissing = () =>
+    teaching.find((n) => !isActive(n as EyeCode)) ?? 10;
+
   if (typeof result.lowestMissingCascadeCode === "number") {
+    if (isActive(result.lowestMissingCascadeCode as EyeCode)) {
+      return firstMissing() as EyeCode;
+    }
     return result.lowestMissingCascadeCode;
+  }
+  const declared =
+    result.focoRevelacionCode ?? result.syntaxDiagnostic?.focoCode ?? null;
+  if (
+    declared &&
+    isActive(declared) &&
+    result.syntacticVacios?.includes(declared)
+  ) {
+    return firstMissing() as EyeCode;
   }
   if (result.focoRevelacionCode) return result.focoRevelacionCode;
   if (result.syntaxDiagnostic?.focoCode) return result.syntaxDiagnostic.focoCode;

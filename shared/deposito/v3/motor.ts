@@ -9,6 +9,7 @@ import {
   mensajeDiagnosticoCascada,
   pedagogicalFeedbackDe,
   primerPendienteCascada,
+  reconciliarCascada,
   estadoAlumnoDe,
 } from "./cascada.ts";
 import { auditarGeometriaSintactica, rutaGeometrica } from "./geometria.ts";
@@ -115,27 +116,25 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
   } else {
     activeCharacterMap[10] = false;
   }
-  const lowestMissingCascadeCode =
-    result.lowestMissingCascadeCode === undefined
-      ? primerPendienteCascada(activeCharacterMap)
-      : result.lowestMissingCascadeCode;
-  const estadoAlumno = result.estadoAlumno ?? estadoAlumnoDe(activeCharacterMap);
-  const masterTone = result.masterTone ?? masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback =
-    result.pedagogicalFeedback ??
-    pedagogicalFeedbackDe(lowestMissingCascadeCode);
-  const focoRevelacionCode = (lowestMissingCascadeCode ?? 10) as EyeCode;
-  const vacios = vaciosDesdeActiveMap(activeCharacterMap);
+  const sync = reconciliarCascada({
+    map: activeCharacterMap,
+    activeCodes,
+  });
+  const lowestMissingCascadeCode = sync.lowestMissingCascadeCode;
+  const estadoAlumno = estadoAlumnoDe(sync.activeCharacterMap);
+  const masterTone = masterToneDe(lowestMissingCascadeCode);
+  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode);
+  const focoRevelacionCode = sync.focoRevelacionCode;
 
   return {
     ...result,
     characterSignedCode: result.characterSignedCode,
     focoRevelacionCode,
-    activeCharacterMap,
-    syntacticVacios: vacios,
-    activeCodes: EYE_CODES.filter((n) => activeCharacterMap[n]),
+    activeCharacterMap: sync.activeCharacterMap,
+    syntacticVacios: sync.syntacticVacios,
+    activeCodes: sync.activeCodes,
     lowestMissingCascadeCode,
-    titleConnectedToClose: Boolean(activeCharacterMap[10]),
+    titleConnectedToClose: Boolean(sync.activeCharacterMap[10]),
     masterTone,
     pedagogicalFeedback,
     estadoAlumno,
@@ -144,7 +143,7 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
       detectedSyntaxCode:
         result.syntaxDiagnostic.detectedSyntaxCode || result.characterSignedCode,
       focoCode: focoRevelacionCode,
-      isCableadoConnected: Boolean(activeCharacterMap[10]),
+      isCableadoConnected: Boolean(sync.activeCharacterMap[10]),
     },
     groundingStatus: {
       ...result.groundingStatus,
@@ -207,7 +206,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Enseñá el primer código pendiente de la cascada C1→C2→C4→C5→C7→C10 con el Tono del Maestro. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Todo código presente (ej. C5) va en activeCodes y no puede ser VACÍO ni FOCO. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C5 y C6 están, el Tono es C7. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

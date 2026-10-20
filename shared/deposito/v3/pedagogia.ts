@@ -162,7 +162,9 @@ export function ajusteCascada(lowest: CascadeCode | null): string {
 export function bloquePuentesPrompt(): string {
   const lineas = [
     "═══ LEY DE LA CASCADA (C1 → C2 → C4 → C5 → C7 → C10) ═══",
-    "Enseñá SOLO el código más bajo no activado. Cero consejo de vida.",
+    "Presencia: recorré C1→C2→C3→C4→C5→C6→C7→C8→C9→C10. Todo código escrito entra a activeCodes.",
+    "Enseñá el primer código realmente ausente. Un activo NUNCA es FOCO y VACÍO a la vez.",
+    "Si C5 ya está en el papel, no pidas C5. Si C5 y C6 están activos, el Tono es C7 (visión / solución propia).",
     "C1 es el Título (Vector Cero). C10 solo existe si C1 está y el cierre abrocha ese vector.",
     "Sin título, C10 es VACÍO AUTOMÁTICO por imposibilidad geométrica de retorno.",
     "immediateAdjustment / pedagogicalFeedback = Tono del Maestro del peldaño pendiente.",

@@ -94,7 +94,9 @@ export {
   masterToneDe,
   mensajeDiagnosticoCascada,
   pedagogicalFeedbackDe,
+  primerAusenteEnSecuencia,
   primerPendienteCascada,
+  reconciliarCascada,
 } from "./cascada.ts";
 
 export {

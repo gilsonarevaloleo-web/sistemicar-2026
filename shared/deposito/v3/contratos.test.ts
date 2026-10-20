@@ -26,7 +26,7 @@ import {
 
 describe("Depósito V3 — contratos", () => {
   it("expone versión y los 10 canales sin repetir id", () => {
-    assert.equal(DEPOSITO_V3_VERSION, "3.10.0-geometria-cascada");
+    assert.equal(DEPOSITO_V3_VERSION, "3.10.1-foco-sync");
     assert.deepEqual([...EYE_CODES], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     const ids = EYE_CODES.map((n) => CANON_TEN_EYES[n].id);
     assert.deepEqual(ids, [...EYE_CODES]);
@@ -286,6 +286,39 @@ describe("Depósito V3 — dictamen sintáctico", () => {
     assert.equal(draft.activeCharacterMap[1], false);
     assert.ok(draft.syntacticVacios.includes(1));
     assert.equal(isDepotAnalysisResult(draft), true);
+  });
+
+  it("si C5 ya está activo, el parse no lo deja como FOCO ni como vacío", () => {
+    const parsed = parseDepotAnalysisResult({
+      characterSignedCode: 3,
+      focoRevelacionCode: 5,
+      lowestMissingCascadeCode: 5,
+      activeCodes: [1, 2, 3, 4, 5, 6],
+      activeCharacterMap: {
+        "1": true,
+        "2": true,
+        "3": true,
+        "4": true,
+        "5": true,
+        "6": true,
+      },
+      syntacticVacios: [5, 7, 8, 9, 10],
+      syntaxDiagnostic: {
+        detectedSyntaxCode: 3,
+        focoCode: 5,
+        isCableadoConnected: false,
+        syntaxCharacteristics: "C5 ya está en el papel.",
+      },
+      immediateAdjustment: "A partir de tu pregunta, traza una línea.",
+    });
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.ok(parsed.result.activeCodes?.includes(5));
+    assert.equal(parsed.result.syntacticVacios.includes(5), false);
+    assert.equal(parsed.result.lowestMissingCascadeCode, 7);
+    assert.equal(parsed.result.focoRevelacionCode, 7);
+    assert.equal(parsed.result.syntaxDiagnostic.focoCode, 7);
+    assert.notEqual(parsed.result.masterTone, 5);
   });
 
   it("mapa de calor vacío cubre C1–C10", () => {

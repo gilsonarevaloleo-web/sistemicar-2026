@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   estadoAlumnoDe,
   primerPendienteCascada,
+  reconciliarCascada,
 } from "./cascada.ts";
 import {
   auditarGeometriaSintactica,
@@ -49,6 +50,40 @@ describe("Geometría sintáctica fría", () => {
     );
   });
 
+  it("C5 enciende con conectores ejecutivos de decisión", () => {
+    for (const rawFact of [
+      "Mi decisión es cortar el paso.",
+      "Decido parar ahora.",
+      "Voy a trazar una línea.",
+    ]) {
+      const geo = auditarGeometriaSintactica({
+        rawFact,
+        userTier: "MATRICULA",
+      });
+      assert.equal(geo.active[5], true, rawFact);
+    }
+  });
+
+  it("C7 enciende con solución o patrón propio", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact: "Mi solución es encajar esto en una idea mía. Concluyo que el patrón es el salteo.",
+      studentHypothesis: "Encaje",
+      userTier: "MATRICULA",
+    });
+    assert.equal(geo.active[7], true);
+  });
+
+  it("C10 abrocha con sello explícito que vuelve al título", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "El pistón del martes. Primero el aceite. Esto cierra el pistón del martes.",
+      studentHypothesis: "El pistón del martes",
+      userTier: "TITULO",
+    });
+    assert.equal(geo.active[1], true);
+    assert.equal(geo.active[10], true);
+  });
+
   it("C6 nombra fuente sin juzgar validez", () => {
     const geo = auditarGeometriaSintactica({
       rawFact: "Lo saqué del libro de banco y de la experiencia en el taller.",
@@ -93,5 +128,24 @@ describe("Ley de la Cascada", () => {
     const cerrado = buildActiveCharacterMap([1, 2, 4, 5, 7, 10]);
     assert.equal(primerPendienteCascada(cerrado), null);
     assert.equal(estadoAlumnoDe(cerrado), "ARQUITECTO_GROUNDED");
+
+    const hastaC6 = buildActiveCharacterMap([1, 2, 3, 4, 5, 6]);
+    assert.equal(primerPendienteCascada(hastaC6), 7);
+    assert.notEqual(primerPendienteCascada(hastaC6), 5);
+  });
+
+  it("reconciliar no deja FOCO C5 si C5 ya está activo", () => {
+    const sync = reconciliarCascada({
+      map: buildActiveCharacterMap([1, 2, 3, 4, 5, 6]),
+      lowestMissingCascadeCode: 5,
+      focoRevelacionCode: 5,
+      syntacticVacios: [5, 7, 8, 9, 10],
+    });
+    assert.ok(sync.activeCodes.includes(5));
+    assert.ok(sync.activeCodes.includes(6));
+    assert.equal(sync.syntacticVacios.includes(5), false);
+    assert.equal(sync.lowestMissingCascadeCode, 7);
+    assert.equal(sync.focoRevelacionCode, 7);
+    assert.equal(sync.syntacticVacios.includes(7), true);
   });
 });
