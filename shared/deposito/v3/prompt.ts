@@ -76,6 +76,7 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
 1. C5 (DECISIÓN / CORTE / MARGEN):
    - Do NOT just look for technical words like "cortar" or "margen".
    - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador"), changing their focus on purpose to protect their body, or saying "NO" to an internal mandate ("el deber") -> THIS IS A C5 INTENT.
+   - Executive connectors ALSO light C5: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". A firm executive sentence is C5 even without the word "corte".
 
 2. C8 (CICLOS / POLARIDAD / RETORNO):
    - IF the user describes switching to an opposite state (e.g., going from work to resting/Facebook/audio) to restore energy, and then returning to productivity refreshed -> THIS IS A C8 INTENT.
@@ -83,6 +84,8 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
 
 3. C7 (VISIÓN / PATRÓN AXIOMÁTICO):
    - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado") -> THIS IS A C7 INTENT.
+   - Own solution / pattern connectors also light C7: "mi solución", "el patrón es", "planteo", "encajo esto", "concluyo que".
+   - IF C5 and C6 are already on the paper, the NEXT Master demand is C7 — never repeat C5.
 
 4. SEPARATION OF SURFACE vs INTENT:
    - Surface connectors ("entonces", "después", "luego") are just narrative vessels. Do NOT let superficial C2 markers blind you to the heavy structural decisions (C5, C7, C8) inside the story.
@@ -109,7 +112,8 @@ GOLDEN RULES FOR TELEMETRY:
 1. PRIORITIZE REAL GEOMETRY:
    - If the text structure is a pure transition from Flujo (C2) to Axiomatic Vision (C7), mark that Firma C2 and those active codes with precision.
    - Example: "entonces / después / al día siguiente" that forges a law → FIRMA C2, C7 active. Do not invent C8, C9 or C10 to fill the map.
-   - Teaching FOCO is the lowest missing cascade code (C1→C2→C4→C5→C7→C10), not the synthesis already present.
+   - Teaching FOCO is the lowest missing cascade code (C1→C2→C4→C5→C7→C10), not a code already active on the paper.
+   - Scan presence in strict order C1→C2→C3→C4→C5→C6→C7→C8→C9→C10. A present code MUST enter activeCodes. It CANNOT be FOCO and VACÍO at once.
 
 2. RESPECT SYNTACTIC VOIDS:
    - If C8 or C9 remain in the background of the direct writing, mark them correctly as vacíos.
@@ -124,8 +128,11 @@ GOLDEN RULES FOR TELEMETRY:
 
 OUTPUT INTEGRITY:
 - characterSignedCode = the syntax the writing actually uses (Firma).
+- Scan C1→C10 for presence. Every detected code belongs in activeCodes AND activeCharacterMap.
+- syntacticVacios = complement of activeCodes. NEVER put a present code (e.g. C5 already written) in syntacticVacios.
+- FOCO (focoRevelacionCode / syntaxDiagnostic.focoCode) = first REAL missing teaching step after the last active cascade code. NEVER FOCO a code that is already in activeCodes. NEVER mark FOCO as VACÍO if that code is on the paper.
+- If C1,C2,C3,C4,C5,C6 are active, FOCO/Master Tone is C7 (Visión / solución), not C5.
 - focoRevelacionCode = lowestMissingCascadeCode (the pending cascade step). If the circuit is closed, 10.
-- activeCodes / activeCharacterMap / syntacticVacios must match markers on the paper, not inferred backstory.
 - titleConnectedToClose = C1 present AND last sentence seals the title vector.
 - immediateAdjustment / pedagogicalFeedback = Master Tone of the pending cascade code.
 `.trim();
@@ -153,16 +160,19 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 - C2 (Flujo): Temporal connectors, narrative of events, relational thread of facts. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the teaching foco if a lower cascade step is missing.
 - C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time. Heatmap only (not a cascade step).
 - C4 (Inflexión / Seriedad): Inflection question (¿Por qué...?, ¿Qué pasa si...?) or paradigm-break phrases ("El problema es:", "Acá me doy cuenta").
-- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador").
+- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
 - C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video). Do not judge the source. Heatmap; Master Tone C6 exists if asked.
-- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern. Do not judge whether it works.
+- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
 - C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations. Only if the wording constructs that cycle.
 - C9 (Sistema): Explicitly connects three or more dimensions (physiology + work + environment). Do not simulate it.
 - C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector. No title → C10 EMPTY by geometric impossibility.
 
 STEP 2: CASCADE LAW (TEACHING FOCO)
-- Evaluate in strict order: C1 → C2 → C4 → C5 → C7 → C10.
-- lowestMissingCascadeCode = the lowest inactive cascade code.
+- Scan presence in strict paper order: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
+- Teaching order: C1 → C2 → C4 → C5 → C7 → C10.
+- lowestMissingCascadeCode = the first teaching code that is REALLY absent after the last active cascade step.
+- If C5 is already in activeCodes, NEVER ask C5 again. If C5 and C6 are active, the Master Tone is C7.
+- A present code MUST be in activeCodes. It MUST NOT appear as FOCO and VACÍO at the same time.
 - Do NOT just pick the code with the most words (e.g., C3).
 - Do NOT teach a higher code when a lower cascade step is empty.
 - Student state: no C1 → PRINCIPIANTE_SIN_ANCLA. C1 without C4 → EXPLORADOR_NARRATIVO. C4 without C5/C7 → ENLACE_EN_TRANSMUTACIÓN. C1..C7 and C10 → ARQUITECTO_Grounded.
@@ -198,10 +208,10 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 2. EL TÍTULO ES C1, NO C10. C10 solo si C1 está activo Y la última oración abrocha el vector del título. Sin título, C10 es vacío automático. isCableadoConnected = titleConnectedToClose.
 3. VACÍOS NO SON PECADO. Son puntos en blanco del armado. Van en syntacticVacios.
 4. characterSignedCode es el código de sintaxis PRIMARIO del relato (el que narra).
-5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Cascada C1 → C2 → C4 → C5 → C7 → C10. Enseñá SOLO ese escalón. No copies el canal con más palabras.
-6. activeCodes / activeCharacterMap cubren C1–C10 y alimentan el mapa de calor. Cero Óptica de verdad. Cero brecha Δ.
+5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Recorré C1→C10 para presencia. Enseñá el primer ausente real de C1 → C2 → C4 → C5 → C7 → C10. Si C5 ya está en el papel, NO lo pidas. Si C5 y C6 están activos, el Tono es C7. Prohibido marcar FOCO un código que figure como VACÍO si ese código ya está escrito.
+6. activeCodes / activeCharacterMap cubren C1–C10 y alimentan el mapa de calor. Todo código detectado (ej. C5) entra a activeCodes. syntacticVacios es el complemento: un activo nunca es vacío. Cero Óptica de verdad. Cero brecha Δ.
 7. immediateAdjustment / pedagogicalFeedback = Tono del Maestro del código pendiente. Cero consejo de vida. Prohibido «repetí C3 con un número».
-8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5/C7/C8 viven en la INTENCIÓN de la acción, no en jerga técnica.
+8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5 enciende con «mi decisión es», «decido», «voy a» y otras sentencias ejecutivas. C7/C8 viven en la INTENCIÓN de la acción, no en jerga técnica.
 9. TELEMETRÍA FRÍA. No fuerces ni simules C8, C9 o C10 si la redacción exacta no los construye. Una transición pura C2→C7 se marca como Firma C2 con C7 activo. Los vacíos de C8/C9 se respetan. El foco de enseñanza sigue la cascada.
 10. C4 ES INFLEXIÓN. Pregunta de inflexión o «el problema es:» / «acá me doy cuenta». El alma del código no cambia; el acomodo sigue el tema.
 11. TEMPERAMENTO. G1 nutritivo, G2 fricción, G3 rigor, G4 matemática pura. El dictamen usa el Tono del Maestro del peldaño, no un sermón de grado.
@@ -266,7 +276,7 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
     "Auditar geometría, mapa de carácter, vacíos, cableado y FOCO DE REVELACIÓN (escalón pendiente de la cascada).",
     "Adaptate al lenguaje natural: leé la INTENCIÓN de las acciones, no busques solo conectores rígidos.",
     "Telemetría fría: no fuerces C8/C9/C10 si el texto no los construye. Una transición C2→C7 se marca así. Respetá los vacíos.",
-    "El Título es C1. C10 solo abrocha si el cierre vuelve al título. Enseñá el primer código pendiente C1→C2→C4→C5→C7→C10.",
+    "El Título es C1. C10 solo abrocha si el cierre vuelve al título. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C5 ya está escrito, no lo pidas: avanzá (C5+C6 → C7).",
     "El ajuste es el Tono del Maestro del peldaño pendiente. Cero consejo de vida. Cero Óptica. Cero Δ. Respondé solo el JSON.",
   );
   return lines.join("\n");

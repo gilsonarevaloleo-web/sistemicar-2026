@@ -44,6 +44,8 @@ describe("Depósito V3 — prompt", () => {
     assert.match(system, /lowestMissingCascadeCode/);
     assert.match(system, /titleConnectedToClose/);
     assert.match(system, /Tono del Maestro/i);
+    assert.match(system, /mi decisión es|decido|voy a/);
+    assert.match(system, /Si C5 y C6|C5 y C6 están/);
     assert.match(system, /pregunta de inflexión|Inflection question/i);
     assert.match(system, /alma del código no cambia/i);
     assert.match(system, /TEMPERAMENTO/);
@@ -308,6 +310,52 @@ describe("Depósito V3 — geometría fría y cascada", () => {
     assert.equal(r.lowestMissingCascadeCode, 5);
     assert.equal(r.estadoAlumno, "ENLACE_EN_TRANSMUTACION");
     assert.equal(r.immediateAdjustment, TONOS_MAESTRO[5]);
+  });
+
+  it("conectores ejecutivos encienden C5: mi decisión es / decido / voy a", () => {
+    for (const frase of [
+      "Hoy mi decisión es cortar el salteo y parar.",
+      "Hoy decido parar el desglosador sin excusa.",
+      "Hoy voy a trazar una línea y cortar el paso.",
+    ]) {
+      const r = diagnosticarAuditoriaLocal({
+        rawFact: frase,
+        userTier: "MATRICULA",
+      });
+      assert.equal(r.activeCharacterMap[5], true, frase);
+      assert.ok(r.activeCodes?.includes(5), frase);
+      assert.equal(r.syntacticVacios.includes(5), false, frase);
+    }
+  });
+
+  it("con C1–C6 activos el Maestro pide C7, nunca C5, y C5 no es vacío", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `El muro del martes.
+Entonces abrí el taller y después el segundo paso se trabó.
+¿Por qué salto el aceite? El problema es: el muro se cayó.
+Mi decisión es cortar el salteo. Decido parar. Voy a trazar una línea.
+Lo saqué del libro de banco y de la experiencia en el taller.`,
+      studentHypothesis: "El muro del martes",
+      userTier: "MATRICULA",
+    });
+    assert.equal(r.activeCharacterMap[1], true);
+    assert.equal(r.activeCharacterMap[2], true);
+    assert.equal(r.activeCharacterMap[4], true);
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.activeCharacterMap[6], true);
+    assert.ok(r.activeCodes?.includes(5));
+    assert.ok(r.activeCodes?.includes(6));
+    assert.equal(r.syntacticVacios.includes(5), false);
+    assert.equal(r.focoRevelacionCode, 7);
+    assert.equal(r.syntaxDiagnostic.focoCode, 7);
+    assert.equal(r.lowestMissingCascadeCode, 7);
+    assert.notEqual(r.masterTone, 5);
+    assert.equal(r.immediateAdjustment, TONOS_MAESTRO[7]);
+    assert.equal(
+      r.syntacticVacios.includes(r.focoRevelacionCode) &&
+        Boolean(r.activeCodes?.includes(r.focoRevelacionCode)),
+      false,
+    );
   });
 
   it("lenguaje natural: parar el desglosador enciende C5 en el mapa", () => {
