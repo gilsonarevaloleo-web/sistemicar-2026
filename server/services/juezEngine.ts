@@ -25,6 +25,11 @@ import {
   creditosDeFase,
   mensajeSaldoInsuficiente,
 } from "../../shared/casas/codigo4/creditos.ts";
+import {
+  HISTORIAL_JUEZ_LIMITE,
+  publicHistorialItem,
+  type HistorialJuezItem,
+} from "../../shared/casas/codigo4/historial.ts";
 import type { SesionJuez } from "../../shared/casas/codigo4/sesion.ts";
 import type {
   EyeCode,
@@ -268,6 +273,22 @@ export async function ejecutarFase1(
   };
 }
 
+export async function listarHistorialJuez(
+  userId: string,
+  deps: JuezEngineDeps = {},
+): Promise<{ ok: true; items: HistorialJuezItem[] } | JuezEngineErr> {
+  const uid = userId.trim();
+  if (!uid) {
+    return { ok: false, status: 400, error: "Falta userId." };
+  }
+  const store = deps.store ?? createDefaultJuezStore();
+  const sesiones = await store.listByUser(uid, HISTORIAL_JUEZ_LIMITE);
+  return {
+    ok: true,
+    items: sesiones.map(publicHistorialItem),
+  };
+}
+
 export async function ejecutarFase2(
   userId: string,
   sesionJuezId: string,
@@ -365,6 +386,7 @@ export function registerJuezRoutes(
     endpoints: {
       fase1: "POST /api/casas/codigo4/fase1",
       fase2: "POST /api/casas/codigo4/fase2",
+      historial: "GET /api/casas/codigo4/historial",
     },
     promptExport: "PROMPT_JUEZ_SERIO",
     promptFn: "buildJuezSerioPrompt",
@@ -399,6 +421,18 @@ export function registerJuezRoutes(
         fase1: CREDITO_FASE1_LECTURA,
         fase2: CREDITO_FASE2_SOLUCION,
       },
+    });
+  });
+
+  app.get("/api/casas/codigo4/historial", async (req: Request, res: Response) => {
+    const userId = String(req.query.userId ?? req.header("x-user-id") ?? "").trim();
+    const resultado = await listarHistorialJuez(userId, runtime);
+    if (!resultado.ok) {
+      return res.status(resultado.status).json(bodyError(resultado));
+    }
+    return res.json({
+      success: true,
+      items: resultado.items,
     });
   });
   app.get("/api/juez/meta", (_req: Request, res: Response) => {
