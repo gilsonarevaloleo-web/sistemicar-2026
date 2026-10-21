@@ -38,6 +38,15 @@ export type {
 export { EYE_CODES } from "./types.ts";
 
 export {
+  CREDITO_FASE1_LECTURA,
+  CREDITO_FASE2_SOLUCION,
+  creditosDeFase,
+  mensajeSaldoInsuficiente,
+} from "./creditos.ts";
+export type { FaseJuez } from "./creditos.ts";
+export type { EstadoSesionJuez, SesionJuez } from "./sesion.ts";
+
+export {
   acotarAlPerimetro,
   detectarCodigoProblema,
   diagnosticarJuezSerioLocal,
