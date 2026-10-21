@@ -6,6 +6,7 @@ import { LienzoEntrada } from "./LienzoEntrada.tsx";
 import { PanelLectura } from "./PanelLectura.tsx";
 import { BloqueDirectiva } from "./BloqueDirectiva.tsx";
 import { ModalSaldoInsuficiente } from "./ModalSaldoInsuficiente.tsx";
+import { HistorialAuditorias } from "./HistorialAuditorias.tsx";
 
 describe("Casa Código 4 — UI", () => {
   it("el lienzo muestra la consigna y el botón de 1 crédito", () => {
@@ -59,6 +60,35 @@ describe("Casa Código 4 — UI", () => {
     );
     assert.match(html, /Interrumpí el pistón automático/);
     assert.match(html, /perímetro conquistado/);
+  });
+
+  it("el historial muestra fecha, volcado y copy", () => {
+    const html = renderToStaticMarkup(
+      createElement(HistorialAuditorias, {
+        items: [
+          {
+            id: "s-hist",
+            createdAt: "2026-10-21T20:05:00.000Z",
+            updatedAt: "2026-10-21T20:05:00.000Z",
+            textoVolcado: "Hoy el pistón no paró.",
+            fase1: {
+              codigoProblemaDetectado: 4,
+              codigoConquistadoMax: 3,
+              fugaInconsciente: "La vía de agua es la coartada.",
+              lecturaPerimetroFria: "El problema habita en C4.",
+            },
+            fase2Desbloqueada: true,
+            directivaOperacional: "Interrumpí el pistón automático.",
+          },
+        ],
+      }),
+    );
+    assert.match(html, /Historial de Auditorías/);
+    assert.match(html, /Hoy el pistón no paró/);
+    assert.match(html, /C4 Estructura/);
+    assert.match(html, /C1 → C3/);
+    assert.match(html, /Interrumpí el pistón automático/);
+    assert.match(html, /Copiar Auditoría/);
   });
 
   it("el modal 402 ofrece recarga", () => {
