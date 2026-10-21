@@ -11,6 +11,7 @@ export {
   LEY_CASAS_UMBRAL_NOMBRE,
   MUNDOS_OPERATIVOS,
   PLANETA_DEPOSITO,
+  PLANETA_JUEZ,
   PLANETA_UMBRAL,
   SALTO_ORIGEN_UMBRAL,
 } from "../../shared/planetas/leyCasasUmbral";

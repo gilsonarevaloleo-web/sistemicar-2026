@@ -10,6 +10,7 @@ import {
   LEY_CASAS_UMBRAL_NO_ES,
   MUNDOS_OPERATIVOS,
   PLANETA_DEPOSITO,
+  PLANETA_JUEZ,
   PLANETA_UMBRAL,
   SALTO_ORIGEN_UMBRAL,
   etiquetaMundo,
@@ -22,6 +23,9 @@ describe("Ley de las Casas y el Umbral", () => {
     assert.equal(LEY_CASAS_UMBRAL_MARCA, "Casa-Umbral");
     assert.match(LEY_CASAS_UMBRAL_FIRMA, /puerta del 8/);
     assert.equal(PLANETA_DEPOSITO, 2);
+    assert.equal(PLANETA_JUEZ, 4);
+    assert.equal(MUNDOS_OPERATIVOS[3].nombre, "Juez Serio");
+    assert.equal(MUNDOS_OPERATIVOS[3].tipo, "casa");
     assert.equal(PLANETA_UMBRAL, 8);
     assert.equal(SALTO_ORIGEN_UMBRAL, "3→8");
     assert.equal(MUNDOS_OPERATIVOS[1].nombre, "Depósito");
@@ -38,7 +42,10 @@ describe("Ley de las Casas y el Umbral", () => {
     assert.match(LEY_CASAS_UMBRAL_CANON, /no es casa/i);
     assert.match(LEY_CASAS_UMBRAL_CANON, /Óptica-Código/);
     assert.match(etiquetaMundo(2), /Casa · Depósito/);
+    assert.match(etiquetaMundo(4), /Casa · Juez Serio/);
     assert.match(etiquetaMundo(8), /Puerta · Umbral/);
+    assert.match(LEY_CASAS_UMBRAL_CANON, /JUEZ SERIO/);
+    assert.match(LEY_CASAS_UMBRAL_KERNEL, /4 Juez/);
     assert.match(resumenLeyCasasUmbral(), /Ley de las Casas y el Umbral/);
   });
 });

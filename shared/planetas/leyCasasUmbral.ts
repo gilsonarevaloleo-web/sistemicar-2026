@@ -51,10 +51,10 @@ export const MUNDOS_OPERATIVOS: readonly MundoOperativo[] = [
   },
   {
     numero: 4,
-    nombre: "—",
-    tipo: "sin_mundo",
-    acto: "Aún no es mundo.",
-    prohibido: "Inventar una casa para no sentir el salto.",
+    nombre: "Juez Serio",
+    tipo: "casa",
+    acto: "Hacer consciente el inconsciente. Delimitar la solución al perímetro conquistado.",
+    prohibido: "Consejos de códigos superiores. Empatía blanda. Teoría académica.",
   },
   {
     numero: 5,
@@ -103,6 +103,8 @@ export const MUNDOS_OPERATIVOS: readonly MundoOperativo[] = [
 export const PLANETA_ESPEJO = 1 as const;
 export const PLANETA_DEPOSITO = 2 as const;
 export const PLANETA_JORNADA = 3 as const;
+export const PLANETA_JUEZ = 4 as const;
+export const PLANETA_CODIGO4 = PLANETA_JUEZ;
 export const PLANETA_UMBRAL = 8 as const;
 
 /** Ficha de origen del producto Umbral: no es defecto, es el salto que lo nombra. */
@@ -119,7 +121,7 @@ export const LEY_CASAS_UMBRAL_AXIOMAS = [
     id: "casa-umbral",
     titulo: "Casa no es umbral",
     texto:
-      "Espejo, Depósito y Jornada se habitan. El Umbral se atraviesa. Si lo tratás como casa, se vuelve infierno de esfuerzo.",
+      "Espejo, Depósito, Jornada y Juez Serio se habitan. El Umbral se atraviesa. Si lo tratás como casa, se vuelve infierno de esfuerzo.",
   },
   {
     id: "adentro",
@@ -157,7 +159,7 @@ export const LEY_CASAS_UMBRAL_NO_ES = [
 export const LEY_CASAS_UMBRAL_KERNEL = `
 LEY DE MUNDOS: ${LEY_CASAS_UMBRAL_NOMBRE} (${LEY_CASAS_UMBRAL_MARCA}).
 ${LEY_CASAS_UMBRAL_FIRMA}
-Casas: 1 Espejo, 2 Depósito, 3 Jornada. Umbral = puerta del 8 (salto ${SALTO_ORIGEN_UMBRAL}).
+Casas: 1 Espejo, 2 Depósito, 3 Jornada, 4 Juez. Umbral = puerta del 8 (salto ${SALTO_ORIGEN_UMBRAL}).
 El canal no sube el planeta. No vendas el 8 como casa ni como si vinieran del 7.
 `.trim();
 
@@ -180,6 +182,7 @@ Hay dos mapas. No se mezclan.
 El Espejo no es “bajo”. Es la casa de la mancha.
 El Depósito no es “superior”. Es la casa del aprendizaje.
 La Jornada no es “productividad”. Es la casa del día.
+El Juez Serio no es “crítica”. Es la casa que desnuda el automático y acota al perímetro.
 El Umbral no es “el módulo de ventas”. Es la PUERTA del 8.
 
 ═══ CASAS ═══
@@ -187,10 +190,12 @@ El Umbral no es “el módulo de ventas”. Es la PUERTA del 8.
 1  ESPEJO     — Nombrar la mancha. Ahí no hay aula.
 2  DEPÓSITO   — Volcar y abrir ojos. Ahí no se cierra el día.
 3  JORNADA    — Cerrar el día. Ahí no se queja ni se da clase.
+4  JUEZ SERIO — Hacer consciente el inconsciente. Delimitar al perímetro conquistado.
 
 Pasaporte 1→2: la queja se vuelve volcado cuando aparece «¿qué aprendí hoy?».
 Pasaporte 2→3: el dictamen entrega el siguiente ojo para operar mañana.
 Bucle 3→2: el cierre del día vuelve a ser materia prima.
+Pasaporte 3→4: la ejecución ciega se vuelve juicio cuando aparece el problema que el automático no veía.
 
 ═══ EL 8 NO ES CASA ═══
 
@@ -203,7 +208,7 @@ FICHA DE ORIGEN: salto 3→8 por aprieto real.
 No es un defecto de numeración. Es el nombre del producto.
 Llegaste antes de tiempo; el sistema te obliga a cruzar en vez de habitar.
 
-Lo saltado (4, 5, 6, 7) vuelve adentro del Umbral:
+Lo saltado (5, 6, 7) vuelve adentro del Umbral:
 esfuerzo del 3, corte del 5, red del 6, visión del 7 —
 entrenados como PUERTAS, no como casas.
 Por eso el Umbral recorre diez códigos y sigue siendo el 8.
@@ -212,7 +217,6 @@ No se vende como si el alumno viniera del 7 limpio.
 
 ═══ AÚN NO SON MUNDO ═══
 
-4  — sin mundo.
 5  — sin mundo.
 6  Alianza   — en camino.
 7  Proyector — en camino.
