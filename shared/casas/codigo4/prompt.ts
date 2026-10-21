@@ -230,6 +230,20 @@ export function serializarPromptJuezSerio(input: JuezSerioInput): string {
   return `${buildCodigo4SystemPrompt()}\n\n${buildCodigo4UserPrompt(input)}`;
 }
 
+/**
+ * Constante principal del planeta 4.
+ * Contrato de consumo: `server/juezEngine.ts`.
+ */
+export const PROMPT_JUEZ_SERIO = CASA_CODIGO4_SYSTEM_PROMPT;
+
+/**
+ * Función principal: prompt listo para el backend (sistema + volcado).
+ * Contrato de consumo: `server/juezEngine.ts`.
+ */
+export function buildJuezSerioPrompt(input: JuezSerioInput): string {
+  return serializarPromptJuezSerio(input);
+}
+
 export function etiquetaPrincipio(codigo: EyeCode): string {
   const p = principioDe(codigo);
   return `C${p.codigo} ${p.nombre}`;

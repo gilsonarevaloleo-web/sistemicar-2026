@@ -9,6 +9,7 @@ import { isEspejoSkuId } from "../shared/espejoPricing";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
 import { registerDepositoV2Routes } from "../server/depositoV2Routes";
 import { registerDepositoV3Routes } from "../server/depositoV3Routes";
+import { registerJuezRoutes } from "../server/juezEngine";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -64,6 +65,9 @@ registerDepositoV2Routes(app, {
   callGemini: callGeminiUmbral,
 });
 registerDepositoV3Routes(app, {
+  callGemini: callGeminiUmbral,
+});
+registerJuezRoutes(app, {
   callGemini: callGeminiUmbral,
 });
 

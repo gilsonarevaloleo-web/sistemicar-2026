@@ -15,6 +15,8 @@ import {
   diccionarioPrincipios,
   jsonSchemaJuezSerio,
   principioDe,
+  PROMPT_JUEZ_SERIO,
+  buildJuezSerioPrompt,
   serializarPromptJuezSerio,
 } from "./index.ts";
 
@@ -38,6 +40,7 @@ describe("Casa Código 4 — prompt", () => {
   it("el sistema exige JSON estricto, perímetro y tono frío", () => {
     const system = buildCodigo4SystemPrompt();
     assert.equal(system, CASA_CODIGO4_SYSTEM_PROMPT);
+    assert.equal(PROMPT_JUEZ_SERIO, CASA_CODIGO4_SYSTEM_PROMPT);
     assert.match(system, /HACER CONSCIENTE EL INCONSCIENTE/);
     assert.match(system, /LEY DEL PERÍMETRO DE RECURSOS/);
     assert.match(system, /ejecución ciega en C3/);
@@ -67,5 +70,15 @@ describe("Casa Código 4 — prompt", () => {
     assert.match(serializarPromptJuezSerio({
       friccionDiaria: "hoy corrí el día en automático apagando incendios",
     }), /Perímetro no declarado/);
+    assert.equal(
+      buildJuezSerioPrompt({
+        friccionDiaria: "hoy corrí el día en automático apagando incendios",
+        codigoConquistadoMax: 3,
+      }),
+      serializarPromptJuezSerio({
+        friccionDiaria: "hoy corrí el día en automático apagando incendios",
+        codigoConquistadoMax: 3,
+      }),
+    );
   });
 });
