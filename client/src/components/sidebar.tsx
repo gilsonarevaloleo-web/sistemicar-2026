@@ -21,6 +21,7 @@ import {
   Radio,
   Zap,
   Sprout,
+  Scale,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -135,6 +136,7 @@ export function Sidebar() {
     { path: "/alquimia", icon: Flame, label: "Sabiduría" },
     { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
     { path: "/esperanza", icon: Sparkles, label: "Depósito V3" },
+    { path: "/juez", icon: Scale, label: "Juez Serio" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
     { path: "/rewards", icon: Trophy, label: "Beneficios" },
     { path: "/camara", icon: Camera, label: "Cámara" },

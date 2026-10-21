@@ -154,6 +154,14 @@ function buildMenuItems(
       route: "/esperanza",
       color: SPECTRUM.NARANJA,
     },
+    {
+      id: "juez-serio",
+      title: "JUEZ SERIO",
+      subtitle: "Casa 4 · consciente el inconsciente",
+      icon: Scale,
+      route: "/juez",
+      color: "#B8B4A8",
+    },
   ];
 
   if (previewOps || shouldShowJornadaMenuTile()) {

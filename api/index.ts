@@ -9,6 +9,15 @@ import { isEspejoSkuId } from "../shared/espejoPricing";
 import { registerUmbralV2Routes } from "../server/umbralV2Routes";
 import { registerDepositoV2Routes } from "../server/depositoV2Routes";
 import { registerDepositoV3Routes } from "../server/depositoV3Routes";
+import { registerJuezRoutes } from "../server/juezEngine";
+import {
+  createDefaultJuezWallet,
+  initJuezCreditosTable,
+} from "../server/services/juezCreditos";
+import {
+  createDefaultJuezStore,
+  initJuezSesionesTable,
+} from "../server/services/juezStore";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -56,6 +65,12 @@ async function callGeminiUmbral(
 initUmbralSessionsTable().catch((err) =>
   console.warn("[umbralSessions] Table init failed (non-fatal):", err?.message),
 );
+initJuezCreditosTable().catch((err) =>
+  console.warn("[juezCreditos] Table init failed (non-fatal):", err?.message),
+);
+initJuezSesionesTable().catch((err) =>
+  console.warn("[juezSesiones] Table init failed (non-fatal):", err?.message),
+);
 registerUmbralV2Routes(app, {
   callGemini: callGeminiUmbral,
   sessionStore: createDefaultUmbralSessionStore(),
@@ -65,6 +80,11 @@ registerDepositoV2Routes(app, {
 });
 registerDepositoV3Routes(app, {
   callGemini: callGeminiUmbral,
+});
+registerJuezRoutes(app, {
+  callGemini: callGeminiUmbral,
+  wallet: createDefaultJuezWallet(),
+  store: createDefaultJuezStore(),
 });
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {

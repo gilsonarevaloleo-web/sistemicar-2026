@@ -2,7 +2,7 @@
  * Vendedor Capa 1 — Planetas de entrada comercial.
  * Tras el triage se fija Código + Planeta comercial (SKU) y se redirige.
  * No confundir con Casa-Umbral (`shared/planetas/leyCasasUmbral.ts`):
- * ahí Espejo=1 casa, Depósito=2 casa, Jornada=3 casa, Umbral=8 puerta.
+ * ahí Espejo=1, Depósito=2, Jornada=3, Juez Serio=4, Umbral=8 puerta.
  */
 
 export type PlanetaId = "ESPEJO" | "JORNADA" | "UMBRAL";
