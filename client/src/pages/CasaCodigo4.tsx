@@ -128,8 +128,8 @@ export default function CasaCodigo4() {
         </header>
 
         <div
-          className="flex items-center justify-between border px-4 py-3"
-          style={{ borderColor: `${JUEZ_IRON}28` }}
+          className="sticky top-0 z-20 flex items-center justify-between border px-4 py-3"
+          style={{ borderColor: `${JUEZ_IRON}28`, backgroundColor: "#050505f2" }}
           data-testid="juez-saldo"
         >
           <span className="text-[10px] tracking-[0.2em] uppercase" style={{ color: JUEZ_STEEL }}>

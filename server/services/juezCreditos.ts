@@ -128,5 +128,18 @@ export function createPostgresJuezWallet(): JuezCreditWallet {
 
 export function createDefaultJuezWallet(): JuezCreditWallet {
   if (process.env.DATABASE_URL) return createPostgresJuezWallet();
-  return createMemoryJuezWallet({ user_arquitecto: 10 });
+  const inner = createMemoryJuezWallet();
+  const sembrados = new Set<string>();
+  return {
+    async saldo(userId) {
+      if (!sembrados.has(userId)) {
+        sembrados.add(userId);
+        const actual = await inner.saldo(userId);
+        if (actual === 0) await inner.acreditar(userId, 10);
+      }
+      return inner.saldo(userId);
+    },
+    debitar: (userId, n) => inner.debitar(userId, n),
+    acreditar: (userId, n) => inner.acreditar(userId, n),
+  };
 }

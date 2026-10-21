@@ -64,7 +64,7 @@ export function LienzoEntrada({
         data-testid="juez-auditar"
       >
         {cargando
-          ? "El Juez lee…"
+          ? "El Juez lee el volcado…"
           : `Auditar con el Juez Serio (${costo} Crédito)`}
       </button>
     </form>
