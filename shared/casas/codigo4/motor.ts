@@ -316,7 +316,7 @@ export function acotarAlPerimetro(result: JuezSerioResult): JuezSerioResult {
       codigoProblemaDetectado: problema,
       codigoConquistadoMax: max,
       fugaInconsciente: result.fase1_lectura.fugaInconsciente.trim(),
-      lecturaPerimetroFrancia: result.fase1_lectura.lecturaPerimetroFrancia.trim(),
+      lecturaPerimetroFria: result.fase1_lectura.lecturaPerimetroFria.trim(),
     },
     fase2_propuesta_solucion: {
       requiereInversionCreditos: true,
@@ -354,7 +354,7 @@ export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
   const problema = parseEyeCode(f1.codigoProblemaDetectado);
   const max = parseEyeCode(f1.codigoConquistadoMax);
   const fuga = trimText(f1.fugaInconsciente);
-  const lectura = trimText(f1.lecturaPerimetroFrancia);
+  const lectura = trimText(f1.lecturaPerimetroFria || f1.lecturaPerimetroFrancia);
   const directiva = trimText(f2.directivaOperacional);
 
   if (!problema || !max) {
@@ -371,7 +371,7 @@ export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
         codigoProblemaDetectado: problema,
         codigoConquistadoMax: max,
         fugaInconsciente: fuga,
-        lecturaPerimetroFrancia: lectura,
+        lecturaPerimetroFria: lectura,
       },
       fase2_propuesta_solucion: {
         requiereInversionCreditos: true,
@@ -400,7 +400,7 @@ export function diagnosticarJuezSerioLocal(
       codigoProblemaDetectado: problema,
       codigoConquistadoMax: max,
       fugaInconsciente: fuga,
-      lecturaPerimetroFrancia: lectura,
+      lecturaPerimetroFria: lectura,
     },
     fase2_propuesta_solucion: {
       requiereInversionCreditos: true,

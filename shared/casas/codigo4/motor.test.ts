@@ -27,7 +27,7 @@ function dictamen(over: Partial<{
       codigoProblemaDetectado: (over.problema ?? 4) as 4,
       codigoConquistadoMax: (over.max ?? 3) as 3,
       fugaInconsciente: over.fuga ?? "Vía de agua.",
-      lecturaPerimetroFrancia: over.lectura ?? "Dictamen de perímetro.",
+      lecturaPerimetroFria: over.lectura ?? "Dictamen de perímetro.",
     },
     fase2_propuesta_solucion: {
       requiereInversionCreditos: true,
@@ -45,8 +45,8 @@ describe("Casa Código 4 — motor", () => {
     assert.equal(r.fase1_lectura.codigoProblemaDetectado, 4);
     assert.equal(r.fase1_lectura.codigoConquistadoMax, 3);
     assert.match(r.fase1_lectura.fugaInconsciente, /automático|coartada|pistón/);
-    assert.match(r.fase1_lectura.lecturaPerimetroFrancia, /C4/);
-    assert.match(r.fase1_lectura.lecturaPerimetroFrancia, /C3/);
+    assert.match(r.fase1_lectura.lecturaPerimetroFria, /C4/);
+    assert.match(r.fase1_lectura.lecturaPerimetroFria, /C3/);
     assert.equal(r.fase2_propuesta_solucion.requiereInversionCreditos, true);
     assert.match(r.fase2_propuesta_solucion.directivaOperacional, /pistón|paso/);
     assert.ok(
@@ -76,7 +76,7 @@ describe("Casa Código 4 — motor", () => {
         codigoProblemaDetectado: 7,
         codigoConquistadoMax: 3,
         fugaInconsciente: "Habla de patrón sin sostenerlo.",
-        lecturaPerimetroFrancia: "Problema C7. Chasis C3.",
+        lecturaPerimetroFria: "Problema C7. Chasis C3.",
       },
       fase2_propuesta_solucion: {
         requiereInversionCreditos: false,
@@ -94,6 +94,28 @@ describe("Casa Código 4 — motor", () => {
     assert.match(
       parsed.result.fase2_propuesta_solucion.directivaOperacional,
       /pistón|paso/,
+    );
+  });
+
+  it("acepta el alias Francia y emite lecturaPerimetroFria", () => {
+    const parsed = parseJuezSerioResult({
+      fase1_lectura: {
+        codigoProblemaDetectado: 4,
+        codigoConquistadoMax: 3,
+        fugaInconsciente: "Vía de agua.",
+        lecturaPerimetroFrancia: "Dictamen frío.",
+      },
+      fase2_propuesta_solucion: {
+        requiereInversionCreditos: true,
+        directivaOperacional: "Nombrá UN paso y cerra.",
+      },
+    });
+    assert.equal(parsed.ok, true);
+    if (!parsed.ok) return;
+    assert.equal(parsed.result.fase1_lectura.lecturaPerimetroFria, "Dictamen frío.");
+    assert.equal(
+      "lecturaPerimetroFrancia" in parsed.result.fase1_lectura,
+      false,
     );
   });
 

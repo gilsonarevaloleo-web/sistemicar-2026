@@ -46,7 +46,7 @@ describe("Casa Código 4 — prompt", () => {
     assert.match(system, /ejecución ciega en C3/);
     assert.match(system, /C1 → C_conquistado/);
     assert.match(system, /requiereInversionCreditos/);
-    assert.match(system, /lecturaPerimetroFrancia/);
+    assert.match(system, /lecturaPerimetroFria/);
     assert.match(system, /fase1_lectura/);
     assert.match(system, /fase2_propuesta_solucion/);
     assert.match(system, /antipaternalista|ANTIPATERNALISTA|cero empatía/i);

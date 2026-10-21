@@ -31,7 +31,7 @@ export interface JuezSerioFase1 {
   /** Vía de agua o vicio que el operador no detectaba. */
   fugaInconsciente: string;
   /** Dictamen frío del problema dentro de sus límites reales. */
-  lecturaPerimetroFrancia: string;
+  lecturaPerimetroFria: string;
 }
 
 export interface JuezSerioFase2 {

@@ -131,7 +131,7 @@ export function jsonSchemaJuezSerio(): string {
     "codigoProblemaDetectado": 4,
     "codigoConquistadoMax": 3,
     "fugaInconsciente": "Operás el día en automático. La vía de agua no es falta de ritmo: es la coartada que sostiene el pistón para no mirar el quiebre.",
-    "lecturaPerimetroFrancia": "El problema habita en C4. El chasis sostiene hasta C3. No hay tijera ni visión disponibles. El dictamen se cierra en C1–C3."
+    "lecturaPerimetroFria": "El problema habita en C4. El chasis sostiene hasta C3. No hay tijera ni visión disponibles. El dictamen se cierra en C1–C3."
   },
   "fase2_propuesta_solucion": {
     "requiereInversionCreditos": true,
@@ -176,7 +176,7 @@ FASE 1 — LECTURA.
 - codigoConquistadoMax: perímetro real del chasis (1–10). Si el input lo declara, usalo. Si no, inferilo por lo que el chasis SOSTIENE, no por lo que menciona. Hablar de estrategia no conquista C7.
 - Un operador que solo narra el día (trabajo, bloques, incendios) sostiene como máximo C3.
 - fugaInconsciente: explicación quirúrgica de la vía de agua que no detectaba.
-- lecturaPerimetroFrancia: dictamen frío del problema DENTRO de sus límites reales. Nombrá el código del problema y el techo del chasis.
+- lecturaPerimetroFria: dictamen frío del problema DENTRO de sus límites reales. Nombrá el código del problema y el techo del chasis.
 
 FASE 2 — PROPUESTA.
 - requiereInversionCreditos: siempre true. La tijera cobra.
@@ -191,7 +191,7 @@ Forma exacta:
 ${jsonSchemaJuezSerio()}
 
 codigoProblemaDetectado y codigoConquistadoMax son enteros 1–10.
-fugaInconsciente, lecturaPerimetroFrancia y directivaOperacional: español, fríos, cortos.
+fugaInconsciente, lecturaPerimetroFria y directivaOperacional: español, fríos, cortos.
 requiereInversionCreditos es siempre true.
 `.trim();
 

@@ -71,7 +71,7 @@ describe("juezEngine — consume prompt.ts", () => {
             codigoProblemaDetectado: 7,
             codigoConquistadoMax: 3,
             fugaInconsciente: "Nombra patrón sin sostenerlo.",
-            lecturaPerimetroFrancia: "Problema C7. Chasis C3.",
+            lecturaPerimetroFria: "Problema C7. Chasis C3.",
           },
           fase2_propuesta_solucion: {
             requiereInversionCreditos: false,
