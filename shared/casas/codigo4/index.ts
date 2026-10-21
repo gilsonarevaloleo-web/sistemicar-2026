@@ -45,6 +45,13 @@ export {
 } from "./creditos.ts";
 export type { FaseJuez } from "./creditos.ts";
 export type { EstadoSesionJuez, SesionJuez } from "./sesion.ts";
+export {
+  HISTORIAL_JUEZ_LIMITE,
+  formatearAuditoriaJuez,
+  formatearFechaAuditoria,
+  publicHistorialItem,
+} from "./historial.ts";
+export type { HistorialJuezItem } from "./historial.ts";
 
 export {
   acotarAlPerimetro,
