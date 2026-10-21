@@ -19,6 +19,11 @@ import {
   leerSaldoJuez,
 } from "@/lib/casas/codigo4/api";
 import {
+  guardarBorradorJuez,
+  leerBorradorJuez,
+  limpiarBorradorJuez,
+} from "@/lib/casas/codigo4/borrador";
+import {
   CASA_CODIGO4_FIRMA,
   CASA_CODIGO4_NOMBRE,
   CREDITO_FASE1_LECTURA,
@@ -32,7 +37,7 @@ export default function CasaCodigo4() {
   const [, navigate] = useLocation();
   const userId = user?.uid ?? "";
 
-  const [texto, setTexto] = useState("");
+  const [texto, setTexto] = useState(() => leerBorradorJuez());
   const [saldo, setSaldo] = useState<number | null>(null);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [fase1, setFase1] = useState<JuezSerioFase1 | null>(null);
@@ -77,6 +82,8 @@ export default function CasaCodigo4() {
       setFase1(out.fase1_lectura);
       setFase2(null);
       setSaldo(out.saldo);
+      setTexto("");
+      limpiarBorradorJuez();
     } catch (err) {
       if (!abrir402(err)) {
         setError(err instanceof Error ? err.message : "El Juez no pudo leer.");
@@ -148,7 +155,10 @@ export default function CasaCodigo4() {
 
         <LienzoEntrada
           texto={texto}
-          onTexto={setTexto}
+          onTexto={(value) => {
+            setTexto(value);
+            guardarBorradorJuez(value);
+          }}
           onAuditar={() => void auditar()}
           cargando={auditando}
           saldo={saldo}
