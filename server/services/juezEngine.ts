@@ -381,6 +381,26 @@ export function registerJuezRoutes(
   app.get("/api/casas/codigo4/meta", (_req: Request, res: Response) => {
     res.json(meta);
   });
+
+  app.get("/api/casas/codigo4/saldo", async (req: Request, res: Response) => {
+    const userId = String(req.query.userId ?? req.header("x-user-id") ?? "").trim();
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "Falta userId.",
+        saldo: null,
+      });
+    }
+    const saldo = await wallet.saldo(userId);
+    return res.json({
+      success: true,
+      saldo,
+      creditos: {
+        fase1: CREDITO_FASE1_LECTURA,
+        fase2: CREDITO_FASE2_SOLUCION,
+      },
+    });
+  });
   app.get("/api/juez/meta", (_req: Request, res: Response) => {
     res.json({ ...meta, endpoint: meta.endpoints.fase1 });
   });

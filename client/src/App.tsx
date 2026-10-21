@@ -37,6 +37,7 @@ const Console = lazyWithRetry(() => import("@/pages/console"));
 const JornadaV4 = lazyJornadaWithRetry(() => import("@/pages/jornadaV4"));
 const Esperanza = lazyWithRetry(() => import("@/pages/esperanza"));
 const DepositoV3 = lazyWithRetry(() => import("@/pages/deposito-v3"));
+const CasaCodigo4 = lazyWithRetry(() => import("@/pages/CasaCodigo4"));
 const Rewards = lazyWithRetry(() => import("@/pages/rewards"));
 const Analytics = lazyWithRetry(() => import("@/pages/analytics"));
 const Acerca = lazyWithRetry(() => import("@/pages/acerca"));
@@ -624,6 +625,15 @@ function Router() {
         </Route>
         <Route path="/esperanza">
           <ProtectedRoute component={DepositoV3} />
+        </Route>
+        <Route path="/juez">
+          <ProtectedRoute component={CasaCodigo4} />
+        </Route>
+        <Route path="/casa-codigo4">
+          <Redirect to="/juez" />
+        </Route>
+        <Route path="/casas/codigo4">
+          <Redirect to="/juez" />
         </Route>
         <Route path="/deposito-v2">
           <ProtectedRoute component={Esperanza} />

@@ -178,6 +178,16 @@ describe("juezEngine — fases y créditos", () => {
 });
 
 describe("juezEngine — HTTP", () => {
+  it("GET /api/casas/codigo4/saldo devuelve el ledger", async () => {
+    await withServer({ saldo: 7, userId: "u-http" }, async (base) => {
+      const res = await fetch(`${base}/api/casas/codigo4/saldo?userId=u-http`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.success, true);
+      assert.equal(body.saldo, 7);
+    });
+  });
+
   it("GET /api/casas/codigo4/meta expone fases y créditos", async () => {
     await withServer({}, async (base) => {
       const res = await fetch(`${base}/api/casas/codigo4/meta`);

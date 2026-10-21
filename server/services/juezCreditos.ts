@@ -128,5 +128,5 @@ export function createPostgresJuezWallet(): JuezCreditWallet {
 
 export function createDefaultJuezWallet(): JuezCreditWallet {
   if (process.env.DATABASE_URL) return createPostgresJuezWallet();
-  return createMemoryJuezWallet();
+  return createMemoryJuezWallet({ user_arquitecto: 10 });
 }
