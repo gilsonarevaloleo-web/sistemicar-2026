@@ -2,6 +2,9 @@ import React, { type FormEvent } from "react";
 
 export const JUEZ_IRON = "#B8B4A8";
 export const JUEZ_STEEL = "#6B7280";
+export const PREGUNTA_MATRIZ_ENTRADA = "¿Cuál es tu problema?";
+export const PLACEHOLDER_VOLCADO =
+  "Escribe aquí el hecho o conflicto crudo de tu día a día...";
 
 export function LienzoEntrada({
   texto,
@@ -36,17 +39,18 @@ export function LienzoEntrada({
     >
       <label className="block">
         <span
-          className="mb-2 block text-[10px] tracking-[0.22em] uppercase"
+          className="mb-3 block text-2xl font-light tracking-tight md:text-3xl"
           style={{ color: JUEZ_IRON }}
+          data-testid="juez-pregunta-matriz"
         >
-          Lienzo de entrada
+          {PREGUNTA_MATRIZ_ENTRADA}
         </span>
         <textarea
           value={texto}
           onChange={(e) => onTexto(e.target.value)}
           rows={8}
           autoFocus
-          placeholder="Volca la fricción diaria para desvelar el problema inconsciente"
+          placeholder={PLACEHOLDER_VOLCADO}
           className="w-full resize-y rounded-none bg-black/60 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25"
           style={{ border: `1px solid ${JUEZ_IRON}33` }}
           data-testid="juez-volcado"

@@ -20,7 +20,8 @@ describe("Casa Código 4 — UI", () => {
         deshabilitado: false,
       }),
     );
-    assert.match(html, /Volca la fricción diaria/);
+    assert.match(html, /¿Cuál es tu problema\?/);
+    assert.match(html, /Escribe aquí el hecho o conflicto crudo de tu día a día/);
     assert.match(html, /Auditar con el Juez Serio \(1 Crédito\)/);
     assert.match(html, /juez-volcado/);
   });

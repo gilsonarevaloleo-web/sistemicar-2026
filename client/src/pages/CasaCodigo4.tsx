@@ -3,7 +3,12 @@ import { Link, useLocation } from "wouter";
 import { Scale } from "lucide-react";
 import { useAuthContext } from "@/App";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
-import { LienzoEntrada, JUEZ_IRON, JUEZ_STEEL } from "@/components/casas/codigo4/LienzoEntrada";
+import {
+  LienzoEntrada,
+  JUEZ_IRON,
+  JUEZ_STEEL,
+  PREGUNTA_MATRIZ_ENTRADA,
+} from "@/components/casas/codigo4/LienzoEntrada";
 import { PanelLectura } from "@/components/casas/codigo4/PanelLectura";
 import { BloqueDirectiva } from "@/components/casas/codigo4/BloqueDirectiva";
 import { ModalSaldoInsuficiente } from "@/components/casas/codigo4/ModalSaldoInsuficiente";
@@ -16,7 +21,6 @@ import {
 import {
   CASA_CODIGO4_FIRMA,
   CASA_CODIGO4_NOMBRE,
-  CASA_CODIGO4_RITUAL,
   CREDITO_FASE1_LECTURA,
   CREDITO_FASE2_SOLUCION,
 } from "@shared/casas/codigo4";
@@ -117,14 +121,16 @@ export default function CasaCodigo4() {
               style={{ color: JUEZ_IRON }}
               data-testid="juez-badge"
             >
-              PLANETA C4 · CASA
+              PLANETA C4 · {CASA_CODIGO4_NOMBRE}
             </p>
           </div>
-          <h1 className="text-3xl font-light tracking-tight md:text-4xl">
-            {CASA_CODIGO4_NOMBRE}
+          <h1
+            className="text-4xl font-light tracking-tight md:text-5xl"
+            data-testid="juez-pregunta-entrada"
+          >
+            {PREGUNTA_MATRIZ_ENTRADA}
           </h1>
           <p className="mt-3 text-sm text-white/45">{CASA_CODIGO4_FIRMA}</p>
-          <p className="mt-1 text-[12px] text-white/30">{CASA_CODIGO4_RITUAL}</p>
         </header>
 
         <div
