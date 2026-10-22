@@ -30,6 +30,7 @@ import {
   Zap,
   Rocket,
   Scale,
+  DoorOpen,
   FileText,
   LogIn,
   Sprout,
@@ -161,6 +162,14 @@ function buildMenuItems(
       icon: Scale,
       route: "/juez",
       color: "#B8B4A8",
+    },
+    {
+      id: "umbral-casa5",
+      title: "CASA 5 UMBRAL",
+      subtitle: "¿Cuál es tu límite? · mapa de intento",
+      icon: DoorOpen,
+      route: "/limite",
+      color: "#C4A06A",
     },
   ];
 

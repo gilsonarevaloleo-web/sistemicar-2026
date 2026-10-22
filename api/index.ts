@@ -10,6 +10,7 @@ import { registerUmbralV2Routes } from "../server/umbralV2Routes";
 import { registerDepositoV2Routes } from "../server/depositoV2Routes";
 import { registerDepositoV3Routes } from "../server/depositoV3Routes";
 import { registerJuezRoutes } from "../server/juezEngine";
+import { registerUmbral5Routes } from "../server/umbral5Engine";
 import {
   createDefaultJuezWallet,
   initJuezCreditosTable,
@@ -18,6 +19,10 @@ import {
   createDefaultJuezStore,
   initJuezSesionesTable,
 } from "../server/services/juezStore";
+import {
+  createDefaultUmbral5Store,
+  initUmbral5SesionesTable,
+} from "../server/services/umbral5Store";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -71,6 +76,9 @@ initJuezCreditosTable().catch((err) =>
 initJuezSesionesTable().catch((err) =>
   console.warn("[juezSesiones] Table init failed (non-fatal):", err?.message),
 );
+initUmbral5SesionesTable().catch((err) =>
+  console.warn("[umbral5Sesiones] Table init failed (non-fatal):", err?.message),
+);
 registerUmbralV2Routes(app, {
   callGemini: callGeminiUmbral,
   sessionStore: createDefaultUmbralSessionStore(),
@@ -81,10 +89,16 @@ registerDepositoV2Routes(app, {
 registerDepositoV3Routes(app, {
   callGemini: callGeminiUmbral,
 });
+const juezCreditWallet = createDefaultJuezWallet();
 registerJuezRoutes(app, {
   callGemini: callGeminiUmbral,
-  wallet: createDefaultJuezWallet(),
+  wallet: juezCreditWallet,
   store: createDefaultJuezStore(),
+});
+registerUmbral5Routes(app, {
+  callGemini: callGeminiUmbral,
+  wallet: juezCreditWallet,
+  store: createDefaultUmbral5Store(),
 });
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {

@@ -111,6 +111,7 @@ import { registerUmbralV2Routes } from "./umbralV2Routes";
 import { registerDepositoV2Routes } from "./depositoV2Routes";
 import { registerDepositoV3Routes } from "./depositoV3Routes";
 import { registerJuezRoutes } from "./juezEngine";
+import { registerUmbral5Routes } from "./umbral5Engine";
 import {
   createDefaultJuezWallet,
   initJuezCreditosTable,
@@ -119,6 +120,10 @@ import {
   createDefaultJuezStore,
   initJuezSesionesTable,
 } from "./services/juezStore";
+import {
+  createDefaultUmbral5Store,
+  initUmbral5SesionesTable,
+} from "./services/umbral5Store";
 import {
   createDefaultUmbralSessionStore,
   initUmbralSessionsTable,
@@ -153,6 +158,7 @@ initPlanificacionModuleGrantsTable().catch(err => console.warn("[planificacionGr
 initUmbralSessionsTable().catch(err => console.warn("[umbralSessions] Table init failed (non-fatal):", err?.message));
 initJuezCreditosTable().catch(err => console.warn("[juezCreditos] Table init failed (non-fatal):", err?.message));
 initJuezSesionesTable().catch(err => console.warn("[juezSesiones] Table init failed (non-fatal):", err?.message));
+initUmbral5SesionesTable().catch(err => console.warn("[umbral5Sesiones] Table init failed (non-fatal):", err?.message));
 
 const umbralSessionStore = createDefaultUmbralSessionStore();
 
@@ -2318,10 +2324,16 @@ registerUmbralV2Routes(app, {
 });
 registerDepositoV2Routes(app, { callGemini });
 registerDepositoV3Routes(app, { callGemini });
+const juezCreditWallet = createDefaultJuezWallet();
 registerJuezRoutes(app, {
   callGemini,
-  wallet: createDefaultJuezWallet(),
+  wallet: juezCreditWallet,
   store: createDefaultJuezStore(),
+});
+registerUmbral5Routes(app, {
+  callGemini,
+  wallet: juezCreditWallet,
+  store: createDefaultUmbral5Store(),
 });
 
 app.post("/api/espejo/analizar-voz", async (req, res) => {
