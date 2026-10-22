@@ -13,6 +13,8 @@ import { createMemoryUmbral5Store } from "./services/umbral5Store.ts";
 import {
   ejecutarLecturaMapa,
   ejecutarVolcadoGratis,
+  leerSesionUmbral5,
+  listarSesionesUmbral5,
   normalizarInputUmbral5,
   registerUmbral5Routes,
 } from "./umbral5Engine.ts";
@@ -164,6 +166,28 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.notEqual(lectura.lectura.codigoUsuario, 10);
   });
 
+  it("lista y relee volcados del mismo usuario", async () => {
+    const store = createMemoryUmbral5Store();
+    const wallet = createMemoryJuezWallet({ u1: 2, u2: 2 });
+    await ejecutarVolcadoGratis("u1", VOLCADO, { wallet, store });
+    await ejecutarVolcadoGratis(
+      "u2",
+      "Ya sé el límite. Se lo hablé a mi familia buscando solución.",
+      { wallet, store },
+    );
+    const lista = await listarSesionesUmbral5("u1", { store });
+    assert.equal(lista.ok, true);
+    if (!lista.ok) return;
+    assert.equal(lista.sesiones.length, 1);
+    assert.equal(lista.sesiones[0]?.userId, "u1");
+    const una = await leerSesionUmbral5("u1", lista.sesiones[0]!.id, { store });
+    assert.equal(una.ok, true);
+    if (!una.ok) return;
+    assert.match(una.sesion.textoVolcado, /aumento está débil/);
+    const ajena = await leerSesionUmbral5("u2", lista.sesiones[0]!.id, { store });
+    assert.equal(ajena.ok, false);
+  });
+
   it("sesión ajena no se lee", async () => {
     const wallet = createMemoryJuezWallet({ u1: 2, u2: 2 });
     const store = createMemoryUmbral5Store();
@@ -197,6 +221,7 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(metaBody.planeta, 5);
       assert.equal(metaBody.promptExport, "PROMPT_UMBRAL5");
       assert.equal(metaBody.endpoints.volcado, "POST /api/casas/umbral5/volcado");
+      assert.equal(metaBody.endpoints.sesiones, "GET /api/casas/umbral5/sesiones");
       assert.equal(metaBody.creditos.lectura, CREDITO_LECTURA_MAPA);
       assert.equal(metaBody.creditos.volcado, 0);
       assert.deepEqual(metaBody.dominioUsuario, [1, 2, 3, 5, 6, 7]);
@@ -254,6 +279,30 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(lectura.status, 402);
       const body2 = await lectura.json();
       assert.equal(body2.codigo, "SALDO_INSUFICIENTE");
+    });
+  });
+
+  it("GET /sesiones devuelve el volcado sellado", async () => {
+    await withServer({ saldo: 2, userId: "u-http" }, async (base) => {
+      await fetch(`${base}/api/casas/umbral5/volcado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "u-http", limiteConocido: VOLCADO }),
+      });
+      const res = await fetch(`${base}/api/casas/umbral5/sesiones?userId=u-http`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.success, true);
+      assert.equal(body.sesiones.length, 1);
+      assert.match(body.sesiones[0].textoVolcado, /aumento está débil/);
+      const una = await fetch(
+        `${base}/api/casas/umbral5/sesion/${body.sesiones[0].id}?userId=u-http`,
+      );
+      assert.equal(una.status, 200);
+      const ajena = await fetch(
+        `${base}/api/casas/umbral5/sesion/${body.sesiones[0].id}?userId=otro`,
+      );
+      assert.equal(ajena.status, 404);
     });
   });
 });
