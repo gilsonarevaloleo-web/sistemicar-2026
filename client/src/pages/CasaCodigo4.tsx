@@ -11,11 +11,14 @@ import {
 } from "@/components/casas/codigo4/LienzoEntrada";
 import { PanelLectura } from "@/components/casas/codigo4/PanelLectura";
 import { BloqueDirectiva } from "@/components/casas/codigo4/BloqueDirectiva";
+import { BotonCopiarAuditoria } from "@/components/casas/codigo4/BotonCopiarAuditoria";
+import { HistorialAuditorias } from "@/components/casas/codigo4/HistorialAuditorias";
 import { ModalSaldoInsuficiente } from "@/components/casas/codigo4/ModalSaldoInsuficiente";
 import {
   JuezSaldoError,
   auditarFase1,
   desbloquearFase2,
+  leerHistorialJuez,
   leerSaldoJuez,
 } from "@/lib/casas/codigo4/api";
 import {
@@ -25,7 +28,11 @@ import {
   CREDITO_FASE2_SOLUCION,
 } from "@shared/casas/codigo4";
 import { PLANETA_JUEZ } from "@shared/planetas/leyCasasUmbral";
-import type { JuezSerioFase1, JuezSerioFase2 } from "@shared/casas/codigo4";
+import type {
+  HistorialJuezItem,
+  JuezSerioFase1,
+  JuezSerioFase2,
+} from "@shared/casas/codigo4";
 
 export default function CasaCodigo4() {
   const { user } = useAuthContext();
@@ -41,12 +48,25 @@ export default function CasaCodigo4() {
   const [desbloqueando, setDesbloqueando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal402, setModal402] = useState<string | null>(null);
+  const [volcadoAuditado, setVolcadoAuditado] = useState("");
+  const [auditadaEn, setAuditadaEn] = useState<string | null>(null);
+  const [historial, setHistorial] = useState<HistorialJuezItem[]>([]);
+
+  const recargarHistorial = async (uid: string) => {
+    try {
+      const out = await leerHistorialJuez(uid);
+      setHistorial(out.items);
+    } catch {
+      // el lienzo sigue; el historial no bloquea
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
     void leerSaldoJuez(userId)
       .then((r) => setSaldo(r.saldo))
       .catch(() => setSaldo(0));
+    void recargarHistorial(userId);
   }, [userId]);
 
   const abrir402 = (err: unknown) => {
@@ -77,6 +97,9 @@ export default function CasaCodigo4() {
       setFase1(out.fase1_lectura);
       setFase2(null);
       setSaldo(out.saldo);
+      setVolcadoAuditado(texto);
+      setAuditadaEn(new Date().toISOString());
+      await recargarHistorial(userId);
     } catch (err) {
       if (!abrir402(err)) {
         setError(err instanceof Error ? err.message : "El Juez no pudo leer.");
@@ -97,6 +120,7 @@ export default function CasaCodigo4() {
       });
       setFase2(out.fase2_propuesta_solucion);
       setSaldo(out.saldo);
+      await recargarHistorial(userId);
     } catch (err) {
       if (!abrir402(err)) {
         setError(err instanceof Error ? err.message : "No se pudo desbloquear.");
@@ -173,6 +197,23 @@ export default function CasaCodigo4() {
         )}
 
         {fase2 && <BloqueDirectiva fase2={fase2} />}
+
+        {fase1 && sesionId && (
+          <BotonCopiarAuditoria
+            item={{
+              id: sesionId,
+              createdAt: auditadaEn ?? new Date().toISOString(),
+              updatedAt: auditadaEn ?? new Date().toISOString(),
+              textoVolcado: volcadoAuditado,
+              fase1,
+              fase2Desbloqueada: Boolean(fase2),
+              directivaOperacional: fase2?.directivaOperacional ?? null,
+            }}
+            testId="juez-copiar-actual"
+          />
+        )}
+
+        <HistorialAuditorias items={historial} />
 
         <CardLeyCasasUmbral planetaActivo={PLANETA_JUEZ} />
 

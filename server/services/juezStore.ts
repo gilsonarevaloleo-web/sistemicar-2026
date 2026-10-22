@@ -12,6 +12,7 @@ const { Pool } = pkg;
 
 export interface JuezSessionStore {
   getById(id: string): Promise<SesionJuez | null>;
+  listByUser(userId: string, limit?: number): Promise<SesionJuez[]>;
   save(sesion: SesionJuez): Promise<SesionJuez>;
   clear?(): Promise<void>;
 }
@@ -39,6 +40,12 @@ export function createMemoryJuezStore(): JuezSessionStore {
   return {
     async getById(id) {
       return byId.get(id) ?? null;
+    },
+    async listByUser(userId, limit = 40) {
+      return [...byId.values()]
+        .filter((s) => s.userId === userId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        .slice(0, limit);
     },
     async save(sesion) {
       const normalized = normalizeSesion(sesion);
@@ -122,6 +129,19 @@ export function createPostgresJuezStore(): JuezSessionStore {
       );
       if (result.rows.length === 0) return null;
       return rowToSesion(result.rows[0]);
+    },
+    async listByUser(userId, limit = 40) {
+      const p = getPool();
+      if (!p) return [];
+      const capped = Math.min(Math.max(1, limit), 80);
+      const result = await p.query(
+        `SELECT * FROM juez_sesiones
+         WHERE user_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [userId, capped],
+      );
+      return result.rows.map((row) => rowToSesion(row));
     },
     async save(sesion) {
       const p = getPool();

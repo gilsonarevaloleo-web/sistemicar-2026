@@ -114,9 +114,12 @@ describe("HistorialV3", () => {
     );
     assert.match(html, /deposito-v3-historial/);
     assert.match(html, /HISTORIAL DE AUDITORÍAS/);
+    assert.match(html, /deposito-v3-historial-reductor/);
+    assert.match(html, /<select/);
     assert.match(html, /C3 Trabajo/);
     assert.match(html, /Vi el patrón a las 9:00/);
     assert.match(html, /Copiar Auditoría/);
+    assert.match(html, /ver volcado/);
     assert.doesNotMatch(html, /Δ 4/);
     assert.doesNotMatch(html, /OJO DOMINANTE/);
     assert.doesNotMatch(html, /sistemicar_volcados[^\-_]/);

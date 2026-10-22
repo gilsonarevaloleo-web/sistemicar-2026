@@ -218,6 +218,45 @@ describe("juezEngine — HTTP", () => {
     });
   });
 
+  it("GET /api/casas/codigo4/historial no filtra la directiva hasta Fase 2", async () => {
+    await withServer({ saldo: 3, userId: "u-http" }, async (base) => {
+      const f1 = await fetch(`${base}/api/casas/codigo4/fase1`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "u-http", friccionDiaria: VOLCADO }),
+      });
+      const body1 = await f1.json();
+      const hist1 = await fetch(`${base}/api/casas/codigo4/historial?userId=u-http`);
+      assert.equal(hist1.status, 200);
+      const list1 = await hist1.json();
+      assert.equal(list1.success, true);
+      assert.equal(list1.items.length, 1);
+      assert.equal(list1.items[0].id, body1.sesionJuezId);
+      assert.equal(list1.items[0].textoVolcado, VOLCADO);
+      assert.equal(list1.items[0].fase2Desbloqueada, false);
+      assert.equal(list1.items[0].directivaOperacional, null);
+      assert.ok(!JSON.stringify(list1).includes("Interrumpí"));
+
+      const ajena = await fetch(`${base}/api/casas/codigo4/historial?userId=otro`);
+      const listAjena = await ajena.json();
+      assert.equal(listAjena.items.length, 0);
+
+      const f2 = await fetch(`${base}/api/casas/codigo4/fase2`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "u-http",
+          sesionJuezId: body1.sesionJuezId,
+        }),
+      });
+      assert.equal(f2.status, 200);
+      const hist2 = await fetch(`${base}/api/casas/codigo4/historial?userId=u-http`);
+      const list2 = await hist2.json();
+      assert.equal(list2.items[0].fase2Desbloqueada, true);
+      assert.match(list2.items[0].directivaOperacional, /pistón|paso|caudal|postura/);
+    });
+  });
+
   it("POST fase2 desbloquea y 402 si no hay saldo", async () => {
     await withServer({ saldo: 1, userId: "u-http" }, async (base) => {
       const f1 = await fetch(`${base}/api/casas/codigo4/fase1`, {

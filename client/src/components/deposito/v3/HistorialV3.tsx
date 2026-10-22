@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   CANON_TEN_EYES,
   etiquetaCodigoOjo,
@@ -11,6 +11,12 @@ import { BotonCopiarV3 } from "./BotonCopiarV3";
 
 const GOLD = "#D4AF37";
 
+function recorte(texto: string, max = 52): string {
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  if (limpio.length <= max) return limpio;
+  return `${limpio.slice(0, max).trim()}…`;
+}
+
 export function HistorialV3({
   entries,
   onSelect,
@@ -18,99 +24,113 @@ export function HistorialV3({
   entries: VolcadoV3Entry[];
   onSelect: (entry: VolcadoV3Entry) => void;
 }) {
-  const [abierto, setAbierto] = useState(true);
+  const [elegidoId, setElegidoId] = useState(entries[0]?.id ?? "");
+
+  useEffect(() => {
+    if (entries.length === 0) {
+      setElegidoId("");
+      return;
+    }
+    if (!entries.some((e) => e.id === elegidoId)) {
+      setElegidoId(entries[0].id);
+    }
+  }, [entries, elegidoId]);
+
+  const elegido = useMemo(
+    () => entries.find((e) => e.id === elegidoId) ?? null,
+    [entries, elegidoId],
+  );
 
   return (
     <section className="mb-8 space-y-3" data-testid="deposito-v3-historial">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="flex w-full items-center justify-between border px-4 py-3 text-left"
-        style={{ borderColor: `${GOLD}28` }}
-        data-testid="deposito-v3-historial-toggle"
-      >
-        <span className="text-[10px] tracking-[0.22em]" style={{ color: GOLD }}>
+      <div className="space-y-2 border px-4 py-3" style={{ borderColor: `${GOLD}28` }}>
+        <p className="text-[10px] tracking-[0.22em]" style={{ color: GOLD }}>
           HISTORIAL DE AUDITORÍAS
-        </span>
-        <span className="text-[11px] text-white/40">
-          {entries.length === 0
-            ? "vacío"
-            : `${entries.length} ${entries.length === 1 ? "sesión" : "sesiones"}`}
-        </span>
-      </button>
-
-      {abierto && entries.length === 0 && (
-        <p className="px-1 text-[12px] text-white/35">
-          Todavía no hay dictámenes. El laboratorio guarda cada auditoría aquí.
         </p>
-      )}
+        {entries.length === 0 ? (
+          <p className="text-[12px] text-white/35">
+            Todavía no hay dictámenes. El laboratorio guarda cada auditoría aquí.
+          </p>
+        ) : (
+          <select
+            value={elegidoId}
+            onChange={(e) => {
+              const next = entries.find((item) => item.id === e.target.value);
+              setElegidoId(e.target.value);
+              if (next) onSelect(next);
+            }}
+            className="w-full bg-black/70 px-3 py-2 text-[12px] text-white outline-none"
+            style={{ border: `1px solid ${GOLD}44`, color: GOLD }}
+            data-testid="deposito-v3-historial-reductor"
+          >
+            {entries.map((v) => {
+              const firma = etiquetaCodigoOjo(v.result.characterSignedCode, "canon");
+              return (
+                <option key={v.id} value={v.id}>
+                  {formatearFechaAuditoriaV3(v.createdAt)} · {firma} ·{" "}
+                  {recorte(v.rawFact)}
+                </option>
+              );
+            })}
+          </select>
+        )}
+      </div>
 
-      {abierto && (
-        <ul className="space-y-3">
-          {entries.slice(0, 12).map((v) => {
-            const firma = CANON_TEN_EYES[v.result.characterSignedCode];
-            const focoCode = focoRevelacionDe(v.result);
-            const ajuste =
-              v.result.pedagogicalFeedback ?? v.result.immediateAdjustment;
-            return (
-              <li key={v.id}>
-                <article
-                  className="space-y-3 border bg-black/40 p-4"
-                  style={{ borderColor: "rgba(255,255,255,0.08)" }}
-                  data-testid={`deposito-v3-historial-item-${v.id}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(v)}
-                    className="w-full text-left"
-                  >
-                    <p className="mb-1 text-[10px] text-white/40">
-                      {formatearFechaAuditoriaV3(v.createdAt)}
-                      <span className="ml-2" style={{ color: GOLD }}>
-                        {v.userTier}
-                      </span>
-                    </p>
-                    <p className="mb-2 text-[10px] text-white/40">
-                      {etiquetaCodigoOjo(v.result.characterSignedCode, "canon")} ·{" "}
-                      {firma.syntaxLabel}
-                      {focoCode !== v.result.characterSignedCode && (
-                        <span className="ml-2" style={{ color: GOLD }}>
-                          FOCO C{focoCode}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[9px] tracking-[0.2em] uppercase text-white/35">
-                      Territorio crudo
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-white/70">
-                      {v.rawFact}
-                    </p>
-                    {v.detectedNoise && (
-                      <p className="mt-2 text-[12px] text-white/55">
-                        <span className="text-white/35">Flor · </span>
-                        {v.detectedNoise}
-                      </p>
-                    )}
-                    {v.omittedShadow && (
-                      <p className="mt-1 text-[12px] text-white/55">
-                        <span className="text-white/35">Sombra · </span>
-                        {v.omittedShadow}
-                      </p>
-                    )}
-                    <p className="mt-2 text-[12px] text-white/60">
-                      <span className="text-white/35">Ajuste · </span>
-                      {ajuste}
-                    </p>
-                  </button>
-                  <BotonCopiarV3
-                    item={v}
-                    testId={`deposito-v3-copiar-${v.id}`}
-                  />
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+      {elegido && (
+        <article
+          className="space-y-3 border bg-black/40 p-4"
+          style={{ borderColor: "rgba(255,255,255,0.08)" }}
+          data-testid={`deposito-v3-historial-item-${elegido.id}`}
+        >
+          <p className="text-[10px] text-white/40">
+            {formatearFechaAuditoriaV3(elegido.createdAt)}
+            <span className="ml-2" style={{ color: GOLD }}>
+              {elegido.userTier}
+            </span>
+          </p>
+          <p className="text-[10px] text-white/40">
+            {etiquetaCodigoOjo(elegido.result.characterSignedCode, "canon")} ·{" "}
+            {CANON_TEN_EYES[elegido.result.characterSignedCode].syntaxLabel}
+            {focoRevelacionDe(elegido.result) !==
+              elegido.result.characterSignedCode && (
+              <span className="ml-2" style={{ color: GOLD }}>
+                FOCO C{focoRevelacionDe(elegido.result)}
+              </span>
+            )}
+          </p>
+          <details>
+            <summary
+              className="cursor-pointer text-[9px] tracking-[0.2em] uppercase text-white/35"
+              data-testid="deposito-v3-historial-volcado"
+            >
+              Territorio crudo · ver volcado
+            </summary>
+            <p className="mt-2 text-sm leading-relaxed text-white/70">
+              {elegido.rawFact}
+            </p>
+            {elegido.detectedNoise && (
+              <p className="mt-2 text-[12px] text-white/55">
+                <span className="text-white/35">Flor · </span>
+                {elegido.detectedNoise}
+              </p>
+            )}
+            {elegido.omittedShadow && (
+              <p className="mt-1 text-[12px] text-white/55">
+                <span className="text-white/35">Sombra · </span>
+                {elegido.omittedShadow}
+              </p>
+            )}
+          </details>
+          <p className="text-[12px] text-white/60">
+            <span className="text-white/35">Ajuste · </span>
+            {elegido.result.pedagogicalFeedback ??
+              elegido.result.immediateAdjustment}
+          </p>
+          <BotonCopiarV3
+            item={elegido}
+            testId={`deposito-v3-copiar-${elegido.id}`}
+          />
+        </article>
       )}
     </section>
   );

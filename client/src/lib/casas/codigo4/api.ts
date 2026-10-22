@@ -2,7 +2,11 @@
  * Cliente del Juez Serio. Fase 1 oculta la directiva. Fase 2 la desbloquea.
  */
 
-import type { JuezSerioFase1, JuezSerioFase2 } from "@shared/casas/codigo4";
+import type {
+  HistorialJuezItem,
+  JuezSerioFase1,
+  JuezSerioFase2,
+} from "@shared/casas/codigo4";
 
 export class JuezSaldoError extends Error {
   readonly status = 402;
@@ -51,6 +55,11 @@ export interface SaldoResponse {
   creditos: { fase1: number; fase2: number };
 }
 
+export interface HistorialResponse {
+  success: true;
+  items: HistorialJuezItem[];
+}
+
 interface ErrorBody {
   success?: false;
   error?: string;
@@ -90,6 +99,17 @@ export async function leerSaldoJuez(userId: string): Promise<SaldoResponse> {
   const body = await parseJson<SaldoResponse | ErrorBody>(res);
   if (!res.ok || !("success" in body) || body.success !== true) {
     throw new Error(("error" in body && body.error) || "No se pudo leer el saldo.");
+  }
+  return body;
+}
+
+export async function leerHistorialJuez(userId: string): Promise<HistorialResponse> {
+  const res = await fetch(
+    `/api/casas/codigo4/historial?userId=${encodeURIComponent(userId)}`,
+  );
+  const body = await parseJson<HistorialResponse | ErrorBody>(res);
+  if (!res.ok || !("success" in body) || body.success !== true) {
+    throw new Error(("error" in body && body.error) || "No se pudo leer el historial.");
   }
   return body;
 }
