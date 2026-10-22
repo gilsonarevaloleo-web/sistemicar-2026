@@ -7,6 +7,11 @@ import {
   type UserTier,
 } from "@shared/deposito/v3";
 import { auditarVolcadoV3 } from "@/lib/deposito/v3/api";
+import {
+  guardarBorradorDepositoV3,
+  leerBorradorDepositoV3,
+  limpiarBorradorDepositoV3,
+} from "@/lib/deposito/v3/borrador";
 
 const GOLD = "#D4AF37";
 const AZURE = "#1E90FF";
@@ -26,15 +31,32 @@ export function FormularioAuditoriaV3({
   onAnalysisComplete,
   disabled,
 }: FormularioAuditoriaV3Props) {
-  const [rawFact, setRawFact] = useState("");
-  const [detectedNoise, setDetectedNoise] = useState("");
-  const [omittedShadow, setOmittedShadow] = useState("");
-  const [studentHypothesis, setStudentHypothesis] = useState("");
+  const [inicial] = useState(leerBorradorDepositoV3);
+  const [rawFact, setRawFact] = useState(inicial.rawFact);
+  const [detectedNoise, setDetectedNoise] = useState(inicial.detectedNoise);
+  const [omittedShadow, setOmittedShadow] = useState(inicial.omittedShadow);
+  const [studentHypothesis, setStudentHypothesis] = useState(
+    inicial.studentHypothesis,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const visibles = camposVisiblesPorTier(userTier);
   const avanzado = isAdvancedTier(userTier);
+
+  const persistir = (next: {
+    rawFact?: string;
+    detectedNoise?: string;
+    omittedShadow?: string;
+    studentHypothesis?: string;
+  }) => {
+    guardarBorradorDepositoV3({
+      rawFact: next.rawFact ?? rawFact,
+      detectedNoise: next.detectedNoise ?? detectedNoise,
+      omittedShadow: next.omittedShadow ?? omittedShadow,
+      studentHypothesis: next.studentHypothesis ?? studentHypothesis,
+    });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -61,6 +83,11 @@ export function FormularioAuditoriaV3({
         userTier,
       };
       const data = await auditarVolcadoV3(payload);
+      setRawFact("");
+      setDetectedNoise("");
+      setOmittedShadow("");
+      setStudentHypothesis("");
+      limpiarBorradorDepositoV3();
       onAnalysisComplete(data.result, data.source, payload);
     } catch (err) {
       const message =
@@ -117,7 +144,10 @@ export function FormularioAuditoriaV3({
           <textarea
             id="deposito-v3-rawfact"
             value={rawFact}
-            onChange={(e) => setRawFact(e.target.value)}
+            onChange={(e) => {
+              setRawFact(e.target.value);
+              persistir({ rawFact: e.target.value });
+            }}
             placeholder="Volcá el día. Crudo. Horas, minutos, acciones…"
             rows={6}
             disabled={disabled || isLoading}
@@ -139,7 +169,10 @@ export function FormularioAuditoriaV3({
               id="deposito-v3-hypothesis"
               type="text"
               value={studentHypothesis}
-              onChange={(e) => setStudentHypothesis(e.target.value)}
+              onChange={(e) => {
+                setStudentHypothesis(e.target.value);
+                persistir({ studentHypothesis: e.target.value });
+              }}
               placeholder="¿Qué ley, título o código creés que apareció?"
               disabled={disabled || isLoading}
               className="w-full px-4 py-3 text-sm text-white/90 outline-none placeholder:text-white/25"
@@ -162,7 +195,10 @@ export function FormularioAuditoriaV3({
               <textarea
                 id="deposito-v3-noise"
                 value={detectedNoise}
-                onChange={(e) => setDetectedNoise(e.target.value)}
+                onChange={(e) => {
+                  setDetectedNoise(e.target.value);
+                  persistir({ detectedNoise: e.target.value });
+                }}
                 placeholder="¿Dónde detectás culpa, «debo» o adorno moral?"
                 rows={3}
                 disabled={disabled || isLoading}
@@ -182,7 +218,10 @@ export function FormularioAuditoriaV3({
               <textarea
                 id="deposito-v3-shadow"
                 value={omittedShadow}
-                onChange={(e) => setOmittedShadow(e.target.value)}
+                onChange={(e) => {
+                  setOmittedShadow(e.target.value);
+                  persistir({ omittedShadow: e.target.value });
+                }}
                 placeholder="¿Qué omitiste o no querías nombrar?"
                 rows={3}
                 disabled={disabled || isLoading}
