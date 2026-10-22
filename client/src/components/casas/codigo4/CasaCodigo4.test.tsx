@@ -84,11 +84,14 @@ describe("Casa Código 4 — UI", () => {
       }),
     );
     assert.match(html, /Historial de Auditorías/);
+    assert.match(html, /juez-historial-reductor/);
+    assert.match(html, /<select/);
     assert.match(html, /Hoy el pistón no paró/);
     assert.match(html, /C4 Estructura/);
     assert.match(html, /C1 → C3/);
     assert.match(html, /Interrumpí el pistón automático/);
     assert.match(html, /Copiar Auditoría/);
+    assert.match(html, /ver volcado/);
   });
 
   it("el modal 402 ofrece recarga", () => {
