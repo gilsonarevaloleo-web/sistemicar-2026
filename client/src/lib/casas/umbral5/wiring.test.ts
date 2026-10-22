@@ -39,5 +39,8 @@ describe("Casa 5 Umbral — cableado A–D", () => {
     assert.match(src, /initUmbral5SesionesTable/);
     assert.match(src, /wallet: juezCreditWallet/);
     assert.match(src, /registerUmbralV2Routes/);
+    const engine = readFileSync(join(root, "server/services/umbral5Engine.ts"), "utf8");
+    assert.match(engine, /GET \/api\/casas\/umbral5\/sesiones/);
+    assert.match(engine, /listarSesionesUmbral5/);
   });
 });

@@ -157,6 +157,38 @@ export async function ejecutarVolcadoGratis(
   };
 }
 
+export async function listarSesionesUmbral5(
+  userId: string,
+  deps: Umbral5EngineDeps = {},
+): Promise<{ ok: true; sesiones: SesionUmbral5[] } | Umbral5EngineErr> {
+  const uid = userId.trim();
+  if (!uid) return { ok: false, status: 400, error: "Falta userId." };
+  const store = deps.store ?? createDefaultUmbral5Store();
+  return { ok: true, sesiones: await store.listByUser(uid) };
+}
+
+export async function leerSesionUmbral5(
+  userId: string,
+  sesionUmbral5Id: string,
+  deps: Umbral5EngineDeps = {},
+): Promise<{ ok: true; sesion: SesionUmbral5 } | Umbral5EngineErr> {
+  const uid = userId.trim();
+  const sid = sesionUmbral5Id.trim();
+  if (!uid) return { ok: false, status: 400, error: "Falta userId." };
+  if (!sid) return { ok: false, status: 400, error: "Falta sesionUmbral5Id." };
+  const store = deps.store ?? createDefaultUmbral5Store();
+  const sesion = await store.getById(sid);
+  if (!sesion || sesion.userId !== uid) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Sesión de Umbral no encontrada.",
+      codigo: sesion ? "SESION_AJENA" : "SESION_NO_ENCONTRADA",
+    };
+  }
+  return { ok: true, sesion };
+}
+
 export async function ejecutarLecturaMapa(
   userId: string,
   sesionUmbral5Id: string,
@@ -276,6 +308,8 @@ export function registerUmbral5Routes(
     endpoints: {
       volcado: "POST /api/casas/umbral5/volcado",
       lectura: "POST /api/casas/umbral5/lectura",
+      sesiones: "GET /api/casas/umbral5/sesiones",
+      sesion: "GET /api/casas/umbral5/sesion/:id",
     },
     promptExport: "PROMPT_UMBRAL5",
     promptChars: PROMPT_UMBRAL5.length,
@@ -288,6 +322,50 @@ export function registerUmbral5Routes(
 
   app.get("/api/casas/umbral5/meta", (_req: Request, res: Response) => {
     res.json(meta);
+  });
+
+  app.get("/api/casas/umbral5/sesiones", async (req: Request, res: Response) => {
+    try {
+      const userId = String(req.query.userId ?? req.header("x-user-id") ?? "").trim();
+      const resultado = await listarSesionesUmbral5(userId, runtime);
+      if (!resultado.ok) {
+        return res.status(resultado.status).json(bodyError(resultado));
+      }
+      return res.json({
+        success: true,
+        userId,
+        sesiones: resultado.sesiones,
+      });
+    } catch (error) {
+      console.error("[casas/umbral5/sesiones]", error);
+      return res.status(500).json({
+        success: false,
+        error: "Error listando volcados de Umbral.",
+        result: null,
+      });
+    }
+  });
+
+  app.get("/api/casas/umbral5/sesion/:id", async (req: Request, res: Response) => {
+    try {
+      const userId = String(req.query.userId ?? req.header("x-user-id") ?? "").trim();
+      const id = String(req.params.id ?? "").trim();
+      const resultado = await leerSesionUmbral5(userId, id, runtime);
+      if (!resultado.ok) {
+        return res.status(resultado.status).json(bodyError(resultado));
+      }
+      return res.json({
+        success: true,
+        sesion: resultado.sesion,
+      });
+    } catch (error) {
+      console.error("[casas/umbral5/sesion]", error);
+      return res.status(500).json({
+        success: false,
+        error: "Error leyendo la sesión de Umbral.",
+        result: null,
+      });
+    }
   });
 
   app.get("/api/casas/umbral5/saldo", async (req: Request, res: Response) => {

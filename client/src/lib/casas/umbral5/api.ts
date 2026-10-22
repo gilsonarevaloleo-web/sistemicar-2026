@@ -3,7 +3,7 @@
  * Volcado gratis. Lectura-mapa a 1 crédito del ledger del Juez.
  */
 
-import type { Umbral5Lectura } from "@shared/casas/umbral5";
+import type { SesionUmbral5, Umbral5Lectura } from "@shared/casas/umbral5";
 
 export class Umbral5SaldoError extends Error {
   readonly status = 402;
@@ -47,6 +47,17 @@ export interface SaldoResponse {
   success: true;
   saldo: number;
   creditos: { lectura: number; volcado: number };
+}
+
+export interface SesionesResponse {
+  success: true;
+  userId: string;
+  sesiones: SesionUmbral5[];
+}
+
+export interface SesionResponse {
+  success: true;
+  sesion: SesionUmbral5;
 }
 
 interface ErrorBody {
@@ -104,6 +115,37 @@ export async function sellarVolcado(input: {
   if (!res.ok || !("success" in body) || body.success !== true) {
     throw new Error(
       ("error" in body && body.error) || "No se pudo sellar el volcado.",
+    );
+  }
+  return body;
+}
+
+export async function listarSesionesUmbral5(
+  userId: string,
+): Promise<SesionesResponse> {
+  const res = await fetch(
+    `/api/casas/umbral5/sesiones?userId=${encodeURIComponent(userId)}`,
+  );
+  const body = await parseJson<SesionesResponse | ErrorBody>(res);
+  if (!res.ok || !("success" in body) || body.success !== true) {
+    throw new Error(
+      ("error" in body && body.error) || "No se pudieron listar los volcados.",
+    );
+  }
+  return body;
+}
+
+export async function leerSesionUmbral5(input: {
+  userId: string;
+  sesionUmbral5Id: string;
+}): Promise<SesionResponse> {
+  const res = await fetch(
+    `/api/casas/umbral5/sesion/${encodeURIComponent(input.sesionUmbral5Id)}?userId=${encodeURIComponent(input.userId)}`,
+  );
+  const body = await parseJson<SesionResponse | ErrorBody>(res);
+  if (!res.ok || !("success" in body) || body.success !== true) {
+    throw new Error(
+      ("error" in body && body.error) || "No se pudo leer la sesión.",
     );
   }
   return body;

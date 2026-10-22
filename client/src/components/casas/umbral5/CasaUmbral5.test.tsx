@@ -6,6 +6,7 @@ import { LienzoLimite } from "./LienzoLimite.tsx";
 import { PanelMapa } from "./PanelMapa.tsx";
 import { BannerGimnasio } from "./BannerGimnasio.tsx";
 import { ModalSaldoInsuficiente } from "./ModalSaldoInsuficiente.tsx";
+import { HistorialLimite } from "./HistorialLimite.tsx";
 
 describe("Casa 5 Umbral — UI", () => {
   it("el lienzo muestra el ritual y el volcado gratis", () => {
@@ -49,6 +50,37 @@ describe("Casa 5 Umbral — UI", () => {
     assert.match(html, /Forja \/ Arena/);
     assert.match(html, /Cerrado/);
     assert.match(html, /disabled/);
+  });
+
+  it("el historial lista volcados guardados", () => {
+    const html = renderToStaticMarkup(
+      createElement(HistorialLimite, {
+        sesiones: [
+          {
+            id: "s1",
+            userId: "u1",
+            textoVolcado: "El Juez dijo que el aumento está débil. No hice nada.",
+            lectura: {
+              codigoUsuario: 1,
+              pisoIntento: 1,
+              tipoLimite: null,
+              lecturaFria: "El asiento es C1.",
+              porQueNoEjecuta: "Cero acto.",
+            },
+            source: "local_fallback",
+            estado: "MAPA_PAGO",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        sesionActivaId: "s1",
+        onSelect: () => {},
+      }),
+    );
+    assert.match(html, /umbral5-historial/);
+    assert.match(html, /Volcados guardados/);
+    assert.match(html, /Mapa C1/);
+    assert.match(html, /aumento está débil/);
   });
 
   it("el modal 402 ofrece recarga", () => {

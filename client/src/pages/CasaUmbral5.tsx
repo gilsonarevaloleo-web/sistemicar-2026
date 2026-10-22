@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { DoorOpen } from "lucide-react";
 import { useAuthContext } from "@/App";
@@ -8,21 +8,30 @@ import {
   UMBRAL5_BRONZE,
 } from "@/components/casas/umbral5/LienzoLimite";
 import { PanelMapa } from "@/components/casas/umbral5/PanelMapa";
+import { HistorialLimite } from "@/components/casas/umbral5/HistorialLimite";
 import { BannerGimnasio } from "@/components/casas/umbral5/BannerGimnasio";
 import { ModalSaldoInsuficiente } from "@/components/casas/umbral5/ModalSaldoInsuficiente";
 import {
   Umbral5SaldoError,
   leerMapa,
   leerSaldoUmbral5,
+  listarSesionesUmbral5,
   sellarVolcado,
 } from "@/lib/casas/umbral5/api";
+import {
+  fusionarSesionesUmbral5Local,
+  guardarBorradorUmbral5,
+  guardarSesionUmbral5Local,
+  leerBorradorUmbral5,
+  listarSesionesUmbral5Local,
+} from "@/lib/casas/umbral5/sesionesLocal";
 import {
   CASA_UMBRAL5_FIRMA,
   CASA_UMBRAL5_NOMBRE,
   CASA_UMBRAL5_RITUAL,
   CREDITO_LECTURA_MAPA,
 } from "@shared/casas/umbral5";
-import type { Umbral5Lectura } from "@shared/casas/umbral5";
+import type { SesionUmbral5, Umbral5Lectura } from "@shared/casas/umbral5";
 
 export default function CasaUmbral5() {
   const { user } = useAuthContext();
@@ -33,17 +42,51 @@ export default function CasaUmbral5() {
   const [saldo, setSaldo] = useState<number | null>(null);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [lectura, setLectura] = useState<Umbral5Lectura | null>(null);
+  const [sesiones, setSesiones] = useState<SesionUmbral5[]>([]);
+  const tocadoRef = useRef(false);
   const [sellando, setSellando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal402, setModal402] = useState<string | null>(null);
+
+  const aplicarSesion = (sesion: SesionUmbral5) => {
+    setSesionId(sesion.id);
+    setTexto(sesion.textoVolcado);
+    setLectura(sesion.lectura);
+    guardarBorradorUmbral5(sesion.textoVolcado);
+  };
 
   useEffect(() => {
     if (!userId) return;
     void leerSaldoUmbral5(userId)
       .then((r) => setSaldo(r.saldo))
       .catch(() => setSaldo(0));
+
+    const locales = listarSesionesUmbral5Local(userId);
+    setSesiones(locales);
+    if (locales[0]) {
+      aplicarSesion(locales[0]);
+    } else {
+      const draft = leerBorradorUmbral5();
+      if (draft) setTexto(draft);
+    }
+
+    void listarSesionesUmbral5(userId)
+      .then((r) => {
+        const merged = fusionarSesionesUmbral5Local(userId, r.sesiones);
+        setSesiones(merged);
+        if (!tocadoRef.current && merged[0]) aplicarSesion(merged[0]);
+      })
+      .catch(() => {
+        /* el caché local ya está */
+      });
   }, [userId]);
+
+  const onTexto = (value: string) => {
+    setTexto(value);
+    tocadoRef.current = true;
+    guardarBorradorUmbral5(value);
+  };
 
   const abrir402 = (err: unknown) => {
     if (err instanceof Umbral5SaldoError) {
@@ -63,6 +106,19 @@ export default function CasaUmbral5() {
         userId,
         limiteConocido: texto,
       });
+      const ahora = new Date().toISOString();
+      const sesion: SesionUmbral5 = {
+        id: out.sesionUmbral5Id,
+        userId,
+        textoVolcado: out.textoVolcado,
+        lectura: null,
+        source: null,
+        estado: "VOLCADO_GRATIS",
+        createdAt: ahora,
+        updatedAt: ahora,
+      };
+      guardarSesionUmbral5Local(sesion);
+      setSesiones((prev) => [sesion, ...prev.filter((s) => s.id !== sesion.id)]);
       setSesionId(out.sesionUmbral5Id);
       setLectura(null);
       setSaldo(out.saldo);
@@ -90,6 +146,22 @@ export default function CasaUmbral5() {
       });
       setLectura(out.lectura);
       setSaldo(out.saldo);
+      setSesiones((prev) => {
+        const next = prev.map((s) =>
+          s.id === out.sesionUmbral5Id
+            ? {
+                ...s,
+                lectura: out.lectura,
+                source: out.source,
+                estado: "MAPA_PAGO" as const,
+                updatedAt: new Date().toISOString(),
+              }
+            : s,
+        );
+        const actual = next.find((s) => s.id === out.sesionUmbral5Id);
+        if (actual) guardarSesionUmbral5Local(actual);
+        return next;
+      });
     } catch (err) {
       if (!abrir402(err)) {
         setError(err instanceof Error ? err.message : "Umbral no pudo leer el mapa.");
@@ -144,10 +216,19 @@ export default function CasaUmbral5() {
 
         <LienzoLimite
           texto={texto}
-          onTexto={setTexto}
+          onTexto={onTexto}
           onSellar={() => void sellar()}
           cargando={sellando}
           deshabilitado={!userId || sellando}
+        />
+
+        <HistorialLimite
+          sesiones={sesiones}
+          sesionActivaId={sesionId}
+          onSelect={(s) => {
+            tocadoRef.current = true;
+            aplicarSesion(s);
+          }}
         />
 
         {sesionId && !lectura && (
