@@ -255,10 +255,10 @@ const C5_DECISION = [
   /el cuerpo pedia/,
   /el cuerpo pidio/,
   /cambie (el |mi )?foco/,
-  /saco (la |mi )?atencion/,
-  /atencion lo saco/,
-  /lo saco del trabajo/,
-  /saco del trabajo/,
+  /sa(co|que) (la |mi )?atencion/,
+  /atencion lo sa(co|que)/,
+  /lo sa(co|que) del trabajo/,
+  /sa(co|que) del trabajo/,
   /cambio de (atencion|enfoque|foco)/,
   /cambiar (de )?(el |mi )?(enfoque|atencion|foco)/,
   /cambio (el |mi )?(enfoque|atencion|foco)/,
@@ -456,12 +456,9 @@ export function auditarGeometriaSintactica(
 ): GeometriaSintactica {
   const titulo = extraerTitulo(payload);
   const cierre = extraerCierre(payload, titulo);
-  const textoPresencia = [titulo, payload.rawFact, payload.omittedShadow]
-    .filter((s) => typeof s === "string" && s.trim())
-    .join("\n");
   const texto = [titulo, payload.rawFact].filter(Boolean).join("\n");
   const norm = normalizarGeometria(texto);
-  const normCuerpo = normalizarGeometria(textoPresencia);
+  const normCuerpo = normalizarGeometria(texto);
 
   const scores = emptyScores();
   const active = emptyActive();
