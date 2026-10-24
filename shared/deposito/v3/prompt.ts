@@ -75,7 +75,8 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
 
 1. C5 (DECISIÓN / CORTE / MARGEN):
    - Do NOT just look for technical words like "cortar" or "margen".
-   - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador"), changing their focus on purpose to protect their body, or saying "NO" to an internal mandate ("el deber") -> THIS IS A C5 INTENT.
+   - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"), changing their focus on purpose to protect their body/brain ("cambio de atención", "cambiar de enfoque"), or saying "NO" to an internal mandate ("el deber", "el Debo") -> THIS IS A C5 INTENT.
+   - Naming the choice to ignore an alert ("elegimos ignorarlo") is also C5.
    - Executive connectors ALSO light C5: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". A firm executive sentence is C5 even without the word "corte".
 
 2. C8 (CICLOS / POLARIDAD / RETORNO):
@@ -83,8 +84,8 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
    - ONLY if that cycle is constructed in the wording. Do NOT infer C8 from implied rest, drama, or recharge that the sentence does not build.
 
 3. C7 (VISIÓN / PATRÓN AXIOMÁTICO):
-   - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado") -> THIS IS A C7 INTENT.
-   - Own solution / pattern connectors also light C7: "mi solución", "el patrón es", "planteo", "encajo esto", "concluyo que".
+   - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado", "la atención tiene ciclo de vida") -> THIS IS A C7 INTENT.
+   - Own solution / pattern connectors also light C7: "mi solución", "el patrón es", "planteo", "encajo esto", "concluyo que", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la respuesta es que".
    - IF C5 and C6 are already on the paper, the NEXT Master demand is C7 — never repeat C5.
 
 4. SEPARATION OF SURFACE vs INTENT:
@@ -158,11 +159,11 @@ Evaluate how the text is constructed, wired, and structured — including the in
 STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 - C1 (Cimiento / Vector Cero): Non-empty title property OR categorical anchoring statements. The Title is C1, NEVER C10.
 - C2 (Flujo): Temporal connectors, narrative of events, relational thread of facts. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the teaching foco if a lower cascade step is missing.
-- C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time. Heatmap only (not a cascade step).
+- C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time. Heatmap only (not a cascade step). Natural chain "entonces / en ese momento / empiezo / con ese / logro" lights C3 without "primero" or a clock.
 - C4 (Inflexión / Seriedad): Inflection question (¿Por qué...?, ¿Qué pasa si...?) or paradigm-break phrases ("El problema es:", "Acá me doy cuenta").
-- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
+- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
 - C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video). Do not judge the source. Heatmap; Master Tone C6 exists if asked.
-- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
+- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
 - C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations. Only if the wording constructs that cycle.
 - C9 (Sistema): Explicitly connects three or more dimensions (physiology + work + environment). Do not simulate it.
 - C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector. No title → C10 EMPTY by geometric impossibility.

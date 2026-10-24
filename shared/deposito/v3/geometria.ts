@@ -202,7 +202,21 @@ const C3_SECUENCIA = [
   /\bconsecuente\b/,
   /\d+\.\s+\S[\s\S]{0,80}\d+\.\s+/,
   /\d{1,2}:\d{2}[\s\S]{0,80}\d{1,2}:\d{2}/,
+  /entonces[\s\S]{0,220}en ese momento/,
+  /en ese momento[\s\S]{0,160}(empiezo|empieza|comienzo|con ese)/,
 ];
+
+/** A → B → C en lenguaje natural, sin exigir "primero" ni reloj. */
+const C3_CADENA_FAMILIAS = [
+  /\b(entonces|cuando|despues|luego)\b/,
+  /\ben ese momento\b/,
+  /\b(empiezo|empieza|comienzo|comienza)\b/,
+  /\b(con ese|con esto|logro que|la respuesta es)\b/,
+];
+
+function tieneCadenaVectorial(norm: string): boolean {
+  return C3_CADENA_FAMILIAS.filter((re) => re.test(norm)).length >= 3;
+}
 
 const C4_INFLEXION = [
   /¿[^?]{6,}\?/,
@@ -241,6 +255,17 @@ const C5_DECISION = [
   /el cuerpo pedia/,
   /el cuerpo pidio/,
   /cambie (el |mi )?foco/,
+  /sa(co|que) (la |mi )?atencion/,
+  /atencion lo sa(co|que)/,
+  /lo sa(co|que) del trabajo/,
+  /sa(co|que) del trabajo/,
+  /cambio de (atencion|enfoque|foco)/,
+  /cambiar (de )?(el |mi )?(enfoque|atencion|foco)/,
+  /cambio (el |mi )?(enfoque|atencion|foco)/,
+  /\belegi(mos)?\b/,
+  /\belegir\b/,
+  /el debo\b/,
+  /no al debo/,
   /a proposito/,
   /traza una linea/,
   /hasta aqui/,
@@ -300,6 +325,14 @@ const C7_VISION = [
   /como encaj/,
   /encajo (esto|el|la|mi|un)/,
   /concluyo que/,
+  /aprend[ií] que/,
+  /hoy aprend/,
+  /me lleva a la conclusion/,
+  /la conclusion (es|que)/,
+  /esto me lleva a/,
+  /la ley tiene/,
+  /(siclo|ciclo) de vida/,
+  /la respuesta es que/,
   /entonces (la ley|el patron|la regla|la solucion)/,
   /como lo resuelvo/,
   /mi respuesta (es|propia)/,
@@ -320,6 +353,10 @@ const C8_CICLO = [
   /dos dias/,
   /\bloop\b/,
   /\bciclo\b/,
+  /\bsiclo\b/,
+  /(ciclo|siclo) de (vida|atencion)/,
+  /empezar de nuevo/,
+  /otro ciclo/,
   /\bretorno\b/,
   /incuba/,
   /polaridad/,
@@ -331,10 +368,10 @@ const C8_CICLO = [
 const C8_POLO_NATURAL =
   /facebook|instagram|whatsapp|tiktok|redes sociales|\baudio\b|descans|siesta|\bocio\b|me recost|a descansar/;
 const C8_RETORNO_NATURAL =
-  /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc/;
+  /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc|empezar de nuevo|otro ciclo/;
 
 const C8_TECNICO =
-  /48\s*h|24\s*h|\bloop\b|ciclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
+  /48\s*h|24\s*h|\bloop\b|ciclo|siclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
 
 const FISIO =
   /\bcuerpo\b|\bfatiga\b|\bsueno\b|\bhambre\b|\bdolor\b|\brespir|\bmusculo\b|\benergia fisica\b/;
@@ -369,11 +406,18 @@ function emptyActive(): Record<EyeCode, boolean> {
   return map;
 }
 
+function esTesisCicloAtencion(norm: string): boolean {
+  return /(ciclo|siclo) de (vida|atencion)/.test(norm);
+}
+
 function elegirFirma(
   active: Record<EyeCode, boolean>,
   scores: Record<EyeCode, number>,
   norm: string,
 ): EyeCode {
+  if (active[8] && esTesisCicloAtencion(norm)) {
+    return 8;
+  }
   if (
     active[8] &&
     esC8Tecnico(norm) &&
@@ -414,7 +458,7 @@ export function auditarGeometriaSintactica(
   const cierre = extraerCierre(payload, titulo);
   const texto = [titulo, payload.rawFact].filter(Boolean).join("\n");
   const norm = normalizarGeometria(texto);
-  const normCuerpo = normalizarGeometria(payload.rawFact);
+  const normCuerpo = normalizarGeometria(texto);
 
   const scores = emptyScores();
   const active = emptyActive();
@@ -428,6 +472,7 @@ export function auditarGeometriaSintactica(
   active[2] = scores[2] > 0;
 
   scores[3] = hitsDe(normCuerpo, C3_SECUENCIA);
+  if (tieneCadenaVectorial(normCuerpo)) scores[3] += 1;
   active[3] = scores[3] > 0;
 
   scores[4] = hitsDe(normCuerpo, C4_INFLEXION);
