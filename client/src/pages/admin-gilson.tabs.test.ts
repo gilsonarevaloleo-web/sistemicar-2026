@@ -28,6 +28,10 @@ describe("admin-gilson — pestañas táctiles", () => {
     assert.match(src, /searchAccounts\(\{ silent: true \}\)/);
     assert.match(src, /Pega el correo del pago y pulsa Registrar/);
     assert.match(src, /`Registrar \$\{displayNameForPlan\(modulePlanId\)\}`/);
+    assert.match(src, /Norte \(incluye Base \+ Ritmo\)/);
+    assert.match(src, /admin-norte-enfoque-hint/);
+    assert.match(src, /planGrantStillNeeded/);
+    assert.match(src, /Encender \$\{displayNameForPlan\(modulePlanId\)\}/);
     assert.doesNotMatch(src, /El servidor no puede buscar en Firebase\. Revisa FIREBASE_SERVICE_ACCOUNT_JSON/);
   });
 

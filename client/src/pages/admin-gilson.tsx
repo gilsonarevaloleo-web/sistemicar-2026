@@ -17,8 +17,36 @@ import {
 } from "@shared/clientAccount";
 import { gmailTypoCorrection } from "@shared/emailAliases";
 import { explainFirebaseAdminError } from "@shared/firebaseServiceAccount";
+import {
+  jornadaPeldañoFlags,
+  planGrantStillNeeded,
+} from "@shared/moduleAccess";
 
 const ADMIN_PASSWORD = "sistemicar2025";
+
+function JornadaPeldañoLine({
+  activeModules,
+  subscriptionPlan,
+}: {
+  activeModules?: string[] | null;
+  subscriptionPlan?: string | null;
+}) {
+  const flags = jornadaPeldañoFlags({ activeModules, subscriptionPlan });
+  const chip = (on: boolean, onLabel: string, offLabel: string) => (
+    <span className={on ? "text-emerald-400 font-bold" : "text-rose-400"}>
+      {on ? onLabel : offLabel}
+    </span>
+  );
+  return (
+    <span className="text-[10px]" data-testid="admin-jornada-peldanos">
+      {chip(flags.hasBase, "Base on", "Base off")}
+      {" · "}
+      {chip(flags.hasRitmo, "Ritmo on", "Ritmo off")}
+      {" · "}
+      {chip(flags.hasNorte, "Norte on", "Norte off")}
+    </span>
+  );
+}
 
 interface User {
   id: string;
@@ -203,6 +231,7 @@ export default function AdminGilson() {
     sovereigntyPoints?: number;
     rank: string;
     activeModules: string[];
+    subscriptionPlan?: string | null;
   }>>([]);
   const [authClientsLoading, setAuthClientsLoading] = useState(false);
   const [authClientsError, setAuthClientsError] = useState<string | null>(null);
@@ -518,7 +547,14 @@ export default function AdminGilson() {
         return true;
       }
       if (data.granted || data.activated) {
-        toast.success(data.message || "Jornada encendida en esa cuenta. Que abra el menú.");
+        toast.success(
+          data.message ||
+            (planId === "soberania_dia"
+              ? "Norte encendida (Base + Ritmo + Hub). Que recargue Jornada — el desglosador de enfoque se abre."
+              : planId === "operativo"
+                ? "Ritmo encendido (incluye Base). Que recargue Jornada — el desglosador de enfoque se abre."
+                : "Jornada encendida en esa cuenta. Que abra el menú."),
+        );
         setAccounts((prev) =>
           prev.map((a) =>
             a.uid === targetUid
@@ -2088,6 +2124,7 @@ export default function AdminGilson() {
                       totalDocs: number;
                       rank: string;
                       activeModules: string[];
+                      subscriptionPlan: string | null;
                     }
                   >();
                   for (const c of authClients) {
@@ -2099,6 +2136,7 @@ export default function AdminGilson() {
                       totalDocs: 0,
                       rank: c.rank,
                       activeModules: c.activeModules || [],
+                      subscriptionPlan: c.subscriptionPlan ?? null,
                     });
                   }
                   for (const a of accounts) {
@@ -2114,6 +2152,7 @@ export default function AdminGilson() {
                         a.activeModules && a.activeModules.length > 0
                           ? a.activeModules
                           : prev?.activeModules || [],
+                      subscriptionPlan: a.subscriptionPlan || prev?.subscriptionPlan || null,
                     });
                   }
                   const list = [...byUid.values()].sort(
@@ -2150,7 +2189,11 @@ export default function AdminGilson() {
                         </button>
                         <div className="space-y-1 max-h-56 overflow-y-auto">
                           {list.map((c) => {
-                            const jornadaOn = c.activeModules.includes("planificacion_base");
+                            const access = {
+                              activeModules: c.activeModules,
+                              subscriptionPlan: c.subscriptionPlan,
+                            };
+                            const needsGrant = planGrantStillNeeded(access, modulePlanId);
                             const isGilson = c.uid === user?.uid;
                             const isRichest = richestHasData && c.uid === richest.uid;
                             return (
@@ -2191,13 +2234,14 @@ export default function AdminGilson() {
                                   {c.totalDocs > 0 ? (
                                     <span className="text-slate-400"> · {c.totalDocs} docs</span>
                                   ) : null}
-                                  {jornadaOn ? (
-                                    <span className="text-emerald-400"> · Jornada on</span>
-                                  ) : (
-                                    <span className="text-rose-400"> · Jornada off</span>
-                                  )}
+                                  <span className="block mt-0.5">
+                                    <JornadaPeldañoLine
+                                      activeModules={c.activeModules}
+                                      subscriptionPlan={c.subscriptionPlan}
+                                    />
+                                  </span>
                                 </button>
-                                {!isGilson && !jornadaOn ? (
+                                {!isGilson && needsGrant ? (
                                   <button
                                     type="button"
                                     disabled={grantingUid === c.uid}
@@ -2205,8 +2249,14 @@ export default function AdminGilson() {
                                     className="shrink-0 px-2 py-1 rounded-md bg-sky-500 text-white font-bold"
                                     data-testid={`button-encender-modulo-${c.uid.slice(0, 6)}`}
                                   >
-                                    {grantingUid === c.uid ? "…" : "Encender"}
+                                    {grantingUid === c.uid
+                                      ? "…"
+                                      : `Encender ${displayNameForPlan(modulePlanId)}`}
                                   </button>
+                                ) : !isGilson ? (
+                                  <span className="shrink-0 text-[10px] text-emerald-400 font-bold">
+                                    {displayNameForPlan(modulePlanId)} on
+                                  </span>
                                 ) : null}
                               </div>
                             );
@@ -2242,13 +2292,16 @@ export default function AdminGilson() {
                 data-testid="select-module-plan"
               >
                 <option value="planificacion_base">Jornada Base</option>
-                <option value="operativo">Ritmo del día</option>
-                <option value="soberania_dia">Norte</option>
+                <option value="operativo">Ritmo del día (incluye Base)</option>
+                <option value="soberania_dia">Norte (incluye Base + Ritmo)</option>
                 <option value="umbral">Umbral</option>
                 <option value="deposito_matricula">Universidad Matrícula</option>
                 <option value="deposito_carrera">Universidad Carrera</option>
                 <option value="deposito_titulo">Universidad Título</option>
               </select>
+              <p className="text-[11px] text-slate-400 mb-3" data-testid="admin-norte-enfoque-hint">
+                Norte incluye Ritmo: abre el desglosador de enfoque. Si ya tiene Base, Encender Norte sigue visible.
+              </p>
               <input
                 type="text"
                 value={moduleNote}

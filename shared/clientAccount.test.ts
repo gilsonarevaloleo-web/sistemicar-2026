@@ -121,5 +121,6 @@ describe("clientAccount — dónde se crea la cuenta", () => {
     });
     assert.match(granted, /activado/);
     assert.match(granted, /No cree otra cuenta/);
+    assert.match(granted, /desglosador de enfoque/);
   });
 });
