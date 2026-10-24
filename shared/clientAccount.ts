@@ -115,7 +115,13 @@ export function moduleGrantAdminMessage(opts: {
   const planName = displayNameForPlan(opts.planId);
   const email = normalizeBuyerEmail(opts.email);
   if (opts.granted) {
-    return `Módulo ${planName} activado para ${email}. La cuenta ya existía: dile que entre en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail. No cree otra cuenta.`;
+    const stack =
+      opts.planId === "soberania_dia"
+        ? " Norte incluye Base + Ritmo: el desglosador de enfoque ya no lleva candado."
+        : opts.planId === "operativo"
+          ? " Ritmo incluye Base: el desglosador de enfoque ya no lleva candado."
+          : "";
+    return `Módulo ${planName} activado para ${email}.${stack} La cuenta ya existía: dile que recargue Jornada en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail. No cree otra cuenta.`;
   }
   if (opts.pending && opts.accountExists) {
     return `Pago de ${planName} registrado para ${email}. La cuenta ya existe: debe entrar en ${CLIENT_ACCESO_PUBLIC_URL} con ese mismo Gmail (no cree otra). Al entrar, el plan se activa solo.`;

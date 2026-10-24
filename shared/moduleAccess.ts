@@ -81,11 +81,13 @@ export const LEGACY_PLAN_MODULES: Record<string, ModuleId[]> = {
   soberano: ["planificacion_base", "soberania_dia", "operativo"],
 };
 
-/** Módulos que otorga cada plan nuevo en checkout. */
+/** Módulos que otorga cada plan (peldaños inferiores incluidos).
+ * Norte = Con norte (Base + Ritmo + Hub). Ritmo incluye Base.
+ * Así el desglosador de enfoque no queda con candado al encender Norte. */
 export const PLAN_MODULE_GRANTS: Record<string, ModuleId[]> = {
   planificacion_base: ["planificacion_base"],
-  soberania_dia: ["soberania_dia"],
-  operativo: ["operativo"],
+  operativo: ["planificacion_base", "operativo"],
+  soberania_dia: ["planificacion_base", "operativo", "soberania_dia"],
   umbral: ["umbral"],
   deposito_matricula: ["deposito_matricula"],
   deposito_carrera: ["deposito_carrera"],
@@ -146,7 +148,40 @@ export function resolveActiveModules(input: ModuleAccessInput): Set<ModuleId> {
       set.add(m);
     }
   }
+  expandJornadaStack(set);
   return set;
+}
+
+/** Norte implica Ritmo + Base; Ritmo implica Base. */
+export function expandJornadaStack(set: Set<ModuleId>): Set<ModuleId> {
+  if (set.has("soberania_dia")) {
+    set.add("planificacion_base");
+    set.add("operativo");
+  } else if (set.has("operativo")) {
+    set.add("planificacion_base");
+  }
+  return set;
+}
+
+export type JornadaPeldañoFlags = {
+  hasBase: boolean;
+  hasRitmo: boolean;
+  hasNorte: boolean;
+};
+
+export function jornadaPeldañoFlags(input: ModuleAccessInput): JornadaPeldañoFlags {
+  const mods = resolveActiveModules(input);
+  return {
+    hasBase: mods.has("planificacion_base"),
+    hasRitmo: mods.has("operativo"),
+    hasNorte: mods.has("soberania_dia"),
+  };
+}
+
+/** True si el plan elegido todavía no está completo en esa cuenta. */
+export function planGrantStillNeeded(input: ModuleAccessInput, planId: string): boolean {
+  const have = resolveActiveModules(input);
+  return modulesGrantedByPlan(planId).some((m) => !have.has(m));
 }
 
 export function hasModule(input: ModuleAccessInput, moduleId: ModuleId): boolean {
