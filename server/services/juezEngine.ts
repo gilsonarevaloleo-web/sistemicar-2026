@@ -163,7 +163,7 @@ export async function ejecutarJuezEngine(
     }
     try {
       const raw2 = await callGemini(
-        `${prompt}\n\nIMPORTANTE: responde SOLO el JSON con fase1_lectura y fase2_propuesta_solucion. requiereInversionCreditos=true. La directiva no sube de C_conquistado.`,
+        `${prompt}\n\nIMPORTANTE: responde SOLO el JSON con fase1_lectura y fase2_propuesta_solucion. requiereInversionCreditos=true. Solo leé. Diez fuerzas. La confrontación no sube de C_conquistado. C5 no es el solver universal.`,
         2048,
         false,
       );

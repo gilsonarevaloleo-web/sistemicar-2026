@@ -2,6 +2,7 @@
  * Historial público del Juez. Fase 2 solo si ya se desbloqueó.
  */
 
+import { hidratarFase1 } from "./motor.ts";
 import { etiquetaPrincipio, principioDe } from "./prompt.ts";
 import type { SesionJuez } from "./sesion.ts";
 import type { JuezSerioFase1 } from "./types.ts";
@@ -17,18 +18,30 @@ export interface HistorialJuezItem {
   fase2Desbloqueada: boolean;
   /** Null si la Fase 2 sigue sellada. */
   directivaOperacional: string | null;
+  /** Alias público de la confrontación. Null si sigue sellada. */
+  confrontacionDeFuerza: string | null;
+}
+
+function fase1Publica(fase1: JuezSerioFase1): JuezSerioFase1 {
+  return hidratarFase1(fase1);
 }
 
 export function publicHistorialItem(sesion: SesionJuez): HistorialJuezItem {
   const abierta = sesion.estado === "FASE2_ABIERTA";
+  const fase1 = fase1Publica(sesion.fase1);
   return {
     id: sesion.id,
     createdAt: sesion.createdAt,
     updatedAt: sesion.updatedAt,
     textoVolcado: sesion.textoVolcado,
-    fase1: sesion.fase1,
+    fase1,
     fase2Desbloqueada: abierta,
-    directivaOperacional: abierta ? sesion.fase2.directivaOperacional : null,
+    directivaOperacional: abierta
+      ? sesion.fase2.confrontacionDeFuerza || sesion.fase2.directivaOperacional
+      : null,
+    confrontacionDeFuerza: abierta
+      ? sesion.fase2.confrontacionDeFuerza || sesion.fase2.directivaOperacional
+      : null,
   };
 }
 
@@ -49,16 +62,28 @@ export function formatearAuditoriaJuez(item: HistorialJuezItem): string {
     "¿Cuál es tu problema?",
     item.textoVolcado.trim(),
     "",
-    "FASE 1 — LECTURA DEL PERÍMETRO",
-    `Código detectado: ${etiquetaPrincipio(problema.codigo)}`,
+    "FASE 1 — MAPA DE FUERZAS",
+    `Código que habla: ${etiquetaPrincipio(problema.codigo)}`,
     `Perímetro conquistado: C1 → ${etiquetaPrincipio(techo.codigo)}`,
+    `Cierre teórico: ${
+      item.fase1.codigoQueCerroTeorico
+        ? etiquetaPrincipio(item.fase1.codigoQueCerroTeorico)
+        : "ninguno"
+    }`,
+    `Fuerza usada: ${
+      item.fase1.fuerzaUsada ? etiquetaPrincipio(item.fase1.fuerzaUsada) : "ninguna"
+    }`,
+    `Fuerza debida: ${etiquetaPrincipio(item.fase1.fuerzaDebida ?? techo.codigo)}`,
+    `Cascada: ${item.fase1.cascadaCumple ? "cumplida" : "incumplida"}`,
+    `Desajuste: ${item.fase1.desajusteFuerza ?? item.fase1.fugaInconsciente}`,
     `Fuga inconsciente: ${item.fase1.fugaInconsciente}`,
     `Lectura fría: ${item.fase1.lecturaPerimetroFria}`,
   ];
-  if (item.fase2Desbloqueada && item.directivaOperacional) {
-    lineas.push("", "FASE 2 — DIRECTIVA OPERACIONAL", item.directivaOperacional);
+  const confrontacion = item.confrontacionDeFuerza ?? item.directivaOperacional;
+  if (item.fase2Desbloqueada && confrontacion) {
+    lineas.push("", "FASE 2 — CONFRONTACIÓN DE FUERZA", confrontacion);
   } else {
-    lineas.push("", "FASE 2 — DIRECTIVA OPERACIONAL", "(sin desbloquear)");
+    lineas.push("", "FASE 2 — CONFRONTACIÓN DE FUERZA", "(sin desbloquear)");
   }
   return lineas.join("\n");
 }

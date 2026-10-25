@@ -32,7 +32,14 @@ describe("Casa Código 4 — UI", () => {
       createElement(PanelLectura, {
         fase1: {
           codigoProblemaDetectado: 4,
+          codigoQueHabla: 4,
           codigoConquistadoMax: 3,
+          participaciones: [{ codigo: 3, fuerza: "Cerrar el paso" }, { codigo: 4, fuerza: "Desnudar" }],
+          codigoQueCerroTeorico: null,
+          fuerzaUsada: null,
+          fuerzaDebida: 3,
+          cascadaCumple: false,
+          desajusteFuerza: "Habla C4. Se aplica Cerrar el paso.",
           fugaInconsciente: "La vía de agua es la coartada.",
           lecturaPerimetroFria: "El problema habita en C4.",
         },
@@ -46,14 +53,15 @@ describe("Casa Código 4 — UI", () => {
     assert.match(html, /Estructura/);
     assert.match(html, /C1 → C3/);
     assert.match(html, /La vía de agua es la coartada/);
-    assert.match(html, /Desbloquear Directiva Operacional \(1 Crédito\)/);
+    assert.match(html, /Desbloquear Confrontación de Fuerza \(1 Crédito\)/);
   });
 
-  it("la directiva deja claro el perímetro", () => {
+  it("la confrontación deja claro el perímetro", () => {
     const html = renderToStaticMarkup(
       createElement(BloqueDirectiva, {
         fase2: {
           requiereInversionCreditos: true,
+          confrontacionDeFuerza: "Interrumpí el pistón automático.",
           directivaOperacional: "Interrumpí el pistón automático.",
         },
       }),
@@ -73,12 +81,20 @@ describe("Casa Código 4 — UI", () => {
             textoVolcado: "Hoy el pistón no paró.",
             fase1: {
               codigoProblemaDetectado: 4,
+              codigoQueHabla: 4,
               codigoConquistadoMax: 3,
+              participaciones: [{ codigo: 4, fuerza: "Desnudar" }],
+              codigoQueCerroTeorico: null,
+              fuerzaUsada: null,
+              fuerzaDebida: 3,
+              cascadaCumple: false,
+              desajusteFuerza: "Habla C4.",
               fugaInconsciente: "La vía de agua es la coartada.",
               lecturaPerimetroFria: "El problema habita en C4.",
             },
             fase2Desbloqueada: true,
             directivaOperacional: "Interrumpí el pistón automático.",
+            confrontacionDeFuerza: "Interrumpí el pistón automático.",
           },
         ],
       }),

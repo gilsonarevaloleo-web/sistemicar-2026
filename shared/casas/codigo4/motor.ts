@@ -1,20 +1,25 @@
 /**
  * Motor local del Juez Serio.
- * El prompt instruye al modelo. Este archivo sella la Ley de Perímetro:
- * la tijera no sube de C_conquistado aunque el relato nombre códigos altos.
+ * Solo lee. Cada código cierra con su fuerza. C5 no es el solver universal.
+ * El cierre se juzga por la energía usada, no por el léxico.
  */
 
 import {
   CASA_CODIGO4_FIRMA,
+  fuerzaDe,
   principioDe,
   recursosDelPerimetro,
 } from "./prompt.ts";
 import {
+  CASCADA_ENSENANZA,
   EYE_CODES,
   type EyeCode,
+  type JuezSerioFase1,
+  type JuezSerioFase2,
   type JuezSerioInput,
   type JuezSerioParseResult,
   type JuezSerioResult,
+  type ParticipacionFuerza,
 } from "./types.ts";
 
 const CODIGO_SUPERIOR_LEX = [
@@ -80,6 +85,8 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bno tengo ancla\b/,
     /\bme desarmo\b/,
     /\bse me va la identidad\b/,
+    /\bdisposici[oó]n\b/,
+    /\bno tengo disponibilidad\b/,
   ],
   2: [
     /\bse estanca\b/,
@@ -99,6 +106,11 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bejeci?uto\b/,
     /\bsin parar\b/,
     /\britmo\b/,
+    /\bv[ií]deos?\b/,
+    /\bpublicar\b/,
+    /\bherramienta\b/,
+    /\bclip\b/,
+    /\bpasos?\b/,
   ],
   4: [
     /\bdeberia\b/,
@@ -113,6 +125,11 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bno quiero ver\b/,
     /\bsiempre igual y no se\b/,
     /\bculpa\b/,
+    /\bparece f[aá]cil\b/,
+    /\bdebe ser f[aá]cil\b/,
+    /\ba la pasada\b/,
+    /\bverdadero problema\b/,
+    /\bhabilidad\b/,
   ],
   5: [
     /\bno decido\b/,
@@ -121,6 +138,8 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bno corto\b/,
     /\bno se si\b/,
     /\bme quedo en el medio\b/,
+    /\bno se por donde\b/,
+    /\bno empiezo\b/,
   ],
   6: [
     /\bentorno\b/,
@@ -142,6 +161,10 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bvuelve otra vez\b/,
     /\bno cierra el bucle\b/,
     /\bcada semana lo mismo\b/,
+    /\bcompra impulsiva\b/,
+    /\bcursos?\b/,
+    /\b3 meces\b/,
+    /\bmeses\b/,
   ],
   9: [
     /\bmuchos frentes\b/,
@@ -149,6 +172,9 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bvariables\b/,
     /\btodo a la vez\b/,
     /\bsistema se cae\b/,
+    /\bvarias cosas\b/,
+    /\bproyecto\b/,
+    /\bpublicista\b/,
   ],
   10: [
     /\bpara que hago esto\b/,
@@ -171,6 +197,8 @@ const MARCAS_CONQUISTA: Record<EyeCode, RegExp[]> = {
     /\bejeci?ut\w*\b/,
     /\bdesglosador\b/,
     /\bincendio\b/,
+    /\bv[ií]deos?\b/,
+    /\bpublicar\b/,
   ],
   4: [
     /\bel problema es\b/,
@@ -208,9 +236,51 @@ function codigoDominante(
   return max > 0 ? best : fallback;
 }
 
+function hayCierreTeorico(norm: string): boolean {
+  return (
+    /\bverdadero problema\b/.test(norm) ||
+    /\bsoluci[oó]n ser[ií]a\b/.test(norm) ||
+    /\bvoy ha\b/.test(norm) ||
+    /\bvoy a crear un proyecto\b/.test(norm) ||
+    /\brutina diaria\b/.test(norm)
+  );
+}
+
+function hayCierreAparato(norm: string): boolean {
+  return (
+    /\bproyecto\b/.test(norm) ||
+    /\bpublicista\b/.test(norm) ||
+    /\brutina diaria\b/.test(norm) ||
+    /\bsoluci[oó]n ser[ií]a\b/.test(norm)
+  );
+}
+
+function hayCeroObra(norm: string): boolean {
+  return (
+    /\b(meses|meces)\b/.test(norm) &&
+    /\bv[ií]deos?\b/.test(norm) &&
+    /\b(no consigo|sin poder publicar|ni un v[ií]deo)\b/.test(norm)
+  );
+}
+
+export function fuerzaUsadaDelCierre(friccion: string): EyeCode | null {
+  const norm = normalizar(friccion);
+  if (!hayCierreTeorico(norm)) return null;
+  if (hayCierreAparato(norm)) return 9;
+  if (/\bverdadero problema\b/.test(norm)) return 4;
+  return null;
+}
+
+export function codigoQueCerroDelVolcado(friccion: string): EyeCode | null {
+  const norm = normalizar(friccion);
+  if (/\bverdadero problema\b/.test(norm)) return 4;
+  if (hayCierreTeorico(norm)) return fuerzaUsadaDelCierre(friccion);
+  return null;
+}
+
 /**
  * Superficie C3 sin inflexión → el problema inconsciente es C4.
- * El Juez no confunde el pistón con la vía de agua.
+ * Inflexión nombrada + aparato o cero obra → habla C5. C5 no es el solver: se nombra.
  */
 export function detectarCodigoProblema(friccion: string): EyeCode {
   const norm = normalizar(friccion);
@@ -219,6 +289,7 @@ export function detectarCodigoProblema(friccion: string): EyeCode {
   const hayInflexion = scores[4] > 0;
   const otroMasAlto = EYE_CODES.filter((n) => n >= 5).some((n) => scores[n] > scores[4]);
 
+  if (hayInflexion && (hayCierreAparato(norm) || hayCeroObra(norm))) return 5;
   if (superficieC3 && !hayInflexion && !otroMasAlto) return 4;
   if (scores[4] > 0 && scores[4] >= scores[5] && !otroMasAlto) return 4;
   return codigoDominante(scores, 4);
@@ -227,6 +298,7 @@ export function detectarCodigoProblema(friccion: string): EyeCode {
 /**
  * El chasis se mide por lo que sostiene, no por lo que nombra.
  * Un volcado de día sin C4+ sostiene como máximo C3.
+ * Nombrar proyecto no conquista C9.
  */
 export function inferirPerimetroConquistado(friccion: string): EyeCode {
   const norm = normalizar(friccion);
@@ -237,41 +309,103 @@ export function inferirPerimetroConquistado(friccion: string): EyeCode {
     else break;
   }
   if (scores[3] > 0 && max < 3) return 3;
-  if (max === 1 && scores[3] === 0 && /dia|hoy|trabajo|bloque/.test(norm)) {
+  if (max === 1 && scores[3] === 0 && /dia|hoy|trabajo|bloque|video|publicar/.test(norm)) {
     return 3;
   }
   return max;
 }
 
+export function participacionesDelVolcado(friccion: string): ParticipacionFuerza[] {
+  const norm = normalizar(friccion);
+  const scores = puntuar(norm, MARCAS_PROBLEMA);
+  const out: ParticipacionFuerza[] = [];
+  for (const n of EYE_CODES) {
+    if (scores[n] > 0) {
+      out.push({ codigo: n, fuerza: fuerzaDe(n).nombre });
+    }
+  }
+  return out;
+}
+
+export function fuerzaDebidaDe(habla: EyeCode, max: EyeCode): EyeCode {
+  return habla > max ? max : habla;
+}
+
+export function cascadaCumpleDe(opts: {
+  fuerzaUsada: EyeCode | null;
+  fuerzaDebida: EyeCode;
+  max: EyeCode;
+  cerroTeorico: EyeCode | null;
+}): boolean {
+  const { fuerzaUsada, fuerzaDebida, max, cerroTeorico } = opts;
+  if (fuerzaUsada == null) return false;
+  if (fuerzaUsada > max) return false;
+  if (fuerzaUsada !== fuerzaDebida) return false;
+  if (cerroTeorico === 4 && fuerzaUsada === 9) return false;
+  if (cerroTeorico && CASCADA_ENSENANZA.includes(cerroTeorico)) {
+    const idx = CASCADA_ENSENANZA.indexOf(cerroTeorico);
+    const siguiente = CASCADA_ENSENANZA[idx + 1];
+    if (siguiente && fuerzaUsada !== siguiente && fuerzaUsada > cerroTeorico) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function desajusteDe(opts: {
+  habla: EyeCode;
+  max: EyeCode;
+  cerroTeorico: EyeCode | null;
+  fuerzaUsada: EyeCode | null;
+  fuerzaDebida: EyeCode;
+  cascada: boolean;
+}): string {
+  const { habla, max, cerroTeorico, fuerzaUsada, fuerzaDebida, cascada } = opts;
+  if (cascada) {
+    return `Cierre legal. Habla C${habla}. Se aplicó ${fuerzaDe(fuerzaDebida).nombre}.`;
+  }
+  if (cerroTeorico && fuerzaUsada && fuerzaUsada !== fuerzaDebida) {
+    return `C${cerroTeorico} cerró el diagnóstico. El cierre teórico usó C${fuerzaUsada} (${fuerzaDe(fuerzaUsada).nombre}). El hueco pedía C${fuerzaDebida} (${fuerzaDe(fuerzaDebida).nombre}). Cascada incumplida.`;
+  }
+  if (fuerzaUsada && fuerzaUsada > max) {
+    return `La fuerza C${fuerzaUsada} no cabe en el perímetro C${max}.`;
+  }
+  return `Habla C${habla}. El chasis sostiene hasta C${max}. Se nombra C${habla} y se aplica ${fuerzaDe(fuerzaDebida).nombre}.`;
+}
+
+export function confrontacionDeFuerza(
+  max: EyeCode,
+  habla: EyeCode,
+  usada: EyeCode | null,
+): string {
+  const debida = fuerzaDebidaDe(habla, max);
+  const acto = fuerzaDe(debida).acto;
+  if (usada && usada !== debida) {
+    return `${acto} ${fuerzaDe(usada).nombre} no cierra este hueco.`;
+  }
+  if (habla > max) {
+    return `${acto} Se nombra C${habla}. El acto cabe en ${principioDe(max).nombre}.`;
+  }
+  return acto;
+}
+
+/** @deprecated usar confrontacionDeFuerza. Se conserva el nombre para tests. */
 export function directivaDelPerimetro(
   max: EyeCode,
   problema: EyeCode,
 ): string {
-  const techo = principioDe(max);
-  const mapa: Record<EyeCode, string> = {
-    1: "Nombrá la postura que se te cayó hoy. Una frase. Sostenela. No cambies de identidad.",
-    2: "Cortá UNA fuga de caudal: la conversación, la pantalla o el roce que se come el flujo. No agregues trabajo.",
-    3: "Interrumpí el pistón automático. Nombrá UN paso de hoy y cerra. No abras el siguiente.",
-    4: "Escribí la coartada en una línea. Esa es la vía de agua. No la moralices. Dejala a la vista.",
-    5: "Una tijera: sí o no. Un objeto. Hoy.",
-    6: "Nombrá la regla del medio que estás violando o aguantando. Ajustá UNA juntura.",
-    7: "Dibujá el patrón en una frase. No armes un plan.",
-    8: "Marcá el bucle que no cerró. Fecha de retorno. Nada más.",
-    9: "Bajá a UN hilo. Los demás quedan fuera del día.",
-    10: "Una línea de origen: para qué este acto. Si no sale, no hay sistema que sostener.",
-  };
-  const corte = mapa[max];
-  if (problema > max) {
-    return `${corte} El acto cabe en ${techo.nombre}. No subas el perímetro.`;
-  }
-  return corte;
+  return confrontacionDeFuerza(max, problema, null);
 }
 
 export function fugaInconscienteDe(
   problema: EyeCode,
   max: EyeCode,
+  extra?: { cerroTeorico?: EyeCode | null; fuerzaUsada?: EyeCode | null },
 ): string {
   const p = principioDe(problema);
+  if (extra?.cerroTeorico === 4 && extra.fuerzaUsada === 9 && max <= 3) {
+    return "Ya nombraste que no es la herramienta. Lo que no veías: el cierre usó fuerza C9 (proyecto) donde la obra pedía C3 (cerrar un paso). La habilidad no precede al primer clip.";
+  }
   if (problema === 4 && max <= 3) {
     return "Operás el día en automático. La vía de agua no es falta de ritmo: es la coartada que sostiene el pistón para no mirar el quiebre.";
   }
@@ -284,9 +418,12 @@ export function fugaInconscienteDe(
 export function lecturaPerimetroDe(
   problema: EyeCode,
   max: EyeCode,
+  extra?: { cascada?: boolean; fuerzaDebida?: EyeCode },
 ): string {
   const recursos = recursosDelPerimetro(max);
-  return `El problema habita en C${problema}. El chasis sostiene hasta C${max} (${recursos}). La tijera no puede subir de C${max}.`;
+  const debida = extra?.fuerzaDebida ?? fuerzaDebidaDe(problema, max);
+  const cascada = extra?.cascada === true ? "Cascada cumplida." : "Cascada incumplida.";
+  return `Habla C${problema}. El chasis sostiene hasta C${max} (${recursos}). Se nombra C${problema} y se aplica ${fuerzaDe(debida).nombre}. ${cascada}`;
 }
 
 export function directivaFiltraPerimetro(
@@ -297,36 +434,96 @@ export function directivaFiltraPerimetro(
   for (const marca of CODIGO_SUPERIOR_LEX) {
     if (marca.codigo > max && marca.re.test(texto)) return false;
   }
-  const mencionados = [...texto.matchAll(/\bC\s*([1-9]|10)\b/gi)].map((m) =>
-    Number(m[1]),
-  );
-  return mencionados.every((n) => n <= max);
+  return true;
+}
+
+export function fase2De(texto: string): JuezSerioFase2 {
+  const limpio = texto.trim();
+  return {
+    requiereInversionCreditos: true,
+    confrontacionDeFuerza: limpio,
+    directivaOperacional: limpio,
+  };
+}
+
+export function hidratarFase1(raw: Partial<JuezSerioFase1> & {
+  codigoProblemaDetectado: EyeCode;
+  codigoConquistadoMax: EyeCode;
+  fugaInconsciente: string;
+  lecturaPerimetroFria: string;
+}): JuezSerioFase1 {
+  const habla = raw.codigoQueHabla ?? raw.codigoProblemaDetectado;
+  const max = raw.codigoConquistadoMax;
+  const debida = raw.fuerzaDebida ?? fuerzaDebidaDe(habla, max);
+  const participaciones =
+    raw.participaciones && raw.participaciones.length > 0
+      ? raw.participaciones
+      : [
+          { codigo: habla, fuerza: fuerzaDe(habla).nombre },
+          ...(max !== habla
+            ? [{ codigo: max, fuerza: fuerzaDe(max).nombre }]
+            : []),
+        ];
+  return {
+    codigoProblemaDetectado: raw.codigoProblemaDetectado,
+    codigoQueHabla: habla,
+    codigoConquistadoMax: max,
+    participaciones,
+    codigoQueCerroTeorico: raw.codigoQueCerroTeorico ?? null,
+    fuerzaUsada: raw.fuerzaUsada ?? null,
+    fuerzaDebida: debida,
+    cascadaCumple: raw.cascadaCumple ?? false,
+    desajusteFuerza:
+      raw.desajusteFuerza?.trim() ||
+      desajusteDe({
+        habla,
+        max,
+        cerroTeorico: raw.codigoQueCerroTeorico ?? null,
+        fuerzaUsada: raw.fuerzaUsada ?? null,
+        fuerzaDebida: debida,
+        cascada: raw.cascadaCumple ?? false,
+      }),
+    fugaInconsciente: raw.fugaInconsciente.trim(),
+    lecturaPerimetroFria: raw.lecturaPerimetroFria.trim(),
+  };
 }
 
 export function acotarAlPerimetro(result: JuezSerioResult): JuezSerioResult {
-  const problema = result.fase1_lectura.codigoProblemaDetectado;
-  const max = result.fase1_lectura.codigoConquistadoMax;
-  const raw = result.fase2_propuesta_solucion.directivaOperacional.trim();
-  const directiva = directivaFiltraPerimetro(raw, max)
-    ? raw
-    : directivaDelPerimetro(max, problema);
+  const f1 = hidratarFase1(result.fase1_lectura);
+  const raw = (
+    result.fase2_propuesta_solucion.confrontacionDeFuerza ||
+    result.fase2_propuesta_solucion.directivaOperacional ||
+    ""
+  ).trim();
+  const local = confrontacionDeFuerza(f1.codigoConquistadoMax, f1.codigoQueHabla, f1.fuerzaUsada);
+  const texto = directivaFiltraPerimetro(raw, f1.codigoConquistadoMax) ? raw : local;
 
   return {
-    fase1_lectura: {
-      codigoProblemaDetectado: problema,
-      codigoConquistadoMax: max,
-      fugaInconsciente: result.fase1_lectura.fugaInconsciente.trim(),
-      lecturaPerimetroFria: result.fase1_lectura.lecturaPerimetroFria.trim(),
-    },
-    fase2_propuesta_solucion: {
-      requiereInversionCreditos: true,
-      directivaOperacional: directiva,
-    },
+    fase1_lectura: f1,
+    fase2_propuesta_solucion: fase2De(texto),
   };
 }
 
 function trimText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseEyeOrNull(value: unknown): EyeCode | null {
+  if (value == null || value === "") return null;
+  return parseEyeCode(value);
+}
+
+function parseParticipaciones(raw: unknown): ParticipacionFuerza[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ParticipacionFuerza[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const codigo = parseEyeCode((item as { codigo?: unknown }).codigo);
+    if (!codigo) continue;
+    const fuerza = trimText((item as { fuerza?: unknown }).fuerza) || fuerzaDe(codigo).nombre;
+    out.push({ codigo, fuerza });
+  }
+  return out;
 }
 
 export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
@@ -351,32 +548,45 @@ export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
 
   const f1 = fase1 as Record<string, unknown>;
   const f2 = fase2 as Record<string, unknown>;
-  const problema = parseEyeCode(f1.codigoProblemaDetectado);
+  const problema = parseEyeCode(f1.codigoProblemaDetectado ?? f1.codigoQueHabla);
   const max = parseEyeCode(f1.codigoConquistadoMax);
   const fuga = trimText(f1.fugaInconsciente);
   const lectura = trimText(f1.lecturaPerimetroFria || f1.lecturaPerimetroFrancia);
-  const directiva = trimText(f2.directivaOperacional);
+  const confrontacion = trimText(f2.confrontacionDeFuerza || f2.directivaOperacional);
 
   if (!problema || !max) {
     return { ok: false, error: "Los códigos deben ser enteros 1–10." };
   }
-  if (!fuga || !lectura || !directiva) {
+  if (!fuga || !lectura || !confrontacion) {
     return { ok: false, error: "Faltan campos de texto del dictamen." };
   }
+
+  const habla = parseEyeCode(f1.codigoQueHabla) ?? problema;
+  const cascadaRaw = f1.cascadaCumple;
+  const cascadaCumple =
+    typeof cascadaRaw === "boolean"
+      ? cascadaRaw
+      : cascadaRaw === "true"
+        ? true
+        : false;
 
   return {
     ok: true,
     result: acotarAlPerimetro({
-      fase1_lectura: {
+      fase1_lectura: hidratarFase1({
         codigoProblemaDetectado: problema,
+        codigoQueHabla: habla,
         codigoConquistadoMax: max,
+        participaciones: parseParticipaciones(f1.participaciones),
+        codigoQueCerroTeorico: parseEyeOrNull(f1.codigoQueCerroTeorico),
+        fuerzaUsada: parseEyeOrNull(f1.fuerzaUsada),
+        fuerzaDebida: parseEyeCode(f1.fuerzaDebida) ?? fuerzaDebidaDe(habla, max),
+        cascadaCumple,
+        desajusteFuerza: trimText(f1.desajusteFuerza),
         fugaInconsciente: fuga,
         lecturaPerimetroFria: lectura,
-      },
-      fase2_propuesta_solucion: {
-        requiereInversionCreditos: true,
-        directivaOperacional: directiva,
-      },
+      }),
+      fase2_propuesta_solucion: fase2De(confrontacion),
     }),
   };
 }
@@ -385,27 +595,51 @@ export function diagnosticarJuezSerioLocal(
   input: JuezSerioInput,
 ): JuezSerioResult {
   const friccion = input.friccionDiaria?.trim() ?? "";
-  const problema = detectarCodigoProblema(friccion);
+  const habla = detectarCodigoProblema(friccion);
   const inferido = inferirPerimetroConquistado(friccion);
   const max = clampEye(input.codigoConquistadoMax ?? inferido);
+  const participaciones = participacionesDelVolcado(friccion);
+  const cerroTeorico = codigoQueCerroDelVolcado(friccion);
+  const fuerzaUsada = fuerzaUsadaDelCierre(friccion);
+  const fuerzaDebida = fuerzaDebidaDe(habla, max);
+  const cascada = cascadaCumpleDe({
+    fuerzaUsada,
+    fuerzaDebida,
+    max,
+    cerroTeorico,
+  });
+  const desajuste = desajusteDe({
+    habla,
+    max,
+    cerroTeorico,
+    fuerzaUsada,
+    fuerzaDebida,
+    cascada,
+  });
   const fuga = friccion
-    ? fugaInconscienteDe(problema, max)
+    ? fugaInconscienteDe(habla, max, { cerroTeorico, fuerzaUsada })
     : "No hay volcado. Sin fricción no hay vía de agua que nombrar.";
   const lectura = friccion
-    ? lecturaPerimetroDe(problema, max)
+    ? lecturaPerimetroDe(habla, max, { cascada, fuerzaDebida })
     : `${CASA_CODIGO4_FIRMA} Sin texto el perímetro no se mide.`;
 
   return acotarAlPerimetro({
-    fase1_lectura: {
-      codigoProblemaDetectado: problema,
+    fase1_lectura: hidratarFase1({
+      codigoProblemaDetectado: habla,
+      codigoQueHabla: habla,
       codigoConquistadoMax: max,
+      participaciones,
+      codigoQueCerroTeorico: cerroTeorico,
+      fuerzaUsada,
+      fuerzaDebida,
+      cascadaCumple: cascada,
+      desajusteFuerza: desajuste,
       fugaInconsciente: fuga,
       lecturaPerimetroFria: lectura,
-    },
-    fase2_propuesta_solucion: {
-      requiereInversionCreditos: true,
-      directivaOperacional: directivaDelPerimetro(max, problema),
-    },
+    }),
+    fase2_propuesta_solucion: fase2De(
+      confrontacionDeFuerza(max, habla, fuerzaUsada),
+    ),
   });
 }
 

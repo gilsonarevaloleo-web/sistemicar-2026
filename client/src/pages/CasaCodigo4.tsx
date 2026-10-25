@@ -207,7 +207,10 @@ export default function CasaCodigo4() {
               textoVolcado: volcadoAuditado,
               fase1,
               fase2Desbloqueada: Boolean(fase2),
-              directivaOperacional: fase2?.directivaOperacional ?? null,
+              directivaOperacional:
+                fase2?.confrontacionDeFuerza ?? fase2?.directivaOperacional ?? null,
+              confrontacionDeFuerza:
+                fase2?.confrontacionDeFuerza ?? fase2?.directivaOperacional ?? null,
             }}
             testId="juez-copiar-actual"
           />

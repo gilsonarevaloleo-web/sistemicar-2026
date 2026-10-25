@@ -22,7 +22,7 @@ import {
 
 describe("Casa Código 4 — prompt", () => {
   it("fija identidad, firma y los 10 principios matriz", () => {
-    assert.equal(CASA_CODIGO4_VERSION, "1.0.0-juez-serio");
+    assert.equal(CASA_CODIGO4_VERSION, "1.1.0-juez-fuerzas");
     assert.equal(CASA_CODIGO4_NOMBRE, "La Casa del Código 4: El Juez Serio");
     assert.equal(CASA_CODIGO4_MARCA, "Juez Serio");
     assert.match(CASA_CODIGO4_FIRMA, /perímetro conquistado/);
@@ -34,7 +34,7 @@ describe("Casa Código 4 — prompt", () => {
     );
     assert.equal(principioDe(4).nombre, "Estructura");
     assert.ok(principioDe(4).vectores.some((v) => /Autoengaño/i.test(v)));
-    assert.equal(CASA_CODIGO4_AXIOMAS.length, 4);
+    assert.equal(CASA_CODIGO4_AXIOMAS.length, 6);
   });
 
   it("el sistema exige JSON estricto, perímetro y tono frío", () => {
@@ -43,10 +43,13 @@ describe("Casa Código 4 — prompt", () => {
     assert.equal(PROMPT_JUEZ_SERIO, CASA_CODIGO4_SYSTEM_PROMPT);
     assert.match(system, /HACER CONSCIENTE EL INCONSCIENTE/);
     assert.match(system, /LEY DEL PERÍMETRO DE RECURSOS/);
-    assert.match(system, /ejecución ciega en C3/);
+    assert.match(system, /SOLO LEER/);
+    assert.match(system, /DIEZ FUERZAS/);
+    assert.match(system, /C5 NO ES EL SOLVER/);
     assert.match(system, /C1 → C_conquistado/);
     assert.match(system, /requiereInversionCreditos/);
     assert.match(system, /lecturaPerimetroFria/);
+    assert.match(system, /confrontacionDeFuerza/);
     assert.match(system, /fase1_lectura/);
     assert.match(system, /fase2_propuesta_solucion/);
     assert.match(system, /antipaternalista|ANTIPATERNALISTA|cero empatía/i);
