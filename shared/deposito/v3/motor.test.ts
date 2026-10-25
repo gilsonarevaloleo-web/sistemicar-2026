@@ -29,6 +29,8 @@ describe("Depósito V3 — prompt", () => {
     assert.match(system, /NEVER give generic advice like "repeat C3 with a number"/i);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /dejé el trabajo|puse pausa al desglosador/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /cambio de atención|cambiar de enfoque/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /aprendí que|me lleva a la conclusión/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /el deber es el enemigo instalado/);
     assert.match(INTENT_AWARE_SYNTAX_PROMPT, /entonces.*después.*luego|narrative vessels/i);
     assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Cold Telemetry Auditor/);
@@ -251,6 +253,38 @@ describe("Depósito V3 — geometría fría y cascada", () => {
     assert.equal(r.activeCharacterMap[8], true);
     assert.equal(r.lowestMissingCascadeCode, 1);
     assert.doesNotMatch(r.immediateAdjustment, /flojo|debo|virtud/i);
+  });
+
+  it("volcado 24/10/2026: C5, C7 y C3 ya están en el papel; firma C8; FOCO C10", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendi que la atención tiene siclo de vida no mayor a dos horas. 
+Cómo estos días estoy prestando atención a los mensajes de mí subconciente para poder fluir con él.  Ya que mí experiencia de concentrarme a fuerza de voluntad me trajo problemas hasta de salud: está vez inmediatamente me aparece las dos alertas de que mí cerebro se está quemando ( cuando parece el Debo, cuando parezca el deseo de que la hora de trabajo se termine porque lo estoy sintiendo largo al tiempo) entonces al parecer uno de eso dos mí atención lo saco del trabajo pero no saco mí cuerpo, en ese momento empiezo ha escuchar audio y el ciclo de atención empieza; con ese cambio de atención logro que no se active las dos señales de que mí cerebro se está quemando. Lobqu estaba buscando saber es: ¿Suprime el cansancio corporal de la primera intención manual y cuánto tiempo dura? La respuesta es que suprime en un 75 a 80% y dura aproximadamente 90 a 120 minutos.  Esto me lleva a la conclusión que puede cuidarnos estando trabajando en nuestra trabajo de costura o manual y para que no salte la alerta de estar quemándose, se debe cambiar de enfoque de atención para empezar de nuevo otro ciclo de atención, siempre en cuando no haya riego de ausentarse cuando se trabaja en piloto automático, porque el hecho de poder cambiar de enfoque voluntariamente requiere haber dominado el trabajo de la primera atencion`,
+      studentHypothesis: "El código 1, que la ley tiene siclo de vida",
+      detectedNoise: "No hay flor",
+      omittedShadow:
+        "Lo no dicho es:  que el mayor daño que podemos hacer a nuestro cerebro es cuando evitamos las dos alertas, el que debo terminar y cuando se siente las horas se ha alargado, la señal a sido enviada y nosotros elegimos ignorarlo. Ahí está el daño.",
+      userTier: "MATRICULA",
+    });
+    assert.equal(r.characterSignedCode, 8);
+    assert.equal(r.activeCharacterMap[1], true);
+    assert.equal(r.activeCharacterMap[2], true);
+    assert.equal(r.activeCharacterMap[3], true);
+    assert.equal(r.activeCharacterMap[4], true);
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.activeCharacterMap[6], true);
+    assert.equal(r.activeCharacterMap[7], true);
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.equal(r.activeCharacterMap[9], false);
+    assert.equal(r.activeCharacterMap[10], false);
+    assert.equal(r.syntacticVacios.includes(3), false);
+    assert.equal(r.syntacticVacios.includes(5), false);
+    assert.equal(r.syntacticVacios.includes(7), false);
+    assert.equal(r.focoRevelacionCode, 10);
+    assert.equal(r.syntaxDiagnostic.focoCode, 10);
+    assert.equal(r.lowestMissingCascadeCode, 10);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.immediateAdjustment, TONOS_MAESTRO[10]);
+    assert.equal(r.estadoAlumno, "ENLACE_EN_TRANSMUTACION");
   });
 
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {

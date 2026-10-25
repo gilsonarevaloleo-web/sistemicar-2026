@@ -55,6 +55,8 @@ describe("Geometría sintáctica fría", () => {
       "Mi decisión es cortar el paso.",
       "Decido parar ahora.",
       "Voy a trazar una línea.",
+      "Mi atención lo saco del trabajo y cambio de enfoque.",
+      "Elegimos ignorarlo. Ahí está el daño.",
     ]) {
       const geo = auditarGeometriaSintactica({
         rawFact,
@@ -71,6 +73,26 @@ describe("Geometría sintáctica fría", () => {
       userTier: "MATRICULA",
     });
     assert.equal(geo.active[7], true);
+  });
+
+  it("C7 enciende con aprendí que / conclusión / ley con ciclo de vida", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "Hoy aprendí que la atención tiene ciclo de vida. Esto me lleva a la conclusión que la ley tiene un tope.",
+      studentHypothesis: "La ley",
+      userTier: "MATRICULA",
+    });
+    assert.equal(geo.active[7], true);
+  });
+
+  it("C3 enciende con cadena entonces → en ese momento → empiezo / logro", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "Entonces saqué la atención. En ese momento empiezo a escuchar audio; con ese cambio logro que no salte la alerta.",
+      userTier: "MATRICULA",
+    });
+    assert.equal(geo.active[3], true);
+    assert.equal(geo.active[5], true);
   });
 
   it("C10 abrocha con sello explícito que vuelve al título", () => {
