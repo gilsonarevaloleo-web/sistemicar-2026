@@ -1,5 +1,5 @@
 import React, { type ReactNode } from "react";
-import { principioDe } from "@shared/casas/codigo4";
+import { hidratarFase1, principioDe } from "@shared/casas/codigo4";
 import type { JuezSerioFase1 } from "@shared/casas/codigo4";
 import { JUEZ_IRON, JUEZ_STEEL } from "./LienzoEntrada";
 
@@ -42,8 +42,9 @@ export function PanelLectura({
   costoFase2: number;
   yaDesbloqueada: boolean;
 }) {
-  const problema = principioDe(fase1.codigoProblemaDetectado);
-  const techo = principioDe(fase1.codigoConquistadoMax);
+  const lectura = hidratarFase1(fase1);
+  const problema = principioDe(lectura.codigoQueHabla);
+  const techo = principioDe(lectura.codigoConquistadoMax);
 
   return (
     <section className="space-y-3" data-testid="juez-panel-lectura">
@@ -51,10 +52,10 @@ export function PanelLectura({
         className="text-[10px] tracking-[0.22em] uppercase"
         style={{ color: JUEZ_IRON }}
       >
-        Lectura del perímetro
+        Mapa de fuerzas
       </p>
       <div className="grid gap-3 md:grid-cols-2">
-        <Card etiqueta="Código del problema" testId="juez-card-problema">
+        <Card etiqueta="Código que habla" testId="juez-card-problema">
           <p className="text-2xl font-light tracking-tight" style={{ color: JUEZ_IRON }}>
             C{problema.codigo}
           </p>
@@ -69,14 +70,25 @@ export function PanelLectura({
           </p>
           <p className="mt-1 text-white/70">{techo.nombre}</p>
           <p className="mt-2 text-[11px] text-white/40">
-            La tijera no puede subir de este techo.
+            Se nombra el código alto. Se aplica solo este techo.
           </p>
         </Card>
+        <Card etiqueta="Participan" testId="juez-card-participaciones">
+          {lectura.participaciones.length === 0
+            ? "Sin marcas de fuerza."
+            : lectura.participaciones
+                .map((p) => `C${p.codigo} ${p.fuerza}`)
+                .join(" · ")}
+        </Card>
+        <Card etiqueta="Cascada" testId="juez-card-cascada">
+          <p>{lectura.cascadaCumple ? "Cumplida" : "Incumplida"}</p>
+          <p className="mt-2 text-[11px] text-white/40">{lectura.desajusteFuerza}</p>
+        </Card>
         <Card etiqueta="Fuga inconsciente" testId="juez-card-fuga">
-          {fase1.fugaInconsciente}
+          {lectura.fugaInconsciente}
         </Card>
         <Card etiqueta="Lectura fría" testId="juez-card-fria">
-          {fase1.lecturaPerimetroFria}
+          {lectura.lecturaPerimetroFria}
         </Card>
       </div>
       {!yaDesbloqueada && (
@@ -86,7 +98,7 @@ export function PanelLectura({
           data-testid="juez-banner-fase2"
         >
           <p className="text-[11px] leading-relaxed text-white/55">
-            La directiva está sellada. El Juez no la entrega sin inversión.
+            La confrontación de la fuerza debida está sellada. El Juez no la entrega sin inversión.
           </p>
           <button
             type="button"
@@ -101,7 +113,7 @@ export function PanelLectura({
           >
             {desbloqueando
               ? "Desbloqueando…"
-              : `Desbloquear Directiva Operacional (${costoFase2} Crédito)`}
+              : `Desbloquear Confrontación de Fuerza (${costoFase2} Crédito)`}
           </button>
         </div>
       )}

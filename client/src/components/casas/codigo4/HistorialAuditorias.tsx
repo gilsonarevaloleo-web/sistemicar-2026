@@ -111,14 +111,23 @@ export function HistorialAuditorias({ items }: { items: HistorialJuezItem[] }) {
               {elegido.fase1.lecturaPerimetroFria}
             </p>
           </div>
-          {elegido.fase2Desbloqueada && elegido.directivaOperacional ? (
+          {elegido.fase1.desajusteFuerza ? (
+            <p className="text-[12px] text-white/70 md:col-span-2">
+              <span className="text-white/35">Cascada · </span>
+              {elegido.fase1.cascadaCumple ? "cumplida" : "incumplida"}
+              {" · "}
+              {elegido.fase1.desajusteFuerza}
+            </p>
+          ) : null}
+          {elegido.fase2Desbloqueada &&
+          (elegido.confrontacionDeFuerza || elegido.directivaOperacional) ? (
             <p className="text-[12px] leading-relaxed text-white/85">
-              <span className="text-white/35">Directiva · </span>
-              {elegido.directivaOperacional}
+              <span className="text-white/35">Confrontación · </span>
+              {elegido.confrontacionDeFuerza || elegido.directivaOperacional}
             </p>
           ) : (
             <p className="text-[11px] text-white/35">
-              Directiva sellada. Aún no se desbloqueó.
+              Confrontación sellada. Aún no se desbloqueó.
             </p>
           )}
           <BotonCopiarAuditoria

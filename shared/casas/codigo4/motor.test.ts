@@ -9,6 +9,7 @@ import {
   inferirPerimetroConquistado,
   parseEyeCode,
   parseJuezSerioResult,
+  VOLCADO_PUBLICISTA,
 } from "./index.ts";
 import type { JuezSerioResult } from "./types.ts";
 
@@ -25,12 +26,20 @@ function dictamen(over: Partial<{
   return {
     fase1_lectura: {
       codigoProblemaDetectado: (over.problema ?? 4) as 4,
+      codigoQueHabla: (over.problema ?? 4) as 4,
       codigoConquistadoMax: (over.max ?? 3) as 3,
+      participaciones: [{ codigo: (over.problema ?? 4) as 4, fuerza: "Desnudar" }],
+      codigoQueCerroTeorico: null,
+      fuerzaUsada: null,
+      fuerzaDebida: (over.max ?? 3) as 3,
+      cascadaCumple: false,
+      desajusteFuerza: "Habla C4. Se aplica C3.",
       fugaInconsciente: over.fuga ?? "Vía de agua.",
       lecturaPerimetroFria: over.lectura ?? "Dictamen de perímetro.",
     },
     fase2_propuesta_solucion: {
       requiereInversionCreditos: true,
+      confrontacionDeFuerza: over.directiva ?? "Interrumpí el pistón automático.",
       directivaOperacional: over.directiva ?? "Interrumpí el pistón automático.",
     },
   };
@@ -49,8 +58,43 @@ describe("Casa Código 4 — motor", () => {
     assert.match(r.fase1_lectura.lecturaPerimetroFria, /C3/);
     assert.equal(r.fase2_propuesta_solucion.requiereInversionCreditos, true);
     assert.match(r.fase2_propuesta_solucion.directivaOperacional, /pistón|paso/);
+    assert.equal(
+      r.fase2_propuesta_solucion.confrontacionDeFuerza,
+      r.fase2_propuesta_solucion.directivaOperacional,
+    );
     assert.ok(
       directivaFiltraPerimetro(r.fase2_propuesta_solucion.directivaOperacional, 3),
+    );
+  });
+
+  it("el primer volcado publicista lee fuerzas y falla la cascada", () => {
+    assert.equal(detectarCodigoProblema(VOLCADO_PUBLICISTA), 5);
+    assert.equal(inferirPerimetroConquistado(VOLCADO_PUBLICISTA), 3);
+
+    const r = evaluarJuezSerio({ friccionDiaria: VOLCADO_PUBLICISTA });
+    const f1 = r.fase1_lectura;
+    assert.equal(f1.codigoQueHabla, 5);
+    assert.equal(f1.codigoProblemaDetectado, 5);
+    assert.equal(f1.codigoConquistadoMax, 3);
+    assert.equal(f1.codigoQueCerroTeorico, 4);
+    assert.equal(f1.fuerzaUsada, 9);
+    assert.equal(f1.fuerzaDebida, 3);
+    assert.equal(f1.cascadaCumple, false);
+    const codes = f1.participaciones.map((p) => p.codigo);
+    for (const n of [1, 3, 4, 5, 8, 9]) {
+      assert.ok(codes.includes(n as 1 | 3 | 4 | 5 | 8 | 9), `falta C${n}`);
+    }
+    assert.match(f1.fugaInconsciente, /C9|proyecto|clip|habilidad/i);
+    assert.doesNotMatch(f1.fugaInconsciente, /pistón automático/);
+    assert.match(f1.desajusteFuerza, /C9/);
+    assert.match(f1.desajusteFuerza, /C3/);
+    assert.match(r.fase2_propuesta_solucion.confrontacionDeFuerza, /paso|Cerrá|aparato/i);
+    assert.doesNotMatch(
+      r.fase2_propuesta_solucion.confrontacionDeFuerza,
+      /decidí|visión|desarrollá la habilidad/i,
+    );
+    assert.ok(
+      directivaFiltraPerimetro(r.fase2_propuesta_solucion.confrontacionDeFuerza, 3),
     );
   });
 

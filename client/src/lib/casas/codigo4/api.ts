@@ -1,5 +1,5 @@
 /**
- * Cliente del Juez Serio. Fase 1 oculta la directiva. Fase 2 la desbloquea.
+ * Cliente del Juez Serio. Fase 1 oculta la confrontación. Fase 2 la desbloquea.
  */
 
 import type {
