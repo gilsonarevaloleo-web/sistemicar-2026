@@ -27,6 +27,21 @@ describe("Casa Código 4 — UI", () => {
     assert.match(html, /juez-volcado/);
   });
 
+  it("el lienzo muestra el volcado restaurado", () => {
+    const html = renderToStaticMarkup(
+      createElement(LienzoEntrada, {
+        texto: "el volcado de ayer",
+        onTexto: () => {},
+        onAuditar: () => {},
+        cargando: false,
+        saldo: 3,
+        costo: 1,
+        deshabilitado: false,
+      }),
+    );
+    assert.match(html, /el volcado de ayer/);
+  });
+
   it("el panel de lectura muestra C4 y el banner de desbloqueo", () => {
     const html = renderToStaticMarkup(
       createElement(PanelLectura, {
