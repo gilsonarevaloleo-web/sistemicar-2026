@@ -5,6 +5,7 @@ import {
   guardarBorradorJuez,
   leerBorradorJuez,
   limpiarBorradorJuez,
+  textoLienzoDesde,
 } from "./borrador.ts";
 
 class MemoryStorage {
@@ -57,5 +58,15 @@ describe("borrador Juez Serio", () => {
     limpiarBorradorJuez();
     assert.equal(localStorage.getItem(JUEZ_DRAFT_KEY), null);
     assert.equal(leerBorradorJuez(), "");
+  });
+
+  it("el borrador local gana al historial; si está vacío, recupera el último volcado", () => {
+    assert.equal(
+      textoLienzoDesde("borrador vivo", "volcado viejo del historial"),
+      "borrador vivo",
+    );
+    assert.equal(textoLienzoDesde("", "volcado viejo del historial"), "volcado viejo del historial");
+    assert.equal(textoLienzoDesde("   ", "volcado viejo del historial"), "volcado viejo del historial");
+    assert.equal(textoLienzoDesde("", null), "");
   });
 });

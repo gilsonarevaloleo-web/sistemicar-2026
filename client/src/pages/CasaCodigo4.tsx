@@ -21,7 +21,11 @@ import {
   leerHistorialJuez,
   leerSaldoJuez,
 } from "@/lib/casas/codigo4/api";
-import { guardarBorradorJuez, leerBorradorJuez } from "@/lib/casas/codigo4/borrador";
+import {
+  guardarBorradorJuez,
+  leerBorradorJuez,
+  textoLienzoDesde,
+} from "@/lib/casas/codigo4/borrador";
 import {
   CASA_CODIGO4_FIRMA,
   CASA_CODIGO4_NOMBRE,
@@ -41,7 +45,9 @@ export default function CasaCodigo4() {
   const userId = user?.uid ?? "";
 
   const [texto, setTexto] = useState(() => leerBorradorJuez());
-  const [recuperarDeHistorial] = useState(() => !leerBorradorJuez().trim());
+  const [recuperarDeHistorial, setRecuperarDeHistorial] = useState(
+    () => !leerBorradorJuez().trim(),
+  );
   const [saldo, setSaldo] = useState<number | null>(null);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [fase1, setFase1] = useState<JuezSerioFase1 | null>(null);
@@ -68,9 +74,12 @@ export default function CasaCodigo4() {
   }, [texto]);
 
   useEffect(() => {
-    if (!recuperarDeHistorial || texto.trim()) return;
-    const ultimo = historial[0]?.textoVolcado?.trim();
-    if (ultimo) setTexto(ultimo);
+    if (!recuperarDeHistorial) return;
+    if (historial.length === 0) return;
+    if (!texto.trim()) {
+      setTexto(textoLienzoDesde(texto, historial[0]?.textoVolcado));
+    }
+    setRecuperarDeHistorial(false);
   }, [historial, recuperarDeHistorial, texto]);
 
   useEffect(() => {

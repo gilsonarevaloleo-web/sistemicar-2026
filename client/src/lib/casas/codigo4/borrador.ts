@@ -34,3 +34,12 @@ export function limpiarBorradorJuez(): void {
     // ignore
   }
 }
+
+/** Prefiere el borrador local. Si está vacío, usa el último volcado del historial. */
+export function textoLienzoDesde(
+  borrador: string,
+  ultimoHistorial?: string | null,
+): string {
+  if (borrador.trim()) return borrador;
+  return ultimoHistorial?.trim() || borrador;
+}
