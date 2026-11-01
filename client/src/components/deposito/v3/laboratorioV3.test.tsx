@@ -4,8 +4,15 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildActiveCharacterMap,
+  calendarioAsistencia,
   cerebroVacio,
   formatFechaPrincipio,
+  libroVacio,
+  marcarSesionCumplida,
+  medirEvolucionOjos,
+  preguntaConciencia,
+  registrarIntencion,
+  resumenAsistencia,
   type CerebroMadre,
   type DepotAnalysisResult,
 } from "@shared/deposito/v3";
@@ -15,6 +22,10 @@ import { DictamenCardV3 } from "./DictamenCardV3.tsx";
 import { HistorialV3 } from "./HistorialV3.tsx";
 import { GradoConsistenciaV3 } from "./GradoConsistenciaV3.tsx";
 import { CerebroMadreV3 } from "./CerebroMadreV3.tsx";
+import { VentanaConcienciaAsistencia } from "./VentanaConcienciaAsistencia.tsx";
+import { ControlAsistencia } from "./ControlAsistencia.tsx";
+import { GraficoEvolucionOjos } from "./GraficoEvolucionOjos.tsx";
+import { MensajeSesionCumplida } from "./MensajeSesionCumplida.tsx";
 
 function fixture(): DepotAnalysisResult {
   return {
@@ -67,6 +78,16 @@ describe("FormularioAuditoriaV3", () => {
     assert.match(html, /deposito-v3-noise/);
     assert.match(html, /deposito-v3-shadow/);
     assert.match(html, /lo no dicho/i);
+  });
+
+  it("ancla el laboratorio para el sí de la ventana", () => {
+    const html = renderToStaticMarkup(
+      createElement(FormularioAuditoriaV3, {
+        userTier: "MATRICULA",
+        onAnalysisComplete: () => {},
+      }),
+    );
+    assert.match(html, /id="deposito-v3-sesion"/);
   });
 });
 
@@ -247,7 +268,79 @@ describe("CerebroMadreV3", () => {
     assert.doesNotMatch(html, /Promover a ley/);
     assert.doesNotMatch(html, /axioma del operador|Criterio Vivo/i);
   });
+});
 
+describe("VentanaConcienciaAsistencia", () => {
+  it("nombra fecha-disciplina y deja entrar con sí o no", () => {
+    const html = renderToStaticMarkup(
+      createElement(VentanaConcienciaAsistencia, {
+        pregunta: preguntaConciencia(Date.UTC(2026, 10, 1, 15, 32, 0)),
+        onSi: () => {},
+        onNo: () => {},
+      }),
+    );
+    assert.match(html, /deposito-conciencia-modal/);
+    assert.match(html, /¿Vas a iniciar tu sesión de Depósito hoy\?/);
+    assert.match(html, /domingo · 1 de noviembre de 2026 · 10:32/);
+    assert.match(html, /deposito-conciencia-si/);
+    assert.match(html, /deposito-conciencia-no/);
+    assert.match(html, /persistencia del estudio/);
+  });
+});
+
+describe("ControlAsistencia", () => {
+  it("marca días con sesión y días sin sesión", () => {
+    let libro = marcarSesionCumplida(libroVacio(), "2026-10-28");
+    libro = registrarIntencion(libro, "2026-10-31", "no");
+    const celdas = calendarioAsistencia(libro, "2026-11-01", 4);
+    const html = renderToStaticMarkup(
+      createElement(ControlAsistencia, {
+        celdas,
+        resumen: resumenAsistencia(celdas),
+      }),
+    );
+    assert.match(html, /deposito-asistencia/);
+    assert.match(html, /1 con sesión/);
+    assert.match(html, /sin sesión/);
+    assert.match(html, /data-estado="cumplida"/);
+    assert.match(html, /data-estado="dijo_no"/);
+    assert.match(html, /data-hoy="1"/);
+  });
+});
+
+describe("GraficoEvolucionOjos", () => {
+  it("declara cascada como medida y presencia como no-evolución", () => {
+    const evo = medirEvolucionOjos([
+      {
+        result: {
+          ...fixture(),
+          activeCharacterMap: buildActiveCharacterMap([1, 2, 4]),
+          syntacticVacios: [3, 5, 6, 7, 8, 9, 10],
+          timestamp: 1,
+        },
+      },
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(GraficoEvolucionOjos, { evo }),
+    );
+    assert.match(html, /deposito-evolucion/);
+    assert.match(html, /no la cantidad de volcados/);
+    assert.match(html, /PRESENCIA · no es evolución/);
+    assert.match(html, /deposito-evolucion-peldano-4/);
+    assert.match(html, /data-alcanzado="1"/);
+  });
+});
+
+describe("MensajeSesionCumplida", () => {
+  it("sella la persistencia sin bloquear el dictamen", () => {
+    const html = renderToStaticMarkup(createElement(MensajeSesionCumplida));
+    assert.match(html, /deposito-sesion-cumplida/);
+    assert.match(html, /Sesión Sistemicar cumplida/);
+    assert.match(html, /Continúa así con tu desarrollo/);
+  });
+});
+
+describe("CerebroMadreV3 vacio extra", () => {
   it("vacío cita la firma de casa", () => {
     const html = renderToStaticMarkup(
       createElement(CerebroMadreV3, {

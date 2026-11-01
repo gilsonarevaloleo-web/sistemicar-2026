@@ -100,6 +100,61 @@ export {
 } from "./cascada.ts";
 
 export {
+  CALENDARIO_SEMANAS,
+  DEPOSITO_ASISTENCIA_TZ,
+  DIAS_SEMANA,
+  LIMA_OFFSET_MS,
+  MESES,
+  MENSAJE_SESION_CUMPLIDA,
+  absorberDiasConVolcado,
+  calendarioAsistencia,
+  debeMostrarVentana,
+  esFechaCivil,
+  estadoDia,
+  fechaDesdeUtc,
+  inicioSemanaLunes,
+  libroVacio,
+  limaDateKey,
+  limaHoraLabel,
+  limaParts,
+  marcaConciencia,
+  marcarSesionCumplida,
+  normalizarLibro,
+  parseFecha,
+  preguntaConciencia,
+  registrarIntencion,
+  resumenAsistencia,
+  sumarDias,
+  weekdayDeFecha,
+} from "./asistencia.ts";
+export type {
+  CeldaAsistencia,
+  EstadoDiaAsistencia,
+  IntencionAsistencia,
+  LibroAsistencia,
+  MarcaConciencia,
+  PreguntaConciencia,
+  RegistroAsistencia,
+  ResumenAsistencia,
+} from "./asistencia.ts";
+
+export {
+  INDICE_CASCADA_MAX,
+  etiquetaPeldano,
+  indiceCascada,
+  medirEvolucionOjos,
+  mensajeEvolucion,
+  peldanoAlcanzado,
+  puntoDesdeVolcado,
+} from "./evolucionOjos.ts";
+export type {
+  EvolucionOjos,
+  PuntoEvolucion,
+  TendenciaEvolucion,
+  VolcadoParaEvolucion,
+} from "./evolucionOjos.ts";
+
+export {
   auditarGeometriaSintactica,
   extraerCierre,
   extraerTitulo,

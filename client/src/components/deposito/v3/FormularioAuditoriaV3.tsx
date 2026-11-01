@@ -106,7 +106,7 @@ export function FormularioAuditoriaV3({
   } as const;
 
   return (
-    <div data-testid="deposito-v3-form">
+    <div id="deposito-v3-sesion" data-testid="deposito-v3-form">
       <div className="mb-6 flex items-start justify-between gap-3 border-b pb-4" style={{ borderColor: `${GOLD}22` }}>
         <div>
           <h2
