@@ -159,6 +159,26 @@ export function pedagogicalFeedbackDe(
   return TONOS_MAESTRO[lowest];
 }
 
+/**
+ * El peldaño pendiente no reutiliza el vocabulario de C5/C7
+ * cuando lo que falta es C10 (abroche) u otro escalón.
+ */
+export function peldañoPendienteEnlace(lowest: CascadeCode | null): string {
+  if (lowest === 10) {
+    return "Falta C10 para abrochar el título con la última oración.";
+  }
+  if (lowest === 7) {
+    return "Falta C7 para ejecutar la idea propia.";
+  }
+  if (lowest === 5) {
+    return "Falta C5 para ejecutar la tijera.";
+  }
+  if (lowest === 2) {
+    return "Falta C2 para relatar el cauce.";
+  }
+  return `Falta C${lowest ?? 5} para el siguiente escalón de la cascada.`;
+}
+
 export function etiquetaEstado(estado: EstadoAlumnoCascada): string {
   if (estado === "PRINCIPIANTE_SIN_ANCLA") return "PRINCIPIANTE_SIN_ANCLA";
   if (estado === "EXPLORADOR_NARRATIVO") return "EXPLORADOR_NARRATIVO";
@@ -186,7 +206,7 @@ export function mensajeDiagnosticoCascada(input: {
     return `${etiquetaEstado(input.estado)}. Hay C1. El peldaño pendiente es C${input.lowest ?? 2}. Relato sin bisagra de seriedad. Cableado título↔cierre: ${input.titleConnectedToClose ? "sí" : "no"}. ${firma}. Activos: ${activos}.`;
   }
   if (input.estado === "ENLACE_EN_TRANSMUTACION") {
-    return `${etiquetaEstado(input.estado)}. C4 está en el papel. Falta C${input.lowest ?? 5} para ejecutar la tijera o la idea propia. Cableado título↔cierre: ${input.titleConnectedToClose ? "sí" : "no"}. ${firma}. Activos: ${activos}.`;
+    return `${etiquetaEstado(input.estado)}. C4 está en el papel. ${peldañoPendienteEnlace(input.lowest)} Cableado título↔cierre: ${input.titleConnectedToClose ? "sí" : "no"}. ${firma}. Activos: ${activos}.`;
   }
   return `${etiquetaEstado(input.estado)}. Circuito C1→C10 cerrado. Título y cierre se abrochan. ${firma}. Activos: ${activos}.`;
 }

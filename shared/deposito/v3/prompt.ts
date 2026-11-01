@@ -81,7 +81,9 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
 
 2. C8 (CICLOS / POLARIDAD / RETORNO):
    - IF the user describes switching to an opposite state (e.g., going from work to resting/Facebook/audio) to restore energy, and then returning to productivity refreshed -> THIS IS A C8 INTENT.
+   - IF the wording constructs attention as a battery that empties, has a limit, multiplies wear when duty insists after the charge is gone, or names an "onda de sierra" -> THIS IS A C8 INTENT (heatmap presence). It does NOT close C10.
    - ONLY if that cycle is constructed in the wording. Do NOT infer C8 from implied rest, drama, or recharge that the sentence does not build.
+   - C8 on the heatmap is presence. C10 stays EMPTY unless the last sentence returns to the Title.
 
 3. C7 (VISIÓN / PATRÓN AXIOMÁTICO):
    - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado", "la atención tiene ciclo de vida") -> THIS IS A C7 INTENT.
@@ -164,7 +166,7 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 - C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
 - C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video). Do not judge the source. Heatmap; Master Tone C6 exists if asked.
 - C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
-- C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations. Only if the wording constructs that cycle.
+- C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations, attention battery that empties, limit of focus, "onda de sierra". Only if the wording constructs that cycle. Presence on the heatmap — it does not light C10.
 - C9 (Sistema): Explicitly connects three or more dimensions (physiology + work + environment). Do not simulate it.
 - C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector. No title → C10 EMPTY by geometric impossibility.
 

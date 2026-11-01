@@ -113,6 +113,50 @@ describe("MapaCalorV3", () => {
     assert.doesNotMatch(html, /ÓPTICA/);
     assert.doesNotMatch(html, /deposito-v3-friccion/);
   });
+
+  it("C10 FOCO vacío no se pinta como activo: muestra VACÍO y data-activo=0", () => {
+    const result: DepotAnalysisResult = {
+      ...fixture(),
+      characterSignedCode: 8,
+      focoRevelacionCode: 10,
+      activeCharacterMap: buildActiveCharacterMap([1, 2, 3, 4, 5, 6, 7, 8]),
+      syntacticVacios: [9, 10],
+      syntaxDiagnostic: {
+        detectedSyntaxCode: 8,
+        focoCode: 10,
+        isCableadoConnected: false,
+        syntaxCharacteristics: "Sierra C8 hacia el escalón C10.",
+      },
+      groundingStatus: {
+        isFullyGrounded: false,
+        diagnosticMessage:
+          "ENLACE_EN_TRANSMUTACIÓN. Falta C10 para abrochar el título con la última oración.",
+      },
+    };
+    const html = renderToStaticMarkup(
+      createElement(MapaCalorV3, {
+        result,
+        userTier: "CARRERA",
+      }),
+    );
+    const c8 = html.match(
+      /data-testid="deposito-v3-eye-8"[\s\S]*?<\/li>/,
+    )?.[0];
+    const c10 = html.match(
+      /data-testid="deposito-v3-eye-10"[\s\S]*?<\/li>/,
+    )?.[0];
+    assert.ok(c8);
+    assert.ok(c10);
+    assert.match(c8, /data-activo="1"/);
+    assert.match(c8, /data-foco="0"/);
+    assert.match(c10, /data-foco="1"/);
+    assert.match(c10, /data-vacio="1"/);
+    assert.match(c10, /data-activo="0"/);
+    assert.match(c10, />VACÍO</);
+    assert.match(c10, />FOCO</);
+    assert.match(c10, /background-color:transparent/);
+    assert.doesNotMatch(c10, /#D4AF3722/);
+  });
 });
 
 describe("HistorialV3", () => {

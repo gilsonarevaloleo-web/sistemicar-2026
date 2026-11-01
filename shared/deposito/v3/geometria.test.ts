@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   estadoAlumnoDe,
+  mensajeDiagnosticoCascada,
+  peldañoPendienteEnlace,
   primerPendienteCascada,
   reconciliarCascada,
 } from "./cascada.ts";
@@ -115,6 +117,20 @@ describe("Geometría sintáctica fría", () => {
     assert.equal(geo.active[6], true);
   });
 
+  it("C8 enciende con batería de atención / onda de sierra, no con C10", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "Hoy aprendí que la atención tiene límite. Todo enfoque es como una batería que se acaba. Después que se ha acabado la batería de la atención, si insistimos con deber, ocurre el desgaste multiplicado. Otra identidad se quedó de hambre.",
+      studentHypothesis:
+        "Código 1. La atención tiene límite y la batería está en su límite más bajo",
+      userTier: "MATRICULA",
+    });
+    assert.equal(geo.active[8], true);
+    assert.equal(geo.active[10], false);
+    assert.equal(geo.titleConnectedToClose, false);
+    assert.equal(geo.characterSignedCode, 8);
+  });
+
   it("C9 exige tres dimensiones conectadas, no un solo hilo", () => {
     const soloTrabajo = auditarGeometriaSintactica({
       rawFact: "El pistón del trabajo se trabó en la secuencia.",
@@ -154,6 +170,29 @@ describe("Ley de la Cascada", () => {
     const hastaC6 = buildActiveCharacterMap([1, 2, 3, 4, 5, 6]);
     assert.equal(primerPendienteCascada(hastaC6), 7);
     assert.notEqual(primerPendienteCascada(hastaC6), 5);
+  });
+
+  it("el dictamen de enlace no llama tijera a un C10 vacío", () => {
+    assert.equal(
+      peldañoPendienteEnlace(10),
+      "Falta C10 para abrochar el título con la última oración.",
+    );
+    assert.equal(peldañoPendienteEnlace(5), "Falta C5 para ejecutar la tijera.");
+    assert.equal(
+      peldañoPendienteEnlace(7),
+      "Falta C7 para ejecutar la idea propia.",
+    );
+    const mensaje = mensajeDiagnosticoCascada({
+      estado: "ENLACE_EN_TRANSMUTACION",
+      lowest: 10,
+      activeCodes: [1, 2, 3, 4, 5, 6, 7, 8],
+      titleConnectedToClose: false,
+      characterSignedCode: 8,
+    });
+    assert.match(mensaje, /Falta C10 para abrochar/);
+    assert.doesNotMatch(mensaje, /tijera|idea propia/);
+    assert.match(mensaje, /Cableado título↔cierre: no/);
+    assert.match(mensaje, /Firma C8/);
   });
 
   it("reconciliar no deja FOCO C5 si C5 ya está activo", () => {

@@ -363,6 +363,12 @@ const C8_CICLO = [
   /\bpolos?\b/,
   /inversion/,
   /ansiedad/,
+  /onda de sierra/,
+  /bater[ií]a (de la atencion|que se acaba|est[aá]|bajo|en su limite)/,
+  /se acaba(do)? la bater[ií]a/,
+  /desgaste multiplicado/,
+  /atencion[\s\S]{0,48}(tiene limite|se acaba|bater)/,
+  /(duracion|limite)[\s\S]{0,40}bater/,
 ];
 
 const C8_POLO_NATURAL =
@@ -407,7 +413,12 @@ function emptyActive(): Record<EyeCode, boolean> {
 }
 
 function esTesisCicloAtencion(norm: string): boolean {
-  return /(ciclo|siclo) de (vida|atencion)/.test(norm);
+  return (
+    /(ciclo|siclo) de (vida|atencion)/.test(norm) ||
+    /atencion tiene (siclo|ciclo|limite)/.test(norm) ||
+    /bater[ií]a (de la atencion|que se acaba|est[aá] en su limite)/.test(norm) ||
+    /onda de sierra/.test(norm)
+  );
 }
 
 function elegirFirma(

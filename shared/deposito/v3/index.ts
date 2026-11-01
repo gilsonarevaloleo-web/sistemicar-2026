@@ -94,6 +94,7 @@ export {
   masterToneDe,
   mensajeDiagnosticoCascada,
   pedagogicalFeedbackDe,
+  peldañoPendienteEnlace,
   primerAusenteEnSecuencia,
   primerPendienteCascada,
   reconciliarCascada,
