@@ -75,6 +75,10 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(page, /addVolcadoV3Entry/);
     assert.match(page, /HistorialV3/);
     assert.match(page, /GradoConsistenciaV3/);
+    assert.match(page, /VentanaConcienciaAsistencia/);
+    assert.match(page, /ControlAsistencia/);
+    assert.match(page, /GraficoEvolucionOjos/);
+    assert.match(page, /MensajeSesionCumplida/);
     assert.match(page, /href="\/deposito-v2"/);
     assert.doesNotMatch(page, /from "@\/lib\/depositoVolcados"/);
     const prefetch = readFromClient("lib/lazyWithRetry.ts");

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useAuthContext } from "@/App";
 import { useDepositoEntitlements } from "@/hooks/useDepositoEntitlements";
+import { useAsistenciaDeposito } from "@/hooks/useAsistenciaDeposito";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
 import { FormularioAuditoriaV3 } from "@/components/deposito/v3/FormularioAuditoriaV3";
@@ -11,6 +12,11 @@ import { BotonCopiarV3 } from "@/components/deposito/v3/BotonCopiarV3";
 import { HistorialV3 } from "@/components/deposito/v3/HistorialV3";
 import { GradoConsistenciaV3 } from "@/components/deposito/v3/GradoConsistenciaV3";
 import { CerebroMadreV3 } from "@/components/deposito/v3/CerebroMadreV3";
+import { VentanaConcienciaAsistencia } from "@/components/deposito/v3/VentanaConcienciaAsistencia";
+import { ControlAsistencia } from "@/components/deposito/v3/ControlAsistencia";
+import { GraficoEvolucionOjos } from "@/components/deposito/v3/GraficoEvolucionOjos";
+import { MensajeSesionCumplida } from "@/components/deposito/v3/MensajeSesionCumplida";
+import { medirEvolucionOjos } from "@shared/deposito/v3";
 import {
   addVolcadoV3Entry,
   listVolcadosV3Local,
@@ -47,6 +53,13 @@ export default function DepositoV3Page() {
   const [ultima, setUltima] = useState<VolcadoV3Entry | null>(null);
   const [historial, setHistorial] = useState<VolcadoV3Entry[]>([]);
   const [cerebro, setCerebro] = useState<CerebroMadre>(cerebroVacio);
+  const [sesionCumplidaVisible, setSesionCumplidaVisible] = useState(false);
+  const timestampsVolcado = useMemo(
+    () => historial.map((e) => e.createdAt.getTime()),
+    [historial],
+  );
+  const asistencia = useAsistenciaDeposito(uid, timestampsVolcado);
+  const evolucion = useMemo(() => medirEvolucionOjos(historial), [historial]);
 
   useEffect(() => {
     setHistorial(listVolcadosV3Local(uid));
@@ -98,6 +111,21 @@ export default function DepositoV3Page() {
           </Link>
         </header>
 
+        {asistencia.mostrarVentana && (
+          <VentanaConcienciaAsistencia
+            pregunta={asistencia.pregunta}
+            onSi={() => asistencia.elegir("si")}
+            onNo={() => asistencia.elegir("no")}
+          />
+        )}
+
+        <ControlAsistencia
+          celdas={asistencia.celdas}
+          resumen={asistencia.resumen}
+        />
+
+        <GraficoEvolucionOjos evo={evolucion} />
+
         <GradoConsistenciaV3 entries={historial} />
 
         <CerebroMadreV3
@@ -135,8 +163,11 @@ export default function DepositoV3Page() {
             };
             setUltima(actual);
             setHistorial(listVolcadosV3Local(uid));
+            if (asistencia.cumplir()) setSesionCumplidaVisible(true);
           }}
         />
+
+        {sesionCumplidaVisible && <MensajeSesionCumplida />}
 
         {analysis && (
           <div className="space-y-6" data-testid="deposito-v3-resultado">
