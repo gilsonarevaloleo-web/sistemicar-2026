@@ -37,6 +37,7 @@ describe("Depósito V3 — prompt", () => {
     assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /Do NOT force or simulate activation of higher codes/);
     assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /pure transition from Flujo \(C2\) to Axiomatic Vision \(C7\)/);
     assert.match(UPDATED_DEPOT_ENGINE_PROMPT, /RESPECT SYNTACTIC VOIDS/);
+    assert.match(INTENT_AWARE_SYNTAX_PROMPT, /onda de sierra|batería that empties|attention as a battery/i);
     assert.match(system, /ADAPT TO THE USER'S NATURAL LANGUAGE/);
     assert.match(system, /Deep Intent Syntax Auditor/);
     assert.match(system, /Cold Telemetry Auditor/);
@@ -285,6 +286,34 @@ Cómo estos días estoy prestando atención a los mensajes de mí subconciente p
     assert.notEqual(r.focoRevelacionCode, 5);
     assert.equal(r.immediateAdjustment, TONOS_MAESTRO[10]);
     assert.equal(r.estadoAlumno, "ENLACE_EN_TRANSMUTACION");
+  });
+
+  it("volcado 01/11/2026: la sierra de atención enciende C8; C10 queda vacío y no se enseña como tijera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendí que la mente bloquea la atención prolongada en algo. 
+Ayer había tenido todo el día sin trabajar costura porque no había corte y como tengo mí componente jornada donde cada momento no pasa inconciente. Pues me tocó desarrollarme en la aria de desarrollo personal.  A las 5:00 am como de costumbre avanso con mí desarrollo personal.  Después del desayuno  a las 8:30 también estudie hasta las 1:00 pm. Después vine a almorzar y hasta las dos ya me había aburrido en mí casa, entonces nuevamente volví ha estudiar hasta 7:00 pm.  En la noche también me sobraba tiempo, ahí se había alterado mí emociones, no sabía que hacer, si mirar tele, seguir estudiando porque todavía tenía para avanzar, pero mí mente se bloqueó para pensar en pasos, había desglosado tareas para concentrarme en una responsabilidad que tenía, pero ya no podía ejecutarlo.  Y para ese tipo de situaciones tenía una solución y era que debía distraerme con chistociada o dramas, pero eso también ya estaba cubierto por lo tanto mí deseo de distraerme, mí hambre de saber, de ejecutar tarea se había apagado y no es que estaba cansado o quería dormir. Más por el contrario me ha agarrado un sentimiento de impotencia porque no estoy avansando con mí publicidad y el dinero no llega. Entonces aca nace la pregunta ¿Porque despues de haber aprovechado el tiempo desde temprano y casi todo el día al final me sentía vasio como si no hubiera trabajado todo el día? Y perque me sentía vasio ¿Será porque  todo enfoque es como una batería que se acaba? Después que se ha acabado la batería de la atención si lo insistimos con deber, ahí ocurre el desgaste multiplicado.  Ahora, pero ¿porque me sentí vasio a pesar que trabaje todo el dia? ¿Será que otra identidad se había quedado de hambre? Esto pudiera ser Sierto. Otra identidad se quedó de hambre.`,
+      studentHypothesis:
+        "Código 1.  La atención tiene límite y el sentimiento de deber te avisa que la duración de batería está en su límite más bajo",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo no dicho es que para cuidar el cuerpo se debe estar atento o sensitivo para identificar que la batería está bajo y inmediatamente llevar al cuerpo a descansar",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.equal(r.activeCharacterMap[10], false);
+    assert.equal(r.syntacticVacios.includes(8), false);
+    assert.equal(r.syntacticVacios.includes(10), true);
+    assert.equal(r.characterSignedCode, 8);
+    assert.equal(r.focoRevelacionCode, 10);
+    assert.equal(r.lowestMissingCascadeCode, 10);
+    assert.equal(r.titleConnectedToClose, false);
+    assert.equal(r.estadoAlumno, "ENLACE_EN_TRANSMUTACION");
+    assert.match(r.groundingStatus.diagnosticMessage, /Falta C10 para abrochar/);
+    assert.doesNotMatch(
+      r.groundingStatus.diagnosticMessage,
+      /tijera|idea propia/,
+    );
+    assert.equal(r.immediateAdjustment, TONOS_MAESTRO[10]);
   });
 
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {

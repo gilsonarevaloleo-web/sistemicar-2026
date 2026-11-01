@@ -9,6 +9,7 @@ import {
   type DepotAnalysisResult,
   type UserTier,
 } from "@shared/deposito/v3";
+import { celdaMuestraVacio, rolCeldaMapaCalor } from "./mapaCalorRol";
 
 const GOLD = "#D4AF37";
 
@@ -49,21 +50,32 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
           const isVacio = vacios.includes(eyeId);
           const activo = Boolean(mapa[eyeId]);
 
+          const rol = rolCeldaMapaCalor({
+            isFoco,
+            activo,
+            isVacio,
+            isCharacter,
+            locked,
+          });
           let border = "rgba(255,255,255,0.08)";
           let bg = "transparent";
           let fg = "rgba(255,255,255,0.35)";
-          if (isFoco) {
+          if (rol === "foco-activo") {
             border = GOLD;
             bg = `${GOLD}22`;
             fg = GOLD;
-          } else if (locked && !isCharacter) {
+          } else if (rol === "foco-vacio") {
+            border = GOLD;
+            bg = "transparent";
+            fg = GOLD;
+          } else if (rol === "bloqueado") {
             border = "rgba(255,255,255,0.05)";
             fg = "rgba(255,255,255,0.22)";
-          } else if (activo) {
+          } else if (rol === "activo") {
             border = `${GOLD}80`;
             bg = `${GOLD}14`;
             fg = GOLD;
-          } else if (isVacio) {
+          } else if (rol === "vacio") {
             border = "rgba(255,255,255,0.06)";
             fg = "rgba(255,255,255,0.28)";
           }
@@ -102,7 +114,7 @@ export function MapaCalorV3({ result, userTier }: MapaCalorV3Props) {
                       FOCO
                     </span>
                   )}
-                  {isVacio && !isCharacter && !isFoco && (
+                  {celdaMuestraVacio({ isVacio, isCharacter }) && (
                     <span className="text-[8px] tracking-widest text-white/25">VACÍO</span>
                   )}
                 </div>
