@@ -316,6 +316,34 @@ Ayer había tenido todo el día sin trabajar costura porque no había corte y co
     assert.equal(r.immediateAdjustment, TONOS_MAESTRO[10]);
   });
 
+  it("volcado 02/11/2026: firma C8 por ley del ciclo; C10 abrocha el límite de la habilidad, no pide cerrar de nuevo", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendí que el desarrollo de habilidades tienen límite. 
+Hace una semana atrás había ido a trabajar en otro taller porque en mí taller no me habían dado corte, ahí te pagan por puntos y yo me fui con todo las ganas  ganar a mí record y sacar una ganancia atractiva y entonces  me apegue a mí ring de conquista . Ahí es que me di cuenta que hasta 3 días había podido tener un incremento de velocidad, al cuarto día solo mantenía ni recor pero no avansaba. La pregunta que me plantines ¿Porque no seguía incrementando mí velocidad si seguía con el esfuerzo de enfocarme-conciente de mí ring de enfoque en cada momento? La respuesta qué de forma natural el desarrollo de habilidad tiene un límite de resistencia, cuando choca esa resistencia  ahi la habilidad funciona en bucle, por lo más que se esfuerse  siempre nuestro va ha ser lo mismo ¿Porque no se puede pasar ese límite de velocidad o habilidad? La respues en esta profundidad es que:  no se puede desarrollar una habilidad de resistencia 2 en un estado donde el tiempo es el enfoque, eso apuro, la idea de avanzar. Entonces ¿en qué estado se pudiera llevarlo al otro nivel nuestra habilidad? La respuesta es la reprogramación, la simulación donde puedas ver el máximo detalle los pasos, simular el tiempo objetivo en un reloj. 
+En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra habilidad, ya no se tiene que esforzarse en un estado de práctica real donde existe el apuro, se tiene que llevar a otro plano mental`,
+      studentHypothesis:
+        "Acá pareció la ley del ciclo, código 8 porque es como funciona la nayuraleza",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo no dicho es que porgusto nos esforsamos en querer incrementar nuestra habilidad en un estado de práctica. La habilidad se pasa al siguiente nivel con reprogramacion",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.characterSignedCode, 8);
+    assert.equal(r.activeCharacterMap[8], true);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.syntacticVacios.includes(10), false);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.equal(r.focoRevelacionCode, 10);
+    assert.doesNotMatch(
+      r.groundingStatus.diagnosticMessage,
+      /Falta C10|tijera/,
+    );
+    assert.match(r.groundingStatus.diagnosticMessage, /abroch|cerrado/i);
+    assert.notEqual(r.characterSignedCode, 2);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:

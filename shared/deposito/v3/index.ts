@@ -159,6 +159,7 @@ export {
   auditarGeometriaSintactica,
   extraerCierre,
   extraerTitulo,
+  primerVectorNarrativo,
   titleConnectedToClose,
 } from "./geometria.ts";
 
