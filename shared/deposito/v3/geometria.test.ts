@@ -50,6 +50,20 @@ describe("Geometría sintáctica fría", () => {
       titleConnectedToClose("El pistón del martes", "Ya veré mañana."),
       false,
     );
+    assert.equal(
+      titleConnectedToClose(
+        "El desarrollo de habilidades tienen límite",
+        "En conclusión, el siguiente nivel de desarrollo con nuestra habilidad va a otro plano mental.",
+      ),
+      true,
+    );
+    assert.equal(
+      titleConnectedToClose(
+        "Ley del ciclo, código 8",
+        "En conclusión ya veré mañana.",
+      ),
+      false,
+    );
   });
 
   it("C5 enciende con conectores ejecutivos de decisión", () => {
@@ -115,6 +129,21 @@ describe("Geometría sintáctica fría", () => {
       userTier: "MATRICULA",
     });
     assert.equal(geo.active[6], true);
+  });
+
+  it("ley del ciclo + bucle firma C8; en conclusión vuelve al límite de la habilidad y abrocha C10", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact: `Hoy aprendí que el desarrollo de habilidades tienen límite.
+Hasta 3 días incrementé. Al cuarto día la habilidad funciona en bucle. Entonces ¿en qué estado se pudiera llevarlo al otro nivel?
+En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra habilidad, se tiene que llevar a otro plano mental.`,
+      studentHypothesis:
+        "Acá pareció la ley del ciclo, código 8 porque es como funciona la nayuraleza",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.characterSignedCode, 8);
+    assert.equal(geo.active[8], true);
+    assert.equal(geo.active[10], true);
+    assert.equal(geo.titleConnectedToClose, true);
   });
 
   it("C8 enciende con batería de atención / onda de sierra, no con C10", () => {

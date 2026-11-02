@@ -92,6 +92,22 @@ function tokensCable(norm: string): string[] {
     .filter((t) => t.length >= 4 && !STOP_CABLE.has(t));
 }
 
+/** Plural ligero: habilidades↔habilidad, limites↔limite. */
+function variantesToken(tok: string): string[] {
+  const out = new Set([tok]);
+  if (tok.length >= 5 && tok.endsWith("s")) out.add(tok.slice(0, -1));
+  if (tok.length >= 6 && tok.endsWith("es")) out.add(tok.slice(0, -2));
+  return [...out];
+}
+
+function tokensCableSet(norm: string): Set<string> {
+  const set = new Set<string>();
+  for (const tok of tokensCable(norm)) {
+    for (const v of variantesToken(tok)) set.add(v);
+  }
+  return set;
+}
+
 function splitFrases(texto: string): string[] {
   return texto
     .replace(/\r/g, "")
@@ -147,6 +163,23 @@ export function extraerCierre(payload: DepotEntryPayload, titulo: string): strin
   return frases[frases.length - 1] ?? "";
 }
 
+/**
+ * Primera frase del volcado: vector narrativo de C1 cuando la hipótesis
+ * solo nombra un código (p. ej. «ley del ciclo, código 8»).
+ */
+export function primerVectorNarrativo(
+  payload: DepotEntryPayload,
+  titulo: string,
+): string {
+  const first = payload.rawFact
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find(Boolean) ?? "";
+  const frase = splitFrases(first)[0] ?? first;
+  if (!frase || frase === titulo) return "";
+  return frase;
+}
+
 export function titleConnectedToClose(
   titulo: string,
   cierre: string,
@@ -164,8 +197,10 @@ export function titleConnectedToClose(
     const ojo = hipotesisComoOjo(t);
     return Boolean(ojo && new RegExp(`\\bc\\s*${ojo}\\b`).test(normCierre));
   }
-  const closeTokens = new Set(tokensCable(normCierre));
-  const hits = tituloTokens.filter((tok) => closeTokens.has(tok)).length;
+  const closeTokens = tokensCableSet(normCierre);
+  const hits = tituloTokens.filter((tok) =>
+    variantesToken(tok).some((v) => closeTokens.has(v)),
+  ).length;
   const umbral = tituloTokens.length === 1 ? 1 : 0.34;
   if (hits / tituloTokens.length >= umbral) return true;
 
@@ -344,6 +379,8 @@ const C10_SELLO = [
   /esto cierra/,
   /cierra (el |la )?(puerta|vector|titulo|circulo|anillo)/,
   /regreso (al |a )/,
+  /en conclusion/,
+  /\ben resumen\b/,
 ];
 
 const C8_CICLO = [
@@ -352,6 +389,7 @@ const C8_CICLO = [
   /me volvi[oó]/,
   /dos dias/,
   /\bloop\b/,
+  /\bbucle\b/,
   /\bciclo\b/,
   /\bsiclo\b/,
   /(ciclo|siclo) de (vida|atencion)/,
@@ -377,7 +415,7 @@ const C8_RETORNO_NATURAL =
   /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc|empezar de nuevo|otro ciclo/;
 
 const C8_TECNICO =
-  /48\s*h|24\s*h|\bloop\b|ciclo|siclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
+  /48\s*h|24\s*h|\bloop\b|\bbucle\b|ciclo|siclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
 
 const FISIO =
   /\bcuerpo\b|\bfatiga\b|\bsueno\b|\bhambre\b|\bdolor\b|\brespir|\bmusculo\b|\benergia fisica\b/;
@@ -415,9 +453,13 @@ function emptyActive(): Record<EyeCode, boolean> {
 function esTesisCicloAtencion(norm: string): boolean {
   return (
     /(ciclo|siclo) de (vida|atencion)/.test(norm) ||
+    /ley del ciclo/.test(norm) ||
+    /codigo\s*8\b/.test(norm) ||
     /atencion tiene (siclo|ciclo|limite)/.test(norm) ||
     /bater[ií]a (de la atencion|que se acaba|est[aá] en su limite)/.test(norm) ||
-    /onda de sierra/.test(norm)
+    /onda de sierra/.test(norm) ||
+    /funciona en bucle/.test(norm) ||
+    /limite de (resistencia|habilidad|velocidad)/.test(norm)
   );
 }
 
@@ -425,8 +467,9 @@ function elegirFirma(
   active: Record<EyeCode, boolean>,
   scores: Record<EyeCode, number>,
   norm: string,
+  titulo?: string,
 ): EyeCode {
-  if (active[8] && esTesisCicloAtencion(norm)) {
+  if (active[8] && (esTesisCicloAtencion(norm) || hipotesisComoOjo(titulo) === 8)) {
     return 8;
   }
   if (
@@ -501,24 +544,35 @@ export function auditarGeometriaSintactica(
 
   scores[8] = hitsDe(normCuerpo, C8_CICLO);
   if (tieneCicloNatural(normCuerpo)) scores[8] += 2;
+  if (hipotesisComoOjo(titulo) === 8) scores[8] += 1;
   active[8] = scores[8] > 0;
 
   const dims = dimensionesC9(normCuerpo);
   scores[9] = hitsDe(normCuerpo, [C9_ENLACE]) + (dims >= 3 ? 1 : 0);
   active[9] = dims >= 3 && C9_ENLACE.test(normCuerpo);
 
+  const vectoresC1 = [titulo, primerVectorNarrativo(payload, titulo)].filter(
+    Boolean,
+  );
   const normCierre = normalizarGeometria(cierre);
   const selloExplicito = hitsDe(normCierre, C10_SELLO) > 0;
-  const tituloTokens = tokensCable(normalizarGeometria(titulo));
-  const selloConTitulo =
-    selloExplicito &&
-    tituloTokens.some((tok) => normCierre.includes(tok));
+  const selloConVector = vectoresC1.some((vector) => {
+    const vectorTokens = tokensCable(normalizarGeometria(vector));
+    return (
+      selloExplicito &&
+      vectorTokens.some((tok) =>
+        variantesToken(tok).some((v) => normCierre.includes(v)),
+      )
+    );
+  });
   const abrocha =
-    active[1] && (titleConnectedToClose(titulo, cierre) || selloConTitulo);
+    active[1] &&
+    (vectoresC1.some((vector) => titleConnectedToClose(vector, cierre)) ||
+      selloConVector);
   scores[10] = abrocha ? 1 : 0;
   active[10] = abrocha;
 
-  const characterSignedCode = elegirFirma(active, scores, normCuerpo);
+  const characterSignedCode = elegirFirma(active, scores, normCuerpo, titulo);
   if (!EYE_CODES.some((n) => active[n])) {
     active[1] = false;
   }
