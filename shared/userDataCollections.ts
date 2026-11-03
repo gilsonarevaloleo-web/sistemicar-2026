@@ -22,6 +22,8 @@ export const USER_PRIVATE_COLLECTIONS = [
   "galeria_aliados",
   "historialSistemico",
   "hopeLogs",
+  "juez_draft",
+  "juez_volcados",
   "manual_progress",
   "meditationSessions",
   "mi_expediente",
@@ -60,6 +62,7 @@ export const RECOVERY_FEATURE_COLLECTIONS = {
   rutina: ["plantillasRutina", "planillas"],
   deposito: ["volcados", "volcados_v3", "acervo"],
   umbral: ["umbralLogros", "umbralOfertas"],
+  juez: ["juez_draft", "juez_volcados"],
 } as const;
 
 export type RecoveryFeature = keyof typeof RECOVERY_FEATURE_COLLECTIONS;
@@ -70,6 +73,7 @@ export const RECOVERY_FEATURE_LABELS: Record<RecoveryFeature, string> = {
   rutina: "Rutina",
   deposito: "Depósito (aprendizaje)",
   umbral: "Umbral",
+  juez: "Juez Serio",
 };
 
 /** Collection groups que delatan una cuenta aunque progression esté en 0. */
@@ -80,7 +84,7 @@ export const RECOVERY_SCAN_COLLECTIONS = [
 ] as const;
 
 export function emptyFeatureCounts(): Record<RecoveryFeature, number> {
-  return { crisol: 0, record: 0, rutina: 0, deposito: 0, umbral: 0 };
+  return { crisol: 0, record: 0, rutina: 0, deposito: 0, umbral: 0, juez: 0 };
 }
 
 export function uidFromPrivateCollectionPath(

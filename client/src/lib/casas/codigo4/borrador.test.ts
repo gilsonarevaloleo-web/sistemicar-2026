@@ -69,4 +69,14 @@ describe("borrador Juez Serio", () => {
     assert.equal(textoLienzoDesde("   ", "volcado viejo del historial"), "volcado viejo del historial");
     assert.equal(textoLienzoDesde("", null), "");
   });
+
+  it("un guardado vacío no pisa el volcado ya escrito", () => {
+    guardarBorradorJuez("el volcado de ayer");
+    guardarBorradorJuez("");
+    assert.equal(leerBorradorJuez(), "el volcado de ayer");
+    guardarBorradorJuez("   ");
+    assert.equal(leerBorradorJuez(), "el volcado de ayer");
+    guardarBorradorJuez("", { allowEmpty: true });
+    assert.equal(leerBorradorJuez(), "");
+  });
 });

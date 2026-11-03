@@ -1,4 +1,4 @@
-/** Borrador del volcado C4. Sobrevive recarga y cambio de pestaña. */
+/** Borrador del volcado C4. Sobrevive recarga, otro dispositivo y limpieza del teléfono. */
 
 export const JUEZ_DRAFT_KEY = "sistemicar_juez_draft";
 
@@ -19,9 +19,25 @@ export function leerBorradorJuez(): string {
   }
 }
 
-export function guardarBorradorJuez(texto: string): void {
+/**
+ * Persiste el lienzo.
+ * Un string vacío no pisa un borrador ya guardado, salvo `allowEmpty`
+ * (el operador borró el campo a propósito).
+ */
+export function guardarBorradorJuez(
+  texto: string,
+  opts?: { allowEmpty?: boolean },
+): void {
   try {
-    storage()?.setItem(JUEZ_DRAFT_KEY, texto);
+    const s = storage();
+    if (!s) return;
+    if (!texto.trim()) {
+      if (opts?.allowEmpty === true) {
+        s.setItem(JUEZ_DRAFT_KEY, texto);
+      }
+      return;
+    }
+    s.setItem(JUEZ_DRAFT_KEY, texto);
   } catch {
     // cuota / modo privado
   }

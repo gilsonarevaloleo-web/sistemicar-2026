@@ -12,7 +12,7 @@ import {
 } from "./userDataCollections.ts";
 
 describe("userDataCollections — recuperación tras limpieza del dispositivo", () => {
-  it("incluye Crisol, Récord, Rutina, Depósito y Umbral", () => {
+  it("incluye Crisol, Récord, Rutina, Depósito, Umbral y Juez", () => {
     const set = new Set<string>(USER_PRIVATE_COLLECTIONS);
     assert.equal(set.has("situacionReserva"), true);
     assert.equal(set.has("vehicleHistory"), true);
@@ -20,6 +20,8 @@ describe("userDataCollections — recuperación tras limpieza del dispositivo", 
     assert.equal(set.has("planillas"), true);
     assert.equal(set.has("volcados"), true);
     assert.equal(set.has("volcados_v3"), true);
+    assert.equal(set.has("juez_draft"), true);
+    assert.equal(set.has("juez_volcados"), true);
     assert.equal(set.has("umbralLogros"), true);
     assert.equal(set.has("umbralOfertas"), true);
     assert.equal(set.has("proyectos"), true);
@@ -43,12 +45,14 @@ describe("userDataCollections — recuperación tras limpieza del dispositivo", 
       plantillasRutina: 1,
       volcados_v3: 7,
       umbralLogros: 3,
+      juez_volcados: 2,
     });
     assert.equal(features.crisol, 6);
     assert.equal(features.record, 9);
     assert.equal(features.rutina, 1);
     assert.equal(features.deposito, 7);
     assert.equal(features.umbral, 3);
+    assert.equal(features.juez, 2);
   });
 
   it("la migración reescribe el uid y deja rastro del origen", () => {
@@ -63,6 +67,7 @@ describe("userDataCollections — recuperación tras limpieza del dispositivo", 
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("vehicleHistory"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("plantillasRutina"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("volcados_v3"));
+    assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("juez_volcados"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("umbralLogros"));
     assert.ok(RECOVERY_SCAN_COLLECTIONS.includes("sovereigntyPointsLog"));
     assert.equal(uidFromPrivateCollectionPath(

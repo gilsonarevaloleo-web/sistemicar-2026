@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Scale } from "lucide-react";
 import { useAuthContext } from "@/App";
@@ -27,6 +27,17 @@ import {
   textoLienzoDesde,
 } from "@/lib/casas/codigo4/borrador";
 import {
+  flushBorradorJuezRemoto,
+  itemDesdeAuditoria,
+  listVolcadosJuezLocal,
+  mergeHistorialJuez,
+  persistFase2Juez,
+  persistVolcadoJuez,
+  programarBorradorJuezRemoto,
+  subscribeBorradorJuez,
+  subscribeToVolcadosJuez,
+} from "@/lib/casas/codigo4/volcados";
+import {
   CASA_CODIGO4_FIRMA,
   CASA_CODIGO4_NOMBRE,
   CREDITO_FASE1_LECTURA,
@@ -43,6 +54,7 @@ export default function CasaCodigo4() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
   const userId = user?.uid ?? "";
+  const hidratado = useRef(false);
 
   const [texto, setTexto] = useState(() => leerBorradorJuez());
   const [recuperarDeHistorial, setRecuperarDeHistorial] = useState(
@@ -61,16 +73,38 @@ export default function CasaCodigo4() {
   const [historial, setHistorial] = useState<HistorialJuezItem[]>([]);
 
   const recargarHistorial = async (uid: string) => {
+    const local = listVolcadosJuezLocal(uid);
+    let api: HistorialJuezItem[] = [];
     try {
       const out = await leerHistorialJuez(uid);
-      setHistorial(out.items);
+      api = out.items;
     } catch {
-      // el lienzo sigue; el historial no bloquea
+      // el lienzo y el historial local siguen
     }
+    setHistorial((prev) => mergeHistorialJuez(prev, api, local));
   };
 
   useEffect(() => {
-    guardarBorradorJuez(texto);
+    if (!hidratado.current) {
+      hidratado.current = true;
+      if (!texto.trim()) return;
+    }
+    guardarBorradorJuez(texto, { allowEmpty: true });
+    if (userId) programarBorradorJuezRemoto(userId, texto);
+  }, [texto, userId]);
+
+  useEffect(() => {
+    const flush = () => {
+      guardarBorradorJuez(texto);
+      flushBorradorJuezRemoto();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("visibilitychange", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("visibilitychange", flush);
+      flush();
+    };
   }, [texto]);
 
   useEffect(() => {
@@ -84,10 +118,30 @@ export default function CasaCodigo4() {
 
   useEffect(() => {
     if (!userId) return;
+    setHistorial(listVolcadosJuezLocal(userId));
     void leerSaldoJuez(userId)
       .then((r) => setSaldo(r.saldo))
       .catch(() => setSaldo(0));
     void recargarHistorial(userId);
+    const unsubVolcados = subscribeToVolcadosJuez(
+      userId,
+      (items) => setHistorial((prev) => mergeHistorialJuez(prev, items)),
+      () => {
+        setHistorial((prev) =>
+          mergeHistorialJuez(prev, listVolcadosJuezLocal(userId)),
+        );
+      },
+    );
+    const unsubDraft = subscribeBorradorJuez(userId, (remoto) => {
+      setTexto((actual) => {
+        if (actual.trim()) return actual;
+        return textoLienzoDesde(actual, remoto);
+      });
+    });
+    return () => {
+      unsubVolcados();
+      unsubDraft();
+    };
   }, [userId]);
 
   const abrir402 = (err: unknown) => {
@@ -114,12 +168,23 @@ export default function CasaCodigo4() {
         userId,
         friccionDiaria: texto,
       });
+      const cuando = new Date().toISOString();
       setSesionId(out.sesionJuezId);
       setFase1(out.fase1_lectura);
       setFase2(null);
       setSaldo(out.saldo);
       setVolcadoAuditado(texto);
-      setAuditadaEn(new Date().toISOString());
+      setAuditadaEn(cuando);
+      guardarBorradorJuez(texto, { allowEmpty: true });
+      await persistVolcadoJuez(
+        userId,
+        itemDesdeAuditoria({
+          id: out.sesionJuezId,
+          createdAt: cuando,
+          textoVolcado: texto,
+          fase1: out.fase1_lectura,
+        }),
+      );
       await recargarHistorial(userId);
     } catch (err) {
       if (!abrir402(err)) {
@@ -141,6 +206,7 @@ export default function CasaCodigo4() {
       });
       setFase2(out.fase2_propuesta_solucion);
       setSaldo(out.saldo);
+      await persistFase2Juez(userId, sesionId, out.fase2_propuesta_solucion);
       await recargarHistorial(userId);
     } catch (err) {
       if (!abrir402(err)) {
