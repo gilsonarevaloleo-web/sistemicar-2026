@@ -14,7 +14,7 @@ import {
   type PrincipioMatriz,
 } from "./types.ts";
 
-export const CASA_CODIGO4_VERSION = "1.1.0-juez-fuerzas" as const;
+export const CASA_CODIGO4_VERSION = "1.1.1-juez-frases" as const;
 export const CASA_CODIGO4_NOMBRE = "La Casa del Código 4: El Juez Serio";
 export const CASA_CODIGO4_MARCA = "Juez Serio";
 export const CASA_CODIGO4_FIRMA =
@@ -251,6 +251,9 @@ ${CASA_CODIGO4_FIRMA}
 1. SOLO LEER.
    El usuario escribe como salga. Cero plantilla. Cero "enumerá". Cero Bloque 1/2 obligatorio.
    No premies la numeración. No pidas formato. No enseñes a volcar. Leé lo que hay.
+   fugaInconsciente, lecturaPerimetroFria y confrontacionDeFuerza CITAN frases reales del volcado.
+   Prohibido reciclar «pistón automático» si el volcado no lo dice.
+   Dos volcados distintos no pueden devolver el mismo texto.
 
 2. HACER CONSCIENTE EL INCONSCIENTE.
    La primera victoria es desnudarle el problema que no veía.
@@ -288,8 +291,8 @@ FASE 1 — MAPA DE FUERZAS (siempre se cobra).
 - fuerzaDebida: energía LEGAL que cierra el hueco restante (min(habla, perímetro) si habla > perímetro → perímetro).
 - cascadaCumple: true solo si hay cierre, fuerzaUsada = fuerzaDebida, fuerzaUsada ≤ perímetro y no hay salto C4→C9.
 - desajusteFuerza: una línea. Qué fuerza usó vs cuál debía.
-- fugaInconsciente: la capa que NO veía. Si ya escribió "el verdadero problema no es X", andá más hondo.
-- lecturaPerimetroFria: habla, techo, si la cascada se cumple.
+- fugaInconsciente: la capa que NO veía, citando una frase del volcado. Si ya escribió "el verdadero problema no es X" o "el problema no es falta de tiempo", andá más hondo.
+- lecturaPerimetroFria: habla, techo, si la cascada se cumple, y una frase suya.
 
 FASE 2 — CONFRONTACIÓN DE FUERZA (se cobra).
 - requiereInversionCreditos: siempre true.
@@ -334,8 +337,8 @@ export function buildCodigo4UserPrompt(input: JuezSerioInput): string {
     );
   }
   lines.push(
-    "Fase 1: mapa de fuerzas. Qué participa, qué cerró en teoría, si la cascada se cumple.",
-    "Fase 2: confrontación de la fuerza debida. No receta. requiereInversionCreditos=true.",
+    "Fase 1: mapa de fuerzas. Qué participa, qué cerró en teoría, si la cascada se cumple. Citá frases del volcado.",
+    "Fase 2: confrontación de la fuerza debida. No receta. requiereInversionCreditos=true. Usá sus palabras.",
     "Cero empatía. Cero teoría. Solo el JSON.",
   );
   return lines.join("\n");

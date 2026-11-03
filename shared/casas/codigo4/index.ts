@@ -80,6 +80,8 @@ export {
   parseEyeCode,
   parseJuezSerioResult,
   participacionesDelVolcado,
+  partirFrases,
+  leerFrasesDelVolcado,
 } from "./motor.ts";
 
-export { VOLCADO_PUBLICISTA } from "./volcadoPublicista.ts";
+export { VOLCADO_PUBLICISTA, VOLCADO_DISPOSICION } from "./volcadoPublicista.ts";
