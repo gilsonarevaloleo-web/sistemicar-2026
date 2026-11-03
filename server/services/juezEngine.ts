@@ -149,7 +149,7 @@ export async function ejecutarJuezEngine(
   if (callGemini) {
     try {
       const raw = await callGemini(prompt, 2048, true);
-      const parsed = parseJuezSerioResult(raw);
+      const parsed = parseJuezSerioResult(raw, input.friccionDiaria);
       if (parsed.ok) {
         return {
           result: parsed.result,
@@ -167,7 +167,7 @@ export async function ejecutarJuezEngine(
         2048,
         false,
       );
-      const parsed2 = parseJuezSerioResult(raw2);
+      const parsed2 = parseJuezSerioResult(raw2, input.friccionDiaria);
       if (parsed2.ok) {
         return {
           result: parsed2.result,

@@ -9,6 +9,7 @@ import {
   inferirPerimetroConquistado,
   parseEyeCode,
   parseJuezSerioResult,
+  VOLCADO_DISPOSICION,
   VOLCADO_PUBLICISTA,
 } from "./index.ts";
 import type { JuezSerioResult } from "./types.ts";
@@ -95,6 +96,28 @@ describe("Casa Código 4 — motor", () => {
     );
     assert.ok(
       directivaFiltraPerimetro(r.fase2_propuesta_solucion.confrontacionDeFuerza, 3),
+    );
+  });
+
+  it("el volcado de disposición cita sus frases y no recicla el pistón", () => {
+    const ciego = evaluarJuezSerio({ friccionDiaria: VOLCADO_C3 });
+    const r = evaluarJuezSerio({ friccionDiaria: VOLCADO_DISPOSICION });
+    const f1 = r.fase1_lectura;
+    const codes = f1.participaciones.map((p) => p.codigo);
+    assert.ok(codes.includes(1), "falta C1 disposición");
+    assert.ok(codes.includes(3), "falta C3 oficio");
+    assert.ok(codes.includes(4), "falta C4 inflexión");
+    assert.notEqual(f1.fugaInconsciente, ciego.fase1_lectura.fugaInconsciente);
+    assert.doesNotMatch(f1.fugaInconsciente, /pistón automático/);
+    assert.match(f1.fugaInconsciente, /tiempo|dispuse|familiariz/i);
+    assert.match(f1.lecturaPerimetroFria, /tiempo|dispuse|familiariz|problema/i);
+    assert.match(
+      r.fase2_propuesta_solucion.confrontacionDeFuerza,
+      /dispuse|familiariz|paso/i,
+    );
+    assert.doesNotMatch(
+      r.fase2_propuesta_solucion.confrontacionDeFuerza,
+      /pistón no paró/i,
     );
   });
 

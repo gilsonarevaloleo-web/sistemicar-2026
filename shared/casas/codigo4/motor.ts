@@ -87,6 +87,8 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bse me va la identidad\b/,
     /\bdisposici[oó]n\b/,
     /\bno tengo disponibilidad\b/,
+    /\bno (siquiera )?me dispuse\b/,
+    /\bme dispuse\b/,
   ],
   2: [
     /\bse estanca\b/,
@@ -111,6 +113,9 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bherramienta\b/,
     /\bclip\b/,
     /\bpasos?\b/,
+    /\bfamiliariz\w*\b/,
+    /\bpeso neuronal\b/,
+    /\bejeci?uci[oó]n del cuerpo\b/,
   ],
   4: [
     /\bdeberia\b/,
@@ -130,6 +135,10 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\ba la pasada\b/,
     /\bverdadero problema\b/,
     /\bhabilidad\b/,
+    /\bel problema no es\b/,
+    /\bno es falta de tiempo\b/,
+    /\bcual es el problema\b/,
+    /\btiempo de sobra\b/,
   ],
   5: [
     /\bno decido\b/,
@@ -327,6 +336,80 @@ export function participacionesDelVolcado(friccion: string): ParticipacionFuerza
   return out;
 }
 
+export type RolFrase = "desnuda" | "cae" | "tapa" | "cierra" | "habla";
+
+export interface FraseLeida {
+  texto: string;
+  codigo: EyeCode;
+  rol: RolFrase;
+}
+
+export function partirFrases(texto: string): string[] {
+  const lined = texto
+    .replace(/\r/g, "")
+    .replace(/(\d+)\.\s+/g, "\n")
+    .replace(/([.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿«"0-9])/g, "$1\n")
+    .replace(/\s+(¿)/g, "\n$1")
+    .replace(/\.\s+/g, ".\n");
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const piece of lined.split("\n")) {
+    const s = piece.replace(/\s+/g, " ").trim();
+    if (s.length < 10) continue;
+    const key = normalizar(s);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+export function recorteFrase(texto: string, max = 130): string {
+  const limpio = texto.replace(/\s+/g, " ").trim();
+  if (limpio.length <= max) return limpio;
+  return `${limpio.slice(0, max).trim()}…`;
+}
+
+function clasificarFrase(texto: string): FraseLeida {
+  const norm = normalizar(texto);
+  if (/\b(no (siquiera )?me dispuse|me dispuse|disponibilidad de disposicion)\b/.test(norm)) {
+    return { texto, codigo: 1, rol: "cae" };
+  }
+  if (
+    /\b(no es falta de tiempo|el problema no es|cual es el problema|tiempo de sobra)\b/.test(
+      norm,
+    )
+  ) {
+    return { texto, codigo: 4, rol: "desnuda" };
+  }
+  if (
+    /\b(familiariz|parece facil|debe ser facil|peso neuronal|ejecucion del cuerpo|a la pasada)\b/.test(
+      norm,
+    )
+  ) {
+    return { texto, codigo: 3, rol: "tapa" };
+  }
+  if (
+    /\b(verdadero problema|soluci[oó]n ser[ií]a|voy ha|proyecto llamado)\b/.test(norm)
+  ) {
+    return {
+      texto,
+      codigo: /\b(proyecto|publicista|rutina diaria)\b/.test(norm) ? 9 : 4,
+      rol: "cierra",
+    };
+  }
+  const scores = puntuar(norm, MARCAS_PROBLEMA);
+  return { texto, codigo: codigoDominante(scores, 4), rol: "habla" };
+}
+
+export function leerFrasesDelVolcado(friccion: string): FraseLeida[] {
+  return partirFrases(friccion).map(clasificarFrase);
+}
+
+function citaFrase(frase?: FraseLeida | null): string {
+  return frase ? `«${recorteFrase(frase.texto)}»` : "";
+}
+
 export function fuerzaDebidaDe(habla: EyeCode, max: EyeCode): EyeCode {
   return habla > max ? max : habla;
 }
@@ -377,16 +460,31 @@ export function confrontacionDeFuerza(
   max: EyeCode,
   habla: EyeCode,
   usada: EyeCode | null,
+  friccion = "",
 ): string {
   const debida = fuerzaDebidaDe(habla, max);
   const acto = fuerzaDe(debida).acto;
+  const frases = friccion ? leerFrasesDelVolcado(friccion) : [];
+  const cae = frases.find((f) => f.rol === "cae");
+  const tapa = frases.find((f) => f.rol === "tapa");
+  const piston = frases.find((f) =>
+    /\b(piston|automatico)\b/.test(normalizar(f.texto)),
+  );
+  let cola = "";
+  if (cae && debida <= 3) {
+    cola = ` La frase que se cayó: ${citaFrase(cae)}.`;
+  } else if (tapa && debida === 3) {
+    cola = ` No abras ${citaFrase(tapa)}.`;
+  } else if (piston && debida === 3) {
+    cola = ` ${citaFrase(piston)}.`;
+  }
   if (usada && usada !== debida) {
-    return `${acto} ${fuerzaDe(usada).nombre} no cierra este hueco.`;
+    return `${acto} ${fuerzaDe(usada).nombre} no cierra este hueco.${cola}`;
   }
   if (habla > max) {
-    return `${acto} Se nombra C${habla}. El acto cabe en ${principioDe(max).nombre}.`;
+    return `${acto} Se nombra C${habla}. El acto cabe en ${principioDe(max).nombre}.${cola}`;
   }
-  return acto;
+  return `${acto}${cola}`;
 }
 
 /** @deprecated usar confrontacionDeFuerza. Se conserva el nombre para tests. */
@@ -400,30 +498,68 @@ export function directivaDelPerimetro(
 export function fugaInconscienteDe(
   problema: EyeCode,
   max: EyeCode,
-  extra?: { cerroTeorico?: EyeCode | null; fuerzaUsada?: EyeCode | null },
+  extra?: {
+    cerroTeorico?: EyeCode | null;
+    fuerzaUsada?: EyeCode | null;
+    friccion?: string;
+  },
 ): string {
   const p = principioDe(problema);
+  const frases = extra?.friccion ? leerFrasesDelVolcado(extra.friccion) : [];
+  const desnuda = frases.find((f) => f.rol === "desnuda");
+  const cae = frases.find((f) => f.rol === "cae");
+  const tapa = frases.find((f) => f.rol === "tapa");
+  const cierra = frases.find((f) => f.rol === "cierra");
+  const piston = frases.find((f) =>
+    /\b(piston|automatico)\b/.test(normalizar(f.texto)),
+  );
+
   if (extra?.cerroTeorico === 4 && extra.fuerzaUsada === 9 && max <= 3) {
-    return "Ya nombraste que no es la herramienta. Lo que no veías: el cierre usó fuerza C9 (proyecto) donde la obra pedía C3 (cerrar un paso). La habilidad no precede al primer clip.";
+    const cita = cierra ? ` En tus palabras: ${citaFrase(cierra)}` : "";
+    return `Ya nombraste que no es la herramienta. Lo que no veías: el cierre usó fuerza C9 (proyecto) donde la obra pedía C3 (cerrar un paso). La habilidad no precede al primer clip.${cita}`;
+  }
+  if (desnuda && (tapa || cae)) {
+    return `Ya desnudaste ${citaFrase(desnuda)}. Lo que no veías: tapaste el hueco con ${citaFrase(tapa ?? cae)}.`;
+  }
+  if (cae && tapa) {
+    return `Nombraste ${citaFrase(cae)} y lo soltaste. La vía de agua es ${citaFrase(tapa)}.`;
   }
   if (problema === 4 && max <= 3) {
+    if (piston) {
+      return `Operás el día en automático. En tus palabras: ${citaFrase(piston)}. La vía de agua no es falta de ritmo: es la coartada que sostiene el pistón para no mirar el quiebre.`;
+    }
+    const pista = desnuda ?? cae ?? tapa ?? frases[0];
+    if (pista) {
+      return `Habla C4. En tus palabras: ${citaFrase(pista)}. La vía de agua es la coartada que tapa el quiebre, no la falta de oficio.`;
+    }
     return "Operás el día en automático. La vía de agua no es falta de ritmo: es la coartada que sostiene el pistón para no mirar el quiebre.";
   }
   if (problema > max) {
-    return `El relato opera en C${max}. El vicio habita en ${p.nombre} C${problema} y el chasis no lo sostiene. Eso es lo que no veías.`;
+    const pista = frases.find((f) => f.codigo === problema) ?? frases[0];
+    const cita = pista ? ` En tus palabras: ${citaFrase(pista)}` : "";
+    return `El relato opera en C${max}. El vicio habita en ${p.nombre} C${problema} y el chasis no lo sostiene. Eso es lo que no veías.${cita}`;
   }
-  return `La vía de agua está en ${p.nombre} C${problema}: ${p.vectores.join(", ").toLowerCase()}. No es un defecto de carácter. Es el principio que el automático tapa.`;
+  const pista = frases.find((f) => f.codigo === problema) ?? frases[0];
+  const cita = pista ? ` En tus palabras: ${citaFrase(pista)}` : "";
+  return `La vía de agua está en ${p.nombre} C${problema}: ${p.vectores.join(", ").toLowerCase()}. No es un defecto de carácter. Es el principio que el automático tapa.${cita}`;
 }
 
 export function lecturaPerimetroDe(
   problema: EyeCode,
   max: EyeCode,
-  extra?: { cascada?: boolean; fuerzaDebida?: EyeCode },
+  extra?: { cascada?: boolean; fuerzaDebida?: EyeCode; friccion?: string },
 ): string {
   const recursos = recursosDelPerimetro(max);
   const debida = extra?.fuerzaDebida ?? fuerzaDebidaDe(problema, max);
   const cascada = extra?.cascada === true ? "Cascada cumplida." : "Cascada incumplida.";
-  return `Habla C${problema}. El chasis sostiene hasta C${max} (${recursos}). Se nombra C${problema} y se aplica ${fuerzaDe(debida).nombre}. ${cascada}`;
+  const base = `Habla C${problema}. El chasis sostiene hasta C${max} (${recursos}). Se nombra C${problema} y se aplica ${fuerzaDe(debida).nombre}. ${cascada}`;
+  if (!extra?.friccion) return base;
+  const frases = leerFrasesDelVolcado(extra.friccion);
+  const pista =
+    frases.find((f) => f.rol === "desnuda" || f.rol === "cae" || f.rol === "cierra") ??
+    frases.find((f) => f.codigo === problema) ??
+    frases[0];
+  return pista ? `${base} En tus palabras: ${citaFrase(pista)}` : base;
 }
 
 export function directivaFiltraPerimetro(
@@ -488,14 +624,22 @@ export function hidratarFase1(raw: Partial<JuezSerioFase1> & {
   };
 }
 
-export function acotarAlPerimetro(result: JuezSerioResult): JuezSerioResult {
+export function acotarAlPerimetro(
+  result: JuezSerioResult,
+  friccion = "",
+): JuezSerioResult {
   const f1 = hidratarFase1(result.fase1_lectura);
   const raw = (
     result.fase2_propuesta_solucion.confrontacionDeFuerza ||
     result.fase2_propuesta_solucion.directivaOperacional ||
     ""
   ).trim();
-  const local = confrontacionDeFuerza(f1.codigoConquistadoMax, f1.codigoQueHabla, f1.fuerzaUsada);
+  const local = confrontacionDeFuerza(
+    f1.codigoConquistadoMax,
+    f1.codigoQueHabla,
+    f1.fuerzaUsada,
+    friccion,
+  );
   const texto = directivaFiltraPerimetro(raw, f1.codigoConquistadoMax) ? raw : local;
 
   return {
@@ -526,7 +670,10 @@ function parseParticipaciones(raw: unknown): ParticipacionFuerza[] {
   return out;
 }
 
-export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
+export function parseJuezSerioResult(
+  raw: unknown,
+  friccion = "",
+): JuezSerioParseResult {
   let data: unknown = raw;
   if (typeof raw === "string") {
     const text = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -587,7 +734,7 @@ export function parseJuezSerioResult(raw: unknown): JuezSerioParseResult {
         lecturaPerimetroFria: lectura,
       }),
       fase2_propuesta_solucion: fase2De(confrontacion),
-    }),
+    }, friccion),
   };
 }
 
@@ -617,10 +764,10 @@ export function diagnosticarJuezSerioLocal(
     cascada,
   });
   const fuga = friccion
-    ? fugaInconscienteDe(habla, max, { cerroTeorico, fuerzaUsada })
+    ? fugaInconscienteDe(habla, max, { cerroTeorico, fuerzaUsada, friccion })
     : "No hay volcado. Sin fricción no hay vía de agua que nombrar.";
   const lectura = friccion
-    ? lecturaPerimetroDe(habla, max, { cascada, fuerzaDebida })
+    ? lecturaPerimetroDe(habla, max, { cascada, fuerzaDebida, friccion })
     : `${CASA_CODIGO4_FIRMA} Sin texto el perímetro no se mide.`;
 
   return acotarAlPerimetro({
@@ -638,9 +785,9 @@ export function diagnosticarJuezSerioLocal(
       lecturaPerimetroFria: lectura,
     }),
     fase2_propuesta_solucion: fase2De(
-      confrontacionDeFuerza(max, habla, fuerzaUsada),
+      confrontacionDeFuerza(max, habla, fuerzaUsada, friccion),
     ),
-  });
+  }, friccion);
 }
 
 export function evaluarJuezSerio(input: JuezSerioInput): JuezSerioResult {

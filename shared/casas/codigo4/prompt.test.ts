@@ -22,7 +22,7 @@ import {
 
 describe("Casa Código 4 — prompt", () => {
   it("fija identidad, firma y los 10 principios matriz", () => {
-    assert.equal(CASA_CODIGO4_VERSION, "1.1.0-juez-fuerzas");
+    assert.equal(CASA_CODIGO4_VERSION, "1.1.1-juez-frases");
     assert.equal(CASA_CODIGO4_NOMBRE, "La Casa del Código 4: El Juez Serio");
     assert.equal(CASA_CODIGO4_MARCA, "Juez Serio");
     assert.match(CASA_CODIGO4_FIRMA, /perímetro conquistado/);
@@ -44,6 +44,8 @@ describe("Casa Código 4 — prompt", () => {
     assert.match(system, /HACER CONSCIENTE EL INCONSCIENTE/);
     assert.match(system, /LEY DEL PERÍMETRO DE RECURSOS/);
     assert.match(system, /SOLO LEER/);
+    assert.match(system, /CITAN frases reales del volcado/);
+    assert.match(system, /Dos volcados distintos/);
     assert.match(system, /DIEZ FUERZAS/);
     assert.match(system, /C5 NO ES EL SOLVER/);
     assert.match(system, /C1 → C_conquistado/);
