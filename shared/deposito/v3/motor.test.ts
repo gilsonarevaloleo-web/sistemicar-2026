@@ -344,6 +344,34 @@ En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra h
     assert.notEqual(r.characterSignedCode, 2);
   });
 
+  it("volcado 04/11/2026: desición ya está escrita; firma C7; no pide tijera C5", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendi que los problemas no solamente son por falta de desición sino por falta de visión. 
+Hace como 4 días hize un volcado en el juez serio, donde se tiene que responde r la pregunta ¿Cual es tu problema? Y mí problema era que hace tiempo que no podía crear ni un vídeo para publicar sobre mí producto, donde que el problema no era código 1, no saber cuál era el problema, código dos tampoco-no saber cuál es la prioridad, código 3 saber que pasos dar. Todo eso se sabía, pero por alguna razón mí cuerpo no quería ejecutar. Entonces la pregunta que surge acá es ¿Porque mí cuerpo no puede ejecutar sabiendo cual es el proble, sabiendo cual es la prioridad, los pasos y hasta la desición que debería ejecutar? El motivo no es por ser flojo, sino el problema es que la mente obliga al cuerpo a ejecutar lo que tiene pistas neuronales,  si pongo fuerza de voluntad no habiendo pistas neuronales: entonces lo único que se va a conseguir son desvíos mentales, procrastinacion, etc.  Entonces aca nos damos cuenta que la solución de este tipos de problemas no está en el esfuerzo de los pasos o fuerza de voluntad. La solución de este tipo de problemas esta  en engruesar las pistas neuronales y las pistas neuronales no se crean haciendo pasos largos con esfuerzo de voluntad sino  visión estructurada.  Esto es la razón por lo que que las desiciones que puedes tomar si no esta creado la pista neuronal  puede ser un torbellino. 
+La conclusión es que si se siente que el cuerpo no quiere ejecutar una desición , lo sabio es crear la vista neuronal con visión planeta 7.`,
+      studentHypothesis: "Acá pareció el código 7, la vision",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo no dicho es que  la enfermera de procrastinación, la pereza puede ser eliminado con una metodología de vision, donde una se aprende ha ver antes de ejecutar",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.activeCharacterMap[7], true);
+    assert.equal(r.syntacticVacios.includes(5), false);
+    assert.equal(r.characterSignedCode, 7);
+    assert.notEqual(r.characterSignedCode, 2);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.doesNotMatch(
+      r.groundingStatus.diagnosticMessage,
+      /Falta C5|tijera/,
+    );
+    assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:
