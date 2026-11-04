@@ -201,11 +201,16 @@ export function titleConnectedToClose(
   const hits = tituloTokens.filter((tok) =>
     variantesToken(tok).some((v) => closeTokens.has(v)),
   ).length;
-  const umbral = tituloTokens.length === 1 ? 1 : 0.34;
+  const umbral = tituloTokens.length === 1 ? 1 : 0.33;
   if (hits / tituloTokens.length >= umbral) return true;
 
   const ojo = hipotesisComoOjo(t);
-  if (ojo && new RegExp(`\\bc\\s*${ojo}\\b`).test(normCierre)) return true;
+  if (
+    ojo &&
+    new RegExp(`(?:\\bc\\s*|codigo\\s*|planeta\\s*)${ojo}\\b`).test(normCierre)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -273,9 +278,13 @@ const C5_DECISION = [
   /cero excusa/,
   /dispar[eé]/,
   /\bdecid\w*\b/,
+  /\bdesicion(es)?\b/,
   /mi decision\b/,
-  /la decision (es|fue|sera|esta|queda|que)/,
-  /tomo (la |una )?decision/,
+  /la desi[cs]ion (es|fue|sera|esta|queda|que)/,
+  /tomo (la |una )?desi[cs]ion/,
+  /ejecutar (una |la )?desi[cs]ion/,
+  /la desi[cs]ion que deberia/,
+  /falta de desi[cs]ion/,
   /\bvoy a\b/,
   /\belijo\b/,
   /\bopto por\b/,
@@ -355,6 +364,9 @@ const C7_VISION = [
   /\bencaje\b/,
   /mi idea/,
   /mi vision\b/,
+  /falta de vision/,
+  /vision estructurada/,
+  /vision planeta/,
   /planteo/,
   /idea propia/,
   /como encaj/,
@@ -450,6 +462,16 @@ function emptyActive(): Record<EyeCode, boolean> {
   return map;
 }
 
+function esTesisVision(norm: string): boolean {
+  return (
+    /codigo\s*7\b/.test(norm) ||
+    /falta de vision/.test(norm) ||
+    /vision estructurada/.test(norm) ||
+    /vision planeta/.test(norm) ||
+    /la vision\b/.test(norm)
+  );
+}
+
 function esTesisCicloAtencion(norm: string): boolean {
   return (
     /(ciclo|siclo) de (vida|atencion)/.test(norm) ||
@@ -471,6 +493,9 @@ function elegirFirma(
 ): EyeCode {
   if (active[8] && (esTesisCicloAtencion(norm) || hipotesisComoOjo(titulo) === 8)) {
     return 8;
+  }
+  if (active[7] && (esTesisVision(norm) || hipotesisComoOjo(titulo) === 7)) {
+    return 7;
   }
   if (
     active[8] &&

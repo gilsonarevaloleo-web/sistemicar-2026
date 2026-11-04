@@ -64,6 +64,13 @@ describe("Geometría sintáctica fría", () => {
       ),
       false,
     );
+    assert.equal(
+      titleConnectedToClose(
+        "Acá pareció el código 7, la vision",
+        "La conclusión es crear la vista neuronal con visión planeta 7.",
+      ),
+      true,
+    );
   });
 
   it("C5 enciende con conectores ejecutivos de decisión", () => {
@@ -73,6 +80,8 @@ describe("Geometría sintáctica fría", () => {
       "Voy a trazar una línea.",
       "Mi atención lo saco del trabajo y cambio de enfoque.",
       "Elegimos ignorarlo. Ahí está el daño.",
+      "Hasta la desición que debería ejecutar. El cuerpo no quería ejecutar una desición.",
+      "El problema no es falta de desición sino falta de visión.",
     ]) {
       const geo = auditarGeometriaSintactica({
         rawFact,
@@ -142,6 +151,21 @@ En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra h
     });
     assert.equal(geo.characterSignedCode, 8);
     assert.equal(geo.active[8], true);
+    assert.equal(geo.active[10], true);
+    assert.equal(geo.titleConnectedToClose, true);
+  });
+
+  it("código 7 / desición en el papel: firma C7, C5 activo, C10 abrocha la visión", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact: `Hoy aprendi que los problemas no solamente son por falta de desición sino por falta de visión.
+Hasta la desición que debería ejecutar. La solución es visión estructurada.
+La conclusión es que si el cuerpo no quiere ejecutar una desición, lo sabio es crear la vista neuronal con visión planeta 7.`,
+      studentHypothesis: "Acá pareció el código 7, la vision",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.active[5], true);
+    assert.equal(geo.active[7], true);
+    assert.equal(geo.characterSignedCode, 7);
     assert.equal(geo.active[10], true);
     assert.equal(geo.titleConnectedToClose, true);
   });

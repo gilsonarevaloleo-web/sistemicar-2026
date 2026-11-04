@@ -78,6 +78,7 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
    - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"), changing their focus on purpose to protect their body/brain ("cambio de atención", "cambiar de enfoque"), or saying "NO" to an internal mandate ("el deber", "el Debo") -> THIS IS A C5 INTENT.
    - Naming the choice to ignore an alert ("elegimos ignorarlo") is also C5.
    - Executive connectors ALSO light C5: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". A firm executive sentence is C5 even without the word "corte".
+   - Naming the decision already on the paper also lights C5, including the common misspelling "desición" / "desiciones": "falta de desición", "la desición que debería ejecutar", "ejecutar una desición". If C5 is written, do NOT teach C5 again.
 
 2. C8 (CICLOS / POLARIDAD / RETORNO):
    - IF the user describes switching to an opposite state (e.g., going from work to resting/Facebook/audio) to restore energy, and then returning to productivity refreshed -> THIS IS A C8 INTENT.
@@ -90,6 +91,7 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
    - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado", "la atención tiene ciclo de vida") -> THIS IS A C7 INTENT.
    - Own solution / pattern connectors also light C7: "mi solución", "el patrón es", "planteo", "encajo esto", "concluyo que", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la respuesta es que".
    - IF C5 and C6 are already on the paper, the NEXT Master demand is C7 — never repeat C5.
+   - IF the hypothesis names código 7 / "la visión", or the dump constructs "falta de visión" / "visión estructurada" / "visión planeta 7" -> FIRMA C7. Do NOT let surface "entonces" (C2) steal the firma, and do NOT ask for a C5 scissors the paper already named.
 
 4. SEPARATION OF SURFACE vs INTENT:
    - Surface connectors ("entonces", "después", "luego") are just narrative vessels. Do NOT let superficial C2 markers blind you to the heavy structural decisions (C5, C7, C8) inside the story.
@@ -164,12 +166,12 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 - C2 (Flujo): Temporal connectors, narrative of events, relational thread of facts. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the teaching foco if a lower cascade step is missing.
 - C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time. Heatmap only (not a cascade step). Natural chain "entonces / en ese momento / empiezo / con ese / logro" lights C3 without "primero" or a clock.
 - C4 (Inflexión / Seriedad): Inflection question (¿Por qué...?, ¿Qué pasa si...?) or paradigm-break phrases ("El problema es:", "Acá me doy cuenta").
-- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
+- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". Also the misspelling "desición" / "la desición que debería ejecutar" / "ejecutar una desición". If C5 is on the paper, it cannot be FOCO or VACÍO.
 - C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video). Do not judge the source. Heatmap; Master Tone C6 exists if asked.
-- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
+- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida", "falta de visión", "visión estructurada", "visión planeta 7"). Do not judge whether it works. If C5 and C6 are present, demand C7 next. If the hypothesis names código 7 / la visión, Firma is C7 — do not let "entonces" steal it.
 - C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations, attention battery that empties, limit of focus, "onda de sierra", "ley del ciclo", plateau that "funciona en bucle" / "límite de resistencia". Only if the wording constructs that cycle. If the hypothesis names código 8 / ley del ciclo, Firma is C8 — do not let "entonces" steal it. Presence on the heatmap — it does not by itself light C10.
 - C9 (Sistema): Explicitly connects three or more dimensions (physiology + work + environment). Do not simulate it.
-- C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector OR the dump's opening sentence. "En conclusión" seals only if it returns to that vector (habilidad/límite ↔ siguiente nivel). No title → C10 EMPTY by geometric impossibility.
+- C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector OR the dump's opening sentence. "En conclusión" / "La conclusión es" seals only if it returns to that vector (visión ↔ planeta 7, habilidad/límite ↔ siguiente nivel). Código/planeta N in the close counts as return to a title that named that code. No title → C10 EMPTY by geometric impossibility.
 
 STEP 2: CASCADE LAW (TEACHING FOCO)
 - Scan presence in strict paper order: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
