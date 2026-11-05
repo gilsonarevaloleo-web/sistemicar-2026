@@ -73,6 +73,8 @@ export {
   fugaInconscienteDe,
   fuerzaDebidaDe,
   fuerzaUsadaDelCierre,
+  hayCuerpoSinEjecutar,
+  hayDecisionRazon,
   hidratarFase1,
   inferirPerimetroConquistado,
   isEyeCode,
@@ -84,4 +86,8 @@ export {
   leerFrasesDelVolcado,
 } from "./motor.ts";
 
-export { VOLCADO_PUBLICISTA, VOLCADO_DISPOSICION } from "./volcadoPublicista.ts";
+export {
+  VOLCADO_DISPOSICION,
+  VOLCADO_PUBLICISTA,
+  VOLCADO_VISION,
+} from "./volcadoPublicista.ts";

@@ -71,6 +71,32 @@ describe("Casa Código 4 — UI", () => {
     assert.match(html, /Desbloquear Confrontación de Fuerza \(1 Crédito\)/);
   });
 
+  it("el panel nombra C1 Atención, no Cimiento", () => {
+    const html = renderToStaticMarkup(
+      createElement(PanelLectura, {
+        fase1: {
+          codigoProblemaDetectado: 1,
+          codigoQueHabla: 1,
+          codigoConquistadoMax: 1,
+          participaciones: [{ codigo: 1, fuerza: "Sostener" }],
+          codigoQueCerroTeorico: null,
+          fuerzaUsada: null,
+          fuerzaDebida: 1,
+          cascadaCumple: false,
+          desajusteFuerza: "Habla C1. Se aplica Sostener.",
+          fugaInconsciente: "C1 es atención.",
+          lecturaPerimetroFria: "Habla C1.",
+        },
+        onDesbloquear: () => {},
+        desbloqueando: false,
+        costoFase2: 1,
+        yaDesbloqueada: false,
+      }),
+    );
+    assert.match(html, /Atención/);
+    assert.doesNotMatch(html, /Cimiento/);
+  });
+
   it("la confrontación deja claro el perímetro", () => {
     const html = renderToStaticMarkup(
       createElement(BloqueDirectiva, {
