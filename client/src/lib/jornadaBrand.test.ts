@@ -44,11 +44,14 @@ describe("jornadaBrand", () => {
 
   it("landing de anuncio es entrada comercial y calla el shell", () => {
     assert.equal(isCommercialEntryPath("/bienvenida"), true);
+    assert.equal(isCommercialEntryPath("/jornada-base"), true);
+    assert.equal(isCommercialEntryPath("/jornada-base?utm_source=facebook"), true);
     assert.equal(isCommercialEntryPath("/ventas-jornada"), true);
     assert.equal(isCommercialEntryPath("/ventas-jornada?utm_source=facebook"), true);
     assert.equal(isCommercialEntryPath("/vendedor?planeta=JORNADA"), true);
     assert.equal(isCommercialEntryPath("/pagos"), false);
     assert.equal(isAppShellQuietPath("/bienvenida"), true);
+    assert.equal(isAppShellQuietPath("/jornada-base"), true);
     assert.equal(isAppShellQuietPath("/ventas-jornada"), true);
     assert.equal(isAppShellQuietPath("/menu"), true);
   });
@@ -96,5 +99,15 @@ describe("jornadaBrand", () => {
     assert.match(src, /href=\{vendedorHref\}/);
     assert.match(src, /touch-manipulation/);
     assert.equal(src.includes("JORNADA_BASE_TRIAL"), false);
+  });
+
+  it("CTAs de /jornada-base son <a href> nativos y un solo mensaje", () => {
+    const src = readFileSync(join(dir, "../pages/jornada-base.tsx"), "utf8");
+    assert.equal(src.includes('from "wouter"'), false);
+    assert.match(src, /<a\s+href=\{/);
+    assert.match(src, /href=\{pagosHref\}/);
+    assert.match(src, /touch-manipulation/);
+    assert.equal(src.includes("JORNADA_BASE_TRIAL"), false);
+    assert.doesNotMatch(src, /vendedorHref/);
   });
 });

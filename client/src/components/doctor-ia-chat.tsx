@@ -448,6 +448,7 @@ export function DoctorIAChat() {
     "/gracias-compra",
     "/umbral-leads",
     "/ventas-espejo",
+    "/jornada-base",
     "/ventas-jornada",
     "/vendedor",
     "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos

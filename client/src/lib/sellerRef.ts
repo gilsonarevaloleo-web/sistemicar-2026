@@ -46,8 +46,8 @@ export function buildSellerVendedorUrl(sellerCode: string): string {
   return `https://sistemicar.app/vendedor?ref=${encodeURIComponent(code)}`;
 }
 
-/** Landing del anuncio Jornada Base con atribución. */
+/** Landing del anuncio Jornada Base (carta corta) con atribución. */
 export function buildSellerVentasJornadaUrl(sellerCode: string): string {
   const code = normalizeSellerRef(sellerCode) ?? sellerCode;
-  return `https://sistemicar.app/ventas-jornada?ref=${encodeURIComponent(code)}`;
+  return `https://sistemicar.app/jornada-base?ref=${encodeURIComponent(code)}`;
 }

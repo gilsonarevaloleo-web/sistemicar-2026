@@ -1,13 +1,16 @@
 /**
- * Entrada comercial Jornada (anuncios Meta → /ventas-jornada → vendedor).
+ * Entrada comercial Jornada (anuncios Meta → /jornada-base → checkout).
  * Este corte solo acepta Jornada Base (códigos 1 / 2 / 3).
+ * /ventas-jornada guarda la carta larga (escalera) para quien ya mide.
  */
 
 import type { PlanetaId } from "./planetasConfig.ts";
 import {
+  JORNADA_BASE_AD_URL,
   VENTAS_JORNADA_VIDEO_A_URL,
   VENTAS_JORNADA_VIDEO_B_URL,
 } from "../adAttribution.ts";
+import { CARTA_FRIA_PATH } from "../jornadaCartaFria.ts";
 import {
   clampCodigoJornadaBase,
   resolverTriageVendedor,
@@ -15,12 +18,14 @@ import {
   type FijacionVendedor,
 } from "./triageLogic.ts";
 
-/** Landing pública del anuncio Base. */
+/** Carta larga (escalera). No es la puerta del anuncio. */
 export const VENTAS_JORNADA_PATH = "/ventas-jornada";
 
-/** URL base de la campaña (sin video). En Meta usa las dos de abajo. */
-export const VENTAS_JORNADA_AD_URL =
-  "https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base";
+/** Landing pública del anuncio Base (carta corta, tráfico frío). */
+export const JORNADA_BASE_PATH = CARTA_FRIA_PATH;
+
+/** URL base de la campaña (sin video). Un anuncio al inicio. */
+export const VENTAS_JORNADA_AD_URL = JORNADA_BASE_AD_URL;
 
 export { VENTAS_JORNADA_VIDEO_A_URL, VENTAS_JORNADA_VIDEO_B_URL };
 

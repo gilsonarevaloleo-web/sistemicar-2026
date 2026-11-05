@@ -23,6 +23,7 @@ describe("sistemaRecintos — oferta actual", () => {
     const jornada = SISTEMA_RECINTOS.find((r) => r.id === "jornada");
     assert.match(`${jornada?.oneLiner} ${jornada?.detail}`, /ring de conquista/i);
     assert.match(`${jornada?.detail}`, /ring de enfoque/i);
+    assert.equal(jornada?.exploreHref, "/jornada-base");
   });
 
   it("cada recinto tiene ritual, detalle y un día encaja", () => {

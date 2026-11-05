@@ -70,7 +70,8 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
     titulo: "Comercio y Acceso",
     color: ORANGE,
     rutas: [
-      { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Carta de venta Base → checkout o vendedor", icon: ExternalLink, color: GOLD, acceso: "libre" },
+      { path: "/jornada-base", nombre: "Jornada Base", desc: "Carta corta para tráfico frío → checkout Base", icon: ExternalLink, color: GOLD, acceso: "libre" },
+      { path: "/ventas-jornada", nombre: "Ventas Jornada", desc: "Carta larga (escalera) para quien ya mide", icon: ExternalLink, color: GOLD, acceso: "libre" },
       { path: "/ventas-deposito", nombre: "Ventas Universidad", desc: "Landing Matrícula → 1 volcado de prueba o checkout", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/embudo", nombre: "Embudo SISTEMICAR", desc: "Funnel de ventas principal", icon: ExternalLink, color: ORANGE, acceso: "libre" },
       { path: "/umbral", nombre: "Umbral", desc: "Página de entrada y conversión", icon: Lock, color: GOLD, acceso: "en_camino" },
