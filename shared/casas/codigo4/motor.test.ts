@@ -11,6 +11,7 @@ import {
   parseJuezSerioResult,
   VOLCADO_DISPOSICION,
   VOLCADO_PUBLICISTA,
+  VOLCADO_VISION,
 } from "./index.ts";
 import type { JuezSerioResult } from "./types.ts";
 
@@ -104,20 +105,44 @@ describe("Casa Código 4 — motor", () => {
     const r = evaluarJuezSerio({ friccionDiaria: VOLCADO_DISPOSICION });
     const f1 = r.fase1_lectura;
     const codes = f1.participaciones.map((p) => p.codigo);
-    assert.ok(codes.includes(1), "falta C1 disposición");
+    assert.equal(f1.codigoQueHabla, 7);
+    assert.ok(codes.includes(7), "falta C7 cuerpo / pista");
+    assert.ok(!codes.includes(1), "C1 no es disposición ni soma");
     assert.ok(codes.includes(3), "falta C3 oficio");
     assert.ok(codes.includes(4), "falta C4 inflexión");
     assert.notEqual(f1.fugaInconsciente, ciego.fase1_lectura.fugaInconsciente);
     assert.doesNotMatch(f1.fugaInconsciente, /pistón automático/);
-    assert.match(f1.fugaInconsciente, /tiempo|dispuse|familiariz/i);
-    assert.match(f1.lecturaPerimetroFria, /tiempo|dispuse|familiariz|problema/i);
+    assert.match(f1.fugaInconsciente, /C1 es atención|pista|cuerpo|dispuse/i);
+    assert.match(f1.lecturaPerimetroFria, /C7|dispuse|neuronal|cuerpo/i);
     assert.match(
       r.fase2_propuesta_solucion.confrontacionDeFuerza,
-      /dispuse|familiariz|paso/i,
+      /dispuse|neuronal|cuerpo|C7|paso/i,
     );
     assert.doesNotMatch(
       r.fase2_propuesta_solucion.confrontacionDeFuerza,
       /pistón no paró/i,
+    );
+  });
+
+  it("el volcado de visión nombra C7 y no pide otra tijera", () => {
+    assert.equal(detectarCodigoProblema(VOLCADO_VISION), 7);
+    const r = evaluarJuezSerio({ friccionDiaria: VOLCADO_VISION });
+    const f1 = r.fase1_lectura;
+    assert.equal(f1.codigoQueHabla, 7);
+    assert.equal(f1.codigoProblemaDetectado, 7);
+    assert.equal(f1.codigoConquistadoMax, 3);
+    assert.equal(f1.codigoQueCerroTeorico, 7);
+    assert.equal(f1.fuerzaUsada, 7);
+    assert.equal(f1.fuerzaDebida, 3);
+    assert.equal(f1.cascadaCumple, false);
+    assert.match(f1.desajusteFuerza, /C5 ya cortó|no se pide otra tijera/i);
+    assert.match(f1.fugaInconsciente, /C1 es atención|pista|cuerpo/i);
+    assert.doesNotMatch(f1.fugaInconsciente, /pistón automático/);
+    assert.match(f1.lecturaPerimetroFria, /C7/);
+    assert.match(r.fase2_propuesta_solucion.confrontacionDeFuerza, /C7|paso|cuerpo/i);
+    assert.doesNotMatch(
+      r.fase2_propuesta_solucion.confrontacionDeFuerza,
+      /decidí|otra tijera|metodolog/i,
     );
   });
 

@@ -79,16 +79,14 @@ function clampEye(n: number): EyeCode {
 
 const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
   1: [
-    /\bno me sostengo\b/,
-    /\bno se quien soy\b/,
-    /\bse me cae la postura\b/,
+    /\batenci[oó]n\b/,
+    /\bniebla\b/,
+    /\bno veo para que\b/,
+    /\bdesvio la atencion\b/,
+    /\bno tracciona\b/,
     /\bno tengo ancla\b/,
-    /\bme desarmo\b/,
-    /\bse me va la identidad\b/,
-    /\bdisposici[oó]n\b/,
-    /\bno tengo disponibilidad\b/,
-    /\bno (siquiera )?me dispuse\b/,
-    /\bme dispuse\b/,
+    /\bno se quien soy\b/,
+    /\bme desvio\b/,
   ],
   2: [
     /\bse estanca\b/,
@@ -114,8 +112,6 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bclip\b/,
     /\bpasos?\b/,
     /\bfamiliariz\w*\b/,
-    /\bpeso neuronal\b/,
-    /\bejeci?uci[oó]n del cuerpo\b/,
   ],
   4: [
     /\bdeberia\b/,
@@ -156,6 +152,9 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\breglas del medio\b/,
     /\bel ambiente\b/,
     /\bcasa no deja\b/,
+    /\bel medio no (deja|permite)\b/,
+    /\broce\b/,
+    /\bconvivencia\b/,
   ],
   7: [
     /\bno veo el patron\b/,
@@ -163,6 +162,15 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
     /\bno se hacia donde\b/,
     /\bno tengo vision\b/,
     /\bmapeo\b/,
+    /\bpeso neuronal\b/,
+    /\bpistas? neuronales?\b/,
+    /\bvisi[oó]n estructurada\b/,
+    /\bejeci?uci[oó]n del cuerpo\b/,
+    /\bcuerpo no (quiere|puede|quer[ií]a) ejecutar\b/,
+    /\bno es falta de decisi\w*\b/,
+    /\bfalta de visi[oó]n\b/,
+    /\bfuerza de voluntad\b/,
+    /\bplaneta 7\b/,
   ],
   8: [
     /\bse repite\b/,
@@ -194,7 +202,7 @@ const MARCAS_PROBLEMA: Record<EyeCode, RegExp[]> = {
 };
 
 const MARCAS_CONQUISTA: Record<EyeCode, RegExp[]> = {
-  1: [/\bme sostengo\b/, /\bpostura\b/, /\bancla\b/, /\bidentidad\b/, /\bdefino\b/],
+  1: [/\batenci[oó]n\b/, /\bclaridad\b/, /\bancla\b/, /\bdefino\b/],
   2: [/\bentonces\b/, /\bdespues\b/, /\bflujo\b/, /\bcaudal\b/, /\brelato\b/],
   3: [
     /\btrabajo\b/,
@@ -251,7 +259,10 @@ function hayCierreTeorico(norm: string): boolean {
     /\bsoluci[oó]n ser[ií]a\b/.test(norm) ||
     /\bvoy ha\b/.test(norm) ||
     /\bvoy a crear un proyecto\b/.test(norm) ||
-    /\brutina diaria\b/.test(norm)
+    /\brutina diaria\b/.test(norm) ||
+    /\bvisi[oó]n estructurada\b/.test(norm) ||
+    /\bplaneta 7\b/.test(norm) ||
+    /\bla conclusi[oó]n es\b/.test(norm)
   );
 }
 
@@ -272,24 +283,71 @@ function hayCeroObra(norm: string): boolean {
   );
 }
 
+export function hayCuerpoSinEjecutar(friccion: string): boolean {
+  const norm = normalizar(friccion);
+  return (
+    /\bcuerpo no (quiere|puede|quer[ií]a) ejecutar\b/.test(norm) ||
+    /\bejeci?uci[oó]n del cuerpo\b/.test(norm) ||
+    /\bpeso neuronal\b/.test(norm) ||
+    /\bpistas? neuronales?\b/.test(norm) ||
+    /\bno (siquiera )?me dispuse\b/.test(norm)
+  );
+}
+
+const DECISION_RAZON =
+  /\bde(cision|sicion)\w*\b/;
+
+export function hayDecisionRazon(friccion: string): boolean {
+  const norm = normalizar(friccion);
+  return (
+    /\bhasta la de(cision|sicion)\w*\b/.test(norm) ||
+    /\bde(cision|sicion)\w* que deber[ií]a\b/.test(norm) ||
+    /\bno .{0,40}falta de de(cision|sicion)\w*\b/.test(norm) ||
+    /\bsabiendo.{0,160}de(cision|sicion)\w*\b/.test(norm) ||
+    (DECISION_RAZON.test(norm) && hayCuerpoSinEjecutar(friccion))
+  );
+}
+
+export function hayMedioDebajo(friccion: string): boolean {
+  const norm = normalizar(friccion);
+  return (
+    /\b(entorno|reglas del medio|casa no deja|el medio no|convivencia)\b/.test(
+      norm,
+    )
+  );
+}
+
+export function hayVisionDebajo(friccion: string): boolean {
+  const norm = normalizar(friccion);
+  return (
+    /\b(peso neuronal|pistas? neuronales?|visi[oó]n estructurada|falta de visi[oó]n|planeta 7|no es falta de decisi)\b/.test(
+      norm,
+    )
+  );
+}
+
 export function fuerzaUsadaDelCierre(friccion: string): EyeCode | null {
   const norm = normalizar(friccion);
   if (!hayCierreTeorico(norm)) return null;
   if (hayCierreAparato(norm)) return 9;
+  if (/\b(visi[oó]n estructurada|planeta 7|pistas? neuronales?)\b/.test(norm)) {
+    return 7;
+  }
   if (/\bverdadero problema\b/.test(norm)) return 4;
   return null;
 }
 
 export function codigoQueCerroDelVolcado(friccion: string): EyeCode | null {
   const norm = normalizar(friccion);
-  if (/\bverdadero problema\b/.test(norm)) return 4;
+  if (/\bverdadero problema\b/.test(norm) && !hayVisionDebajo(friccion)) return 4;
   if (hayCierreTeorico(norm)) return fuerzaUsadaDelCierre(friccion);
   return null;
 }
 
 /**
  * Superficie C3 sin inflexión → el problema inconsciente es C4.
- * Inflexión nombrada + aparato o cero obra → habla C5. C5 no es el solver: se nombra.
+ * Inflexión + aparato o cero obra → habla C5. C5 no es el solver: se nombra.
+ * Cuerpo que no ejecuta no es C1: el bloqueo es C6 (medio) o C7 (visión).
  */
 export function detectarCodigoProblema(friccion: string): EyeCode {
   const norm = normalizar(friccion);
@@ -297,7 +355,12 @@ export function detectarCodigoProblema(friccion: string): EyeCode {
   const superficieC3 = scores[3] > 0;
   const hayInflexion = scores[4] > 0;
   const otroMasAlto = EYE_CODES.filter((n) => n >= 5).some((n) => scores[n] > scores[4]);
+  const cuerpo = hayCuerpoSinEjecutar(friccion);
+  const decision = hayDecisionRazon(friccion);
 
+  if (cuerpo && hayMedioDebajo(friccion)) return 6;
+  if (cuerpo && (hayVisionDebajo(friccion) || decision)) return 7;
+  if (cuerpo && !/\b(no se si|entre dos|no se por donde)\b/.test(norm)) return 7;
   if (hayInflexion && (hayCierreAparato(norm) || hayCeroObra(norm))) return 5;
   if (superficieC3 && !hayInflexion && !otroMasAlto) return 4;
   if (scores[4] > 0 && scores[4] >= scores[5] && !otroMasAlto) return 4;
@@ -372,8 +435,16 @@ export function recorteFrase(texto: string, max = 130): string {
 
 function clasificarFrase(texto: string): FraseLeida {
   const norm = normalizar(texto);
-  if (/\b(no (siquiera )?me dispuse|me dispuse|disponibilidad de disposicion)\b/.test(norm)) {
-    return { texto, codigo: 1, rol: "cae" };
+  if (
+    /\b(no (siquiera )?me dispuse|me dispuse|cuerpo no (quiere|puede|queria) ejecutar|peso neuronal|pistas? neuronales?|ejecucion del cuerpo)\b/.test(
+      norm,
+    )
+  ) {
+    return {
+      texto,
+      codigo: hayMedioDebajo(texto) ? 6 : 7,
+      rol: "cae",
+    };
   }
   if (
     /\b(no es falta de tiempo|el problema no es|cual es el problema|tiempo de sobra)\b/.test(
@@ -383,11 +454,16 @@ function clasificarFrase(texto: string): FraseLeida {
     return { texto, codigo: 4, rol: "desnuda" };
   }
   if (
-    /\b(familiariz|parece facil|debe ser facil|peso neuronal|ejecucion del cuerpo|a la pasada)\b/.test(
+    /\b(familiariz|parece facil|debe ser facil|a la pasada)\b/.test(
       norm,
     )
   ) {
     return { texto, codigo: 3, rol: "tapa" };
+  }
+  if (
+    /\b(visi[oó]n estructurada|planeta 7|la conclusi[oó]n es)\b/.test(norm)
+  ) {
+    return { texto, codigo: 7, rol: "cierra" };
   }
   if (
     /\b(verdadero problema|soluci[oó]n ser[ií]a|voy ha|proyecto llamado)\b/.test(norm)
@@ -442,8 +518,16 @@ export function desajusteDe(opts: {
   fuerzaUsada: EyeCode | null;
   fuerzaDebida: EyeCode;
   cascada: boolean;
+  friccion?: string;
 }): string {
-  const { habla, max, cerroTeorico, fuerzaUsada, fuerzaDebida, cascada } = opts;
+  const { habla, max, cerroTeorico, fuerzaUsada, fuerzaDebida, cascada, friccion } = opts;
+  if (
+    friccion &&
+    (habla === 6 || habla === 7) &&
+    hayDecisionRazon(friccion)
+  ) {
+    return `C5 ya cortó por razón. El hueco está debajo, en C${habla} (${fuerzaDe(habla).nombre}). No se pide otra tijera. Se nombra C${habla} y se aplica ${fuerzaDe(fuerzaDebida).nombre}.`;
+  }
   if (cascada) {
     return `Cierre legal. Habla C${habla}. Se aplicó ${fuerzaDe(fuerzaDebida).nombre}.`;
   }
@@ -517,6 +601,19 @@ export function fugaInconscienteDe(
   if (extra?.cerroTeorico === 4 && extra.fuerzaUsada === 9 && max <= 3) {
     const cita = cierra ? ` En tus palabras: ${citaFrase(cierra)}` : "";
     return `Ya nombraste que no es la herramienta. Lo que no veías: el cierre usó fuerza C9 (proyecto) donde la obra pedía C3 (cerrar un paso). La habilidad no precede al primer clip.${cita}`;
+  }
+  if (problema === 6 || problema === 7) {
+    const piso =
+      problema === 6
+        ? "C6 (el medio no deja)"
+        : "C7 (sin vista / sin pista neuronal)";
+    const pista =
+      frases.find((f) => f.codigo === 6 || f.codigo === 7) ??
+      cae ??
+      cierra ??
+      frases[0];
+    const cita = pista ? ` En tus palabras: ${citaFrase(pista)}` : "";
+    return `C1 es atención: no hay conflicto con el cuerpo ahí. C5 puede ser decisión de razón. Debajo, ${piso} no deja ejecutar.${cita}`;
   }
   if (desnuda && (tapa || cae)) {
     return `Ya desnudaste ${citaFrase(desnuda)}. Lo que no veías: tapaste el hueco con ${citaFrase(tapa ?? cae)}.`;
@@ -762,6 +859,7 @@ export function diagnosticarJuezSerioLocal(
     fuerzaUsada,
     fuerzaDebida,
     cascada,
+    friccion,
   });
   const fuga = friccion
     ? fugaInconscienteDe(habla, max, { cerroTeorico, fuerzaUsada, friccion })

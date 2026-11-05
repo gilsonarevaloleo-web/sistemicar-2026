@@ -14,7 +14,7 @@ import {
   type PrincipioMatriz,
 } from "./types.ts";
 
-export const CASA_CODIGO4_VERSION = "1.1.1-juez-frases" as const;
+export const CASA_CODIGO4_VERSION = "1.2.0-juez-atencion" as const;
 export const CASA_CODIGO4_NOMBRE = "La Casa del Código 4: El Juez Serio";
 export const CASA_CODIGO4_MARCA = "Juez Serio";
 export const CASA_CODIGO4_FIRMA =
@@ -25,11 +25,11 @@ export const CASA_CODIGO4_RITUAL =
 export const PRINCIPIOS_MATRIZ: readonly PrincipioMatriz[] = [
   {
     codigo: 1,
-    nombre: "Cimiento",
+    nombre: "Atención",
     vectores: [
-      "Ancla",
-      "Postura Somática",
-      "Capacidad de Sostener Identidad",
+      "Claridad",
+      "Ancla de atención",
+      "Utilidad puntual",
     ],
   },
   {
@@ -92,8 +92,8 @@ export const FUERZAS_CODIGO: readonly FuerzaCodigo[] = [
   {
     codigo: 1,
     nombre: "Sostener",
-    cierra: "Disposición, postura, identidad.",
-    acto: "Nombrá la postura que se te cayó hoy. Una frase. Sostenela. No cambies de identidad.",
+    cierra: "Atención puesta. Una excusa que desvía. Cero conflicto con el cuerpo.",
+    acto: "Nombrá a qué está puesta la atención hoy. Una frase. El cuerpo no se pelea en C1.",
   },
   {
     codigo: 2,
@@ -183,6 +183,12 @@ export const CASA_CODIGO4_AXIOMAS = [
       "Cada código cierra con su energía. El cierre se juzga por la fuerza usada, no por el léxico. C5 no sustituye a nadie.",
   },
   {
+    id: "atencion-cuerpo",
+    titulo: "C1 es atención. El cuerpo es código superior",
+    texto:
+      "C1 no pelea con el soma. Si el cuerpo no ejecuta, el bloqueo es C6 (medio) o C7 (visión). C5 puede ser decisión de razón; no se pide otra tijera. Debajo, C6 o C7 pueden impedir el cuerpo.",
+  },
+  {
     id: "solo-leer",
     titulo: "Solo leer",
     texto:
@@ -262,6 +268,11 @@ ${CASA_CODIGO4_FIRMA}
 3. DIEZ FUERZAS. C5 NO ES EL SOLVER UNIVERSAL.
    Cada código cierra con su energía. El cierre se juzga por la fuerza USADA, no por el léxico.
    Decir "pasos" y armar un proyecto es C9 vestido de C3.
+   C1 ES ATENCIÓN. No hay conflicto cuerpo-somático en C1.
+   Si el cuerpo no ejecuta, el bloqueo es superior: C6 (medio/roce) o C7 (visión/pista neuronal).
+   C5 puede ser decisión guiada por la razón. Si ya está, no pidas otra tijera.
+   Debajo de C5, C6 o C7 pueden impedir el cuerpo.
+   C3 = no sé el paso. C7 = sé el paso y la decisión; el cuerpo no va porque no hay vista.
 ${diccionarioFuerzas()}
 
 4. LEY DEL PERÍMETRO DE RECURSOS (LEY DE CASCADA).
@@ -284,7 +295,7 @@ ${diccionarioFuerzas()}
 
 FASE 1 — MAPA DE FUERZAS (siempre se cobra).
 - Leé qué códigos PARTICIPAN. Un volcado puede encender varios.
-- codigoQueHabla / codigoProblemaDetectado: cimiento del atasco (1–10). Día ciego sin inflexión → C4, no "falta de ritmo". Inflexión ya nombrada + cierre con aparato + cero obra → habla C5.
+- codigoQueHabla / codigoProblemaDetectado: cimiento del atasco (1–10). Día ciego sin inflexión → C4, no "falta de ritmo". Inflexión + aparato + cero obra → habla C5. Cuerpo que no ejecuta con decisión de razón → habla C6 o C7, no C1 ni otra tijera.
 - codigoConquistadoMax: lo que el chasis SOSTIENE, no lo que nombra. Hablar de proyecto no conquista C9.
 - codigoQueCerroTeorico: qué código cerró el diagnóstico, o null.
 - fuerzaUsada: energía del cierre teórico, o null. No el léxico.
@@ -298,7 +309,7 @@ FASE 2 — CONFRONTACIÓN DE FUERZA (se cobra).
 - requiereInversionCreditos: siempre true.
 - confrontacionDeFuerza: el principio de la fuerza DEBIDA. No es receta de oficio. No es "desarrollá la habilidad".
 - directivaOperacional: el mismo texto que confrontacionDeFuerza (alias).
-- Si C_conquistado = 3, la confrontación usa solo Cimiento, Flujo o Trabajo.
+- Si C_conquistado = 3, la confrontación usa solo Atención, Flujo o Trabajo. Se NOMBRA C6/C7. No se aplica tijera ni metodología de visión.
 
 ═══ SALIDA ═══
 
