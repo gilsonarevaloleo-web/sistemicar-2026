@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calendarioAsistencia,
   debeMostrarVentana,
@@ -18,7 +18,10 @@ import {
 export function useAsistenciaDeposito(
   userId: string,
   timestampsVolcado: readonly number[],
+  opts?: { onElegirSi?: () => void },
 ) {
+  const onElegirSiRef = useRef(opts?.onElegirSi);
+  onElegirSiRef.current = opts?.onElegirSi;
   const marca = useMemo(() => marcaConciencia(), []);
   const pregunta = useMemo(() => preguntaConciencia(), []);
   const diasClave = useMemo(
@@ -51,14 +54,17 @@ export function useAsistenciaDeposito(
   const elegir = useCallback(
     (intencion: IntencionAsistencia) => {
       setLibro(elegirIntencionHoy(userId, marca.fecha, intencion, marca.hora));
+      if (intencion === "si") {
+        onElegirSiRef.current?.();
+      }
       if (intencion === "si" && typeof document !== "undefined") {
-        document.getElementById("deposito-v3-sesion")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
         window.setTimeout(() => {
+          document.getElementById("deposito-v3-sesion")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
           document.getElementById("deposito-v3-rawfact")?.focus();
-        }, 280);
+        }, 80);
       }
     },
     [userId, marca.fecha, marca.hora],

@@ -80,6 +80,11 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.match(page, /GraficoEvolucionOjos/);
     assert.match(page, /MensajeSesionCumplida/);
     assert.match(page, /href="\/deposito-v2"/);
+    assert.match(page, /DepositoShell/);
+    assert.match(page, /DepositoMobileNav/);
+    assert.match(page, /deposito-v3-panel-auditar/);
+    assert.match(page, /deposito-v3-panel-casa/);
+    assert.match(page, /deposito-v3-panel-huella/);
     assert.doesNotMatch(page, /from "@\/lib\/depositoVolcados"/);
     const prefetch = readFromClient("lib/lazyWithRetry.ts");
     assert.match(prefetch, /import\("@\/pages\/deposito-v3"\)/);
@@ -130,6 +135,11 @@ describe("Depósito v2 visible y anti-freeze nav", () => {
     assert.doesNotMatch(src, /if \(loading\)/);
     assert.doesNotMatch(src, /path="\/esperanza\/grado/);
     assert.doesNotMatch(src, /onChange=\{setCaptura\}/);
+    assert.match(src, /DepositoShell/);
+    assert.match(src, /DepositoMobileNav/);
+    assert.match(src, /deposito-v2-panel-volcar/);
+    assert.match(src, /deposito-v2-panel-lectura/);
+    assert.match(src, /deposito-v2-panel-casa/);
   });
 
   it("App carga Depósito (y las otras casas) en chunk lazy, no en el bundle inicial", () => {
