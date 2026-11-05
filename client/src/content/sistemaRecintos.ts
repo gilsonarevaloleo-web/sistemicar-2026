@@ -62,7 +62,7 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     detail:
       "Entrenador de Intención Panorámica. El ring de conquista cierra unidades; el ring de enfoque sella imprevistos. El día termina con un número. Ocupado no cuenta. Base · Ritmo · Norte.",
     color: "#22C55E",
-    exploreHref: "/ventas-jornada",
+    exploreHref: "/jornada-base",
     publicExplore: true,
     exploreLabel: "Ver Jornada",
   },

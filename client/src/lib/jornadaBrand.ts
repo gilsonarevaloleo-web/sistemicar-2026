@@ -97,6 +97,8 @@ export function isCommercialEntryPath(
   return (
     path === "/bienvenida" ||
     path.startsWith("/bienvenida/") ||
+    path === "/jornada-base" ||
+    path.startsWith("/jornada-base/") ||
     path === "/ventas-jornada" ||
     path.startsWith("/ventas-jornada/") ||
     path === "/vendedor" ||

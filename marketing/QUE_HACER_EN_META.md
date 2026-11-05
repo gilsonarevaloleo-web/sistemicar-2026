@@ -1,67 +1,59 @@
-# Qué debes hacer tú: publicar los 2 videos de Jornada Base
+# Qué debes hacer tú: publicar Jornada Base en Facebook
 
-La web ya une Facebook, el video, la landing y el vendedor.  
-Tú solo publicas **una campaña con dos anuncios** (un video cada uno).
+La web ya une Facebook, el video, la landing corta y el checkout.  
+Tú publicas **una campaña, un conjunto, un anuncio**.
 
-No crees 2 campañas. No impulsés desde el perfil. No mandes el clic a WhatsApp.
+No crees 2 campañas. No impulsés desde el perfil. No mandes el clic a WhatsApp.  
+No pegues esta URL a `/ventas-jornada` (esa es la carta larga, para quien ya mide).
 
 ---
 
 ## Cómo se sincronizan (no hay un plugin extra)
 
 ```
-VIDEO A o VIDEO B  (Ads Manager)
+VIDEO  (Ads Manager)
         │
         │  clic → Facebook agrega fbclid solo
         ▼
-/ventas-jornada?utm_content=video_a  (o video_b)
+/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base
         │
-        ├─ Pixel ViewContent  →  “Jornada Base · VIDEO A”
-        ├─ se guarda el video en el celular (utm + fbclid)
+        ├─ Pixel ViewContent  →  “Jornada Base”
+        ├─ se guarda utm + fbclid en el celular
         │
-        ├─ ACTIVAR JORNADA BASE   →  /pagos?plan=planificacion_base  →  Purchase
-        └─ QUE ME LLAME           →  /vendedor (JORNADA, código 3)  →  Lead + llamada
+        └─ ACTIVAR MI JORNADA AHORA  →  /pagos?plan=planificacion_base  →  Purchase
 ```
 
-**Facebook** sabe qué video convirtió porque:
+**Facebook** sabe quién convirtió porque:
 
-1. Cada anuncio tiene su propia URL (`utm_content=video_a` vs `video_b`).
+1. El anuncio tiene esta URL (`utm_campaign=jornada_base`).
 2. Facebook agrega `fbclid` al clic. El Pixel (ID `1066497298319685`) vive en `sistemicar.app`.
 3. Al registrarse, Advanced Matching manda el email. Al pagar, `Purchase` con $24.99.
 
-**La página** copia `utm_*` y `fbclid` a vendedor y checkout.  
-**El vendedor** llega con Jornada Base ya fijada (código 3) y el admin ve `VIDEO A` o `VIDEO B` junto a la llamada.
+**La página** copia `utm_*` y `fbclid` al checkout.
 
-No pegues el video en la landing. El video se ve en Facebook; el clic abre la página.
+No pegues el video en la landing. El video se ve en Facebook; el clic abre la carta corta.
 
 ---
 
 ## 0. Espera a que la landing esté en producción
 
-Abre **las dos** URLs en el celular **antes** de pagar el anuncio:
-
-**VIDEO A**
+Abre esta URL en el celular **antes** de pagar el anuncio:
 
 ```
-https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a
+https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base
 ```
 
-**VIDEO B**
+Debes ver:
 
-```
-https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b
-```
-
-En cada una debes ver:
-
-1. El titular de telemetría (no disciplina: fuga de tiempo).
-2. Arriba, en letra chica: `ANUNCIO · VIDEO A` o `VIDEO B`.
-3. El botón dorado **ACTIVAR JORNADA BASE · $24.99/mes**.
-4. **QUE ME LLAME** → vendedor con La Jornada ya fijada y el mismo `ANUNCIO · VIDEO A/B`. Sin trial.
+1. El titular: no disciplina — fuga invisible en tu tiempo. **Sin** la palabra telemetría.
+2. Arriba, la captura del cronómetro en «Pegado de etiqueta», 09:06, 18 unidades, Termina a las 21:59.
+3. Un solo precio: **$24.99/mes**. Sin Ritmo, Dirección ni Universidad.
+4. El botón dorado **ACTIVAR MI JORNADA AHORA — $24.99/mes**.
 
 Si da 404, el deploy todavía no salió. No gastes plata.
 
-Copia lista: `marketing/copys-meta-jornada.md`.
+Copia lista: `marketing/copys-meta-jornada.md`.  
+Guion de video: `marketing/guion-video-jornada-base.md`.
 
 ---
 
@@ -76,33 +68,38 @@ El Píxel **ya está en la web** (ID `1066497298319685`). En Events Manager debe
 **Las dos conversiones que Meta usa para ubicar públicos:**
 
 - `CompleteRegistration` — el usuario se registra con Google (`/acceso`, `/bienvenida`). Lleva el email (Advanced Matching) para que Meta sepa quién es.
-- `Purchase` — el usuario paga y Mercado Pago lo devuelve a `/pagos?status=success&plan=…`. Valor real del plan (Jornada Base $24.99). No depende de `/gracias-compra`.
+- `Purchase` — el usuario paga y Mercado Pago lo devuelve a `/pagos?status=success&plan=…`. Valor real del plan (Jornada Base $24.99).
 
-**El resto del embudo (lleva VIDEO A o VIDEO B):**
+**El resto del embudo:**
 
 - `PageView` en todas las páginas
-- `ViewContent` en `/ventas-jornada`
-- `Lead` cuando el prospecto deja teléfono (vendedor) o se anota
+- `ViewContent` en `/jornada-base`
 - `InitiateCheckout` en `/pagos?plan=planificacion_base`
 
-En el anuncio, objetivo **Conversiones** (no solo Tráfico) y evento de optimización: `Purchase`. Si aún no hay pagos, usa `CompleteRegistration`.
+### Evento de optimización (presupuesto bajo)
+
+Al inicio **no** optimices por `Purchase`. Con $10–15/día el algoritmo no tiene datos suficientes.
+
+Usa **Ver contenido** (`ViewContent`) o **Clic al enlace**.  
+Recién después de 2 semanas, si hay pagos, evalúa cambiar a `Purchase`.
 
 Si Events Manager no muestra el pixel o dice “no recibe eventos”, el plugin **no está vigente** del lado de Meta (cuenta, dominio o pixel pausado). El código de la web sí dispara.
 
 ---
 
-## 2. UNA campaña, UN conjunto, DOS anuncios
+## 2. UNA campaña, UN conjunto, UN anuncio
 
-**Crear** → objetivo **Ventas / Conversiones** (no Tráfico, no Mensajes).
+**Crear** → objetivo **Ventas / Conversiones** (no Mensajes). Evento: `ViewContent`.
 
 | Nivel | Nombre | Qué es |
 |---|---|---|
 | Campaña | `jornada_base_dia_sin_numero` | Una sola |
-| Conjunto | `peru_duenos_25_55` | A quién le llega |
-| Anuncio 1 | `jornada_base_video_a` | Tu primer video + URL A |
-| Anuncio 2 | `jornada_base_video_b` | Tu segundo video + URL B |
+| Conjunto | `amplia_25_55` | Audiencia amplia |
+| Anuncio | `jornada_base_video` | Un video + la URL de `/jornada-base` |
 
-Desactiva el A/B test oficial de Meta. Los dos anuncios viven **en el mismo conjunto**: Meta gasta más en el video que convierta.
+Un solo mensaje: Jornada Base, $24.99. Sin Ritmo, Dirección ni Universidad.
+
+Si más adelante quieres comparar dos videos, usa las URLs `utm_content=video_a` y `video_b` en el **mismo** conjunto. No al primer dólar.
 
 ---
 
@@ -110,33 +107,31 @@ Desactiva el A/B test oficial de Meta. Los dos anuncios viven **en el mismo conj
 
 | Campo | Qué pones |
 |---|---|
-| Nombre | `peru_duenos_25_55` |
+| Nombre | `amplia_25_55` |
 | Ubicaciones | Perú |
 | Edad | 25–55 |
 | Género | Todos |
 | Idioma | Español |
-| Intereses | Advantage+ / automático. Si te obliga: “pequeña empresa”. |
-| Presupuesto | **S/ 20–30 por día**. Diario, no vitalicio. |
-| Duración | Continua. A los 7 días miramos. |
+| Intereses | Advantage+ / automático. No satures de intereses. |
+| Presupuesto | **$10–15 por día**. Diario, no vitalicio. |
+| Duración | 10–14 días antes de evaluar. |
 
-No agregues 15 intereses. No excluyas ciudades.
+Con presupuesto bajo, segmentar mucho frena el aprendizaje del algoritmo.  
+No excluyas ciudades. No armes 15 intereses.
 
 ---
 
-## 4. Los dos anuncios (los videos)
-
-Para **cada** video:
+## 4. El anuncio (el video)
 
 1. Formato: **video** vertical (9:16). Sube el archivo desde tu celular o computadora.
-2. Destino del clic: pega la URL **completa** de ese video (arriba, paso 0).  
-   El anuncio A **no** puede usar la URL B.
-3. Texto: el de `copys-meta-jornada.md` (puedes usar el mismo en los dos).
+2. Destino del clic: pega la URL **completa** del paso 0.
+3. Texto: el de `marketing/copys-meta-jornada.md`.
 4. Título: `No tienes un problema de disciplina.`
-5. Descripción: `Telemetría de unidades. El día termina con evidencia.`
+5. Descripción: `Mide dónde se va tu día. Menos de $1 al día.`
 6. Botón: **Más información** (no Comprar, no WhatsApp).
-7. Vista previa: el toque abre `sistemicar.app/ventas-jornada`, no el chat.
+7. Vista previa: el toque abre `sistemicar.app/jornada-base`, no el chat.
 
-No pongas los dos videos en un solo anuncio (carrusel). Un archivo = un anuncio.
+No pongas el video en la landing.
 
 ---
 
@@ -149,27 +144,29 @@ No edites cada hora. Cada edición reinicia el aprendizaje.
 
 ---
 
-## 6. Cómo saber cuál video funciona
+## 6. Cómo saber si funciona
 
-En Ads Manager, desglosa por **Anuncio** (no por campaña):
+En Ads Manager, mira el anuncio (no solo la campaña):
 
 | Señal | Bien | Mal |
 |---|---|---|
-| Clics a la landing | Hay clics en A o B | 0 clics en 3 días → el gancho no para el scroll |
-| ViewContent VIDEO A/B | Events Manager muestra el video | Llegan sin `utm_content` → pegaste mal la URL |
-| Lead / llamada | Admin muestra `VIDEO A` o `VIDEO B` | Llegan y se van → el teléfono da miedo |
+| Clics a la landing | Hay clics | 0 clics en 3 días → el gancho no para el scroll |
+| ViewContent | Events Manager muestra el evento | Llegan sin `utm_campaign` → pegaste mal la URL |
+| Costo por clic / por ViewContent | A los 7 días lo anotas | No evalúes a los 2 días |
 | Registro / pago | CompleteRegistration o Purchase | Clics sin pago → el close de la carta no cerró |
 
-A los **7 días**: deja prendido el que trajo llamadas o pagos. Pausa el otro.  
+A los **7 días**: revisa costo por clic y costo por «ver contenido».  
+A los **10–14 días**: recién ahí decides si subes presupuesto o cambias el evento a `Purchase`.  
 No subas presupuesto a los 2 días. No publiques Ritmo ni Norte todavía.
 
 ---
 
 ## 7. Lo que no hagas
 
-- No 2 campañas (una por video). Meta no compara bien y gastas doble.
+- No 2 campañas.
 - No impulsos desde Instagram.
-- No tu WhatsApp en el anuncio: el vendedor algoritmo recibe al cliente.
-- No cambies la URL a `/pagos` ni `/vendedor`. La puerta es `/ventas-jornada`.
+- No tu WhatsApp en el anuncio.
+- No cambies la URL a `/pagos`, `/vendedor` ni `/ventas-jornada`. La puerta es `/jornada-base`.
+- No menciones Ritmo, Dirección ni Universidad en el anuncio.
 
 Cuando tengas la primera llamada o el primer pago, avisas y armamos el siguiente paso.

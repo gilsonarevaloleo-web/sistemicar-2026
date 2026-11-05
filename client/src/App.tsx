@@ -73,6 +73,7 @@ const GraciasCompra = lazyWithRetry(() => import("@/pages/gracias-compra"));
 const UmbralLeads = lazyWithRetry(() => import("@/pages/umbral-leads"));
 const VentasEspejo = lazyWithRetry(() => import("@/pages/ventas-espejo"));
 const VentasJornada = lazyWithRetry(() => import("@/pages/ventas-jornada"));
+const JornadaBaseLanding = lazyWithRetry(() => import("@/pages/jornada-base"));
 const VentasDeposito = lazyWithRetry(() => import("@/pages/ventas-deposito"));
 const MetricasDocumento = lazyWithRetry(() => import("@/pages/metricas-documento"));
 const MapaSistemicar = lazyWithRetry(() => import("@/pages/mapa-sistemicar"));
@@ -568,6 +569,14 @@ function Router() {
       </Suspense>
     );
   }
+  if (location === "/jornada-base" || location.startsWith("/jornada-base")) {
+    return (
+      <Suspense fallback={<HouseRouteFallback />}>
+        <SellerRefCapture />
+        <JornadaBaseLanding />
+      </Suspense>
+    );
+  }
   if (location === "/ventas-jornada" || location.startsWith("/ventas-jornada")) {
     return (
       <Suspense fallback={<HouseRouteFallback />}>
@@ -787,6 +796,8 @@ function VoiceBootstrap() {
         p.startsWith("/menu/") ||
         p === "/vendedor" ||
         p.startsWith("/vendedor/") ||
+        p === "/jornada-base" ||
+        p.startsWith("/jornada-base") ||
         p === "/ventas-jornada" ||
         p.startsWith("/ventas-jornada") ||
         p === "/ventas-deposito" ||

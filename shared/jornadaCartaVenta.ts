@@ -1,6 +1,9 @@
 /**
- * Carta de venta maestra de Jornada Base.
+ * Carta de venta maestra de Jornada Base (cálida / escalera).
  * Cuerpo canónico de /ventas-jornada.
+ *
+ * Para quien ya conoce Base o está decidiendo subir a Ritmo / Dirección.
+ * El anuncio de Facebook usa /jornada-base (jornadaCartaFria).
  *
  * No ofrece trial ni 500 PS. La escalera ancla el precio;
  * solo Base se compra en esta puerta.

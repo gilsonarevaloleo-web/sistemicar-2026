@@ -1,5 +1,5 @@
 /**
- * Atribución del anuncio Meta → landing → vendedor.
+ * Atribución del anuncio Meta → /jornada-base → checkout.
  * utm_content distingue video A vs video B. fbclid lo pone Facebook solo.
  */
 
@@ -15,11 +15,14 @@ export type AdAttribution = {
 export const VIDEO_A_CONTENT = "video_a";
 export const VIDEO_B_CONTENT = "video_b";
 
+export const JORNADA_BASE_AD_URL =
+  "https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base";
+
 export const VENTAS_JORNADA_VIDEO_A_URL =
-  "https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a";
+  "https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a";
 
 export const VENTAS_JORNADA_VIDEO_B_URL =
-  "https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b";
+  "https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b";
 
 const EMPTY: AdAttribution = {
   utmSource: null,

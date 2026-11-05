@@ -114,7 +114,7 @@ export default function VendedoresPlanificacion() {
   const copyVendedorLink = (code: string) =>
     copyText(buildSellerVendedorUrl(code), "Link triage /vendedor copiado");
   const copyVentasJornadaLink = (code: string) =>
-    copyText(buildSellerVentasJornadaUrl(code), "Link landing /ventas-jornada copiado");
+    copyText(buildSellerVentasJornadaUrl(code), "Link landing /jornada-base copiado");
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 pb-24">
@@ -468,7 +468,7 @@ export default function VendedoresPlanificacion() {
         <section className="p-5 rounded-xl border mb-6" style={{ borderColor: `${GOLD}40` }} data-testid="kit-link">
           <h2 className="text-sm font-bold text-white mb-2">Tus links de venta</h2>
           <p className="text-[11px] text-slate-500 mb-3">
-            Gilson te asigna un código. Anuncio Meta ? `/ventas-jornada`. Triage ? `/vendedor`. Checkout ? `/pagos` con `ref=`:
+            Gilson te asigna un código. Anuncio Meta ? `/jornada-base`. Triage ? `/vendedor`. Checkout ? `/pagos` con `ref=`:
           </p>
           <div className="flex gap-2 mb-3">
             <input

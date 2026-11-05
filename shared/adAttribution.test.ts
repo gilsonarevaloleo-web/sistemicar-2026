@@ -18,6 +18,9 @@ describe("adAttribution Meta → landing → vendedor", () => {
     assert.equal(b.utmContent, "video_b");
     assert.equal(adVideoLabel(a.utmContent), "VIDEO A");
     assert.equal(adVideoLabel(b.utmContent), "VIDEO B");
+    assert.match(VENTAS_JORNADA_VIDEO_A_URL, /\/jornada-base\?/);
+    assert.match(VENTAS_JORNADA_VIDEO_B_URL, /\/jornada-base\?/);
+    assert.doesNotMatch(VENTAS_JORNADA_VIDEO_A_URL, /\/ventas-jornada/);
   });
 
   it("no pisa un video previo si la siguiente URL no trae utm_content", () => {

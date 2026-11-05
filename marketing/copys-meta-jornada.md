@@ -1,36 +1,41 @@
-# Copy Meta — Jornada Base (2 videos, 1 campaña)
+# Copy Meta — Jornada Base (carta corta, tráfico frío)
 
-**Versión:** 3.0 · octubre 2026  
-**Producto:** Jornada Base · $24.99/mes · telemetría de unidades  
-**Carta:** `/ventas-jornada`
+**Versión:** 4.0 · noviembre 2026  
+**Producto:** Jornada Base · $24.99/mes  
+**Carta:** `/jornada-base`  
+**No uses** `/ventas-jornada` (carta larga, para quien ya mide).
 
-Una campaña `jornada_base_dia_sin_numero`. Un conjunto. **Dos anuncios.**  
-El clic siempre va a `/ventas-jornada`. No uses `/pagos`, `/vendedor` ni `/bienvenida`.
-
-Las URLs `video_a` / `video_b` no se tocan si cambias el archivo del video.
+Una campaña `jornada_base_dia_sin_numero`. Un conjunto. **Un anuncio.**  
+El clic siempre va a `/jornada-base`. No uses `/pagos`, `/vendedor` ni `/bienvenida`.
 
 ---
 
-## Destino — pégalo tal cual en cada anuncio
-
-**Anuncio VIDEO A**
+## Destino — pégalo tal cual en el anuncio
 
 ```
-https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a
+https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base
 ```
 
-**Anuncio VIDEO B**
+Si más adelante comparas dos videos (mismo conjunto):
+
+**VIDEO A**
 
 ```
-https://sistemicar.app/ventas-jornada?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b
+https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_a
 ```
 
-`utm_content` es lo que une el video con la página, el Pixel y el vendedor.  
+**VIDEO B**
+
+```
+https://sistemicar.app/jornada-base?utm_source=facebook&utm_medium=paid&utm_campaign=jornada_base&utm_content=video_b
+```
+
+`utm_campaign` une el anuncio con la página y el Pixel.  
 Facebook agrega `fbclid` solo; no lo escribas tú.
 
 ---
 
-## Texto (el mismo en A y B)
+## Texto
 
 **Título / gancho (primera línea, ≤ 10 palabras)**  
 No tienes un problema de disciplina.
@@ -39,32 +44,32 @@ No tienes un problema de disciplina.
 
 ```
 No tienes un problema de disciplina.
-Tienes una fuga invisible en la telemetría de tu tiempo.
+Tienes una fuga invisible en tu tiempo.
 
-Las listas te dejaron una mancha mental.
-Jornada Base no es otra lista: lanzas un bloque, mides unidades
-y el día termina con evidencia.
+Mide exactamente dónde se va tu día — en menos de 3 minutos,
+sin listas, sin fuerza de voluntad.
 
-$24.99 al mes. Ritmo y Dirección vienen después, cuando ya mides.
+Jornada Base cronometra cada tarea en vivo
+y te dice a qué hora vas a cerrar el día.
 
-Toca. Activa Base o pide que te llame el vendedor.
+$24.99 al mes. Menos de $1 al día.
 ```
 
 **Texto largo** (si Meta pide cuerpo extendido):
 
 ```
 No tienes un problema de disciplina.
-Tienes una fuga invisible en la telemetría de tu tiempo.
+Tienes una fuga invisible en tu tiempo.
 
-Trabajaste. Contestaste. Apagaste incendios.
-Al final no hay un cierre — solo la sensación de que el día se evaporó.
+Si trabajas por volumen y el día se te escapa,
+el problema no es organización: es que nadie te dice,
+en tiempo real, cuánto cuesta cada tarea ni a qué hora terminas.
 
-Jornada Base no es un anotador de tareas.
-Es telemetría: Ring de conquista, Reloj Proyectivo y varianza en tiempo real.
+Jornada Base mide cada tarea mientras la haces.
+Sabes tu ritmo. Sabes tu hora de cierre.
+Sabes si vas ganando o perdiendo tiempo — al instante.
 
-$24.99 al mes. Ritmo y Dirección se ofrecen después, cuando ya mides.
-
-Toca y activa. O pide que te llame el vendedor.
+$24.99 al mes. Menos de un dólar al día.
 ```
 
 **CTA del anuncio (en Meta):**  
@@ -72,25 +77,23 @@ Toca y activa. O pide que te llame el vendedor.
 No elijas “Comprar” ni “Enviar mensaje de WhatsApp”.
 
 **Descripción opcional (enlace):**  
-Telemetría de unidades. El día termina con evidencia.
+Mide dónde se va tu día. Menos de $1 al día.
 
-**Emojis:** ninguno en el gancho. Si quieres uno, un solo ⚡ al final del cuerpo.
+**Emojis:** ninguno en el gancho.
 
 ---
 
 ## Videos
 
-Sube **tu** archivo en cada anuncio (Ads Manager). Un video = un anuncio.  
-No armes un carrusel con los dos. No pongas el video en la landing.
-
-Los dos videos viejos (día sin número / trial) se pausan.  
-Los nuevos usan las **mismas URLs** `video_a` y `video_b`.
+Sube **tu** archivo (Ads Manager). Un video = el anuncio.  
+Guion: `marketing/guion-video-jornada-base.md`.  
+No armes un carrusel. No pongas el video en la landing.
 
 ---
 
 ## Lo que NO se publica todavía
 
-- Ritmo / Dirección (carta propia, después)
-- Un tercer anuncio “por si acaso”
-- Destino WhatsApp o `/pagos` directo
+- Ritmo / Dirección / Universidad
+- Un segundo anuncio “por si acaso” el primer día
+- Destino WhatsApp, `/pagos` directo o `/ventas-jornada`
 - “7 días gratis” ni “500 PS = Base gratis”
