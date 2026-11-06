@@ -278,6 +278,7 @@ const C5_DECISION = [
   /cero excusa/,
   /dispar[eé]/,
   /\bdecid\w*\b/,
+  /\bdesid\w*\b/,
   /\bdesicion(es)?\b/,
   /mi decision\b/,
   /la desi[cs]ion (es|fue|sera|esta|queda|que)/,
@@ -289,6 +290,8 @@ const C5_DECISION = [
   /\belijo\b/,
   /\bopto por\b/,
   /deje (el trabajo|de trabajar|el desglosador|de hacer|de seguir|de empujar)/,
+  /\blo deje\b/,
+  /termine comprando/,
   /puse pausa/,
   /pause (el |al |la )/,
   /pausa (al |el |del )desglosador/,
@@ -325,6 +328,12 @@ const C6_FUENTE = [
   /\blibro\b/,
   /\bvideo\b/,
   /\byoutube\b/,
+  /\banuncio\b/,
+  /\bpublicidad\b/,
+  /\bcurso\b/,
+  /\bvendedor\b/,
+  /vi un anuncio/,
+  /en facebook/,
   /\bme dijo\b/,
   /\ble dije\b/,
   /con ella/,
@@ -496,6 +505,9 @@ function elegirFirma(
   }
   if (active[7] && (esTesisVision(norm) || hipotesisComoOjo(titulo) === 7)) {
     return 7;
+  }
+  if (active[2] && hipotesisComoOjo(titulo) === 2) {
+    return 2;
   }
   if (
     active[8] &&
