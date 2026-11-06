@@ -372,6 +372,31 @@ La conclusión es que si se siente que el cuerpo no quiere ejecutar una desició
     assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
   });
 
+  it("volcado 06/11/2026: el curso/anuncio enciende C6; desidí enciende C5; no pide tijera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendí que la necesidad no está en lo que nos rodea sino en nuestra propia mente. 
+Hace como 10 días atrás estaba escroliando en Facebook y vi un anuncio que decía algo parecido a esto:  desarrolla tu capacidad comprensión lectora de 0 a 10 en menos de un mes. Ese curso le termine comprando y ¿para que compre? Recuerdo que ese curso lo leí como 3 dias, de ahí me di cuenta que no era importante desarrollar una habilidad de lectura y lo deje. Pero ¿Que paso en ese momento que leí la publicidad? ¿Porque desidí gastar mí dinero hasta mí tiempo sino era mí necesidad? La necesidad no es que debas convertirte en un buen lector para ganar dinero, lo que pasa que hay un código que está hambriento (código 2- el desarrollo-aprender) y cuando ese codigo está hambriento va a ser llamado por cualquier publicidad que hable sobre superación y si promete crecimiento rápido mejor, ¿porque desidí comprar el curso si no  era importante o necesario de manera razonable? Acá me me doy cuenta hay dos conocimientos: 
+1.  Sino alimentas a las identidades, las identidades internas te obligarán a actuar a favor de ellos.  Y eso es lo que causa las compras compulsivas. Las compras compulsivas son códigos hambrientos.  No es que los códigos sean malos, lo que pasa que el está pidiendo alimento y va a depender de tipo de alimento le dan su amo. 
+2.  También acá nos damos cuenta que siendo un vendedor, no hay necesidad de tener un producto llamativo o ser un florero en ventas. Solamente hay que activar la necesidad del código.  Porque la necesidad tal vez no está en la urgencia de necesidad material, pero puede ser que tiempos no están alimentando a uno de  sus identidades. 
+Por eso digo que la necesidad no necesariamente tiene que estar en lo urgente o necesario, sino en la sed de cada código.`,
+      studentHypothesis: "El código 2. La sed d aprender, de mejorar",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo que no quise nombrar es que si una persona comprende el arte de activar el hambre de cada código va ha ser verdero vendedor sin importar la simplicidad del producto que venda",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[6], true);
+    assert.equal(r.syntacticVacios.includes(6), false);
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.syntacticVacios.includes(5), false);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.characterSignedCode, 2);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C5|tijera/);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:

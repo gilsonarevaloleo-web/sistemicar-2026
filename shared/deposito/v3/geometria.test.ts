@@ -81,6 +81,7 @@ describe("Geometría sintáctica fría", () => {
       "Mi atención lo saco del trabajo y cambio de enfoque.",
       "Elegimos ignorarlo. Ahí está el daño.",
       "Hasta la desición que debería ejecutar. El cuerpo no quería ejecutar una desición.",
+      "¿Porque desidí comprar el curso? Lo deje a los tres días.",
       "El problema no es falta de desición sino falta de visión.",
     ]) {
       const geo = auditarGeometriaSintactica({
@@ -138,6 +139,23 @@ describe("Geometría sintáctica fría", () => {
       userTier: "MATRICULA",
     });
     assert.equal(geo.active[6], true);
+  });
+
+  it("C6 enciende con anuncio / curso / en Facebook, no con un Facebook de ocio", () => {
+    const fuente = auditarGeometriaSintactica({
+      rawFact:
+        "Estaba escroliando en Facebook y vi un anuncio. Ese curso lo terminé comprando y lo leí tres días.",
+      studentHypothesis: "La sed de aprender",
+      userTier: "CARRERA",
+    });
+    assert.equal(fuente.active[6], true);
+
+    const ocio = auditarGeometriaSintactica({
+      rawFact:
+        "Entonces me fui a Facebook, puse un audio y descansé. Después volví a producir.",
+      userTier: "CARRERA",
+    });
+    assert.equal(ocio.active[6], false);
   });
 
   it("ley del ciclo + bucle firma C8; en conclusión vuelve al límite de la habilidad y abrocha C10", () => {
