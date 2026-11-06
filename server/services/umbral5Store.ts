@@ -12,8 +12,15 @@ const { Pool } = pkg;
 
 export interface Umbral5SessionStore {
   getById(id: string): Promise<SesionUmbral5 | null>;
+  listByUser(userId: string, limit?: number): Promise<SesionUmbral5[]>;
   save(sesion: SesionUmbral5): Promise<SesionUmbral5>;
   clear?(): Promise<void>;
+}
+
+export const UMBRAL5_LIST_LIMIT = 40;
+
+function sortByUpdatedDesc(a: SesionUmbral5, b: SesionUmbral5): number {
+  return b.updatedAt.localeCompare(a.updatedAt);
 }
 
 export function newSesionUmbral5Id(): string {
@@ -38,6 +45,14 @@ export function createMemoryUmbral5Store(): Umbral5SessionStore {
   return {
     async getById(id) {
       return byId.get(id) ?? null;
+    },
+    async listByUser(userId, limit = UMBRAL5_LIST_LIMIT) {
+      const uid = String(userId ?? "").trim();
+      if (!uid) return [];
+      return [...byId.values()]
+        .filter((s) => s.userId === uid)
+        .sort(sortByUpdatedDesc)
+        .slice(0, Math.max(1, limit));
     },
     async save(sesion) {
       const normalized = normalizeSesion(sesion);
@@ -121,6 +136,20 @@ export function createPostgresUmbral5Store(): Umbral5SessionStore {
       );
       if (result.rows.length === 0) return null;
       return rowToSesion(result.rows[0]);
+    },
+    async listByUser(userId, limit = UMBRAL5_LIST_LIMIT) {
+      const p = getPool();
+      if (!p) return [];
+      const uid = String(userId ?? "").trim();
+      if (!uid) return [];
+      const result = await p.query(
+        `SELECT * FROM umbral5_sesiones
+         WHERE user_id = $1
+         ORDER BY updated_at DESC
+         LIMIT $2`,
+        [uid, Math.max(1, limit)],
+      );
+      return result.rows.map((row) => rowToSesion(row));
     },
     async save(sesion) {
       const p = getPool();

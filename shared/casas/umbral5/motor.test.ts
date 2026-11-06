@@ -19,6 +19,7 @@ describe("Casa 5 Umbral — motor", () => {
     assert.equal(r.pisoIntento, 1);
     assert.match(r.lecturaFria, /C1/);
     assert.match(r.porQueNoEjecuta, /saber|Cero acto/i);
+    assert.equal(r.moduloGimnasio, "social_producto");
   });
 
   it("baja autoestima no es C1: es queja del Espejo", () => {
@@ -29,6 +30,7 @@ describe("Casa 5 Umbral — motor", () => {
     assert.match(r.lecturaFria, /Espejo/);
     assert.doesNotMatch(r.lecturaFria, /asiento es C1/);
     assert.doesNotMatch(r.porQueNoEjecuta, /autoestima/i);
+    assert.equal(r.moduloGimnasio, null);
   });
 
   it("hablé con el alrededor → C2; trabajé y no se mueve → C3", () => {
@@ -100,6 +102,7 @@ describe("Casa 5 Umbral — motor", () => {
       tipoLimite: "impronta",
       lecturaFria: "  x  ",
       porQueNoEjecuta: "  y  ",
+      moduloGimnasio: null,
     });
     assert.equal(sealed.codigoUsuario, 7);
   });

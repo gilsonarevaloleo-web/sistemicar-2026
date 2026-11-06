@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { DoorOpen } from "lucide-react";
 import { useAuthContext } from "@/App";
@@ -8,21 +8,40 @@ import {
   UMBRAL5_BRONZE,
 } from "@/components/casas/umbral5/LienzoLimite";
 import { PanelMapa } from "@/components/casas/umbral5/PanelMapa";
+import { HistorialLimite } from "@/components/casas/umbral5/HistorialLimite";
 import { BannerGimnasio } from "@/components/casas/umbral5/BannerGimnasio";
+import { ConsolaGimnasio } from "@/components/casas/gimnasio6/ConsolaGimnasio";
+import { HistorialLibros } from "@/components/casas/gimnasio6/HistorialLibros";
 import { ModalSaldoInsuficiente } from "@/components/casas/umbral5/ModalSaldoInsuficiente";
 import {
   Umbral5SaldoError,
   leerMapa,
   leerSaldoUmbral5,
+  listarSesionesUmbral5,
   sellarVolcado,
 } from "@/lib/casas/umbral5/api";
+import {
+  abrirGimnasio,
+  continuarGimnasio,
+  leerLibroGimnasio,
+  listarLibrosGimnasio,
+  responderGimnasio,
+} from "@/lib/casas/gimnasio6/api";
+import type { LibroGimnasio, PreguntaViva } from "@shared/casas/gimnasio6";
+import {
+  fusionarSesionesUmbral5Local,
+  guardarBorradorUmbral5,
+  guardarSesionUmbral5Local,
+  leerBorradorUmbral5,
+  listarSesionesUmbral5Local,
+} from "@/lib/casas/umbral5/sesionesLocal";
 import {
   CASA_UMBRAL5_FIRMA,
   CASA_UMBRAL5_NOMBRE,
   CASA_UMBRAL5_RITUAL,
   CREDITO_LECTURA_MAPA,
 } from "@shared/casas/umbral5";
-import type { Umbral5Lectura } from "@shared/casas/umbral5";
+import type { SesionUmbral5, Umbral5Lectura } from "@shared/casas/umbral5";
 
 export default function CasaUmbral5() {
   const { user } = useAuthContext();
@@ -33,17 +52,64 @@ export default function CasaUmbral5() {
   const [saldo, setSaldo] = useState<number | null>(null);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [lectura, setLectura] = useState<Umbral5Lectura | null>(null);
+  const [sesiones, setSesiones] = useState<SesionUmbral5[]>([]);
+  const tocadoRef = useRef(false);
   const [sellando, setSellando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal402, setModal402] = useState<string | null>(null);
+  const [libro, setLibro] = useState<LibroGimnasio | null>(null);
+  const [preguntaGym, setPreguntaGym] = useState<PreguntaViva | null>(null);
+  const [copiaGym, setCopiaGym] = useState("");
+  const [topeDiario, setTopeDiario] = useState(false);
+  const [libros, setLibros] = useState<LibroGimnasio[]>([]);
+  const [abriendoGym, setAbriendoGym] = useState(false);
+  const [enviandoGym, setEnviandoGym] = useState(false);
+
+  const aplicarSesion = (sesion: SesionUmbral5) => {
+    setSesionId(sesion.id);
+    setTexto(sesion.textoVolcado);
+    setLectura(sesion.lectura);
+    guardarBorradorUmbral5(sesion.textoVolcado);
+  };
 
   useEffect(() => {
     if (!userId) return;
     void leerSaldoUmbral5(userId)
       .then((r) => setSaldo(r.saldo))
       .catch(() => setSaldo(0));
+
+    const locales = listarSesionesUmbral5Local(userId);
+    setSesiones(locales);
+    if (locales[0]) {
+      aplicarSesion(locales[0]);
+    } else {
+      const draft = leerBorradorUmbral5();
+      if (draft) setTexto(draft);
+    }
+
+    void listarSesionesUmbral5(userId)
+      .then((r) => {
+        const merged = fusionarSesionesUmbral5Local(userId, r.sesiones);
+        setSesiones(merged);
+        if (!tocadoRef.current && merged[0]) aplicarSesion(merged[0]);
+      })
+      .catch(() => {
+        /* el caché local ya está */
+      });
+
+    void listarLibrosGimnasio(userId)
+      .then((r) => setLibros(r.libros))
+      .catch(() => {
+        /* sin libros todavía */
+      });
   }, [userId]);
+
+  const onTexto = (value: string) => {
+    setTexto(value);
+    tocadoRef.current = true;
+    guardarBorradorUmbral5(value);
+  };
 
   const abrir402 = (err: unknown) => {
     if (err instanceof Umbral5SaldoError) {
@@ -63,8 +129,25 @@ export default function CasaUmbral5() {
         userId,
         limiteConocido: texto,
       });
+      const ahora = new Date().toISOString();
+      const sesion: SesionUmbral5 = {
+        id: out.sesionUmbral5Id,
+        userId,
+        textoVolcado: out.textoVolcado,
+        lectura: null,
+        source: null,
+        estado: "VOLCADO_GRATIS",
+        createdAt: ahora,
+        updatedAt: ahora,
+      };
+      guardarSesionUmbral5Local(sesion);
+      setSesiones((prev) => [sesion, ...prev.filter((s) => s.id !== sesion.id)]);
       setSesionId(out.sesionUmbral5Id);
       setLectura(null);
+      setLibro(null);
+      setPreguntaGym(null);
+      setCopiaGym("");
+      setTopeDiario(false);
       setSaldo(out.saldo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo sellar el volcado.");
@@ -90,12 +173,93 @@ export default function CasaUmbral5() {
       });
       setLectura(out.lectura);
       setSaldo(out.saldo);
+      setSesiones((prev) => {
+        const next = prev.map((s) =>
+          s.id === out.sesionUmbral5Id
+            ? {
+                ...s,
+                lectura: out.lectura,
+                source: out.source,
+                estado: "MAPA_PAGO" as const,
+                updatedAt: new Date().toISOString(),
+              }
+            : s,
+        );
+        const actual = next.find((s) => s.id === out.sesionUmbral5Id);
+        if (actual) guardarSesionUmbral5Local(actual);
+        return next;
+      });
     } catch (err) {
       if (!abrir402(err)) {
         setError(err instanceof Error ? err.message : "Umbral no pudo leer el mapa.");
       }
     } finally {
       setLeyendo(false);
+    }
+  };
+
+  const aplicarGym = (payload: {
+    libro: LibroGimnasio;
+    pregunta: PreguntaViva | null;
+    copia: string;
+    topeDiario: boolean;
+  }) => {
+    setLibro(payload.libro);
+    setPreguntaGym(payload.pregunta);
+    setCopiaGym(payload.copia);
+    setTopeDiario(payload.topeDiario);
+    setLibros((prev) => [payload.libro, ...prev.filter((l) => l.id !== payload.libro.id)]);
+  };
+
+  const entrarGym = async () => {
+    if (!userId || !sesionId) return;
+    setError(null);
+    setAbriendoGym(true);
+    try {
+      const out = await abrirGimnasio({ userId, sesionUmbral5Id: sesionId });
+      aplicarGym(out);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo abrir el gimnasio.");
+    } finally {
+      setAbriendoGym(false);
+    }
+  };
+
+  const responderGym = async (textoRespuesta: string) => {
+    if (!userId || !libro) return;
+    setError(null);
+    setEnviandoGym(true);
+    try {
+      const out = await responderGimnasio({
+        userId,
+        libroId: libro.id,
+        respuesta: textoRespuesta,
+      });
+      aplicarGym(out);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "El maestro no pudo tomar el turno.");
+    } finally {
+      setEnviandoGym(false);
+    }
+  };
+
+  const continuarGym = async () => {
+    if (!userId || !libro) return;
+    setError(null);
+    try {
+      const out = await continuarGimnasio({ userId, libroId: libro.id });
+      aplicarGym(out);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Todavía no es el siguiente capítulo.");
+    }
+  };
+
+  const copiarGym = async () => {
+    if (!copiaGym) return;
+    try {
+      await navigator.clipboard.writeText(copiaGym);
+    } catch {
+      /* sin clipboard */
     }
   };
 
@@ -144,10 +308,19 @@ export default function CasaUmbral5() {
 
         <LienzoLimite
           texto={texto}
-          onTexto={setTexto}
+          onTexto={onTexto}
           onSellar={() => void sellar()}
           cargando={sellando}
           deshabilitado={!userId || sellando}
+        />
+
+        <HistorialLimite
+          sesiones={sesiones}
+          sesionActivaId={sesionId}
+          onSelect={(s) => {
+            tocadoRef.current = true;
+            aplicarSesion(s);
+          }}
         />
 
         {sesionId && !lectura && (
@@ -185,7 +358,38 @@ export default function CasaUmbral5() {
 
         {lectura && <PanelMapa lectura={lectura} />}
 
-        {lectura && <BannerGimnasio />}
+        {lectura && !libro && (
+          <BannerGimnasio
+            modulo={lectura.moduloGimnasio ?? null}
+            onEntrar={() => void entrarGym()}
+            cargando={abriendoGym}
+          />
+        )}
+
+        {libro && (
+          <ConsolaGimnasio
+            libro={libro}
+            pregunta={preguntaGym}
+            topeDiario={topeDiario}
+            onResponder={(t) => void responderGym(t)}
+            onContinuar={() => void continuarGym()}
+            onCopiar={() => void copiarGym()}
+            enviando={enviandoGym}
+          />
+        )}
+
+        <HistorialLibros
+          libros={libros}
+          libroActivoId={libro?.id ?? null}
+          onSelect={(l) => {
+            if (!userId) return;
+            void leerLibroGimnasio({ userId, libroId: l.id })
+              .then(aplicarGym)
+              .catch((err) => {
+                setError(err instanceof Error ? err.message : "No se pudo abrir el libro.");
+              });
+          }}
+        />
 
         <Link
           href="/menu"

@@ -3,10 +3,12 @@
  * Clasifica intento (C1–C3) y tipo. Nunca sienta C8–C10.
  */
 
+import { detectarModuloGimnasio } from "../gimnasio6/oferta.ts";
 import { CASA_UMBRAL5_FIRMA } from "./prompt.ts";
 import {
   CODIGOS_USUARIO,
   type CodigoUsuario,
+  type ModuloGimnasioOferta,
   type PisoIntento,
   type TipoLimite,
   type Umbral5Input,
@@ -202,6 +204,8 @@ export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
     tipoLimite: tipo,
     lecturaFria: lectura.lecturaFria.trim(),
     porQueNoEjecuta: lectura.porQueNoEjecuta.trim(),
+    moduloGimnasio:
+      lectura.moduloGimnasio === "social_producto" ? "social_producto" : null,
   };
 }
 
@@ -263,6 +267,7 @@ export function diagnosticarUmbral5Local(input: Umbral5Input): Umbral5Lectura {
       tipoLimite: null,
       lecturaFria: `${CASA_UMBRAL5_FIRMA} Sin límite escrito no hay asiento.`,
       porQueNoEjecuta: "No hay volcado.",
+      moduloGimnasio: null,
     };
   }
   const piso = detectarPisoIntento(texto);
@@ -280,8 +285,11 @@ export function diagnosticarUmbral5Local(input: Umbral5Input): Umbral5Lectura {
       lecturaFria:
         "Eso es mancha o queja. Pertenece al Espejo, no a esta casa. C1 no se gana por autoestima.",
       porQueNoEjecuta: "No hay límite ya nombrado. Hay queja.",
+      moduloGimnasio: null,
     });
   }
+
+  const modulo: ModuloGimnasioOferta = detectarModuloGimnasio(texto);
 
   return sellarLectura({
     codigoUsuario: codigo,
@@ -289,6 +297,7 @@ export function diagnosticarUmbral5Local(input: Umbral5Input): Umbral5Lectura {
     tipoLimite: tipo,
     lecturaFria: lecturaDelAsiento(codigo, piso, tipo, hayIntentoClaro),
     porQueNoEjecuta: porqueDelAsiento(codigo, piso, tipo, hayIntentoClaro),
+    moduloGimnasio: modulo,
   });
 }
 
@@ -332,6 +341,9 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
   if (!lectura || !porque) {
     return { ok: false, error: "Faltan campos de texto de la lectura." };
   }
+  const moduloRaw = o.moduloGimnasio;
+  const modulo: ModuloGimnasioOferta =
+    moduloRaw === "social_producto" ? "social_producto" : null;
   return {
     ok: true,
     result: sellarLectura({
@@ -340,8 +352,19 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
       tipoLimite: tipo,
       lecturaFria: lectura,
       porQueNoEjecuta: porque,
+      moduloGimnasio: modulo,
     }),
   };
+}
+
+export function adjuntarModuloGimnasio(
+  lectura: Umbral5Lectura,
+  limite: string,
+): Umbral5Lectura {
+  if (esQuejaEspejo(limite) && /queja/i.test(lectura.porQueNoEjecuta)) {
+    return { ...lectura, moduloGimnasio: null };
+  }
+  return { ...lectura, moduloGimnasio: detectarModuloGimnasio(limite) };
 }
 
 export function evaluarUmbral5(input: Umbral5Input): Umbral5Lectura {

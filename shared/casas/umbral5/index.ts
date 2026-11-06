@@ -23,6 +23,7 @@ export {
 
 export type {
   CodigoUsuario,
+  ModuloGimnasioOferta,
   PisoIntento,
   TipoLimite,
   Umbral5Input,
@@ -37,6 +38,7 @@ export { CREDITO_LECTURA_MAPA, mensajeSaldoInsuficiente } from "./creditos.ts";
 export type { EstadoSesionUmbral5, SesionUmbral5 } from "./sesion.ts";
 
 export {
+  adjuntarModuloGimnasio,
   detectarPisoIntento,
   detectarTipoLimite,
   diagnosticarUmbral5Local,

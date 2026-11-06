@@ -39,5 +39,23 @@ describe("Casa 5 Umbral — cableado A–D", () => {
     assert.match(src, /initUmbral5SesionesTable/);
     assert.match(src, /wallet: juezCreditWallet/);
     assert.match(src, /registerUmbralV2Routes/);
+    const engine = readFileSync(join(root, "server/services/umbral5Engine.ts"), "utf8");
+    assert.match(engine, /GET \/api\/casas\/umbral5\/sesiones/);
+    assert.match(engine, /listarSesionesUmbral5/);
+  });
+
+  it("el gimnasio se registra sin nueva puerta y sin tocar /umbral", () => {
+    const src = readFileSync(join(root, "server/index.ts"), "utf8");
+    assert.match(src, /registerGimnasio6Routes/);
+    assert.match(src, /initGimnasio6LibrosTable/);
+    const app = readFileSync(join(root, "client/src/App.tsx"), "utf8");
+    assert.match(app, /path="\/limite"/);
+    assert.match(app, /path="\/umbral"/);
+    assert.doesNotMatch(app, /path="\/gimnasio"/);
+    const ritual = readFileSync(join(root, "shared/casas/umbral5/prompt.ts"), "utf8");
+    assert.match(ritual, /¿Cuál es tu límite\?/);
+    const gymPrompt = readFileSync(join(root, "shared/casas/gimnasio6/prompt.ts"), "utf8");
+    assert.match(gymPrompt, /¿Cuál es tu límite\?/);
+    assert.match(gymPrompt, /capa profunda/);
   });
 });
