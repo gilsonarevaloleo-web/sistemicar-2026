@@ -28,13 +28,14 @@ describe("Casa 5 Umbral — UI", () => {
   it("el mapa muestra asiento, tipo y no sienta C10", () => {
     const html = renderToStaticMarkup(
       createElement(PanelMapa, {
-        lectura: {
-          codigoUsuario: 7,
-          pisoIntento: 1,
-          tipoLimite: "impronta",
-          lecturaFria: "El tipo es impronta. Se nombra. El asiento es C7.",
-          porQueNoEjecuta: "Está estampada. El origen no se habita.",
-        },
+            lectura: {
+              codigoUsuario: 7,
+              pisoIntento: 1,
+              tipoLimite: "impronta",
+              lecturaFria: "El tipo es impronta. Se nombra. El asiento es C7.",
+              porQueNoEjecuta: "Está estampada. El origen no se habita.",
+              moduloGimnasio: null,
+            },
       }),
     );
     assert.match(html, /C7/);
@@ -44,12 +45,24 @@ describe("Casa 5 Umbral — UI", () => {
     assert.doesNotMatch(html, />C10</);
   });
 
-  it("el gimnasio está cerrado", () => {
-    const html = renderToStaticMarkup(createElement(BannerGimnasio));
-    assert.match(html, /umbral5-gimnasio-cerrado/);
-    assert.match(html, /Forja \/ Arena/);
-    assert.match(html, /Cerrado/);
-    assert.match(html, /disabled/);
+  it("el gimnasio se ofrece cuando el módulo es exposición social", () => {
+    const cerrado = renderToStaticMarkup(
+      createElement(BannerGimnasio, { modulo: null }),
+    );
+    assert.match(cerrado, /umbral5-gimnasio-cerrado/);
+    assert.match(cerrado, /Cerrado/);
+    assert.match(cerrado, /disabled/);
+    assert.doesNotMatch(cerrado, /Forja \/ Arena/);
+
+    const oferta = renderToStaticMarkup(
+      createElement(BannerGimnasio, {
+        modulo: "social_producto",
+        onEntrar: () => {},
+      }),
+    );
+    assert.match(oferta, /umbral5-gimnasio-oferta/);
+    assert.match(oferta, /Entrar al gimnasio/);
+    assert.match(oferta, /capa profunda/);
   });
 
   it("el historial lista volcados guardados", () => {
@@ -66,6 +79,7 @@ describe("Casa 5 Umbral — UI", () => {
               tipoLimite: null,
               lecturaFria: "El asiento es C1.",
               porQueNoEjecuta: "Cero acto.",
+              moduloGimnasio: "social_producto",
             },
             source: "local_fallback",
             estado: "MAPA_PAGO",

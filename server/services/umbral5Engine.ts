@@ -1,6 +1,7 @@
 /**
  * Servicio de La Casa 5: Umbral.
- * Volcado gratis. Lectura-mapa a 1 crédito. Sin gimnasio en A–D.
+ * Volcado gratis. Lectura-mapa a 1 crédito.
+ * El gimnasio es capa profunda: se ofrece después del mapa, no cambia la entrada.
  */
 
 import type { Express, Request, Response } from "express";
@@ -13,6 +14,7 @@ import {
   CREDITO_LECTURA_MAPA,
   PROMPT_UMBRAL5,
   buildUmbral5Prompt,
+  adjuntarModuloGimnasio,
   diagnosticarUmbral5Local,
   mensajeSaldoInsuficiente,
   parseUmbral5Lectura,
@@ -110,7 +112,10 @@ async function dictaminar(
       const raw = await callGemini(buildUmbral5Prompt(input), 1024, true);
       const parsed = parseUmbral5Lectura(raw);
       if (parsed.ok) {
-        return { lectura: parsed.result, source: "gemini" };
+        return {
+          lectura: adjuntarModuloGimnasio(parsed.result, input.limiteConocido),
+          source: "gemini",
+        };
       }
     } catch (error) {
       console.warn("[umbral5Engine] Gemini falló → fallback local:", error);

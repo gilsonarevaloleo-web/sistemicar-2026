@@ -110,6 +110,7 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(lectura.creditosDescontados, CREDITO_LECTURA_MAPA);
     assert.equal(lectura.saldo, 1);
     assert.equal(lectura.lectura.codigoUsuario, 1);
+    assert.equal(lectura.lectura.moduloGimnasio, "social_producto");
     assert.equal(lectura.source, "local_fallback");
     const otra = await ejecutarLecturaMapa("u1", volcado.sesionUmbral5Id, {
       wallet,
