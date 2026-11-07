@@ -9,7 +9,7 @@ import {
   sellarLectura,
 } from "./index.ts";
 
-describe("Casa 5 Umbral — motor", () => {
+describe("Casa 6 Umbral — motor", () => {
   it("tu caso: ya lo sé, no hice nada → C1", () => {
     const texto =
       "El Juez dijo que mi aumento está débil para poder ser vendedor. La mente arma una coartada. Ya sé cuál es mi límite. No hice nada.";

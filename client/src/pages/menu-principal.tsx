@@ -140,14 +140,6 @@ function buildMenuItems(
       color: "#00FFC3",
     },
     {
-      id: "umbral-v2",
-      title: "UMBRAL V2",
-      subtitle: "Consola · 10 Códigos · Espejo / Arena",
-      icon: Zap,
-      route: "/umbral/v2",
-      color: "#D4AF37",
-    },
-    {
       id: "deposito-v3",
       title: "DEPÓSITO V3",
       subtitle: "Universidad · óptica + carácter + Δ",
@@ -164,8 +156,16 @@ function buildMenuItems(
       color: "#B8B4A8",
     },
     {
-      id: "umbral-casa5",
-      title: "CASA 5 UMBRAL",
+      id: "oficio-casa5",
+      title: "CASA 5 OFICIO",
+      subtitle: "¿Qué se te debe? · 10 códigos del deber",
+      icon: Zap,
+      route: "/umbral/entrada",
+      color: "#D4AF37",
+    },
+    {
+      id: "umbral-casa6",
+      title: "CASA 6 UMBRAL",
       subtitle: "¿Cuál es tu límite? · mapa de intento",
       icon: DoorOpen,
       route: "/limite",
@@ -926,8 +926,9 @@ export default function MenuPrincipal() {
                       ) {
                         prefetchEspejoChunk();
                       } else if (
-                        item.id === "umbral-v2" ||
-                        item.route === "/umbral/v2"
+                        item.id === "oficio-casa5" ||
+                        item.route === "/umbral/v2" ||
+                        item.route === "/umbral/entrada"
                       ) {
                         prefetchUmbralV2Chunk();
                       }

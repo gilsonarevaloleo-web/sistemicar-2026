@@ -14,10 +14,10 @@ import {
   buildUmbral5UserPrompt,
 } from "./index.ts";
 
-describe("Casa 5 Umbral — prompt", () => {
+describe("Casa 6 Umbral — prompt", () => {
   it("fija identidad, ritual y axiomas", () => {
-    assert.equal(CASA_UMBRAL5_VERSION, "1.0.0-umbral-casa5");
-    assert.equal(CASA_UMBRAL5_NOMBRE, "La Casa 5: Umbral");
+    assert.equal(CASA_UMBRAL5_VERSION, "1.1.0-umbral-casa6");
+    assert.equal(CASA_UMBRAL5_NOMBRE, "La Casa 6: Umbral");
     assert.equal(CASA_UMBRAL5_MARCA, "Umbral");
     assert.match(CASA_UMBRAL5_FIRMA, /Sabés qué hacer/);
     assert.equal(CASA_UMBRAL5_RITUAL, "¿Cuál es tu límite?");
@@ -41,6 +41,7 @@ describe("Casa 5 Umbral — prompt", () => {
       limiteConocido: "El Juez dijo que el aumento está débil. Ya lo sé. No hice nada.",
     });
     assert.match(user, /aumento está débil/);
+    assert.match(user, /Planeta: 6 · Casa · Umbral/);
     assert.match(user, /No le asignes C8, C9 ni C10/);
     assert.equal(
       buildUmbral5Prompt({

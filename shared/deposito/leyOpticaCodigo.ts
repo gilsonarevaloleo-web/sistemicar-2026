@@ -237,7 +237,7 @@ Si alguien la archiva en esas cajas, la ley se diluyó. Recupera la firma.
 ═══ RELACIÓN CON LAS HERMANAS ═══
 
 Cascada (Doctor / editorial): QUÉ falla si saltas el código N.
-Carácter-Código (Umbral / Maestro): CÓMO se enseña a cruzar el código N.
+Carácter-Código (Oficio / Maestro): CÓMO se perfecciona el deber en el 5.
 Óptica-Código (Depósito): CON QUÉ se ve el mismo hecho.
 Casa-Umbral: EN QUÉ MUNDO estás parado. El Depósito es planeta 2 (casa).
 

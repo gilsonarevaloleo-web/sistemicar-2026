@@ -1,6 +1,6 @@
 /**
- * Contratos de La Casa 5: Umbral.
- * El usuario ya sabe el límite. El código no es queja.
+ * Contratos de La Casa 6: Umbral.
+ * El usuario ya sabe el límite. El código no es queja. No es Oficio.
  * C8–C10 son dominio nuestro: nunca se le asignan.
  */
 

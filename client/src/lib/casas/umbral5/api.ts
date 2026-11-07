@@ -1,5 +1,5 @@
 /**
- * Cliente de La Casa 5: Umbral.
+ * Cliente de La Casa 6: Umbral.
  * Volcado gratis. Lectura-mapa a 1 crédito del ledger del Juez.
  */
 

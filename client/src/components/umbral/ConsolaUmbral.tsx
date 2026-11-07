@@ -61,7 +61,11 @@ import { CardCartaCruce } from "./CardCartaCruce";
 import { CardOfertaArena } from "./CardOfertaArena";
 import { CardPerfilCliente } from "./CardPerfilCliente";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
-import { PLANETA_UMBRAL } from "@shared/planetas/leyCasasUmbral";
+import { PLANETA_OFICIO } from "@shared/planetas/leyCasasUmbral";
+import {
+  CASA_OFICIO_MARCA,
+  CASA_OFICIO_RITUAL_CORTO,
+} from "@shared/umbral/oficioCasa";
 import {
   anclarTextoAOferta,
   aplicarSelloOferta,
@@ -619,7 +623,7 @@ export function ConsolaUmbral({
           style={{ color: GOLD }}
         >
           <Lock size={14} />
-          UMBRAL · ACCESO COMPLETO
+          OFICIO · ACCESO COMPLETO
         </p>
         <h2
           className="mt-2 text-xl font-black text-white"
@@ -778,10 +782,10 @@ export function ConsolaUmbral({
               style={{ color: GOLD }}
               data-testid="umbral-v2-header"
             >
-              UMBRAL · CARÁCTER-CÓDIGO
+              {CASA_OFICIO_MARCA.toUpperCase()} · {CASA_OFICIO_RITUAL_CORTO}
             </p>
             <p className="mt-1 text-[11px] text-white/40">
-              Ley del Carácter del Código · el Maestro se vuelve la voz del
+              Casa 5 · 10 códigos del deber · el Maestro se vuelve la voz del
               obstáculo para que termines los diez
             </p>
           </div>
@@ -1037,7 +1041,7 @@ export function ConsolaUmbral({
 
           {!mostrarPaywall && !codigoBloqueadoPorPago && !arenaSinOferta && (
             <>
-              <CardLeyCasasUmbral planetaActivo={PLANETA_UMBRAL} />
+              <CardLeyCasasUmbral planetaActivo={PLANETA_OFICIO} />
               <CardLeyCaracterCodigo />
               <CardMaestroCodigo codigo={cfg.numero} modo={modo} />
             </>

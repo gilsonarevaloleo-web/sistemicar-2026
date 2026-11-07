@@ -1,5 +1,5 @@
 /**
- * Motor local de La Casa 5: Umbral.
+ * Motor local de La Casa 6: Umbral.
  * Clasifica intento (C1–C3) y tipo. Nunca sienta C8–C10.
  */
 

@@ -7,7 +7,7 @@
  * - Carácter-Código dice CÓMO se enseña a cruzarlo.
  *
  * Autor del ensamble: Gilson Arévalo Pezo (el Maestro) · SISTEMICAR
- * Uso: Umbral (Forja / Arena). Planeta 8 · Puerta (salto 3→8).
+ * Uso: Oficio (Forja / Arena). Planeta 5 · Casa. Círculo cerrado de 10 códigos.
  * No diluir en coaching empático ni en DISC.
  */
 
@@ -79,8 +79,8 @@ ${LEY_CARACTER_CODIGO_FIRMA}
 
 ═══ EL PRINCIPIO ═══
 
-El Umbral no es un quiz de ventas ni un espejo clínico.
-Es una secuencia de diez puertas. Cada puerta tiene carácter.
+El Oficio no es un quiz de ventas ni un espejo clínico.
+Es una secuencia de diez códigos. Cada código tiene carácter.
 El Maestro no se pone en el lugar del alumno (eso es coaching).
 El Maestro no se pone en el lugar del tipo psicológico del cliente (eso es DISC).
 El Maestro SE VUELVE la voz del código activo.
@@ -131,9 +131,9 @@ Si alguien la archiva en esas cajas, la ley se diluyó. Recupera la firma.
 ═══ RELACIÓN CON LAS HERMANAS ═══
 
 Cascada (Doctor / editorial): QUÉ falla si saltas el código N.
-Carácter-Código (Umbral / Maestro): CÓMO se enseña a cruzar el código N.
+Carácter-Código (Oficio / Maestro): CÓMO se perfecciona el deber en el 5.
 Óptica-Código (Depósito): CON QUÉ se ve el mismo hecho.
-Casa-Umbral: EN QUÉ MUNDO estás parado (2 = casa; 8 = puerta).
+Casa-Umbral: EN QUÉ MUNDO estás parado (5 = Oficio; 6 = Umbral).
 
 Arquitectura, pedagogía, óptica y mapa de mundos.
 

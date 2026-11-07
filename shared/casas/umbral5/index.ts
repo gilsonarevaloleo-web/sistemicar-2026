@@ -1,5 +1,5 @@
 /**
- * La Casa 5: Umbral.
+ * La Casa 6: Umbral.
  * El límite ya está nombrado. C8–C10 son dominio nuestro.
  */
 

@@ -4,7 +4,7 @@ import { CASA_UMBRAL5_RITUAL } from "@shared/casas/umbral5";
 export const UMBRAL5_BRONZE = "#C4A06A";
 export const UMBRAL5_ASH = "#7A6A52";
 export const PLACEHOLDER_LIMITE =
-  "El Juez ya lo nombró. Escribí el límite que ya sabés. No la queja.";
+  "Escribí el límite que ya sabés. No la queja. No el oficio.";
 
 export function LienzoLimite({
   texto,

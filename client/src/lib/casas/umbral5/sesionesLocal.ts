@@ -1,5 +1,5 @@
 /**
- * Caché local de volcados de Casa 5.
+ * Caché local de volcados de Casa 6.
  * El servidor (Postgres, como el Juez) es la fuente.
  * Esto sobrevive recarga y serverless sin memoria.
  */

@@ -8,7 +8,7 @@ import { BannerGimnasio } from "./BannerGimnasio.tsx";
 import { ModalSaldoInsuficiente } from "./ModalSaldoInsuficiente.tsx";
 import { HistorialLimite } from "./HistorialLimite.tsx";
 
-describe("Casa 5 Umbral — UI", () => {
+describe("Casa 6 Umbral — UI", () => {
   it("el lienzo muestra el ritual y el volcado gratis", () => {
     const html = renderToStaticMarkup(
       createElement(LienzoLimite, {
@@ -20,7 +20,7 @@ describe("Casa 5 Umbral — UI", () => {
       }),
     );
     assert.match(html, /¿Cuál es tu límite\?/);
-    assert.match(html, /El Juez ya lo nombró/);
+    assert.match(html, /Escribí el límite que ya sabés/);
     assert.match(html, /Sellar volcado \(gratis\)/);
     assert.match(html, /umbral5-volcado/);
   });

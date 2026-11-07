@@ -1,5 +1,5 @@
 /**
- * Precio de la lectura-mapa de la Casa 5.
+ * Precio de la lectura-mapa de la Casa 6.
  * El volcado es gratis. El gimnasio no cobra crédito.
  */
 
