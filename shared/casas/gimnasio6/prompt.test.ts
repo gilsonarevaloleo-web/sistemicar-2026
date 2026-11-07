@@ -19,6 +19,7 @@ describe("Gimnasio 6 — prompt del maestro", () => {
   it("el maestro hace pasar, no suspende, no da clase de venta, C3 no es reloj", () => {
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /hacerle pasar/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /variante/i);
+    assert.match(GIMNASIO6_SYSTEM_PROMPT, /ya contestó/);
     assert.doesNotMatch(GIMNASIO6_SYSTEM_PROMPT, /te acompaño/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /No calificás el pitch/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /C3 ES SECUENCIA, NO RELOJ/);

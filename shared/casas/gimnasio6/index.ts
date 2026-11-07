@@ -61,5 +61,6 @@ export {
   puedeAbrirCapitulo,
   preguntaVivaDe,
   recursosVacios,
+  resolverEvaluacion,
   textoCopiaLibro,
 } from "./motor.ts";

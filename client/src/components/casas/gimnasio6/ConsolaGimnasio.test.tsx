@@ -48,4 +48,30 @@ describe("Consola gimnasio", () => {
     assert.doesNotMatch(html, /fallaste/);
     assert.doesNotMatch(html, /conocimiento sobre tu producto/);
   });
+
+  it("muestra el aviso del maestro junto al recuadro, no arriba de la pantalla", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConsolaGimnasio, {
+        libro,
+        pregunta: {
+          escenario: "Imagina que esa intención llega a 10.",
+          pregunta:
+            "¿Marcaría una diferencia si tu intención de prioridad de vender llegara a nivel 10, y cómo sería esa situación?",
+          capitulo: 1,
+          subcodigo: 2,
+          indice: 3,
+          variante: 0,
+          etiquetaCapitulo: "Seguridad en tu producto",
+        },
+        topeDiario: false,
+        onResponder: () => {},
+        onCopiar: () => {},
+        enviando: false,
+        aviso: "El maestro no pudo tomar el turno.",
+      }),
+    );
+    assert.match(html, /gimnasio6-aviso/);
+    assert.match(html, /El maestro no pudo tomar el turno/);
+    assert.match(html, /Respondé desde el cuarto/);
+  });
 });

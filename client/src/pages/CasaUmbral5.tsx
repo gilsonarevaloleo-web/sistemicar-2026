@@ -375,6 +375,7 @@ export default function CasaUmbral5() {
             onContinuar={() => void continuarGym()}
             onCopiar={() => void copiarGym()}
             enviando={enviandoGym}
+            aviso={error}
           />
         )}
 

@@ -24,10 +24,11 @@ function normalizar(texto: string): string {
     .trim();
 }
 
+const NIEBLA_TOTAL =
+  /^(no se|ns|nada|ok|bueno|mas o menos|este|ya|si|no|no se si)$/;
+
 const NIEBLA = [
-  /^(no se|no se|ns|nada|ok|bueno|mas o menos|este|ya|si|no)$/,
   /\bmas o menos\b/,
-  /\bno se\b/,
   /\bla gente\b/,
   /\bdespues hablamos\b/,
   /\bno es para (mi|vos|el|ella|ellos)\b/,
@@ -61,6 +62,9 @@ function esCorto(texto: string): boolean {
 }
 
 function hayNiebla(norm: string): boolean {
+  if (NIEBLA_TOTAL.test(norm)) return true;
+  // «no se» solo es niebla en respuestas cortas. En un texto largo es español normal.
+  if (norm.length < 28 && /\bno se\b/.test(norm)) return true;
   return NIEBLA.some((p) => p.test(norm));
 }
 
@@ -175,6 +179,24 @@ export function parseEvaluacion(raw: unknown): EvaluacionTurno | null {
     pasa: o.pasa,
     motivo: typeof o.motivo === "string" && o.motivo.trim() ? o.motivo.trim() : o.pasa ? "Roce." : "Sin roce.",
   };
+}
+
+/**
+ * Gemini puede hacer pasar. No puede retener a quien ya contestó el cuarto.
+ * Una sola variante extra si el maestro pide ir más cerca; la segunda con
+ * sustancia avanza. Si Gemini no llega, vale el motor local.
+ */
+export function resolverEvaluacion(
+  local: EvaluacionTurno,
+  remota: EvaluacionTurno | null,
+  variante: number,
+): EvaluacionTurno {
+  if (remota?.pasa) return remota;
+  if (local.pasa) {
+    if (!remota || variante >= 1) return local;
+    return remota;
+  }
+  return remota ?? local;
 }
 
 export function preguntaVivaDe(libro: LibroGimnasio): PreguntaViva | null {

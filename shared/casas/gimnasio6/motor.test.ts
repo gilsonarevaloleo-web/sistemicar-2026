@@ -11,6 +11,7 @@ import {
   puedeAbrirCapitulo,
   preguntaVivaDe,
   recursosVacios,
+  resolverEvaluacion,
 } from "./motor.ts";
 import { copiarLibro } from "./prompt.ts";
 import type { LibroGimnasio } from "./types.ts";
@@ -121,5 +122,30 @@ describe("Gimnasio 6 — motor", () => {
     const esc = fluidezVariante(p, "estoy más o menos", 1);
     assert.match(esc, /más o menos/);
     assert.match(esc, /mismo cuarto/);
+  });
+
+  it("la situación del 10 no se traba por un «no sé» dentro de una respuesta concreta", () => {
+    const p = preguntaCanon(1, 2, 3)!;
+    const niebla = evaluarRespuestaLocal(p, "no sé");
+    assert.equal(niebla.pasa, false);
+    const concreta = evaluarRespuestaLocal(
+      p,
+      "No sé si la diferencia sería chica o enorme, pero el 10 sería vender antes del depósito y grabar el video el mismo día, con la prioridad puesta ahí.",
+    );
+    assert.equal(concreta.pasa, true);
+  });
+
+  it("Gemini no retiene una respuesta con sustancia más de una variante", () => {
+    const local = { pasa: true, motivo: "Roce." };
+    const remota = { pasa: false, motivo: "Sin roce." };
+    assert.equal(resolverEvaluacion(local, remota, 0).pasa, false);
+    assert.equal(resolverEvaluacion(local, remota, 1).pasa, true);
+    assert.equal(resolverEvaluacion(local, null, 0).pasa, true);
+    assert.equal(resolverEvaluacion({ pasa: false, motivo: "Niebla." }, remota, 0).pasa, false);
+    assert.equal(
+      resolverEvaluacion({ pasa: false, motivo: "Niebla." }, { pasa: true, motivo: "Roce." }, 0)
+        .pasa,
+      true,
+    );
   });
 });
