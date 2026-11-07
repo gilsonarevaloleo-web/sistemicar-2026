@@ -18,6 +18,7 @@ import {
   puedeAbrirCapitulo,
   preguntaVivaDe,
   recursosVacios,
+  resolverEvaluacion,
   textoCopiaLibro,
 } from "../../shared/casas/gimnasio6/motor.ts";
 import { serializarPromptGimnasio6 } from "../../shared/casas/gimnasio6/prompt.ts";
@@ -41,6 +42,24 @@ export interface Gimnasio6EngineDeps {
   callGemini?: Gimnasio6GeminiCaller;
   store?: Gimnasio6Store;
   umbral5Store?: Umbral5SessionStore;
+  /** Tope para no perder el turno si Gemini se cuelga (Netlify corta la función). */
+  geminiTimeoutMs?: number;
+}
+
+const GEMINI_TURNO_MS = 5000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("gimnasio6 Gemini timeout")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export interface Gimnasio6EngineErr {
@@ -79,6 +98,7 @@ async function evaluarTurno(
   libro: LibroGimnasio,
   respuesta: string,
   callGemini?: Gimnasio6GeminiCaller,
+  geminiTimeoutMs: number = GEMINI_TURNO_MS,
 ) {
   const canon = preguntaCanon(
     libro.puntero.capitulo,
@@ -96,20 +116,25 @@ async function evaluarTurno(
     },
     respuesta,
   );
+  // Ya raspó y no es la primera variante: no esperamos a Gemini para no perder el turno.
+  if (local.pasa && libro.puntero.variante >= 1) return local;
   if (!callGemini || !canon) return local;
   try {
-    const raw = await callGemini(
-      serializarPromptGimnasio6({
-        limiteOrigen: libro.limiteOrigen,
-        pregunta: canon,
-        respuesta,
-        variante: libro.puntero.variante,
-      }),
-      512,
-      true,
+    const raw = await withTimeout(
+      callGemini(
+        serializarPromptGimnasio6({
+          limiteOrigen: libro.limiteOrigen,
+          pregunta: canon,
+          respuesta,
+          variante: libro.puntero.variante,
+        }),
+        512,
+        true,
+      ),
+      geminiTimeoutMs,
     );
     const parsed = parseEvaluacion(raw);
-    if (parsed) return parsed;
+    return resolverEvaluacion(local, parsed, libro.puntero.variante);
   } catch (error) {
     console.warn("[gimnasio6Engine] Gemini falló → fallback local:", error);
   }
@@ -223,7 +248,12 @@ export async function responderGimnasio(
     };
   }
 
-  const evaluacion = await evaluarTurno(libro, texto, deps.callGemini);
+  const evaluacion = await evaluarTurno(
+    libro,
+    texto,
+    deps.callGemini,
+    deps.geminiTimeoutMs ?? GEMINI_TURNO_MS,
+  );
   const next = aplicarRespuesta(libro, texto, evaluacion);
   await store.save(next);
   return { ok: true, ...payloadVivo(next) };
@@ -299,6 +329,7 @@ export function registerGimnasio6Routes(
     callGemini: deps.callGemini,
     store: deps.store ?? createDefaultGimnasio6Store(),
     umbral5Store: deps.umbral5Store ?? createDefaultUmbral5Store(),
+    geminiTimeoutMs: deps.geminiTimeoutMs,
   };
 
   app.get("/api/casas/gimnasio6/meta", (_req: Request, res: Response) => {

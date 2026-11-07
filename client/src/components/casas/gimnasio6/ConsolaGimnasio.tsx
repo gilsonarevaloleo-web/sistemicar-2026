@@ -1,4 +1,4 @@
-import React, { type FormEvent, useState } from "react";
+import React, { type FormEvent, useEffect, useRef, useState } from "react";
 import type { LibroGimnasio, PreguntaViva } from "@shared/casas/gimnasio6";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "../umbral5/LienzoLimite";
 
@@ -10,6 +10,7 @@ export function ConsolaGimnasio({
   onContinuar,
   onCopiar,
   enviando,
+  aviso,
 }: {
   libro: LibroGimnasio;
   pregunta: PreguntaViva | null;
@@ -18,14 +19,28 @@ export function ConsolaGimnasio({
   onContinuar?: () => void;
   onCopiar: () => void;
   enviando: boolean;
+  aviso?: string | null;
 }) {
   const [texto, setTexto] = useState("");
+  const enviandoRef = useRef(false);
+  const turnoCount = libro.turnos.length;
+  const punteroClave = `${libro.id}:${libro.puntero.capitulo}.${libro.puntero.subcodigo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
+
+  useEffect(() => {
+    enviandoRef.current = enviando;
+  }, [enviando]);
+
+  // Solo se vacía cuando el libro realmente avanzó o guardó el turno.
+  // Si el maestro no responde, el texto se queda.
+  useEffect(() => {
+    setTexto("");
+  }, [punteroClave]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (enviando || texto.trim().length < 1) return;
+    if (enviando || enviandoRef.current || texto.trim().length < 1) return;
+    enviandoRef.current = true;
     onResponder(texto);
-    setTexto("");
   };
 
   return (
@@ -47,7 +62,7 @@ export function ConsolaGimnasio({
         </button>
       </header>
 
-      {libro.turnos.slice(-4).map((t) => (
+      {libro.turnos.slice(-8).map((t) => (
         <article
           key={t.id}
           className="border px-4 py-3"
@@ -85,7 +100,13 @@ export function ConsolaGimnasio({
 
       {pregunta && !topeDiario && libro.estado === "ABIERTO" && (
         <form onSubmit={handleSubmit} className="space-y-3" data-testid="gimnasio6-form">
-          <p className="text-sm leading-relaxed text-white/55">{pregunta.escenario}</p>
+          <p
+            className={`text-sm leading-relaxed ${pregunta.variante > 0 ? "" : "text-white/55"}`}
+            style={pregunta.variante > 0 ? { color: UMBRAL5_BRONZE } : undefined}
+            data-testid="gimnasio6-escenario"
+          >
+            {pregunta.escenario}
+          </p>
           <p
             className="text-lg font-light leading-snug"
             style={{ color: UMBRAL5_BRONZE }}
@@ -97,11 +118,17 @@ export function ConsolaGimnasio({
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={5}
-            className="w-full resize-y bg-black/60 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25"
+            disabled={enviando}
+            className="w-full resize-y bg-black/60 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25 disabled:opacity-70"
             style={{ border: `1px solid ${UMBRAL5_BRONZE}33` }}
             placeholder="Respondé desde el cuarto. No desde la teoría."
             data-testid="gimnasio6-respuesta"
           />
+          {aviso && (
+            <p className="text-sm text-red-400/80" data-testid="gimnasio6-aviso">
+              {aviso}
+            </p>
+          )}
           <button
             type="submit"
             disabled={enviando || texto.trim().length < 1}
