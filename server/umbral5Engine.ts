@@ -1,5 +1,5 @@
 /**
- * Reexporta el servicio de La Casa 5: Umbral.
+ * Reexporta el servicio de La Casa 6: Umbral.
  */
 
 export {

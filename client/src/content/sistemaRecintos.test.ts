@@ -24,6 +24,11 @@ describe("sistemaRecintos — oferta actual", () => {
     assert.match(`${jornada?.oneLiner} ${jornada?.detail}`, /ring de conquista/i);
     assert.match(`${jornada?.detail}`, /ring de enfoque/i);
     assert.equal(jornada?.exploreHref, "/jornada-base");
+    const oficio = SISTEMA_RECINTOS.find((r) => r.id === "umbral");
+    assert.equal(oficio?.name, "Oficio");
+    assert.equal(oficio?.ritual, "¿Qué se te debe?");
+    assert.equal(oficio?.exploreHref, "/umbral/entrada");
+    assert.doesNotMatch(oficio?.ritual ?? "", /límite/i);
   });
 
   it("cada recinto tiene ritual, detalle y un día encaja", () => {
@@ -35,7 +40,7 @@ describe("sistemaRecintos — oferta actual", () => {
     assert.equal(SISTEMA_DIA.length, 4);
     assert.deepEqual(
       SISTEMA_DIA.map((p) => p.recinto),
-      ["Espejo", "Depósito", "Jornada", "Umbral"],
+      ["Espejo", "Depósito", "Jornada", "Oficio"],
     );
   });
 });

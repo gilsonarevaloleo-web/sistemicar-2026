@@ -1,5 +1,5 @@
 /**
- * Persistencia de sesiones de la Casa 5: Umbral.
+ * Persistencia de sesiones de la Casa 6: Umbral.
  * Memoria en tests; Postgres si hay DATABASE_URL.
  */
 

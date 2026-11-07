@@ -455,7 +455,7 @@ export function DoctorIAChat() {
     "/umbral/entrada",
     "/umbral/metricas",
     "/esperanza", // Depósito V3: sin FAB sobre la auditoría
-    "/limite", // Casa 5: sin FAB sobre el volcado
+    "/limite", // Casa 6: sin FAB sobre el volcado
     "/deposito",
     "/deposito-v2",
     "/deposito-v3",

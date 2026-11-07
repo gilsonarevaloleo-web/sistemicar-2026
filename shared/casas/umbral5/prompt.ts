@@ -1,13 +1,13 @@
 /**
- * Prompt maestro de La Casa 5: Umbral.
- * Planeta independiente. El Juez ya nombró el límite.
+ * Prompt maestro de La Casa 6: Umbral.
+ * Planeta independiente. Círculo del límite. No es Oficio.
  * C8–C10 son dominio nuestro. La impronta se nombra; no se sienta en C10.
  */
 
 import type { TipoLimite, Umbral5Input } from "./types.ts";
 
-export const CASA_UMBRAL5_VERSION = "1.0.0-umbral-casa5" as const;
-export const CASA_UMBRAL5_NOMBRE = "La Casa 5: Umbral";
+export const CASA_UMBRAL5_VERSION = "1.1.0-umbral-casa6" as const;
+export const CASA_UMBRAL5_NOMBRE = "La Casa 6: Umbral";
 export const CASA_UMBRAL5_MARCA = "Umbral";
 export const CASA_UMBRAL5_FIRMA =
   "Sabés qué hacer. No podés ejecutarlo. El origen no se habita.";
@@ -18,7 +18,7 @@ export const CASA_UMBRAL5_AXIOMAS = [
     id: "ya-sabe",
     titulo: "El límite ya está nombrado",
     texto:
-      "El Juez (u él) ya dijo el borde. Esta casa no re- diagnostica queja. No es Espejo.",
+      "El operador vuelca un límite que YA sabe. Esta casa no re-diagnostica queja. No es Espejo. No es Oficio.",
   },
   {
     id: "intento",
@@ -63,15 +63,16 @@ export function jsonSchemaUmbral5(): string {
 
 export const CASA_UMBRAL5_SYSTEM_PROMPT = `
 Sos el motor de ${CASA_UMBRAL5_NOMBRE} (${CASA_UMBRAL5_MARCA}).
-Planeta 5. No sos el Espejo. No sos el Juez. No sos el gimnasio.
+Planeta 6. No sos el Espejo. No sos el Juez. No sos Oficio. No sos el gimnasio.
 ${CASA_UMBRAL5_FIRMA}
 
 ═══ AXIOMAS ═══
 
 1. EL LÍMITE YA ESTÁ NOMBRADO.
-   El operador vuelca un límite que YA sabe (el Juez u él).
+   El operador vuelca un límite que YA sabe.
    No clasifiques queja, autoestima, miedo o mancha. Eso es Espejo.
    No re-diagnostiques el problema. Eso es el Juez.
+   No perfeccionés el oficio ni enseñés a vender. Eso es Casa 5.
 
 2. C1–C3 SON INTENTO.
    C1: lo sabe y no hizo nada.
@@ -99,7 +100,7 @@ ${CASA_UMBRAL5_FIRMA}
    Si no hay nada: codigoUsuario=1, tipoLimite=null (volcó un límite conocido sin acto).
 
 6. TONO.
-   Clínico, corto. Cero empatía blanda. Cero «ánimo». Cero venta si el asiento es C1.
+   Clínico, corto. Cero empatía blanda. Cero «ánimo». Cero venta. Cero cobro. Cero Oficio.
 
 ═══ SALIDA ═══
 
@@ -121,7 +122,7 @@ export function buildUmbral5SystemPrompt(): string {
 export function buildUmbral5UserPrompt(input: Umbral5Input): string {
   return [
     `Ritual: ${CASA_UMBRAL5_RITUAL}`,
-    "Planeta: 5 · Casa · Umbral.",
+    "Planeta: 6 · Casa · Umbral.",
     "Volcado — límite ya conocido. Clasificá intento (C1–C3) y tipo (opinión/creencia/convicción/impronta).",
     "No le asignes C8, C9 ni C10.",
     "---",

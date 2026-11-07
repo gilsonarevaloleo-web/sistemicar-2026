@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../../../../..");
 
-describe("Casa 5 Umbral — cableado A–D", () => {
+describe("Casa 6 Umbral — cableado A–D", () => {
   it("App monta /limite y no redirige /umbral vivo", () => {
     const src = readFileSync(join(root, "client/src/App.tsx"), "utf8");
     assert.match(src, /path="\/limite"/);
@@ -26,14 +26,39 @@ describe("Casa 5 Umbral — cableado A–D", () => {
     assert.match(src, /path: "\/umbral"/);
   });
 
-  it("menú ofrece Casa 5 sin tocar el tile de Umbral V2", () => {
+  it("menú ofrece Casa 6 Umbral y Casa 5 Oficio sin mezclarlos", () => {
     const src = readFileSync(join(root, "client/src/pages/menu-principal.tsx"), "utf8");
-    assert.match(src, /id: "umbral-casa5"/);
+    assert.match(src, /id: "umbral-casa6"/);
+    assert.match(src, /CASA 6 UMBRAL/);
     assert.match(src, /route: "\/limite"/);
-    assert.match(src, /route: "\/umbral\/v2"/);
+    assert.match(src, /id: "oficio-casa5"/);
+    assert.match(src, /CASA 5 OFICIO/);
+    assert.match(src, /route: "\/umbral\/entrada"/);
+    assert.doesNotMatch(src, /CASA 5 UMBRAL/);
+    const oficio = src.indexOf('id: "oficio-casa5"');
+    const umbral6 = src.indexOf('id: "umbral-casa6"');
+    assert.ok(oficio >= 0 && umbral6 >= 0 && oficio < umbral6, "Oficio (5) antes de Umbral (6)");
   });
 
-  it("el servidor registra Casa 5 y reusa la billetera del Juez", () => {
+  it("la pantalla /limite es planeta 6 y no manda al Oficio", () => {
+    const page = readFileSync(join(root, "client/src/pages/CasaUmbral5.tsx"), "utf8");
+    assert.match(page, /PLANETA C6/);
+    assert.doesNotMatch(page, /PLANETA C5/);
+    assert.doesNotMatch(page, /\/umbral\/v2/);
+    assert.doesNotMatch(page, /\/umbral\/entrada/);
+    const prompt = readFileSync(join(root, "shared/casas/umbral5/prompt.ts"), "utf8");
+    assert.match(prompt, /La Casa 6: Umbral/);
+    assert.match(prompt, /Planeta 6/);
+    assert.match(prompt, /No sos Oficio/);
+    const consola = readFileSync(
+      join(root, "client/src/components/umbral/ConsolaUmbral.tsx"),
+      "utf8",
+    );
+    assert.match(consola, /PLANETA_OFICIO/);
+    assert.doesNotMatch(consola, /planetaActivo=\{PLANETA_UMBRAL\}/);
+  });
+
+  it("el servidor registra Casa 6 y reusa la billetera del Juez", () => {
     const src = readFileSync(join(root, "server/index.ts"), "utf8");
     assert.match(src, /registerUmbral5Routes/);
     assert.match(src, /initUmbral5SesionesTable/);

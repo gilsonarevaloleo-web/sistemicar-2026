@@ -45,7 +45,7 @@ function sesion(
   };
 }
 
-describe("Casa 5 — caché local de volcados", () => {
+describe("Casa 6 — caché local de volcados", () => {
   beforeEach(() => {
     store.clear();
   });

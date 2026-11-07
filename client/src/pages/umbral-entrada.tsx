@@ -1,44 +1,40 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import { ArrowRight, Crosshair, Swords } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import {
-  UMBRAL_DIAGNOSTICO_PREGUNTAS,
-  resolverDiagnosticoUmbral,
-  type UmbralDiagnosticoOpcion,
-  type UmbralDiagnosticoOpcionId,
-} from "@shared/umbral/entradaDiagnostico";
-import { UMBRAL_SKU } from "@shared/umbralPricing";
+  CASA_OFICIO_FIRMA,
+  CASA_OFICIO_MARCA,
+  CASA_OFICIO_NOMBRE,
+  CASA_OFICIO_PLACEHOLDER,
+  CASA_OFICIO_RITUAL,
+  CASA_OFICIO_RITUAL_CORTO,
+} from "@shared/umbral/oficioCasa";
 
 const GOLD = "#D4AF37";
-const CYAN = "#00FFC3";
-const WARN = "#FF6B35";
+const DRAFT_KEY = "sistemicar.oficio.entrada.draft";
 
 /**
- * Entrada comercial Umbral: micro-diagnóstico → trial Código 1 → paywall.
+ * Entrada de Casa 5 Oficio: lienzo del deber → círculo de 10 códigos.
+ * No es el quiz de objeción. No manda al Umbral (casa 6).
  */
 export default function UmbralEntrada() {
-  const [paso, setPaso] = useState(0);
-  const [picks, setPicks] = useState<
-    Partial<Record<string, UmbralDiagnosticoOpcion>>
-  >({});
+  const [texto, setTexto] = useState("");
 
-  const pregunta = UMBRAL_DIAGNOSTICO_PREGUNTAS[paso];
-  const completo =
-    UMBRAL_DIAGNOSTICO_PREGUNTAS.every((p) => picks[p.id] != null);
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem(DRAFT_KEY);
+      if (draft) setTexto(draft);
+    } catch {
+      /* sin storage */
+    }
+  }, []);
 
-  const resultado = useMemo(() => {
-    if (!completo) return null;
-    const list = UMBRAL_DIAGNOSTICO_PREGUNTAS.map((p) => picks[p.id]!).filter(
-      Boolean,
-    );
-    return resolverDiagnosticoUmbral(list);
-  }, [completo, picks]);
-
-  function elegir(op: UmbralDiagnosticoOpcion) {
-    setPicks((prev) => ({ ...prev, [pregunta.id]: op }));
-    if (paso < UMBRAL_DIAGNOSTICO_PREGUNTAS.length - 1) {
-      window.setTimeout(() => setPaso((p) => p + 1), 180);
+  function onTexto(value: string) {
+    setTexto(value);
+    try {
+      localStorage.setItem(DRAFT_KEY, value);
+    } catch {
+      /* sin storage */
     }
   }
 
@@ -56,141 +52,51 @@ export default function UmbralEntrada() {
           className="text-[12px] tracking-[0.22em]"
           style={{ color: GOLD }}
         >
-          UMBRAL · ENTRADA
+          PLANETA C5 · {CASA_OFICIO_NOMBRE.toUpperCase()}
+        </p>
+        <p className="mt-2 text-[10px] tracking-[0.2em] text-white/40">
+          {CASA_OFICIO_MARCA.toUpperCase()} · {CASA_OFICIO_RITUAL_CORTO}
         </p>
         <h1
-          className="mt-2 text-3xl font-black text-white"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          className="mt-3 text-2xl font-light tracking-tight text-white md:text-3xl"
+          data-testid="umbral-entrada-ritual"
         >
-          ¿En qué Código te trabas?
+          {CASA_OFICIO_RITUAL}
         </h1>
-        <p className="mt-2 text-sm text-white/55">
-          Diagnóstico de 30 segundos. Luego entras a la Ley del Carácter del
-          Código: el Maestro se vuelve la voz del obstáculo — no un tour de
-          features.
+        <p className="mt-3 text-sm text-white/55">{CASA_OFICIO_FIRMA}</p>
+        <p className="mt-2 text-xs leading-relaxed text-white/40">
+          Un hecho de oficio. Sin pitch. Sin plan de negocio. Sin mandar al
+          Juez. Sin mandar al límite.
         </p>
 
-        {!resultado && pregunta && (
-          <motion.section
-            key={pregunta.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 space-y-3"
-            data-testid="umbral-entrada-pregunta"
-          >
-            <p className="text-[10px] tracking-[0.2em] text-white/40">
-              PREGUNTA {paso + 1} / {UMBRAL_DIAGNOSTICO_PREGUNTAS.length}
-            </p>
-            <h2 className="text-lg font-bold text-white/90">{pregunta.pregunta}</h2>
-            <div className="space-y-2">
-              {pregunta.opciones.map((op) => {
-                const active = picks[pregunta.id]?.id === op.id;
-                return (
-                  <button
-                    key={op.id as UmbralDiagnosticoOpcionId}
-                    type="button"
-                    onClick={() => elegir(op)}
-                    className="w-full border px-4 py-3 text-left text-sm transition-colors"
-                    style={{
-                      borderColor: active ? CYAN : "rgba(255,255,255,0.12)",
-                      background: active ? `${CYAN}14` : "rgba(0,0,0,0.4)",
-                      color: active ? CYAN : "rgba(255,255,255,0.75)",
-                    }}
-                    data-testid={`umbral-entrada-opcion-${op.id}`}
-                  >
-                    {op.label}
-                  </button>
-                );
-              })}
-            </div>
-            {paso > 0 && (
-              <button
-                type="button"
-                onClick={() => setPaso((p) => Math.max(0, p - 1))}
-                className="text-[11px] tracking-widest text-white/35 hover:text-white/60"
-              >
-                ← ANTERIOR
-              </button>
-            )}
-          </motion.section>
-        )}
+        <label className="mt-8 block">
+          <textarea
+            value={texto}
+            onChange={(e) => onTexto(e.target.value)}
+            rows={8}
+            autoFocus
+            placeholder={CASA_OFICIO_PLACEHOLDER}
+            className="w-full resize-y rounded-none bg-black/60 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25"
+            style={{ border: `1px solid ${GOLD}33` }}
+            data-testid="umbral-entrada-volcado"
+          />
+        </label>
 
-        {resultado && (
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 space-y-4"
-            data-testid="umbral-entrada-resultado"
-          >
-            <div
-              className="border-2 p-5"
-              style={{ borderColor: `${WARN}77`, background: `${WARN}10` }}
-            >
-              <p
-                className="flex items-center gap-2 text-[10px] tracking-[0.2em]"
-                style={{ color: WARN }}
-              >
-                <Crosshair size={14} />
-                FRICCIÓN PROBABLE · {resultado.modoLabel.toUpperCase()}
-              </p>
-              <h2
-                className="mt-2 text-xl font-black text-white"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
-              >
-                Código {resultado.codigo}
-                {resultado.arquetipoNombre
-                  ? ` · ${resultado.arquetipoNombre}`
-                  : ""}
-              </h2>
-              <p className="mt-1 text-sm text-white/55">{resultado.nombreCodigo}</p>
-              <div
-                className="mt-4 border p-3"
-                style={{ borderColor: `${CYAN}44`, background: `${CYAN}0d` }}
-              >
-                <p className="text-[10px] tracking-widest" style={{ color: CYAN }}>
-                  RECOMENDACIÓN TÁCTICA
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/80">
-                  {resultado.recomendacion}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/umbral/v2"
-              className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.16em]"
-              style={{
-                background: `linear-gradient(90deg, ${CYAN}22, ${GOLD}18)`,
-                border: `1px solid ${CYAN}66`,
-                color: CYAN,
-              }}
-              data-testid="umbral-entrada-cta-trial"
-            >
-              <Swords size={16} />
-              PROBAR CÓDIGO 1 GRATIS
-              <ArrowRight size={14} />
-            </Link>
-
-            <Link
-              href={UMBRAL_SKU.checkoutHref}
-              className="flex w-full items-center justify-center gap-2 border border-[#D4AF37]/50 px-4 py-3 text-[11px] tracking-widest text-[#D4AF37]"
-              data-testid="umbral-entrada-cta-pago"
-            >
-              ACTIVAR UMBRAL · ${UMBRAL_SKU.priceUsd}/MES
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => {
-                setPicks({});
-                setPaso(0);
-              }}
-              className="w-full text-center text-[11px] tracking-widest text-white/35 hover:text-white/60"
-            >
-              REHACER DIAGNÓSTICO
-            </button>
-          </motion.section>
-        )}
+        <Link
+          href="/umbral/v2"
+          className="mt-4 flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[12px] font-bold tracking-[0.16em]"
+          style={{
+            background: `linear-gradient(90deg, ${GOLD}22, ${GOLD}18)`,
+            border: `1px solid ${GOLD}66`,
+            color: GOLD,
+            opacity: texto.trim().length < 8 ? 0.45 : 1,
+            pointerEvents: texto.trim().length < 8 ? "none" : "auto",
+          }}
+          data-testid="umbral-entrada-cta-trial"
+        >
+          ENTRAR A LOS 10 CÓDIGOS
+          <ArrowRight size={14} />
+        </Link>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 /**
- * Umbral v2 — Motor de los 10 Códigos
+ * Oficio (Casa 5) — Motor de los 10 Códigos.
  * Núcleo de datos, lenguaje y validación (sin UI).
+ * Domicilio: círculo cerrado del deber. No es el Umbral (casa 6).
  *
  * Modos:
  * - INTERNO_HABILIDAD → "La Forja" (desarrollo de habilidad)

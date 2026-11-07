@@ -1,6 +1,6 @@
 /**
  * Oferta pública de SISTEMICAR — una sola voz para bienvenida y onboarding.
- * Los cuatro recintos vivos: Espejo, Depósito, Jornada, Umbral.
+ * Los cuatro recintos vivos: Espejo, Depósito, Jornada, Oficio.
  * No mezclar con Alquimia / Historia / “ordenar la mente” (oferta anterior).
  */
 
@@ -10,7 +10,7 @@ export const SISTEMA_OFERTA = {
   subhead:
     "Cuatro recintos. Un sistema que limpia la carga, enseña a ver, mide unidades y entrena el cruce.",
   puente:
-    "Espejo limpia. Depósito nombra un ojo. Jornada cierra unidades. Umbral atraviesa el obstáculo con criterio.",
+    "Espejo limpia. Depósito nombra un ojo. Jornada cierra unidades. Oficio perfecciona el deber.",
 } as const;
 
 export interface SistemaRecinto {
@@ -68,16 +68,16 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
   },
   {
     id: "umbral",
-    name: "Umbral",
-    nameUpper: "UMBRAL",
-    ritual: "Atraviesa con criterio",
-    oneLiner: "10 Códigos. El Maestro es la voz del obstáculo.",
+    name: "Oficio",
+    nameUpper: "OFICIO",
+    ritual: "¿Qué se te debe?",
+    oneLiner: "10 códigos del deber. El Maestro es la voz del obstáculo.",
     detail:
-      "Entrenador de umbrales: Forja + Arena. Código 1 se prueba con evaluador real. El resto se entrena — no es motivación, es estándar.",
+      "Casa 5. Perfeccionar el oficio: Forja + Arena. Código 1 se prueba con evaluador real. El resto se entrena — no es el límite, no es el gimnasio.",
     color: "#D4AF37",
     exploreHref: "/umbral/entrada",
     publicExplore: true,
-    exploreLabel: "Código 1",
+    exploreLabel: "Oficio",
   },
 ] as const;
 
@@ -98,8 +98,8 @@ export const SISTEMA_DIA = [
     gesto: "Lanzar el ring de conquista y cerrar unidades.",
   },
   {
-    recinto: "Umbral",
-    cuando: "El mismo obstáculo se repite",
-    gesto: "Entrenar el Código. Cruzar con criterio.",
+    recinto: "Oficio",
+    cuando: "El deber salió sin cuenta",
+    gesto: "Nombrar qué se te debe. Entrar a los diez códigos.",
   },
 ] as const;

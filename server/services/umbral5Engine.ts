@@ -1,5 +1,5 @@
 /**
- * Servicio de La Casa 5: Umbral.
+ * Servicio de La Casa 6: Umbral.
  * Volcado gratis. Lectura-mapa a 1 crédito.
  * El gimnasio es capa profunda: se ofrece después del mapa, no cambia la entrada.
  */

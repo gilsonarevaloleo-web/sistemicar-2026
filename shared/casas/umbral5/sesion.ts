@@ -1,5 +1,5 @@
 /**
- * Sesión persistida de la Casa 5: Umbral.
+ * Sesión persistida de la Casa 6: Umbral.
  * Misma forma que el Juez: texto + dictamen + estado por usuario.
  * El volcado es gratis. La lectura se cobra. El gimnasio no se abre en A–D.
  */

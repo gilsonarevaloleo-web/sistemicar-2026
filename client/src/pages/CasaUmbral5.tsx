@@ -278,7 +278,7 @@ export default function CasaUmbral5() {
               style={{ color: UMBRAL5_BRONZE }}
               data-testid="umbral5-badge"
             >
-              PLANETA C5 · {CASA_UMBRAL5_NOMBRE}
+              PLANETA C6 · {CASA_UMBRAL5_NOMBRE}
             </p>
           </div>
           <h1
