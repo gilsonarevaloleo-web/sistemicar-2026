@@ -175,15 +175,17 @@ En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra h
     assert.equal(geo.titleConnectedToClose, true);
   });
 
-  it("hipótesis código 1 no deja que entonces robe la firma; a partir de hoy enciende C5", () => {
+  it("hipótesis código 1 no firma C1 si hay C7/C9; a partir de hoy enciende C5", () => {
     const geo = auditarGeometriaSintactica({
       rawFact:
-        "Hoy aprendí que el valor interno se siente. Entonces ¿por qué no lo valoré? A partir de hoy lo primero que debo hacer es si soy. Por eso el valor se expresa en los demás.",
+        "Hoy aprendí que el valor interno se siente. Entonces ¿por qué no lo valoré? A partir de hoy lo primero que debo hacer es si soy. Por eso razón el valor personal no se expresa hablando: se expresa en los demás.",
       studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
       userTier: "CARRERA",
     });
-    assert.equal(geo.characterSignedCode, 1);
     assert.equal(geo.active[5], true);
+    assert.equal(geo.active[9], true);
+    assert.equal(geo.characterSignedCode, 9);
+    assert.notEqual(geo.characterSignedCode, 1);
   });
 
   it("código 7 / desición en el papel: firma C7, C5 activo, C10 abrocha la visión", () => {
@@ -215,13 +217,22 @@ La conclusión es que si el cuerpo no quiere ejecutar una desición, lo sabio es
     assert.equal(geo.characterSignedCode, 8);
   });
 
-  it("C9 exige tres dimensiones conectadas, no un solo hilo", () => {
+  it("C9 enciende con principio sistémico, no exige tres hilos", () => {
     const soloTrabajo = auditarGeometriaSintactica({
       rawFact: "El pistón del trabajo se trabó en la secuencia.",
       studentHypothesis: "Trabajo",
       userTier: "MATRICULA",
     });
     assert.equal(soloTrabajo.active[9], false);
+
+    const principio = auditarGeometriaSintactica({
+      rawFact:
+        "Por eso razón el valor personal no se expresa hablando de nuestro valor, sino cruzando el valor de importancia en los demás.",
+      studentHypothesis: "La ley del valor en los demas",
+      userTier: "CARRERA",
+    });
+    assert.equal(principio.active[9], true);
+    assert.equal(principio.characterSignedCode, 9);
 
     const triple = auditarGeometriaSintactica({
       rawFact:

@@ -390,14 +390,15 @@ Por eso digo que la necesidad no necesariamente tiene que estar en lo urgente o 
     assert.equal(r.activeCharacterMap[5], true);
     assert.equal(r.syntacticVacios.includes(5), false);
     assert.notEqual(r.focoRevelacionCode, 5);
-    assert.equal(r.characterSignedCode, 2);
+    assert.equal(r.characterSignedCode, 9);
+    assert.equal(r.activeCharacterMap[9], true);
     assert.equal(r.activeCharacterMap[10], true);
     assert.equal(r.titleConnectedToClose, true);
     assert.equal(r.lowestMissingCascadeCode, null);
     assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C5|tijera/);
   });
 
-  it("volcado 08/11/2026: decreto a partir de hoy enciende C5; firma C1; no pide tijera", () => {
+  it("volcado 08/11/2026: C9 principio sistémico firma; no acredita C1; no pide tijera", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact: `Hoy aprendi que el valor interno se siente más de que puede gritar el ego exterior. 
 Hace como 15 días atrás mí esposa me había hecho un reclamo, sobre que es ella el que trabaja más en la casa: yo inmediatamente rechase esa idea porque mí planificación abarca un hora antes de que ella se levante y dos horas después de que ella a dormido.  Pero una semana después ocurrió algo:  he empesado a ver qué mí mujer más de lo que antes veía y lo hacía sin quejar, sin decirme que es ella la que trabaja más o tal vez la que no trabaja más porque yo también trabajo, solo que empecé a valorar más lo que hace mí mujer. He empesado ha sentirme afortunado por tener una mujer laboriosa: mantiene cu casa  limpio, busca tiempo aparte de la costura para lavar la ropa sin dejar vasitos en la costura. La pregunta acá es ¿Porque cuando antes me dijo de que ella trabaja más que yo no lo valore y por el contrario se resal mí valor mío sobre ella? La respuesta ha esto pudiera ser dos cosa: 
@@ -413,8 +414,11 @@ Por eso razón el valor personal no se expresa hablando de nuestro valor, sino n
     });
     assert.equal(r.activeCharacterMap[5], true);
     assert.equal(r.syntacticVacios.includes(5), false);
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
     assert.notEqual(r.focoRevelacionCode, 5);
-    assert.equal(r.characterSignedCode, 1);
+    assert.equal(r.characterSignedCode, 9);
+    assert.notEqual(r.characterSignedCode, 1);
     assert.notEqual(r.characterSignedCode, 2);
     assert.equal(r.activeCharacterMap[10], true);
     assert.equal(r.titleConnectedToClose, true);
@@ -422,9 +426,9 @@ Por eso razón el valor personal no se expresa hablando de nuestro valor, sino n
     assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
     assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C5|tijera/);
     assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
-    assert.match(r.immediateAdjustment, /Fortalezas en el papel: Firma C1/);
+    assert.match(r.immediateAdjustment, /Fortalezas en el papel: Firma C9/);
     assert.match(r.immediateAdjustment, /abrochado/i);
-    assert.match(r.immediateAdjustment, /no abren peldaño/);
+    assert.match(r.immediateAdjustment, /C9/);
   });
 
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
