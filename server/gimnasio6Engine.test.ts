@@ -5,7 +5,9 @@ import { createMemoryJuezWallet } from "./services/juezCreditos.ts";
 import { createMemoryUmbral5Store } from "./services/umbral5Store.ts";
 import { createMemoryGimnasio6Store } from "./services/gimnasio6Store.ts";
 import { registerUmbral5Routes } from "./umbral5Engine.ts";
-import { registerGimnasio6Routes, type Gimnasio6EngineDeps } from "./gimnasio6Engine.ts";
+import { registerGimnasio6Routes, responderGimnasio, type Gimnasio6EngineDeps } from "./gimnasio6Engine.ts";
+import { recursosVacios } from "../shared/casas/gimnasio6/motor.ts";
+import type { LibroGimnasio } from "../shared/casas/gimnasio6/types.ts";
 import { CASA_UMBRAL5_RITUAL } from "../shared/casas/umbral5/prompt.ts";
 
 const VOLCADO =
@@ -165,6 +167,46 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
         callGemini: () => new Promise(() => {}),
       },
     );
+  });
+
+  it("si el store perdió el libro, lo recupera del snapshot y avanza", async () => {
+    const snapshot: LibroGimnasio = {
+      id: "lib-perdido",
+      userId: "u-gym",
+      sesionUmbral5Id: "s1",
+      modulo: "social_producto",
+      limiteOrigen: VOLCADO,
+      recursos: recursosVacios(),
+      puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
+      estado: "ABIERTO",
+      capituloSelladoDia: null,
+      capitulosSellados: [],
+      turnos: [],
+      createdAt: "2026-11-08T00:00:00.000Z",
+      updatedAt: "2026-11-08T00:00:00.000Z",
+    };
+    const vacio = createMemoryGimnasio6Store();
+    const sinSnapshot = await responderGimnasio(
+      "u-gym",
+      snapshot.id,
+      "Me posiciono en un 2.",
+      { store: vacio },
+    );
+    assert.equal(sinSnapshot.ok, false);
+    if (!sinSnapshot.ok) assert.equal(sinSnapshot.codigo, "LIBRO_NO_ENCONTRADO");
+
+    const conSnapshot = await responderGimnasio(
+      "u-gym",
+      snapshot.id,
+      "Me posiciono en un 2.",
+      { store: vacio },
+      snapshot,
+    );
+    assert.equal(conSnapshot.ok, true);
+    if (conSnapshot.ok) {
+      assert.equal(conSnapshot.libro.puntero.indice, 2);
+      assert.match(conSnapshot.copia, /Me posiciono en un 2/);
+    }
   });
 });
 

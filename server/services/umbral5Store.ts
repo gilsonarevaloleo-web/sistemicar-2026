@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import pkg from "pg";
 import type { SesionUmbral5 } from "../../shared/casas/umbral5/sesion.ts";
 import type { Umbral5Lectura } from "../../shared/casas/umbral5/types.ts";
+import { resolveDatabaseUrl } from "./databaseUrl.ts";
 
 const { Pool } = pkg;
 
@@ -68,10 +69,11 @@ export function createMemoryUmbral5Store(): Umbral5SessionStore {
 let pool: InstanceType<typeof Pool> | null = null;
 
 function getPool(): InstanceType<typeof Pool> | null {
-  if (!process.env.DATABASE_URL) return null;
+  const url = resolveDatabaseUrl();
+  if (!url) return null;
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: url,
       ssl:
         process.env.NODE_ENV === "production"
           ? { rejectUnauthorized: false }
@@ -182,6 +184,6 @@ export function createPostgresUmbral5Store(): Umbral5SessionStore {
 }
 
 export function createDefaultUmbral5Store(): Umbral5SessionStore {
-  if (process.env.DATABASE_URL) return createPostgresUmbral5Store();
+  if (resolveDatabaseUrl()) return createPostgresUmbral5Store();
   return createMemoryUmbral5Store();
 }

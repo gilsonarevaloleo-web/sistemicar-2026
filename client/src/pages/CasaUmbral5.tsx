@@ -28,6 +28,7 @@ import {
   responderGimnasio,
 } from "@/lib/casas/gimnasio6/api";
 import type { LibroGimnasio, PreguntaViva } from "@shared/casas/gimnasio6";
+import { preguntaVivaDe, textoCopiaLibro } from "@shared/casas/gimnasio6";
 import {
   fusionarSesionesUmbral5Local,
   guardarBorradorUmbral5,
@@ -35,6 +36,16 @@ import {
   leerBorradorUmbral5,
   listarSesionesUmbral5Local,
 } from "@/lib/casas/umbral5/sesionesLocal";
+import {
+  fusionarLibrosGimnasioLocal,
+  guardarLibroGimnasioLocal,
+  libroAbiertoLocal,
+  listarLibrosGimnasioLocal,
+} from "@/lib/casas/gimnasio6/librosLocal";
+import {
+  guardarSaldoUmbral5Local,
+  leerSaldoUmbral5Local,
+} from "@/lib/casas/umbral5/saldoLocal";
 import {
   CASA_UMBRAL5_FIRMA,
   CASA_UMBRAL5_NOMBRE,
@@ -75,9 +86,20 @@ export default function CasaUmbral5() {
 
   useEffect(() => {
     if (!userId) return;
+    const saldoCache = leerSaldoUmbral5Local(userId);
+    if (saldoCache != null) setSaldo(saldoCache);
     void leerSaldoUmbral5(userId)
-      .then((r) => setSaldo(r.saldo))
-      .catch(() => setSaldo(0));
+      .then((r) => {
+        if (r.saldo === 0 && saldoCache != null && saldoCache > 0) {
+          /* cold start vacío: no pisar el último saldo conocido */
+          return;
+        }
+        setSaldo(r.saldo);
+        guardarSaldoUmbral5Local(userId, r.saldo);
+      })
+      .catch(() => {
+        /* se queda el último saldo conocido; no volver a 0 */
+      });
 
     const locales = listarSesionesUmbral5Local(userId);
     setSesiones(locales);
@@ -98,10 +120,23 @@ export default function CasaUmbral5() {
         /* el caché local ya está */
       });
 
+    const librosLocales = listarLibrosGimnasioLocal(userId);
+    if (librosLocales.length) setLibros(librosLocales);
+    const abierto = libroAbiertoLocal(userId);
+    if (abierto) {
+      setLibro(abierto);
+      setPreguntaGym(abierto.estado === "ABIERTO" ? preguntaVivaDe(abierto) : null);
+      setCopiaGym(textoCopiaLibro(abierto));
+      setTopeDiario(abierto.estado === "TOPE_DIARIO");
+    }
+
     void listarLibrosGimnasio(userId)
-      .then((r) => setLibros(r.libros))
+      .then((r) => {
+        const merged = fusionarLibrosGimnasioLocal(userId, r.libros);
+        setLibros(merged);
+      })
       .catch(() => {
-        /* sin libros todavía */
+        /* el caché local ya está */
       });
   }, [userId]);
 
@@ -114,7 +149,10 @@ export default function CasaUmbral5() {
   const abrir402 = (err: unknown) => {
     if (err instanceof Umbral5SaldoError) {
       setModal402(err.message);
-      if (err.saldo != null) setSaldo(err.saldo);
+      if (err.saldo != null) {
+        setSaldo(err.saldo);
+        guardarSaldoUmbral5Local(userId, err.saldo);
+      }
       return true;
     }
     return false;
@@ -149,6 +187,7 @@ export default function CasaUmbral5() {
       setCopiaGym("");
       setTopeDiario(false);
       setSaldo(out.saldo);
+      guardarSaldoUmbral5Local(userId, out.saldo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo sellar el volcado.");
     } finally {
@@ -173,6 +212,7 @@ export default function CasaUmbral5() {
       });
       setLectura(out.lectura);
       setSaldo(out.saldo);
+      guardarSaldoUmbral5Local(userId, out.saldo);
       setSesiones((prev) => {
         const next = prev.map((s) =>
           s.id === out.sesionUmbral5Id
@@ -208,6 +248,7 @@ export default function CasaUmbral5() {
     setPreguntaGym(payload.pregunta);
     setCopiaGym(payload.copia);
     setTopeDiario(payload.topeDiario);
+    guardarLibroGimnasioLocal(payload.libro);
     setLibros((prev) => [payload.libro, ...prev.filter((l) => l.id !== payload.libro.id)]);
   };
 
@@ -234,6 +275,7 @@ export default function CasaUmbral5() {
         userId,
         libroId: libro.id,
         respuesta: textoRespuesta,
+        libro,
       });
       aplicarGym(out);
     } catch (err) {
@@ -247,7 +289,7 @@ export default function CasaUmbral5() {
     if (!userId || !libro) return;
     setError(null);
     try {
-      const out = await continuarGimnasio({ userId, libroId: libro.id });
+      const out = await continuarGimnasio({ userId, libroId: libro.id, libro });
       aplicarGym(out);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Todavía no es el siguiente capítulo.");
