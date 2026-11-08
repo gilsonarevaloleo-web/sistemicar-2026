@@ -30,6 +30,33 @@ export const TONOS_MAESTRO: Record<MasterToneCode, string> = {
 export const TONO_ARQUITECTO_GROUNDED =
   "Circuito C1→C10 abrochado. El título y la última oración se responden en el papel. No hay escalón pendiente en la cascada.";
 
+/**
+ * Ajuste cuando no hay peldaño pendiente: nombra lo que el papel ya sostiene.
+ * Cero sermón de vida. C3, C8 y C9 vacíos no abren escalón.
+ */
+export function tonoFortalezas(input: {
+  characterSignedCode: EyeCode;
+  activeCodes: readonly EyeCode[];
+}): string {
+  const activos = new Set(input.activeCodes);
+  const cascada = CASCADE_CODES.filter((n) => activos.has(n))
+    .map((n) => `C${n}`)
+    .join(" · ");
+  const mapaActivo = ([3, 6, 8, 9] as const).filter((n) => activos.has(n));
+  const mapaVacio = ([3, 8, 9] as const).filter((n) => !activos.has(n));
+  const extra =
+    mapaActivo.length > 0
+      ? ` También en el mapa: ${mapaActivo.map((n) => `C${n}`).join(" · ")}.`
+      : "";
+  const vacios =
+    mapaVacio.length === 0
+      ? ""
+      : ` ${mapaVacio.map((n) => `C${n}`).join(" · ")} ${
+          mapaVacio.length === 1 ? "queda vacío" : "quedan vacíos"
+        } en el mapa y no abren peldaño.`;
+  return `Circuito C1→C10 abrochado. Fortalezas en el papel: Firma C${input.characterSignedCode}. Cascada completa: ${cascada}. El cierre vuelve al título.${extra}${vacios}`;
+}
+
 export function mapaTiene(
   map: Record<EyeCode, boolean> | null | undefined,
   code: EyeCode,
@@ -154,8 +181,14 @@ export function masterToneDe(
 
 export function pedagogicalFeedbackDe(
   lowest: CascadeCode | null,
+  fortalezas?: {
+    characterSignedCode: EyeCode;
+    activeCodes: readonly EyeCode[];
+  },
 ): string {
-  if (lowest === null) return TONO_ARQUITECTO_GROUNDED;
+  if (lowest === null) {
+    return fortalezas ? tonoFortalezas(fortalezas) : TONO_ARQUITECTO_GROUNDED;
+  }
   return TONOS_MAESTRO[lowest];
 }
 

@@ -89,6 +89,7 @@ export {
 export {
   TONOS_MAESTRO,
   TONO_ARQUITECTO_GROUNDED,
+  tonoFortalezas,
   estadoAlumnoDe,
   etiquetaEstado,
   masterToneDe,

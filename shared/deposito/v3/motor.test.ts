@@ -397,6 +397,36 @@ Por eso digo que la necesidad no necesariamente tiene que estar en lo urgente o 
     assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C5|tijera/);
   });
 
+  it("volcado 08/11/2026: decreto a partir de hoy enciende C5; firma C1; no pide tijera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendi que el valor interno se siente más de que puede gritar el ego exterior. 
+Hace como 15 días atrás mí esposa me había hecho un reclamo, sobre que es ella el que trabaja más en la casa: yo inmediatamente rechase esa idea porque mí planificación abarca un hora antes de que ella se levante y dos horas después de que ella a dormido.  Pero una semana después ocurrió algo:  he empesado a ver qué mí mujer más de lo que antes veía y lo hacía sin quejar, sin decirme que es ella la que trabaja más o tal vez la que no trabaja más porque yo también trabajo, solo que empecé a valorar más lo que hace mí mujer. He empesado ha sentirme afortunado por tener una mujer laboriosa: mantiene cu casa  limpio, busca tiempo aparte de la costura para lavar la ropa sin dejar vasitos en la costura. La pregunta acá es ¿Porque cuando antes me dijo de que ella trabaja más que yo no lo valore y por el contrario se resal mí valor mío sobre ella? La respuesta ha esto pudiera ser dos cosa: 
+1.  Cuando se reclama del valor ha voz lo que realmente le está diciendo al subconsciente de la persona es: yo tengo una necesidad de que me digan que soy laboriosa, porque yo no lo soy. ¿Que tiene que pasar para que sea entonces? A la hora de trabajar no lo debe hacer para la aprobación exterior, sino por su responsabilidad de utilidad en la casa, actuar lo contrario es ego- es el valor de la apariencia. 
+2. El valor de alguien se siente cuando una persona a crusado el umbral del deseo de  recibir algo a cambio en los demás sobre lo que hace. 
+Por eso dado este aprendisaje a partir de hoy en adelante cuando me encuentre en la situación de cobrar o compararme con los demás lo primero que debo hacer es si soy, porque el mismo hecho de reclamar o decir yo soy mejor que tu significa  que no soy, eso sería autodespreciarme a mí primero o más que al que le reclamo. 
+Por eso razón el valor personal no se expresa hablando de nuestro valor, sino nuestro valor se expresa crusando el valor de importancia en los demás.`,
+      studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo no dicho es que nuestra boca sirve para engañar más no para decir la verdad.  La boca habla de lo que nos falta no de lo que queremos o somos",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[5], true);
+    assert.equal(r.syntacticVacios.includes(5), false);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.characterSignedCode, 1);
+    assert.notEqual(r.characterSignedCode, 2);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C5|tijera/);
+    assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
+    assert.match(r.immediateAdjustment, /Fortalezas en el papel: Firma C1/);
+    assert.match(r.immediateAdjustment, /abrochado/i);
+    assert.match(r.immediateAdjustment, /no abren peldaño/);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:

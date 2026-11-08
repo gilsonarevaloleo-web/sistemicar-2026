@@ -59,9 +59,12 @@ export function diagnosticarAuditoriaLocal(
   const lowestMissingCascadeCode = primerPendienteCascada(activeCharacterMap);
   const estadoAlumno = estadoAlumnoDe(activeCharacterMap);
   const masterTone = masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode);
-  const focoRevelacionCode = (lowestMissingCascadeCode ?? 10) as EyeCode;
   const characterSignedCode = geo.characterSignedCode;
+  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode, {
+    characterSignedCode,
+    activeCodes,
+  });
+  const focoRevelacionCode = (lowestMissingCascadeCode ?? 10) as EyeCode;
   const syntacticVacios = vaciosDesdeActiveMap(activeCharacterMap);
   const grounded = estadoAlumno === "ARQUITECTO_GROUNDED";
 
@@ -123,7 +126,10 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
   const lowestMissingCascadeCode = sync.lowestMissingCascadeCode;
   const estadoAlumno = estadoAlumnoDe(sync.activeCharacterMap);
   const masterTone = masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode);
+  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode, {
+    characterSignedCode: result.characterSignedCode,
+    activeCodes: sync.activeCodes,
+  });
   const focoRevelacionCode = sync.focoRevelacionCode;
 
   return {
