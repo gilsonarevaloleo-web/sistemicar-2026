@@ -4,6 +4,7 @@
  */
 
 import pkg from "pg";
+import { resolveDatabaseUrl } from "./databaseUrl.ts";
 
 const { Pool } = pkg;
 
@@ -52,10 +53,11 @@ export function createMemoryJuezWallet(
 let pool: InstanceType<typeof Pool> | null = null;
 
 function getPool(): InstanceType<typeof Pool> | null {
-  if (!process.env.DATABASE_URL) return null;
+  const url = resolveDatabaseUrl();
+  if (!url) return null;
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: url,
       ssl:
         process.env.NODE_ENV === "production"
           ? { rejectUnauthorized: false }
@@ -126,20 +128,59 @@ export function createPostgresJuezWallet(): JuezCreditWallet {
   };
 }
 
+async function saldoComprado(userId: string): Promise<number | null> {
+  try {
+    const { getEspejoCreditsForUser } = await import("../firebaseAdmin.ts");
+    return await getEspejoCreditsForUser(userId);
+  } catch {
+    return null;
+  }
+}
+
 export function createDefaultJuezWallet(): JuezCreditWallet {
-  if (process.env.DATABASE_URL) return createPostgresJuezWallet();
-  const inner = createMemoryJuezWallet();
-  const sembrados = new Set<string>();
+  const pg = resolveDatabaseUrl() ? createPostgresJuezWallet() : null;
+  const mem = pg ? null : createMemoryJuezWallet();
   return {
     async saldo(userId) {
-      if (!sembrados.has(userId)) {
-        sembrados.add(userId);
-        const actual = await inner.saldo(userId);
-        if (actual === 0) await inner.acreditar(userId, 10);
-      }
-      return inner.saldo(userId);
+      const comprado = await saldoComprado(userId);
+      const ledger = pg ? await pg.saldo(userId) : mem ? await mem.saldo(userId) : 0;
+      if (comprado == null) return ledger;
+      return Math.max(comprado, ledger);
     },
-    debitar: (userId, n) => inner.debitar(userId, n),
-    acreditar: (userId, n) => inner.acreditar(userId, n),
+    async debitar(userId, amount) {
+      if (amount <= 0) {
+        const saldo = await this.saldo(userId);
+        return { ok: true, saldo };
+      }
+      const comprado = await saldoComprado(userId);
+      const ledger = pg ? await pg.saldo(userId) : mem ? await mem.saldo(userId) : 0;
+      if ((comprado ?? 0) >= amount && comprado != null) {
+        const next = comprado - amount;
+        try {
+          const { setEspejoCreditsForUser } = await import("../firebaseAdmin.ts");
+          const ok = await setEspejoCreditsForUser(userId, next);
+          if (ok) return { ok: true, saldo: next };
+        } catch {
+          /* ledger de abajo */
+        }
+      }
+      if (pg) return pg.debitar(userId, amount);
+      if (mem) return mem.debitar(userId, amount);
+      return { ok: false, saldo: Math.max(comprado ?? 0, ledger) };
+    },
+    async acreditar(userId, amount) {
+      const add = Math.max(0, amount);
+      if (add <= 0) return this.saldo(userId);
+      const fire = await import("../firebaseAdmin.ts")
+        .then((m) => m.addEspejoCreditsForUser(userId, add))
+        .catch(() => false);
+      if (pg) await pg.acreditar(userId, add);
+      else if (mem) await mem.acreditar(userId, add);
+      if (fire) {
+        const comprado = await saldoComprado(userId);
+        if (comprado != null) return comprado;
+      }
+      return this.saldo(userId);
+    },
   };
 }

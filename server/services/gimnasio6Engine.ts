@@ -28,6 +28,7 @@ import type { Umbral5SessionStore } from "./umbral5Store.ts";
 import { createDefaultUmbral5Store } from "./umbral5Store.ts";
 import {
   createDefaultGimnasio6Store,
+  hydrateLibroGimnasio,
   newLibroGimnasioId,
   type Gimnasio6Store,
 } from "./gimnasio6Store.ts";
@@ -206,11 +207,25 @@ export async function abrirLibroGimnasio(
   return { ok: true, ...payloadVivo(libro) };
 }
 
+async function cargarLibroVivo(
+  store: Gimnasio6Store,
+  uid: string,
+  lid: string,
+  snapshot?: unknown,
+): Promise<LibroGimnasio | null> {
+  const found = await store.getById(lid);
+  if (found && found.userId === uid) return found;
+  const recovered = hydrateLibroGimnasio(snapshot, { userId: uid, id: lid });
+  if (!recovered) return null;
+  return store.save(recovered);
+}
+
 export async function responderGimnasio(
   userId: string,
   libroId: string,
   respuesta: string,
   deps: Gimnasio6EngineDeps = {},
+  snapshot?: unknown,
 ): Promise<{ ok: true } & ReturnType<typeof payloadVivo> | Gimnasio6EngineErr> {
   const uid = userId.trim();
   const lid = libroId.trim();
@@ -224,7 +239,7 @@ export async function responderGimnasio(
   }
 
   const store = deps.store ?? createDefaultGimnasio6Store();
-  const libro = await store.getById(lid);
+  const libro = await cargarLibroVivo(store, uid, lid, snapshot);
   if (!libro || libro.userId !== uid) {
     return { ok: false, status: 404, error: "Libro no encontrado.", codigo: "LIBRO_NO_ENCONTRADO" };
   }
@@ -264,12 +279,13 @@ export async function continuarCapituloGimnasio(
   libroId: string,
   deps: Gimnasio6EngineDeps = {},
   now: Date | string = new Date(),
+  snapshot?: unknown,
 ): Promise<{ ok: true } & ReturnType<typeof payloadVivo> | Gimnasio6EngineErr> {
   const uid = userId.trim();
   const lid = libroId.trim();
   if (!uid) return { ok: false, status: 400, error: "Falta userId.", codigo: "FALTA_USER" };
   const store = deps.store ?? createDefaultGimnasio6Store();
-  const libro = await store.getById(lid);
+  const libro = await cargarLibroVivo(store, uid, lid, snapshot);
   if (!libro || libro.userId !== uid) {
     return { ok: false, status: 404, error: "Libro no encontrado.", codigo: "LIBRO_NO_ENCONTRADO" };
   }
@@ -411,7 +427,13 @@ export function registerGimnasio6Routes(
       const raw = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
       const libroId = String(raw.libroId ?? raw.id ?? "").trim();
       const respuesta = String(raw.respuesta ?? raw.texto ?? "").trim();
-      const resultado = await responderGimnasio(userId, libroId, respuesta, runtime);
+      const resultado = await responderGimnasio(
+        userId,
+        libroId,
+        respuesta,
+        runtime,
+        raw.libro ?? raw.snapshot,
+      );
       if (!resultado.ok) return res.status(resultado.status).json(bodyError(resultado));
       return res.json({
         success: true,
@@ -432,7 +454,13 @@ export function registerGimnasio6Routes(
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
       const raw = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
       const libroId = String(raw.libroId ?? raw.id ?? "").trim();
-      const resultado = await continuarCapituloGimnasio(userId, libroId, runtime);
+      const resultado = await continuarCapituloGimnasio(
+        userId,
+        libroId,
+        runtime,
+        new Date(),
+        raw.libro ?? raw.snapshot,
+      );
       if (!resultado.ok) return res.status(resultado.status).json(bodyError(resultado));
       return res.json({
         success: true,

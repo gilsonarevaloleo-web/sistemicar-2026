@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import pkg from "pg";
 import type { LibroGimnasio } from "../../shared/casas/gimnasio6/types.ts";
 import { recursosVacios } from "../../shared/casas/gimnasio6/motor.ts";
+import { resolveDatabaseUrl } from "./databaseUrl.ts";
 
 const { Pool } = pkg;
 
@@ -102,11 +103,24 @@ export function createMemoryGimnasio6Store(): Gimnasio6Store {
 
 let pool: InstanceType<typeof Pool> | null = null;
 
+export function hydrateLibroGimnasio(
+  raw: unknown,
+  expected?: { userId?: string; id?: string },
+): LibroGimnasio | null {
+  if (!raw || typeof raw !== "object") return null;
+  const libro = normalizeLibro(raw as LibroGimnasio);
+  if (!libro.id || !libro.userId) return null;
+  if (expected?.id && libro.id !== expected.id) return null;
+  if (expected?.userId && libro.userId !== expected.userId) return null;
+  return libro;
+}
+
 function getPool(): InstanceType<typeof Pool> | null {
-  if (!process.env.DATABASE_URL) return null;
+  const url = resolveDatabaseUrl();
+  if (!url) return null;
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: url,
       ssl:
         process.env.NODE_ENV === "production"
           ? { rejectUnauthorized: false }
@@ -199,7 +213,7 @@ export function createPostgresGimnasio6Store(): Gimnasio6Store {
 }
 
 export function createDefaultGimnasio6Store(): Gimnasio6Store {
-  if (process.env.DATABASE_URL) return createPostgresGimnasio6Store();
+  if (resolveDatabaseUrl()) return createPostgresGimnasio6Store();
   return createMemoryGimnasio6Store();
 }
 

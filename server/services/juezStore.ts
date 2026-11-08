@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import pkg from "pg";
 import type { SesionJuez } from "../../shared/casas/codigo4/sesion.ts";
 import type { JuezSerioFase1, JuezSerioFase2 } from "../../shared/casas/codigo4/types.ts";
+import { resolveDatabaseUrl } from "./databaseUrl.ts";
 
 const { Pool } = pkg;
 
@@ -61,10 +62,11 @@ export function createMemoryJuezStore(): JuezSessionStore {
 let pool: InstanceType<typeof Pool> | null = null;
 
 function getPool(): InstanceType<typeof Pool> | null {
-  if (!process.env.DATABASE_URL) return null;
+  const url = resolveDatabaseUrl();
+  if (!url) return null;
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: url,
       ssl:
         process.env.NODE_ENV === "production"
           ? { rejectUnauthorized: false }
@@ -176,6 +178,6 @@ export function createPostgresJuezStore(): JuezSessionStore {
 }
 
 export function createDefaultJuezStore(): JuezSessionStore {
-  if (process.env.DATABASE_URL) return createPostgresJuezStore();
+  if (resolveDatabaseUrl()) return createPostgresJuezStore();
   return createMemoryJuezStore();
 }

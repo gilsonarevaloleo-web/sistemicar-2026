@@ -52,6 +52,7 @@ export async function responderGimnasio(input: {
   userId: string;
   libroId: string;
   respuesta: string;
+  libro?: LibroGimnasio;
 }): Promise<GimnasioPayload> {
   const res = await fetch("/api/casas/gimnasio6/responder", {
     method: "POST",
@@ -66,6 +67,7 @@ export async function responderGimnasio(input: {
 export async function continuarGimnasio(input: {
   userId: string;
   libroId: string;
+  libro?: LibroGimnasio;
 }): Promise<GimnasioPayload> {
   const res = await fetch("/api/casas/gimnasio6/continuar", {
     method: "POST",
