@@ -72,7 +72,7 @@ export interface ModuleAccessInput {
   email?: string | null;
 }
 
-const OWNER_EMAIL = "gilsonarevalo.leo@gmail.com";
+export const OWNER_EMAIL = "gilsonarevalo.leo@gmail.com";
 
 /** Módulos que otorga cada plan legacy (grandfather). */
 export const LEGACY_PLAN_MODULES: Record<string, ModuleId[]> = {

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { DoorOpen } from "lucide-react";
 import { useAuthContext } from "@/App";
+import { isOwner } from "@/lib/owner";
+import { etiquetaSaldoCreditos, SALDO_ILIMITADO } from "@shared/ownerCredits";
 import {
   LienzoLimite,
   UMBRAL5_ASH,
@@ -58,6 +60,8 @@ export default function CasaUmbral5() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
   const userId = user?.uid ?? "";
+  const email = user?.email ?? "";
+  const dueno = isOwner(email);
 
   const [texto, setTexto] = useState("");
   const [saldo, setSaldo] = useState<number | null>(null);
@@ -86,10 +90,18 @@ export default function CasaUmbral5() {
 
   useEffect(() => {
     if (!userId) return;
-    const saldoCache = leerSaldoUmbral5Local(userId);
-    if (saldoCache != null) setSaldo(saldoCache);
-    void leerSaldoUmbral5(userId)
+    const saldoCache = dueno ? null : leerSaldoUmbral5Local(userId);
+    if (dueno) {
+      setSaldo(SALDO_ILIMITADO);
+    } else if (saldoCache != null) {
+      setSaldo(saldoCache);
+    }
+    void leerSaldoUmbral5(userId, email)
       .then((r) => {
+        if (r.ilimitado || dueno) {
+          setSaldo(SALDO_ILIMITADO);
+          return;
+        }
         if (r.saldo === 0 && saldoCache != null && saldoCache > 0) {
           /* cold start vacío: no pisar el último saldo conocido */
           return;
@@ -100,7 +112,10 @@ export default function CasaUmbral5() {
       .catch(() => {
         /* se queda el último saldo conocido; no volver a 0 */
       });
+  }, [userId, email, dueno]);
 
+  useEffect(() => {
+    if (!userId) return;
     const locales = listarSesionesUmbral5Local(userId);
     setSesiones(locales);
     if (locales[0]) {
@@ -149,7 +164,7 @@ export default function CasaUmbral5() {
   const abrir402 = (err: unknown) => {
     if (err instanceof Umbral5SaldoError) {
       setModal402(err.message);
-      if (err.saldo != null) {
+      if (err.saldo != null && !dueno) {
         setSaldo(err.saldo);
         guardarSaldoUmbral5Local(userId, err.saldo);
       }
@@ -165,6 +180,7 @@ export default function CasaUmbral5() {
     try {
       const out = await sellarVolcado({
         userId,
+        email,
         limiteConocido: texto,
       });
       const ahora = new Date().toISOString();
@@ -186,8 +202,12 @@ export default function CasaUmbral5() {
       setPreguntaGym(null);
       setCopiaGym("");
       setTopeDiario(false);
-      setSaldo(out.saldo);
-      guardarSaldoUmbral5Local(userId, out.saldo);
+      if (dueno) {
+        setSaldo(SALDO_ILIMITADO);
+      } else {
+        setSaldo(out.saldo);
+        guardarSaldoUmbral5Local(userId, out.saldo);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo sellar el volcado.");
     } finally {
@@ -198,7 +218,7 @@ export default function CasaUmbral5() {
   const mapear = async () => {
     if (!userId || !sesionId) return;
     setError(null);
-    if ((saldo ?? 0) < CREDITO_LECTURA_MAPA) {
+    if (!dueno && (saldo ?? 0) < CREDITO_LECTURA_MAPA) {
       setModal402(
         `Saldo insuficiente para la lectura del mapa. Se requieren ${CREDITO_LECTURA_MAPA} crédito(s). Saldo: ${saldo ?? 0}.`,
       );
@@ -208,11 +228,16 @@ export default function CasaUmbral5() {
     try {
       const out = await leerMapa({
         userId,
+        email,
         sesionUmbral5Id: sesionId,
       });
       setLectura(out.lectura);
-      setSaldo(out.saldo);
-      guardarSaldoUmbral5Local(userId, out.saldo);
+      if (dueno) {
+        setSaldo(SALDO_ILIMITADO);
+      } else {
+        setSaldo(out.saldo);
+        guardarSaldoUmbral5Local(userId, out.saldo);
+      }
       setSesiones((prev) => {
         const next = prev.map((s) =>
           s.id === out.sesionUmbral5Id
@@ -344,7 +369,7 @@ export default function CasaUmbral5() {
             Saldo
           </span>
           <span className="text-sm" style={{ color: UMBRAL5_BRONZE }}>
-            {saldo == null ? "…" : `${saldo} crédito${saldo === 1 ? "" : "s"}`}
+            {etiquetaSaldoCreditos(saldo, { email, ilimitado: dueno })}
           </span>
         </div>
 

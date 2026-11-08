@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Scale } from "lucide-react";
 import { useAuthContext } from "@/App";
+import { isOwner } from "@/lib/owner";
+import { etiquetaSaldoCreditos, SALDO_ILIMITADO } from "@shared/ownerCredits";
 import { CardLeyCasasUmbral } from "@/components/planetas/CardLeyCasasUmbral";
 import {
   LienzoEntrada,
@@ -54,6 +56,8 @@ export default function CasaCodigo4() {
   const { user } = useAuthContext();
   const [, navigate] = useLocation();
   const userId = user?.uid ?? "";
+  const email = user?.email ?? "";
+  const dueno = isOwner(email);
   const hidratado = useRef(false);
 
   const [texto, setTexto] = useState(() => leerBorradorJuez());
@@ -119,9 +123,12 @@ export default function CasaCodigo4() {
   useEffect(() => {
     if (!userId) return;
     setHistorial(listVolcadosJuezLocal(userId));
-    void leerSaldoJuez(userId)
-      .then((r) => setSaldo(r.saldo))
-      .catch(() => setSaldo(0));
+    if (dueno) setSaldo(SALDO_ILIMITADO);
+    void leerSaldoJuez(userId, email)
+      .then((r) => setSaldo(r.ilimitado || dueno ? SALDO_ILIMITADO : r.saldo))
+      .catch(() => {
+        if (!dueno) setSaldo(0);
+      });
     void recargarHistorial(userId);
     const unsubVolcados = subscribeToVolcadosJuez(
       userId,
@@ -142,12 +149,12 @@ export default function CasaCodigo4() {
       unsubVolcados();
       unsubDraft();
     };
-  }, [userId]);
+  }, [userId, email, dueno]);
 
   const abrir402 = (err: unknown) => {
     if (err instanceof JuezSaldoError) {
       setModal402(err.message);
-      if (err.saldo != null) setSaldo(err.saldo);
+      if (err.saldo != null && !dueno) setSaldo(err.saldo);
       return true;
     }
     return false;
@@ -156,7 +163,7 @@ export default function CasaCodigo4() {
   const auditar = async () => {
     if (!userId) return;
     setError(null);
-    if ((saldo ?? 0) < CREDITO_FASE1_LECTURA) {
+    if (!dueno && (saldo ?? 0) < CREDITO_FASE1_LECTURA) {
       setModal402(
         `Saldo insuficiente para la Fase 1 (Lectura del Perímetro). Se requieren ${CREDITO_FASE1_LECTURA} crédito(s). Saldo: ${saldo ?? 0}.`,
       );
@@ -166,13 +173,14 @@ export default function CasaCodigo4() {
     try {
       const out = await auditarFase1({
         userId,
+        email,
         friccionDiaria: texto,
       });
       const cuando = new Date().toISOString();
       setSesionId(out.sesionJuezId);
       setFase1(out.fase1_lectura);
       setFase2(null);
-      setSaldo(out.saldo);
+      setSaldo(dueno ? SALDO_ILIMITADO : out.saldo);
       setVolcadoAuditado(texto);
       setAuditadaEn(cuando);
       guardarBorradorJuez(texto, { allowEmpty: true });
@@ -202,10 +210,11 @@ export default function CasaCodigo4() {
     try {
       const out = await desbloquearFase2({
         userId,
+        email,
         sesionJuezId: sesionId,
       });
       setFase2(out.fase2_propuesta_solucion);
-      setSaldo(out.saldo);
+      setSaldo(dueno ? SALDO_ILIMITADO : out.saldo);
       await persistFase2Juez(userId, sesionId, out.fase2_propuesta_solucion);
       await recargarHistorial(userId);
     } catch (err) {
@@ -253,7 +262,7 @@ export default function CasaCodigo4() {
             Saldo
           </span>
           <span className="text-sm" style={{ color: JUEZ_IRON }}>
-            {saldo == null ? "…" : `${saldo} crédito${saldo === 1 ? "" : "s"}`}
+            {etiquetaSaldoCreditos(saldo, { email, ilimitado: dueno })}
           </span>
         </div>
 
@@ -262,7 +271,7 @@ export default function CasaCodigo4() {
           onTexto={setTexto}
           onAuditar={() => void auditar()}
           cargando={auditando}
-          saldo={saldo}
+          saldo={dueno ? SALDO_ILIMITADO : saldo}
           costo={CREDITO_FASE1_LECTURA}
           deshabilitado={!userId || auditando}
         />

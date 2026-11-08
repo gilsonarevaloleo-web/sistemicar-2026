@@ -52,6 +52,7 @@ export interface Fase2Response {
 export interface SaldoResponse {
   success: true;
   saldo: number;
+  ilimitado?: boolean;
   creditos: { fase1: number; fase2: number };
 }
 
@@ -92,10 +93,17 @@ function throwIfPagoRequerido(res: Response, body: ErrorBody): void {
   );
 }
 
-export async function leerSaldoJuez(userId: string): Promise<SaldoResponse> {
-  const res = await fetch(
-    `/api/casas/codigo4/saldo?userId=${encodeURIComponent(userId)}`,
-  );
+function queryUsuario(userId: string, email?: string | null): string {
+  const q = new URLSearchParams({ userId });
+  if (email?.trim()) q.set("email", email.trim());
+  return q.toString();
+}
+
+export async function leerSaldoJuez(
+  userId: string,
+  email?: string | null,
+): Promise<SaldoResponse> {
+  const res = await fetch(`/api/casas/codigo4/saldo?${queryUsuario(userId, email)}`);
   const body = await parseJson<SaldoResponse | ErrorBody>(res);
   if (!res.ok || !("success" in body) || body.success !== true) {
     throw new Error(("error" in body && body.error) || "No se pudo leer el saldo.");
@@ -118,6 +126,7 @@ export async function auditarFase1(input: {
   userId: string;
   friccionDiaria: string;
   codigoConquistadoMax?: number;
+  email?: string | null;
 }): Promise<Fase1Response> {
   const res = await fetch("/api/casas/codigo4/fase1", {
     method: "POST",
@@ -135,6 +144,7 @@ export async function auditarFase1(input: {
 export async function desbloquearFase2(input: {
   userId: string;
   sesionJuezId: string;
+  email?: string | null;
 }): Promise<Fase2Response> {
   const res = await fetch("/api/casas/codigo4/fase2", {
     method: "POST",

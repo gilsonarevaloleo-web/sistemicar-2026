@@ -8,6 +8,8 @@ import {
   buildUmbral5Prompt,
 } from "../shared/casas/umbral5/prompt.ts";
 import { CREDITO_LECTURA_MAPA } from "../shared/casas/umbral5/creditos.ts";
+import { OWNER_EMAIL } from "../shared/moduleAccess.ts";
+import { SALDO_ILIMITADO } from "../shared/ownerCredits.ts";
 import { createMemoryJuezWallet } from "./services/juezCreditos.ts";
 import { createMemoryUmbral5Store } from "./services/umbral5Store.ts";
 import {
@@ -139,6 +141,31 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     const sesion = await store.getById(volcado.sesionUmbral5Id);
     assert.equal(sesion?.lectura, null);
     assert.equal(sesion?.estado, "VOLCADO_GRATIS");
+  });
+
+  it("el dueño lee el mapa con ledger en 0 y no se cobra", async () => {
+    const wallet = createMemoryJuezWallet({ u1: 0 });
+    const store = createMemoryUmbral5Store();
+    const volcado = await ejecutarVolcadoGratis("u1", VOLCADO, {
+      wallet,
+      store,
+      email: OWNER_EMAIL,
+    });
+    assert.equal(volcado.ok, true);
+    if (!volcado.ok) return;
+    assert.equal(volcado.saldo, SALDO_ILIMITADO);
+    const lectura = await ejecutarLecturaMapa("u1", volcado.sesionUmbral5Id, {
+      wallet,
+      store,
+      email: OWNER_EMAIL,
+    });
+    assert.equal(lectura.ok, true);
+    if (!lectura.ok) return;
+    assert.equal(lectura.creditosDescontados, 0);
+    assert.equal(lectura.saldo, SALDO_ILIMITADO);
+    assert.equal(await wallet.saldo("u1"), 0);
+    const sesion = await store.getById(volcado.sesionUmbral5Id);
+    assert.equal(sesion?.estado, "MAPA_PAGO");
   });
 
   it("Gemini C10 cae al fallback local", async () => {
@@ -280,6 +307,42 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(lectura.status, 402);
       const body2 = await lectura.json();
       assert.equal(body2.codigo, "SALDO_INSUFICIENTE");
+    });
+  });
+
+  it("POST lectura del dueño pasa con saldo 0", async () => {
+    await withServer({ saldo: 0, userId: "u-dueno" }, async (base) => {
+      const volcado = await fetch(`${base}/api/casas/umbral5/volcado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "u-dueno",
+          email: OWNER_EMAIL,
+          limiteConocido: VOLCADO,
+        }),
+      });
+      assert.equal(volcado.status, 200);
+      const body1 = await volcado.json();
+      const saldo = await fetch(
+        `${base}/api/casas/umbral5/saldo?userId=u-dueno&email=${encodeURIComponent(OWNER_EMAIL)}`,
+      );
+      const saldoBody = await saldo.json();
+      assert.equal(saldoBody.ilimitado, true);
+      assert.equal(saldoBody.saldo, SALDO_ILIMITADO);
+      const lectura = await fetch(`${base}/api/casas/umbral5/lectura`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "u-dueno",
+          email: OWNER_EMAIL,
+          sesionUmbral5Id: body1.sesionUmbral5Id,
+        }),
+      });
+      assert.equal(lectura.status, 200);
+      const body2 = await lectura.json();
+      assert.equal(body2.success, true);
+      assert.equal(body2.creditosDescontados, 0);
+      assert.equal(body2.saldo, SALDO_ILIMITADO);
     });
   });
 

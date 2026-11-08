@@ -43,6 +43,11 @@ import {
   type JuezCreditWallet,
 } from "./juezCreditos.ts";
 import {
+  cobroCreditos,
+  consultarSaldoCreditos,
+  emailDePeticion,
+} from "./duenoCreditos.ts";
+import {
   createDefaultJuezStore,
   newSesionJuezId,
   type JuezSessionStore,
@@ -58,6 +63,7 @@ export interface JuezEngineDeps {
   callGemini?: JuezGeminiCaller;
   wallet?: JuezCreditWallet;
   store?: JuezSessionStore;
+  email?: string | null;
 }
 
 export interface JuezEngineOk {
@@ -237,14 +243,19 @@ export async function ejecutarFase1(
 
   const wallet = deps.wallet ?? createDefaultJuezWallet();
   const store = deps.store ?? createDefaultJuezStore();
-  const saldoAntes = await wallet.saldo(uid);
-  if (saldoAntes < CREDITO_FASE1_LECTURA) {
-    return saldoInsuficiente(1, saldoAntes);
+  const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
+  if (!visto.ilimitado && visto.saldo < CREDITO_FASE1_LECTURA) {
+    return saldoInsuficiente(1, visto.saldo);
   }
 
   const dictamen = await ejecutarJuezEngine(input, deps.callGemini);
-  const debito = await wallet.debitar(uid, CREDITO_FASE1_LECTURA);
-  if (!debito.ok) return saldoInsuficiente(1, debito.saldo);
+  const cobro = await cobroCreditos(
+    wallet,
+    uid,
+    CREDITO_FASE1_LECTURA,
+    deps.email,
+  );
+  if (!cobro.ok) return saldoInsuficiente(1, cobro.saldo);
 
   const now = new Date().toISOString();
   const sesion: SesionJuez = {
@@ -265,8 +276,8 @@ export async function ejecutarFase1(
     sesionJuezId: sesion.id,
     fase1_lectura: sesion.fase1,
     requiereInversionCreditos: true,
-    creditosDescontados: CREDITO_FASE1_LECTURA,
-    saldo: debito.saldo,
+    creditosDescontados: cobro.cobrado,
+    saldo: cobro.saldo,
     source: dictamen.source,
     ritual: CASA_CODIGO4_RITUAL,
     version: CASA_CODIGO4_VERSION,
@@ -324,22 +335,28 @@ export async function ejecutarFase2(
   }
 
   if (sesion.estado === "FASE2_ABIERTA") {
+    const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
     return {
       ok: true,
       sesionJuezId: sesion.id,
       fase2_propuesta_solucion: sesion.fase2,
       creditosDescontados: 0,
-      saldo: await wallet.saldo(uid),
+      saldo: visto.saldo,
       version: CASA_CODIGO4_VERSION,
     };
   }
 
-  const saldoAntes = await wallet.saldo(uid);
-  if (saldoAntes < CREDITO_FASE2_SOLUCION) {
-    return saldoInsuficiente(2, saldoAntes);
+  const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
+  if (!visto.ilimitado && visto.saldo < CREDITO_FASE2_SOLUCION) {
+    return saldoInsuficiente(2, visto.saldo);
   }
-  const debito = await wallet.debitar(uid, CREDITO_FASE2_SOLUCION);
-  if (!debito.ok) return saldoInsuficiente(2, debito.saldo);
+  const cobro = await cobroCreditos(
+    wallet,
+    uid,
+    CREDITO_FASE2_SOLUCION,
+    deps.email,
+  );
+  if (!cobro.ok) return saldoInsuficiente(2, cobro.saldo);
 
   sesion.estado = "FASE2_ABIERTA";
   sesion.updatedAt = new Date().toISOString();
@@ -349,8 +366,8 @@ export async function ejecutarFase2(
     ok: true,
     sesionJuezId: sesion.id,
     fase2_propuesta_solucion: sesion.fase2,
-    creditosDescontados: CREDITO_FASE2_SOLUCION,
-    saldo: debito.saldo,
+    creditosDescontados: cobro.cobrado,
+    saldo: cobro.saldo,
     version: CASA_CODIGO4_VERSION,
   };
 }
@@ -413,10 +430,12 @@ export function registerJuezRoutes(
         saldo: null,
       });
     }
-    const saldo = await wallet.saldo(userId);
+    const email = emailDePeticion(null, req.header("x-user-email"), req.query);
+    const visto = await consultarSaldoCreditos(wallet, userId, email);
     return res.json({
       success: true,
-      saldo,
+      saldo: visto.saldo,
+      ilimitado: visto.ilimitado,
       creditos: {
         fase1: CREDITO_FASE1_LECTURA,
         fase2: CREDITO_FASE2_SOLUCION,
@@ -442,13 +461,19 @@ export function registerJuezRoutes(
   const handleFase1 = async (req: Request, res: Response) => {
     try {
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
+      const email = emailDePeticion(req.body, req.header("x-user-email"), req.query);
       const input = normalizarInputJuez(req.body);
       if ("ok" in input && input.ok === false) {
         return res.status(input.status).json(bodyError(input));
       }
-      const resultado = await ejecutarFase1(userId, input.friccionDiaria, runtime, {
-        codigoConquistadoMax: input.codigoConquistadoMax,
-      });
+      const resultado = await ejecutarFase1(
+        userId,
+        input.friccionDiaria,
+        { ...runtime, email },
+        {
+          codigoConquistadoMax: input.codigoConquistadoMax,
+        },
+      );
       if (!resultado.ok) {
         return res.status(resultado.status).json(bodyError(resultado));
       }
@@ -476,8 +501,12 @@ export function registerJuezRoutes(
   const handleFase2 = async (req: Request, res: Response) => {
     try {
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
+      const email = emailDePeticion(req.body, req.header("x-user-email"), req.query);
       const sesionJuezId = sesionIdDe(req.body);
-      const resultado = await ejecutarFase2(userId, sesionJuezId, runtime);
+      const resultado = await ejecutarFase2(userId, sesionJuezId, {
+        ...runtime,
+        email,
+      });
       if (!resultado.ok) {
         return res.status(resultado.status).json(bodyError(resultado));
       }

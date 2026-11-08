@@ -8,6 +8,8 @@ import {
   buildJuezSerioPrompt,
 } from "../shared/casas/codigo4/prompt.ts";
 import { CREDITO_FASE1_LECTURA, CREDITO_FASE2_SOLUCION } from "../shared/casas/codigo4/creditos.ts";
+import { OWNER_EMAIL } from "../shared/moduleAccess.ts";
+import { SALDO_ILIMITADO } from "../shared/ownerCredits.ts";
 import { createMemoryJuezWallet } from "./services/juezCreditos.ts";
 import { createMemoryJuezStore } from "./services/juezStore.ts";
 import {
@@ -142,6 +144,30 @@ describe("juezEngine — fases y créditos", () => {
     assert.equal(fase1.status, 402);
     assert.equal(fase1.codigo, "SALDO_INSUFICIENTE");
     assert.equal(fase1.fase, 1);
+  });
+
+  it("el dueño audita Fase 1 con ledger en 0", async () => {
+    const wallet = createMemoryJuezWallet({ u1: 0 });
+    const store = createMemoryJuezStore();
+    const fase1 = await ejecutarFase1("u1", VOLCADO, {
+      wallet,
+      store,
+      email: OWNER_EMAIL,
+    });
+    assert.equal(fase1.ok, true);
+    if (!fase1.ok) return;
+    assert.equal(fase1.creditosDescontados, 0);
+    assert.equal(fase1.saldo, SALDO_ILIMITADO);
+    assert.equal(await wallet.saldo("u1"), 0);
+    const fase2 = await ejecutarFase2("u1", fase1.sesionJuezId, {
+      wallet,
+      store,
+      email: OWNER_EMAIL,
+    });
+    assert.equal(fase2.ok, true);
+    if (!fase2.ok) return;
+    assert.equal(fase2.creditosDescontados, 0);
+    assert.equal(await wallet.saldo("u1"), 0);
   });
 
   it("Fase 2 cobra y desbloquea la directiva", async () => {
