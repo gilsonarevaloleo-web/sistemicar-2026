@@ -92,3 +92,15 @@ export interface PreguntaViva {
   variante: number;
   etiquetaCapitulo: string;
 }
+
+export type EstadoPasoCapitulo = "hecho" | "actual" | "pendiente";
+
+export interface PasoCapitulo {
+  capitulo: CapituloId;
+  subcodigo: SubcodigoId;
+  indice: PreguntaIndice;
+  etiquetaSubcodigo: string;
+  etiquetaCapitulo: string;
+  estado: EstadoPasoCapitulo;
+  recorteEscenario: string | null;
+}

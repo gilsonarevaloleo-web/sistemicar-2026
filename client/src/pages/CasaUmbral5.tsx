@@ -29,6 +29,7 @@ import {
   listarLibrosGimnasio,
   responderGimnasio,
 } from "@/lib/casas/gimnasio6/api";
+import { unlockCuartoAudio } from "@/lib/casas/gimnasio6/cuartoAudio";
 import type { LibroGimnasio, PreguntaViva } from "@shared/casas/gimnasio6";
 import { preguntaVivaDe, textoCopiaLibro } from "@shared/casas/gimnasio6";
 import {
@@ -282,6 +283,7 @@ export default function CasaUmbral5() {
     setError(null);
     setAbriendoGym(true);
     try {
+      await unlockCuartoAudio();
       const out = await abrirGimnasio({ userId, sesionUmbral5Id: sesionId });
       aplicarGym(out);
     } catch (err) {
@@ -314,6 +316,7 @@ export default function CasaUmbral5() {
     if (!userId || !libro) return;
     setError(null);
     try {
+      await unlockCuartoAudio();
       const out = await continuarGimnasio({ userId, libroId: libro.id, libro });
       aplicarGym(out);
     } catch (err) {
@@ -451,6 +454,7 @@ export default function CasaUmbral5() {
           libroActivoId={libro?.id ?? null}
           onSelect={(l) => {
             if (!userId) return;
+            void unlockCuartoAudio();
             void leerLibroGimnasio({ userId, libroId: l.id })
               .then(aplicarGym)
               .catch((err) => {
