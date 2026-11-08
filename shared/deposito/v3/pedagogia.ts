@@ -76,7 +76,7 @@ export const PUENTES_ESCRITURA: Record<EyeCode, PuenteEscritura> = {
     codigo: 9,
     percepcion: "Sistema",
     escritura:
-      "conectá tres dimensiones en el mismo escrito: fisiología + trabajo + entorno",
+      "escribí el principio sistémico: una afirmación sin duda, no tres hilos",
   },
   10: {
     codigo: 10,

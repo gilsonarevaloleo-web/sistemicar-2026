@@ -10,6 +10,11 @@
 
 import { CANON_TEN_EYES, isEyeCode } from "./ojos.ts";
 import { PUENTES_ESCRITURA } from "./pedagogia.ts";
+import {
+  esPrincipioSistemico,
+  extraerCierre,
+  extraerTitulo,
+} from "./geometria.ts";
 import type {
   DepotAnalysisResult,
   DepotEntryPayload,
@@ -248,6 +253,9 @@ export function destilarAcomodo(
   if (formas.escena && (foco === 6 || firma === 6)) {
     piezas.push("La escena física sostiene C6.");
   }
+  if (foco === 9 || firma === 9) {
+    piezas.push("C9 es el principio sistémico: afirmación sin duda, no multi-hilo.");
+  }
 
   if (cableado) {
     piezas.push("Título y cierre van por el mismo cordón (C10).");
@@ -336,10 +344,15 @@ export function extraerPrincipioAprendizaje(
   if (esClimaCorto(crudo)) return null;
 
   const grounded = Boolean(input.result.groundingStatus?.isFullyGrounded);
-  const foco = (input.result.focoRevelacionCode ??
-    input.result.syntaxDiagnostic?.focoCode ??
-    input.result.characterSignedCode) as EyeCode;
   const firma = input.result.characterSignedCode;
+  const c9enPapel = volcadoConstruyeCodigo(input.result, 9);
+  const foco = (
+    c9enPapel
+      ? 9
+      : (input.result.focoRevelacionCode ??
+        input.result.syntaxDiagnostic?.focoCode ??
+        firma)
+  ) as EyeCode;
   if (!isEyeCode(foco) || !isEyeCode(firma)) return null;
 
   if (
@@ -362,7 +375,9 @@ export function extraerPrincipioAprendizaje(
     firma,
     percepcion: puente.percepcion,
     escritura: puente.escritura,
-    enunciado: enunciadoPrincipio(foco),
+    enunciado: c9enPapel
+      ? extraerEnunciadoSistemico(input.payload) || enunciadoPrincipio(9)
+      : enunciadoPrincipio(foco),
     acomodo,
     anclas: extraerAnclasGeometricas(crudo),
     usos: 1,
@@ -371,9 +386,30 @@ export function extraerPrincipioAprendizaje(
   };
 }
 
+function extraerEnunciadoSistemico(payload: DepotEntryPayload): string {
+  const titulo = extraerTitulo(payload);
+  const cierre = extraerCierre(payload, titulo);
+  if (cierre && esPrincipioSistemico(cierre)) {
+    return clampFrase(cierre, MAX_ENUNCIADO);
+  }
+  const frases = (payload.rawFact ?? "")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (let i = frases.length - 1; i >= 0; i -= 1) {
+    if (esPrincipioSistemico(frases[i])) {
+      return clampFrase(frases[i], MAX_ENUNCIADO);
+    }
+  }
+  if (titulo && esPrincipioSistemico(titulo)) {
+    return clampFrase(titulo, MAX_ENUNCIADO);
+  }
+  return "";
+}
+
 function extraerAnclasGeometricas(texto: string): string[] {
   const geometricas =
-    /patron|patrn|ley|piston|secuencia|corte|inflexion|paradigma|ciclo|carga|titulo|cierre|firma|foco|axioma|modelo/i;
+    /patron|patrn|ley|piston|secuencia|corte|inflexion|paradigma|ciclo|carga|titulo|cierre|firma|foco|axioma|modelo|principio|valor|sistema/i;
   const toks = [...tokensDe(texto)].filter((t) => geometricas.test(t));
   return toks.slice(0, MAX_ANCLAS);
 }

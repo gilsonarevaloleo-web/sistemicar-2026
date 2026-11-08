@@ -450,6 +450,20 @@ const ENTORNO =
 const C9_ENLACE =
   /al mismo tiempo|varios hilos|balance de carga|mientras [\s\S]+ tambien|multihilo|y tambien|ademas de/;
 
+/** Principio sistémico: afirmación sin duda. No exige multi-hilo. */
+const C9_PRINCIPIO = [
+  /por eso (razon|digo|dado)/,
+  /no se expresa[\s\S]{0,100}sino/,
+  /no necesariamente[\s\S]{0,80}sino/,
+  /el valor (personal|de alguien)/,
+  /valor en los demas/,
+  /la ley del valor/,
+  /eso (significa|quiere decir) que/,
+  /\bprincipio sistem/,
+  /afirmacion sin duda/,
+  /\bsin duda\b/,
+];
+
 function tieneCicloNatural(norm: string): boolean {
   return C8_POLO_NATURAL.test(norm) && C8_RETORNO_NATURAL.test(norm);
 }
@@ -460,6 +474,10 @@ function esC8Tecnico(norm: string): boolean {
 
 function dimensionesC9(norm: string): number {
   return [FISIO, TRABAJO, ENTORNO].filter((re) => re.test(norm)).length;
+}
+
+export function esPrincipioSistemico(texto: string): boolean {
+  return hitsDe(normalizarGeometria(texto), C9_PRINCIPIO) > 0;
 }
 
 function emptyScores(): Record<EyeCode, number> {
@@ -506,14 +524,17 @@ function elegirFirma(
   if (active[8] && (esTesisCicloAtencion(norm) || hipotesisComoOjo(titulo) === 8)) {
     return 8;
   }
+  if (active[9]) {
+    return 9;
+  }
   if (active[7] && (esTesisVision(norm) || hipotesisComoOjo(titulo) === 7)) {
+    return 7;
+  }
+  if (active[7] && hipotesisComoOjo(titulo) === 1) {
     return 7;
   }
   if (active[2] && hipotesisComoOjo(titulo) === 2) {
     return 2;
-  }
-  if (active[1] && hipotesisComoOjo(titulo) === 1) {
-    return 1;
   }
   if (
     active[8] &&
@@ -591,8 +612,10 @@ export function auditarGeometriaSintactica(
   active[8] = scores[8] > 0;
 
   const dims = dimensionesC9(normCuerpo);
-  scores[9] = hitsDe(normCuerpo, [C9_ENLACE]) + (dims >= 3 ? 1 : 0);
-  active[9] = dims >= 3 && C9_ENLACE.test(normCuerpo);
+  const principio = hitsDe(normCuerpo, C9_PRINCIPIO);
+  const hilos = dims >= 3 && C9_ENLACE.test(normCuerpo);
+  scores[9] = principio + (hilos ? 1 : 0);
+  active[9] = principio > 0 || hilos;
 
   const vectoresC1 = [titulo, primerVectorNarrativo(payload, titulo)].filter(
     Boolean,

@@ -111,14 +111,15 @@ export const CANON_TEN_EYES: Record<EyeCode, EyeDefinition> = {
   9: {
     id: 9,
     name: "Sistema",
-    concept: "El conjunto",
+    concept: "El principio",
     description:
-      "Balance de carga de los 10 canales, arquitectura de escalabilidad.",
+      "Principio sistémico: afirmación sin duda que el conjunto sostiene. No exige varios hilos.",
     tierRequired: "TITULO",
     planeta: "Sistema",
     planetaOjo: "El Ojo del Sistema",
-    syntaxLabel: "Multihilo",
-    syntaxCharacteristics: "Balance de carga, varios hilos a la vez.",
+    syntaxLabel: "Principio",
+    syntaxCharacteristics:
+      "Afirmación sin duda, ley del conjunto. El Cerebro Madre absorbe C9.",
   },
   10: {
     id: 10,

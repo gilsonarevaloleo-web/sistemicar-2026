@@ -14,6 +14,7 @@ import {
   rechazarPrincipio,
   resumenCerebroMadre,
 } from "./cerebroMadre.ts";
+import { diagnosticarAuditoriaLocal } from "./motor.ts";
 import type { DepotEntryPayload } from "./types.ts";
 
 const NACIMIENTO = Date.UTC(2026, 9, 18, 12, 0, 0);
@@ -219,5 +220,30 @@ describe("Depósito V3 — Cerebro Madre", () => {
     assert.equal(c7.ultimaMedida?.construyo, false);
     assert.equal(c7.createdAt, NACIMIENTO);
     assert.equal(falla.cerebro.pedidoPendiente?.codigo, 3);
+  });
+
+  it("C9 principio sistémico entra al Cerebro Madre, no el ego C1 ni el diario", () => {
+    const payload08: DepotEntryPayload = {
+      rawFact: `Hoy aprendi que el valor interno se siente más de que puede gritar el ego exterior.
+Por eso dado este aprendisaje a partir de hoy en adelante lo primero que debo hacer es si soy.
+Por eso razón el valor personal no se expresa hablando de nuestro valor, sino nuestro valor se expresa crusando el valor de importancia en los demás.`,
+      studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
+      detectedNoise: "No hay",
+      omittedShadow: "La boca habla de lo que nos falta",
+      userTier: "CARRERA",
+    };
+    const result = diagnosticarAuditoriaLocal(payload08);
+    const p = extraerPrincipioAprendizaje({
+      payload: payload08,
+      result,
+      now: NACIMIENTO,
+    });
+    assert.ok(p);
+    assert.equal(p.foco, 9);
+    assert.equal(p.firma, 9);
+    assert.match(p.enunciado, /valor personal|importancia en los demás/i);
+    assert.doesNotMatch(p.enunciado, /esposa|reclamo|costura|ego exterior/i);
+    assert.match(p.acomodo, /principio sistémico|afirmación sin duda/i);
+    assert.doesNotMatch(p.escritura, /tres dimensiones|fisiología/i);
   });
 });
