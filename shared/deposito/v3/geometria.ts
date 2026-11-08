@@ -319,6 +319,9 @@ const C5_DECISION = [
   /\bbasta\b/,
   /no mas\b/,
   /(corte|limite|decision)\s*:/,
+  /a partir de hoy/,
+  /de hoy en adelante/,
+  /lo primero que debo (hacer|es)/,
 ];
 
 const C6_FUENTE = [
@@ -508,6 +511,9 @@ function elegirFirma(
   }
   if (active[2] && hipotesisComoOjo(titulo) === 2) {
     return 2;
+  }
+  if (active[1] && hipotesisComoOjo(titulo) === 1) {
+    return 1;
   }
   if (
     active[8] &&

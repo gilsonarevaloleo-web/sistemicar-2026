@@ -6,6 +6,7 @@ import {
   peldañoPendienteEnlace,
   primerPendienteCascada,
   reconciliarCascada,
+  tonoFortalezas,
 } from "./cascada.ts";
 import {
   auditarGeometriaSintactica,
@@ -83,6 +84,7 @@ describe("Geometría sintáctica fría", () => {
       "Hasta la desición que debería ejecutar. El cuerpo no quería ejecutar una desición.",
       "¿Porque desidí comprar el curso? Lo deje a los tres días.",
       "El problema no es falta de desición sino falta de visión.",
+      "A partir de hoy en adelante lo primero que debo hacer es si soy.",
     ]) {
       const geo = auditarGeometriaSintactica({
         rawFact,
@@ -171,6 +173,17 @@ En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra h
     assert.equal(geo.active[8], true);
     assert.equal(geo.active[10], true);
     assert.equal(geo.titleConnectedToClose, true);
+  });
+
+  it("hipótesis código 1 no deja que entonces robe la firma; a partir de hoy enciende C5", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "Hoy aprendí que el valor interno se siente. Entonces ¿por qué no lo valoré? A partir de hoy lo primero que debo hacer es si soy. Por eso el valor se expresa en los demás.",
+      studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.characterSignedCode, 1);
+    assert.equal(geo.active[5], true);
   });
 
   it("código 7 / desición en el papel: firma C7, C5 activo, C10 abrocha la visión", () => {
@@ -264,6 +277,19 @@ describe("Ley de la Cascada", () => {
     assert.doesNotMatch(mensaje, /tijera|idea propia/);
     assert.match(mensaje, /Cableado título↔cierre: no/);
     assert.match(mensaje, /Firma C8/);
+  });
+
+  it("circuito cerrado nombra fortalezas, no tijera", () => {
+    const ajuste = tonoFortalezas({
+      characterSignedCode: 1,
+      activeCodes: [1, 2, 4, 5, 6, 7, 10],
+    });
+    assert.match(ajuste, /Firma C1/);
+    assert.match(ajuste, /C1 · C2 · C4 · C5 · C7 · C10/);
+    assert.match(ajuste, /C6/);
+    assert.match(ajuste, /C3 · C8 · C9 quedan vacíos/);
+    assert.match(ajuste, /no abren peldaño/);
+    assert.doesNotMatch(ajuste, /traza una línea|tijera/i);
   });
 
   it("reconciliar no deja FOCO C5 si C5 ya está activo", () => {
