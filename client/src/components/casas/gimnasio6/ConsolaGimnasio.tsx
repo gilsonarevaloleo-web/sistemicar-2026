@@ -1,6 +1,21 @@
 import React, { type FormEvent, useEffect, useRef, useState } from "react";
-import type { LibroGimnasio, PreguntaViva } from "@shared/casas/gimnasio6";
+import { Volume2, VolumeX } from "lucide-react";
+import {
+  ETIQUETA_CAPITULO,
+  capituloVisibleDe,
+  pasosDelCapitulo,
+  type LibroGimnasio,
+  type PreguntaViva,
+} from "@shared/casas/gimnasio6";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "../umbral5/LienzoLimite";
+import { PasosCapitulo } from "./PasosCapitulo";
+import {
+  playPasoCuarto,
+  setCuartoMute,
+  startCamaCuarto,
+  stopCamaCuarto,
+  unlockCuartoAudio,
+} from "../../../lib/casas/gimnasio6/cuartoAudio.ts";
 
 export function ConsolaGimnasio({
   libro,
@@ -22,9 +37,23 @@ export function ConsolaGimnasio({
   aviso?: string | null;
 }) {
   const [texto, setTexto] = useState("");
+  const [mute, setMute] = useState(false);
   const enviandoRef = useRef(false);
+  const pasoPrevio = useRef<string | null>(null);
   const turnoCount = libro.turnos.length;
   const punteroClave = `${libro.id}:${libro.puntero.capitulo}.${libro.puntero.subcodigo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
+  const capituloVista = capituloVisibleDe(libro);
+  const sellado =
+    topeDiario ||
+    libro.estado === "TOPE_DIARIO" ||
+    libro.estado === "CAPITULO_SELLADO";
+  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado });
+  const pasoClave = `${capituloVista}.${libro.puntero.subcodigo}.${libro.puntero.indice}`;
+  const etiqueta = ETIQUETA_CAPITULO[capituloVista];
+  const punteroLabel = sellado
+    ? "sellado"
+    : `${libro.puntero.subcodigo}.${libro.puntero.indice}`;
+  const enCuarto = libro.estado === "ABIERTO" && !topeDiario;
 
   useEffect(() => {
     enviandoRef.current = enviando;
@@ -36,48 +65,113 @@ export function ConsolaGimnasio({
     setTexto("");
   }, [punteroClave]);
 
+  useEffect(() => {
+    if (!enCuarto || mute) {
+      stopCamaCuarto();
+      return;
+    }
+    startCamaCuarto(capituloVista);
+    return () => {
+      stopCamaCuarto();
+    };
+  }, [enCuarto, mute, capituloVista, libro.id]);
+
+  useEffect(() => {
+    if (!enCuarto) {
+      pasoPrevio.current = pasoClave;
+      return;
+    }
+    if (pasoPrevio.current && pasoPrevio.current !== pasoClave) {
+      playPasoCuarto();
+    }
+    pasoPrevio.current = pasoClave;
+  }, [pasoClave, enCuarto]);
+
+  useEffect(() => {
+    return () => {
+      stopCamaCuarto();
+    };
+  }, []);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (enviando || enviandoRef.current || texto.trim().length < 1) return;
     enviandoRef.current = true;
+    void unlockCuartoAudio();
     onResponder(texto);
   };
 
+  const toggleMute = () => {
+    const next = !mute;
+    setMute(next);
+    setCuartoMute(next);
+    if (!next) {
+      void unlockCuartoAudio().then(() => {
+        if (enCuarto) startCamaCuarto(capituloVista);
+      });
+    } else {
+      stopCamaCuarto();
+    }
+  };
+
   return (
-    <section className="space-y-4" data-testid="gimnasio6-consola">
-      <header className="flex items-center justify-between">
+    <section
+      className="relative space-y-5 overflow-hidden border px-5 py-6"
+      style={{
+        borderColor: `${UMBRAL5_BRONZE}55`,
+        background:
+          "radial-gradient(ellipse at 50% 28%, #1c1610 0%, #0a0908 48%, #050505 100%)",
+        boxShadow: `inset 0 0 90px #000, 0 0 0 1px ${UMBRAL5_BRONZE}14`,
+      }}
+      data-testid="gimnasio6-consola"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 22%, transparent 78%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
+      <header className="relative flex items-center justify-between gap-3">
         <p
           className="text-[10px] tracking-[0.22em] uppercase"
           style={{ color: UMBRAL5_BRONZE }}
+          data-testid="gimnasio6-puntero"
         >
-          {pregunta?.etiquetaCapitulo ?? "Gimnasio"}
+          {etiqueta} · {punteroLabel}
         </p>
-        <button
-          type="button"
-          onClick={onCopiar}
-          className="text-[10px] uppercase tracking-[0.18em] text-white/40 hover:text-white/70"
-          data-testid="gimnasio6-copiar"
-        >
-          Copiar libro
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="text-white/40 hover:text-white/70"
+            aria-label={mute ? "Activar sonido del cuarto" : "Silenciar el cuarto"}
+            data-testid="gimnasio6-mute"
+          >
+            {mute ? (
+              <VolumeX size={14} />
+            ) : (
+              <Volume2 size={14} style={{ color: UMBRAL5_BRONZE }} />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onCopiar}
+            className="text-[10px] uppercase tracking-[0.18em] text-white/40 hover:text-white/70"
+            data-testid="gimnasio6-copiar"
+          >
+            Copiar libro
+          </button>
+        </div>
       </header>
 
-      {libro.turnos.slice(-8).map((t) => (
-        <article
-          key={t.id}
-          className="border px-4 py-3"
-          style={{ borderColor: `${UMBRAL5_BRONZE}22` }}
-          data-testid={`gimnasio6-turno-${t.id}`}
-        >
-          <p className="text-[11px] text-white/45">{t.pregunta}</p>
-          {t.respuesta && (
-            <p className="mt-2 text-sm text-white/80">{t.respuesta}</p>
-          )}
-        </article>
-      ))}
+      <div className="relative">
+        <PasosCapitulo pasos={pasos} />
+      </div>
 
       {topeDiario && (
-        <p className="text-[12px] leading-relaxed text-white/55" data-testid="gimnasio6-tope">
+        <p className="relative text-[12px] leading-relaxed text-white/55" data-testid="gimnasio6-tope">
           Capítulo sellado. A lo mucho uno por día. Mañana sigue el libro.
         </p>
       )}
@@ -86,7 +180,7 @@ export function ConsolaGimnasio({
         <button
           type="button"
           onClick={onContinuar}
-          className="w-full px-4 py-3 text-[11px] font-semibold tracking-[0.14em] uppercase"
+          className="relative w-full px-4 py-3 text-[11px] font-semibold tracking-[0.14em] uppercase"
           style={{
             backgroundColor: "transparent",
             color: UMBRAL5_BRONZE,
@@ -99,16 +193,22 @@ export function ConsolaGimnasio({
       )}
 
       {pregunta && !topeDiario && libro.estado === "ABIERTO" && (
-        <form onSubmit={handleSubmit} className="space-y-3" data-testid="gimnasio6-form">
+        <form
+          onSubmit={handleSubmit}
+          className="relative space-y-4"
+          data-testid="gimnasio6-form"
+        >
           <p
-            className={`text-sm leading-relaxed ${pregunta.variante > 0 ? "" : "text-white/55"}`}
-            style={pregunta.variante > 0 ? { color: UMBRAL5_BRONZE } : undefined}
+            className="text-base font-light leading-relaxed md:text-lg"
+            style={{
+              color: pregunta.variante > 0 ? UMBRAL5_BRONZE : "rgba(255,255,255,0.72)",
+            }}
             data-testid="gimnasio6-escenario"
           >
             {pregunta.escenario}
           </p>
           <p
-            className="text-lg font-light leading-snug"
+            className="text-xl font-light leading-snug"
             style={{ color: UMBRAL5_BRONZE }}
             data-testid="gimnasio6-pregunta"
           >
@@ -119,8 +219,8 @@ export function ConsolaGimnasio({
             onChange={(e) => setTexto(e.target.value)}
             rows={5}
             disabled={enviando}
-            className="w-full resize-y bg-black/60 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25 disabled:opacity-70"
-            style={{ border: `1px solid ${UMBRAL5_BRONZE}33` }}
+            className="w-full resize-y bg-black/50 px-4 py-3 text-sm leading-relaxed text-white outline-none placeholder:text-white/25 disabled:opacity-70"
+            style={{ border: `1px solid ${UMBRAL5_BRONZE}40` }}
             placeholder="Respondé desde el cuarto. No desde la teoría."
             data-testid="gimnasio6-respuesta"
           />
@@ -141,11 +241,28 @@ export function ConsolaGimnasio({
         </form>
       )}
 
+      {libro.turnos.slice(-3).map((t) => (
+        <article
+          key={t.id}
+          className="relative border px-4 py-3"
+          style={{ borderColor: `${UMBRAL5_BRONZE}22` }}
+          data-testid={`gimnasio6-turno-${t.id}`}
+        >
+          <p className="text-[11px] text-white/45">{t.pregunta}</p>
+          {t.respuesta && (
+            <p className="mt-2 text-sm text-white/80">{t.respuesta}</p>
+          )}
+        </article>
+      ))}
+
       {libro.estado === "LIBRO_CERRADO" && (
-        <p className="text-[12px] text-white/50">El libro está cerrado.</p>
+        <p className="relative text-[12px] text-white/50">El libro está cerrado.</p>
       )}
 
-      <p className="text-[10px] tracking-[0.16em] uppercase" style={{ color: UMBRAL5_ASH }}>
+      <p
+        className="relative text-[10px] tracking-[0.16em] uppercase"
+        style={{ color: UMBRAL5_ASH }}
+      >
         El poder no está en el ambiente. Está en este cuarto.
       </p>
     </section>

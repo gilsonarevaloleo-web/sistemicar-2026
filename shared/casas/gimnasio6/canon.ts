@@ -4,7 +4,15 @@
  * Cada subcódigo: 3 preguntas. Se entregan de a una.
  */
 
-import type { CapituloId, PreguntaCanon, PreguntaIndice, SubcodigoId } from "./types.ts";
+import type {
+  CapituloId,
+  LibroGimnasio,
+  PasoCapitulo,
+  PreguntaCanon,
+  PreguntaIndice,
+  PunteroGimnasio,
+  SubcodigoId,
+} from "./types.ts";
 
 export const ETIQUETA_CAPITULO: Record<CapituloId, string> = {
   1: "Seguridad en tu producto",
@@ -12,6 +20,94 @@ export const ETIQUETA_CAPITULO: Record<CapituloId, string> = {
   3: "Tres canales",
   4: "Lo imprevisto",
 };
+
+export const ETIQUETA_SUBCODIGO: Record<CapituloId, Record<SubcodigoId, string>> = {
+  1: {
+    1: "Frente al producto",
+    2: "Prioridad",
+    3: "Semana",
+    4: "Lo no ensayado",
+  },
+  2: {
+    1: "Alguien de tu alrededor",
+    2: "Quien no compraría",
+    3: "Semana social",
+    4: "Lo temido",
+  },
+  3: {
+    1: "Canal uno",
+    2: "Canal dos",
+    3: "Canal tres",
+    4: "Cierre",
+  },
+  4: {
+    1: "El golpe",
+    2: "El cuerpo",
+    3: "La mirada",
+    4: "El 10",
+  },
+};
+
+export function etiquetaSubcodigo(
+  capitulo: CapituloId,
+  subcodigo: SubcodigoId,
+): string {
+  return ETIQUETA_SUBCODIGO[capitulo][subcodigo];
+}
+
+export function recorteEscenario(texto: string, max = 52): string {
+  const clean = texto.trim().replace(/\s+/g, " ");
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1).trimEnd()}…`;
+}
+
+function ordinalPaso(subcodigo: SubcodigoId, indice: PreguntaIndice): number {
+  return (subcodigo - 1) * 3 + indice;
+}
+
+export function capituloVisibleDe(
+  libro: Pick<LibroGimnasio, "puntero" | "estado" | "capitulosSellados">,
+): CapituloId {
+  if (libro.estado === "TOPE_DIARIO" || libro.estado === "CAPITULO_SELLADO") {
+    const last = libro.capitulosSellados[libro.capitulosSellados.length - 1];
+    if (last) return last;
+  }
+  return libro.puntero.capitulo;
+}
+
+export function pasosDelCapitulo(
+  capitulo: CapituloId,
+  puntero: PunteroGimnasio,
+  opts: { sellado?: boolean } = {},
+): PasoCapitulo[] {
+  const items = CANON.filter((p) => p.capitulo === capitulo);
+  const actual = ordinalPaso(puntero.subcodigo, puntero.indice);
+  const mismoCapitulo = puntero.capitulo === capitulo;
+  return items.map((p) => {
+    const ord = ordinalPaso(p.subcodigo, p.indice);
+    let estado: PasoCapitulo["estado"];
+    if (opts.sellado) {
+      estado = "hecho";
+    } else if (!mismoCapitulo) {
+      estado = puntero.capitulo > capitulo ? "hecho" : "pendiente";
+    } else if (ord < actual) {
+      estado = "hecho";
+    } else if (ord === actual) {
+      estado = "actual";
+    } else {
+      estado = "pendiente";
+    }
+    return {
+      capitulo: p.capitulo,
+      subcodigo: p.subcodigo,
+      indice: p.indice,
+      etiquetaSubcodigo: etiquetaSubcodigo(p.capitulo, p.subcodigo),
+      etiquetaCapitulo: ETIQUETA_CAPITULO[p.capitulo],
+      estado,
+      recorteEscenario: estado === "hecho" ? recorteEscenario(p.escenario) : null,
+    };
+  });
+}
 
 const C1: PreguntaCanon[] = [
   {

@@ -14,9 +14,11 @@ export type {
   CapituloId,
   EstadoCapitulo,
   EstadoLibro,
+  EstadoPasoCapitulo,
   EvaluacionTurno,
   LibroGimnasio,
   ModuloGimnasio,
+  PasoCapitulo,
   PreguntaCanon,
   PreguntaIndice,
   PreguntaViva,
@@ -35,8 +37,13 @@ export {
 export {
   CANON_GIMNASIO,
   ETIQUETA_CAPITULO,
+  ETIQUETA_SUBCODIGO,
   capituloPreparable,
+  capituloVisibleDe,
+  etiquetaSubcodigo,
+  pasosDelCapitulo,
   preguntaCanon,
+  recorteEscenario,
   siguientePuntero,
 } from "./canon.ts";
 
