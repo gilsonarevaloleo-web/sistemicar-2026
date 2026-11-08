@@ -26,6 +26,11 @@ import {
   type JuezCreditWallet,
 } from "./juezCreditos.ts";
 import {
+  cobroCreditos,
+  consultarSaldoCreditos,
+  emailDePeticion,
+} from "./duenoCreditos.ts";
+import {
   createDefaultUmbral5Store,
   newSesionUmbral5Id,
   type Umbral5SessionStore,
@@ -41,6 +46,7 @@ export interface Umbral5EngineDeps {
   callGemini?: Umbral5GeminiCaller;
   wallet?: JuezCreditWallet;
   store?: Umbral5SessionStore;
+  email?: string | null;
 }
 
 export interface Umbral5EngineErr {
@@ -151,12 +157,13 @@ export async function ejecutarVolcadoGratis(
   };
   await store.save(sesion);
 
+  const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
   return {
     ok: true,
     sesionUmbral5Id: sesion.id,
     textoVolcado: sesion.textoVolcado,
     creditosDescontados: 0,
-    saldo: await wallet.saldo(uid),
+    saldo: visto.saldo,
     ritual: CASA_UMBRAL5_RITUAL,
     version: CASA_UMBRAL5_VERSION,
   };
@@ -225,27 +232,28 @@ export async function ejecutarLecturaMapa(
   }
 
   if (sesion.estado === "MAPA_PAGO" && sesion.lectura) {
+    const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
     return {
       ok: true,
       sesionUmbral5Id: sesion.id,
       lectura: sesion.lectura,
       creditosDescontados: 0,
-      saldo: await wallet.saldo(uid),
+      saldo: visto.saldo,
       source: sesion.source === "gemini" ? "gemini" : "local_fallback",
       ritual: CASA_UMBRAL5_RITUAL,
       version: CASA_UMBRAL5_VERSION,
     };
   }
 
-  const saldoAntes = await wallet.saldo(uid);
-  if (saldoAntes < CREDITO_LECTURA_MAPA) {
+  const visto = await consultarSaldoCreditos(wallet, uid, deps.email);
+  if (!visto.ilimitado && visto.saldo < CREDITO_LECTURA_MAPA) {
     return {
       ok: false,
       status: 402,
-      error: mensajeSaldoInsuficiente(CREDITO_LECTURA_MAPA, saldoAntes),
+      error: mensajeSaldoInsuficiente(CREDITO_LECTURA_MAPA, visto.saldo),
       codigo: "SALDO_INSUFICIENTE",
       requeridos: CREDITO_LECTURA_MAPA,
-      saldo: saldoAntes,
+      saldo: visto.saldo,
     };
   }
 
@@ -253,15 +261,20 @@ export async function ejecutarLecturaMapa(
     { limiteConocido: sesion.textoVolcado },
     deps.callGemini,
   );
-  const debito = await wallet.debitar(uid, CREDITO_LECTURA_MAPA);
-  if (!debito.ok) {
+  const cobro = await cobroCreditos(
+    wallet,
+    uid,
+    CREDITO_LECTURA_MAPA,
+    deps.email,
+  );
+  if (!cobro.ok) {
     return {
       ok: false,
       status: 402,
-      error: mensajeSaldoInsuficiente(CREDITO_LECTURA_MAPA, debito.saldo),
+      error: mensajeSaldoInsuficiente(CREDITO_LECTURA_MAPA, cobro.saldo),
       codigo: "SALDO_INSUFICIENTE",
       requeridos: CREDITO_LECTURA_MAPA,
-      saldo: debito.saldo,
+      saldo: cobro.saldo,
     };
   }
 
@@ -275,8 +288,8 @@ export async function ejecutarLecturaMapa(
     ok: true,
     sesionUmbral5Id: sesion.id,
     lectura: sesion.lectura,
-    creditosDescontados: CREDITO_LECTURA_MAPA,
-    saldo: debito.saldo,
+    creditosDescontados: cobro.cobrado,
+    saldo: cobro.saldo,
     source: dictamen.source,
     ritual: CASA_UMBRAL5_RITUAL,
     version: CASA_UMBRAL5_VERSION,
@@ -382,10 +395,12 @@ export function registerUmbral5Routes(
         saldo: null,
       });
     }
-    const saldo = await wallet.saldo(userId);
+    const email = emailDePeticion(null, req.header("x-user-email"), req.query);
+    const visto = await consultarSaldoCreditos(wallet, userId, email);
     return res.json({
       success: true,
-      saldo,
+      saldo: visto.saldo,
+      ilimitado: visto.ilimitado,
       creditos: { lectura: CREDITO_LECTURA_MAPA, volcado: 0 },
     });
   });
@@ -393,11 +408,15 @@ export function registerUmbral5Routes(
   app.post("/api/casas/umbral5/volcado", async (req: Request, res: Response) => {
     try {
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
+      const email = emailDePeticion(req.body, req.header("x-user-email"), req.query);
       const input = normalizarInputUmbral5(req.body);
       if ("ok" in input && input.ok === false) {
         return res.status(input.status).json(bodyError(input));
       }
-      const resultado = await ejecutarVolcadoGratis(userId, input.limiteConocido, runtime);
+      const resultado = await ejecutarVolcadoGratis(userId, input.limiteConocido, {
+        ...runtime,
+        email,
+      });
       if (!resultado.ok) {
         return res.status(resultado.status).json(bodyError(resultado));
       }
@@ -423,8 +442,12 @@ export function registerUmbral5Routes(
   app.post("/api/casas/umbral5/lectura", async (req: Request, res: Response) => {
     try {
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
+      const email = emailDePeticion(req.body, req.header("x-user-email"), req.query);
       const sesionUmbral5Id = sesionIdDe(req.body);
-      const resultado = await ejecutarLecturaMapa(userId, sesionUmbral5Id, runtime);
+      const resultado = await ejecutarLecturaMapa(userId, sesionUmbral5Id, {
+        ...runtime,
+        email,
+      });
       if (!resultado.ok) {
         return res.status(resultado.status).json(bodyError(resultado));
       }

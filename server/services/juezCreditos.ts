@@ -5,6 +5,7 @@
 
 import pkg from "pg";
 import { resolveDatabaseUrl } from "./databaseUrl.ts";
+import { esDuenoCreditos, SALDO_ILIMITADO } from "./duenoCreditos.ts";
 
 const { Pool } = pkg;
 
@@ -137,10 +138,29 @@ async function saldoComprado(userId: string): Promise<number | null> {
   }
 }
 
+function conCreditoIlimitadoDueno(inner: JuezCreditWallet): JuezCreditWallet {
+  return {
+    async saldo(userId) {
+      if (await esDuenoCreditos(userId)) return SALDO_ILIMITADO;
+      return inner.saldo(userId);
+    },
+    async debitar(userId, amount) {
+      if (await esDuenoCreditos(userId)) {
+        return { ok: true, saldo: SALDO_ILIMITADO };
+      }
+      return inner.debitar(userId, amount);
+    },
+    async acreditar(userId, amount) {
+      if (await esDuenoCreditos(userId)) return SALDO_ILIMITADO;
+      return inner.acreditar(userId, amount);
+    },
+  };
+}
+
 export function createDefaultJuezWallet(): JuezCreditWallet {
   const pg = resolveDatabaseUrl() ? createPostgresJuezWallet() : null;
   const mem = pg ? null : createMemoryJuezWallet();
-  return {
+  return conCreditoIlimitadoDueno({
     async saldo(userId) {
       const comprado = await saldoComprado(userId);
       const ledger = pg ? await pg.saldo(userId) : mem ? await mem.saldo(userId) : 0;
@@ -182,5 +202,5 @@ export function createDefaultJuezWallet(): JuezCreditWallet {
       }
       return this.saldo(userId);
     },
-  };
+  });
 }

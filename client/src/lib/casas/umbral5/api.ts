@@ -46,6 +46,7 @@ export interface LecturaResponse {
 export interface SaldoResponse {
   success: true;
   saldo: number;
+  ilimitado?: boolean;
   creditos: { lectura: number; volcado: number };
 }
 
@@ -89,10 +90,17 @@ function throwIfPagoRequerido(res: Response, body: ErrorBody): void {
   });
 }
 
-export async function leerSaldoUmbral5(userId: string): Promise<SaldoResponse> {
-  const res = await fetch(
-    `/api/casas/umbral5/saldo?userId=${encodeURIComponent(userId)}`,
-  );
+function queryUsuario(userId: string, email?: string | null): string {
+  const q = new URLSearchParams({ userId });
+  if (email?.trim()) q.set("email", email.trim());
+  return q.toString();
+}
+
+export async function leerSaldoUmbral5(
+  userId: string,
+  email?: string | null,
+): Promise<SaldoResponse> {
+  const res = await fetch(`/api/casas/umbral5/saldo?${queryUsuario(userId, email)}`);
   const body = await parseJson<SaldoResponse | ErrorBody>(res);
   if (!res.ok || !("success" in body) || body.success !== true) {
     throw new Error(
@@ -105,6 +113,7 @@ export async function leerSaldoUmbral5(userId: string): Promise<SaldoResponse> {
 export async function sellarVolcado(input: {
   userId: string;
   limiteConocido: string;
+  email?: string | null;
 }): Promise<VolcadoResponse> {
   const res = await fetch("/api/casas/umbral5/volcado", {
     method: "POST",
@@ -154,6 +163,7 @@ export async function leerSesionUmbral5(input: {
 export async function leerMapa(input: {
   userId: string;
   sesionUmbral5Id: string;
+  email?: string | null;
 }): Promise<LecturaResponse> {
   const res = await fetch("/api/casas/umbral5/lectura", {
     method: "POST",
