@@ -252,10 +252,14 @@ export function shouldPreserveLocalActivo(v: Vehicle, nowMs: number, dayStartMs?
   const dayStart = dayStartMs ?? getJournalDayStartMs(nowMs);
   if (isGhostActiveVehicle(v, nowMs, dayStart)) return false;
 
+  const apertura = v.aperturaAt || (v.createdAt instanceof Date ? v.createdAt.getTime() : 0);
+  // Trabajo vivo de una jornada anterior: el barrido de término debe cerrarlo,
+  // no rehidratarlo desde park. El arrastre 04:00→mañana no es stale.
+  if (isJournalStaleActiveVehicle(apertura, nowMs, dayStart)) return false;
+
   // Desglosador con trabajo vivo: preservar tras ausencias largas / borde de jornada.
   if (hasLiveDesglosadorWork(v)) return true;
 
-  const apertura = v.aperturaAt || (v.createdAt instanceof Date ? v.createdAt.getTime() : 0);
   if (apertura >= dayStart) return true;
 
   const age = apertura > 0 ? nowMs - apertura : Infinity;

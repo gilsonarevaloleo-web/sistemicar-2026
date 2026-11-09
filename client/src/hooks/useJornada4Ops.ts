@@ -125,7 +125,7 @@ import {
   PS_CIERRE_CONSCIENTE_PLAN,
   readCierreConscientePlan,
   recordCierresConscientesPlan,
-  vehiclesToCloseAtPlanEnd,
+  selectVehiclesForPlanEndSweep,
 } from "@/jornada4/cierrePlanSweep";
 import {
   isPlanTerminado,
@@ -313,55 +313,62 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
         premiados: 0,
       };
       if (!userId || sweepInFlightRef.current) return empty;
-      if (!isPlanTerminado(segs)) return empty;
+      const planDone = isPlanTerminado(segs);
+      const leftovers = selectVehiclesForPlanEndSweep(vehiclesRef.current, planDone);
+      if (!planDone && leftovers.length === 0) return empty;
       sweepInFlightRef.current = true;
       try {
-        const leftovers = vehiclesToCloseAtPlanEnd(vehiclesRef.current);
         for (let i = 0; i < leftovers.length; i++) {
           await closeVehiclePorTerminoPlan(leftovers[i].id);
         }
-        const last = resolveLastSegmentWindowMs(segs);
-        const win = resolvePlanWindowMs(segs);
         let premiados = 0;
         let ledger = readCierreConscientePlan(userId);
-        if (last && win) {
-          const ids = collectCierresConscientesAlTermino(
-            vehiclesRef.current,
-            last.startMs,
-            win.endMs
-          );
-          const recorded = recordCierresConscientesPlan(userId, ids);
-          ledger = recorded.ledger;
-          if (recorded.nuevos.length > 0) {
-            const extraPs = recorded.nuevos.length * PS_CIERRE_CONSCIENTE_PLAN;
-            markCierresConscientesPsAwarded(userId, extraPs);
-            premiados = recorded.nuevos.length;
-            await safeAwardPS(
-              extraPs,
-              `Disciplina · ${premiados} cierre(s) consciente(s) al término`
+        if (planDone) {
+          const last = resolveLastSegmentWindowMs(segs);
+          const win = resolvePlanWindowMs(segs);
+          if (last && win) {
+            const ids = collectCierresConscientesAlTermino(
+              vehiclesRef.current,
+              last.startMs,
+              win.endMs
             );
-            toast.success(
-              `Carácter · +${extraPs} PS · +${recorded.ledger.bonoPct}% disciplina`,
-              {
-                description: "Cerrar a mano en la última hora del plan forma el carácter.",
-                duration: 4000,
-                style: {
-                  backgroundColor: PIZARRA,
-                  border: `1px solid ${GOLD}`,
-                  color: GOLD,
-                },
-              }
-            );
+            const recorded = recordCierresConscientesPlan(userId, ids);
+            ledger = recorded.ledger;
+            if (recorded.nuevos.length > 0) {
+              const extraPs = recorded.nuevos.length * PS_CIERRE_CONSCIENTE_PLAN;
+              markCierresConscientesPsAwarded(userId, extraPs);
+              premiados = recorded.nuevos.length;
+              await safeAwardPS(
+                extraPs,
+                `Disciplina · ${premiados} cierre(s) consciente(s) al término`
+              );
+              toast.success(
+                `Carácter · +${extraPs} PS · +${recorded.ledger.bonoPct}% disciplina`,
+                {
+                  description: "Cerrar a mano en la última hora del plan forma el carácter.",
+                  duration: 4000,
+                  style: {
+                    backgroundColor: PIZARRA,
+                    border: `1px solid ${GOLD}`,
+                    color: GOLD,
+                  },
+                }
+              );
+            }
           }
         }
         if (leftovers.length > 0) {
           toast.message(
             leftovers.length === 1
-              ? "El plan cerró 1 vehículo"
-              : `El plan cerró ${leftovers.length} vehículos`,
+              ? planDone
+                ? "El plan cerró 1 vehículo"
+                : "Se cerró 1 vehículo de una jornada anterior"
+              : planDone
+                ? `El plan cerró ${leftovers.length} vehículos`
+                : `Se cerraron ${leftovers.length} vehículos de jornadas anteriores`,
             {
               description:
-                "Regla: todo vehículo se cierra al término. Quien cierra a mano en la última hora suma disciplina.",
+                "Regla: todo vehículo se cierra al término de su jornada. Quien cierra a mano en la última hora suma disciplina.",
               duration: 4200,
               style: {
                 backgroundColor: PIZARRA,
@@ -371,14 +378,16 @@ export function useJornada4Ops(params: UseJornada4OpsParams) {
             }
           );
         }
-        const revelacion = sealRevelacionPlanDia(userId, {
-          segmentos: segs,
-          vehicles: vehiclesRef.current,
-          huecos: buildMetricaHuecoIntervals({
-            vehicles: vehiclesRef.current,
-            segmentos: segs,
-          }),
-        });
+        const revelacion = planDone
+          ? sealRevelacionPlanDia(userId, {
+              segmentos: segs,
+              vehicles: vehiclesRef.current,
+              huecos: buildMetricaHuecoIntervals({
+                vehicles: vehiclesRef.current,
+                segmentos: segs,
+              }),
+            })
+          : empty.revelacion;
         return {
           revelacion,
           ledger,

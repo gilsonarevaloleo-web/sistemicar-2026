@@ -2,13 +2,19 @@
  * Cierre al término del plan.
  *
  * Regla: todo vehículo consciente activo se cierra al horaFin del último
- * segmento. El cierre consciente del operador en la última franja
- * (último segmento) suma disciplina. El cierre del sistema no.
+ * segmento. Si el operador no tenía la app abierta a esa hora, el leftover
+ * sigue `activo` y reaparece al día siguiente (la «enfermedad» de vehículos
+ * de jornadas pasadas). El barrido también los cierra al abrir la jornada
+ * nueva — no espera al horaFin de hoy.
+ *
+ * El cierre consciente del operador en la última franja suma disciplina.
+ * El cierre del sistema no.
  */
 import type { Vehicle } from "@/lib/persistence";
 import { skipsTriadaCoverage } from "@/lib/concienciaTriadaLinea";
+import { isJournalStaleActiveVehicle } from "@/lib/ghostVehicleEngine";
 import { safeSetItem } from "@/lib/storageHygiene";
-import { getJournalDateString } from "@/lib/segmentTime";
+import { getJournalDateString, getJournalDayStartMs } from "@/lib/segmentTime";
 
 export const BONO_DISCIPLINA_POR_CIERRE = 5;
 export const BONO_DISCIPLINA_TOPE = 15;
@@ -35,6 +41,27 @@ function ledgerKey(userId: string): string {
   return `${LEDGER_KEY}_${userId}`;
 }
 
+function vehicleAperturaMs(
+  vehicle: Pick<Vehicle, "aperturaAt" | "createdAt">
+): number {
+  if (typeof vehicle.aperturaAt === "number" && vehicle.aperturaAt > 0) {
+    return vehicle.aperturaAt;
+  }
+  if (vehicle.createdAt instanceof Date) return vehicle.createdAt.getTime();
+  return 0;
+}
+
+/** Activo consciente abierto en una jornada anterior (cruce 05:00, no el arrastre 04:00). */
+export function isActiveFromPreviousJornada(
+  vehicle: Vehicle,
+  nowMs = Date.now(),
+  dayStartMs = getJournalDayStartMs(nowMs)
+): boolean {
+  if (!vehicle || vehicle.status !== "activo") return false;
+  if (skipsTriadaCoverage(vehicle)) return false;
+  return isJournalStaleActiveVehicle(vehicleAperturaMs(vehicle), nowMs, dayStartMs);
+}
+
 /** Activos conscientes que el sistema debe cerrar al término. */
 export function vehiclesToCloseAtPlanEnd(vehicles: Vehicle[]): Vehicle[] {
   const out: Vehicle[] = [];
@@ -45,6 +72,37 @@ export function vehiclesToCloseAtPlanEnd(vehicles: Vehicle[]): Vehicle[] {
     out.push(v);
   }
   return out;
+}
+
+/**
+ * Leftovers de jornadas anteriores. El plan de HOY aún no termina, pero
+ * estos ya debieron cerrarse anoche al horaFin.
+ */
+export function vehiclesToCloseAsStaleJornada(
+  vehicles: Vehicle[],
+  nowMs = Date.now()
+): Vehicle[] {
+  const dayStart = getJournalDayStartMs(nowMs);
+  const out: Vehicle[] = [];
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    if (!v || !isActiveFromPreviousJornada(v, nowMs, dayStart)) continue;
+    out.push(v);
+  }
+  return out;
+}
+
+/**
+ * Al término: cierra todos. Antes del término: solo los de jornadas pasadas.
+ * Así un vehículo de hoy sigue vivo hasta horaFin.
+ */
+export function selectVehiclesForPlanEndSweep(
+  vehicles: Vehicle[],
+  planTerminado: boolean,
+  nowMs = Date.now()
+): Vehicle[] {
+  if (planTerminado) return vehiclesToCloseAtPlanEnd(vehicles);
+  return vehiclesToCloseAsStaleJornada(vehicles, nowMs);
 }
 
 /** Ids de vehículos que el operador cerró a mano en la última franja. */
