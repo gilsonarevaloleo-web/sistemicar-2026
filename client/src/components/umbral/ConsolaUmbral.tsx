@@ -66,6 +66,7 @@ import {
   CASA_OFICIO_MARCA,
   CASA_OFICIO_RITUAL_CORTO,
 } from "@shared/umbral/oficioCasa";
+import { parseOficioPracticaSearch } from "@shared/umbral/entradaPractica";
 import {
   anclarTextoAOferta,
   aplicarSelloOferta,
@@ -124,15 +125,25 @@ const fade = {
   transition: { duration: 0.32, ease: "easeOut" as const },
 };
 
+function leerPracticaInicial() {
+  if (typeof window === "undefined") return null;
+  return parseOficioPracticaSearch(window.location.search);
+}
+
 export function ConsolaUmbral({
   userId,
-  backHref = "/umbral",
-  backLabel = "← UMBRAL V1",
+  backHref = "/umbral/entrada",
+  backLabel = "← PLANETA 5",
   hasPaidAccess = false,
   checkoutHref = UMBRAL_SKU.checkoutHref,
 }: ConsolaUmbralProps) {
-  const [modo, setModo] = useState<ModoUmbral>("INTERNO_HABILIDAD");
-  const [codigoActual, setCodigoActual] = useState<CodigoNumero>(1);
+  const practicaRef = useRef(leerPracticaInicial());
+  const [modo, setModo] = useState<ModoUmbral>(
+    () => practicaRef.current?.modo ?? "INTERNO_HABILIDAD",
+  );
+  const [codigoActual, setCodigoActual] = useState<CodigoNumero>(
+    () => practicaRef.current?.codigo ?? 1,
+  );
   const [superadosPorModo, setSuperadosPorModo] = useState<
     Record<ModoUmbral, Set<CodigoNumero>>
   >({
@@ -284,6 +295,10 @@ export function ConsolaUmbral({
           }
         } catch {
           /* local ya cargó */
+        }
+        const practica = practicaRef.current;
+        if (practica?.codigo && practica.modo === "INTERNO_HABILIDAD") {
+          setCodigoActual(practica.codigo);
         }
       } catch (e) {
         console.warn("[ConsolaUmbral] No se pudo hidratar progreso:", e);
@@ -782,11 +797,12 @@ export function ConsolaUmbral({
               style={{ color: GOLD }}
               data-testid="umbral-v2-header"
             >
-              {CASA_OFICIO_MARCA.toUpperCase()} · {CASA_OFICIO_RITUAL_CORTO}
+              PLANETA C5 · {CASA_OFICIO_MARCA.toUpperCase()} ·{" "}
+              {CASA_OFICIO_RITUAL_CORTO}
             </p>
             <p className="mt-1 text-[11px] text-white/40">
-              Casa 5 · 10 códigos del deber · el Maestro se vuelve la voz del
-              obstáculo para que termines los diez
+              Casa 5 · 10 códigos de prueba · Forja y Arena. El 8 ya no es la
+              puerta. El Maestro se vuelve la voz del obstáculo.
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">

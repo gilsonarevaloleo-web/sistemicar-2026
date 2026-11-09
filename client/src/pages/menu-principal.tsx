@@ -157,8 +157,8 @@ function buildMenuItems(
     },
     {
       id: "oficio-casa5",
-      title: "CASA 5 OFICIO",
-      subtitle: "¿Qué se te debe? · 10 códigos del deber",
+      title: "PLANETA 5 OFICIO",
+      subtitle: "¿Cuánto sabes sobre tu oficio?",
       icon: Zap,
       route: "/umbral/entrada",
       color: "#D4AF37",

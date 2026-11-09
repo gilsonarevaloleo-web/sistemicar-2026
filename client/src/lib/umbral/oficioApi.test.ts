@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+describe("Casa 5 Oficio — cableado de entrada", () => {
+  it("el cliente pega al volcado gratis y cae al motor local", () => {
+    const src = readFileSync(join(here, "oficioApi.ts"), "utf8");
+    assert.match(src, /\/api\/casas\/oficio\/volcado/);
+    assert.match(src, /diagnosticarOficioLocal/);
+    assert.match(src, /local_fallback/);
+    assert.doesNotMatch(src, /\/limite|\/api\/casas\/umbral5/);
+  });
+
+  it("App y servidor registran Oficio sin mezclarlo con el 6", () => {
+    const root = join(here, "../../../..");
+    const app = readFileSync(join(root, "client/src/App.tsx"), "utf8");
+    assert.match(app, /path="\/umbral\/entrada"/);
+    assert.match(app, /path="\/oficio"/);
+    const server = readFileSync(join(root, "server/index.ts"), "utf8");
+    assert.match(server, /registerOficioRoutes/);
+    assert.match(server, /registerUmbral5Routes/);
+    const api = readFileSync(join(root, "api/index.ts"), "utf8");
+    assert.match(api, /registerOficioRoutes/);
+  });
+});

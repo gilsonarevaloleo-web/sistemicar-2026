@@ -1,6 +1,7 @@
 /**
- * Umbral — Micro-diagnóstico de entrada (embudo).
- * 3 preguntas → código/arquetipo probable + CTA trial.
+ * Oficio (Casa 5) — Micro-diagnóstico de entrada a la práctica de 10 códigos.
+ * 3 preguntas → código/arquetipo probable + CTA trial (Forja o Arena).
+ * No es el Umbral (casa 6) ni el planeta 8 vacío.
  */
 
 import type { CodigoNumero, ModoUmbral } from "./engineConfig.ts";

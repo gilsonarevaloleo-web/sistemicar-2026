@@ -971,7 +971,7 @@ export default function Pagos() {
                   className="inline-block mt-3 text-[10px] tracking-widest uppercase text-[#00FFC3]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Probar entrada / Código 1 gratis →
+                  Planeta 5 · probar Código 1 gratis →
                 </Link>
               </div>
               <div className="shrink-0 text-left sm:text-right">

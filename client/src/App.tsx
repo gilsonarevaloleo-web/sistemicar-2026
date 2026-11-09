@@ -705,7 +705,11 @@ function Router() {
           <ProtectedRoute component={Manuales} />
         </Route>
         <Route path="/umbral/entrada" component={UmbralEntrada} />
+        <Route path="/oficio" component={UmbralEntrada} />
         <Route path="/umbral/v2">
+          <ProtectedRoute component={UmbralV2} />
+        </Route>
+        <Route path="/oficio/v2">
           <ProtectedRoute component={UmbralV2} />
         </Route>
         <Route path="/umbral/metricas">
@@ -804,6 +808,8 @@ function VoiceBootstrap() {
         p.startsWith("/ventas-deposito") ||
         p === "/umbral" ||
         p.startsWith("/umbral/") ||
+        p === "/oficio" ||
+        p.startsWith("/oficio/") ||
         p === "/limite" ||
         p.startsWith("/limite/") ||
         p === "/esperanza" ||

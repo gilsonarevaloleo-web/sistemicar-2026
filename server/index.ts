@@ -112,6 +112,7 @@ import { registerDepositoV2Routes } from "./depositoV2Routes";
 import { registerDepositoV3Routes } from "./depositoV3Routes";
 import { registerJuezRoutes } from "./juezEngine";
 import { registerUmbral5Routes } from "./umbral5Engine";
+import { registerOficioRoutes } from "./oficioEngine";
 import { registerGimnasio6Routes } from "./gimnasio6Engine";
 import {
   createDefaultJuezWallet,
@@ -2342,6 +2343,7 @@ registerUmbral5Routes(app, {
   wallet: juezCreditWallet,
   store: umbral5Store,
 });
+registerOficioRoutes(app);
 registerGimnasio6Routes(app, {
   callGemini,
   store: createDefaultGimnasio6Store(),

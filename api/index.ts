@@ -11,6 +11,7 @@ import { registerDepositoV2Routes } from "../server/depositoV2Routes";
 import { registerDepositoV3Routes } from "../server/depositoV3Routes";
 import { registerJuezRoutes } from "../server/juezEngine";
 import { registerUmbral5Routes } from "../server/umbral5Engine";
+import { registerOficioRoutes } from "../server/oficioEngine";
 import {
   createDefaultJuezWallet,
   initJuezCreditosTable,
@@ -100,6 +101,7 @@ registerUmbral5Routes(app, {
   wallet: juezCreditWallet,
   store: createDefaultUmbral5Store(),
 });
+registerOficioRoutes(app);
 
 app.post("/api/alquimia/validate", async (req: Request, res: Response) => {
   try {
