@@ -431,6 +431,30 @@ Por eso razón el valor personal no se expresa hablando de nuestro valor, sino n
     assert.match(r.immediateAdjustment, /C9/);
   });
 
+  it("volcado 09/11/2026: el principio de cansancio/polo enciende C9; no pide C10 de nuevo", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendi que el cansancio es el enfoque el polo positivo a más de 90 minutos. 
+Hace como un mes atrás estaba trabajando en otro taller aparte de mí taller, me fui a ganar por puntos de operación.  Ya están en su tercer día y un día antes había medido mí operaciones, al día siguiente me propuse usar solo dos desglosadores (en el tiempo de la mañana meter todo las tareas que alcanza ese horario que eera hasta las 12:30 pm, hasta esa hora alcansaba hacer 10 paquetes y en la tarde usar el segundo desglosador)  el resultado: en el turno de la mañana había llegado más de mí objetivo, hice 11 paquetes. En la tarde esperaba lo mismo, pero por una razón desconocida me agarró un sueño insoportable; yo dije esto será por el almuerzo-voy a trabajar relajado en dos paquetes que cosa relajado ya me pasa, pero no fue a si, el sueño o cansancio no físico me dominaba, ahí es donde probé en abandonar el enfoque de avansar y probé enfocarme en el punto medio de los movimientos, esa parte donde no se llega al final de la operación, esa parte antes de t rminar el ciclo de una operación (las pausa, el puente donde empieza el siguiente paso)  y ocurrió algo que no me esperaba:  la respirqcion se automatismo para llenar más aire a mis pulmones sin pensar respirar profundo,  el sueño desminuyo un 30%, el ritmo de velocidad no bajo sin pensar en avanzar. Entonces ha raíz de esta experiencia la pregunta es:  ¿Porque el cansancio se freno cuando cambie el punto de enfoque- deje la intención de avanzar y solo observe sin intención, me enfoque en los puntos puentes? ¿Será que el cansancio es el enfoque repetitivo en el polo positivo de avanzar y el descanso es el enfoque contrario de avanzar? 
+Parece que el cansancio es el foco o intención del polo positivo y el cuerpo pasa ha ser un tema secundario para generar el cansancio, más es la intención en el polo positivo. Si esto es a si se pudiera descansar solamente cambiando de foco sin cambiar de movimiento, solamente jugamos con la observación respondiendo la pregunta ¿Donde observo? 
+Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos si cambiamos de enfoque al polo contrario- los puentes sin cambiar la mecánica de movimiento: pudiera disipar el cansancio o al menos frenar el progreso de cansancio`,
+      studentHypothesis: "Acá pareció la ley de la economía de energía código 7",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo que no dije es que el cuerpo sigue a la atención,  si la atención está en el polo posito, por ley de causa efecto el cuerpo se va ha cansar, pero cambiamos de polo sin cambiar de movimiento el cuerpo puede frenar el cansancio",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
+    assert.equal(r.characterSignedCode, 9);
+    assert.notEqual(r.characterSignedCode, 2);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.doesNotMatch(r.groundingStatus.diagnosticMessage, /Falta C10|abrochar el título/);
+    assert.match(r.immediateAdjustment, /Firma C9/);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:

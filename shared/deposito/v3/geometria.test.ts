@@ -234,6 +234,16 @@ La conclusión es que si el cuerpo no quiere ejecutar una desición, lo sabio es
     assert.equal(principio.active[9], true);
     assert.equal(principio.characterSignedCode, 9);
 
+    const energia = auditarGeometriaSintactica({
+      rawFact:
+        "Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos si cambiamos de enfoque al polo contrario sin cambiar la mecánica de movimiento.",
+      studentHypothesis: "La ley de la economía de energía código 7",
+      userTier: "CARRERA",
+    });
+    assert.equal(energia.active[9], true);
+    assert.equal(energia.characterSignedCode, 9);
+    assert.notEqual(energia.characterSignedCode, 2);
+
     const triple = auditarGeometriaSintactica({
       rawFact:
         "El cuerpo pedía parar al mismo tiempo que el trabajo del desglosador y el entorno de la casa se cargaban.",
