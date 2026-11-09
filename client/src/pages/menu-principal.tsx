@@ -158,7 +158,7 @@ function buildMenuItems(
     {
       id: "oficio-casa5",
       title: "PLANETA 5 OFICIO",
-      subtitle: "Arena + Forja · 10 códigos de prueba",
+      subtitle: "¿Cuánto sabes sobre tu oficio?",
       icon: Zap,
       route: "/umbral/entrada",
       color: "#D4AF37",

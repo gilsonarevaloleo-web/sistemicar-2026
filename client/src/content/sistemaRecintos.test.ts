@@ -26,7 +26,7 @@ describe("sistemaRecintos — oferta actual", () => {
     assert.equal(jornada?.exploreHref, "/jornada-base");
     const oficio = SISTEMA_RECINTOS.find((r) => r.id === "umbral");
     assert.equal(oficio?.name, "Oficio");
-    assert.equal(oficio?.ritual, "¿Qué se te debe?");
+    assert.equal(oficio?.ritual, "¿Cuánto sabes sobre tu oficio?");
     assert.equal(oficio?.exploreHref, "/umbral/entrada");
     assert.doesNotMatch(oficio?.ritual ?? "", /límite/i);
   });

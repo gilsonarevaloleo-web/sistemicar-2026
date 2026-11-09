@@ -36,7 +36,7 @@ describe("Casa 6 Umbral — cableado A–D", () => {
     assert.match(src, /id: "oficio-casa5"/);
     assert.match(src, /PLANETA 5 OFICIO/);
     assert.match(src, /route: "\/umbral\/entrada"/);
-    assert.match(src, /Arena \+ Forja/);
+    assert.match(src, /¿Cuánto sabes sobre tu oficio\?/);
     assert.doesNotMatch(src, /CASA 5 UMBRAL/);
     const oficio = src.indexOf('id: "oficio-casa5"');
     const umbral6 = src.indexOf('id: "umbral-casa6"');
@@ -66,6 +66,7 @@ describe("Casa 6 Umbral — cableado A–D", () => {
   it("el servidor registra Casa 6 y reusa la billetera del Juez", () => {
     const src = readFileSync(join(root, "server/index.ts"), "utf8");
     assert.match(src, /registerUmbral5Routes/);
+    assert.match(src, /registerOficioRoutes/);
     assert.match(src, /initUmbral5SesionesTable/);
     assert.match(src, /wallet: juezCreditWallet/);
     assert.match(src, /registerUmbralV2Routes/);

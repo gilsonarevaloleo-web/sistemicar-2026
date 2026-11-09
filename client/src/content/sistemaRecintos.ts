@@ -70,10 +70,10 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     id: "umbral",
     name: "Oficio",
     nameUpper: "OFICIO",
-    ritual: "¿Qué se te debe?",
-    oneLiner: "Práctica de venta: 10 códigos. El Maestro es la voz del obstáculo.",
+    ritual: "¿Cuánto sabes sobre tu oficio?",
+    oneLiner: "Volcás el deber. El motor nombra tu código de la matriz del 5.",
     detail:
-      "Planeta 5. Forja + Arena. La práctica de venta de 10 códigos vive aquí, no en el 8. Código 1 se prueba con evaluador real. El resto se entrena — no es el límite, no es el gimnasio.",
+      "Planeta 5. C5 Oficio es Cálculo, no Decisión. El volcado identifica al operador; Forja y Arena quedan dentro del código. No es el límite, no es el gimnasio.",
     color: "#D4AF37",
     exploreHref: "/umbral/entrada",
     publicExplore: true,
@@ -100,6 +100,6 @@ export const SISTEMA_DIA = [
   {
     recinto: "Oficio",
     cuando: "El deber salió sin cuenta",
-    gesto: "Nombrar qué se te debe. Entrar a los diez códigos.",
+    gesto: "Nombrar cuánto sabes de tu oficio. Cubrir el hueco con cálculo.",
   },
 ] as const;
