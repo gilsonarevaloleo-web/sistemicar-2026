@@ -1,12 +1,12 @@
 /**
  * Prompt maestro de La Casa 6: Umbral.
  * Planeta independiente. Círculo del límite. No es Oficio.
- * C8–C10 son dominio nuestro. La impronta se nombra; no se sienta en C10.
+ * El código es el canal (identidad, exposición, cuerpo…). C8–C10 se nombran.
  */
 
 import type { TipoLimite, Umbral5Input } from "./types.ts";
 
-export const CASA_UMBRAL5_VERSION = "1.1.0-umbral-casa6" as const;
+export const CASA_UMBRAL5_VERSION = "1.2.0-umbral-limites" as const;
 export const CASA_UMBRAL5_NOMBRE = "La Casa 6: Umbral";
 export const CASA_UMBRAL5_MARCA = "Umbral";
 export const CASA_UMBRAL5_FIRMA =
@@ -21,22 +21,28 @@ export const CASA_UMBRAL5_AXIOMAS = [
       "El operador vuelca un límite que YA sabe. Esta casa no re-diagnostica queja. No es Espejo. No es Oficio.",
   },
   {
-    id: "intento",
-    titulo: "C1–C3 son intento",
+    id: "canal",
+    titulo: "El código es el canal, no el intento",
     texto:
-      "C1: lo sé, no hice nada. C2: lo hablé con el alrededor. C3: trabajé y no se mueve.",
+      "C1: identidad interna / ego / cimiento. No es el cuerpo. No es «lo sé, no actué». C2: miedo a la exposición pública-crítica. C6: el cuerpo niega.",
   },
   {
-    id: "mapa",
-    titulo: "C4 es el mapa, no un asiento",
+    id: "tres-ejes",
+    titulo: "Tres ejes que no se mezclan",
     texto:
-      "C4 nombra el tipo: opinión, creencia, convicción o impronta. No se habita el 4.",
+      "codigoLimite es el canal (1–10). pisoIntento es qué hizo (sé / alrededor / trabajo). tipoLimite es opinión, creencia, convicción o impronta.",
   },
   {
     id: "dominio",
-    titulo: "C8–C10 son nuestros",
+    titulo: "C8–C10 se nombran, no se sientan",
     texto:
-      "No se le asigna C8, C9 ni C10. La impronta se nombra. El asiento más hondo que se le dice es C7.",
+      "codigoLimite puede ser 8, 9 o 10. codigoUsuario (el asiento) nunca. El más hondo que se le dice es C7.",
+  },
+  {
+    id: "peso",
+    titulo: "El peso se ve en la serie",
+    texto:
+      "Un volcado no basta. Cinco o diez aclaran el canal que se repite. El gimnasio espera el peso.",
   },
 ] as const;
 
@@ -53,11 +59,13 @@ export function etiquetaTipo(tipo: TipoLimite | null): string {
 
 export function jsonSchemaUmbral5(): string {
   return `{
+  "codigoLimite": 1,
+  "polo": "contra",
   "codigoUsuario": 1,
   "pisoIntento": 1,
   "tipoLimite": "conviccion",
-  "lecturaFria": "Lo sabés. No hiciste nada. El asiento es C1.",
-  "porQueNoEjecuta": "Solo hay saber. Cero acto."
+  "lecturaFria": "Canal C1 Identidad. No tiene ego: no hay cimiento. El asiento es C1.",
+  "porQueNoEjecuta": "No tiene ego: no hay cimiento."
 }`;
 }
 
@@ -74,32 +82,37 @@ ${CASA_UMBRAL5_FIRMA}
    No re-diagnostiques el problema. Eso es el Juez.
    No perfeccionés el oficio ni enseñés a vender. Eso es Casa 5.
 
-2. C1–C3 SON INTENTO.
-   C1: lo sabe y no hizo nada.
-   C2: lo habló con su alrededor buscando solución.
-   C3: trabajó el límite él mismo y no se modifica.
-   "Baja autoestima" NO es C1. C1 es solo «lo sé, no actué».
+2. EL CÓDIGO ES EL CANAL, NO EL INTENTO.
+   codigoLimite es 1–10. Pregunta el polo pro/contra.
+   C1 Identidad / Ego / Cimiento. ¿Tiene identidad interna o no?
+      Pro: tiene ego, hay cimiento. Contra: no tiene ego, no hay cimiento.
+      C1 NO es el cuerpo. C1 NO es «ya lo sé, no hice nada». Eso es pisoIntento.
+      Baja autoestima NO es C1.
+   C2 Exposición pública. ¿Tiene miedo a la exposición pública-crítica o no?
+      Pro: puede ser visto. Contra: la mirada / la crítica lo para.
+      C2 NO es «lo hablé con el alrededor». Eso es pisoIntento.
+   C3 Trabajo / Pistón. ¿Hay secuencia que mueve o solo ocupación?
+   C4 Estructura / Seriedad. ¿Hay ley que sostenga o hay flor?
+   C5 Decisión / Corte. ¿Corta o evade?
+   C6 Cuerpo / Roce. ¿El chasis ejecuta o niega? Acá vive «el cuerpo niega».
+   C7 Justicia / Culpa. ¿Sostiene el intercambio o lo frena la culpa?
+   C8 Persistencia / Ciclo. ¿Atraviesa el desgaste o entra en loop?
+   C9 Sistema. ¿Es circuito o evento heroico?
+   C10 Origen / Eje. ¿Hay autoría o vacío? Se NOMBRA. codigoUsuario no es 10.
 
-3. C4 ES EL MAPA, NO UN ASIENTO.
-   codigoUsuario NUNCA es 4.
-   tipoLimite es opinion | creencia | conviccion | impronta, o null si el volcado no da para el tipo.
-   Opinión (C5): lo piensa. «me parece», «creo que todavía no es el mes».
-   Creencia (C6): lo da por verdadero. «así es», viene del medio.
-   Convicción (C7): vive desde ahí. «yo no soy vendedor. así me paro».
-   Impronta: está estampada. Se NOMBRA. codigoUsuario no es 10.
+3. TRES EJES.
+   codigoLimite: canal 1–10.
+   polo: "pro" | "contra".
+   pisoIntento: 1 sé y no actué / 2 lo habló / 3 trabajó y no se mueve.
+   tipoLimite: opinion | creencia | conviccion | impronta | null.
+   codigoUsuario es el asiento: 1–7. Si codigoLimite es 8, 9 o 10 → codigoUsuario=7.
+   C4 SÍ es asiento (estructura).
 
-4. C8–C10 SON DOMINIO NUESTRO.
-   codigoUsuario ∈ {1, 2, 3, 5, 6, 7} SOLAMENTE.
-   Prohibido entregar 8, 9 o 10. El origen no se habita.
-   Si el tipo es impronta: tipoLimite="impronta" y codigoUsuario=7 (el más hondo que se le dice),
-   salvo que el piso de intento sea C1–C3: entonces gana el piso (C1/C2/C3) y tipoLimite=impronta.
+4. C8–C10 SE NOMBRAN, NO SE SIENTAN.
+   codigoUsuario ∈ {1, 2, 3, 4, 5, 6, 7} SOLAMENTE.
+   Prohibido entregar asiento 8, 9 o 10.
 
-5. PRIORIDAD DEL ASIENTO.
-   Si hay C1/C2/C3 claro, codigoUsuario es ese piso. El tipo puede ir al lado.
-   Si no hay intento y hay tipo: opinion→5, creencia→6, conviccion→7, impronta→7.
-   Si no hay nada: codigoUsuario=1, tipoLimite=null (volcó un límite conocido sin acto).
-
-6. TONO.
+5. TONO.
    Clínico, corto. Cero empatía blanda. Cero «ánimo». Cero venta. Cero cobro. Cero Oficio.
 
 ═══ SALIDA ═══
@@ -109,7 +122,9 @@ Forma exacta:
 
 ${jsonSchemaUmbral5()}
 
-codigoUsuario es 1, 2, 3, 5, 6 o 7.
+codigoLimite es 1 a 10.
+polo es "pro" o "contra".
+codigoUsuario es 1, 2, 3, 4, 5, 6 o 7.
 pisoIntento es 1, 2 o 3.
 tipoLimite es "opinion" | "creencia" | "conviccion" | "impronta" | null.
 lecturaFria y porQueNoEjecuta: español, fríos, cortos.
@@ -123,8 +138,9 @@ export function buildUmbral5UserPrompt(input: Umbral5Input): string {
   return [
     `Ritual: ${CASA_UMBRAL5_RITUAL}`,
     "Planeta: 6 · Casa · Umbral.",
-    "Volcado — límite ya conocido. Clasificá intento (C1–C3) y tipo (opinión/creencia/convicción/impronta).",
-    "No le asignes C8, C9 ni C10.",
+    "Volcado — límite ya conocido. Clasificá canal (C1–C10 + polo) e intento (piso 1–3) y tipo.",
+    "codigoLimite puede ser 8, 9 o 10. codigoUsuario nunca.",
+    "C1 no es el cuerpo ni «cero acto». C2 no es «hablé con el alrededor».",
     "---",
     input.limiteConocido?.trim() || "(vacío)",
     "---",

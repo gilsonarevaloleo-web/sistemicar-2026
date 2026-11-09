@@ -1,12 +1,17 @@
 /**
  * Contratos de La Casa 6: Umbral.
- * El usuario ya sabe el límite. El código no es queja. No es Oficio.
- * C8–C10 son dominio nuestro: nunca se le asignan.
+ * El usuario ya sabe el límite. El código es el canal, no la queja ni el Oficio.
+ * C8–C10 se nombran. El asiento que se le dice es C1–C7.
  */
 
-export type CodigoUsuario = 1 | 2 | 3 | 5 | 6 | 7;
+import type { CodigoLimite, PoloLimite } from "./diccionarioLimites.ts";
 
-export const CODIGOS_USUARIO: readonly CodigoUsuario[] = [1, 2, 3, 5, 6, 7];
+export type { CodigoLimite, PoloLimite };
+
+/** Asiento que se le dice. Incluye C4 (estructura). Nunca 8, 9 ni 10. */
+export type CodigoUsuario = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export const CODIGOS_USUARIO: readonly CodigoUsuario[] = [1, 2, 3, 4, 5, 6, 7];
 
 export type PisoIntento = 1 | 2 | 3;
 
@@ -27,11 +32,15 @@ export interface Umbral5Input {
 }
 
 export interface Umbral5Lectura {
-  /** Asiento que se le dice. Nunca 4, 8, 9 ni 10. */
+  /** Canal del límite (C1–C10). */
+  codigoLimite: CodigoLimite;
+  /** Pro sostiene; contra es el límite. */
+  polo: PoloLimite;
+  /** Asiento que se le dice. Nunca 8, 9 ni 10. */
   codigoUsuario: CodigoUsuario;
-  /** C1 sé / C2 alrededor / C3 trabajé. */
+  /** C1 sé / C2 alrededor / C3 trabajé. No es el canal. */
   pisoIntento: PisoIntento;
-  /** C4 nombra el tipo. Impronta no sienta C10. */
+  /** Opinión / creencia / convicción / impronta. No es el canal. */
   tipoLimite: TipoLimite | null;
   /** Frase fría del asiento. */
   lecturaFria: string;

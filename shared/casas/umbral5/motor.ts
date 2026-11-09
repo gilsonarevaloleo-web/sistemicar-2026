@@ -1,10 +1,18 @@
 /**
  * Motor local de La Casa 6: Umbral.
- * Clasifica intento (C1–C3) y tipo. Nunca sienta C8–C10.
+ * Canal (C1–C10) ≠ intento (piso) ≠ tipo.
+ * C8–C10 se nombran; el asiento que se le dice es C1–C7.
  */
 
 import { detectarModuloGimnasio } from "../gimnasio6/oferta.ts";
 import { CASA_UMBRAL5_FIRMA } from "./prompt.ts";
+import {
+  CODIGOS_LIMITE,
+  DICCIONARIO_LIMITES,
+  asientoDeCanal,
+  type CodigoLimite,
+  type PoloLimite,
+} from "./diccionarioLimites.ts";
 import {
   CODIGOS_USUARIO,
   type CodigoUsuario,
@@ -109,7 +117,7 @@ const QUEJA_ESPEJO = [
   /\bme quejo\b/,
 ];
 
-function hits(norm: string, pats: RegExp[]): number {
+function hits(norm: string, pats: readonly RegExp[]): number {
   let n = 0;
   for (const p of pats) if (p.test(norm)) n += 1;
   return n;
@@ -123,13 +131,32 @@ export function isCodigoUsuario(value: unknown): value is CodigoUsuario {
   );
 }
 
+export function isCodigoLimite(value: unknown): value is CodigoLimite {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    (CODIGOS_LIMITE as readonly number[]).includes(value)
+  );
+}
+
+export function parseCodigoLimite(value: unknown): CodigoLimite | null {
+  if (isCodigoLimite(value)) return value;
+  if (typeof value === "string") {
+    const m = value.trim().match(/^(?:C\s*)?([1-9]|10)$/i);
+    if (!m) return null;
+    const n = Number(m[1]);
+    if (isCodigoLimite(n)) return n;
+  }
+  if (typeof value === "number" && value === 10) return 10;
+  return null;
+}
+
 export function parseCodigoUsuario(value: unknown): CodigoUsuario | null {
   if (isCodigoUsuario(value)) return value;
   if (typeof value === "string") {
     const m = value.trim().match(/^(?:C\s*)?([1-7])$/i);
     if (!m) return null;
     const n = Number(m[1]);
-    if (n === 4) return null;
     if (isCodigoUsuario(n)) return n;
   }
   return null;
@@ -165,22 +192,97 @@ export function detectarTipoLimite(limite: string): TipoLimite | null {
   return max > 0 ? best : null;
 }
 
+export function detectarCanal(limite: string): {
+  codigoLimite: CodigoLimite;
+  polo: PoloLimite;
+} {
+  const norm = normalizar(limite);
+  let bestContra: CodigoLimite | null = null;
+  let maxContra = 0;
+  let bestPro: CodigoLimite | null = null;
+  let maxPro = 0;
+  for (const n of CODIGOS_LIMITE) {
+    const entrada = DICCIONARIO_LIMITES[n];
+    const contra = hits(norm, entrada.marcasContra);
+    const pro = hits(norm, entrada.marcasPro);
+    if (contra > maxContra) {
+      maxContra = contra;
+      bestContra = n;
+    }
+    if (pro > maxPro) {
+      maxPro = pro;
+      bestPro = n;
+    }
+  }
+  if (bestContra && maxContra > 0) {
+    return { codigoLimite: bestContra, polo: "contra" };
+  }
+  if (bestPro && maxPro > 0) {
+    return { codigoLimite: bestPro, polo: "pro" };
+  }
+  return { codigoLimite: 1, polo: "contra" };
+}
+
 export function esQuejaEspejo(limite: string): boolean {
   const norm = normalizar(limite);
   if (hits(norm, QUEJA_ESPEJO) === 0) return false;
+  const canal = detectarCanal(limite);
+  const canalMarcado =
+    canal.codigoLimite !== 1 ||
+    hits(norm, DICCIONARIO_LIMITES[1].marcasContra) +
+      hits(norm, DICCIONARIO_LIMITES[1].marcasPro) +
+      hits(norm, DICCIONARIO_LIMITES[2].marcasContra) >
+      0;
+  if (canalMarcado && canal.codigoLimite !== 1) return false;
+  if (hits(norm, DICCIONARIO_LIMITES[2].marcasContra) > 0) return false;
   return hits(norm, MARCAS_C1) === 0 && hits(norm, MARCAS_C2) === 0 && hits(norm, MARCAS_C3) === 0;
 }
 
-function asientoDe(
+function moduloDeCanal(
+  canal: CodigoLimite,
+  polo: PoloLimite,
+  limite: string,
+): ModuloGimnasioOferta {
+  if (esQuejaEspejo(limite)) return null;
+  if (canal === 2 && polo === "contra") return "social_producto";
+  return detectarModuloGimnasio(limite) === "social_producto" && canal === 2
+    ? "social_producto"
+    : null;
+}
+
+function lecturaDelCanal(
+  canal: CodigoLimite,
+  polo: PoloLimite,
   piso: PisoIntento,
   tipo: TipoLimite | null,
-  hayIntentoClaro: boolean,
-): CodigoUsuario {
-  if (hayIntentoClaro) return piso;
-  if (tipo === "opinion") return 5;
-  if (tipo === "creencia") return 6;
-  if (tipo === "conviccion" || tipo === "impronta") return 7;
-  return piso;
+): string {
+  const entrada = DICCIONARIO_LIMITES[canal];
+  const poloTxt = polo === "pro" ? entrada.pro : entrada.contra;
+  const tipoTxt = tipo
+    ? tipo === "impronta"
+      ? " El tipo es impronta: se nombra, no se habita el 10."
+      : ` Tipo: ${tipo}.`
+    : "";
+  const intentoTxt =
+    piso === 1
+      ? " Intento: lo sé, no actué."
+      : piso === 2
+        ? " Intento: lo hablé con el alrededor."
+        : " Intento: trabajé y no se mueve.";
+  const asiento = asientoDeCanal(canal);
+  const asientoTxt =
+    canal >= 8
+      ? ` Se nombra C${canal}. El asiento es C${asiento}.`
+      : ` El asiento es C${asiento}.`;
+  return `Canal C${canal} ${entrada.nombre}. ${poloTxt}${asientoTxt}${intentoTxt}${tipoTxt}`;
+}
+
+function porqueDelCanal(canal: CodigoLimite, polo: PoloLimite, piso: PisoIntento): string {
+  const entrada = DICCIONARIO_LIMITES[canal];
+  if (polo === "contra") return entrada.contra;
+  if (piso === 1) return "Solo hay saber. Cero acto.";
+  if (piso === 2) return "La palabra del círculo no lo movió.";
+  return "El trabajo propio no lo modificó.";
 }
 
 export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
@@ -194,12 +296,18 @@ export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
     lectura.tipoLimite === "impronta"
       ? lectura.tipoLimite
       : null;
-  let codigo = lectura.codigoUsuario;
-  if (!isCodigoUsuario(codigo)) {
-    codigo = asientoDe(piso, tipo, true);
+  const polo: PoloLimite = lectura.polo === "pro" ? "pro" : "contra";
+  let canal = lectura.codigoLimite;
+  if (!isCodigoLimite(canal)) {
+    canal = isCodigoUsuario(lectura.codigoUsuario)
+      ? (lectura.codigoUsuario as CodigoLimite)
+      : 1;
   }
+  const asiento = asientoDeCanal(canal);
   return {
-    codigoUsuario: codigo,
+    codigoLimite: canal,
+    polo,
+    codigoUsuario: asiento,
     pisoIntento: piso,
     tipoLimite: tipo,
     lecturaFria: lectura.lecturaFria.trim(),
@@ -209,59 +317,12 @@ export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
   };
 }
 
-export function lecturaDelPiso(piso: PisoIntento, tipo: TipoLimite | null): string {
-  const tipoTxt = tipo
-    ? tipo === "impronta"
-      ? " El tipo es impronta: se nombra, no se habita el 10."
-      : ` Tipo: ${tipo}.`
-    : "";
-  if (piso === 1) return `Lo sabés. No hiciste nada. El asiento es C1.${tipoTxt}`;
-  if (piso === 2) return `Lo hablaste con el alrededor. El asiento es C2.${tipoTxt}`;
-  return `Trabajaste el límite y no se mueve. El asiento es C3.${tipoTxt}`;
-}
-
-export function porqueDelPiso(piso: PisoIntento): string {
-  if (piso === 1) return "Solo hay saber. Cero acto.";
-  if (piso === 2) return "La palabra del círculo no lo movió.";
-  return "El trabajo propio no lo modificó.";
-}
-
-function lecturaDelAsiento(
-  codigo: CodigoUsuario,
-  piso: PisoIntento,
-  tipo: TipoLimite | null,
-  hayIntentoClaro: boolean,
-): string {
-  if (hayIntentoClaro || codigo === 1 || codigo === 2 || codigo === 3) {
-    return lecturaDelPiso(piso, tipo);
-  }
-  if (codigo === 5) return "El tipo es opinión. El asiento es C5.";
-  if (codigo === 6) return "El tipo es creencia. El asiento es C6.";
-  if (tipo === "impronta") {
-    return "El tipo es impronta. Se nombra. El asiento es C7. No se habita el 10.";
-  }
-  return "El tipo es convicción. El asiento es C7.";
-}
-
-function porqueDelAsiento(
-  codigo: CodigoUsuario,
-  piso: PisoIntento,
-  tipo: TipoLimite | null,
-  hayIntentoClaro: boolean,
-): string {
-  if (hayIntentoClaro || codigo === 1 || codigo === 2 || codigo === 3) {
-    return porqueDelPiso(piso);
-  }
-  if (codigo === 5) return "Es opinión. Se mueve con un hecho.";
-  if (codigo === 6) return "Lo da por verdadero. El medio lo sostiene.";
-  if (tipo === "impronta") return "Está estampada. El origen no se habita.";
-  return "Vive desde ahí. No se discute.";
-}
-
 export function diagnosticarUmbral5Local(input: Umbral5Input): Umbral5Lectura {
   const texto = input.limiteConocido?.trim() ?? "";
   if (!texto) {
     return {
+      codigoLimite: 1,
+      polo: "contra",
       codigoUsuario: 1,
       pisoIntento: 1,
       tipoLimite: null,
@@ -272,32 +333,31 @@ export function diagnosticarUmbral5Local(input: Umbral5Input): Umbral5Lectura {
   }
   const piso = detectarPisoIntento(texto);
   const tipo = detectarTipoLimite(texto);
-  const norm = normalizar(texto);
-  const hayIntentoClaro =
-    hits(norm, MARCAS_C1) + hits(norm, MARCAS_C2) + hits(norm, MARCAS_C3) > 0;
-  const codigo = asientoDe(piso, tipo, hayIntentoClaro);
+  const { codigoLimite, polo } = detectarCanal(texto);
 
-  if (esQuejaEspejo(texto) && !hayIntentoClaro && !tipo) {
+  if (esQuejaEspejo(texto)) {
     return sellarLectura({
+      codigoLimite: 1,
+      polo: "contra",
       codigoUsuario: 1,
       pisoIntento: 1,
       tipoLimite: null,
       lecturaFria:
-        "Eso es mancha o queja. Pertenece al Espejo, no a esta casa. C1 no se gana por autoestima.",
+        "Eso es mancha o queja. Pertenece al Espejo, no a esta casa. C1 no se gana por autoestima. C1 es identidad, no el cuerpo.",
       porQueNoEjecuta: "No hay límite ya nombrado. Hay queja.",
       moduloGimnasio: null,
     });
   }
 
-  const modulo: ModuloGimnasioOferta = detectarModuloGimnasio(texto);
-
   return sellarLectura({
-    codigoUsuario: codigo,
+    codigoLimite,
+    polo,
+    codigoUsuario: asientoDeCanal(codigoLimite),
     pisoIntento: piso,
     tipoLimite: tipo,
-    lecturaFria: lecturaDelAsiento(codigo, piso, tipo, hayIntentoClaro),
-    porQueNoEjecuta: porqueDelAsiento(codigo, piso, tipo, hayIntentoClaro),
-    moduloGimnasio: modulo,
+    lecturaFria: lecturaDelCanal(codigoLimite, polo, piso, tipo),
+    porQueNoEjecuta: porqueDelCanal(codigoLimite, polo, piso),
+    moduloGimnasio: moduloDeCanal(codigoLimite, polo, texto),
   });
 }
 
@@ -319,10 +379,22 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
     return { ok: false, error: "La lectura no es un objeto." };
   }
   const o = data as Record<string, unknown>;
-  const codigo = parseCodigoUsuario(o.codigoUsuario);
+  let canal = parseCodigoLimite(o.codigoLimite);
+  if (!canal) {
+    const rawAsiento = o.codigoUsuario;
+    const n =
+      typeof rawAsiento === "number"
+        ? rawAsiento
+        : typeof rawAsiento === "string"
+          ? Number(String(rawAsiento).replace(/^C/i, "").trim())
+          : NaN;
+    if (n >= 1 && n <= 10) canal = n as CodigoLimite;
+  }
+  if (!canal) {
+    return { ok: false, error: "codigoLimite debe ser 1 a 10." };
+  }
   const pisoRaw = parseCodigoUsuario(o.pisoIntento);
-  const piso: PisoIntento =
-    pisoRaw === 2 || pisoRaw === 3 ? pisoRaw : 1;
+  const piso: PisoIntento = pisoRaw === 2 || pisoRaw === 3 ? pisoRaw : 1;
   const tipoRaw = o.tipoLimite;
   const tipo: TipoLimite | null =
     tipoRaw === "opinion" ||
@@ -330,14 +402,10 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
     tipoRaw === "conviccion" ||
     tipoRaw === "impronta"
       ? tipoRaw
-      : tipoRaw === null || tipoRaw === "null" || tipoRaw === ""
-        ? null
-        : null;
+      : null;
+  const polo: PoloLimite = o.polo === "pro" ? "pro" : "contra";
   const lectura = trimText(o.lecturaFria);
   const porque = trimText(o.porQueNoEjecuta);
-  if (!codigo) {
-    return { ok: false, error: "codigoUsuario debe ser 1, 2, 3, 5, 6 o 7." };
-  }
   if (!lectura || !porque) {
     return { ok: false, error: "Faltan campos de texto de la lectura." };
   }
@@ -347,7 +415,9 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
   return {
     ok: true,
     result: sellarLectura({
-      codigoUsuario: codigo,
+      codigoLimite: canal,
+      polo,
+      codigoUsuario: asientoDeCanal(canal),
       pisoIntento: piso,
       tipoLimite: tipo,
       lecturaFria: lectura,
@@ -364,7 +434,10 @@ export function adjuntarModuloGimnasio(
   if (esQuejaEspejo(limite) && /queja/i.test(lectura.porQueNoEjecuta)) {
     return { ...lectura, moduloGimnasio: null };
   }
-  return { ...lectura, moduloGimnasio: detectarModuloGimnasio(limite) };
+  return {
+    ...lectura,
+    moduloGimnasio: moduloDeCanal(lectura.codigoLimite, lectura.polo, limite),
+  };
 }
 
 export function evaluarUmbral5(input: Umbral5Input): Umbral5Lectura {

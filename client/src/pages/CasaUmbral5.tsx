@@ -11,6 +11,7 @@ import {
 } from "@/components/casas/umbral5/LienzoLimite";
 import { PanelMapa } from "@/components/casas/umbral5/PanelMapa";
 import { HistorialLimite } from "@/components/casas/umbral5/HistorialLimite";
+import { BannerMapaOpcional } from "@/components/casas/umbral5/BannerMapaOpcional";
 import { BannerGimnasio } from "@/components/casas/umbral5/BannerGimnasio";
 import { ConsolaGimnasio } from "@/components/casas/gimnasio6/ConsolaGimnasio";
 import { HistorialLibros } from "@/components/casas/gimnasio6/HistorialLibros";
@@ -37,6 +38,7 @@ import {
   guardarBorradorUmbral5,
   guardarSesionUmbral5Local,
   leerBorradorUmbral5,
+  limpiarBorradorUmbral5,
   listarSesionesUmbral5Local,
 } from "@/lib/casas/umbral5/sesionesLocal";
 import {
@@ -54,6 +56,8 @@ import {
   CASA_UMBRAL5_NOMBRE,
   CASA_UMBRAL5_RITUAL,
   CREDITO_LECTURA_MAPA,
+  diagnosticarUmbral5Local,
+  hayPesoParaGimnasio,
 } from "@shared/casas/umbral5";
 import type { SesionUmbral5, Umbral5Lectura } from "@shared/casas/umbral5";
 
@@ -84,9 +88,7 @@ export default function CasaUmbral5() {
 
   const aplicarSesion = (sesion: SesionUmbral5) => {
     setSesionId(sesion.id);
-    setTexto(sesion.textoVolcado);
     setLectura(sesion.lectura);
-    guardarBorradorUmbral5(sesion.textoVolcado);
   };
 
   useEffect(() => {
@@ -119,18 +121,13 @@ export default function CasaUmbral5() {
     if (!userId) return;
     const locales = listarSesionesUmbral5Local(userId);
     setSesiones(locales);
-    if (locales[0]) {
-      aplicarSesion(locales[0]);
-    } else {
-      const draft = leerBorradorUmbral5();
-      if (draft) setTexto(draft);
-    }
+    const draft = leerBorradorUmbral5();
+    if (draft) setTexto(draft);
 
     void listarSesionesUmbral5(userId)
       .then((r) => {
         const merged = fusionarSesionesUmbral5Local(userId, r.sesiones);
         setSesiones(merged);
-        if (!tocadoRef.current && merged[0]) aplicarSesion(merged[0]);
       })
       .catch(() => {
         /* el caché local ya está */
@@ -185,12 +182,15 @@ export default function CasaUmbral5() {
         limiteConocido: texto,
       });
       const ahora = new Date().toISOString();
+      const lecturaLocal =
+        out.lectura ??
+        diagnosticarUmbral5Local({ limiteConocido: out.textoVolcado });
       const sesion: SesionUmbral5 = {
         id: out.sesionUmbral5Id,
         userId,
         textoVolcado: out.textoVolcado,
-        lectura: null,
-        source: null,
+        lectura: lecturaLocal,
+        source: out.source ?? "local_gratis",
         estado: "VOLCADO_GRATIS",
         createdAt: ahora,
         updatedAt: ahora,
@@ -198,11 +198,10 @@ export default function CasaUmbral5() {
       guardarSesionUmbral5Local(sesion);
       setSesiones((prev) => [sesion, ...prev.filter((s) => s.id !== sesion.id)]);
       setSesionId(out.sesionUmbral5Id);
-      setLectura(null);
-      setLibro(null);
-      setPreguntaGym(null);
-      setCopiaGym("");
-      setTopeDiario(false);
+      setLectura(lecturaLocal);
+      setTexto("");
+      limpiarBorradorUmbral5();
+      tocadoRef.current = false;
       if (dueno) {
         setSaldo(SALDO_ILIMITADO);
       } else {
@@ -388,37 +387,18 @@ export default function CasaUmbral5() {
           sesiones={sesiones}
           sesionActivaId={sesionId}
           onSelect={(s) => {
-            tocadoRef.current = true;
             aplicarSesion(s);
           }}
         />
 
-        {sesionId && !lectura && (
-          <div
-            className="border px-4 py-4"
-            style={{ borderColor: `${UMBRAL5_BRONZE}55`, backgroundColor: "#0a0a0a" }}
-            data-testid="umbral5-banner-mapa"
-          >
-            <p className="text-[11px] leading-relaxed text-white/55">
-              Volcado sellado. El mapa se cobra. C4 nombra el tipo; no se habita.
-            </p>
-            <button
-              type="button"
-              onClick={() => void mapear()}
-              disabled={leyendo}
-              className="mt-3 w-full px-4 py-3 text-[11px] font-semibold tracking-[0.14em] uppercase disabled:opacity-40"
-              style={{
-                backgroundColor: UMBRAL5_BRONZE,
-                color: "#0a0a0a",
-              }}
-              data-testid="umbral5-leer-mapa"
-            >
-              {leyendo
-                ? "Leyendo el mapa…"
-                : `Leer el mapa (${CREDITO_LECTURA_MAPA} Crédito)`}
-            </button>
-          </div>
-        )}
+        <BannerMapaOpcional
+          visible={Boolean(
+            sesionId &&
+              sesiones.find((s) => s.id === sesionId)?.estado !== "MAPA_PAGO",
+          )}
+          onLeer={() => void mapear()}
+          cargando={leyendo}
+        />
 
         {error && (
           <p className="text-sm text-red-400/80" data-testid="umbral5-error">
@@ -428,7 +408,7 @@ export default function CasaUmbral5() {
 
         {lectura && <PanelMapa lectura={lectura} />}
 
-        {lectura && !libro && (
+        {lectura && !libro && hayPesoParaGimnasio(sesiones) && (
           <BannerGimnasio
             modulo={lectura.moduloGimnasio ?? null}
             onEntrar={() => void entrarGym()}

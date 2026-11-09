@@ -1,7 +1,7 @@
 /**
  * Servicio de La Casa 6: Umbral.
- * Volcado gratis. Lectura-mapa a 1 crédito.
- * El gimnasio es capa profunda: se ofrece después del mapa, no cambia la entrada.
+ * Volcado gratis con lectura local. Lectura-mapa a 1 crédito (opcional).
+ * El gimnasio espera el peso de la serie.
  */
 
 import type { Express, Request, Response } from "express";
@@ -62,6 +62,8 @@ export interface VolcadoOk {
   ok: true;
   sesionUmbral5Id: string;
   textoVolcado: string;
+  lectura: Umbral5Lectura;
+  source: "local_gratis";
   creditosDescontados: 0;
   saldo: number;
   ritual: typeof CASA_UMBRAL5_RITUAL;
@@ -139,18 +141,20 @@ export async function ejecutarVolcadoGratis(
   if (!uid) {
     return { ok: false, status: 400, error: "Falta userId." };
   }
-  const input = normalizarInputUmbral5({ limiteConocido: textoVolcado });
-  if ("ok" in input && input.ok === false) return input;
+  const parsed = normalizarInputUmbral5({ limiteConocido: textoVolcado });
+  if ("ok" in parsed && parsed.ok === false) return parsed;
+  const input = parsed as Umbral5Input;
 
   const wallet = deps.wallet ?? createDefaultJuezWallet();
   const store = deps.store ?? createDefaultUmbral5Store();
   const now = new Date().toISOString();
+  const lectura = diagnosticarUmbral5Local(input);
   const sesion: SesionUmbral5 = {
     id: newSesionUmbral5Id(),
     userId: uid,
     textoVolcado: input.limiteConocido,
-    lectura: null,
-    source: null,
+    lectura,
+    source: "local_gratis",
     estado: "VOLCADO_GRATIS",
     createdAt: now,
     updatedAt: now,
@@ -162,6 +166,8 @@ export async function ejecutarVolcadoGratis(
     ok: true,
     sesionUmbral5Id: sesion.id,
     textoVolcado: sesion.textoVolcado,
+    lectura,
+    source: "local_gratis",
     creditosDescontados: 0,
     saldo: visto.saldo,
     ritual: CASA_UMBRAL5_RITUAL,
@@ -334,7 +340,7 @@ export function registerUmbral5Routes(
     gemini: Boolean(callGemini),
     fallbackLocal: true,
     creditos: { lectura: CREDITO_LECTURA_MAPA, volcado: 0 },
-    dominioUsuario: [1, 2, 3, 5, 6, 7],
+    dominioUsuario: [1, 2, 3, 4, 5, 6, 7],
     dominioNuestro: [8, 9, 10],
   };
 
@@ -409,11 +415,11 @@ export function registerUmbral5Routes(
     try {
       const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
       const email = emailDePeticion(req.body, req.header("x-user-email"), req.query);
-      const input = normalizarInputUmbral5(req.body);
-      if ("ok" in input && input.ok === false) {
-        return res.status(input.status).json(bodyError(input));
+      const parsed = normalizarInputUmbral5(req.body);
+      if ("ok" in parsed && parsed.ok === false) {
+        return res.status(parsed.status).json(bodyError(parsed));
       }
-      const resultado = await ejecutarVolcadoGratis(userId, input.limiteConocido, {
+      const resultado = await ejecutarVolcadoGratis(userId, (parsed as Umbral5Input).limiteConocido, {
         ...runtime,
         email,
       });
@@ -424,6 +430,8 @@ export function registerUmbral5Routes(
         success: true,
         sesionUmbral5Id: resultado.sesionUmbral5Id,
         textoVolcado: resultado.textoVolcado,
+        lectura: resultado.lectura,
+        source: resultado.source,
         creditosDescontados: 0,
         saldo: resultado.saldo,
         ritual: resultado.ritual,

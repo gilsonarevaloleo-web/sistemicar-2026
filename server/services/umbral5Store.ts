@@ -34,7 +34,14 @@ function normalizeSesion(raw: SesionUmbral5): SesionUmbral5 {
     userId: String(raw.userId),
     textoVolcado: String(raw.textoVolcado ?? ""),
     lectura: raw.lectura,
-    source: raw.source === "gemini" ? "gemini" : raw.source === "local_fallback" ? "local_fallback" : null,
+    source:
+      raw.source === "gemini"
+        ? "gemini"
+        : raw.source === "local_fallback"
+          ? "local_fallback"
+          : raw.source === "local_gratis"
+            ? "local_gratis"
+            : null,
     estado: raw.estado === "MAPA_PAGO" ? "MAPA_PAGO" : "VOLCADO_GRATIS",
     createdAt: String(raw.createdAt),
     updatedAt: String(raw.updatedAt),

@@ -66,7 +66,9 @@ function parseAll(): SesionUmbral5[] {
             ? "gemini"
             : s.source === "local_fallback"
               ? "local_fallback"
-              : null,
+              : s.source === "local_gratis"
+                ? "local_gratis"
+                : null,
         estado: s.estado === "MAPA_PAGO" ? "MAPA_PAGO" : "VOLCADO_GRATIS",
         createdAt: String(s.createdAt ?? ""),
         updatedAt: String(s.updatedAt ?? s.createdAt ?? ""),

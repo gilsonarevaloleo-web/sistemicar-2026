@@ -1,5 +1,9 @@
 import React, { type ReactNode } from "react";
-import { etiquetaTipo } from "@shared/casas/umbral5";
+import {
+  etiquetaPolo,
+  etiquetaTipo,
+  entradaLimite,
+} from "@shared/casas/umbral5";
 import type { PisoIntento, Umbral5Lectura } from "@shared/casas/umbral5";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "./LienzoLimite";
 
@@ -36,6 +40,7 @@ function Card({
 }
 
 export function PanelMapa({ lectura }: { lectura: Umbral5Lectura }) {
+  const entrada = entradaLimite(lectura.codigoLimite);
   return (
     <section className="space-y-3" data-testid="umbral5-panel-mapa">
       <p
@@ -45,16 +50,26 @@ export function PanelMapa({ lectura }: { lectura: Umbral5Lectura }) {
         Mapa del límite
       </p>
       <div className="grid gap-3 md:grid-cols-2">
-        <Card etiqueta="Asiento" testId="umbral5-card-asiento">
+        <Card etiqueta="Canal" testId="umbral5-card-asiento">
           <p
             className="text-2xl font-light tracking-tight"
             style={{ color: UMBRAL5_BRONZE }}
           >
-            C{lectura.codigoUsuario}
+            C{lectura.codigoLimite}
           </p>
-          <p className="mt-2 text-[11px] text-white/40">
-            C8–C10 no se habitan. C4 no es asiento.
+          <p className="mt-1 text-white/70">{entrada.nombre}</p>
+          <p
+            className="mt-2 text-[11px] uppercase tracking-[0.16em]"
+            data-testid="umbral5-card-polo"
+            style={{ color: UMBRAL5_ASH }}
+          >
+            {etiquetaPolo(lectura.polo)} · {lectura.polo === "pro" ? entrada.pro : entrada.contra}
           </p>
+          {lectura.codigoLimite >= 8 && (
+            <p className="mt-2 text-[11px] text-white/40">
+              Se nombra. El asiento es C{lectura.codigoUsuario}. No se sienta en C10.
+            </p>
+          )}
         </Card>
         <Card etiqueta="Intento" testId="umbral5-card-intento">
           <p
@@ -66,8 +81,11 @@ export function PanelMapa({ lectura }: { lectura: Umbral5Lectura }) {
           <p className="mt-1 text-white/70">
             {PISO_ETIQUETA[lectura.pisoIntento]}
           </p>
+          <p className="mt-2 text-[11px] text-white/40">
+            El intento no es el canal.
+          </p>
         </Card>
-        <Card etiqueta="Tipo · mapa C4" testId="umbral5-card-tipo">
+        <Card etiqueta="Tipo" testId="umbral5-card-tipo">
           <p className="text-lg font-light" style={{ color: UMBRAL5_BRONZE }}>
             {etiquetaTipo(lectura.tipoLimite)}
           </p>

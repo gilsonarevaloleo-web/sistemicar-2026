@@ -81,7 +81,7 @@ describe("umbral5Engine — consume prompt.ts", () => {
 });
 
 describe("umbral5Engine — volcado gratis y lectura", () => {
-  it("el volcado no cobra y no entrega mapa", async () => {
+  it("el volcado no cobra y entrega lectura local", async () => {
     const wallet = createMemoryJuezWallet({ u1: 3 });
     const store = createMemoryUmbral5Store();
     const out = await ejecutarVolcadoGratis("u1", VOLCADO, { wallet, store });
@@ -91,10 +91,12 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(out.saldo, 3);
     assert.equal(out.ritual, CASA_UMBRAL5_RITUAL);
     assert.equal(out.version, CASA_UMBRAL5_VERSION);
-    assert.equal("lectura" in out, false);
+    assert.equal(out.source, "local_gratis");
+    assert.equal(out.lectura.codigoLimite, 1);
     const sesion = await store.getById(out.sesionUmbral5Id);
     assert.equal(sesion?.estado, "VOLCADO_GRATIS");
-    assert.equal(sesion?.lectura, null);
+    assert.equal(sesion?.lectura?.codigoLimite, 1);
+    assert.equal(sesion?.source, "local_gratis");
   });
 
   it("la lectura cobra 1 crédito y sienta C1 en el caso del aumento", async () => {
@@ -112,7 +114,8 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(lectura.creditosDescontados, CREDITO_LECTURA_MAPA);
     assert.equal(lectura.saldo, 1);
     assert.equal(lectura.lectura.codigoUsuario, 1);
-    assert.equal(lectura.lectura.moduloGimnasio, "social_producto");
+    assert.equal(lectura.lectura.codigoLimite, 1);
+    assert.equal(lectura.lectura.moduloGimnasio, null);
     assert.equal(lectura.source, "local_fallback");
     const otra = await ejecutarLecturaMapa("u1", volcado.sesionUmbral5Id, {
       wallet,
@@ -139,8 +142,9 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(lectura.status, 402);
     assert.equal(lectura.codigo, "SALDO_INSUFICIENTE");
     const sesion = await store.getById(volcado.sesionUmbral5Id);
-    assert.equal(sesion?.lectura, null);
     assert.equal(sesion?.estado, "VOLCADO_GRATIS");
+    assert.ok(sesion?.lectura);
+    assert.notEqual(sesion?.source, "gemini");
   });
 
   it("el dueño lee el mapa con ledger en 0 y no se cobra", async () => {
@@ -168,7 +172,7 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(sesion?.estado, "MAPA_PAGO");
   });
 
-  it("Gemini C10 cae al fallback local", async () => {
+  it("Gemini nombra C10 y sienta C7", async () => {
     const wallet = createMemoryJuezWallet({ u1: 2 });
     const store = createMemoryUmbral5Store();
     const volcado = await ejecutarVolcadoGratis("u1", VOLCADO, { wallet, store });
@@ -180,6 +184,8 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
       callGemini: async (prompt) => {
         assert.ok(String(prompt).includes(PROMPT_UMBRAL5.slice(0, 80)));
         return JSON.stringify({
+          codigoLimite: 10,
+          polo: "contra",
           codigoUsuario: 10,
           pisoIntento: 1,
           tipoLimite: "impronta",
@@ -190,8 +196,9 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     });
     assert.equal(lectura.ok, true);
     if (!lectura.ok) return;
-    assert.equal(lectura.source, "local_fallback");
-    assert.notEqual(lectura.lectura.codigoUsuario, 10);
+    assert.equal(lectura.source, "gemini");
+    assert.equal(lectura.lectura.codigoLimite, 10);
+    assert.equal(lectura.lectura.codigoUsuario, 7);
   });
 
   it("lista y relee volcados del mismo usuario", async () => {
@@ -252,7 +259,7 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(metaBody.endpoints.sesiones, "GET /api/casas/umbral5/sesiones");
       assert.equal(metaBody.creditos.lectura, CREDITO_LECTURA_MAPA);
       assert.equal(metaBody.creditos.volcado, 0);
-      assert.deepEqual(metaBody.dominioUsuario, [1, 2, 3, 5, 6, 7]);
+      assert.deepEqual(metaBody.dominioUsuario, [1, 2, 3, 4, 5, 6, 7]);
     });
   });
 
@@ -268,7 +275,8 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(body1.success, true);
       assert.equal(body1.creditosDescontados, 0);
       assert.equal(body1.saldo, 2);
-      assert.equal(body1.lectura, undefined);
+      assert.equal(body1.lectura.codigoLimite, 1);
+      assert.equal(body1.source, "local_gratis");
 
       const lectura = await fetch(`${base}/api/casas/umbral5/lectura`, {
         method: "POST",
@@ -284,6 +292,7 @@ describe("umbral5Engine — HTTP", () => {
       assert.equal(body2.creditosDescontados, 1);
       assert.equal(body2.saldo, 1);
       assert.equal(body2.lectura.codigoUsuario, 1);
+      assert.equal(body2.lectura.codigoLimite, 1);
       assert.notEqual(body2.lectura.codigoUsuario, 10);
     });
   });
