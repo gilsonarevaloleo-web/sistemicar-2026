@@ -29,6 +29,7 @@ const CATEGORIAS: { titulo: string; color: string; rutas: Ruta[] }[] = [
       { path: "/jornada-v4", nombre: JORNADA_MODULE.title, desc: `${JORNADA_MODULE.tagline} — Jornada Base (Conquista + PS)`, icon: Zap, color: ORANGE, acceso: "planificacion_base" },
       { path: "/proyectos", nombre: "Proyectos y Peldaños", desc: "Hub — requiere Norte (peldaño alto valor)", icon: Layers, color: "#38BDF8", acceso: "soberania_dia" },
       { path: "/espejo", nombre: "Espejo Soberano", desc: "Vaciado mental · Doctor IA", icon: Heart, color: "#ef4444", acceso: "libre" },
+      { path: "/umbral/entrada", nombre: "Planeta 5 Oficio", desc: "Práctica de venta · Forja + Arena · 10 códigos de prueba", icon: Zap, color: GOLD, acceso: "libre" },
       { path: "/proyector", nombre: "Proyector", desc: "Arquitectura de realidad futura — 4 ejes × 5 niveles", icon: Target, color: VIOLET, acceso: "en_camino" },
       { path: "/alquimia", nombre: "Alquimia", desc: "Transformación de estados internos", icon: Sparkles, color: VIOLET, acceso: "en_camino" },
       { path: "/esperanza", nombre: "Depósito V3", desc: "Universidad — óptica + carácter + Δ", icon: Star, color: EMERALD, acceso: "usuario" },

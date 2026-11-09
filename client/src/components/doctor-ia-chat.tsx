@@ -453,6 +453,8 @@ export function DoctorIAChat() {
     "/vendedor",
     "/umbral/v2", // Consola: sin FAB robando toques sobre modos/códigos
     "/umbral/entrada",
+    "/oficio",
+    "/oficio/v2",
     "/umbral/metricas",
     "/esperanza", // Depósito V3: sin FAB sobre la auditoría
     "/limite", // Casa 6: sin FAB sobre el volcado
@@ -469,6 +471,7 @@ export function DoctorIAChat() {
     location.startsWith("/admin-gilson") ||
     location.startsWith("/admin-semillas") ||
     location.startsWith("/umbral/") ||
+    location.startsWith("/oficio") ||
     location.startsWith("/esperanza") ||
     location.startsWith("/deposito")
   ) {

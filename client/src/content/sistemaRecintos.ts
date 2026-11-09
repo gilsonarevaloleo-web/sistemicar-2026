@@ -71,9 +71,9 @@ export const SISTEMA_RECINTOS: readonly SistemaRecinto[] = [
     name: "Oficio",
     nameUpper: "OFICIO",
     ritual: "¿Qué se te debe?",
-    oneLiner: "10 códigos del deber. El Maestro es la voz del obstáculo.",
+    oneLiner: "Práctica de venta: 10 códigos. El Maestro es la voz del obstáculo.",
     detail:
-      "Casa 5. Perfeccionar el oficio: Forja + Arena. Código 1 se prueba con evaluador real. El resto se entrena — no es el límite, no es el gimnasio.",
+      "Planeta 5. Forja + Arena. La práctica de venta de 10 códigos vive aquí, no en el 8. Código 1 se prueba con evaluador real. El resto se entrena — no es el límite, no es el gimnasio.",
     color: "#D4AF37",
     exploreHref: "/umbral/entrada",
     publicExplore: true,

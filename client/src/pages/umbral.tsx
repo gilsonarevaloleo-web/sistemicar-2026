@@ -645,7 +645,7 @@ export default function Umbral() {
               className="mt-2 inline-block text-[10px] tracking-widest text-[#D4AF37]/80 hover:text-[#D4AF37]"
               data-testid="link-umbral-v2"
             >
-              ENTRADA + CONSOLA V2 →
+              PLANETA 5 · PRÁCTICA DE 10 CÓDIGOS →
             </Link>
           </div>
           <div className="flex items-center gap-2">

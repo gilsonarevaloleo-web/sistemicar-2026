@@ -16,24 +16,27 @@ describe("Casa 6 Umbral — cableado A–D", () => {
     assert.match(src, /path="\/umbral"/);
   });
 
-  it("sidebar pone Límite junto al Juez", () => {
+  it("sidebar pone Oficio (5) entre Juez y Límite", () => {
     const src = readFileSync(join(root, "client/src/components/sidebar.tsx"), "utf8");
     const juez = src.indexOf('{ path: "/juez", icon: Scale, label: "Juez Serio" }');
+    const oficio = src.indexOf('{ path: "/umbral/entrada", icon: Zap, label: "Oficio" }');
     const limite = src.indexOf('{ path: "/limite", icon: DoorOpen, label: "Límite" }');
     assert.ok(juez >= 0, "falta /juez");
+    assert.ok(oficio >= 0, "falta Oficio en módulos");
     assert.ok(limite >= 0, "falta /limite");
-    assert.ok(juez < limite, "/limite debe ir después de /juez");
+    assert.ok(juez < oficio && oficio < limite, "Oficio (5) entre Juez (4) y Límite (6)");
     assert.match(src, /path: "\/umbral"/);
   });
 
-  it("menú ofrece Casa 6 Umbral y Casa 5 Oficio sin mezclarlos", () => {
+  it("menú ofrece Casa 6 Umbral y Planeta 5 Oficio sin mezclarlos", () => {
     const src = readFileSync(join(root, "client/src/pages/menu-principal.tsx"), "utf8");
     assert.match(src, /id: "umbral-casa6"/);
     assert.match(src, /CASA 6 UMBRAL/);
     assert.match(src, /route: "\/limite"/);
     assert.match(src, /id: "oficio-casa5"/);
-    assert.match(src, /CASA 5 OFICIO/);
+    assert.match(src, /PLANETA 5 OFICIO/);
     assert.match(src, /route: "\/umbral\/entrada"/);
+    assert.match(src, /Arena \+ Forja/);
     assert.doesNotMatch(src, /CASA 5 UMBRAL/);
     const oficio = src.indexOf('id: "oficio-casa5"');
     const umbral6 = src.indexOf('id: "umbral-casa6"');
@@ -55,6 +58,8 @@ describe("Casa 6 Umbral — cableado A–D", () => {
       "utf8",
     );
     assert.match(consola, /PLANETA_OFICIO/);
+    assert.match(consola, /PLANETA C5/);
+    assert.match(consola, /parseOficioPracticaSearch/);
     assert.doesNotMatch(consola, /planetaActivo=\{PLANETA_UMBRAL\}/);
   });
 
@@ -76,6 +81,7 @@ describe("Casa 6 Umbral — cableado A–D", () => {
     const app = readFileSync(join(root, "client/src/App.tsx"), "utf8");
     assert.match(app, /path="\/limite"/);
     assert.match(app, /path="\/umbral"/);
+    assert.match(app, /path="\/oficio"/);
     assert.doesNotMatch(app, /path="\/gimnasio"/);
     const ritual = readFileSync(join(root, "shared/casas/umbral5/prompt.ts"), "utf8");
     assert.match(ritual, /¿Cuál es tu límite\?/);

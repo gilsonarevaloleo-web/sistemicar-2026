@@ -46,6 +46,22 @@ function isNavPathActive(location: string, itemPath: string): boolean {
       location === "/planeacion-v3"
     );
   }
+  if (itemPath === "/umbral/entrada") {
+    return (
+      location === "/umbral/entrada" ||
+      location.startsWith("/umbral/entrada?") ||
+      location === "/oficio" ||
+      location.startsWith("/oficio?")
+    );
+  }
+  if (itemPath === "/umbral/v2") {
+    return (
+      location === "/umbral/v2" ||
+      location.startsWith("/umbral/v2?") ||
+      location === "/oficio/v2" ||
+      location.startsWith("/oficio/v2?")
+    );
+  }
   return location === itemPath;
 }
 
@@ -138,6 +154,7 @@ export function Sidebar() {
     { path: JORNADA_V4_PATH, icon: Compass, label: JORNADA_MODULE.title },
     { path: "/esperanza", icon: Sparkles, label: "Depósito V3" },
     { path: "/juez", icon: Scale, label: "Juez Serio" },
+    { path: "/umbral/entrada", icon: Zap, label: "Oficio" },
     { path: "/limite", icon: DoorOpen, label: "Límite" },
     { path: "/analytics", icon: TrendingUp, label: "Analytics" },
     { path: "/rewards", icon: Trophy, label: "Beneficios" },
@@ -150,9 +167,8 @@ export function Sidebar() {
   const arquitectoLibrosItems: NavItem[] = [
     { path: "/manuales", icon: BookOpen, label: "Manuales" },
     { path: "/codice", icon: Shield, label: "Códice" },
-    { path: "/umbral/entrada", icon: Zap, label: "Oficio" },
     { path: "/umbral/v2", icon: Zap, label: "Oficio · 10 códigos" },
-    { path: "/umbral", icon: Zap, label: "Umbral" },
+    { path: "/umbral", icon: Zap, label: "Galería Umbral" },
   ];
 
   const navItems = esArquitecto ? [...arquitectoModuleItems, ...arquitectoLibrosItems] : baseNavItems;
