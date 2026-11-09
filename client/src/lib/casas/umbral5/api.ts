@@ -3,7 +3,11 @@
  * Volcado gratis. Lectura-mapa a 1 crédito del ledger del Juez.
  */
 
-import type { SesionUmbral5, Umbral5Lectura } from "@shared/casas/umbral5";
+import type {
+  FuenteLecturaUmbral5,
+  SesionUmbral5,
+  Umbral5Lectura,
+} from "@shared/casas/umbral5";
 
 export class Umbral5SaldoError extends Error {
   readonly status = 402;
@@ -26,6 +30,8 @@ export interface VolcadoResponse {
   success: true;
   sesionUmbral5Id: string;
   textoVolcado: string;
+  lectura: Umbral5Lectura;
+  source: FuenteLecturaUmbral5;
   creditosDescontados: 0;
   saldo: number;
   ritual: string;
@@ -171,7 +177,7 @@ export async function leerMapa(input: {
     body: JSON.stringify(input),
   });
   const body = await parseJson<LecturaResponse | ErrorBody>(res);
-  throwIfPagoRequerido(res, body);
+  throwIfPagoRequerido(res, "error" in body ? body : {});
   if (!res.ok || !("success" in body) || body.success !== true) {
     throw new Error(
       ("error" in body && body.error) || "No se pudo leer el mapa.",

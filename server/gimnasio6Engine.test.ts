@@ -13,6 +13,9 @@ import { CASA_UMBRAL5_RITUAL } from "../shared/casas/umbral5/prompt.ts";
 const VOLCADO =
   "El Juez dijo que mi aumento está débil para poder ser vendedor. Ya sé cuál es mi límite. No hice nada.";
 
+const VOLCADO_C2 =
+  "Si me ven vendiendo me critican. Miedo a la exposición pública. No salgo a la luz.";
+
 async function withServer(
   run: (base: string, userId: string) => Promise<void>,
   gymDeps: Partial<Gimnasio6EngineDeps> = {},
@@ -41,7 +44,7 @@ async function withServer(
 }
 
 describe("gimnasio6Engine — capa profunda del límite", () => {
-  it("no abre sin mapa; con mapa de vendedor abre una pregunta; no cambia el ritual", async () => {
+  it("no abre sin peso; con cinco volcados de exposición abre una pregunta", async () => {
     await withServer(async (base, userId) => {
       const meta = await fetch(`${base}/api/casas/gimnasio6/meta`).then((r) => r.json());
       assert.equal(meta.ritualEntrada, CASA_UMBRAL5_RITUAL);
@@ -54,28 +57,33 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
       });
       assert.equal(sinMapa.status, 404);
 
-      const volcado = await fetch(`${base}/api/casas/umbral5/volcado`, {
+      const primero = await fetch(`${base}/api/casas/umbral5/volcado`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, limiteConocido: VOLCADO }),
+        body: JSON.stringify({ userId, limiteConocido: VOLCADO_C2 }),
       }).then((r) => r.json());
       const prematuro = await fetch(`${base}/api/casas/gimnasio6/abrir`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, sesionUmbral5Id: volcado.sesionUmbral5Id }),
+        body: JSON.stringify({ userId, sesionUmbral5Id: primero.sesionUmbral5Id }),
       });
       assert.equal(prematuro.status, 409);
+      const prematuroBody = await prematuro.json();
+      assert.equal(prematuroBody.codigo, "SIN_PESO");
 
-      await fetch(`${base}/api/casas/umbral5/lectura`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, sesionUmbral5Id: volcado.sesionUmbral5Id }),
-      });
+      let ultimo = primero;
+      for (let i = 0; i < 4; i += 1) {
+        ultimo = await fetch(`${base}/api/casas/umbral5/volcado`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, limiteConocido: VOLCADO_C2 }),
+        }).then((r) => r.json());
+      }
 
       const abierto = await fetch(`${base}/api/casas/gimnasio6/abrir`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, sesionUmbral5Id: volcado.sesionUmbral5Id }),
+        body: JSON.stringify({ userId, sesionUmbral5Id: ultimo.sesionUmbral5Id }),
       }).then((r) => r.json());
       assert.equal(abierto.success, true);
       assert.equal(abierto.ritualEntrada, "¿Cuál es tu límite?");
@@ -211,19 +219,17 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
 });
 
 async function abrirLibroListo(base: string, userId: string) {
-  const volcado = await fetch(`${base}/api/casas/umbral5/volcado`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, limiteConocido: VOLCADO }),
-  }).then((r) => r.json());
-  await fetch(`${base}/api/casas/umbral5/lectura`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, sesionUmbral5Id: volcado.sesionUmbral5Id }),
-  });
+  let ultimo: { sesionUmbral5Id?: string } = {};
+  for (let i = 0; i < 5; i += 1) {
+    ultimo = await fetch(`${base}/api/casas/umbral5/volcado`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, limiteConocido: VOLCADO_C2 }),
+    }).then((r) => r.json());
+  }
   return fetch(`${base}/api/casas/gimnasio6/abrir`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, sesionUmbral5Id: volcado.sesionUmbral5Id }),
+    body: JSON.stringify({ userId, sesionUmbral5Id: ultimo.sesionUmbral5Id }),
   }).then((r) => r.json());
 }

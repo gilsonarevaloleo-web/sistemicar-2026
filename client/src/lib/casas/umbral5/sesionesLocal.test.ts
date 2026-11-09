@@ -8,6 +8,7 @@ import {
   guardarBorradorUmbral5,
   guardarSesionUmbral5Local,
   leerBorradorUmbral5,
+  limpiarBorradorUmbral5,
   listarSesionesUmbral5Local,
 } from "./sesionesLocal.ts";
 
@@ -74,5 +75,12 @@ describe("Casa 6 — caché local de volcados", () => {
     guardarBorradorUmbral5("El Juez dijo el borde. No hice nada.");
     assert.equal(leerBorradorUmbral5(), "El Juez dijo el borde. No hice nada.");
     assert.ok(store.get(UMBRAL5_DRAFT_KEY));
+  });
+
+  it("limpia el borrador como Depósito", () => {
+    guardarBorradorUmbral5("texto sucio");
+    limpiarBorradorUmbral5();
+    assert.equal(leerBorradorUmbral5(), "");
+    assert.equal(store.get(UMBRAL5_DRAFT_KEY), undefined);
   });
 });

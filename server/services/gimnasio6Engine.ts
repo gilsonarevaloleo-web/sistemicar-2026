@@ -24,6 +24,7 @@ import {
 import { serializarPromptGimnasio6 } from "../../shared/casas/gimnasio6/prompt.ts";
 import { preguntaCanon } from "../../shared/casas/gimnasio6/canon.ts";
 import type { LibroGimnasio, PreguntaViva } from "../../shared/casas/gimnasio6/types.ts";
+import { hayPesoParaGimnasio } from "../../shared/casas/umbral5/peso.ts";
 import type { Umbral5SessionStore } from "./umbral5Store.ts";
 import { createDefaultUmbral5Store } from "./umbral5Store.ts";
 import {
@@ -71,6 +72,7 @@ export interface Gimnasio6EngineErr {
     | "FALTA_USER"
     | "SESION_NO_ENCONTRADA"
     | "SIN_MAPA"
+    | "SIN_PESO"
     | "SIN_MODULO"
     | "TOPE_DIARIO"
     | "LIBRO_NO_ENCONTRADO"
@@ -165,12 +167,21 @@ export async function abrirLibroGimnasio(
       codigo: "SESION_NO_ENCONTRADA",
     };
   }
-  if (!sesion.lectura || sesion.estado !== "MAPA_PAGO") {
+  if (!sesion.lectura) {
     return {
       ok: false,
       status: 409,
-      error: "Primero el mapa del límite. El gimnasio es capa profunda.",
+      error: "Primero el volcado del límite. El gimnasio es capa profunda.",
       codigo: "SIN_MAPA",
+    };
+  }
+  const serie = await umbralStore.listByUser(uid);
+  if (!hayPesoParaGimnasio(serie)) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Todavía no hay peso. Seguí volcando el límite.",
+      codigo: "SIN_PESO",
     };
   }
   if (sesion.lectura.moduloGimnasio !== "social_producto") {

@@ -9,8 +9,9 @@ function recorte(texto: string, max = 160): string {
 }
 
 function etiquetaEstado(sesion: SesionUmbral5): string {
-  if (sesion.estado === "MAPA_PAGO" && sesion.lectura) {
-    return `Mapa C${sesion.lectura.codigoUsuario}`;
+  if (sesion.lectura) {
+    const canal = `C${sesion.lectura.codigoLimite ?? sesion.lectura.codigoUsuario}`;
+    return sesion.estado === "MAPA_PAGO" ? `Mapa ${canal}` : canal;
   }
   return "Volcado";
 }

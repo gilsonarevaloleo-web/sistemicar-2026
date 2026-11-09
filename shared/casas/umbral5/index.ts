@@ -1,6 +1,6 @@
 /**
  * La Casa 6: Umbral.
- * El límite ya está nombrado. C8–C10 son dominio nuestro.
+ * El límite ya está nombrado. El código es el canal. C8–C10 se nombran.
  */
 
 export {
@@ -22,9 +22,11 @@ export {
 } from "./prompt.ts";
 
 export type {
+  CodigoLimite,
   CodigoUsuario,
   ModuloGimnasioOferta,
   PisoIntento,
+  PoloLimite,
   TipoLimite,
   Umbral5Input,
   Umbral5Lectura,
@@ -34,17 +36,41 @@ export type {
 } from "./types.ts";
 export { CODIGOS_USUARIO, TIPOS_LIMITE } from "./types.ts";
 
+export {
+  CODIGOS_LIMITE,
+  DICCIONARIO_LIMITES,
+  asientoDeCanal,
+  entradaLimite,
+  etiquetaPolo,
+} from "./diccionarioLimites.ts";
+export type { EntradaDiccionarioLimite } from "./diccionarioLimites.ts";
+
+export {
+  MIN_REPETICIONES_PESO,
+  MIN_VOLCADOS_PESO,
+  hayPesoParaGimnasio,
+  pesoDeVolcados,
+} from "./peso.ts";
+export type { PesoLimite } from "./peso.ts";
+
 export { CREDITO_LECTURA_MAPA, mensajeSaldoInsuficiente } from "./creditos.ts";
-export type { EstadoSesionUmbral5, SesionUmbral5 } from "./sesion.ts";
+export type {
+  EstadoSesionUmbral5,
+  FuenteLecturaUmbral5,
+  SesionUmbral5,
+} from "./sesion.ts";
 
 export {
   adjuntarModuloGimnasio,
+  detectarCanal,
   detectarPisoIntento,
   detectarTipoLimite,
   diagnosticarUmbral5Local,
   esQuejaEspejo,
   evaluarUmbral5,
+  isCodigoLimite,
   isCodigoUsuario,
+  parseCodigoLimite,
   parseCodigoUsuario,
   parseUmbral5Lectura,
   sellarLectura,
