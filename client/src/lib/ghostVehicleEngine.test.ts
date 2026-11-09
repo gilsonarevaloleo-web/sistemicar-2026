@@ -83,7 +83,38 @@ describe("ghostVehicleEngine", () => {
       ],
     });
     assert.equal(isGhostActiveVehicle(longConquista, NOW, DAY_START), false);
-    assert.equal(shouldPreserveLocalActivo(longConquista, NOW, DAY_START), true);
+    // 12h atrás cae en la jornada anterior a las 08:00: no rehidratar desde park.
+    assert.equal(shouldPreserveLocalActivo(longConquista, NOW, DAY_START), false);
+  });
+
+  it("conquista viva del mismo día se preserva tras ausencia larga", () => {
+    const late = DAY_START + 13 * 3600_000;
+    const sameDay = v({
+      id: "same-day-conq",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: DAY_START + 30 * 60_000,
+      subVehiculos: [
+        { id: "s1", titulo: "Pegar", status: "cumplido" },
+        { id: "s2", titulo: "Cortar", status: "activo" },
+      ],
+    });
+    assert.equal(isGhostActiveVehicle(sameDay, late, DAY_START), false);
+    assert.equal(shouldPreserveLocalActivo(sameDay, late, DAY_START), true);
+  });
+
+  it("conquista viva de la noche anterior no se rehidrata desde park", () => {
+    const nineAm = DAY_START + 4 * 3600_000;
+    const leftover = v({
+      id: "night-conq",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: DAY_START - 8 * 3600_000,
+      subVehiculos: [{ id: "s1", titulo: "Unidad", status: "activo" }],
+    });
+    assert.equal(hasLiveDesglosadorWork(leftover), true);
+    assert.equal(isGhostActiveVehicle(leftover, nineAm, DAY_START), false);
+    assert.equal(shouldPreserveLocalActivo(leftover, nineAm, DAY_START), false);
   });
 
   it("ring situacional con cron activo resiste >12h", () => {
@@ -134,6 +165,18 @@ describe("ghostVehicleEngine", () => {
     const nightOpen = DAY_START - 8 * 3600_000;
     const stale = v({ id: "night", aperturaAt: nightOpen });
     assert.equal(shouldPreserveLocalActivo(stale, nineAm, DAY_START), false);
+  });
+
+  it("recoverMissingJournalDayActives no reincorpora conquista de jornada anterior", () => {
+    const leftover = v({
+      id: "old",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: DAY_START - 10 * 3600_000,
+      subVehiculos: [{ id: "s1", titulo: "U", status: "pendiente" }],
+    });
+    const recovered = recoverMissingJournalDayActives([], [leftover], NOW);
+    assert.equal(recovered.length, 0);
   });
 
   it("recoverMissingJournalDayActives reincorpora activo local del día", () => {

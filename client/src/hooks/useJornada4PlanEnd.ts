@@ -23,6 +23,8 @@ export type UseJornada4PlanEndParams = {
   userId: string | undefined;
   segmentos: { horaInicio?: string; horaFin?: string }[];
   vehiclesRef: { current: Vehicle[] };
+  /** Ids de activos: el barrido se relanza cuando la flota termina de hidratar. */
+  activeSig?: string;
   sweepPlanEnd: (
     segmentos: { horaInicio?: string; horaFin?: string }[]
   ) => Promise<PlanEndSweepResult>;
@@ -53,6 +55,7 @@ export function useJornada4PlanEnd({
   userId,
   segmentos,
   sweepPlanEnd,
+  activeSig = "",
   enabled = true,
 }: UseJornada4PlanEndParams): {
   revelacion: RevelacionPlanDia | null;
@@ -94,21 +97,27 @@ export function useJornada4PlanEnd({
     };
 
     const segs = segsRef.current;
-    if (isPlanTerminado(segs)) {
-      return scheduleIdle(run, 1800);
+    const cleanups: Array<() => void> = [];
+    // Siempre: leftovers de jornadas anteriores, aunque el plan de hoy no haya
+    // terminado. activeSig relanza cuando la flota hidrata (antes: 0 vehículos).
+    cleanups.push(scheduleIdle(run, isPlanTerminado(segs) ? 1800 : 900));
+
+    if (!isPlanTerminado(segs)) {
+      const win = resolvePlanWindowMs(segs);
+      if (win) {
+        const delay = win.endMs - Date.now() + 600;
+        if (delay > 0 && delay <= 36 * 3_600_000) {
+          const t = window.setTimeout(run, delay);
+          cleanups.push(() => window.clearTimeout(t));
+        }
+      }
     }
 
-    const win = resolvePlanWindowMs(segs);
-    if (!win) return;
-    const delay = win.endMs - Date.now() + 600;
-    if (delay <= 0) return scheduleIdle(run, 800);
-    if (delay > 36 * 3_600_000) return;
-    const t = window.setTimeout(run, delay);
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
+      for (let i = 0; i < cleanups.length; i++) cleanups[i]!();
     };
-  }, [userId, enabled, sig]);
+  }, [userId, enabled, sig, activeSig]);
 
   return { revelacion, ledger, planEndLabel };
 }

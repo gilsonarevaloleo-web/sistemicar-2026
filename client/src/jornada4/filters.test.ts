@@ -193,6 +193,33 @@ describe("jornada4 filters", () => {
     assert.ok(dual.length <= 6);
   });
 
+  it("no lista conquistas de jornadas anteriores aunque tengan faena viva", () => {
+    const old = v({
+      id: "old-manga",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: NOW - 16 * 24 * 3600_000,
+      subVehiculos: [
+        {
+          id: "s1",
+          titulo: "Face",
+          status: "activo",
+          aperturaAt: NOW - 16 * 24 * 3600_000,
+        },
+      ],
+    });
+    const today = v({
+      id: "hoy",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: NOW,
+      subVehiculos: [{ id: "s2", titulo: "Ahora", status: "activo", aperturaAt: NOW }],
+    });
+    const dual = filterJornada4Vehicles([old, today], NOW);
+    assert.equal(dual.some(x => x.id === "old-manga"), false);
+    assert.equal(dual.some(x => x.id === "hoy"), true);
+  });
+
   it("desglosador en pausa sigue listado para reanudar o cerrar", () => {
     const paused = v({
       id: "paused-conq",

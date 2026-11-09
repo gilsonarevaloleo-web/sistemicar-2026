@@ -56,6 +56,22 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     assert.match(session, /useJornada4Ops/);
   });
 
+  it("barrido de término cierra leftovers de jornada anterior sin esperar horaFin de hoy", () => {
+    const hook = readFileSync(join(clientSrc, "hooks/useJornada4PlanEnd.ts"), "utf8");
+    assert.match(hook, /activeSig/);
+    assert.match(hook, /scheduleIdle\(run/);
+    const ops = readFileSync(join(clientSrc, "hooks/useJornada4Ops.ts"), "utf8");
+    assert.match(ops, /selectVehiclesForPlanEndSweep/);
+    assert.equal(
+      ops.includes("if (!isPlanTerminado(segs)) return empty"),
+      false,
+      "no debe abortar el barrido solo porque el plan de hoy sigue abierto"
+    );
+    const sweep = readFileSync(join(clientSrc, "jornada4/cierrePlanSweep.ts"), "utf8");
+    assert.match(sweep, /vehiclesToCloseAsStaleJornada/);
+    assert.match(sweep, /isActiveFromPreviousJornada/);
+  });
+
   it("árbol jornada4 + hooks J4 sin motores prohibidos", () => {
     const roots = [
       join(clientSrc, "jornada4"),
@@ -177,6 +193,7 @@ describe("Jornada 4 Dual Kernel import guard", () => {
     // Toasts sí; tick UI de badges no (false = sin setState root cada 1s).
     assert.match(session, /useJornada4PuertaAlerts\(planillaApi\.planilla, Boolean\(user\), false\)/);
     assert.match(session, /useJornada4PlanEnd/);
+    assert.match(session, /activeSig/);
     assert.match(session, /Jornada4OpsToolsRail/);
     assert.equal(session.includes("useJornada4Tick"), false);
     assert.equal(session.includes("HubRendicionTiempo"), false);

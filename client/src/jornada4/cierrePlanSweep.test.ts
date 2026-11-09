@@ -7,10 +7,14 @@ import {
   BONO_DISCIPLINA_TOPE,
   bonoDisciplinaDesdeCierres,
   collectCierresConscientesAlTermino,
+  isActiveFromPreviousJornada,
   isCierreConscienteAlTermino,
   recordCierresConscientesPlan,
+  selectVehiclesForPlanEndSweep,
+  vehiclesToCloseAsStaleJornada,
   vehiclesToCloseAtPlanEnd,
 } from "./cierrePlanSweep.ts";
+import { getJournalDayStartMs } from "../lib/segmentTime.ts";
 
 function lima(hhmm: string): number {
   return Date.parse(`2026-08-19T${hhmm}:00-05:00`);
@@ -128,6 +132,77 @@ describe("cierrePlanSweep", () => {
     assert.equal(bonoDisciplinaDesdeCierres(9), BONO_DISCIPLINA_TOPE);
     assert.equal(applyBonoCierreConsciente(100, 15), 115);
     assert.equal(applyBonoCierreConsciente(118, 15), 120);
+  });
+
+  it("antes del término de hoy cierra leftovers de jornadas pasadas, no los de hoy", () => {
+    const morning = Date.parse("2026-08-20T07:29:00-05:00");
+    const dayStart = getJournalDayStartMs(morning);
+    const fromDaysAgo = v({
+      id: "punio",
+      status: "activo",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: morning - 16 * 24 * 3600_000,
+      subVehiculos: [{ id: "s1", titulo: "Face", status: "activo" }],
+    });
+    const fromLastNight = v({
+      id: "manga",
+      status: "activo",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: dayStart - 10 * 3600_000,
+      subVehiculos: [{ id: "s2", titulo: "Unidad", status: "pendiente" }],
+    });
+    const fromToday = v({
+      id: "hoy",
+      status: "activo",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: dayStart + 3600_000,
+      subVehiculos: [{ id: "s3", titulo: "Ahora", status: "activo" }],
+    });
+    const carryover = v({
+      id: "madrugada",
+      status: "activo",
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      aperturaAt: dayStart - 30 * 60_000,
+      subVehiculos: [{ id: "s4", titulo: "Cruce", status: "activo" }],
+    });
+
+    assert.equal(isActiveFromPreviousJornada(fromDaysAgo, morning, dayStart), true);
+    assert.equal(isActiveFromPreviousJornada(fromLastNight, morning, dayStart), true);
+    assert.equal(isActiveFromPreviousJornada(fromToday, morning, dayStart), false);
+    assert.equal(isActiveFromPreviousJornada(carryover, morning, dayStart), false);
+
+    const stale = vehiclesToCloseAsStaleJornada(
+      [fromDaysAgo, fromLastNight, fromToday, carryover],
+      morning
+    );
+    assert.deepEqual(
+      stale.map(x => x.id).sort(),
+      ["manga", "punio"]
+    );
+
+    const beforeEnd = selectVehiclesForPlanEndSweep(
+      [fromDaysAgo, fromLastNight, fromToday, carryover],
+      false,
+      morning
+    );
+    assert.deepEqual(
+      beforeEnd.map(x => x.id).sort(),
+      ["manga", "punio"]
+    );
+
+    const afterEnd = selectVehiclesForPlanEndSweep(
+      [fromDaysAgo, fromToday],
+      true,
+      morning
+    );
+    assert.deepEqual(
+      afterEnd.map(x => x.id).sort(),
+      ["hoy", "punio"]
+    );
   });
 
   it("ledger es idempotente por vehicleId", () => {

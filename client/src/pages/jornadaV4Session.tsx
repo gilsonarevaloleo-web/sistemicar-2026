@@ -177,10 +177,20 @@ export default function JornadaV4Session() {
     segmentoActivo: planillaApi.segmentoActivo,
     segmentos: planillaApi.planilla?.segmentos ?? [],
   });
+  const activeSig = useMemo(
+    () =>
+      core.vehicles
+        .filter(v => v.status === "activo" && !v.autoVerdad)
+        .map(v => v.id)
+        .sort()
+        .join(","),
+    [core.vehicles]
+  );
   const planEnd = useJornada4PlanEnd({
     userId: user?.uid,
     segmentos: planillaApi.planilla?.segmentos ?? [],
     vehiclesRef: core.vehiclesRef,
+    activeSig,
     sweepPlanEnd: ops.sweepPlanEnd,
     enabled: Boolean(user),
   });

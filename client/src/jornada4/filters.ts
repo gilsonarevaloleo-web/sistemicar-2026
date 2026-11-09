@@ -1,9 +1,11 @@
 import {
   excludeGhostActivesFromReconcile,
+  isJournalStaleActiveVehicle,
   isZombieConsciousVehicle,
   lastLiveActivityMs,
 } from "../lib/ghostVehicleEngine";
 import type { Vehicle } from "../lib/persistence";
+import { getJournalDayStartMs } from "../lib/segmentTime";
 import { ringSessionOperable } from "../lib/ringEnfoqueReal";
 import { isPausedPresence } from "../lib/vehiculoPausa";
 import { isSituacionListaLibre } from "./situacionLibreSeed";
@@ -24,15 +26,27 @@ export function isJornada4Vehicle(v: Vehicle): boolean {
   return false;
 }
 
+function vehicleAperturaMs(v: Vehicle): number {
+  if (typeof v.aperturaAt === "number" && v.aperturaAt > 0) return v.aperturaAt;
+  if (v.createdAt instanceof Date) return v.createdAt.getTime();
+  return 0;
+}
+
 /**
  * Dual Kernel: faena viva + pausas/cascarones que el operador debe ver para cerrar.
- * La avalancha histórica (decenas de `activo` resucitados) sigue fuera.
+ * La avalancha histórica y los leftovers de jornadas anteriores siguen fuera;
+ * el barrido de término los archiva.
  */
 export function filterJornada4Vehicles(
   vehicles: Vehicle[],
   nowMs = Date.now()
 ): Vehicle[] {
-  const jornada = vehicles.filter(isJornada4Vehicle);
+  const dayStart = getJournalDayStartMs(nowMs);
+  const jornada = vehicles.filter(v => {
+    if (!isJornada4Vehicle(v)) return false;
+    // La jornada anterior ya debió cerrarlos. No pintarlos mientras el barrido archiva.
+    return !isJournalStaleActiveVehicle(vehicleAperturaMs(v), nowMs, dayStart);
+  });
   const visible = excludeGhostActivesFromReconcile(jornada, nowMs).filter(isJornada4Vehicle);
   const visibleIds = new Set(visible.map(v => v.id));
   const leftover = jornada
