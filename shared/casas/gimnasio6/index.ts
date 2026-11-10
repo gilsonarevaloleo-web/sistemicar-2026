@@ -58,6 +58,16 @@ export {
 } from "./prompt.ts";
 
 export {
+  esLibroContinuable,
+  etiquetaLibro,
+  formatearCopiaLibroNumerado,
+  numeroLibro,
+  numerosLibro,
+  ordenarLibrosPorCreacion,
+  recortarLibro,
+} from "./historial.ts";
+
+export {
   abrirSiguienteCapitulo,
   aplicarRespuesta,
   diaLima,

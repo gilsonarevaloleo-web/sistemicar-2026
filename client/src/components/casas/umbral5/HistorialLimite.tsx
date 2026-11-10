@@ -1,20 +1,14 @@
 import React, { useState } from "react";
-import type { SesionUmbral5 } from "@shared/casas/umbral5";
+import {
+  CASA_UMBRAL5_RITUAL,
+  cabeceraVolcado,
+  formatearCopiaVolcado,
+  numerosVolcado,
+  recortarVolcado,
+  type SesionUmbral5,
+} from "@shared/casas/umbral5";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "./LienzoLimite";
-
-function recorte(texto: string, max = 160): string {
-  const t = texto.trim().replace(/\s+/g, " ");
-  if (t.length <= max) return t;
-  return `${t.slice(0, max).trim()}…`;
-}
-
-function etiquetaEstado(sesion: SesionUmbral5): string {
-  if (sesion.lectura) {
-    const canal = `C${sesion.lectura.codigoLimite ?? sesion.lectura.codigoUsuario}`;
-    return sesion.estado === "MAPA_PAGO" ? `Mapa ${canal}` : canal;
-  }
-  return "Volcado";
-}
+import { BotonCopiarUmbral } from "./BotonCopiarUmbral";
 
 export function HistorialLimite({
   sesiones,
@@ -26,6 +20,7 @@ export function HistorialLimite({
   onSelect: (sesion: SesionUmbral5) => void;
 }) {
   const [abierto, setAbierto] = useState(true);
+  const numeros = numerosVolcado(sesiones);
 
   return (
     <section className="space-y-3" data-testid="umbral5-historial">
@@ -57,29 +52,53 @@ export function HistorialLimite({
 
       {abierto && (
         <ul className="space-y-2">
-          {sesiones.slice(0, 12).map((s) => {
+          {sesiones.map((s) => {
             const activa = s.id === sesionActivaId;
+            const numero = numeros.get(s.id) ?? 0;
             return (
               <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(s)}
-                  className="w-full border bg-black/40 px-4 py-3 text-left"
+                <article
+                  className="space-y-3 border bg-black/40 px-4 py-3"
                   style={{
                     borderColor: activa ? `${UMBRAL5_BRONZE}66` : `${UMBRAL5_BRONZE}22`,
                   }}
                   data-testid={`umbral5-historial-item-${s.id}`}
                 >
-                  <p
-                    className="text-[10px] tracking-[0.18em] uppercase"
-                    style={{ color: UMBRAL5_ASH }}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(s)}
+                    className="w-full text-left"
+                    data-testid={`umbral5-historial-select-${s.id}`}
                   >
-                    {etiquetaEstado(s)}
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-white/75">
-                    {recorte(s.textoVolcado)}
-                  </p>
-                </button>
+                    <p
+                      className="text-[10px] tracking-[0.18em] uppercase"
+                      style={{ color: UMBRAL5_ASH }}
+                    >
+                      {cabeceraVolcado(s, numero)}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-white/75">
+                      {recortarVolcado(s.textoVolcado)}
+                    </p>
+                  </button>
+                  <details className="group">
+                    <summary
+                      className="cursor-pointer text-[9px] tracking-[0.2em] uppercase text-white/35"
+                      data-testid={`umbral5-historial-volcado-${s.id}`}
+                    >
+                      {CASA_UMBRAL5_RITUAL} · ver volcado
+                    </summary>
+                    <p
+                      className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/80"
+                      data-testid={`umbral5-historial-texto-${s.id}`}
+                    >
+                      {s.textoVolcado}
+                    </p>
+                  </details>
+                  <BotonCopiarUmbral
+                    texto={formatearCopiaVolcado(s, numero)}
+                    testId={`umbral5-copiar-${s.id}`}
+                  />
+                </article>
               </li>
             );
           })}

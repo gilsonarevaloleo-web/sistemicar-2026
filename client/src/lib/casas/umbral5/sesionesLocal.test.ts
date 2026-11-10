@@ -32,7 +32,8 @@ function sesion(
   id: string,
   userId: string,
   texto: string,
-  updatedAt: string,
+  createdAt: string,
+  updatedAt = createdAt,
 ): SesionUmbral5 {
   return {
     id,
@@ -41,7 +42,7 @@ function sesion(
     lectura: null,
     source: null,
     estado: "VOLCADO_GRATIS",
-    createdAt: updatedAt,
+    createdAt,
     updatedAt,
   };
 }
@@ -60,15 +61,33 @@ describe("Casa 6 — caché local de volcados", () => {
     assert.ok(store.get(UMBRAL5_SESIONES_KEY));
   });
 
-  it("fusiona remoto encima y ordena por updatedAt", () => {
+  it("fusiona remoto encima y ordena por createdAt", () => {
     guardarSesionUmbral5Local(sesion("a", "u1", "viejo", "2026-01-01T00:00:00.000Z"));
     const merged = fusionarSesionesUmbral5Local("u1", [
-      sesion("a", "u1", "nuevo", "2026-01-04T00:00:00.000Z"),
+      sesion("a", "u1", "nuevo", "2026-01-01T00:00:00.000Z", "2026-01-04T00:00:00.000Z"),
       sesion("c", "u1", "otro", "2026-01-03T00:00:00.000Z"),
     ]);
-    assert.equal(merged[0]?.id, "a");
-    assert.equal(merged[0]?.textoVolcado, "nuevo");
-    assert.equal(merged[1]?.id, "c");
+    assert.equal(merged[0]?.id, "c");
+    assert.equal(merged[1]?.id, "a");
+    assert.equal(merged[1]?.textoVolcado, "nuevo");
+  });
+
+  it("pagar el mapa no mueve el volcado de su orden de sellado", () => {
+    guardarSesionUmbral5Local(sesion("a", "u1", "primero", "2026-01-01T00:00:00.000Z"));
+    guardarSesionUmbral5Local(sesion("b", "u1", "segundo", "2026-01-02T00:00:00.000Z"));
+    const conMapa = sesion(
+      "a",
+      "u1",
+      "primero",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-05T00:00:00.000Z",
+    );
+    conMapa.estado = "MAPA_PAGO";
+    guardarSesionUmbral5Local(conMapa);
+    const lista = listarSesionesUmbral5Local("u1");
+    assert.equal(lista[0]?.id, "b");
+    assert.equal(lista[1]?.id, "a");
+    assert.equal(lista[1]?.estado, "MAPA_PAGO");
   });
 
   it("persiste el borrador del lienzo", () => {

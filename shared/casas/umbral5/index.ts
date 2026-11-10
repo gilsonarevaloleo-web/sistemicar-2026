@@ -61,6 +61,18 @@ export type {
 } from "./sesion.ts";
 
 export {
+  cabeceraVolcado,
+  compararCreacionDesc,
+  etiquetaCanalVolcado,
+  formatearCopiaVolcado,
+  formatearFechaVolcado,
+  numeroVolcado,
+  numerosVolcado,
+  ordenarVolcadosPorCreacion,
+  recortarVolcado,
+} from "./historial.ts";
+
+export {
   adjuntarModuloGimnasio,
   detectarCanal,
   detectarPisoIntento,

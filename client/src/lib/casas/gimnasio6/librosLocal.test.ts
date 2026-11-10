@@ -56,6 +56,26 @@ describe("Gimnasio 6 — caché local de libros", () => {
     assert.equal(listarLibrosGimnasioLocal("u2").length, 0);
   });
 
+  it("lista por createdAt aunque el turno actualice updatedAt", () => {
+    guardarLibroGimnasioLocal(
+      libro({
+        id: "lib-1",
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-08T02:00:00.000Z",
+      }),
+    );
+    guardarLibroGimnasioLocal(
+      libro({
+        id: "lib-2",
+        createdAt: "2026-11-07T00:00:00.000Z",
+        updatedAt: "2026-11-07T00:00:00.000Z",
+      }),
+    );
+    const lista = listarLibrosGimnasioLocal("u1");
+    assert.equal(lista[0]?.id, "lib-2");
+    assert.equal(lista[1]?.id, "lib-1");
+  });
+
   it("fusiona remoto sin borrar un turno más nuevo en local", () => {
     guardarLibroGimnasioLocal(
       libro({ updatedAt: "2026-11-08T02:00:00.000Z", puntero: { capitulo: 1, subcodigo: 1, indice: 2, variante: 0 } }),

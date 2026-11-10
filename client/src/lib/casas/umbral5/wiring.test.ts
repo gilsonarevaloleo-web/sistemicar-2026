@@ -90,4 +90,14 @@ describe("Casa 6 Umbral — cableado A–D", () => {
     assert.match(gymPrompt, /¿Cuál es tu límite\?/);
     assert.match(gymPrompt, /capa profunda/);
   });
+
+  it("el gimnasio no se autoabre: el operador elige puerta o práctica", () => {
+    const page = readFileSync(join(root, "client/src/pages/CasaUmbral5.tsx"), "utf8");
+    assert.match(page, /BifurcacionPractica/);
+    assert.match(page, /elegirPuerta/);
+    assert.match(page, /elegirGimnasio/);
+    assert.match(page, /modo === "gimnasio"/);
+    assert.doesNotMatch(page, /setLibro\(abierto\)/);
+    assert.doesNotMatch(page, /path="\/gimnasio"/);
+  });
 });
