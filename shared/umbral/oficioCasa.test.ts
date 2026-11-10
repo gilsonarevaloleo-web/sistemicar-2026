@@ -8,6 +8,7 @@ import {
   CASA_OFICIO_RITUAL,
   CASA_OFICIO_RITUAL_CORTO,
   MATRIZ_OFICIO,
+  OFICIO_PRODUCTO_VENTAS,
   fichaMatrizOficio,
 } from "./oficioCasa.ts";
 import { CASA_UMBRAL5_RITUAL } from "../casas/umbral5/prompt.ts";
@@ -33,5 +34,9 @@ describe("Casa 5 Oficio — identidad", () => {
     assert.notEqual(fichaMatrizOficio(5).marca, "Decisión");
     assert.equal(fichaMatrizOficio(7).marca, "Justicia");
     assert.doesNotMatch(MATRIZ_OFICIO.map((f) => f.marca).join(" "), /Decisión|Límite|Mancha/);
+  });
+
+  it("el maestro de Oficio ofrece Maestro en ventas como capa profunda", () => {
+    assert.equal(OFICIO_PRODUCTO_VENTAS, "Maestro en ventas");
   });
 });

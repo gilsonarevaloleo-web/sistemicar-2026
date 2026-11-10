@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuthContext } from "@/App";
+import { isOwner } from "@/lib/owner";
 import { LienzoOficio, OFICIO_GOLD } from "@/components/umbral/LienzoOficio";
 import { PanelLecturaOficio } from "@/components/umbral/PanelLecturaOficio";
 import { leerVolcadoOficio } from "@/lib/umbral/oficioApi";
@@ -8,6 +9,12 @@ import {
   guardarBorradorOficio,
   leerBorradorOficio,
 } from "@/lib/umbral/oficioLocal";
+import {
+  hasUmbralAccess,
+  subscribeToProgression,
+} from "@/lib/persistence";
+import { isPreviewOpsUnlocked } from "@/lib/previewOps";
+import { buildOficioPracticaHref } from "@shared/umbral/entradaPractica";
 import type { OficioLectura } from "@shared/umbral/oficioMotor";
 import {
   CASA_OFICIO_FIRMA,
@@ -23,21 +30,49 @@ import {
 /**
  * Planeta 5 Oficio — entrada cortante.
  * Una pregunta, un volcado, un código de la matriz del 5.
- * Forja/Arena quedan como CTA interior del código, no como portada.
+ * La práctica de venta es capa profunda: botón chico al costado del volcado.
  */
 export default function UmbralEntrada() {
   const { user } = useAuthContext();
   const userId = user?.uid || guestIdOficio();
+  const dueno = isOwner(user?.email);
 
   const [texto, setTexto] = useState("");
   const [lectura, setLectura] = useState<OficioLectura | null>(null);
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [incluido, setIncluido] = useState(dueno || isPreviewOpsUnlocked());
 
   useEffect(() => {
     const draft = leerBorradorOficio();
     if (draft) setTexto(draft);
   }, [userId]);
+
+  useEffect(() => {
+    if (dueno || isPreviewOpsUnlocked()) {
+      setIncluido(true);
+      return;
+    }
+    if (!user?.uid) {
+      setIncluido(false);
+      return;
+    }
+    const unsub = subscribeToProgression(
+      user.uid,
+      (prog) => {
+        setIncluido(
+          hasUmbralAccess(
+            prog.subscriptionPlan,
+            user.email,
+            prog.rank,
+            prog.activeModules,
+          ),
+        );
+      },
+      () => setIncluido(false),
+    );
+    return () => unsub();
+  }, [user?.uid, user?.email, dueno]);
 
   const onTexto = (value: string) => {
     setTexto(value);
@@ -117,23 +152,31 @@ export default function UmbralEntrada() {
         </article>
 
         <div className="mt-8">
-          {!lectura ? (
-            <LienzoOficio
-              texto={texto}
-              onTexto={onTexto}
-              onLeer={() => void leer()}
-              cargando={leyendo}
-            />
-          ) : (
+          <LienzoOficio
+            texto={texto}
+            onTexto={onTexto}
+            onLeer={() => void leer()}
+            cargando={leyendo}
+            hrefPracticaVenta={buildOficioPracticaHref(
+              "EXTERNO_VENTAS",
+              lectura?.codigo,
+            )}
+          />
+        </div>
+
+        {lectura && (
+          <div className="mt-8">
             <PanelLecturaOficio
               lectura={lectura}
+              dueno={dueno}
+              incluido={incluido}
               onRehacer={() => {
                 setLectura(null);
                 setError(null);
               }}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         {error && (
           <p className="mt-4 text-sm text-red-400" data-testid="umbral-entrada-error">

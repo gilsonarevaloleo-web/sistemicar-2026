@@ -7,6 +7,7 @@ import {
   type UserProgression,
 } from "@/lib/persistence";
 import { isPreviewOpsUnlocked } from "@/lib/previewOps";
+import { isOwner } from "@/lib/owner";
 import { UMBRAL_SKU } from "@shared/umbralPricing";
 import { useViewTransitionShield } from "@/hooks/useViewTransitionShield";
 import { useDualKernelMotorsQuiet } from "@/lib/dualKernelQuiet";
@@ -56,6 +57,7 @@ export default function UmbralV2() {
   }
 
   const paid =
+    isOwner(user.email) ||
     isPreviewOpsUnlocked() ||
     hasUmbralAccess(
       progression?.subscriptionPlan,
