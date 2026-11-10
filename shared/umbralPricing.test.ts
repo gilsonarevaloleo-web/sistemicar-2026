@@ -6,7 +6,7 @@ import {
   esCodigoUmbralEnTrial,
   requierePagoUmbral,
 } from "./umbralPricing.ts";
-import { modulesGrantedByPlan, hasUmbralAccess } from "./moduleAccess.ts";
+import { modulesGrantedByPlan, hasUmbralAccess, OWNER_EMAIL } from "./moduleAccess.ts";
 
 describe("Umbral pricing + acceso", () => {
   it("SKU mensual ancla en 24.99 USD", () => {
@@ -35,5 +35,6 @@ describe("Umbral pricing + acceso", () => {
       hasUmbralAccess({ activeModules: ["planificacion_base"], email: "x@y.com" }),
       false,
     );
+    assert.equal(hasUmbralAccess({ email: OWNER_EMAIL }), true);
   });
 });

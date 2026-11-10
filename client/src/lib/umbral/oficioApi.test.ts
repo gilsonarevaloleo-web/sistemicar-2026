@@ -26,4 +26,14 @@ describe("Casa 5 Oficio — cableado de entrada", () => {
     const api = readFileSync(join(root, "api/index.ts"), "utf8");
     assert.match(api, /registerOficioRoutes/);
   });
+
+  it("la Arena deja libre al dueño y no espera el ledger", () => {
+    const root = join(here, "../../../..");
+    const v2 = readFileSync(join(root, "client/src/pages/umbral-v2.tsx"), "utf8");
+    assert.match(v2, /isOwner\(user\.email\)/);
+    assert.match(v2, /hasPaidAccess=\{paid\}/);
+    const entrada = readFileSync(join(root, "client/src/pages/umbral-entrada.tsx"), "utf8");
+    assert.match(entrada, /isOwner/);
+    assert.match(entrada, /LIBRE|dueno/);
+  });
 });

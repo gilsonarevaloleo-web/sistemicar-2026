@@ -31,6 +31,11 @@ export const CASA_OFICIO_PROHIBIDO =
 export const CASA_OFICIO_PERIMETRO =
   "Oficio no es límite. C5 Oficio es Cálculo, no Decisión. El 6 no enseña a vender ni a cobrar.";
 
+/** Producto del maestro de Oficio: práctica de venta de 10 códigos. Capa profunda, no la puerta. */
+export const OFICIO_PRODUCTO_VENTAS = "Maestro en ventas";
+export const OFICIO_PRODUCTO_VENTAS_CAPA =
+  "Capa profunda del Oficio. Práctica de venta con cada código de la matriz.";
+
 export interface FichaMatrizOficio {
   numero: CodigoNumero;
   marca: string;

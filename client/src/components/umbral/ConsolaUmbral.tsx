@@ -638,7 +638,7 @@ export function ConsolaUmbral({
           style={{ color: GOLD }}
         >
           <Lock size={14} />
-          OFICIO · ACCESO COMPLETO
+          OFICIO · MAESTRO EN VENTAS
         </p>
         <h2
           className="mt-2 text-xl font-black text-white"
@@ -672,7 +672,7 @@ export function ConsolaUmbral({
               padding: "0.85rem 1rem",
             }}
           >
-            ACTIVAR UMBRAL · ${UMBRAL_SKU.priceUsd}/MES
+            ACTIVAR MAESTRO EN VENTAS · ${UMBRAL_SKU.priceUsd}/MES
           </span>
         </NavTransitionLink>
         <button
@@ -847,7 +847,7 @@ export function ConsolaUmbral({
             className="border border-[#D4AF37]/25 bg-[#D4AF37]/08 px-3 py-2 text-[11px] text-[#D4AF37]/90"
             data-testid="umbral-v2-trial-banner"
           >
-            TRIAL · Código 1 gratis · Códigos 2–10 requieren Umbral ($
+            TRIAL · Código 1 gratis · Códigos 2–10 requieren Maestro en ventas ($
             {UMBRAL_SKU.priceUsd}/mes)
           </p>
         )}
@@ -1049,8 +1049,8 @@ export function ConsolaUmbral({
             <PaywallUmbral
               motivo={
                 aprobados.has(1) && !hasPaidAccess
-                  ? "Aprobaste el Código 1. Para atravesar los Códigos 2–10 necesitas la membresía Umbral."
-                  : "Los Códigos 2–10, ambos modos completos y el panel de métricas requieren Umbral."
+                  ? "Aprobaste el Código 1. Para atravesar los Códigos 2–10 el maestro ofrece Maestro en ventas."
+                  : "Los Códigos 2–10, ambos modos completos y el panel de métricas requieren Maestro en ventas."
               }
             />
           )}
