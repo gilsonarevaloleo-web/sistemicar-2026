@@ -29,6 +29,12 @@ function sortByUpdatedDesc(a: LibroGimnasio, b: LibroGimnasio): number {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
+function sortByCreatedDesc(a: LibroGimnasio, b: LibroGimnasio): number {
+  const byCreated = b.createdAt.localeCompare(a.createdAt);
+  if (byCreated !== 0) return byCreated;
+  return b.id.localeCompare(a.id);
+}
+
 function normalizeLibro(raw: LibroGimnasio): LibroGimnasio {
   const cap = raw.puntero?.capitulo;
   const sub = raw.puntero?.subcodigo;
@@ -87,7 +93,7 @@ export function createMemoryGimnasio6Store(): Gimnasio6Store {
       if (!uid) return [];
       return [...byId.values()]
         .filter((l) => l.userId === uid)
-        .sort(sortByUpdatedDesc)
+        .sort(sortByCreatedDesc)
         .slice(0, Math.max(1, limit));
     },
     async save(libro) {
@@ -188,7 +194,7 @@ export function createPostgresGimnasio6Store(): Gimnasio6Store {
       const result = await p.query(
         `SELECT * FROM gimnasio6_libros
          WHERE user_id = $1
-         ORDER BY updated_at DESC
+         ORDER BY created_at DESC, id DESC
          LIMIT $2`,
         [uid, Math.max(1, limit)],
       );

@@ -1,12 +1,14 @@
 import React, { useState } from "react";
-import type { LibroGimnasio } from "@shared/casas/gimnasio6";
+import {
+  formatearCopiaLibroNumerado,
+  etiquetaLibro,
+  numerosLibro,
+  recortarLibro,
+  type LibroGimnasio,
+} from "@shared/casas/gimnasio6";
+import { formatearFechaVolcado } from "@shared/casas/umbral5";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "../umbral5/LienzoLimite";
-
-function recorte(texto: string, max = 140): string {
-  const t = texto.trim().replace(/\s+/g, " ");
-  if (t.length <= max) return t;
-  return `${t.slice(0, max).trim()}…`;
-}
+import { BotonCopiarUmbral } from "../umbral5/BotonCopiarUmbral";
 
 export function HistorialLibros({
   libros,
@@ -18,6 +20,7 @@ export function HistorialLibros({
   onSelect: (libro: LibroGimnasio) => void;
 }) {
   const [abierto, setAbierto] = useState(true);
+  const numeros = numerosLibro(libros);
   if (libros.length === 0) return null;
 
   return (
@@ -40,34 +43,81 @@ export function HistorialLibros({
       </button>
       {abierto && (
         <ul className="space-y-2">
-          {libros.slice(0, 8).map((libro) => (
-            <li key={libro.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(libro)}
-                className="w-full border bg-black/40 px-4 py-3 text-left"
-                style={{
-                  borderColor:
-                    libro.id === libroActivoId
-                      ? `${UMBRAL5_BRONZE}66`
-                      : `${UMBRAL5_BRONZE}22`,
-                }}
-                data-testid={`gimnasio6-historial-item-${libro.id}`}
-              >
-                <p
-                  className="text-[10px] tracking-[0.18em] uppercase"
-                  style={{ color: UMBRAL5_ASH }}
+          {libros.map((libro) => {
+            const numero = numeros.get(libro.id) ?? 0;
+            return (
+              <li key={libro.id}>
+                <article
+                  className="space-y-3 border bg-black/40 px-4 py-3"
+                  style={{
+                    borderColor:
+                      libro.id === libroActivoId
+                        ? `${UMBRAL5_BRONZE}66`
+                        : `${UMBRAL5_BRONZE}22`,
+                  }}
+                  data-testid={`gimnasio6-historial-item-${libro.id}`}
                 >
-                  {libro.estado === "ABIERTO"
-                    ? `Capítulo ${libro.puntero.capitulo}`
-                    : libro.estado}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-white/75">
-                  {recorte(libro.limiteOrigen)}
-                </p>
-              </button>
-            </li>
-          ))}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(libro)}
+                    className="w-full text-left"
+                    data-testid={`gimnasio6-historial-select-${libro.id}`}
+                  >
+                    <p
+                      className="text-[10px] tracking-[0.18em] uppercase"
+                      style={{ color: UMBRAL5_ASH }}
+                    >
+                      Libro {numero} · {formatearFechaVolcado(libro.createdAt)} ·{" "}
+                      {etiquetaLibro(libro)}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-white/75">
+                      {recortarLibro(libro.limiteOrigen)}
+                    </p>
+                  </button>
+                  <details className="group">
+                    <summary
+                      className="cursor-pointer text-[9px] tracking-[0.2em] uppercase text-white/35"
+                      data-testid={`gimnasio6-historial-volcado-${libro.id}`}
+                    >
+                      Límite de origen · ver volcado
+                    </summary>
+                    <p
+                      className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/80"
+                      data-testid={`gimnasio6-historial-texto-${libro.id}`}
+                    >
+                      {libro.limiteOrigen}
+                    </p>
+                    {libro.turnos.length > 0 && (
+                      <ol className="mt-3 space-y-2">
+                        {libro.turnos.map((t, i) => (
+                          <li
+                            key={t.id}
+                            className="text-sm leading-relaxed text-white/75"
+                          >
+                            <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                              Turno {i + 1} · {formatearFechaVolcado(t.creadoAt)}
+                            </p>
+                            <p className="mt-1 text-white/45">{t.pregunta}</p>
+                            {t.respuesta && (
+                              <p className="mt-1 whitespace-pre-wrap text-white/80">
+                                {t.respuesta}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </details>
+                  <BotonCopiarUmbral
+                    texto={formatearCopiaLibroNumerado(libro, numero)}
+                    etiqueta="Copiar libro"
+                    toastOk="Libro copiado al portapapeles"
+                    testId={`gimnasio6-copiar-${libro.id}`}
+                  />
+                </article>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

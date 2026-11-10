@@ -20,8 +20,10 @@ export interface Umbral5SessionStore {
 
 export const UMBRAL5_LIST_LIMIT = 40;
 
-function sortByUpdatedDesc(a: SesionUmbral5, b: SesionUmbral5): number {
-  return b.updatedAt.localeCompare(a.updatedAt);
+function sortByCreatedDesc(a: SesionUmbral5, b: SesionUmbral5): number {
+  const byCreated = b.createdAt.localeCompare(a.createdAt);
+  if (byCreated !== 0) return byCreated;
+  return b.id.localeCompare(a.id);
 }
 
 export function newSesionUmbral5Id(): string {
@@ -59,7 +61,7 @@ export function createMemoryUmbral5Store(): Umbral5SessionStore {
       if (!uid) return [];
       return [...byId.values()]
         .filter((s) => s.userId === uid)
-        .sort(sortByUpdatedDesc)
+        .sort(sortByCreatedDesc)
         .slice(0, Math.max(1, limit));
     },
     async save(sesion) {
@@ -154,7 +156,7 @@ export function createPostgresUmbral5Store(): Umbral5SessionStore {
       const result = await p.query(
         `SELECT * FROM umbral5_sesiones
          WHERE user_id = $1
-         ORDER BY updated_at DESC
+         ORDER BY created_at DESC, id DESC
          LIMIT $2`,
         [uid, Math.max(1, limit)],
       );

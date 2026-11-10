@@ -4,7 +4,10 @@
  * Esto sobrevive recarga y serverless sin memoria.
  */
 
-import type { SesionUmbral5 } from "@shared/casas/umbral5";
+import {
+  ordenarVolcadosPorCreacion,
+  type SesionUmbral5,
+} from "@shared/casas/umbral5";
 
 export const UMBRAL5_SESIONES_KEY = "sistemicar_umbral5_sesiones";
 export const UMBRAL5_DRAFT_KEY = "sistemicar_umbral5_draft";
@@ -86,9 +89,9 @@ function writeAll(sesiones: SesionUmbral5[]): void {
 export function listarSesionesUmbral5Local(userId: string): SesionUmbral5[] {
   const uid = userId.trim();
   if (!uid) return [];
-  return parseAll()
-    .filter((s) => s.userId === uid)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return ordenarVolcadosPorCreacion(
+    parseAll().filter((s) => s.userId === uid),
+  );
 }
 
 export function guardarSesionUmbral5Local(sesion: SesionUmbral5): void {
@@ -109,9 +112,7 @@ export function fusionarSesionesUmbral5Local(
   for (const s of remotas) {
     if (s.userId === uid) byId.set(s.id, s);
   }
-  const merged = [...byId.values()].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
-  );
+  const merged = ordenarVolcadosPorCreacion(Array.from(byId.values()));
   const others = parseAll().filter((s) => s.userId !== uid);
   writeAll([...others, ...merged]);
   return merged;

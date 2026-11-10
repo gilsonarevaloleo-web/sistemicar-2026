@@ -3,7 +3,10 @@
  * El servidor (Postgres) es la fuente. Esto sobrevive recarga y serverless sin memoria.
  */
 
-import type { LibroGimnasio } from "@shared/casas/gimnasio6";
+import {
+  ordenarLibrosPorCreacion,
+  type LibroGimnasio,
+} from "@shared/casas/gimnasio6";
 
 export const GIMNASIO6_LIBROS_KEY = "sistemicar_gimnasio6_libros";
 
@@ -60,9 +63,7 @@ function writeAll(libros: LibroGimnasio[]): void {
 export function listarLibrosGimnasioLocal(userId: string): LibroGimnasio[] {
   const uid = userId.trim();
   if (!uid) return [];
-  return parseAll()
-    .filter((l) => l.userId === uid)
-    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  return ordenarLibrosPorCreacion(parseAll().filter((l) => l.userId === uid));
 }
 
 export function guardarLibroGimnasioLocal(libro: LibroGimnasio): void {
@@ -87,9 +88,7 @@ export function fusionarLibrosGimnasioLocal(
       byId.set(l.id, l);
     }
   }
-  const merged = [...byId.values()].sort((a, b) =>
-    String(b.updatedAt).localeCompare(String(a.updatedAt)),
-  );
+  const merged = ordenarLibrosPorCreacion(Array.from(byId.values()));
   const others = parseAll().filter((l) => l.userId !== uid);
   writeAll([...others, ...merged]);
   return merged;

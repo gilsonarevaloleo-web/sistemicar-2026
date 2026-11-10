@@ -201,6 +201,41 @@ describe("umbral5Engine — volcado gratis y lectura", () => {
     assert.equal(lectura.lectura.codigoUsuario, 7);
   });
 
+  it("lista volcados por orden de sellado aunque el mapa actualice", async () => {
+    const store = createMemoryUmbral5Store();
+    const wallet = createMemoryJuezWallet({ u1: 4 });
+    const primero = await ejecutarVolcadoGratis("u1", VOLCADO, { wallet, store });
+    assert.equal(primero.ok, true);
+    if (!primero.ok) return;
+    const segundo = await ejecutarVolcadoGratis(
+      "u1",
+      "Ya sé el límite. Se lo hablé a mi familia buscando solución.",
+      { wallet, store },
+    );
+    assert.equal(segundo.ok, true);
+    if (!segundo.ok) return;
+    const s1 = await store.getById(primero.sesionUmbral5Id);
+    const s2 = await store.getById(segundo.sesionUmbral5Id);
+    assert.ok(s1 && s2);
+    s1.createdAt = "2026-01-01T00:00:00.000Z";
+    s1.updatedAt = "2026-01-01T00:00:00.000Z";
+    s2.createdAt = "2026-01-02T00:00:00.000Z";
+    s2.updatedAt = "2026-01-02T00:00:00.000Z";
+    await store.save(s1);
+    await store.save(s2);
+    const mapa = await ejecutarLecturaMapa("u1", primero.sesionUmbral5Id, {
+      wallet,
+      store,
+    });
+    assert.equal(mapa.ok, true);
+    const lista = await listarSesionesUmbral5("u1", { store });
+    assert.equal(lista.ok, true);
+    if (!lista.ok) return;
+    assert.equal(lista.sesiones[0]?.id, segundo.sesionUmbral5Id);
+    assert.equal(lista.sesiones[1]?.id, primero.sesionUmbral5Id);
+    assert.equal(lista.sesiones[1]?.estado, "MAPA_PAGO");
+  });
+
   it("lista y relee volcados del mismo usuario", async () => {
     const store = createMemoryUmbral5Store();
     const wallet = createMemoryJuezWallet({ u1: 2, u2: 2 });
