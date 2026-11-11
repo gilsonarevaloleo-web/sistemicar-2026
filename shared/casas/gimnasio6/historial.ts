@@ -47,13 +47,14 @@ export function numeroLibro(
 }
 
 export function etiquetaLibro(libro: LibroGimnasio): string {
+  const puerta = libro.modulo === "vendedor" ? "Puerta B" : "Puerta A";
   if (libro.estado === "ABIERTO") {
-    return `Capítulo ${libro.puntero.capitulo} · ${ETIQUETA_CAPITULO[libro.puntero.capitulo]}`;
+    return `${puerta} · C${libro.puntero.capitulo} · ${ETIQUETA_CAPITULO[libro.puntero.capitulo]}`;
   }
   if (libro.estado === "TOPE_DIARIO" || libro.estado === "CAPITULO_SELLADO") {
-    return `${ETIQUETA_CAPITULO[libro.puntero.capitulo]} · sellado`;
+    return `${puerta} · ${ETIQUETA_CAPITULO[libro.puntero.capitulo]} · sellado`;
   }
-  return libro.estado;
+  return `${puerta} · ${libro.estado}`;
 }
 
 export function esLibroContinuable(libro: LibroGimnasio): boolean {

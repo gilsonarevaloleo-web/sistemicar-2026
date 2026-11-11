@@ -3,6 +3,10 @@ import { mensajeOferta } from "@shared/casas/gimnasio6";
 import type { ModuloGimnasioOferta } from "@shared/casas/umbral5";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "./LienzoLimite";
 
+function abrePuertaA(modulo: ModuloGimnasioOferta): boolean {
+  return modulo === "limite" || modulo === "social_producto";
+}
+
 export function BannerGimnasio({
   modulo,
   onEntrar,
@@ -12,7 +16,7 @@ export function BannerGimnasio({
   onEntrar?: () => void;
   cargando?: boolean;
 }) {
-  const abre = modulo === "social_producto";
+  const abre = abrePuertaA(modulo);
   return (
     <div
       className="border px-4 py-4"
@@ -27,10 +31,10 @@ export function BannerGimnasio({
         className="text-[10px] tracking-[0.22em] uppercase"
         style={{ color: UMBRAL5_ASH }}
       >
-        Gimnasio · capa profunda
+        Puerta A · Límite
       </p>
       <p className="mt-2 text-[11px] leading-relaxed text-white/50">
-        {mensajeOferta(modulo)}
+        {mensajeOferta(modulo === "social_producto" ? "limite" : modulo)}
       </p>
       <button
         type="button"
@@ -44,7 +48,7 @@ export function BannerGimnasio({
         }}
         data-testid="umbral5-gimnasio-boton"
       >
-        {cargando ? "Abriendo…" : abre ? "Entrar al gimnasio" : "Cerrado"}
+        {cargando ? "Abriendo…" : abre ? "Entrar al límite" : "Cerrado"}
       </button>
     </div>
   );

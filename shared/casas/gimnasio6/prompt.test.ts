@@ -5,6 +5,7 @@ import {
   GIMNASIO6_AXIOMAS,
   GIMNASIO6_RITUAL_ENTRADA,
   GIMNASIO6_SYSTEM_PROMPT,
+  GIMNASIO6_SYSTEM_PROMPT_VENDEDOR,
   serializarPromptGimnasio6,
 } from "./prompt.ts";
 import { preguntaCanon } from "./canon.ts";
@@ -16,10 +17,11 @@ describe("Gimnasio 6 — prompt del maestro", () => {
     assert.equal(GIMNASIO6_AXIOMAS[0].id, "entrada");
   });
 
-  it("el maestro hace pasar, no suspende, no da clase de venta, C3 no es reloj", () => {
+  it("el maestro hace pasar tres tiempos, no suspende, no da clase de venta", () => {
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /hacerle pasar/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /variante/i);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /ya contestó/);
+    assert.match(GIMNASIO6_SYSTEM_PROMPT, /No se sella en el primero/);
     assert.doesNotMatch(GIMNASIO6_SYSTEM_PROMPT, /te acompaño/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /No calificás el pitch/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /No mandás al Oficio/);
@@ -27,17 +29,23 @@ describe("Gimnasio 6 — prompt del maestro", () => {
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /capa profunda/);
   });
 
-  it("el user prompt evalúa una sola pregunta", () => {
+  it("el user prompt evalúa un solo tiempo y nombra la sensación", () => {
     const p = preguntaCanon(1, 1, 1);
     assert.ok(p);
     const user = serializarPromptGimnasio6({
-      limiteOrigen: "No puedo vender. El cuerpo se niega.",
+      limiteOrigen: "No sé quién soy para enamorar.",
       pregunta: p!,
-      respuesta: "Un 6.",
+      respuesta: "Yo soy el que se para.",
       variante: 0,
     });
-    assert.match(user, /Una escala del 1 al 10/i);
-    assert.match(user, /Un 6/);
+    assert.match(user, /quién sos/i);
+    assert.match(user, /Yo soy el que se para/);
+    assert.match(user, /Sensación a cumplir/);
     assert.doesNotMatch(user, /¿Qué conocimiento sobre tu producto/);
+  });
+
+  it("la puerta B no usa el cimiento", () => {
+    assert.match(GIMNASIO6_SYSTEM_PROMPT_VENDEDOR, /Cortador de Niebla/);
+    assert.doesNotMatch(GIMNASIO6_SYSTEM_PROMPT_VENDEDOR, /C1 es identidad/);
   });
 });

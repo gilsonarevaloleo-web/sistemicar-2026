@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LienzoLimite } from "./LienzoLimite.tsx";
 import { PanelMapa } from "./PanelMapa.tsx";
 import { BannerGimnasio } from "./BannerGimnasio.tsx";
+import { BannerPuertaVendedor } from "./BannerPuertaVendedor.tsx";
 import { BannerMapaOpcional } from "./BannerMapaOpcional.tsx";
 import { ModalSaldoInsuficiente } from "./ModalSaldoInsuficiente.tsx";
 import { HistorialLimite } from "./HistorialLimite.tsx";
@@ -69,7 +70,7 @@ describe("Casa 6 Umbral — UI", () => {
     assert.doesNotMatch(html, /background-color:#C4A06A/);
   });
 
-  it("el gimnasio se ofrece cuando el módulo es exposición social", () => {
+  it("el gimnasio se ofrece cuando el módulo es límite", () => {
     const cerrado = renderToStaticMarkup(
       createElement(BannerGimnasio, { modulo: null }),
     );
@@ -80,13 +81,20 @@ describe("Casa 6 Umbral — UI", () => {
 
     const oferta = renderToStaticMarkup(
       createElement(BannerGimnasio, {
-        modulo: "social_producto",
+        modulo: "limite",
         onEntrar: () => {},
       }),
     );
     assert.match(oferta, /umbral5-gimnasio-oferta/);
-    assert.match(oferta, /Entrar al gimnasio/);
-    assert.match(oferta, /capa profunda/);
+    assert.match(oferta, /Entrar al límite/);
+    assert.match(oferta, /Puerta A/);
+
+    const vendedor = renderToStaticMarkup(
+      createElement(BannerPuertaVendedor, { onEntrar: () => {} }),
+    );
+    assert.match(vendedor, /umbral5-gimnasio-vendedor/);
+    assert.match(vendedor, /Puerta B/);
+    assert.match(vendedor, /Entrar al vendedor/);
   });
 
   it("el historial lista volcados enumerados, enteros y copiables", () => {
@@ -183,7 +191,7 @@ describe("Casa 6 Umbral — UI", () => {
             id: "lib-1",
             userId: "u1",
             sesionUmbral5Id: "s1",
-            modulo: "social_producto",
+            modulo: "limite",
             limiteOrigen: "No puedo vender el producto de la jornada a mis conocidos.",
             recursos: recursosVacios(),
             puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
@@ -229,6 +237,8 @@ describe("Casa 6 Umbral — UI", () => {
     assert.match(page, /BifurcacionPractica/);
     assert.match(page, /setLibroContinuable/);
     assert.match(page, /copiarTexto/);
+    assert.match(page, /BannerPuertaVendedor/);
+    assert.match(page, /abrirVendedorGimnasio/);
     assert.doesNotMatch(page, /aplicarSesion\(locales\[0\]\)/);
     assert.doesNotMatch(page, /setTexto\(sesion\.textoVolcado\)/);
     assert.doesNotMatch(page, /setLibro\(abierto\)/);

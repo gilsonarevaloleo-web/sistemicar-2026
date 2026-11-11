@@ -12,7 +12,7 @@ function lectura(canal: 1 | 2 | 3): Umbral5Lectura {
     tipoLimite: null,
     lecturaFria: `C${canal}`,
     porQueNoEjecuta: "x",
-    moduloGimnasio: canal === 2 ? "social_producto" : null,
+    moduloGimnasio: "limite",
   };
 }
 

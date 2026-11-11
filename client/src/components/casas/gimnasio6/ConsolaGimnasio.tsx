@@ -41,18 +41,23 @@ export function ConsolaGimnasio({
   const enviandoRef = useRef(false);
   const pasoPrevio = useRef<string | null>(null);
   const turnoCount = libro.turnos.length;
-  const punteroClave = `${libro.id}:${libro.puntero.capitulo}.${libro.puntero.subcodigo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
+  const punteroClave = `${libro.id}:${libro.modulo}:${libro.puntero.capitulo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
   const capituloVista = capituloVisibleDe(libro);
   const sellado =
     topeDiario ||
     libro.estado === "TOPE_DIARIO" ||
     libro.estado === "CAPITULO_SELLADO";
-  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado });
-  const pasoClave = `${capituloVista}.${libro.puntero.subcodigo}.${libro.puntero.indice}`;
-  const etiqueta = ETIQUETA_CAPITULO[capituloVista];
+  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, {
+    sellado,
+    puerta: libro.modulo === "vendedor" ? "vendedor" : "limite",
+    origen: libro.limiteOrigen,
+  });
+  const pasoClave = `${capituloVista}.${libro.puntero.indice}`;
+  const etiqueta =
+    pregunta?.etiquetaCapitulo ?? ETIQUETA_CAPITULO[capituloVista] ?? `C${capituloVista}`;
   const punteroLabel = sellado
     ? "sellado"
-    : `${libro.puntero.subcodigo}.${libro.puntero.indice}`;
+    : pregunta?.etiquetaTiempo ?? `${libro.puntero.indice}`;
   const enCuarto = libro.estado === "ABIERTO" && !topeDiario;
 
   useEffect(() => {
@@ -172,7 +177,7 @@ export function ConsolaGimnasio({
 
       {topeDiario && (
         <p className="relative text-[12px] leading-relaxed text-white/55" data-testid="gimnasio6-tope">
-          Capítulo sellado. A lo mucho uno por día. Mañana sigue el libro.
+          Código sellado. A lo mucho uno por día. Mañana sigue el libro.
         </p>
       )}
 
@@ -188,7 +193,7 @@ export function ConsolaGimnasio({
           }}
           data-testid="gimnasio6-continuar"
         >
-          Continuar el siguiente capítulo
+          Continuar el siguiente código
         </button>
       )}
 
