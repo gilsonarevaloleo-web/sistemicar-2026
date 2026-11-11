@@ -10,8 +10,8 @@ const libro: LibroGimnasio = {
   id: "lib-1",
   userId: "u1",
   sesionUmbral5Id: "s1",
-  modulo: "limite",
-  limiteOrigen: "No sé quién soy para enamorar.",
+  modulo: "social_producto",
+  limiteOrigen: "No puedo vender.",
   recursos: recursosVacios(),
   puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
   estado: "ABIERTO",
@@ -23,19 +23,18 @@ const libro: LibroGimnasio = {
 };
 
 describe("Consola gimnasio", () => {
-  it("muestra una sola pregunta y tres tiempos", () => {
+  it("muestra una sola pregunta y permite copiar el libro", () => {
     const html = renderToStaticMarkup(
       createElement(ConsolaGimnasio, {
         libro,
         pregunta: {
-          escenario: "Estás en este cuarto. Antes de hacer nada.",
-          pregunta: "¿Quién sos vos en este cuarto?",
+          escenario: "Ahora tienes tu propósito: vender.",
+          pregunta: "En una escala del 1 al 10, ¿en qué número te posicionas?",
           capitulo: 1,
           subcodigo: 1,
           indice: 1,
           variante: 0,
-          etiquetaCapitulo: "C1 Identidad / Ego / Cimiento",
-          etiquetaTiempo: "Plantar",
+          etiquetaCapitulo: "Seguridad en tu producto",
         },
         topeDiario: false,
         onResponder: () => {},
@@ -44,37 +43,38 @@ describe("Consola gimnasio", () => {
       }),
     );
     assert.match(html, /gimnasio6-consola/);
-    assert.match(html, /Quién sos vos/);
+    assert.match(html, /1 al 10/);
     assert.match(html, /gimnasio6-copiar/);
     assert.doesNotMatch(html, /fallaste/);
     assert.doesNotMatch(html, /conocimiento sobre tu producto/);
     assert.match(html, /gimnasio6-pasos/);
-    assert.match(html, /Plantar/);
-    assert.match(html, /Rozar/);
-    assert.match(html, /Sostener/);
+    assert.match(html, /Frente al producto/);
+    assert.match(html, /Seguridad en tu producto · 1\.1/);
     assert.match(html, /gimnasio6-mute/);
     assert.match(html, /data-estado="actual"/);
     assert.match(html, /gimnasio6-paso-1-1/);
-    assert.match(html, /gimnasio6-paso-1-3/);
-    assert.doesNotMatch(html, /gimnasio6-paso-4-3/);
+    assert.match(html, /gimnasio6-paso-4-3/);
+    assert.doesNotMatch(html, /Quién sería esta persona/);
+    assert.doesNotMatch(html, /se salió de casillas/);
   });
 
-  it("en rozar no adelanta sostener", () => {
+  it("en el paso 2.1 no adelanta las preguntas de 2.2", () => {
     const html = renderToStaticMarkup(
       createElement(ConsolaGimnasio, {
         libro: {
           ...libro,
-          puntero: { capitulo: 1, subcodigo: 1, indice: 2, variante: 0 },
+          puntero: { capitulo: 1, subcodigo: 2, indice: 1, variante: 0 },
         },
         pregunta: {
-          escenario: "Esa frase tiene que pesar.",
-          pregunta: "Sostené esa frase. ¿Qué cambia en el cuerpo si no pedís permiso?",
+          escenario:
+            "Ahora que sabes sobre tu producto. Entre todos tus deberes personales.",
+          pregunta:
+            "¿Qué prioridad le das del 1 al 10 al oficio de vender entre todo lo que tienes que hacer?",
           capitulo: 1,
-          subcodigo: 1,
-          indice: 2,
+          subcodigo: 2,
+          indice: 1,
           variante: 0,
-          etiquetaCapitulo: "C1 Identidad / Ego / Cimiento",
-          etiquetaTiempo: "Rozar",
+          etiquetaCapitulo: "Seguridad en tu producto",
         },
         topeDiario: false,
         onResponder: () => {},
@@ -82,26 +82,27 @@ describe("Consola gimnasio", () => {
         enviando: false,
       }),
     );
-    assert.match(html, /gimnasio6-paso-1-2/);
+    assert.match(html, /gimnasio6-paso-2-1/);
     assert.match(html, /data-estado="actual"/);
-    assert.match(html, /Rozar/);
-    assert.match(html, /Esa frase tiene que pesar/);
-    assert.doesNotMatch(html, /Ahora te dicen que no sos nadie/);
+    assert.match(html, /Prioridad/);
+    assert.match(html, /tu propósito: vender/);
+    assert.doesNotMatch(html, /Cómo te planificarías para poder sacar tu semana/);
+    assert.doesNotMatch(html, /Del 1 al 10, sin flor/);
   });
 
-  it("muestra el aviso del maestro junto al recuadro", () => {
+  it("muestra el aviso del maestro junto al recuadro, no arriba de la pantalla", () => {
     const html = renderToStaticMarkup(
       createElement(ConsolaGimnasio, {
         libro,
         pregunta: {
-          escenario: "Estás en este cuarto.",
-          pregunta: "¿Quién sos vos en este cuarto?",
+          escenario: "Imagina que esa intención llega a 10.",
+          pregunta:
+            "¿Marcaría una diferencia si tu intención de prioridad de vender llegara a nivel 10, y cómo sería esa situación?",
           capitulo: 1,
-          subcodigo: 1,
-          indice: 1,
+          subcodigo: 2,
+          indice: 3,
           variante: 0,
-          etiquetaCapitulo: "C1 Identidad / Ego / Cimiento",
-          etiquetaTiempo: "Plantar",
+          etiquetaCapitulo: "Seguridad en tu producto",
         },
         topeDiario: false,
         onResponder: () => {},
@@ -115,7 +116,7 @@ describe("Consola gimnasio", () => {
     assert.match(html, /Respondé desde el cuarto/);
   });
 
-  it("código sellado muestra el mapa hecho y no abre el siguiente", () => {
+  it("capítulo sellado muestra el mapa hecho y no abre el capítulo 2", () => {
     const html = renderToStaticMarkup(
       createElement(ConsolaGimnasio, {
         libro: {
@@ -132,9 +133,52 @@ describe("Consola gimnasio", () => {
         enviando: false,
       }),
     );
-    assert.match(html, /sellado/);
+    assert.match(html, /Seguridad en tu producto · sellado/);
     assert.match(html, /gimnasio6-tope/);
     assert.match(html, /data-estado="hecho"/);
+    assert.doesNotMatch(html, /Quién sería esta persona/);
     assert.doesNotMatch(html, /gimnasio6-form/);
+  });
+
+  it("no deja debajo del recuadro una pregunta de los tres tiempos", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConsolaGimnasio, {
+        libro: {
+          ...libro,
+          puntero: { capitulo: 2, subcodigo: 1, indice: 2, variante: 0 },
+          turnos: [
+            {
+              id: "viejo",
+              capitulo: 2,
+              subcodigo: 1,
+              indice: 2,
+              variante: 0,
+              escenario: "Esa persona te está mirando.",
+              pregunta: "¿Qué hace tu cuerpo con esa mirada?",
+              respuesta: "Se tensa.",
+              pasa: true,
+              creadoAt: "2026-11-11T00:00:00.000Z",
+            },
+          ],
+        },
+        pregunta: {
+          escenario: "Esa persona ya está en el cuarto.",
+          pregunta: "¿Qué le pudiera gustar y qué no le gustaría?",
+          capitulo: 2,
+          subcodigo: 1,
+          indice: 2,
+          variante: 0,
+          etiquetaCapitulo: "Fricción social",
+        },
+        topeDiario: false,
+        onResponder: () => {},
+        onCopiar: () => {},
+        enviando: false,
+      }),
+    );
+    assert.match(html, /Qué le pudiera gustar/);
+    assert.doesNotMatch(html, /Qué hace tu cuerpo con esa mirada/);
+    assert.doesNotMatch(html, /Tres tiempos/);
+    assert.match(html, /gimnasio6-paso-4-3/);
   });
 });

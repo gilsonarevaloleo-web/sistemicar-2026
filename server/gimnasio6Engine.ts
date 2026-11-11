@@ -4,7 +4,6 @@
 
 export {
   abrirLibroGimnasio,
-  abrirLibroVendedor,
   continuarCapituloGimnasio,
   leerLibroGimnasio,
   listarLibrosGimnasio,

@@ -1,16 +1,9 @@
 /**
- * Motor del gimnasio: una pregunta a la vez, tres tiempos por código,
- * variante del MISMO tiempo si no raspa, sello de código, tope de uno por día.
+ * Motor del gimnasio: una pregunta a la vez, variante si no raspa,
+ * sello de capítulo, tope de un capítulo por día.
  */
 
-import {
-  capituloPreparable,
-  etiquetaCapituloDe,
-  preguntaCanon,
-  siguienteCodigo,
-  siguientePuntero,
-} from "./canon.ts";
-import { ETIQUETA_TIEMPO, fichaDe } from "./fichas.ts";
+import { capituloPreparable, ETIQUETA_CAPITULO, preguntaCanon, siguientePuntero } from "./canon.ts";
 import { copiarLibro } from "./prompt.ts";
 import type {
   CapituloId,
@@ -21,7 +14,6 @@ import type {
   RecursosGimnasio,
   TurnoGimnasio,
 } from "./types.ts";
-import { puertaDeModulo } from "./types.ts";
 
 function normalizar(texto: string): string {
   return texto
@@ -71,6 +63,7 @@ function esCorto(texto: string): boolean {
 
 function hayNiebla(norm: string): boolean {
   if (NIEBLA_TOTAL.test(norm)) return true;
+  // «no se» solo es niebla en respuestas cortas. En un texto largo es español normal.
   if (norm.length < 28 && /\bno se\b/.test(norm)) return true;
   return NIEBLA.some((p) => p.test(norm));
 }
@@ -81,7 +74,7 @@ function hayFlor(norm: string): boolean {
 }
 
 function hayNombrePropio(texto: string): boolean {
-  return /(?:\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}\b)|(?:\bmi (mama|papá|papa|hermano|hermana|esposo|esposa|jefe|amigo|amiga|primo|prima|tio|tia|vecino|cliente|vecina)\b)/i.test(
+  return /(?:\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}\b)|(?:\bmi (mama|papá|papa|hermano|hermana|esposo|esposa|jefe|amigo|amiga|primo|prima|tio|tia|vecino|cliente)\b)/i.test(
     texto.trim(),
   );
 }
@@ -96,26 +89,70 @@ export function evaluarRespuestaLocal(
     return { pasa: false, motivo: "Vacío. El cuarto sigue esperando." };
   }
 
-  if (hayNiebla(norm) && esCorto(texto)) {
-    return { pasa: false, motivo: "Niebla. El mismo tiempo, más cerca." };
-  }
-  if (esCorto(texto) || hayNiebla(norm)) {
-    return { pasa: false, motivo: "Eso no raspa. El cuarto sigue." };
-  }
-  if (hayFlor(norm) && pregunta.indice !== 1) {
-    return { pasa: false, motivo: "Flor. El hecho no apareció." };
+  const pideEscala =
+    (pregunta.capitulo === 1 &&
+      ((pregunta.subcodigo === 1 && pregunta.indice === 1) ||
+        (pregunta.subcodigo === 2 && pregunta.indice === 1) ||
+        (pregunta.subcodigo === 4 && pregunta.indice === 1))) ||
+    (pregunta.capitulo === 1 && pregunta.subcodigo === 3 && pregunta.indice === 2);
+
+  if (pideEscala && extraerEscala(texto) == null) {
+    return { pasa: false, motivo: "Falta la posición. El 1 al 10 es un lugar, no un adorno." };
   }
 
-  if (pregunta.capitulo === 1 && pregunta.indice === 1) {
-    if (/\bquien soy yo para\b/.test(norm) || /\bno soy nadie\b/.test(norm)) {
-      return { pasa: false, motivo: "Eso es permiso. El cimiento no pide permiso." };
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 1 && pregunta.indice === 2) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "Eso no es conocimiento del producto. Niebla." };
     }
   }
 
-  if (pregunta.capitulo === 2 && pregunta.indice === 1) {
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 1 && pregunta.indice === 3) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "El 10 no se imaginó." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 2 && pregunta.indice === 2) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "No hay por qué de ese número." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 2 && pregunta.indice === 3) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "No hay situación del 10." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 3 && pregunta.indice === 1) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "La semana no se sostuvo." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 3 && pregunta.indice === 3) {
+    if (esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "Falta el máximo esfuerzo." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4) {
+    if (hayFlor(norm) && pregunta.indice !== 1) {
+      return { pasa: false, motivo: "Flor. El hecho no apareció." };
+    }
+    if (pregunta.indice !== 1 && esCorto(texto)) {
+      return { pasa: false, motivo: "Sin hecho no hay sello." };
+    }
+  }
+
+  if (pregunta.capitulo === 2 && pregunta.indice === 1 && (pregunta.subcodigo === 1 || pregunta.subcodigo === 2)) {
     if (!hayNombrePropio(texto) || /\bla gente\b/.test(norm)) {
       return { pasa: false, motivo: "Un nombre. No la masa." };
     }
+  }
+
+  if (pregunta.capitulo === 2 && esCorto(texto)) {
+    return { pasa: false, motivo: "Eso no raspa. El cuarto sigue." };
   }
 
   if (pregunta.capitulo === 2 && /\bno es para (mi|vos|el)\b/.test(norm)) {
@@ -163,24 +200,21 @@ export function resolverEvaluacion(
 }
 
 export function preguntaVivaDe(libro: LibroGimnasio): PreguntaViva | null {
-  const { capitulo, indice, variante } = libro.puntero;
-  const puerta = puertaDeModulo(libro.modulo);
-  const canon = preguntaCanon(capitulo, 1, indice, puerta, libro.limiteOrigen);
+  const { capitulo, subcodigo, indice, variante } = libro.puntero;
+  const canon = preguntaCanon(capitulo, subcodigo, indice);
   if (!canon) return null;
-  const ficha = fichaDe(puerta, capitulo);
   const escenario =
     variante === 0
       ? canon.escenario
-      : fluidezVariante(canon, ultimoTexto(libro), variante, ficha.variante);
+      : fluidezVariante(canon, ultimoTexto(libro), variante);
   return {
     escenario,
     pregunta: canon.pregunta,
     capitulo,
-    subcodigo: 1,
+    subcodigo,
     indice,
     variante,
-    etiquetaCapitulo: etiquetaCapituloDe(capitulo, puerta),
-    etiquetaTiempo: ETIQUETA_TIEMPO[indice],
+    etiquetaCapitulo: ETIQUETA_CAPITULO[capitulo],
   };
 }
 
@@ -196,15 +230,11 @@ export function fluidezVariante(
   pregunta: PreguntaCanon,
   respuesta: string,
   variante: number,
-  semilla?: string,
 ): string {
   const recorte = respuesta.trim().replace(/\s+/g, " ").slice(0, 120);
   const dicho = recorte ? `Dijiste: «${recorte}».` : "Eso no llenó el cuarto.";
-  const misma =
-    semilla?.trim() ||
-    "El mismo tiempo. Más cerca. No adelantes.";
   if (variante === 1) {
-    return `${pregunta.escenario} ${dicho} ${misma}`;
+    return `${pregunta.escenario} ${dicho} El mismo cuarto. Más cerca.`;
   }
   return `${pregunta.escenario} ${dicho} Otra vez, con gente de tu vida. No teatro.`;
 }
@@ -220,13 +250,10 @@ export function aplicarRespuesta(
   now: Date | string = new Date(),
 ): LibroGimnasio {
   const viva = preguntaVivaDe(libro);
-  const puerta = puertaDeModulo(libro.modulo);
   const canon = preguntaCanon(
     libro.puntero.capitulo,
-    1,
+    libro.puntero.subcodigo,
     libro.puntero.indice,
-    puerta,
-    libro.limiteOrigen,
   );
   if (!viva || !canon) return libro;
 
@@ -235,7 +262,7 @@ export function aplicarRespuesta(
   const turno: TurnoGimnasio = {
     id: nuevoTurnoId(libro),
     capitulo: viva.capitulo,
-    subcodigo: 1,
+    subcodigo: viva.subcodigo,
     indice: viva.indice,
     variante: viva.variante,
     escenario: viva.escenario,
@@ -246,7 +273,7 @@ export function aplicarRespuesta(
   };
 
   const turnos = [...libro.turnos, turno];
-  const recursos = absorberRecursos(libro.recursos, viva.indice, respuesta);
+  const recursos = absorberRecursos(libro.recursos, canon, respuesta);
 
   if (!evaluacion.pasa) {
     return {
@@ -259,13 +286,13 @@ export function aplicarRespuesta(
     };
   }
 
-  const next = siguientePuntero(viva.capitulo, 1, viva.indice);
+  const next = siguientePuntero(viva.capitulo, viva.subcodigo, viva.indice);
   if (next === "sellar") {
     const sellados = libro.capitulosSellados.includes(viva.capitulo)
       ? libro.capitulosSellados
       : [...libro.capitulosSellados, viva.capitulo];
-    const siguiente = siguienteCodigo(viva.capitulo);
-    const siguienteExiste = siguiente != null && capituloPreparable(siguiente);
+    const haySiguiente = (viva.capitulo + 1) as CapituloId;
+    const siguienteExiste = haySiguiente <= 4 && capituloPreparable(haySiguiente);
     return {
       ...libro,
       recursos,
@@ -273,7 +300,7 @@ export function aplicarRespuesta(
       capitulosSellados: sellados,
       capituloSelladoDia: diaLima(nowDate),
       puntero: siguienteExiste
-        ? { capitulo: siguiente, subcodigo: 1, indice: 1, variante: 0 }
+        ? { capitulo: haySiguiente, subcodigo: 1, indice: 1, variante: 0 }
         : libro.puntero,
       estado: siguienteExiste ? "TOPE_DIARIO" : "LIBRO_CERRADO",
       updatedAt: iso,
@@ -292,17 +319,25 @@ export function aplicarRespuesta(
 
 function absorberRecursos(
   recursos: RecursosGimnasio,
-  tiempo: PreguntaIndiceDeMotor,
+  pregunta: PreguntaCanon,
   respuesta: string,
 ): RecursosGimnasio {
   const t = respuesta.trim();
   if (!t) return recursos;
-  if (tiempo === 1) return { ...recursos, experiencia: recursos.experiencia || t };
-  if (tiempo === 2) return { ...recursos, miedo: recursos.miedo || t };
-  return { ...recursos, familia: recursos.familia || t };
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 1 && pregunta.indice === 2) {
+    return { ...recursos, experiencia: recursos.experiencia || t };
+  }
+  if (pregunta.capitulo === 2 && pregunta.subcodigo === 1 && pregunta.indice === 1) {
+    return { ...recursos, familia: recursos.familia || t };
+  }
+  if (pregunta.capitulo === 2 && pregunta.subcodigo === 2 && pregunta.indice === 1) {
+    return { ...recursos, familia: recursos.familia || t };
+  }
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 2) {
+    return { ...recursos, miedo: recursos.miedo || t };
+  }
+  return recursos;
 }
-
-type PreguntaIndiceDeMotor = 1 | 2 | 3;
 
 export function puedeAbrirCapitulo(libro: LibroGimnasio, now: Date | string = new Date()): boolean {
   if (libro.estado === "LIBRO_CERRADO") return false;

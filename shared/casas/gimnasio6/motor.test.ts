@@ -22,8 +22,8 @@ function libroBase(over: Partial<LibroGimnasio> = {}): LibroGimnasio {
     id: "lib-1",
     userId: "u1",
     sesionUmbral5Id: "s1",
-    modulo: "limite",
-    limiteOrigen: "No sé quién soy para enamorar. No hay cimiento.",
+    modulo: "social_producto",
+    limiteOrigen: "No puedo vender. El cuerpo se niega ante el producto.",
     recursos: recursosVacios(),
     puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
     estado: "ABIERTO",
@@ -36,61 +36,54 @@ function libroBase(over: Partial<LibroGimnasio> = {}): LibroGimnasio {
   };
 }
 
-describe("Gimnasio 6 — motor de tres tiempos", () => {
+describe("Gimnasio 6 — motor", () => {
   it("una pregunta a la vez: el puntero no suelta las tres", () => {
     const viva = preguntaVivaDe(libroBase());
     assert.ok(viva);
-    assert.match(viva!.pregunta, /quién sos/i);
+    assert.match(viva!.pregunta, /1 al 10/);
     assert.equal(viva!.indice, 1);
     const nextSlot = siguientePuntero(1, 1, 1);
     assert.notEqual(nextSlot, "sellar");
     if (nextSlot !== "sellar") assert.equal(nextSlot.indice, 2);
   });
 
-  it("niebla no pasa y planta variante del mismo tiempo", () => {
+  it("sin número en la escala no pasa y planta variante", () => {
     const p = preguntaCanon(1, 1, 1)!;
-    const ev = evaluarRespuestaLocal(p, "más o menos");
+    const ev = evaluarRespuestaLocal(p, "más o menos bien");
     assert.equal(ev.pasa, false);
-    const next = aplicarRespuesta(libroBase(), "más o menos", ev);
+    const next = aplicarRespuesta(libroBase(), "más o menos bien", ev);
     assert.equal(next.puntero.variante, 1);
     assert.equal(next.puntero.indice, 1);
     assert.equal(next.estado, "ABIERTO");
     const v = preguntaVivaDe(next);
-    assert.match(v!.escenario, /más o menos/i);
+    assert.match(v!.escenario, /más o menos bien/i);
     assert.doesNotMatch(v!.escenario, /fallaste/i);
   });
 
-  it("un yo concreto pasa a rozar, no sella el código", () => {
-    const ev = evaluarRespuestaLocal(
-      preguntaCanon(1, 1, 1)!,
-      "Yo soy el que se para acá. Hay cimiento.",
-    );
+  it("un 7 pasa a la pregunta 2 del mismo subcódigo", () => {
+    assert.equal(extraerEscala("Me pongo en un 7."), 7);
+    const ev = evaluarRespuestaLocal(preguntaCanon(1, 1, 1)!, "Me pongo en un 7.");
     assert.equal(ev.pasa, true);
-    const next = aplicarRespuesta(
-      libroBase(),
-      "Yo soy el que se para acá. Hay cimiento.",
-      ev,
-    );
+    const next = aplicarRespuesta(libroBase(), "Me pongo en un 7.", ev);
     assert.equal(next.puntero.indice, 2);
-    assert.equal(next.puntero.capitulo, 1);
     assert.equal(next.puntero.variante, 0);
-    assert.equal(next.estado, "ABIERTO");
   });
 
-  it("quién soy yo para no planta C1", () => {
-    const p = preguntaCanon(1, 1, 1)!;
+  it("el conocimiento vacío no pasa; el concreto sí", () => {
+    const p = preguntaCanon(1, 1, 2)!;
+    assert.equal(evaluarRespuestaLocal(p, "más o menos").pasa, false);
     assert.equal(
-      evaluarRespuestaLocal(p, "Quién soy yo para enamorar a esa chica.").pasa,
-      false,
+      evaluarRespuestaLocal(p, "Conozco el origen del cacao y cómo se tuesta el grano.").pasa,
+      true,
     );
   });
 
-  it("sella el código 1 al tercer tiempo y aplica tope diario", () => {
+  it("sella el capítulo 1 y aplica tope diario", () => {
     let libro = libroBase({
-      puntero: { capitulo: 1, subcodigo: 1, indice: 3, variante: 0 },
+      puntero: { capitulo: 1, subcodigo: 4, indice: 3, variante: 0 },
     });
-    const p = preguntaCanon(1, 1, 3)!;
-    const cierre = "Queda parado el que cobra. No pido permiso. Hay suelo.";
+    const p = preguntaCanon(1, 4, 3)!;
+    const cierre = "El 10 sería sostener el hecho, sin flor, con el chasis caliente.";
     const ev = evaluarRespuestaLocal(p, cierre);
     assert.equal(ev.pasa, true);
     const now = "2026-11-05T20:00:00.000Z";
@@ -103,26 +96,18 @@ describe("Gimnasio 6 — motor de tres tiempos", () => {
     assert.equal(puedeAbrirCapitulo(libro, "2026-11-06T13:00:00.000Z"), true);
   });
 
-  it("en C2 plantar, «la gente» no pasa; un nombre sí", () => {
+  it("en el 2, «la gente» no pasa; un nombre sí", () => {
     const p = preguntaCanon(2, 1, 1)!;
     assert.equal(evaluarRespuestaLocal(p, "La gente de mi barrio.").pasa, false);
-    assert.equal(evaluarRespuestaLocal(p, "Mi hermano Carlos me está mirando.").pasa, true);
+    assert.equal(evaluarRespuestaLocal(p, "Mi hermano Carlos.").pasa, true);
   });
 
   it("el libro se copia sin decir fallaste", () => {
-    const ev = evaluarRespuestaLocal(
-      preguntaCanon(1, 1, 1)!,
-      "Yo soy el que se para. Hay cimiento.",
-    );
-    const libro = aplicarRespuesta(
-      libroBase(),
-      "Yo soy el que se para. Hay cimiento.",
-      ev,
-    );
+    const ev = evaluarRespuestaLocal(preguntaCanon(1, 1, 1)!, "Un 6.");
+    const libro = aplicarRespuesta(libroBase(), "Un 6.", ev);
     const copia = copiarLibro(libro);
     assert.match(copia, /# Libro del gimnasio/);
-    assert.match(copia, /Puerta: A/);
-    assert.match(copia, /cimiento/i);
+    assert.match(copia, /Un 6/);
     assert.doesNotMatch(copia, /fallaste/);
   });
 
@@ -136,11 +121,18 @@ describe("Gimnasio 6 — motor de tres tiempos", () => {
     const p = preguntaCanon(1, 1, 1)!;
     const esc = fluidezVariante(p, "estoy más o menos", 1);
     assert.match(esc, /más o menos/);
-    assert.match(esc, /mismo/i);
+    assert.match(esc, /mismo cuarto/);
   });
 
-  it("extraerEscala sigue existiendo como utilidad", () => {
-    assert.equal(extraerEscala("Me pongo en un 7."), 7);
+  it("la situación del 10 no se traba por un «no sé» dentro de una respuesta concreta", () => {
+    const p = preguntaCanon(1, 2, 3)!;
+    const niebla = evaluarRespuestaLocal(p, "no sé");
+    assert.equal(niebla.pasa, false);
+    const concreta = evaluarRespuestaLocal(
+      p,
+      "No sé si la diferencia sería chica o enorme, pero el 10 sería vender antes del depósito y grabar el video el mismo día, con la prioridad puesta ahí.",
+    );
+    assert.equal(concreta.pasa, true);
   });
 
   it("Gemini no retiene una respuesta con sustancia más de una variante", () => {
@@ -155,17 +147,5 @@ describe("Gimnasio 6 — motor de tres tiempos", () => {
         .pasa,
       true,
     );
-  });
-
-  it("la puerta B usa el Cortador, no el cimiento", () => {
-    const viva = preguntaVivaDe(
-      libroBase({
-        modulo: "vendedor",
-        limiteOrigen: "Tengo que vender y me trabo en la primera frase.",
-      }),
-    );
-    assert.ok(viva);
-    assert.match(viva!.pregunta, /frase/i);
-    assert.match(viva!.etiquetaCapitulo, /Cortador/);
   });
 });
