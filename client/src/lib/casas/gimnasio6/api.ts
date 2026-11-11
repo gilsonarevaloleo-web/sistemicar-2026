@@ -34,6 +34,20 @@ function throwIfNotOk(res: Response, body: GimnasioPayload | ErrorBody): asserts
   }
 }
 
+export async function abrirVendedorGimnasio(input: {
+  userId: string;
+  textoOficio?: string;
+}): Promise<GimnasioPayload> {
+  const res = await fetch("/api/casas/gimnasio6/abrir-vendedor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = await parseJson<GimnasioPayload | ErrorBody>(res);
+  throwIfNotOk(res, body);
+  return body;
+}
+
 export async function abrirGimnasio(input: {
   userId: string;
   sesionUmbral5Id: string;

@@ -1,10 +1,11 @@
 /**
  * El motor del límite decide si ofrece el gimnasio.
- * Módulo 1: chasis que no soporta la exposición social ante un producto.
- * Otros módulos: después.
+ * Puerta A (límite): abre por peso, no exige producto.
+ * Puerta B (vendedor): producto hermano, no comparte C1.
  */
 
 import type { ModuloGimnasio } from "./types.ts";
+import { puertaDeModulo } from "./types.ts";
 
 function normalizar(texto: string): string {
   return texto
@@ -15,49 +16,32 @@ function normalizar(texto: string): string {
     .trim();
 }
 
-const MARCAS_SOCIAL_PRODUCTO = [
-  /\bvend/,
-  /\bventa\b/,
-  /\bvendedor/,
-  /\bproducto\b/,
-  /\boficio\b/,
-  /\bcliente/,
-  /\bcobr/,
-  /\bnegocio\b/,
-  /\bemprend/,
-  /\bexpon/,
-  /\bexposicion\b/,
-  /\bverguenza\b/,
-  /\bhablarle\b/,
-  /\bmostr/,
-  /\bridicul/,
-  /\bcritica\b/,
-  /\bla gente\b/,
-  /\bpitch\b/,
-  /\boferta\b/,
-  /\bservicio\b/,
-];
-
 export function detectarModuloGimnasio(limite: string): ModuloGimnasio | null {
   const texto = limite.trim();
   if (!texto) return null;
   const norm = normalizar(texto);
-  for (const p of MARCAS_SOCIAL_PRODUCTO) {
-    if (p.test(norm)) return "social_producto";
-  }
-  return null;
+  if (!norm) return null;
+  return "limite";
 }
 
-export function etiquetaModulo(modulo: ModuloGimnasio | null): string {
-  if (modulo === "social_producto") {
-    return "Exposición social ante un producto";
-  }
+export function etiquetaModulo(modulo: ModuloGimnasio | string | null): string {
+  const puerta = modulo ? puertaDeModulo(modulo) : null;
+  if (puerta === "vendedor") return "Vendedor · Carácter-Código";
+  if (puerta === "limite" || modulo === "social_producto") return "Límite · exposición y cimiento";
   return "Sin módulo todavía";
 }
 
-export function mensajeOferta(modulo: ModuloGimnasio | null): string {
-  if (modulo === "social_producto") {
-    return "Este límite es de ejecución: sabés qué hacer y el cuerpo niega la exposición. El gimnasio simula ese espacio.";
+export function mensajeOferta(modulo: ModuloGimnasio | string | null): string {
+  const puerta = modulo ? puertaDeModulo(modulo) : null;
+  if (modulo === "social_producto" || puerta === "limite") {
+    return "Este límite es de ejecución: sabés qué hacer y el cuerpo niega. El gimnasio simula ese espacio. La escena sale del volcado: venta, enamorar, público o familia.";
   }
-  return "Este límite no abre el módulo de exposición social. Otros módulos, después.";
+  if (puerta === "vendedor") {
+    return "Puerta B: el vendedor camina C1–C10 del Oficio. No se califica el pitch. C1 es el Cortador, no el cimiento.";
+  }
+  return "Este límite todavía no abre la puerta A. Seguí volcando hasta que haya peso.";
+}
+
+export function mensajeOfertaVendedor(): string {
+  return "Puerta B · Vendedor. Mismo gimnasio, otro libro. Carácter-Código, dos resistencias. No se califica el pitch.";
 }

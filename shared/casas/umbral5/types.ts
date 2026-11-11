@@ -24,7 +24,7 @@ export const TIPOS_LIMITE: readonly TipoLimite[] = [
   "impronta",
 ];
 
-export type ModuloGimnasioOferta = "social_producto" | null;
+export type ModuloGimnasioOferta = "limite" | "vendedor" | "social_producto" | null;
 
 export interface Umbral5Input {
   /** Límite ya conocido. El Juez (u él) ya lo nombró. */
@@ -47,8 +47,9 @@ export interface Umbral5Lectura {
   /** Por qué ese saber no se ejecuta. */
   porQueNoEjecuta: string;
   /**
-   * Módulo de gimnasio que se ofrece desde esta lectura.
-   * null = este límite no abre el módulo 1. Otros módulos, después.
+   * Puerta A del gimnasio: "limite".
+   * "social_producto" se hidrata como "limite".
+   * null = queja del Espejo u origen vacío.
    */
   moduloGimnasio: ModuloGimnasioOferta;
 }

@@ -23,8 +23,14 @@ import {
 } from "../../shared/casas/gimnasio6/motor.ts";
 import { serializarPromptGimnasio6 } from "../../shared/casas/gimnasio6/prompt.ts";
 import { preguntaCanon } from "../../shared/casas/gimnasio6/canon.ts";
-import type { LibroGimnasio, PreguntaViva } from "../../shared/casas/gimnasio6/types.ts";
-import { hayPesoParaGimnasio } from "../../shared/casas/umbral5/peso.ts";
+import {
+  SESION_PUERTA_VENDEDOR,
+  puertaDeModulo,
+  type CapituloId,
+  type LibroGimnasio,
+  type PreguntaViva,
+} from "../../shared/casas/gimnasio6/types.ts";
+import { hayPesoParaGimnasio, pesoDeVolcados } from "../../shared/casas/umbral5/peso.ts";
 import type { Umbral5SessionStore } from "./umbral5Store.ts";
 import { createDefaultUmbral5Store } from "./umbral5Store.ts";
 import {
@@ -103,10 +109,13 @@ async function evaluarTurno(
   callGemini?: Gimnasio6GeminiCaller,
   geminiTimeoutMs: number = GEMINI_TURNO_MS,
 ) {
+  const puerta = puertaDeModulo(libro.modulo);
   const canon = preguntaCanon(
     libro.puntero.capitulo,
-    libro.puntero.subcodigo,
+    1,
     libro.puntero.indice,
+    puerta,
+    libro.limiteOrigen,
   );
   const local = evaluarRespuestaLocal(
     canon ?? {
@@ -130,6 +139,7 @@ async function evaluarTurno(
           pregunta: canon,
           respuesta,
           variante: libro.puntero.variante,
+          puerta,
         }),
         512,
         true,
@@ -184,14 +194,9 @@ export async function abrirLibroGimnasio(
       codigo: "SIN_PESO",
     };
   }
-  if (sesion.lectura.moduloGimnasio !== "social_producto") {
-    return {
-      ok: false,
-      status: 409,
-      error: "Este límite no abre el módulo de exposición social. Otros módulos, después.",
-      codigo: "SIN_MODULO",
-    };
-  }
+  const peso = pesoDeVolcados(serie);
+  const canal = peso.canal ?? sesion.lectura.codigoLimite ?? 1;
+  const codigo: CapituloId = canal;
 
   const existente = await store.getBySesionUmbral5(uid, sid);
   if (existente) {
@@ -203,8 +208,45 @@ export async function abrirLibroGimnasio(
     id: newLibroGimnasioId(),
     userId: uid,
     sesionUmbral5Id: sid,
-    modulo: "social_producto",
+    modulo: "limite",
     limiteOrigen: sesion.textoVolcado,
+    recursos: recursosVacios(),
+    puntero: { capitulo: codigo, subcodigo: 1, indice: 1, variante: 0 },
+    estado: "ABIERTO",
+    capituloSelladoDia: null,
+    capitulosSellados: [],
+    turnos: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await store.save(libro);
+  return { ok: true, ...payloadVivo(libro) };
+}
+
+export async function abrirLibroVendedor(
+  userId: string,
+  textoOficio = "",
+  deps: Gimnasio6EngineDeps = {},
+): Promise<{ ok: true } & ReturnType<typeof payloadVivo> | Gimnasio6EngineErr> {
+  const uid = userId.trim();
+  if (!uid) return { ok: false, status: 400, error: "Falta userId.", codigo: "FALTA_USER" };
+
+  const store = deps.store ?? createDefaultGimnasio6Store();
+  const existente = await store.getBySesionUmbral5(uid, SESION_PUERTA_VENDEDOR);
+  if (existente) {
+    return { ok: true, ...payloadVivo(existente) };
+  }
+
+  const origen =
+    textoOficio.trim() ||
+    "El oficio. Sabés qué hacer. El cuerpo niega el deber de vender.";
+  const now = new Date().toISOString();
+  const libro: LibroGimnasio = {
+    id: newLibroGimnasioId(),
+    userId: uid,
+    sesionUmbral5Id: SESION_PUERTA_VENDEDOR,
+    modulo: "vendedor",
+    limiteOrigen: origen,
     recursos: recursosVacios(),
     puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
     estado: "ABIERTO",
@@ -367,10 +409,12 @@ export function registerGimnasio6Routes(
       marca: GIMNASIO6_MARCA,
       firma: GIMNASIO6_FIRMA,
       ritualEntrada: "¿Cuál es tu límite?",
-      modulo: "social_producto",
-      creditos: { abrir: 0, responder: 0 },
+      puertas: { limite: "A", vendedor: "B" },
+      modulo: "limite",
+      creditos: { abrir: 0, responder: 0, abrirVendedor: 0 },
       endpoints: {
         abrir: "POST /api/casas/gimnasio6/abrir",
+        abrirVendedor: "POST /api/casas/gimnasio6/abrir-vendedor",
         responder: "POST /api/casas/gimnasio6/responder",
         continuar: "POST /api/casas/gimnasio6/continuar",
         libros: "GET /api/casas/gimnasio6/libros",
@@ -408,6 +452,27 @@ export function registerGimnasio6Routes(
     } catch (error) {
       console.error("[casas/gimnasio6/libro]", error);
       return res.status(500).json({ success: false, error: "Error leyendo el libro.", result: null });
+    }
+  });
+
+  app.post("/api/casas/gimnasio6/abrir-vendedor", async (req: Request, res: Response) => {
+    try {
+      const userId = userIdDe(req.body, req.header("x-user-id") ?? undefined);
+      const raw = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+      const textoOficio = String(raw.textoOficio ?? raw.texto ?? raw.limiteOrigen ?? "").trim();
+      const resultado = await abrirLibroVendedor(userId, textoOficio, runtime);
+      if (!resultado.ok) return res.status(resultado.status).json(bodyError(resultado));
+      return res.json({
+        success: true,
+        libro: resultado.libro,
+        pregunta: resultado.pregunta,
+        copia: resultado.copia,
+        topeDiario: resultado.topeDiario,
+        ritualEntrada: resultado.ritualEntrada,
+      });
+    } catch (error) {
+      console.error("[casas/gimnasio6/abrir-vendedor]", error);
+      return res.status(500).json({ success: false, error: "Error abriendo la puerta B.", result: null });
     }
   });
 

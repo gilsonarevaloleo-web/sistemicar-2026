@@ -1,6 +1,6 @@
 /**
  * Planeta 6 · Gimnasio.
- * Capa profunda del límite. Módulo 1: exposición social ante un producto.
+ * Dos puertas: A límite, B vendedor. Tres tiempos por código.
  */
 
 export {
@@ -9,9 +9,13 @@ export {
   GIMNASIO6_NOMBRE,
   GIMNASIO6_VERSION,
   MODULOS_GIMNASIO,
+  SESION_PUERTA_VENDEDOR,
+  esModuloGimnasio,
+  puertaDeModulo,
 } from "./types.ts";
 export type {
   CapituloId,
+  CodigoGimnasio,
   EstadoCapitulo,
   EstadoLibro,
   EstadoPasoCapitulo,
@@ -23,6 +27,7 @@ export type {
   PreguntaIndice,
   PreguntaViva,
   PunteroGimnasio,
+  PuertaGimnasio,
   RecursosGimnasio,
   SubcodigoId,
   TurnoGimnasio,
@@ -32,25 +37,52 @@ export {
   detectarModuloGimnasio,
   etiquetaModulo,
   mensajeOferta,
+  mensajeOfertaVendedor,
 } from "./oferta.ts";
 
 export {
   CANON_GIMNASIO,
   ETIQUETA_CAPITULO,
   ETIQUETA_SUBCODIGO,
+  ETIQUETA_TIEMPO,
   capituloPreparable,
   capituloVisibleDe,
+  etiquetaCapituloDe,
   etiquetaSubcodigo,
   pasosDelCapitulo,
   preguntaCanon,
   recorteEscenario,
+  siguienteCodigo,
   siguientePuntero,
 } from "./canon.ts";
+
+export {
+  ETIQUETA_TIEMPO as ETIQUETA_TIEMPO_FICHA,
+  FICHAS_LIMITE,
+  FICHAS_VENDEDOR,
+  conEscena,
+  esCodigoGimnasio,
+  esTiempoId,
+  fichaDe,
+  fichaLimiteDe,
+  fichaVendedorDe,
+  packDe,
+  tiempoDe,
+  tiempoLimiteDe,
+  tiempoVendedorDe,
+} from "./fichas.ts";
+export type {
+  FichaVivaLimite,
+  NombreTiempo,
+  TiempoFicha,
+  TiempoId,
+} from "./fichas.ts";
 
 export {
   GIMNASIO6_AXIOMAS,
   GIMNASIO6_RITUAL_ENTRADA,
   GIMNASIO6_SYSTEM_PROMPT,
+  GIMNASIO6_SYSTEM_PROMPT_VENDEDOR,
   PROMPT_GIMNASIO6,
   buildGimnasio6UserPrompt,
   copiarLibro,

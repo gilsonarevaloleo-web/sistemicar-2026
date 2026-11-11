@@ -35,15 +35,24 @@ function sortByCreatedDesc(a: LibroGimnasio, b: LibroGimnasio): number {
   return b.id.localeCompare(a.id);
 }
 
+function asCodigo(n: unknown): LibroGimnasio["puntero"]["capitulo"] {
+  const v = Number(n);
+  if (Number.isInteger(v) && v >= 1 && v <= 10) {
+    return v as LibroGimnasio["puntero"]["capitulo"];
+  }
+  return 1;
+}
+
 function normalizeLibro(raw: LibroGimnasio): LibroGimnasio {
-  const cap = raw.puntero?.capitulo;
+  const cap = asCodigo(raw.puntero?.capitulo);
   const sub = raw.puntero?.subcodigo;
   const ind = raw.puntero?.indice;
+  const modulo = raw.modulo === "vendedor" ? "vendedor" : "limite";
   return {
     id: String(raw.id),
     userId: String(raw.userId),
-    sesionUmbral5Id: String(raw.sesionUmbral5Id),
-    modulo: "social_producto",
+    sesionUmbral5Id: String(raw.sesionUmbral5Id ?? ""),
+    modulo,
     limiteOrigen: String(raw.limiteOrigen ?? ""),
     recursos: {
       experiencia: String(raw.recursos?.experiencia ?? ""),
@@ -52,7 +61,7 @@ function normalizeLibro(raw: LibroGimnasio): LibroGimnasio {
       gustos: String(raw.recursos?.gustos ?? ""),
     },
     puntero: {
-      capitulo: cap === 2 || cap === 3 || cap === 4 ? cap : 1,
+      capitulo: cap,
       subcodigo: sub === 2 || sub === 3 || sub === 4 ? sub : 1,
       indice: ind === 2 || ind === 3 ? ind : 1,
       variante: Math.max(0, Number(raw.puntero?.variante ?? 0) || 0),
@@ -65,7 +74,9 @@ function normalizeLibro(raw: LibroGimnasio): LibroGimnasio {
         : "ABIERTO",
     capituloSelladoDia: raw.capituloSelladoDia ? String(raw.capituloSelladoDia) : null,
     capitulosSellados: Array.isArray(raw.capitulosSellados)
-      ? raw.capitulosSellados.filter((c): c is 1 | 2 | 3 | 4 => c === 1 || c === 2 || c === 3 || c === 4)
+      ? raw.capitulosSellados
+          .map((c) => asCodigo(c))
+          .filter((c, i, arr) => arr.indexOf(c) === i)
       : [],
     turnos: Array.isArray(raw.turnos) ? raw.turnos : [],
     createdAt: String(raw.createdAt),
