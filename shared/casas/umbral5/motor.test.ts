@@ -37,7 +37,7 @@ describe("Casa 6 Umbral — motor", () => {
     assert.equal(r.pisoIntento, 1);
     assert.equal(r.codigoLimite, 1);
     assert.match(r.lecturaFria, /Intento: lo sé/);
-    assert.equal(r.moduloGimnasio, "limite");
+    assert.equal(r.moduloGimnasio, null);
   });
 
   it("baja autoestima no es C1: es queja del Espejo", () => {
@@ -58,7 +58,7 @@ describe("Casa 6 Umbral — motor", () => {
     });
     assert.equal(miedo.codigoLimite, 2);
     assert.equal(miedo.polo, "contra");
-    assert.equal(miedo.moduloGimnasio, "limite");
+    assert.equal(miedo.moduloGimnasio, "social_producto");
 
     const sinMiedo = diagnosticarUmbral5Local({
       limiteConocido: "No me importa que me vean. Puedo exponerme. Salgo a la luz.",

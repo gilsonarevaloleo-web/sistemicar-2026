@@ -4,6 +4,7 @@ import {
   ETIQUETA_CAPITULO,
   capituloVisibleDe,
   pasosDelCapitulo,
+  preguntaCanon,
   type LibroGimnasio,
   type PreguntaViva,
 } from "@shared/casas/gimnasio6";
@@ -41,24 +42,22 @@ export function ConsolaGimnasio({
   const enviandoRef = useRef(false);
   const pasoPrevio = useRef<string | null>(null);
   const turnoCount = libro.turnos.length;
-  const punteroClave = `${libro.id}:${libro.modulo}:${libro.puntero.capitulo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
+  const punteroClave = `${libro.id}:${libro.puntero.capitulo}.${libro.puntero.subcodigo}.${libro.puntero.indice}.${libro.puntero.variante}:${turnoCount}`;
   const capituloVista = capituloVisibleDe(libro);
   const sellado =
     topeDiario ||
     libro.estado === "TOPE_DIARIO" ||
     libro.estado === "CAPITULO_SELLADO";
-  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, {
-    sellado,
-    puerta: libro.modulo === "vendedor" ? "vendedor" : "limite",
-    origen: libro.limiteOrigen,
-  });
-  const pasoClave = `${capituloVista}.${libro.puntero.indice}`;
-  const etiqueta =
-    pregunta?.etiquetaCapitulo ?? ETIQUETA_CAPITULO[capituloVista] ?? `C${capituloVista}`;
+  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado });
+  const pasoClave = `${capituloVista}.${libro.puntero.subcodigo}.${libro.puntero.indice}`;
+  const etiqueta = ETIQUETA_CAPITULO[capituloVista];
   const punteroLabel = sellado
     ? "sellado"
-    : pregunta?.etiquetaTiempo ?? `${libro.puntero.indice}`;
+    : `${libro.puntero.subcodigo}.${libro.puntero.indice}`;
   const enCuarto = libro.estado === "ABIERTO" && !topeDiario;
+  const turnosDelCanon = libro.turnos
+    .filter((t) => preguntaCanon(t.capitulo, t.subcodigo, t.indice)?.pregunta === t.pregunta)
+    .slice(-3);
 
   useEffect(() => {
     enviandoRef.current = enviando;
@@ -177,7 +176,7 @@ export function ConsolaGimnasio({
 
       {topeDiario && (
         <p className="relative text-[12px] leading-relaxed text-white/55" data-testid="gimnasio6-tope">
-          Código sellado. A lo mucho uno por día. Mañana sigue el libro.
+          Capítulo sellado. A lo mucho uno por día. Mañana sigue el libro.
         </p>
       )}
 
@@ -193,7 +192,7 @@ export function ConsolaGimnasio({
           }}
           data-testid="gimnasio6-continuar"
         >
-          Continuar el siguiente código
+          Continuar el siguiente capítulo
         </button>
       )}
 
@@ -246,7 +245,7 @@ export function ConsolaGimnasio({
         </form>
       )}
 
-      {libro.turnos.slice(-3).map((t) => (
+      {turnosDelCanon.map((t) => (
         <article
           key={t.id}
           className="relative border px-4 py-3"

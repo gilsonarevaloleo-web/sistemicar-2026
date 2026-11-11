@@ -30,7 +30,7 @@ function libro(over: Partial<LibroGimnasio> = {}): LibroGimnasio {
     id: "lib-1",
     userId: "u1",
     sesionUmbral5Id: "s1",
-    modulo: "limite",
+    modulo: "social_producto",
     limiteOrigen: "No puedo vender.",
     recursos: recursosVacios(),
     puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },

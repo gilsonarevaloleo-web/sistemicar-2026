@@ -5,7 +5,7 @@ import { createMemoryJuezWallet } from "./services/juezCreditos.ts";
 import { createMemoryUmbral5Store } from "./services/umbral5Store.ts";
 import { createMemoryGimnasio6Store } from "./services/gimnasio6Store.ts";
 import { registerUmbral5Routes } from "./umbral5Engine.ts";
-import { registerGimnasio6Routes, abrirLibroVendedor, responderGimnasio, type Gimnasio6EngineDeps } from "./gimnasio6Engine.ts";
+import { registerGimnasio6Routes, responderGimnasio, type Gimnasio6EngineDeps } from "./gimnasio6Engine.ts";
 import { recursosVacios } from "../shared/casas/gimnasio6/motor.ts";
 import type { LibroGimnasio } from "../shared/casas/gimnasio6/types.ts";
 import { CASA_UMBRAL5_RITUAL } from "../shared/casas/umbral5/prompt.ts";
@@ -87,9 +87,7 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
       }).then((r) => r.json());
       assert.equal(abierto.success, true);
       assert.equal(abierto.ritualEntrada, "¿Cuál es tu límite?");
-      assert.equal(abierto.libro.modulo, "limite");
-      assert.equal(abierto.libro.puntero.capitulo, 2);
-      assert.match(abierto.pregunta.pregunta, /quién te está mirando/i);
+      assert.match(abierto.pregunta.pregunta, /1 al 10/);
       assert.doesNotMatch(abierto.pregunta.pregunta, /conocimiento sobre tu producto/);
 
       const niebla = await fetch(`${base}/api/casas/gimnasio6/responder`, {
@@ -112,11 +110,11 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
         body: JSON.stringify({
           userId,
           libroId: abierto.libro.id,
-          respuesta: "Mi vecina Laura me está mirando desde el balcón.",
+          respuesta: "Me posiciono en un 7.",
         }),
       }).then((r) => r.json());
       assert.equal(pasa.libro.puntero.indice, 2);
-      assert.match(pasa.copia, /Laura/);
+      assert.match(pasa.copia, /Me posiciono en un 7/);
     });
   });
 
@@ -130,12 +128,12 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
           body: JSON.stringify({
             userId,
             libroId: abierto.libro.id,
-            respuesta: "Mi vecina Laura me está mirando desde el balcón.",
+            respuesta: "Me posiciono en un 7.",
           }),
         }).then((r) => r.json());
         assert.equal(primero.libro.puntero.indice, 1);
         assert.equal(primero.libro.puntero.variante, 1);
-        assert.match(primero.pregunta.escenario, /Laura/);
+        assert.match(primero.pregunta.escenario, /Me posiciono en un 7/);
 
         const segundo = await fetch(`${base}/api/casas/gimnasio6/responder`, {
           method: "POST",
@@ -143,7 +141,7 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
           body: JSON.stringify({
             userId,
             libroId: abierto.libro.id,
-            respuesta: "Sigo: Laura me mira y no me voy del cuarto.",
+            respuesta: "Sigo en un 7, con el producto delante.",
           }),
         }).then((r) => r.json());
         assert.equal(segundo.libro.puntero.indice, 2);
@@ -165,12 +163,12 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
           body: JSON.stringify({
             userId,
             libroId: abierto.libro.id,
-            respuesta: "Mi vecina Laura me está mirando desde el balcón.",
+            respuesta: "Me posiciono en un 7.",
           }),
         }).then((r) => r.json());
         assert.equal(pasa.success, true);
         assert.equal(pasa.libro.puntero.indice, 2);
-        assert.match(pasa.copia, /Laura/);
+        assert.match(pasa.copia, /Me posiciono en un 7/);
       },
       {
         geminiTimeoutMs: 30,
@@ -184,7 +182,7 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
       id: "lib-perdido",
       userId: "u-gym",
       sesionUmbral5Id: "s1",
-      modulo: "limite",
+      modulo: "social_producto",
       limiteOrigen: VOLCADO,
       recursos: recursosVacios(),
       puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
@@ -217,23 +215,6 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
       assert.equal(conSnapshot.libro.puntero.indice, 2);
       assert.match(conSnapshot.copia, /Me posiciono en un 2/);
     }
-  });
-
-  it("la puerta B abre sin peso y con C1 Cortador, no cimiento", async () => {
-    const store = createMemoryGimnasio6Store();
-    const abierto = await abrirLibroVendedor("u-gym", "Tengo que vender y me trabo.", {
-      store,
-    });
-    assert.equal(abierto.ok, true);
-    if (!abierto.ok) return;
-    assert.equal(abierto.libro.modulo, "vendedor");
-    assert.equal(abierto.libro.puntero.capitulo, 1);
-    assert.match(abierto.pregunta?.pregunta ?? "", /frase/i);
-    assert.doesNotMatch(abierto.pregunta?.pregunta ?? "", /quién sos vos/i);
-
-    const otra = await abrirLibroVendedor("u-gym", "otro texto", { store });
-    assert.equal(otra.ok, true);
-    if (otra.ok) assert.equal(otra.libro.id, abierto.libro.id);
   });
 });
 

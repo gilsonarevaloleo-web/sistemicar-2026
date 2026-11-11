@@ -16,7 +16,7 @@ function libro(
   return {
     userId: "u1",
     sesionUmbral5Id: "s1",
-    modulo: "limite",
+    modulo: "social_producto",
     limiteOrigen: "No puedo vender mi producto.",
     recursos: recursosVacios(),
     puntero: { capitulo: 1, subcodigo: 1, indice: 1, variante: 0 },
@@ -67,8 +67,7 @@ describe("Gimnasio 6 — orden y copia de libros", () => {
       ],
     });
     assert.equal(esLibroContinuable(abierto), true);
-    assert.match(etiquetaLibro(abierto), /Puerta A/);
-    assert.match(etiquetaLibro(abierto), /C1/);
+    assert.match(etiquetaLibro(abierto), /Capítulo 1/);
     const copia = formatearCopiaLibroNumerado(abierto, 1);
     assert.match(copia, /GIMNASIO — Libro 1/);
     assert.match(copia, /Estoy en un 4/);

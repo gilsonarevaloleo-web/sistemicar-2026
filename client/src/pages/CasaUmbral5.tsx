@@ -13,7 +13,6 @@ import { PanelMapa } from "@/components/casas/umbral5/PanelMapa";
 import { HistorialLimite } from "@/components/casas/umbral5/HistorialLimite";
 import { BannerMapaOpcional } from "@/components/casas/umbral5/BannerMapaOpcional";
 import { BannerGimnasio } from "@/components/casas/umbral5/BannerGimnasio";
-import { BannerPuertaVendedor } from "@/components/casas/umbral5/BannerPuertaVendedor";
 import { BifurcacionPractica } from "@/components/casas/umbral5/BifurcacionPractica";
 import { ConsolaGimnasio } from "@/components/casas/gimnasio6/ConsolaGimnasio";
 import { HistorialLibros } from "@/components/casas/gimnasio6/HistorialLibros";
@@ -28,7 +27,6 @@ import {
 } from "@/lib/casas/umbral5/api";
 import {
   abrirGimnasio,
-  abrirVendedorGimnasio,
   continuarGimnasio,
   leerLibroGimnasio,
   listarLibrosGimnasio,
@@ -317,24 +315,6 @@ export default function CasaUmbral5() {
     }
   };
 
-  const entrarVendedor = async () => {
-    if (!userId) return;
-    setError(null);
-    setAbriendoGym(true);
-    try {
-      await unlockCuartoAudio();
-      const out = await abrirVendedorGimnasio({
-        userId,
-        textoOficio: texto.trim() || undefined,
-      });
-      aplicarGym(out);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo abrir la puerta B.");
-    } finally {
-      setAbriendoGym(false);
-    }
-  };
-
   const responderGym = async (textoRespuesta: string) => {
     if (!userId || !libro) return;
     setError(null);
@@ -478,22 +458,12 @@ export default function CasaUmbral5() {
 
         {lectura && <PanelMapa lectura={lectura} />}
 
-        {modo === "puerta" && !libro && (
-          <div className="grid gap-3 md:grid-cols-2">
-            {hayPesoParaGimnasio(sesiones) && (
-              <BannerGimnasio
-                modulo="limite"
-                onEntrar={sesionId ? () => void entrarGym() : undefined}
-                cargando={abriendoGym}
-              />
-            )}
-            {userId ? (
-              <BannerPuertaVendedor
-                onEntrar={() => void entrarVendedor()}
-                cargando={abriendoGym}
-              />
-            ) : null}
-          </div>
+        {lectura && modo === "puerta" && hayPesoParaGimnasio(sesiones) && (
+          <BannerGimnasio
+            modulo={lectura.moduloGimnasio ?? null}
+            onEntrar={() => void entrarGym()}
+            cargando={abriendoGym}
+          />
         )}
 
         {modo === "gimnasio" && libro && (

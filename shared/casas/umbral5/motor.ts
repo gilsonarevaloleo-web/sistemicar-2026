@@ -239,12 +239,15 @@ export function esQuejaEspejo(limite: string): boolean {
 }
 
 function moduloDeCanal(
-  _canal: CodigoLimite,
-  _polo: PoloLimite,
+  canal: CodigoLimite,
+  polo: PoloLimite,
   limite: string,
 ): ModuloGimnasioOferta {
   if (esQuejaEspejo(limite)) return null;
-  return detectarModuloGimnasio(limite) === "limite" ? "limite" : null;
+  if (canal === 2 && polo === "contra") return "social_producto";
+  return detectarModuloGimnasio(limite) === "social_producto" && canal === 2
+    ? "social_producto"
+    : null;
 }
 
 function lecturaDelCanal(
@@ -282,12 +285,6 @@ function porqueDelCanal(canal: CodigoLimite, polo: PoloLimite, piso: PisoIntento
   return "El trabajo propio no lo modificó.";
 }
 
-function sellarModuloGimnasio(raw: unknown): ModuloGimnasioOferta {
-  if (raw === "limite" || raw === "social_producto") return "limite";
-  if (raw === "vendedor") return "vendedor";
-  return null;
-}
-
 export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
   const piso = (lectura.pisoIntento === 2 || lectura.pisoIntento === 3
     ? lectura.pisoIntento
@@ -315,7 +312,8 @@ export function sellarLectura(lectura: Umbral5Lectura): Umbral5Lectura {
     tipoLimite: tipo,
     lecturaFria: lectura.lecturaFria.trim(),
     porQueNoEjecuta: lectura.porQueNoEjecuta.trim(),
-    moduloGimnasio: sellarModuloGimnasio(lectura.moduloGimnasio),
+    moduloGimnasio:
+      lectura.moduloGimnasio === "social_producto" ? "social_producto" : null,
   };
 }
 
@@ -411,7 +409,9 @@ export function parseUmbral5Lectura(raw: unknown): Umbral5ParseResult {
   if (!lectura || !porque) {
     return { ok: false, error: "Faltan campos de texto de la lectura." };
   }
-  const modulo = sellarModuloGimnasio(o.moduloGimnasio);
+  const moduloRaw = o.moduloGimnasio;
+  const modulo: ModuloGimnasioOferta =
+    moduloRaw === "social_producto" ? "social_producto" : null;
   return {
     ok: true,
     result: sellarLectura({
