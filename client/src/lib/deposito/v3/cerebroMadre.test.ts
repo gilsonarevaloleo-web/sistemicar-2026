@@ -37,7 +37,7 @@ function installStorage() {
 }
 
 const VOLCADO =
-  "Vi el patrón: cada vez que salteo la secuencia a las 9:00, 9:20, 9:40 el pistón se atasca. El modelo se repite.";
+  "Por eso digo que el valor personal no se expresa hablando de nuestro valor, sino crusando el valor de importancia en los demás. El conjunto sostiene esa ley y no es un diario de clima.";
 
 describe("Cerebro Madre — persistencia de casa", () => {
   let store: Map<string, string>;
@@ -51,15 +51,15 @@ describe("Cerebro Madre — persistencia de casa", () => {
 
   it("escribe su propia clave y no toca V2, volcados V3 ni axiomas del alumno", () => {
     const result = scaffoldAnalysisResult({
-      characterSignedCode: 2,
-      focoRevelacionCode: 7,
+      characterSignedCode: 9,
+      focoRevelacionCode: 9,
       groundingStatus: {
         isFullyGrounded: true,
-        diagnosticMessage: "Firma C2 foco C7.",
+        diagnosticMessage: "Firma C9.",
       },
     });
     registrarAuditoriaEnCerebroMadre(
-      { rawFact: VOLCADO, userTier: "MATRICULA" },
+      { rawFact: VOLCADO, userTier: "CARRERA" },
       result,
     );
     const cerebro = loadCerebroMadre();
@@ -83,15 +83,15 @@ describe("Cerebro Madre — persistencia de casa", () => {
 
   it("promover a ley exige filtro y conserva createdAt", () => {
     const result = scaffoldAnalysisResult({
-      characterSignedCode: 2,
-      focoRevelacionCode: 7,
+      characterSignedCode: 9,
+      focoRevelacionCode: 9,
       groundingStatus: {
         isFullyGrounded: true,
-        diagnosticMessage: "Firma C2 foco C7.",
+        diagnosticMessage: "Firma C9.",
       },
     });
     const nacido = registrarAuditoriaEnCerebroMadre(
-      { rawFact: VOLCADO, userTier: "MATRICULA" },
+      { rawFact: VOLCADO, userTier: "CARRERA" },
       result,
     );
     const id = nacido.principios[0].id;

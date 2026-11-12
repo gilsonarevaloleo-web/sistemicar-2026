@@ -7,7 +7,6 @@ import type {
   DepotEntryInput,
   UserTier,
 } from "@shared/deposito/v3";
-import { leyesCasaLocal } from "./cerebroMadre";
 
 export interface DepositoV3AuditSuccess {
   success: true;
@@ -62,10 +61,7 @@ export async function auditarVolcadoV3(
       fetch("/api/deposito/v3/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          leyesCasa: leyesCasaLocal(),
-        }),
+        body: JSON.stringify(payload),
       }),
       12000,
     );
