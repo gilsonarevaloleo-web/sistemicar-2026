@@ -251,6 +251,15 @@ La conclusión es que si el cuerpo no quiere ejecutar una desición, lo sabio es
       userTier: "MATRICULA",
     });
     assert.equal(triple.active[9], true);
+
+    const diseno = auditarGeometriaSintactica({
+      rawFact:
+        "Esto es la razón por lo que digo que por diseño no se atiende lo que se escucha.",
+      studentHypothesis: "Atención y aprendizaje de otra fuente",
+      userTier: "CARRERA",
+    });
+    assert.equal(diseno.active[9], true);
+    assert.equal(diseno.characterSignedCode, 9);
   });
 });
 
