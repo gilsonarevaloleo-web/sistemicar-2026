@@ -50,5 +50,11 @@ describe("Depósito V3 — pedagogía de escritura", () => {
   it("circuito cerrado no usa el tono de abroche pendiente", () => {
     assert.match(pedagogicalFeedbackDe(null), /abrochado|C1→C10/i);
     assert.equal(pedagogicalFeedbackDe(10), TONOS_MAESTRO[10]);
+    const fortalezas = pedagogicalFeedbackDe(null, {
+      characterSignedCode: 1,
+      activeCodes: [1, 2, 4, 5, 7, 10],
+    });
+    assert.match(fortalezas, /Firma C1/);
+    assert.doesNotMatch(fortalezas, /traza una línea|tijera/i);
   });
 });

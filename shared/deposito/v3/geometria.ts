@@ -92,6 +92,22 @@ function tokensCable(norm: string): string[] {
     .filter((t) => t.length >= 4 && !STOP_CABLE.has(t));
 }
 
+/** Plural ligero: habilidades↔habilidad, limites↔limite. */
+function variantesToken(tok: string): string[] {
+  const out = new Set([tok]);
+  if (tok.length >= 5 && tok.endsWith("s")) out.add(tok.slice(0, -1));
+  if (tok.length >= 6 && tok.endsWith("es")) out.add(tok.slice(0, -2));
+  return [...out];
+}
+
+function tokensCableSet(norm: string): Set<string> {
+  const set = new Set<string>();
+  for (const tok of tokensCable(norm)) {
+    for (const v of variantesToken(tok)) set.add(v);
+  }
+  return set;
+}
+
 function splitFrases(texto: string): string[] {
   return texto
     .replace(/\r/g, "")
@@ -147,6 +163,23 @@ export function extraerCierre(payload: DepotEntryPayload, titulo: string): strin
   return frases[frases.length - 1] ?? "";
 }
 
+/**
+ * Primera frase del volcado: vector narrativo de C1 cuando la hipótesis
+ * solo nombra un código (p. ej. «ley del ciclo, código 8»).
+ */
+export function primerVectorNarrativo(
+  payload: DepotEntryPayload,
+  titulo: string,
+): string {
+  const first = payload.rawFact
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find(Boolean) ?? "";
+  const frase = splitFrases(first)[0] ?? first;
+  if (!frase || frase === titulo) return "";
+  return frase;
+}
+
 export function titleConnectedToClose(
   titulo: string,
   cierre: string,
@@ -164,13 +197,20 @@ export function titleConnectedToClose(
     const ojo = hipotesisComoOjo(t);
     return Boolean(ojo && new RegExp(`\\bc\\s*${ojo}\\b`).test(normCierre));
   }
-  const closeTokens = new Set(tokensCable(normCierre));
-  const hits = tituloTokens.filter((tok) => closeTokens.has(tok)).length;
-  const umbral = tituloTokens.length === 1 ? 1 : 0.34;
+  const closeTokens = tokensCableSet(normCierre);
+  const hits = tituloTokens.filter((tok) =>
+    variantesToken(tok).some((v) => closeTokens.has(v)),
+  ).length;
+  const umbral = tituloTokens.length === 1 ? 1 : 0.33;
   if (hits / tituloTokens.length >= umbral) return true;
 
   const ojo = hipotesisComoOjo(t);
-  if (ojo && new RegExp(`\\bc\\s*${ojo}\\b`).test(normCierre)) return true;
+  if (
+    ojo &&
+    new RegExp(`(?:\\bc\\s*|codigo\\s*|planeta\\s*)${ojo}\\b`).test(normCierre)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -238,13 +278,20 @@ const C5_DECISION = [
   /cero excusa/,
   /dispar[eé]/,
   /\bdecid\w*\b/,
+  /\bdesid\w*\b/,
+  /\bdesicion(es)?\b/,
   /mi decision\b/,
-  /la decision (es|fue|sera|esta|queda|que)/,
-  /tomo (la |una )?decision/,
+  /la desi[cs]ion (es|fue|sera|esta|queda|que)/,
+  /tomo (la |una )?desi[cs]ion/,
+  /ejecutar (una |la )?desi[cs]ion/,
+  /la desi[cs]ion que deberia/,
+  /falta de desi[cs]ion/,
   /\bvoy a\b/,
   /\belijo\b/,
   /\bopto por\b/,
   /deje (el trabajo|de trabajar|el desglosador|de hacer|de seguir|de empujar)/,
+  /\blo deje\b/,
+  /termine comprando/,
   /puse pausa/,
   /pause (el |al |la )/,
   /pausa (al |el |del )desglosador/,
@@ -272,6 +319,9 @@ const C5_DECISION = [
   /\bbasta\b/,
   /no mas\b/,
   /(corte|limite|decision)\s*:/,
+  /a partir de hoy/,
+  /de hoy en adelante/,
+  /lo primero que debo (hacer|es)/,
 ];
 
 const C6_FUENTE = [
@@ -281,6 +331,12 @@ const C6_FUENTE = [
   /\blibro\b/,
   /\bvideo\b/,
   /\byoutube\b/,
+  /\banuncio\b/,
+  /\bpublicidad\b/,
+  /\bcurso\b/,
+  /\bvendedor\b/,
+  /vi un anuncio/,
+  /en facebook/,
   /\bme dijo\b/,
   /\ble dije\b/,
   /con ella/,
@@ -320,6 +376,9 @@ const C7_VISION = [
   /\bencaje\b/,
   /mi idea/,
   /mi vision\b/,
+  /falta de vision/,
+  /vision estructurada/,
+  /vision planeta/,
   /planteo/,
   /idea propia/,
   /como encaj/,
@@ -344,6 +403,8 @@ const C10_SELLO = [
   /esto cierra/,
   /cierra (el |la )?(puerta|vector|titulo|circulo|anillo)/,
   /regreso (al |a )/,
+  /en conclusion/,
+  /\ben resumen\b/,
 ];
 
 const C8_CICLO = [
@@ -352,6 +413,7 @@ const C8_CICLO = [
   /me volvi[oó]/,
   /dos dias/,
   /\bloop\b/,
+  /\bbucle\b/,
   /\bciclo\b/,
   /\bsiclo\b/,
   /(ciclo|siclo) de (vida|atencion)/,
@@ -377,7 +439,7 @@ const C8_RETORNO_NATURAL =
   /volvi( o| a | con )|regres|de vuelta|otra vez (al |a )?(trabajo|produc|desglos)|energia (estaba|volvio|cargo|de vuelta)|refresc|empezar de nuevo|otro ciclo/;
 
 const C8_TECNICO =
-  /48\s*h|24\s*h|\bloop\b|ciclo|siclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
+  /48\s*h|24\s*h|\bloop\b|\bbucle\b|ciclo|siclo|retorno|polaridad|\bpolos?\b|incuba|inversion|ansiedad/;
 
 const FISIO =
   /\bcuerpo\b|\bfatiga\b|\bsueno\b|\bhambre\b|\bdolor\b|\brespir|\bmusculo\b|\benergia fisica\b/;
@@ -387,6 +449,25 @@ const ENTORNO =
   /\bcasa\b|\bhogar\b|\bentorno\b|\bambiente\b|\bfacebook\b|\bredes\b|\bcalle\b|\bcocina\b|\bescritorio\b|\btaller\b/;
 const C9_ENLACE =
   /al mismo tiempo|varios hilos|balance de carga|mientras [\s\S]+ tambien|multihilo|y tambien|ademas de/;
+
+/** Principio sistémico: afirmación sin duda. No exige multi-hilo. */
+const C9_PRINCIPIO = [
+  /por eso (razon|digo|dado)/,
+  /no se expresa[\s\S]{0,100}sino/,
+  /no necesariamente[\s\S]{0,80}sino/,
+  /el valor (personal|de alguien)/,
+  /valor en los demas/,
+  /la ley del valor/,
+  /ley de (la )?economia/,
+  /el cansancio (solo )?es/,
+  /polo contrario/,
+  /cambiando de (foco|enfoque) sin cambiar/,
+  /sin cambiar (de |la )?(movimiento|mecanica)/,
+  /eso (significa|quiere decir) que/,
+  /\bprincipio sistem/,
+  /afirmacion sin duda/,
+  /\bsin duda\b/,
+];
 
 function tieneCicloNatural(norm: string): boolean {
   return C8_POLO_NATURAL.test(norm) && C8_RETORNO_NATURAL.test(norm);
@@ -398,6 +479,10 @@ function esC8Tecnico(norm: string): boolean {
 
 function dimensionesC9(norm: string): number {
   return [FISIO, TRABAJO, ENTORNO].filter((re) => re.test(norm)).length;
+}
+
+export function esPrincipioSistemico(texto: string): boolean {
+  return hitsDe(normalizarGeometria(texto), C9_PRINCIPIO) > 0;
 }
 
 function emptyScores(): Record<EyeCode, number> {
@@ -412,12 +497,26 @@ function emptyActive(): Record<EyeCode, boolean> {
   return map;
 }
 
+function esTesisVision(norm: string): boolean {
+  return (
+    /codigo\s*7\b/.test(norm) ||
+    /falta de vision/.test(norm) ||
+    /vision estructurada/.test(norm) ||
+    /vision planeta/.test(norm) ||
+    /la vision\b/.test(norm)
+  );
+}
+
 function esTesisCicloAtencion(norm: string): boolean {
   return (
     /(ciclo|siclo) de (vida|atencion)/.test(norm) ||
+    /ley del ciclo/.test(norm) ||
+    /codigo\s*8\b/.test(norm) ||
     /atencion tiene (siclo|ciclo|limite)/.test(norm) ||
     /bater[ií]a (de la atencion|que se acaba|est[aá] en su limite)/.test(norm) ||
-    /onda de sierra/.test(norm)
+    /onda de sierra/.test(norm) ||
+    /funciona en bucle/.test(norm) ||
+    /limite de (resistencia|habilidad|velocidad)/.test(norm)
   );
 }
 
@@ -425,9 +524,22 @@ function elegirFirma(
   active: Record<EyeCode, boolean>,
   scores: Record<EyeCode, number>,
   norm: string,
+  titulo?: string,
 ): EyeCode {
-  if (active[8] && esTesisCicloAtencion(norm)) {
+  if (active[8] && (esTesisCicloAtencion(norm) || hipotesisComoOjo(titulo) === 8)) {
     return 8;
+  }
+  if (active[9]) {
+    return 9;
+  }
+  if (active[7] && (esTesisVision(norm) || hipotesisComoOjo(titulo) === 7)) {
+    return 7;
+  }
+  if (active[7] && hipotesisComoOjo(titulo) === 1) {
+    return 7;
+  }
+  if (active[2] && hipotesisComoOjo(titulo) === 2) {
+    return 2;
   }
   if (
     active[8] &&
@@ -501,24 +613,37 @@ export function auditarGeometriaSintactica(
 
   scores[8] = hitsDe(normCuerpo, C8_CICLO);
   if (tieneCicloNatural(normCuerpo)) scores[8] += 2;
+  if (hipotesisComoOjo(titulo) === 8) scores[8] += 1;
   active[8] = scores[8] > 0;
 
   const dims = dimensionesC9(normCuerpo);
-  scores[9] = hitsDe(normCuerpo, [C9_ENLACE]) + (dims >= 3 ? 1 : 0);
-  active[9] = dims >= 3 && C9_ENLACE.test(normCuerpo);
+  const principio = hitsDe(normCuerpo, C9_PRINCIPIO);
+  const hilos = dims >= 3 && C9_ENLACE.test(normCuerpo);
+  scores[9] = principio + (hilos ? 1 : 0);
+  active[9] = principio > 0 || hilos;
 
+  const vectoresC1 = [titulo, primerVectorNarrativo(payload, titulo)].filter(
+    Boolean,
+  );
   const normCierre = normalizarGeometria(cierre);
   const selloExplicito = hitsDe(normCierre, C10_SELLO) > 0;
-  const tituloTokens = tokensCable(normalizarGeometria(titulo));
-  const selloConTitulo =
-    selloExplicito &&
-    tituloTokens.some((tok) => normCierre.includes(tok));
+  const selloConVector = vectoresC1.some((vector) => {
+    const vectorTokens = tokensCable(normalizarGeometria(vector));
+    return (
+      selloExplicito &&
+      vectorTokens.some((tok) =>
+        variantesToken(tok).some((v) => normCierre.includes(v)),
+      )
+    );
+  });
   const abrocha =
-    active[1] && (titleConnectedToClose(titulo, cierre) || selloConTitulo);
+    active[1] &&
+    (vectoresC1.some((vector) => titleConnectedToClose(vector, cierre)) ||
+      selloConVector);
   scores[10] = abrocha ? 1 : 0;
   active[10] = abrocha;
 
-  const characterSignedCode = elegirFirma(active, scores, normCuerpo);
+  const characterSignedCode = elegirFirma(active, scores, normCuerpo, titulo);
   if (!EYE_CODES.some((n) => active[n])) {
     active[1] = false;
   }

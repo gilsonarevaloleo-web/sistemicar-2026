@@ -17,7 +17,6 @@ import {
   buildActiveCharacterMap,
   vaciosDesdeActiveMap,
 } from "./ojos.ts";
-import type { PrincipioAprendizaje } from "./cerebroMadre.ts";
 import { serializarPromptAuditoria } from "./prompt.ts";
 import {
   parseDepotAnalysisResult,
@@ -59,9 +58,12 @@ export function diagnosticarAuditoriaLocal(
   const lowestMissingCascadeCode = primerPendienteCascada(activeCharacterMap);
   const estadoAlumno = estadoAlumnoDe(activeCharacterMap);
   const masterTone = masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode);
-  const focoRevelacionCode = (lowestMissingCascadeCode ?? 10) as EyeCode;
   const characterSignedCode = geo.characterSignedCode;
+  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode, {
+    characterSignedCode,
+    activeCodes,
+  });
+  const focoRevelacionCode = (lowestMissingCascadeCode ?? 10) as EyeCode;
   const syntacticVacios = vaciosDesdeActiveMap(activeCharacterMap);
   const grounded = estadoAlumno === "ARQUITECTO_GROUNDED";
 
@@ -123,7 +125,10 @@ function sellarLocal(result: DepotAnalysisResult): DepotAnalysisResult {
   const lowestMissingCascadeCode = sync.lowestMissingCascadeCode;
   const estadoAlumno = estadoAlumnoDe(sync.activeCharacterMap);
   const masterTone = masterToneDe(lowestMissingCascadeCode);
-  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode);
+  const pedagogicalFeedback = pedagogicalFeedbackDe(lowestMissingCascadeCode, {
+    characterSignedCode: result.characterSignedCode,
+    activeCodes: sync.activeCodes,
+  });
   const focoRevelacionCode = sync.focoRevelacionCode;
 
   return {
@@ -186,10 +191,9 @@ function fusionarGeminiConGeometria(
 export async function procesarAuditoriaV3(
   payload: DepotEntryPayload,
   callGemini?: GeminiAuditCaller,
-  leyesCasa: readonly PrincipioAprendizaje[] = [],
 ): Promise<ResultadoAuditoriaV3> {
   const local = diagnosticarAuditoriaLocal(payload);
-  const serialized = serializarPromptAuditoria(payload, leyesCasa);
+  const serialized = serializarPromptAuditoria(payload);
 
   if (callGemini) {
     try {
@@ -206,7 +210,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Todo código presente (ej. C5) va en activeCodes y no puede ser VACÍO ni FOCO. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C5 y C6 están, el Tono es C7. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Todo código presente (ej. C5) va en activeCodes y no puede ser VACÍO ni FOCO. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C9 y C10 están, no pidas C5. Si C5 y C6 están, el Tono es C7. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

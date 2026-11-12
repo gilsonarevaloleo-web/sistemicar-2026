@@ -76,7 +76,7 @@ export const PUENTES_ESCRITURA: Record<EyeCode, PuenteEscritura> = {
     codigo: 9,
     percepcion: "Sistema",
     escritura:
-      "conectá tres dimensiones en el mismo escrito: fisiología + trabajo + entorno",
+      "escribí el principio sistémico: una afirmación sin duda, no tres hilos",
   },
   10: {
     codigo: 10,
@@ -164,10 +164,10 @@ export function bloquePuentesPrompt(): string {
     "═══ LEY DE LA CASCADA (C1 → C2 → C4 → C5 → C7 → C10) ═══",
     "Presencia: recorré C1→C2→C3→C4→C5→C6→C7→C8→C9→C10. Todo código escrito entra a activeCodes.",
     "Enseñá el primer código realmente ausente. Un activo NUNCA es FOCO y VACÍO a la vez.",
-    "Si C5 ya está en el papel, no pidas C5. Si C5 y C6 están activos, el Tono es C7 (visión / solución propia).",
+    "Si C5 ya está en el papel, no pidas C5. Si C9 y C10 están, no pidas C5. Si C5 y C6 están activos, el Tono es C7 (visión / solución propia).",
     "C1 es el Título (Vector Cero). C10 solo existe si C1 está y el cierre abrocha ese vector.",
     "Sin título, C10 es VACÍO AUTOMÁTICO por imposibilidad geométrica de retorno.",
-    "immediateAdjustment / pedagogicalFeedback = Tono del Maestro del peldaño pendiente.",
+    "immediateAdjustment / pedagogicalFeedback = Tono del Maestro del peldaño pendiente. Circuito cerrado: fortalezas del papel, no tono C5.",
   ];
   for (const n of EYE_CODES) {
     const p = PUENTES_ESCRITURA[n];
@@ -181,7 +181,9 @@ export function bloquePuentesPrompt(): string {
   lineas.push(`C6: ${TONOS_MAESTRO[6]}`);
   lineas.push(`C7: ${TONOS_MAESTRO[7]}`);
   lineas.push(`C10: ${TONOS_MAESTRO[10]}`);
-  lineas.push(`Circuito cerrado: ${TONO_ARQUITECTO_GROUNDED}`);
+  lineas.push(
+    `Circuito cerrado: ${TONO_ARQUITECTO_GROUNDED} Si no hay peldaño, nombrá Firma, cascada activa y cableado. C3/C8/C9 vacíos no abren peldaño.`,
+  );
   return lineas.join("\n");
 }
 

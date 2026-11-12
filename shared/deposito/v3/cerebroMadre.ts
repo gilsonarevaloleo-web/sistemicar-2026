@@ -1,15 +1,20 @@
 /**
  * Cerebro Madre — recinto de casa de Depósito V3.
  *
- * Candidato → filtro → ley. No publica sola.
- * createdAt nace con el principio y no se toca.
- * El enunciado es el alma del código (puente). El acomodo es lo que ESTE
- * volcado enseñó sobre cómo escribir ese ojo — geometría, no diario.
- * El próximo volcado se mide: ¿construyó el C pedido?
+ * Colisionador: candidato → filtro → ley. No publica sola.
+ * Solo un C9 (principio sistémico) ocupa la bandeja del oráculo.
+ * Identidad = enunciado, no foco+firma. createdAt no se toca.
+ * acomodo = geometría de este volcado. aplicacion = acción del hacedor (filtro).
+ * El oráculo cita leyes selladas; el auditor del volcado no las inyecta.
  */
 
 import { CANON_TEN_EYES, isEyeCode } from "./ojos.ts";
 import { PUENTES_ESCRITURA } from "./pedagogia.ts";
+import {
+  esPrincipioSistemico,
+  extraerCierre,
+  extraerTitulo,
+} from "./geometria.ts";
 import type {
   DepotAnalysisResult,
   DepotEntryPayload,
@@ -24,6 +29,7 @@ export const CEREBRO_MADRE_NO_ES = [
   "No es el diario del alumno.",
   "No mezcla axiomas privados (V2) con ley de casa.",
   "No asciende un candidato a ley sin filtro.",
+  "No es el auditor del volcado: las leyes no viajan al dictamen.",
   "El acomodo es geometría de escritura, no el episodio.",
 ] as const;
 
@@ -60,10 +66,12 @@ export interface PrincipioAprendizaje {
   firma: EyeCode;
   percepcion: string;
   escritura: string;
-  /** Alma del código: puente percepción → geometría. No cambia con el tema. */
+  /** Alma del código: el principio sistémico extraído. No el puente pedagógico. */
   enunciado: string;
-  /** Acomodo de ESTE volcado. Sigue el tema. No copia el diario. */
+  /** Acomodo de ESTE volcado. Geometría, no el episodio. */
   acomodo: string;
+  /** Acción operativa del hacedor. La escribe el filtro; el oráculo no la inventa. */
+  aplicacion: string;
   anclas: string[];
   usos: number;
   /** Veces que el siguiente volcado fue medido contra este pedido. */
@@ -97,7 +105,20 @@ const MIN_PALABRAS = 18;
 const UMBRAL_CLIMA_CORTO = 40;
 const MAX_ENUNCIADO = 280;
 const MAX_ACOMODO = 360;
+const MAX_APLICACION = 360;
 const MAX_ANCLAS = 6;
+
+const CATEGORIA_ALIAS: Partial<Record<EyeCode, string>> = {
+  1: "Atención",
+  4: "Estructura",
+  5: "Foco",
+  9: "Soberanía",
+};
+
+/** Índice operativo del canal. C1 Atención · C4 Estructura · C5 Foco · C9 Soberanía. */
+export function categoriaDe(codigo: EyeCode): string {
+  return CATEGORIA_ALIAS[codigo] ?? CANON_TEN_EYES[codigo].name;
+}
 const MAX_CANDIDATOS = 40;
 const MAX_LEYES = 12;
 
@@ -248,6 +269,9 @@ export function destilarAcomodo(
   if (formas.escena && (foco === 6 || firma === 6)) {
     piezas.push("La escena física sostiene C6.");
   }
+  if (foco === 9 || firma === 9) {
+    piezas.push("C9 es el principio sistémico: afirmación sin duda, no multi-hilo.");
+  }
 
   if (cableado) {
     piezas.push("Título y cierre van por el mismo cordón (C10).");
@@ -300,7 +324,7 @@ function clampFrase(texto: string, max: number): string {
   return (ultimo > 40 ? corte.slice(0, ultimo) : corte).trim();
 }
 
-function normalizar(texto: string): string {
+export function normalizarTextoCasa(texto: string): string {
   return texto
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
@@ -310,9 +334,9 @@ function normalizar(texto: string): string {
     .trim();
 }
 
-function tokensDe(texto: string): Set<string> {
+export function tokensDeTextoCasa(texto: string): Set<string> {
   const out = new Set<string>();
-  for (const t of normalizar(texto).split(" ")) {
+  for (const t of normalizarTextoCasa(texto).split(" ")) {
     if (t.length >= 4 && !STOP.has(t)) out.add(t);
   }
   return out;
@@ -326,31 +350,23 @@ function esClimaCorto(texto: string): boolean {
 }
 
 /**
- * Un volcado de clima corto no enseña a la casa.
- * El candidato nace de geometría de escritura, no del ánimo.
+ * Solo un C9 escrito entra a la bandeja. El puente pedagógico de C2→C7
+ * no es ley de casa. Sin enunciado sistémico no hay candidato.
  */
 export function extraerPrincipioAprendizaje(
   input: ExtraerPrincipioInput,
 ): PrincipioAprendizaje | null {
   const crudo = input.payload.rawFact ?? "";
   if (esClimaCorto(crudo)) return null;
+  if (!volcadoConstruyeCodigo(input.result, 9)) return null;
 
-  const grounded = Boolean(input.result.groundingStatus?.isFullyGrounded);
-  const foco = (input.result.focoRevelacionCode ??
-    input.result.syntaxDiagnostic?.focoCode ??
-    input.result.characterSignedCode) as EyeCode;
   const firma = input.result.characterSignedCode;
-  if (!isEyeCode(foco) || !isEyeCode(firma)) return null;
+  if (!isEyeCode(firma)) return null;
 
-  if (
-    !grounded &&
-    firma === 1 &&
-    foco === 1 &&
-    contarPalabrasVolcado(crudo) < UMBRAL_CLIMA_CORTO
-  ) {
-    return null;
-  }
+  const enunciado = extraerEnunciadoSistemico(input.payload);
+  if (!enunciado) return null;
 
+  const foco = 9 as EyeCode;
   const puente = PUENTES_ESCRITURA[foco];
   const now = input.now ?? Date.now();
   const acomodo = destilarAcomodo(foco, firma, input.result, input.payload);
@@ -362,8 +378,9 @@ export function extraerPrincipioAprendizaje(
     firma,
     percepcion: puente.percepcion,
     escritura: puente.escritura,
-    enunciado: enunciadoPrincipio(foco),
+    enunciado,
     acomodo,
+    aplicacion: "",
     anclas: extraerAnclasGeometricas(crudo),
     usos: 1,
     pedidos: 0,
@@ -371,15 +388,42 @@ export function extraerPrincipioAprendizaje(
   };
 }
 
+function extraerEnunciadoSistemico(payload: DepotEntryPayload): string {
+  const titulo = extraerTitulo(payload);
+  const cierre = extraerCierre(payload, titulo);
+  if (cierre && esPrincipioSistemico(cierre)) {
+    return clampFrase(cierre, MAX_ENUNCIADO);
+  }
+  const frases = (payload.rawFact ?? "")
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (let i = frases.length - 1; i >= 0; i -= 1) {
+    if (esPrincipioSistemico(frases[i])) {
+      return clampFrase(frases[i], MAX_ENUNCIADO);
+    }
+  }
+  if (titulo && esPrincipioSistemico(titulo)) {
+    return clampFrase(titulo, MAX_ENUNCIADO);
+  }
+  return "";
+}
+
 function extraerAnclasGeometricas(texto: string): string[] {
   const geometricas =
-    /patron|patrn|ley|piston|secuencia|corte|inflexion|paradigma|ciclo|carga|titulo|cierre|firma|foco|axioma|modelo/i;
-  const toks = [...tokensDe(texto)].filter((t) => geometricas.test(t));
+    /patron|patrn|ley|piston|secuencia|corte|inflexion|paradigma|ciclo|carga|titulo|cierre|firma|foco|axioma|modelo|principio|valor|sistema/i;
+  const toks = [...tokensDeTextoCasa(texto)].filter((t) => geometricas.test(t));
   return toks.slice(0, MAX_ANCLAS);
 }
 
+function claveEnunciado(enunciado: string): string {
+  return normalizarTextoCasa(enunciado);
+}
+
 function esDuplicado(a: PrincipioAprendizaje, b: PrincipioAprendizaje): boolean {
-  return a.foco === b.foco && a.firma === b.firma;
+  const ka = claveEnunciado(a.enunciado);
+  const kb = claveEnunciado(b.enunciado);
+  return ka.length > 0 && ka === kb;
 }
 
 function preservarCreatedAt(
@@ -396,6 +440,9 @@ function preservarCreatedAt(
       : incoming.acomodo.length > existente.acomodo.length
         ? incoming.acomodo
         : existente.acomodo;
+  const aplicacion = existente.aplicacion?.trim()
+    ? existente.aplicacion
+    : incoming.aplicacion ?? "";
   return {
     ...existente,
     createdAt: existente.createdAt,
@@ -407,6 +454,7 @@ function preservarCreatedAt(
     percepcion: existente.percepcion,
     escritura: existente.escritura,
     acomodo,
+    aplicacion,
     usos: existente.usos + 1,
     anclas,
   };
@@ -443,6 +491,7 @@ export function absorbPrincipio(
   const nuevo: PrincipioAprendizaje = {
     ...candidato,
     estado: "candidato",
+    aplicacion: candidato.aplicacion ?? "",
     usos: Math.max(1, candidato.usos || 1),
     pedidos: candidato.pedidos ?? 0,
     confirmados: candidato.confirmados ?? 0,
@@ -554,6 +603,23 @@ export function promoverALey(
   });
 }
 
+/** El filtro escribe la aplicación operativa. Una ley sellada no se reescribe aquí. */
+export function escribirAplicacion(
+  cerebro: CerebroMadre,
+  id: string,
+  aplicacion: string,
+): CerebroMadre {
+  const limpia = clampFrase(aplicacion, MAX_APLICACION);
+  return mapPrincipio(cerebro, id, (p) => {
+    if (p.estado === "ley") return p;
+    return {
+      ...p,
+      createdAt: p.createdAt,
+      aplicacion: limpia,
+    };
+  });
+}
+
 /** Candidato o filtro → rechazado. Una ley no se despublica desde aquí. */
 export function rechazarPrincipio(
   cerebro: CerebroMadre,
@@ -614,9 +680,10 @@ export function bloqueLeyesCasaPrompt(
       (p.pedidos ?? 0) > 0
         ? ` Próximo: ${p.confirmados ?? 0}/${p.pedidos} construyeron C${p.foco}.`
         : "";
-    const acomodo = p.acomodo ? ` Acomodo: ${p.acomodo}` : "";
+    const acomodo = p.acomodo ? ` Acomodo: ${p.acomodo}`         : "";
+    const aplicacion = p.aplicacion ? ` Aplicación: ${p.aplicacion}` : "";
     lineas.push(
-      `- C${p.foco} ${p.percepcion} · creado ${formatFechaPrincipio(p.createdAt)}: ${p.enunciado}.${acomodo}${medida}`,
+      `- C${p.foco} ${p.percepcion} · ${categoriaDe(p.foco)} · creado ${formatFechaPrincipio(p.createdAt)}: ${p.enunciado}.${acomodo}${aplicacion}${medida}`,
     );
   }
   return lineas.join("\n");
@@ -674,6 +741,10 @@ export function normalizarPrincipio(
     acomodo:
       typeof v.acomodo === "string"
         ? clampFrase(v.acomodo, MAX_ACOMODO)
+        : "",
+    aplicacion:
+      typeof v.aplicacion === "string"
+        ? clampFrase(v.aplicacion, MAX_APLICACION)
         : "",
     anclas: Array.isArray(v.anclas)
       ? v.anclas.filter((a): a is string => typeof a === "string").slice(0, MAX_ANCLAS)

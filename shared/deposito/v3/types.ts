@@ -18,7 +18,7 @@ export type EyeCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export const EYE_CODES: readonly EyeCode[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-/** Escalera pedagógica: C1 → C2 → C4 → C5 → C7 → C10. */
+/** Escalera pedagógica: C1 → C2 → C4 → C5 → C7 → C10. Con C9, se salta C5. */
 export type CascadeCode = 1 | 2 | 4 | 5 | 7 | 10;
 
 export const CASCADE_CODES: readonly CascadeCode[] = [1, 2, 4, 5, 7, 10];

@@ -6,10 +6,6 @@
  * Telemetría fría: no fuerza C8/C9/C10 si el volcado no los construye en pantalla.
  */
 
-import {
-  bloqueLeyesCasaPrompt,
-  type PrincipioAprendizaje,
-} from "./cerebroMadre.ts";
 import { CANON_TEN_EYES, etiquetaCodigoOjo } from "./ojos.ts";
 import {
   bloquePuentesPrompt,
@@ -78,17 +74,20 @@ HOW TO DETECT DEEP CODES IN NATURAL LANGUAGE:
    - IF the user describes stopping an automatic behavior (e.g., "dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"), changing their focus on purpose to protect their body/brain ("cambio de atención", "cambiar de enfoque"), or saying "NO" to an internal mandate ("el deber", "el Debo") -> THIS IS A C5 INTENT.
    - Naming the choice to ignore an alert ("elegimos ignorarlo") is also C5.
    - Executive connectors ALSO light C5: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". A firm executive sentence is C5 even without the word "corte".
+   - Naming the decision already on the paper also lights C5, including the common misspelling "desición" / "desidí": "falta de desición", "desidí comprar", "la desición que debería ejecutar", "ejecutar una desición", "lo dejé". Decrees "a partir de hoy", "de hoy en adelante", "lo primero que debo hacer" are C5. If C5 is written, do NOT teach C5 again.
 
 2. C8 (CICLOS / POLARIDAD / RETORNO):
    - IF the user describes switching to an opposite state (e.g., going from work to resting/Facebook/audio) to restore energy, and then returning to productivity refreshed -> THIS IS A C8 INTENT.
-   - IF the wording constructs attention as a battery that empties, has a limit, multiplies wear when duty insists after the charge is gone, or names an "onda de sierra" -> THIS IS A C8 INTENT (heatmap presence). It does NOT close C10.
+   - IF the wording constructs attention as a battery that empties, has a limit, multiplies wear when duty insists after the charge is gone, or names an "onda de sierra" -> THIS IS A C8 INTENT (heatmap presence). It does NOT close C10 by itself.
+   - IF the hypothesis names "ley del ciclo" / código 8, or the dump constructs a plateau that "funciona en bucle" / "límite de resistencia" -> FIRMA C8. Do NOT let surface "entonces" (C2) steal the firma.
    - ONLY if that cycle is constructed in the wording. Do NOT infer C8 from implied rest, drama, or recharge that the sentence does not build.
-   - C8 on the heatmap is presence. C10 stays EMPTY unless the last sentence returns to the Title.
+   - C8 on the heatmap is presence. C10 stays EMPTY unless the last sentence returns to the Title or to the dump's opening sentence.
 
 3. C7 (VISIÓN / PATRÓN AXIOMÁTICO):
    - IF the user discovers a rule about how things work (e.g., "donde está tu atención está tu energía", "el deber es el enemigo instalado", "la atención tiene ciclo de vida") -> THIS IS A C7 INTENT.
    - Own solution / pattern connectors also light C7: "mi solución", "el patrón es", "planteo", "encajo esto", "concluyo que", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la respuesta es que".
    - IF C5 and C6 are already on the paper, the NEXT Master demand is C7 — never repeat C5.
+   - IF the hypothesis names código 7 / "la visión", or the dump constructs "falta de visión" / "visión estructurada" / "visión planeta 7" -> FIRMA C7. Do NOT let surface "entonces" (C2) steal the firma, and do NOT ask for a C5 scissors the paper already named.
 
 4. SEPARATION OF SURFACE vs INTENT:
    - Surface connectors ("entonces", "después", "luego") are just narrative vessels. Do NOT let superficial C2 markers blind you to the heavy structural decisions (C5, C7, C8) inside the story.
@@ -133,11 +132,11 @@ OUTPUT INTEGRITY:
 - characterSignedCode = the syntax the writing actually uses (Firma).
 - Scan C1→C10 for presence. Every detected code belongs in activeCodes AND activeCharacterMap.
 - syntacticVacios = complement of activeCodes. NEVER put a present code (e.g. C5 already written) in syntacticVacios.
-- FOCO (focoRevelacionCode / syntaxDiagnostic.focoCode) = first REAL missing teaching step after the last active cascade code. NEVER FOCO a code that is already in activeCodes. NEVER mark FOCO as VACÍO if that code is on the paper.
+- FOCO (focoRevelacionCode / syntaxDiagnostic.focoCode) = first REAL missing teaching step after the last active cascade code. NEVER FOCO a code that is already in activeCodes. NEVER mark FOCO as VACÍO if that code is on the paper. If C9 and C10 are present, FOCO is not C5.
 - If C1,C2,C3,C4,C5,C6 are active, FOCO/Master Tone is C7 (Visión / solución), not C5.
 - focoRevelacionCode = lowestMissingCascadeCode (the pending cascade step). If the circuit is closed, 10.
 - titleConnectedToClose = C1 present AND last sentence seals the title vector.
-- immediateAdjustment / pedagogicalFeedback = Master Tone of the pending cascade code.
+- immediateAdjustment / pedagogicalFeedback = Master Tone of the pending cascade code. If the circuit is closed, name the syntactic strengths on the paper (Firma, cascade codes, cableado). Do NOT reuse the C5 tone.
 `.trim();
 
 /**
@@ -163,27 +162,28 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 - C2 (Flujo): Temporal connectors, narrative of events, relational thread of facts. SURFACE ONLY — "entonces/después/luego" are narrative vessels, not the teaching foco if a lower cascade step is missing.
 - C3 (Trabajo): Antecedent -> Consequent sequential chain. Independent of clock time. Heatmap only (not a cascade step). Natural chain "entonces / en ese momento / empiezo / con ese / logro" lights C3 without "primero" or a clock.
 - C4 (Inflexión / Seriedad): Inflection question (¿Por qué...?, ¿Qué pasa si...?) or paradigm-break phrases ("El problema es:", "Acá me doy cuenta").
-- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo".
-- C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video). Do not judge the source. Heatmap; Master Tone C6 exists if asked.
-- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida"). Do not judge whether it works. If C5 and C6 are present, demand C7 next.
-- C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations, attention battery that empties, limit of focus, "onda de sierra". Only if the wording constructs that cycle. Presence on the heatmap — it does not light C10.
-- C9 (Sistema): Explicitly connects three or more dimensions (physiology + work + environment). Do not simulate it.
-- C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector. No title → C10 EMPTY by geometric impossibility.
+- C5 (Decisión / Tijera): Executive answer after C4, short cutting sentences, limit decrees, containment signs with a decision. Stopping an automatic behavior ("dejé el trabajo", "puse pausa al desglosador", "saqué la atención del trabajo"). Changing focus on purpose ("cambio de atención", "cambiar de enfoque"). Naming the choice to ignore an alert ("elegimos ignorarlo"). Connectors: "mi decisión es", "decido", "voy a", "tomo la decisión", "elijo". Also the misspelling "desición" / "la desición que debería ejecutar" / "ejecutar una desición". Decrees "a partir de hoy", "de hoy en adelante", "lo primero que debo hacer" are C5. If C5 is on the paper, it cannot be FOCO or VACÍO. If C7 or C9 are on the paper, do NOT credit Firma C1 (ego). Lower-code claims become irrelevant.
+- C6 (La Fuente): Mentions where the fact/knowledge came from (taller, hogar, libro, persona, video, curso, anuncio, publicidad, "en Facebook"). Do not judge the source. A Facebook ad / bought course is C6 presence. Heatmap; Master Tone C6 exists if asked.
+- C7 (Visión / Encaje): Own solution idea, fitting proposal, or pattern ("mi solución", "el patrón es", "encajo esto", "aprendí que", "me lleva a la conclusión", "la ley tiene", "la atención tiene ciclo de vida", "falta de visión", "visión estructurada", "visión planeta 7"). Do not judge whether it works. If C5 and C6 are present, demand C7 next. If the hypothesis names código 7 / la visión, Firma is C7 — do not let "entonces" steal it.
+- C8 (Ciclos): Opposite pairs, state changes, energy/time fluctuations, attention battery that empties, limit of focus, "onda de sierra", "ley del ciclo", plateau that "funciona en bucle" / "límite de resistencia". Only if the wording constructs that cycle. If the hypothesis names código 8 / ley del ciclo, Firma is C8 — do not let "entonces" steal it. Presence on the heatmap — it does not by itself light C10.
+- C9 (Sistema / Principio): Systemic principle — an affirmation without doubt ("por eso digo", "el cansancio es el enfoque", "polo contrario", "ley de la economía", "cambiando de foco sin cambiar el movimiento", "el valor personal"). This is what Cerebro Madre absorbs. Do NOT require three threads (physiology + work + environment); that would force the dump off-topic. Multi-thread may still light C9, but it is not the definition.
+- C10 (Origen / Matriz): ONLY if C1 is Active AND the last sentence seals the Title vector OR the dump's opening sentence. "En conclusión" / "La conclusión es" seals only if it returns to that vector (visión ↔ planeta 7, habilidad/límite ↔ siguiente nivel). Código/planeta N in the close counts as return to a title that named that code. No title → C10 EMPTY by geometric impossibility.
 
 STEP 2: CASCADE LAW (TEACHING FOCO)
 - Scan presence in strict paper order: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
-- Teaching order: C1 → C2 → C4 → C5 → C7 → C10.
+- Teaching order: C1 → C2 → C4 → C5 → C7 → C10. If C9 (systemic principle) is on the paper, skip C5: C1 → C2 → C4 → C7 → C10.
 - lowestMissingCascadeCode = the first teaching code that is REALLY absent after the last active cascade step.
-- If C5 is already in activeCodes, NEVER ask C5 again. If C5 and C6 are active, the Master Tone is C7.
+- If C5 is already in activeCodes, NEVER ask C5 again. If C9 and C10 are on the paper, NEVER ask C5. If C5 and C6 are active, the Master Tone is C7.
 - A present code MUST be in activeCodes. It MUST NOT appear as FOCO and VACÍO at the same time.
 - Do NOT just pick the code with the most words (e.g., C3).
 - Do NOT teach a higher code when a lower cascade step is empty.
-- Student state: no C1 → PRINCIPIANTE_SIN_ANCLA. C1 without C4 → EXPLORADOR_NARRATIVO. C4 without C5/C7 → ENLACE_EN_TRANSMUTACIÓN. C1..C7 and C10 → ARQUITECTO_Grounded.
-- characterSignedCode = primary syntax used for storytelling (Firma).
+- Student state: no C1 → PRINCIPIANTE_SIN_ANCLA. C1 without C4 → EXPLORADOR_NARRATIVO. C4 without C5/C7 → ENLACE_EN_TRANSMUTACIÓN. C7+C10 and (C5 or C9) → ARQUITECTO_Grounded. A client's «sí» is not the author's C5.
+- characterSignedCode = primary syntax used for storytelling (Firma). If C9 is on the paper, Firma is C9. If C7 or C9 are present, NEVER credit Firma C1.
 - focoRevelacionCode = lowestMissingCascadeCode (pending step). If closed, 10.
 
 STEP 3: GENERATE THE "AJUSTE DE PERCEPCIÓN" (immediateAdjustment)
 - Use the Master Tone of the PENDING cascade code. Do not give life-coaching or moral advice.
+- If no cascade step is missing (ARQUITECTO_Grounded), do NOT reuse C5 ("traza una línea"). If C9 and C10 are on the paper, C5 empty is not a pending step — name Firma C9. C3/C8 empty do not open a step. Zero moral congratulations.
 - C1 tone: start with a title. C2: narrate facts. C4: uncomfortable question. C5: firm decision. C6: name the source. C7: own solution. C10: last sentence returns to the title.
 - NEVER give generic advice like "repeat C3 with a number".
 - NEVER evaluate bueno/malo, eficaz/ineficaz, or calidad de vida.
@@ -195,10 +195,7 @@ ${jsonSchemaEjemplo()}
 /** Alias: el motor de firma ahora es el prompt de maestría. */
 export const DEPOT_V3_SYNTAX_ONLY_PROMPT = DEPOT_V3_MASTER_PROMPT;
 
-export function buildDepositoV3SystemPrompt(
-  leyesCasa: readonly PrincipioAprendizaje[] = [],
-): string {
-  const leyes = bloqueLeyesCasaPrompt(leyesCasa);
+export function buildDepositoV3SystemPrompt(): string {
   const cuerpo = `
 ${DEPOT_V3_MASTER_PROMPT}
 
@@ -211,14 +208,14 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 2. EL TÍTULO ES C1, NO C10. C10 solo si C1 está activo Y la última oración abrocha el vector del título. Sin título, C10 es vacío automático. isCableadoConnected = titleConnectedToClose.
 3. VACÍOS NO SON PECADO. Son puntos en blanco del armado. Van en syntacticVacios.
 4. characterSignedCode es el código de sintaxis PRIMARIO del relato (el que narra).
-5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Recorré C1→C10 para presencia. Enseñá el primer ausente real de C1 → C2 → C4 → C5 → C7 → C10. Si C5 ya está en el papel, NO lo pidas. Si C5 y C6 están activos, el Tono es C7. Prohibido marcar FOCO un código que figure como VACÍO si ese código ya está escrito.
+5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Recorré C1→C10 para presencia. Enseñá el primer ausente real de C1 → C2 → C4 → C5 → C7 → C10. Si C5 ya está en el papel, NO lo pidas. Si C9 y C10 están, NO pidas C5 (el principio sella; C5 vacío no abre peldaño). Si C5 y C6 están activos, el Tono es C7. Prohibido marcar FOCO un código que figure como VACÍO si ese código ya está escrito.
 6. activeCodes / activeCharacterMap cubren C1–C10 y alimentan el mapa de calor. Todo código detectado (ej. C5) entra a activeCodes. syntacticVacios es el complemento: un activo nunca es vacío. Cero Óptica de verdad. Cero brecha Δ.
-7. immediateAdjustment / pedagogicalFeedback = Tono del Maestro del código pendiente. Cero consejo de vida. Prohibido «repetí C3 con un número».
-8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5 enciende con «mi decisión es», «decido», «voy a» y otras sentencias ejecutivas. C7/C8 viven en la INTENCIÓN de la acción, no en jerga técnica.
-9. TELEMETRÍA FRÍA. No fuerces ni simules C8, C9 o C10 si la redacción exacta no los construye. Una transición pura C2→C7 se marca como Firma C2 con C7 activo. Los vacíos de C8/C9 se respetan. El foco de enseñanza sigue la cascada.
+7. immediateAdjustment / pedagogicalFeedback = Tono del Maestro del código pendiente. Si el circuito está cerrado, nombrá las fortalezas sintácticas del papel (Firma, cascada activa, cableado). No reutilices el tono C5. Cero consejo de vida. Prohibido «repetí C3 con un número».
+8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5 enciende con «mi decisión es», «decido», «voy a», «a partir de hoy», «lo primero que debo hacer» y otras sentencias ejecutivas. Si C7 o C9 están en el papel, Firma no es C1. C7/C8/C9 viven en la INTENCIÓN de la acción, no en jerga técnica.
+9. TELEMETRÍA FRÍA. C9 es principio sistémico (afirmación sin duda), no multi-hilo. El Cerebro Madre absorbe C9. No fuerces C8 ni C10 si el texto no los construye. Una transición pura C2→C7 sin principio se marca Firma C2 con C7 activo. El foco de enseñanza sigue la cascada.
 10. C4 ES INFLEXIÓN. Pregunta de inflexión o «el problema es:» / «acá me doy cuenta». El alma del código no cambia; el acomodo sigue el tema.
 11. TEMPERAMENTO. G1 nutritivo, G2 fricción, G3 rigor, G4 matemática pura. El dictamen usa el Tono del Maestro del peldaño, no un sermón de grado.
-12. ESTADOS: PRINCIPIANTE_SIN_ANCLA (sin C1) · EXPLORADOR_NARRATIVO (C1 sin C4) · ENLACE_EN_TRANSMUTACIÓN (C4 sin C5/C7) · ARQUITECTO_Grounded (C1..C7 y C10).
+12. ESTADOS: PRINCIPIANTE_SIN_ANCLA (sin C1) · EXPLORADOR_NARRATIVO (C1 sin C4) · ENLACE_EN_TRANSMUTACIÓN (C4 sin C5/C7) · ARQUITECTO_Grounded (C7+C10 y C5 o C9).
 
 ═══ SALIDA ═══
 Respondé SOLO un JSON válido (sin markdown) con la forma exacta de OUTPUT JSON STRUCTURE.
@@ -230,14 +227,14 @@ activeCharacterMap cubre las claves "1"…"10".
 syntacticVacios es un array de IDs 1–10 omitidos (puede ser []).
 syntaxDiagnostic.isCableadoConnected = titleConnectedToClose.
 syntaxCharacteristics, groundingStatus.diagnosticMessage e immediateAdjustment: español, cortos, estructurales.
-immediateAdjustment = pedagogicalFeedback = Tono del Maestro del código pendiente. Cero sermón. Cero consejo de vida.
+immediateAdjustment = pedagogicalFeedback = Tono del Maestro del código pendiente. Circuito cerrado: fortalezas del papel, no tono C5. Cero sermón. Cero consejo de vida.
 
 ${bloquePuentesPrompt()}
 
 LOS 10 CÓDIGOS DE CARÁCTER:
 ${diccionarioCanales()}
 `.trim();
-  return leyes ? `${cuerpo}\n\n${leyes}` : cuerpo;
+  return cuerpo;
 }
 
 export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
@@ -287,9 +284,8 @@ export function buildDepositoV3UserPrompt(payload: DepotEntryPayload): string {
 
 export function serializarPromptAuditoria(
   payload: DepotEntryPayload,
-  leyesCasa: readonly PrincipioAprendizaje[] = [],
 ): string {
-  return `${buildDepositoV3SystemPrompt(leyesCasa)}\n\n${buildDepositoV3UserPrompt(payload)}`;
+  return `${buildDepositoV3SystemPrompt()}\n\n${buildDepositoV3UserPrompt(payload)}`;
 }
 
 export function etiquetaCanalPrompt(codigo: EyeCode, dialect: "canon" | "planeta" = "canon"): string {

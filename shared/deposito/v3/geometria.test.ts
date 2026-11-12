@@ -6,6 +6,7 @@ import {
   peldañoPendienteEnlace,
   primerPendienteCascada,
   reconciliarCascada,
+  tonoFortalezas,
 } from "./cascada.ts";
 import {
   auditarGeometriaSintactica,
@@ -50,6 +51,27 @@ describe("Geometría sintáctica fría", () => {
       titleConnectedToClose("El pistón del martes", "Ya veré mañana."),
       false,
     );
+    assert.equal(
+      titleConnectedToClose(
+        "El desarrollo de habilidades tienen límite",
+        "En conclusión, el siguiente nivel de desarrollo con nuestra habilidad va a otro plano mental.",
+      ),
+      true,
+    );
+    assert.equal(
+      titleConnectedToClose(
+        "Ley del ciclo, código 8",
+        "En conclusión ya veré mañana.",
+      ),
+      false,
+    );
+    assert.equal(
+      titleConnectedToClose(
+        "Acá pareció el código 7, la vision",
+        "La conclusión es crear la vista neuronal con visión planeta 7.",
+      ),
+      true,
+    );
   });
 
   it("C5 enciende con conectores ejecutivos de decisión", () => {
@@ -59,6 +81,10 @@ describe("Geometría sintáctica fría", () => {
       "Voy a trazar una línea.",
       "Mi atención lo saco del trabajo y cambio de enfoque.",
       "Elegimos ignorarlo. Ahí está el daño.",
+      "Hasta la desición que debería ejecutar. El cuerpo no quería ejecutar una desición.",
+      "¿Porque desidí comprar el curso? Lo deje a los tres días.",
+      "El problema no es falta de desición sino falta de visión.",
+      "A partir de hoy en adelante lo primero que debo hacer es si soy.",
     ]) {
       const geo = auditarGeometriaSintactica({
         rawFact,
@@ -117,6 +143,66 @@ describe("Geometría sintáctica fría", () => {
     assert.equal(geo.active[6], true);
   });
 
+  it("C6 enciende con anuncio / curso / en Facebook, no con un Facebook de ocio", () => {
+    const fuente = auditarGeometriaSintactica({
+      rawFact:
+        "Estaba escroliando en Facebook y vi un anuncio. Ese curso lo terminé comprando y lo leí tres días.",
+      studentHypothesis: "La sed de aprender",
+      userTier: "CARRERA",
+    });
+    assert.equal(fuente.active[6], true);
+
+    const ocio = auditarGeometriaSintactica({
+      rawFact:
+        "Entonces me fui a Facebook, puse un audio y descansé. Después volví a producir.",
+      userTier: "CARRERA",
+    });
+    assert.equal(ocio.active[6], false);
+  });
+
+  it("ley del ciclo + bucle firma C8; en conclusión vuelve al límite de la habilidad y abrocha C10", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact: `Hoy aprendí que el desarrollo de habilidades tienen límite.
+Hasta 3 días incrementé. Al cuarto día la habilidad funciona en bucle. Entonces ¿en qué estado se pudiera llevarlo al otro nivel?
+En conclusión si se quiere pasar al siguiente nivel de desarrollo con nuestra habilidad, se tiene que llevar a otro plano mental.`,
+      studentHypothesis:
+        "Acá pareció la ley del ciclo, código 8 porque es como funciona la nayuraleza",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.characterSignedCode, 8);
+    assert.equal(geo.active[8], true);
+    assert.equal(geo.active[10], true);
+    assert.equal(geo.titleConnectedToClose, true);
+  });
+
+  it("hipótesis código 1 no firma C1 si hay C7/C9; a partir de hoy enciende C5", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact:
+        "Hoy aprendí que el valor interno se siente. Entonces ¿por qué no lo valoré? A partir de hoy lo primero que debo hacer es si soy. Por eso razón el valor personal no se expresa hablando: se expresa en los demás.",
+      studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.active[5], true);
+    assert.equal(geo.active[9], true);
+    assert.equal(geo.characterSignedCode, 9);
+    assert.notEqual(geo.characterSignedCode, 1);
+  });
+
+  it("código 7 / desición en el papel: firma C7, C5 activo, C10 abrocha la visión", () => {
+    const geo = auditarGeometriaSintactica({
+      rawFact: `Hoy aprendi que los problemas no solamente son por falta de desición sino por falta de visión.
+Hasta la desición que debería ejecutar. La solución es visión estructurada.
+La conclusión es que si el cuerpo no quiere ejecutar una desición, lo sabio es crear la vista neuronal con visión planeta 7.`,
+      studentHypothesis: "Acá pareció el código 7, la vision",
+      userTier: "CARRERA",
+    });
+    assert.equal(geo.active[5], true);
+    assert.equal(geo.active[7], true);
+    assert.equal(geo.characterSignedCode, 7);
+    assert.equal(geo.active[10], true);
+    assert.equal(geo.titleConnectedToClose, true);
+  });
+
   it("C8 enciende con batería de atención / onda de sierra, no con C10", () => {
     const geo = auditarGeometriaSintactica({
       rawFact:
@@ -131,13 +217,32 @@ describe("Geometría sintáctica fría", () => {
     assert.equal(geo.characterSignedCode, 8);
   });
 
-  it("C9 exige tres dimensiones conectadas, no un solo hilo", () => {
+  it("C9 enciende con principio sistémico, no exige tres hilos", () => {
     const soloTrabajo = auditarGeometriaSintactica({
       rawFact: "El pistón del trabajo se trabó en la secuencia.",
       studentHypothesis: "Trabajo",
       userTier: "MATRICULA",
     });
     assert.equal(soloTrabajo.active[9], false);
+
+    const principio = auditarGeometriaSintactica({
+      rawFact:
+        "Por eso razón el valor personal no se expresa hablando de nuestro valor, sino cruzando el valor de importancia en los demás.",
+      studentHypothesis: "La ley del valor en los demas",
+      userTier: "CARRERA",
+    });
+    assert.equal(principio.active[9], true);
+    assert.equal(principio.characterSignedCode, 9);
+
+    const energia = auditarGeometriaSintactica({
+      rawFact:
+        "Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos si cambiamos de enfoque al polo contrario sin cambiar la mecánica de movimiento.",
+      studentHypothesis: "La ley de la economía de energía código 7",
+      userTier: "CARRERA",
+    });
+    assert.equal(energia.active[9], true);
+    assert.equal(energia.characterSignedCode, 9);
+    assert.notEqual(energia.characterSignedCode, 2);
 
     const triple = auditarGeometriaSintactica({
       rawFact:
@@ -170,6 +275,14 @@ describe("Ley de la Cascada", () => {
     const hastaC6 = buildActiveCharacterMap([1, 2, 3, 4, 5, 6]);
     assert.equal(primerPendienteCascada(hastaC6), 7);
     assert.notEqual(primerPendienteCascada(hastaC6), 5);
+
+    const conC9sinC5 = buildActiveCharacterMap([1, 2, 4, 7, 9, 10]);
+    assert.equal(primerPendienteCascada(conC9sinC5), null);
+    assert.equal(estadoAlumnoDe(conC9sinC5), "ARQUITECTO_GROUNDED");
+
+    const c4c7sinC9 = buildActiveCharacterMap([1, 2, 4, 7, 10]);
+    assert.equal(primerPendienteCascada(c4c7sinC9), 5);
+    assert.equal(estadoAlumnoDe(c4c7sinC9), "ENLACE_EN_TRANSMUTACION");
   });
 
   it("el dictamen de enlace no llama tijera a un C10 vacío", () => {
@@ -193,6 +306,19 @@ describe("Ley de la Cascada", () => {
     assert.doesNotMatch(mensaje, /tijera|idea propia/);
     assert.match(mensaje, /Cableado título↔cierre: no/);
     assert.match(mensaje, /Firma C8/);
+  });
+
+  it("circuito cerrado nombra fortalezas, no tijera", () => {
+    const ajuste = tonoFortalezas({
+      characterSignedCode: 1,
+      activeCodes: [1, 2, 4, 5, 6, 7, 10],
+    });
+    assert.match(ajuste, /Firma C1/);
+    assert.match(ajuste, /C1 · C2 · C4 · C5 · C7 · C10/);
+    assert.match(ajuste, /C6/);
+    assert.match(ajuste, /C3 · C8 · C9 quedan vacíos/);
+    assert.match(ajuste, /no abren peldaño/);
+    assert.doesNotMatch(ajuste, /traza una línea|tijera/i);
   });
 
   it("reconciliar no deja FOCO C5 si C5 ya está activo", () => {
