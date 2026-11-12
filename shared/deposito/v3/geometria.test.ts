@@ -275,6 +275,14 @@ describe("Ley de la Cascada", () => {
     const hastaC6 = buildActiveCharacterMap([1, 2, 3, 4, 5, 6]);
     assert.equal(primerPendienteCascada(hastaC6), 7);
     assert.notEqual(primerPendienteCascada(hastaC6), 5);
+
+    const conC9sinC5 = buildActiveCharacterMap([1, 2, 4, 7, 9, 10]);
+    assert.equal(primerPendienteCascada(conC9sinC5), null);
+    assert.equal(estadoAlumnoDe(conC9sinC5), "ARQUITECTO_GROUNDED");
+
+    const c4c7sinC9 = buildActiveCharacterMap([1, 2, 4, 7, 10]);
+    assert.equal(primerPendienteCascada(c4c7sinC9), 5);
+    assert.equal(estadoAlumnoDe(c4c7sinC9), "ENLACE_EN_TRANSMUTACION");
   });
 
   it("el dictamen de enlace no llama tijera a un C10 vacío", () => {

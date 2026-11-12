@@ -455,6 +455,32 @@ Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos 
     assert.match(r.immediateAdjustment, /Firma C9/);
   });
 
+  it("volcado 11/11/2026: C9 sella; C5 vacío no es FOCO ni tijera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendi que la necesidad de un cliente puede que no exista, hasta que se lo haga conciente. 
+Habeces me encuentro aburrido de hacer lo mismo y me voy por a distraerme en Facebook, ahí encuentro publicidad y resulta que esa publicidad crea una necesidad que antes no tenía. Me fui  fui ha Facebook por aburrimiento y resulta que ahora necesito algo que hay final termino comprando ese producto que antes ni siquiera veía esa necesidad.  Quiere decir ¿Que la necesidad se impone en una persona? ¿Porque se impone? Parece que se impone porque el publicista sabe hablar el lenguaje de los códigos que se encuentran ambriento.  Esto me hace pensar que hay una mecánica para activar un código interno ¿Cual sería esa mecánica? Hay 10 códigos, cada código se activa de manera diferente. Por ejemplo al código 1 para activarlo debemos ofrecer el nacimiento del ego (eso es alimento del ese código) del código 2 su alimento es la dopamina, la importancia. Código 3 es la sensación de que se está avansando, etc. Ahora ¿Cual sería la mecánica para activar uno de estés códigos? Sospecho que pudiera ser el beneficio del código y después una pregunta de creación de necesidad y etiquetacio de lo puedo de ese código, donde obligatoriamente tuviera que responder que si.  Llevemos a un ejemplo real.  Supongamos que estoy queriendo vender jornada base ¿Cómo hablo de la necesidad específica que cubre o abarca?  Eres un trabajador que tu salario depende de producción de unidades? Jornada base es para ti.  Acá va la creación de necesidad Jordan para que responda que si. ¿Porque es para ti? Porque tu no quieres terminar el día sintiendo que se ha perdido el día ¿Sierto! Tu quieres terminar el día sabiendo en que se te ha ido el día, tu quieres terminar el día el día sabiendo antes que tú jornada empiece en que vas a utilizar tu tiempo duro medido en minutos sin que ese tiempo pase ¿Sierto?. 
+Ahí hemos creado una necesidad que antes no había. 
+Por eso digo que la necesidad no existe hasta que un vendedor lo haga conciente de la necesidad del cliente.`,
+      studentHypothesis: "La ley de si no lo ve, no existe. Código 1",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo no dicho es que a cualquier cliente podemos convencer si utilizando el arte de  mostrar la necesidad y después obligarle a que tenga que decir que si ha esa necesidad y en realidad no es forsarlo, sino mensionar una necesidad de un código, antes no lo veía esa necesidad de codigo porque nadie no le mostraba",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
+    assert.equal(r.characterSignedCode, 9);
+    assert.notEqual(r.characterSignedCode, 1);
+    assert.notEqual(r.characterSignedCode, 2);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
+    assert.match(r.immediateAdjustment, /Firma C9/);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:
