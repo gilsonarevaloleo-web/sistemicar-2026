@@ -3,6 +3,7 @@
  *
  * Presencia: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
  * Enseñanza: C1 → C2 → C4 → C5 → C7 → C10.
+ * Si C9 (principio) está en el papel, C5 no es peldaño: C1 → C2 → C4 → C7 → C10.
  * C3, C6, C8 y C9 viven en el mapa de calor; no abren el siguiente peldaño.
  * Un código presente nunca es FOCO y VACÍO a la vez.
  * El dictamen usa el Tono del Maestro del primer ausente real. Cero consejo de vida.
@@ -78,14 +79,19 @@ export function primerAusenteEnSecuencia(
   return null;
 }
 
+/** Con C9 en el papel, C5 no abre peldaño. */
+export const CASCADA_CON_PRINCIPIO: readonly CascadeCode[] = [1, 2, 4, 7, 10];
+
 /**
  * Escalón de enseñanza: primer código inactivo de C1→C2→C4→C5→C7→C10.
+ * Si C9 está activo, se salta C5: C1→C2→C4→C7→C10.
  * Nunca devuelve un código que ya está en el mapa de activos.
  */
 export function primerPendienteCascada(
   map: Record<EyeCode, boolean> | null | undefined,
 ): CascadeCode | null {
-  const pendiente = primerAusenteEnSecuencia(map, CASCADE_CODES);
+  const stairs = mapaTiene(map, 9) ? CASCADA_CON_PRINCIPIO : CASCADE_CODES;
+  const pendiente = primerAusenteEnSecuencia(map, stairs);
   return pendiente as CascadeCode | null;
 }
 
@@ -167,7 +173,9 @@ export function estadoAlumnoDe(
   if (!mapaTiene(map, 1)) return "PRINCIPIANTE_SIN_ANCLA";
   if (!mapaTiene(map, 4)) return "EXPLORADOR_NARRATIVO";
   const cierra =
-    mapaTiene(map, 5) && mapaTiene(map, 7) && mapaTiene(map, 10);
+    mapaTiene(map, 7) &&
+    mapaTiene(map, 10) &&
+    (mapaTiene(map, 5) || mapaTiene(map, 9));
   if (!cierra) return "ENLACE_EN_TRANSMUTACION";
   if (primerPendienteCascada(map) === null) return "ARQUITECTO_GROUNDED";
   return "ENLACE_EN_TRANSMUTACION";

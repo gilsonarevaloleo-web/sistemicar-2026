@@ -212,7 +212,7 @@ export async function procesarAuditoriaV3(
     }
     try {
       const raw2 = await callGemini(
-        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Todo código presente (ej. C5) va en activeCodes y no puede ser VACÍO ni FOCO. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C5 y C6 están, el Tono es C7. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
+        `${serialized}\n\nIMPORTANTE: responde SOLO el JSON con characterSignedCode, focoRevelacionCode, activeCharacterMap, syntacticVacios, activeCodes, lowestMissingCascadeCode, titleConnectedToClose, masterTone, pedagogicalFeedback, estadoAlumno, syntaxDiagnostic (incluye focoCode e isCableadoConnected), groundingStatus, immediateAdjustment. El Título es C1. C10 solo si C1 y el cierre abrocha el título. Todo código presente (ej. C5) va en activeCodes y no puede ser VACÍO ni FOCO. Enseñá el primer código AUSENTE C1→C2→C4→C5→C7→C10. Si C9 y C10 están, no pidas C5. Si C5 y C6 están, el Tono es C7. Cero consejo de vida. Cero perceptionEye. Cero deltaGap.`,
         2048,
         false,
       );

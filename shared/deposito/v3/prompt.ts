@@ -136,7 +136,7 @@ OUTPUT INTEGRITY:
 - characterSignedCode = the syntax the writing actually uses (Firma).
 - Scan C1→C10 for presence. Every detected code belongs in activeCodes AND activeCharacterMap.
 - syntacticVacios = complement of activeCodes. NEVER put a present code (e.g. C5 already written) in syntacticVacios.
-- FOCO (focoRevelacionCode / syntaxDiagnostic.focoCode) = first REAL missing teaching step after the last active cascade code. NEVER FOCO a code that is already in activeCodes. NEVER mark FOCO as VACÍO if that code is on the paper.
+- FOCO (focoRevelacionCode / syntaxDiagnostic.focoCode) = first REAL missing teaching step after the last active cascade code. NEVER FOCO a code that is already in activeCodes. NEVER mark FOCO as VACÍO if that code is on the paper. If C9 and C10 are present, FOCO is not C5.
 - If C1,C2,C3,C4,C5,C6 are active, FOCO/Master Tone is C7 (Visión / solución), not C5.
 - focoRevelacionCode = lowestMissingCascadeCode (the pending cascade step). If the circuit is closed, 10.
 - titleConnectedToClose = C1 present AND last sentence seals the title vector.
@@ -175,19 +175,19 @@ STEP 1: MAP THE 10 SYNTAX CODES (CARÁCTER) — COLD MARKERS ONLY
 
 STEP 2: CASCADE LAW (TEACHING FOCO)
 - Scan presence in strict paper order: C1 → C2 → C3 → C4 → C5 → C6 → C7 → C8 → C9 → C10.
-- Teaching order: C1 → C2 → C4 → C5 → C7 → C10.
+- Teaching order: C1 → C2 → C4 → C5 → C7 → C10. If C9 (systemic principle) is on the paper, skip C5: C1 → C2 → C4 → C7 → C10.
 - lowestMissingCascadeCode = the first teaching code that is REALLY absent after the last active cascade step.
-- If C5 is already in activeCodes, NEVER ask C5 again. If C5 and C6 are active, the Master Tone is C7.
+- If C5 is already in activeCodes, NEVER ask C5 again. If C9 and C10 are on the paper, NEVER ask C5. If C5 and C6 are active, the Master Tone is C7.
 - A present code MUST be in activeCodes. It MUST NOT appear as FOCO and VACÍO at the same time.
 - Do NOT just pick the code with the most words (e.g., C3).
 - Do NOT teach a higher code when a lower cascade step is empty.
-- Student state: no C1 → PRINCIPIANTE_SIN_ANCLA. C1 without C4 → EXPLORADOR_NARRATIVO. C4 without C5/C7 → ENLACE_EN_TRANSMUTACIÓN. C1..C7 and C10 → ARQUITECTO_Grounded.
+- Student state: no C1 → PRINCIPIANTE_SIN_ANCLA. C1 without C4 → EXPLORADOR_NARRATIVO. C4 without C5/C7 → ENLACE_EN_TRANSMUTACIÓN. C7+C10 and (C5 or C9) → ARQUITECTO_Grounded. A client's «sí» is not the author's C5.
 - characterSignedCode = primary syntax used for storytelling (Firma). If C9 is on the paper, Firma is C9. If C7 or C9 are present, NEVER credit Firma C1.
 - focoRevelacionCode = lowestMissingCascadeCode (pending step). If closed, 10.
 
 STEP 3: GENERATE THE "AJUSTE DE PERCEPCIÓN" (immediateAdjustment)
 - Use the Master Tone of the PENDING cascade code. Do not give life-coaching or moral advice.
-- If no cascade step is missing (ARQUITECTO_Grounded), do NOT reuse C5 ("traza una línea"). Name the syntactic strengths already on the paper: Firma, active cascade codes, title↔close cable. C3/C8/C9 empty do not open a step. Zero moral congratulations.
+- If no cascade step is missing (ARQUITECTO_Grounded), do NOT reuse C5 ("traza una línea"). If C9 and C10 are on the paper, C5 empty is not a pending step — name Firma C9. C3/C8 empty do not open a step. Zero moral congratulations.
 - C1 tone: start with a title. C2: narrate facts. C4: uncomfortable question. C5: firm decision. C6: name the source. C7: own solution. C10: last sentence returns to the title.
 - NEVER give generic advice like "repeat C3 with a number".
 - NEVER evaluate bueno/malo, eficaz/ineficaz, or calidad de vida.
@@ -215,14 +215,14 @@ Cimiento y Claridad son el mismo canal. Trabajo y Ritmo son el mismo canal. La e
 2. EL TÍTULO ES C1, NO C10. C10 solo si C1 está activo Y la última oración abrocha el vector del título. Sin título, C10 es vacío automático. isCableadoConnected = titleConnectedToClose.
 3. VACÍOS NO SON PECADO. Son puntos en blanco del armado. Van en syntacticVacios.
 4. characterSignedCode es el código de sintaxis PRIMARIO del relato (el que narra).
-5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Recorré C1→C10 para presencia. Enseñá el primer ausente real de C1 → C2 → C4 → C5 → C7 → C10. Si C5 ya está en el papel, NO lo pidas. Si C5 y C6 están activos, el Tono es C7. Prohibido marcar FOCO un código que figure como VACÍO si ese código ya está escrito.
+5. FOCO DE REVELACIÓN = lowestMissingCascadeCode. Recorré C1→C10 para presencia. Enseñá el primer ausente real de C1 → C2 → C4 → C5 → C7 → C10. Si C5 ya está en el papel, NO lo pidas. Si C9 y C10 están, NO pidas C5 (el principio sella; C5 vacío no abre peldaño). Si C5 y C6 están activos, el Tono es C7. Prohibido marcar FOCO un código que figure como VACÍO si ese código ya está escrito.
 6. activeCodes / activeCharacterMap cubren C1–C10 y alimentan el mapa de calor. Todo código detectado (ej. C5) entra a activeCodes. syntacticVacios es el complemento: un activo nunca es vacío. Cero Óptica de verdad. Cero brecha Δ.
 7. immediateAdjustment / pedagogicalFeedback = Tono del Maestro del código pendiente. Si el circuito está cerrado, nombrá las fortalezas sintácticas del papel (Firma, cascada activa, cableado). No reutilices el tono C5. Cero consejo de vida. Prohibido «repetí C3 con un número».
 8. LENGUAJE NATURAL. Adaptate a cómo escribe el usuario. «entonces/después/luego» son vasos narrativos. C5 enciende con «mi decisión es», «decido», «voy a», «a partir de hoy», «lo primero que debo hacer» y otras sentencias ejecutivas. Si C7 o C9 están en el papel, Firma no es C1. C7/C8/C9 viven en la INTENCIÓN de la acción, no en jerga técnica.
 9. TELEMETRÍA FRÍA. C9 es principio sistémico (afirmación sin duda), no multi-hilo. El Cerebro Madre absorbe C9. No fuerces C8 ni C10 si el texto no los construye. Una transición pura C2→C7 sin principio se marca Firma C2 con C7 activo. El foco de enseñanza sigue la cascada.
 10. C4 ES INFLEXIÓN. Pregunta de inflexión o «el problema es:» / «acá me doy cuenta». El alma del código no cambia; el acomodo sigue el tema.
 11. TEMPERAMENTO. G1 nutritivo, G2 fricción, G3 rigor, G4 matemática pura. El dictamen usa el Tono del Maestro del peldaño, no un sermón de grado.
-12. ESTADOS: PRINCIPIANTE_SIN_ANCLA (sin C1) · EXPLORADOR_NARRATIVO (C1 sin C4) · ENLACE_EN_TRANSMUTACIÓN (C4 sin C5/C7) · ARQUITECTO_Grounded (C1..C7 y C10).
+12. ESTADOS: PRINCIPIANTE_SIN_ANCLA (sin C1) · EXPLORADOR_NARRATIVO (C1 sin C4) · ENLACE_EN_TRANSMUTACIÓN (C4 sin C5/C7) · ARQUITECTO_Grounded (C7+C10 y C5 o C9).
 
 ═══ SALIDA ═══
 Respondé SOLO un JSON válido (sin markdown) con la forma exacta de OUTPUT JSON STRUCTURE.
