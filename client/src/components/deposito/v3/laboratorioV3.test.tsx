@@ -277,10 +277,30 @@ describe("CerebroMadreV3", () => {
             "Para que tu percepción de C7 (Visión) se desarrolle, escribí el patrón en una frase.",
           acomodo:
             "Acomodo: el relato narra en C2 (Flujo) y la revelación se forja en C7 (Visión).",
+          aplicacion: "",
           anclas: ["patron"],
           usos: 1,
           pedidos: 1,
           confirmados: 1,
+        },
+      ],
+    };
+  }
+
+  function cerebroConFiltro(): CerebroMadre {
+    const base = cerebroConCandidato().principios[0];
+    return {
+      principios: [
+        {
+          ...base,
+          id: "cm_filtro",
+          estado: "filtro",
+          foco: 9,
+          firma: 9,
+          percepcion: "Sistema",
+          enunciado:
+            "Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos.",
+          aplicacion: "",
         },
       ],
     };
@@ -293,6 +313,7 @@ describe("CerebroMadreV3", () => {
         onEnviarAFiltro: () => {},
         onPromover: () => {},
         onRechazar: () => {},
+        onEscribirAplicacion: () => {},
       }),
     );
     assert.match(html, /deposito-v3-cerebro-madre/);
@@ -311,6 +332,25 @@ describe("CerebroMadreV3", () => {
     assert.match(html, /Próximo · 1\/1 construyeron C7/);
     assert.doesNotMatch(html, /Promover a ley/);
     assert.doesNotMatch(html, /axioma del operador|Criterio Vivo/i);
+    assert.match(html, /deposito-v3-cm-oraculo/);
+    assert.match(html, /deposito-v3-cm-oraculo-input/);
+    assert.match(html, /Qué dice Sistemicar/);
+  });
+
+  it("en filtro pide la aplicación operativa antes de promover", () => {
+    const html = renderToStaticMarkup(
+      createElement(CerebroMadreV3, {
+        cerebro: cerebroConFiltro(),
+        onEnviarAFiltro: () => {},
+        onPromover: () => {},
+        onRechazar: () => {},
+        onEscribirAplicacion: () => {},
+      }),
+    );
+    assert.match(html, /deposito-v3-cm-aplicacion-cm_filtro/);
+    assert.match(html, /APLICACIÓN OPERATIVA/);
+    assert.match(html, /Promover a ley/);
+    assert.match(html, /deposito-v3-cm-oraculo/);
   });
 });
 
@@ -392,6 +432,7 @@ describe("CerebroMadreV3 vacio extra", () => {
         onEnviarAFiltro: () => {},
         onPromover: () => {},
         onRechazar: () => {},
+        onEscribirAplicacion: () => {},
       }),
     );
     assert.match(html, /No publica sola/);

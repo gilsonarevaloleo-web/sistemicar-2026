@@ -5,12 +5,17 @@ import {
   CEREBRO_MADRE_MARCA,
   CEREBRO_MADRE_NOMBRE,
   CEREBRO_MADRE_NO_ES,
+  ORACULO_CASA_TONO,
+  categoriaDe,
   formatFechaPrincipio,
+  leyesDeCasa,
   principiosPorEstado,
+  responderConsulta,
   resumenCerebroMadre,
   type CerebroMadre,
   type EstadoPrincipio,
   type PrincipioAprendizaje,
+  type RespuestaOraculo,
 } from "@shared/deposito/v3";
 
 const GOLD = "#D4AF37";
@@ -31,13 +36,17 @@ export function CerebroMadreV3({
   onEnviarAFiltro,
   onPromover,
   onRechazar,
+  onEscribirAplicacion,
 }: {
   cerebro: CerebroMadre;
   onEnviarAFiltro: (id: string) => void;
   onPromover: (id: string) => void;
   onRechazar: (id: string) => void;
+  onEscribirAplicacion: (id: string, aplicacion: string) => void;
 }) {
   const [abierta, setAbierta] = useState(true);
+  const [pregunta, setPregunta] = useState("");
+  const [dictamen, setDictamen] = useState<RespuestaOraculo | null>(null);
 
   return (
     <section
@@ -88,6 +97,79 @@ export function CerebroMadreV3({
           >
             {CEREBRO_MADRE_FIRMA}
           </p>
+          <form
+            className="space-y-3"
+            data-testid="deposito-v3-cm-oraculo"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setDictamen(responderConsulta(pregunta, leyesDeCasa(cerebro)));
+            }}
+          >
+            <p
+              className="text-[10px] tracking-[0.18em]"
+              style={{ color: GOLD }}
+            >
+              ORÁCULO
+            </p>
+            <p className="text-[11px] leading-relaxed text-white/40">
+              {ORACULO_CASA_TONO}
+            </p>
+            <label className="block">
+              <span className="sr-only">Consulta a Sistemicar</span>
+              <input
+                type="text"
+                value={pregunta}
+                onChange={(e) => setPregunta(e.target.value)}
+                placeholder="¿Qué dice Sistemicar sobre…?"
+                className="w-full bg-black px-3 py-2 font-mono text-xs text-white outline-none"
+                style={{ border: `1px solid ${GOLD}55` }}
+                data-testid="deposito-v3-cm-oraculo-input"
+              />
+            </label>
+            <button
+              type="submit"
+              className="px-3 py-1.5 text-[10px] uppercase tracking-widest"
+              style={{ border: `1px solid ${GOLD}66`, color: GOLD }}
+              data-testid="deposito-v3-cm-oraculo-submit"
+            >
+              Consultar
+            </button>
+            {dictamen?.vacio === true && (
+              <p
+                className="text-xs leading-relaxed text-white/70"
+                data-testid="deposito-v3-cm-oraculo-vacio"
+              >
+                {dictamen.texto}
+              </p>
+            )}
+            {dictamen?.vacio === false && (
+              <div className="space-y-2" data-testid="deposito-v3-cm-oraculo-hit">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-white/45">
+                  C{dictamen.codigo} · {dictamen.categoria}
+                </p>
+                <p
+                  className="text-xs leading-relaxed text-white/80"
+                  data-testid="deposito-v3-cm-oraculo-axioma"
+                >
+                  <span className="mr-2 tracking-[0.14em] text-white/40">
+                    AXIOMA
+                  </span>
+                  {dictamen.axioma}
+                </p>
+                {dictamen.aplicacion ? (
+                  <p
+                    className="text-xs leading-relaxed text-white/65"
+                    data-testid="deposito-v3-cm-oraculo-aplicacion"
+                  >
+                    <span className="mr-2 tracking-[0.14em] text-white/40">
+                      APLICACIÓN
+                    </span>
+                    {dictamen.aplicacion}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </form>
           <div className="grid gap-4 md:grid-cols-3">
             {BANDEJAS.map((b) => {
               const items = principiosPorEstado(cerebro, b.estado);
@@ -120,6 +202,7 @@ export function CerebroMadreV3({
                           onEnviarAFiltro={onEnviarAFiltro}
                           onPromover={onPromover}
                           onRechazar={onRechazar}
+                          onEscribirAplicacion={onEscribirAplicacion}
                         />
                       ))}
                     </ul>
@@ -142,11 +225,13 @@ function PrincipioCard({
   onEnviarAFiltro,
   onPromover,
   onRechazar,
+  onEscribirAplicacion,
 }: {
   principio: PrincipioAprendizaje;
   onEnviarAFiltro: (id: string) => void;
   onPromover: (id: string) => void;
   onRechazar: (id: string) => void;
+  onEscribirAplicacion: (id: string, aplicacion: string) => void;
 }) {
   return (
     <li
@@ -155,6 +240,9 @@ function PrincipioCard({
     >
       <p className="text-[10px] font-mono uppercase tracking-wider text-white/50">
         C{principio.foco} {principio.percepcion}
+        <span className="ml-2 text-white/35">
+          · {categoriaDe(principio.foco)}
+        </span>
         {principio.firma !== principio.foco && (
           <span className="ml-2" style={{ color: GOLD }}>
             FIRMA C{principio.firma}
@@ -173,6 +261,14 @@ function PrincipioCard({
           {principio.acomodo}
         </p>
       )}
+      {principio.estado === "ley" && principio.aplicacion ? (
+        <p
+          className="text-[11px] leading-relaxed text-white/60"
+          data-testid={`deposito-v3-cm-aplicacion-ley-${principio.id}`}
+        >
+          {principio.aplicacion}
+        </p>
+      ) : null}
       {(principio.pedidos ?? 0) > 0 && (
         <p
           className="text-[10px] font-mono text-white/40"
@@ -227,6 +323,22 @@ function PrincipioCard({
       )}
       {principio.estado === "filtro" && (
         <div className="flex flex-wrap gap-2">
+          <label className="block w-full">
+            <span className="mb-1 block text-[10px] tracking-[0.14em] text-white/40">
+              APLICACIÓN OPERATIVA
+            </span>
+            <textarea
+              value={principio.aplicacion ?? ""}
+              onChange={(e) =>
+                onEscribirAplicacion(principio.id, e.target.value)
+              }
+              rows={3}
+              className="w-full bg-black px-2 py-1.5 font-mono text-[11px] text-white/80 outline-none"
+              style={{ border: `1px solid ${GOLD}44` }}
+              placeholder="Cómo se traduce este axioma en una acción del hacedor."
+              data-testid={`deposito-v3-cm-aplicacion-${principio.id}`}
+            />
+          </label>
           <button
             type="button"
             onClick={() => onPromover(principio.id)}

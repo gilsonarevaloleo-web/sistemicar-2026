@@ -31,6 +31,7 @@ import {
 } from "@/lib/deposito/v3/volcados";
 import {
   enviarCandidatoAFiltro,
+  escribirAplicacionFiltro,
   loadCerebroMadre,
   promoverFiltroALey,
   rechazarCandidatoOFiltro,
@@ -219,6 +220,9 @@ export default function DepositoV3Page() {
             onEnviarAFiltro={(id) => setCerebro(enviarCandidatoAFiltro(id))}
             onPromover={(id) => setCerebro(promoverFiltroALey(id))}
             onRechazar={(id) => setCerebro(rechazarCandidatoOFiltro(id))}
+            onEscribirAplicacion={(id, aplicacion) =>
+              setCerebro(escribirAplicacionFiltro(id, aplicacion))
+            }
           />
         </div>
 

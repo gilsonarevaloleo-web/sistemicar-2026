@@ -5,8 +5,10 @@ import {
   absorbPrincipio,
   absorbPrincipioDesdeVolcado,
   bloqueLeyesCasaPrompt,
+  categoriaDe,
   cerebroVacio,
   enviarAFiltro,
+  escribirAplicacion,
   extraerPrincipioAprendizaje,
   formatFechaPrincipio,
   leyesDeCasa,
@@ -19,22 +21,49 @@ import type { DepotEntryPayload } from "./types.ts";
 
 const NACIMIENTO = Date.UTC(2026, 9, 18, 12, 0, 0);
 
-const VOLCADO_LARGO =
-  "Vi el patrón: cada vez que salteo la secuencia a las 9:00, 9:20, 9:40 el pistón se atasca. El modelo se repite. No es clima.";
+const VOLCADO_C4_C7: DepotEntryPayload = {
+  rawFact:
+    "Vi el patrón: cada vez que salteo la secuencia a las 9:00, 9:20, 9:40 el pistón se atasca. El modelo se repite. No es clima.",
+  studentHypothesis: "El pistón se atasca cuando salto el orden",
+  userTier: "MATRICULA",
+};
+
+const VOLCADO_08: DepotEntryPayload = {
+  rawFact: `Hoy aprendi que el valor interno se siente más de que puede gritar el ego exterior.
+Por eso dado este aprendisaje a partir de hoy en adelante lo primero que debo hacer es si soy.
+Por eso razón el valor personal no se expresa hablando de nuestro valor, sino nuestro valor se expresa crusando el valor de importancia en los demás.`,
+  studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
+  detectedNoise: "No hay",
+  omittedShadow: "La boca habla de lo que nos falta",
+  userTier: "CARRERA",
+};
+
+const VOLCADO_09: DepotEntryPayload = {
+  rawFact: `Hoy aprendi que el cansancio es el enfoque el polo positivo a más de 90 minutos.
+Hace como un mes atrás estaba trabajando en otro taller. El sueño me dominaba. Cambié el enfoque al polo contrario, los puentes, sin cambiar el movimiento.
+Por eso digo que el cansancio solo es enfoque en lo mismo a mayor de 90 minutos si cambiamos de enfoque al polo contrario- los puentes sin cambiar la mecánica de movimiento.`,
+  studentHypothesis: "Acá pareció la ley de la economía de energía código 7",
+  detectedNoise: "No hay",
+  omittedShadow: "El cuerpo sigue a la atención",
+  userTier: "CARRERA",
+};
+
+const VOLCADO_11: DepotEntryPayload = {
+  rawFact: `Hoy aprendi que la necesidad de un cliente puede que no exista, hasta que se lo haga conciente.
+Habeces me encuentro aburrido y me voy a Facebook, ahí encuentro publicidad y esa publicidad crea una necesidad.
+Por eso digo que la necesidad no existe hasta que un vendedor lo haga conciente de la necesidad del cliente.`,
+  studentHypothesis: "La ley de si no lo ve, no existe. Código 1",
+  detectedNoise: "No hay",
+  omittedShadow: "Mostrar la necesidad no es forsarlo",
+  userTier: "CARRERA",
+};
 
 function payload(rawFact: string): DepotEntryPayload {
   return { rawFact, userTier: "MATRICULA" };
 }
 
-function resultC2C7() {
-  return scaffoldAnalysisResult({
-    characterSignedCode: 2,
-    focoRevelacionCode: 7,
-    groundingStatus: {
-      isFullyGrounded: true,
-      diagnosticMessage: "Firma C2 con axioma de cierre C7.",
-    },
-  });
+function sellar(cerebro: ReturnType<typeof cerebroVacio>, id: string, now: number) {
+  return promoverALey(enviarAFiltro(cerebro, id, now), id, now + 1);
 }
 
 describe("Depósito V3 — Cerebro Madre", () => {
@@ -55,47 +84,79 @@ describe("Depósito V3 — Cerebro Madre", () => {
     assert.equal(absorbido.cerebro.principios.length, 0);
   });
 
-  it("extrae pedagogía de escritura, no el diario del alumno", () => {
+  it("un dump C4+C7 sin C9 no entra como candidato de ley", () => {
+    const result = diagnosticarAuditoriaLocal(VOLCADO_C4_C7);
     const p = extraerPrincipioAprendizaje({
-      payload: {
-        rawFact: VOLCADO_LARGO,
-        studentHypothesis: "Mi pelea con el cliente es culpa de nadie.",
-        userTier: "MATRICULA",
-      },
-      result: resultC2C7(),
+      payload: VOLCADO_C4_C7,
+      result,
+      now: NACIMIENTO,
+    });
+    assert.equal(p, null);
+    assert.equal(result.activeCharacterMap[9], false);
+  });
+
+  it("C9 principio sistémico entra al Cerebro Madre, no el ego C1 ni el diario", () => {
+    const result = diagnosticarAuditoriaLocal(VOLCADO_08);
+    const p = extraerPrincipioAprendizaje({
+      payload: VOLCADO_08,
+      result,
       now: NACIMIENTO,
     });
     assert.ok(p);
     assert.equal(p.estado, "candidato");
-    assert.equal(p.foco, 7);
-    assert.equal(p.firma, 2);
-    assert.equal(p.createdAt, NACIMIENTO);
-    assert.match(p.enunciado, /percepción de C7/i);
-    assert.match(p.enunciado, /patrón|frase/i);
-    assert.doesNotMatch(p.enunciado, /firma C2/i);
-    assert.match(p.acomodo, /firma C2|narra en C2/i);
-    assert.match(p.acomodo, /C7/);
-    assert.doesNotMatch(p.enunciado, /pelea con el cliente|culpa de nadie/i);
-    assert.doesNotMatch(p.acomodo, /pelea con el cliente|culpa de nadie/i);
-    assert.doesNotMatch(p.enunciado, /9:00|pistón se atasca/i);
-    assert.doesNotMatch(p.acomodo, /9:00|pistón se atasca/i);
+    assert.equal(p.foco, 9);
+    assert.equal(p.firma, 9);
+    assert.equal(p.aplicacion, "");
+    assert.equal(categoriaDe(p.foco), "Soberanía");
+    assert.match(p.enunciado, /valor personal|importancia en los demás/i);
+    assert.doesNotMatch(p.enunciado, /esposa|reclamo|costura|ego exterior/i);
+    assert.match(p.acomodo, /principio sistémico|afirmación sin duda/i);
+    assert.doesNotMatch(p.escritura, /tres dimensiones|fisiología/i);
   });
 
-  it("createdAt no se toca al reforzar, filtrar ni promover", () => {
+  it("el volcado 11/11 C9 entra; dos C9 distintos no se fusionan", () => {
+    const r11 = diagnosticarAuditoriaLocal(VOLCADO_11);
+    const p11 = extraerPrincipioAprendizaje({
+      payload: VOLCADO_11,
+      result: r11,
+      now: NACIMIENTO,
+    });
+    assert.ok(p11);
+    assert.equal(p11.foco, 9);
+    assert.match(p11.enunciado, /necesidad no existe/i);
+
     const primero = absorbPrincipioDesdeVolcado(cerebroVacio(), {
-      payload: payload(VOLCADO_LARGO),
-      result: resultC2C7(),
+      payload: VOLCADO_08,
+      result: diagnosticarAuditoriaLocal(VOLCADO_08),
+      now: NACIMIENTO,
+    });
+    const segundo = absorbPrincipioDesdeVolcado(primero.cerebro, {
+      payload: VOLCADO_11,
+      result: r11,
+      now: NACIMIENTO + 86_400_000,
+    });
+    assert.equal(segundo.evolucion, "nuevo");
+    assert.equal(segundo.cerebro.principios.length, 2);
+    const enunciados = segundo.cerebro.principios.map((p) => p.enunciado).join(" ");
+    assert.match(enunciados, /valor personal/i);
+    assert.match(enunciados, /necesidad no existe/i);
+  });
+
+  it("el mismo enunciado C9 se refuerza y conserva createdAt", () => {
+    const result = diagnosticarAuditoriaLocal(VOLCADO_09);
+    const primero = absorbPrincipioDesdeVolcado(cerebroVacio(), {
+      payload: VOLCADO_09,
+      result,
       now: NACIMIENTO,
     });
     assert.equal(primero.evolucion, "nuevo");
     const id = primero.principio!.id;
     assert.equal(primero.principio!.createdAt, NACIMIENTO);
+    assert.equal(primero.principio!.aplicacion, "");
 
     const reforzado = absorbPrincipioDesdeVolcado(primero.cerebro, {
-      payload: payload(
-        `${VOLCADO_LARGO} Otra vez el modelo se repite en la secuencia del pistón.`,
-      ),
-      result: resultC2C7(),
+      payload: VOLCADO_09,
+      result,
       now: NACIMIENTO + 86_400_000,
     });
     assert.equal(reforzado.evolucion, "reforzado");
@@ -109,23 +170,30 @@ describe("Depósito V3 — Cerebro Madre", () => {
       id,
       NACIMIENTO + 2 * 86_400_000,
     );
-    const enFiltro = filtrado.principios[0];
-    assert.equal(enFiltro.estado, "filtro");
-    assert.equal(enFiltro.createdAt, NACIMIENTO);
-    assert.equal(enFiltro.evaluatedAt, NACIMIENTO + 2 * 86_400_000);
+    const conApp = escribirAplicacion(
+      filtrado,
+      id,
+      "Cambia de polo (puentes) sin cambiar el movimiento.",
+    );
+    assert.equal(
+      conApp.principios[0].aplicacion,
+      "Cambia de polo (puentes) sin cambiar el movimiento.",
+    );
+    assert.equal(conApp.principios[0].createdAt, NACIMIENTO);
 
-    const ley = promoverALey(filtrado, id, NACIMIENTO + 3 * 86_400_000);
+    const ley = promoverALey(conApp, id, NACIMIENTO + 3 * 86_400_000);
     const sellada = leyesDeCasa(ley)[0];
     assert.equal(sellada.estado, "ley");
     assert.equal(sellada.createdAt, NACIMIENTO);
     assert.equal(sellada.promotedAt, NACIMIENTO + 3 * 86_400_000);
     assert.equal(sellada.usos, 2);
+    assert.match(sellada.aplicacion, /polo/);
   });
 
   it("no salta de candidato a ley y no despublica una ley", () => {
     const nacido = absorbPrincipioDesdeVolcado(cerebroVacio(), {
-      payload: payload(VOLCADO_LARGO),
-      result: resultC2C7(),
+      payload: VOLCADO_08,
+      result: diagnosticarAuditoriaLocal(VOLCADO_08),
       now: NACIMIENTO,
     });
     const id = nacido.principio!.id;
@@ -138,25 +206,24 @@ describe("Depósito V3 — Cerebro Madre", () => {
     const despublicar = rechazarPrincipio(casa, id, NACIMIENTO + 4);
     assert.equal(despublicar.principios[0].estado, "ley");
     assert.equal(despublicar.principios[0].createdAt, NACIMIENTO);
+    const reescribir = escribirAplicacion(despublicar, id, "no debe entrar");
+    assert.equal(reescribir.principios[0].aplicacion, "");
   });
 
   it("el bloque de prompt cita solo leyes y muestra la fecha de creación", () => {
     assert.equal(bloqueLeyesCasaPrompt([]), "");
     const nacido = absorbPrincipioDesdeVolcado(cerebroVacio(), {
-      payload: payload(VOLCADO_LARGO),
-      result: resultC2C7(),
+      payload: VOLCADO_08,
+      result: diagnosticarAuditoriaLocal(VOLCADO_08),
       now: NACIMIENTO,
     });
     assert.equal(bloqueLeyesCasaPrompt(nacido.cerebro.principios), "");
     const id = nacido.principio!.id;
-    const casa = promoverALey(
-      enviarAFiltro(nacido.cerebro, id, NACIMIENTO + 1),
-      id,
-      NACIMIENTO + 2,
-    );
+    const casa = sellar(nacido.cerebro, id, NACIMIENTO + 1);
     const bloque = bloqueLeyesCasaPrompt(casa.principios);
     assert.match(bloque, /LEYES DE CASA/);
-    assert.match(bloque, /C7/);
+    assert.match(bloque, /C9/);
+    assert.match(bloque, /Soberanía/);
     assert.match(bloque, /18 oct 2026/);
     assert.ok(bloque.includes(formatFechaPrincipio(NACIMIENTO)));
     assert.match(bloque, /Prohibido citar un candidato/);
@@ -166,8 +233,8 @@ describe("Depósito V3 — Cerebro Madre", () => {
   it("el resumen nombra bandejas y no mezcla V2", () => {
     assert.match(resumenCerebroMadre(cerebroVacio()), /No publica sola/);
     const p = extraerPrincipioAprendizaje({
-      payload: payload(VOLCADO_LARGO),
-      result: resultC2C7(),
+      payload: VOLCADO_08,
+      result: diagnosticarAuditoriaLocal(VOLCADO_08),
       now: NACIMIENTO,
     });
     const cerebro = absorbPrincipio(cerebroVacio(), p).cerebro;
@@ -177,18 +244,16 @@ describe("Depósito V3 — Cerebro Madre", () => {
 
   it("el próximo volcado se mide: ¿construyó el C pedido?", () => {
     const primero = absorbPrincipioDesdeVolcado(cerebroVacio(), {
-      payload: payload(VOLCADO_LARGO),
-      result: resultC2C7(),
+      payload: VOLCADO_09,
+      result: diagnosticarAuditoriaLocal(VOLCADO_09),
       now: NACIMIENTO,
     });
     assert.equal(primero.principio!.pedidos, 0);
-    assert.equal(primero.cerebro.pedidoPendiente?.codigo, 7);
+    assert.equal(primero.cerebro.pedidoPendiente?.codigo, 9);
 
     const confirma = absorbPrincipioDesdeVolcado(primero.cerebro, {
-      payload: payload(
-        `${VOLCADO_LARGO} Otra vez el modelo se repite: el patrón se nombra en una frase.`,
-      ),
-      result: resultC2C7(),
+      payload: VOLCADO_09,
+      result: diagnosticarAuditoriaLocal(VOLCADO_09),
       now: NACIMIENTO + 86_400_000,
     });
     assert.equal(confirma.evolucion, "reforzado");
@@ -196,54 +261,21 @@ describe("Depósito V3 — Cerebro Madre", () => {
     assert.equal(confirma.principio!.pedidos, 1);
     assert.equal(confirma.principio!.confirmados, 1);
     assert.equal(confirma.principio!.ultimaMedida?.construyo, true);
-    assert.equal(confirma.principio!.ultimaMedida?.codigo, 7);
+    assert.equal(confirma.principio!.ultimaMedida?.codigo, 9);
     assert.match(resumenCerebroMadre(confirma.cerebro), /próximo 1\/1/);
 
     const falla = absorbPrincipioDesdeVolcado(confirma.cerebro, {
-      payload: payload(
-        "Primero abrí el taller. Después armé el pistón. Luego salió el primer turno. La secuencia A B C se sostiene y no nombra ninguna ley.",
-      ),
-      result: scaffoldAnalysisResult({
-        characterSignedCode: 3,
-        focoRevelacionCode: 3,
-        groundingStatus: {
-          isFullyGrounded: true,
-          diagnosticMessage: "Secuencia C3 sin axioma.",
-        },
-      }),
+      payload: VOLCADO_C4_C7,
+      result: diagnosticarAuditoriaLocal(VOLCADO_C4_C7),
       now: NACIMIENTO + 2 * 86_400_000,
     });
-    const c7 = falla.cerebro.principios.find((p) => p.foco === 7);
-    assert.ok(c7);
-    assert.equal(c7.pedidos, 2);
-    assert.equal(c7.confirmados, 1);
-    assert.equal(c7.ultimaMedida?.construyo, false);
-    assert.equal(c7.createdAt, NACIMIENTO);
-    assert.equal(falla.cerebro.pedidoPendiente?.codigo, 3);
-  });
-
-  it("C9 principio sistémico entra al Cerebro Madre, no el ego C1 ni el diario", () => {
-    const payload08: DepotEntryPayload = {
-      rawFact: `Hoy aprendi que el valor interno se siente más de que puede gritar el ego exterior.
-Por eso dado este aprendisaje a partir de hoy en adelante lo primero que debo hacer es si soy.
-Por eso razón el valor personal no se expresa hablando de nuestro valor, sino nuestro valor se expresa crusando el valor de importancia en los demás.`,
-      studentHypothesis: "Acá apareció el código 1  la ley del valor en los demas",
-      detectedNoise: "No hay",
-      omittedShadow: "La boca habla de lo que nos falta",
-      userTier: "CARRERA",
-    };
-    const result = diagnosticarAuditoriaLocal(payload08);
-    const p = extraerPrincipioAprendizaje({
-      payload: payload08,
-      result,
-      now: NACIMIENTO,
-    });
-    assert.ok(p);
-    assert.equal(p.foco, 9);
-    assert.equal(p.firma, 9);
-    assert.match(p.enunciado, /valor personal|importancia en los demás/i);
-    assert.doesNotMatch(p.enunciado, /esposa|reclamo|costura|ego exterior/i);
-    assert.match(p.acomodo, /principio sistémico|afirmación sin duda/i);
-    assert.doesNotMatch(p.escritura, /tres dimensiones|fisiología/i);
+    assert.equal(falla.evolucion, "sin-cambio");
+    const c9 = falla.cerebro.principios.find((p) => p.foco === 9);
+    assert.ok(c9);
+    assert.equal(c9.pedidos, 2);
+    assert.equal(c9.confirmados, 1);
+    assert.equal(c9.ultimaMedida?.construyo, false);
+    assert.equal(c9.createdAt, NACIMIENTO);
+    assert.equal(falla.cerebro.principios.length, 1);
   });
 });

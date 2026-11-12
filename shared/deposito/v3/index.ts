@@ -184,11 +184,13 @@ export {
   absorbPrincipio,
   absorbPrincipioDesdeVolcado,
   bloqueLeyesCasaPrompt,
+  categoriaDe,
   cerebroVacio,
   contarPalabrasVolcado,
   destilarAcomodo,
   enviarAFiltro,
   enunciadoPrincipio,
+  escribirAplicacion,
   extraerPrincipioAprendizaje,
   formatFechaPrincipio,
   leyesDeCasa,
@@ -196,10 +198,12 @@ export {
   normalizarCerebroMadre,
   normalizarLeyesCasa,
   normalizarPrincipio,
+  normalizarTextoCasa,
   principiosPorEstado,
   promoverALey,
   rechazarPrincipio,
   resumenCerebroMadre,
+  tokensDeTextoCasa,
   volcadoConstruyeCodigo,
 } from "./cerebroMadre.ts";
 export type {
@@ -212,6 +216,19 @@ export type {
   PedidoPercepcion,
   PrincipioAprendizaje,
 } from "./cerebroMadre.ts";
+
+export {
+  ORACULO_CASA_TONO,
+  ORACULO_CASA_VACIO,
+  consultarLeyesCasa,
+  responderConsulta,
+  responderConsultaDeCerebro,
+} from "./oraculoCasa.ts";
+export type {
+  RespuestaOraculo,
+  RespuestaOraculoHit,
+  RespuestaOraculoVacio,
+} from "./oraculoCasa.ts";
 
 export {
   diagnosticarAuditoriaLocal,

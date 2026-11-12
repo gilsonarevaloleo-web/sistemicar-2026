@@ -7,6 +7,7 @@ import {
   absorbPrincipioDesdeVolcado,
   cerebroVacio,
   enviarAFiltro,
+  escribirAplicacion,
   leyesDeCasa,
   normalizarCerebroMadre,
   promoverALey,
@@ -103,6 +104,13 @@ export function promoverFiltroALey(id: string): CerebroMadre {
 
 export function rechazarCandidatoOFiltro(id: string): CerebroMadre {
   return saveCerebroMadre(rechazarPrincipio(loadCerebroMadre(), id));
+}
+
+export function escribirAplicacionFiltro(
+  id: string,
+  aplicacion: string,
+): CerebroMadre {
+  return saveCerebroMadre(escribirAplicacion(loadCerebroMadre(), id, aplicacion));
 }
 
 export function subscribeToCerebroMadre(
