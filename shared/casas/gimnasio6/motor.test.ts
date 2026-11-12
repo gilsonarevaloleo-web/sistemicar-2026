@@ -83,7 +83,8 @@ describe("Gimnasio 6 — motor", () => {
       puntero: { capitulo: 1, subcodigo: 4, indice: 3, variante: 0 },
     });
     const p = preguntaCanon(1, 4, 3)!;
-    const cierre = "El 10 sería sostener el hecho, sin flor, con el chasis caliente.";
+    const cierre =
+      "El lunes a las 7, antes del depósito, grabo el video del producto con la misma casa desordenada.";
     const ev = evaluarRespuestaLocal(p, cierre);
     assert.equal(ev.pasa, true);
     const now = "2026-11-05T20:00:00.000Z";
@@ -133,6 +134,54 @@ describe("Gimnasio 6 — motor", () => {
       "No sé si la diferencia sería chica o enorme, pero el 10 sería vender antes del depósito y grabar el video el mismo día, con la prioridad puesta ahí.",
     );
     assert.equal(concreta.pasa, true);
+  });
+
+  it("en 1.4.1 el tajo pasa; el slogan y la niebla no", () => {
+    const p = preguntaCanon(1, 4, 1)!;
+    assert.equal(evaluarRespuestaLocal(p, "Seguiría.").pasa, false);
+    assert.equal(evaluarRespuestaLocal(p, "Seguiría porque soy persistente.").pasa, false);
+    assert.equal(
+      evaluarRespuestaLocal(
+        p,
+        "Seguiría porque el producto ya está en la casa y no tengo otro oficio que pague la semana.",
+      ).pasa,
+      true,
+    );
+    assert.equal(
+      evaluarRespuestaLocal(
+        p,
+        "Me detendría. Sin clientes en el barrio el cuerpo ya no entra al cuarto.",
+      ).pasa,
+      true,
+    );
+  });
+
+  it("en 1.4.2 el valor pide número; la agenda de deberes no pasa", () => {
+    const p = preguntaCanon(1, 4, 2)!;
+    assert.equal(evaluarRespuestaLocal(p, "Es lo más importante.").pasa, false);
+    assert.equal(
+      evaluarRespuestaLocal(p, "Un 8 entre todos los deberes y tareas de la semana.").pasa,
+      false,
+    );
+    assert.equal(
+      evaluarRespuestaLocal(
+        p,
+        "Un 8. Es el único propósito que, si lo suelto, me deja sin quién soy frente al producto.",
+      ).pasa,
+      true,
+    );
+  });
+
+  it("en 1.4.3 la flor no sella; una escena sí", () => {
+    const p = preguntaCanon(1, 4, 3)!;
+    assert.equal(evaluarRespuestaLocal(p, "Todo va a estar bien y confío en mí.").pasa, false);
+    assert.equal(
+      evaluarRespuestaLocal(
+        p,
+        "El lunes a las 7, antes del depósito, grabo el video con la casa igual de desordenada.",
+      ).pasa,
+      true,
+    );
   });
 
   it("Gemini no retiene una respuesta con sustancia más de una variante", () => {

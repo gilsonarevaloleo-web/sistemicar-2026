@@ -25,6 +25,8 @@ describe("Gimnasio 6 — prompt del maestro", () => {
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /No mandás al Oficio/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /C3 ES SECUENCIA, NO RELOJ/);
     assert.match(GIMNASIO6_SYSTEM_PROMPT, /capa profunda/);
+    assert.match(GIMNASIO6_SYSTEM_PROMPT, /1\.4 es valor del propósito/);
+    assert.match(GIMNASIO6_SYSTEM_PROMPT, /prioridad entre deberes/);
   });
 
   it("el user prompt evalúa una sola pregunta", () => {
