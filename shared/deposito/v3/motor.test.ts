@@ -453,6 +453,33 @@ Por eso digo que la necesidad no existe hasta que un vendedor lo haga conciente 
     assert.match(r.immediateAdjustment, /Firma C9/);
   });
 
+  it("volcado 12/11/2026: por diseño no se atiende lo que se escucha firma C9; no pide tijera", () => {
+    const r = diagnosticarAuditoriaLocal({
+      rawFact: `Hoy aprendí que por diseño natural no se entiendo lo que se escucha. 
+En mí busca de querer solucionar problemas de publicará videos, de avanzar con mí plaforma, me he encontrado en la situación que debo hacer dos cosas a la misma vez (trabajar en costura y escuchar tutoriales sobre como publicar) mientras escuchaba el tutoría al final del vídeo si alguien me preguntaba que es lo que entendí del vídeo, estoy seguro que no respondía nada. Ahí es que me di cuenta que mí atención no está en lo que yo mismo he asignado como deber o lo que yo quiero.  Y no solamente en eso me me he dado cuenta que mí atención no me ayuda; también ocurre eso cuando mí hijo de 18 años me dice sus cosas y no logro entender que es lo que está diciendo. Lo que me preguntó es: ¿Porque no logro entender a pesar que yo tengo la intención de entender? 
+1. La respuesta a esto pudiera ser que no estoy continuamente sometido a situaciones donde debo aprender mediant la escucha, más soy de enseñar que de aprender. 
+2. El segundo pudiera ser que no tengo una estrategia de absorción de información externa, por lo que mí atención no tiene donde parar y salta como canguro. 
+Si no tengo una estrategia de absorción lo único que me queda es escuchar por emocio, osea un diseño ya establecido por mí pasado.  Esto es la razón por lo que digo que por diseño no se atiende lo que se escucha.  Y el problema está en un día tengas que escuchar por deber, por prioridad, tu atención te traicionara acá, porque atendera otra cosa que tu no haz priorisado.  Esto es uno de las poderosas razones por lo que los lumnos no aprenden, los emprendedores como yo se bloquean cuando tienen que aprender algo nuevo de otra fuente.`,
+      studentHypothesis: "Código 1 y 2. Atención y aprendisaje de otra fuente",
+      detectedNoise: "No hay",
+      omittedShadow:
+        "Lo que no nombre es que por diseño estamos estructurado para no entender más de lo que ya sabemos internamente y ahí está nuestro gran límite. Por esa razón que debemos diseñar una nuevo diseño de escucha para adsober informacion, no por emoción sino por prioridad",
+      userTier: "CARRERA",
+    });
+    assert.equal(r.activeCharacterMap[9], true);
+    assert.equal(r.syntacticVacios.includes(9), false);
+    assert.equal(r.characterSignedCode, 9);
+    assert.notEqual(r.characterSignedCode, 7);
+    assert.notEqual(r.characterSignedCode, 1);
+    assert.equal(r.activeCharacterMap[10], true);
+    assert.equal(r.titleConnectedToClose, true);
+    assert.equal(r.lowestMissingCascadeCode, null);
+    assert.notEqual(r.focoRevelacionCode, 5);
+    assert.equal(r.estadoAlumno, "ARQUITECTO_GROUNDED");
+    assert.doesNotMatch(r.immediateAdjustment, /traza una línea|decisión firme/i);
+    assert.match(r.immediateAdjustment, /Firma C9/);
+  });
+
   it("lenguaje natural: C5, C7 y C8 se leen en el mapa; sin título no se enseña C7", () => {
     const r = diagnosticarAuditoriaLocal({
       rawFact:

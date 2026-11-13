@@ -114,6 +114,28 @@ describe("Depósito V3 — Cerebro Madre", () => {
     assert.doesNotMatch(p.escritura, /tres dimensiones|fisiología/i);
   });
 
+  it("el volcado 12/11 C9 entra con el principio de diseño de escucha", () => {
+    const payload12: DepotEntryPayload = {
+      rawFact: `Hoy aprendí que por diseño natural no se entiendo lo que se escucha.
+Esto es la razón por lo que digo que por diseño no se atiende lo que se escucha.
+Los emprendedores se bloquean cuando tienen que aprender algo nuevo de otra fuente.`,
+      studentHypothesis: "Código 1 y 2. Atención y aprendisaje de otra fuente",
+      detectedNoise: "No hay",
+      omittedShadow: "Por diseño estamos estructurado para no entender más de lo que ya sabemos",
+      userTier: "CARRERA",
+    };
+    const result = diagnosticarAuditoriaLocal(payload12);
+    const p = extraerPrincipioAprendizaje({
+      payload: payload12,
+      result,
+      now: NACIMIENTO,
+    });
+    assert.ok(p);
+    assert.equal(p.foco, 9);
+    assert.match(p.enunciado, /diseño|atiende|escucha/i);
+    assert.doesNotMatch(p.enunciado, /hijo de 18|costura/i);
+  });
+
   it("el volcado 11/11 C9 entra; dos C9 distintos no se fusionan", () => {
     const r11 = diagnosticarAuditoriaLocal(VOLCADO_11);
     const p11 = extraerPrincipioAprendizaje({

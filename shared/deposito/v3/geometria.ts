@@ -453,6 +453,10 @@ const C9_ENLACE =
 /** Principio sistémico: afirmación sin duda. No exige multi-hilo. */
 const C9_PRINCIPIO = [
   /por eso (razon|digo|dado)/,
+  /por lo que digo que/,
+  /(la )?razon por (lo que|eso) digo/,
+  /por diseno[\s\S]{0,48}no se (entiend[eo]|atiende|escuch)/,
+  /no se (entiend[eo]|atiende) lo que se (escucha|oye)/,
   /no se expresa[\s\S]{0,100}sino/,
   /no necesariamente[\s\S]{0,80}sino/,
   /el valor (personal|de alguien)/,
