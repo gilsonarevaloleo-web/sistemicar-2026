@@ -20,7 +20,7 @@ describe("Gimnasio 6 — pasos del capítulo", () => {
     assert.equal(CANON_GIMNASIO.filter((p) => p.capitulo === 1).length, 12);
     assert.equal(c1[0]?.etiquetaSubcodigo, ETIQUETA_SUBCODIGO[1][1]);
     assert.equal(c1[3]?.etiquetaSubcodigo, "Prioridad");
-    assert.equal(c1[9]?.etiquetaSubcodigo, "Lo no ensayado");
+    assert.equal(c1[9]?.etiquetaSubcodigo, "El propósito");
 
     const c2 = pasosDelCapitulo(2, {
       capitulo: 2,

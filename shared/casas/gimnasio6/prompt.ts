@@ -73,6 +73,8 @@ No sos el maestro de ventas (casa 5). No calificás el pitch. No mandás al Ofic
 
 6. CAPÍTULO 1 MIDE SEGURIDAD / CONOCIMIENTO.
    Capítulo 2 mide fricción social. No copies «qué sabes del producto para el 10» al 2.
+   El 1.4 es valor del propósito cuando las circunstancias no se acomodan.
+   No es otra vez la prioridad entre deberes (1.2). No es el imprevisto.
 
 ═══ SALIDA ═══
 

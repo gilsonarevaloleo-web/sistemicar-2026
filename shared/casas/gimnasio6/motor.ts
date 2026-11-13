@@ -79,6 +79,35 @@ function hayNombrePropio(texto: string): boolean {
   );
 }
 
+function hayTajo(norm: string): boolean {
+  return (
+    /\b(me detendr\w*|me detengo|me paro|pararia|me bajo|abandon\w*|renunci\w*|no sigo|dejaria|lo dejo)\b/.test(
+      norm,
+    ) ||
+    /\b(seguiria|sigo|seguire|continu\w*|no paro|no me detengo|me quedo|sigo adelante)\b/.test(
+      norm,
+    )
+  );
+}
+
+const SLOGAN_PERSISTENCIA = [
+  /\bsoy persistente\b/,
+  /\bnunca me rindo\b/,
+  /\bno me rindo\b/,
+  /\bhay que seguir\b/,
+  /\bsiempre sigo\b/,
+];
+
+function haySloganPersistencia(norm: string): boolean {
+  return SLOGAN_PERSISTENCIA.some((p) => p.test(norm));
+}
+
+function esAgendaNoValor(norm: string): boolean {
+  return /\b(deberes?|tareas?|agenda|calendario|entre todo lo que (tengo|hay) que hacer)\b/.test(
+    norm,
+  );
+}
+
 export function evaluarRespuestaLocal(
   pregunta: PreguntaCanon,
   respuesta: string,
@@ -90,11 +119,11 @@ export function evaluarRespuestaLocal(
   }
 
   const pideEscala =
-    (pregunta.capitulo === 1 &&
-      ((pregunta.subcodigo === 1 && pregunta.indice === 1) ||
-        (pregunta.subcodigo === 2 && pregunta.indice === 1) ||
-        (pregunta.subcodigo === 4 && pregunta.indice === 1))) ||
-    (pregunta.capitulo === 1 && pregunta.subcodigo === 3 && pregunta.indice === 2);
+    pregunta.capitulo === 1 &&
+    ((pregunta.subcodigo === 1 && pregunta.indice === 1) ||
+      (pregunta.subcodigo === 2 && pregunta.indice === 1) ||
+      (pregunta.subcodigo === 3 && pregunta.indice === 2) ||
+      (pregunta.subcodigo === 4 && pregunta.indice === 2));
 
   if (pideEscala && extraerEscala(texto) == null) {
     return { pasa: false, motivo: "Falta la posición. El 1 al 10 es un lugar, no un adorno." };
@@ -136,12 +165,27 @@ export function evaluarRespuestaLocal(
     }
   }
 
-  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4) {
-    if (hayFlor(norm) && pregunta.indice !== 1) {
-      return { pasa: false, motivo: "Flor. El hecho no apareció." };
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 1) {
+    const palabras = texto.split(/\s+/).filter(Boolean).length;
+    if (
+      !hayTajo(norm) ||
+      palabras < 8 ||
+      hayNiebla(norm) ||
+      haySloganPersistencia(norm)
+    ) {
+      return { pasa: false, motivo: "Falta el tajo: te detienes o sigues, y por qué. No el slogan." };
     }
-    if (pregunta.indice !== 1 && esCorto(texto)) {
-      return { pasa: false, motivo: "Sin hecho no hay sello." };
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 2) {
+    if (esCorto(texto) || hayNiebla(norm) || esAgendaNoValor(norm)) {
+      return { pasa: false, motivo: "Ese número es valor entre propósitos, no otra vez la agenda." };
+    }
+  }
+
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 3) {
+    if (hayFlor(norm) || esCorto(texto) || hayNiebla(norm)) {
+      return { pasa: false, motivo: "Flor. Pedí una escena de esa vida, no un afiche." };
     }
   }
 
@@ -333,7 +377,7 @@ function absorberRecursos(
   if (pregunta.capitulo === 2 && pregunta.subcodigo === 2 && pregunta.indice === 1) {
     return { ...recursos, familia: recursos.familia || t };
   }
-  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 2) {
+  if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 1) {
     return { ...recursos, miedo: recursos.miedo || t };
   }
   return recursos;

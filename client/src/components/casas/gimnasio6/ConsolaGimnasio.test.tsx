@@ -87,7 +87,39 @@ describe("Consola gimnasio", () => {
     assert.match(html, /Prioridad/);
     assert.match(html, /tu propósito: vender/);
     assert.doesNotMatch(html, /Cómo te planificarías para poder sacar tu semana/);
-    assert.doesNotMatch(html, /Del 1 al 10, sin flor/);
+    assert.doesNotMatch(html, /circunstancias no se acomodan/);
+    assert.doesNotMatch(html, /escena de tu vida cambiaría/);
+  });
+
+  it("en el 1.3 no adelanta el texto del 1.4", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConsolaGimnasio, {
+        libro: {
+          ...libro,
+          puntero: { capitulo: 1, subcodigo: 3, indice: 1, variante: 0 },
+        },
+        pregunta: {
+          escenario:
+            "Ahora que tu prioridad es alta. Por circunstancia de vida, vender es tu paga diaria.",
+          pregunta: "¿Cómo te planificarías para poder sacar tu semana?",
+          capitulo: 1,
+          subcodigo: 3,
+          indice: 1,
+          variante: 0,
+          etiquetaCapitulo: "Seguridad en tu producto",
+        },
+        topeDiario: false,
+        onResponder: () => {},
+        onCopiar: () => {},
+        enviando: false,
+      }),
+    );
+    assert.match(html, /gimnasio6-paso-3-1/);
+    assert.match(html, /El propósito/);
+    assert.match(html, /sacar tu semana/);
+    assert.doesNotMatch(html, /circunstancias no se acomodan/);
+    assert.doesNotMatch(html, /nivel de valor le das a este propósito/);
+    assert.doesNotMatch(html, /escena de tu vida cambiaría/);
   });
 
   it("muestra el aviso del maestro junto al recuadro, no arriba de la pantalla", () => {

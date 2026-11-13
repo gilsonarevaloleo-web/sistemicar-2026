@@ -27,7 +27,7 @@ export const ETIQUETA_SUBCODIGO: Record<CapituloId, Record<SubcodigoId, string>>
     1: "Frente al producto",
     2: "Prioridad",
     3: "Semana",
-    4: "Lo no ensayado",
+    4: "El propósito",
   },
   2: {
     1: "Alguien de tu alrededor",
@@ -193,26 +193,29 @@ const C1: PreguntaCanon[] = [
     capitulo: 1,
     subcodigo: 4,
     indice: 1,
-    escenario:
-      "La semana ya corre. Entra lo que no ensayaste.",
-    pregunta: "Del 1 al 10, sin flor, ¿dónde quedas cuando eso ya pasó?",
-    criterioMotor: "¿Hay posición sin flor o cubrió con ánimo?",
+    escenario: "Ahora se sabe el esfuerzo de llevar adelante tu propósito.",
+    pregunta:
+      "¿Qué pasaría si, a pesar de ese esfuerzo, las circunstancias no se acomodan para conseguir lo que quieres? ¿Te detendrías o seguirías, y por qué?",
+    criterioMotor: "¿Hay tajo (me detengo / sigo) y un porqué concreto, o slogan de persistencia?",
   },
   {
     capitulo: 1,
     subcodigo: 4,
     indice: 2,
-    escenario: "El imprevisto sigue en el cuarto.",
-    pregunta: "¿Qué hecho te pone en ese número?",
-    criterioMotor: "¿Hay hecho o flor?",
+    escenario:
+      "Esa persistencia, a pesar de la adversidad, ya está en el cuarto.",
+    pregunta:
+      "En una escala del 1 al 10, ¿qué nivel de valor le das a este propósito entre todos los que tienes, y por qué te corresponde ese número?",
+    criterioMotor: "¿Hay 1–10 y un porqué de valor, o otra vez la prioridad entre deberes?",
   },
   {
     capitulo: 1,
     subcodigo: 4,
     indice: 3,
-    escenario: "El 10, con eso ya ocurrido.",
-    pregunta: "¿Cómo sería el 10 cuando eso ya pasó?",
-    criterioMotor: "¿Imaginó el 10 del hecho o prometió la próxima vez?",
+    escenario:
+      "Imagina que ese propósito se alinea con tus valores más altos: nivel 10.",
+    pregunta: "¿Qué escena de tu vida cambiaría si eso ya fuera así?",
+    criterioMotor: "¿Hay escena concreta o flor / «todo va a estar bien»?",
   },
 ];
 
