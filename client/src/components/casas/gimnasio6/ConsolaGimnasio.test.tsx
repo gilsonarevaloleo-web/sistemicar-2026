@@ -51,6 +51,8 @@ describe("Consola gimnasio", () => {
     assert.match(html, /Frente al producto/);
     assert.match(html, /Seguridad en tu producto · 1\.1/);
     assert.match(html, /gimnasio6-mute/);
+    assert.match(html, /gimnasio6-ambiente/);
+    assert.match(html, /data-avance="0\.00"/);
     assert.match(html, /data-estado="actual"/);
     assert.match(html, /gimnasio6-paso-1-1/);
     assert.match(html, /gimnasio6-paso-4-3/);
