@@ -293,15 +293,15 @@ const C2: PreguntaCanon[] = [
     subcodigo: 3,
     indice: 1,
     escenario:
-      "{critico} no desaparece: está en tu trabajo, tu familia o tu barrio. Cada día de esta semana puedes cruzarte con esa mirada.",
-    pregunta: "¿Cómo te planificas para sostener tu semana con la mirada de {critico} encima?",
+      "Esa crítica no desaparece: está en tu trabajo, tu familia o tu barrio. Cada día de esta semana puedes cruzarte con esa mirada.",
+    pregunta: "¿Cómo te planificas para sostener tu semana con esa mirada encima?",
     criterioMotor: "¿Sintió la secuencia de la semana social o se fue a «ya no le hablo»?",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 2,
-    escenario: "La semana ya pesa. Cada mirada de {critico} es un paso más.",
+    escenario: "La semana ya pesa. Cada mirada es un paso más.",
     pregunta: "¿Qué nivel de esfuerzo le pones a sostener esa crítica?",
     criterioMotor: "¿Nombró el esfuerzo emocional o pidió que se termine?",
   },
@@ -309,7 +309,7 @@ const C2: PreguntaCanon[] = [
     capitulo: 2,
     subcodigo: 3,
     indice: 3,
-    escenario: "Todavía hay más peso. El cuerpo pide esconderse de {critico}.",
+    escenario: "Todavía hay más peso. El cuerpo pide esconderse.",
     pregunta:
       "¿Cuál es tu máximo esfuerzo: el punto donde quieres esconderte y sigues ahí?",
     criterioMotor: "¿Hay máximo o confort?",
@@ -319,7 +319,7 @@ const C2: PreguntaCanon[] = [
     subcodigo: 4,
     indice: 1,
     escenario:
-      "A pesar de todo ese esfuerzo, ocurre lo que no esperabas: fracasas frente a {critico}.",
+      "A pesar de todo ese esfuerzo, ocurre lo que no esperabas: fracasas frente a los demás.",
     pregunta: "¿Qué pasa en ti cuando eso sucede? ¿Te detienes o sigues, y por qué?",
     criterioMotor: "¿Hay tajo (me detengo / sigo) y un porqué concreto, o slogan?",
   },
