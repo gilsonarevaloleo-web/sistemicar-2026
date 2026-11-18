@@ -32,8 +32,8 @@ export const ETIQUETA_SUBCODIGO: Record<CapituloId, Record<SubcodigoId, string>>
   2: {
     1: "Alguien de tu alrededor",
     2: "Quien no compraría",
-    3: "Semana social",
-    4: "Lo temido",
+    3: "La semana",
+    4: "Lo inesperado",
   },
   3: {
     1: "Canal uno",
@@ -54,6 +54,21 @@ export function etiquetaSubcodigo(
   subcodigo: SubcodigoId,
 ): string {
   return ETIQUETA_SUBCODIGO[capitulo][subcodigo];
+}
+
+/** Nombre corto de la persona a partir de la respuesta libre (primera frase, máx. 40). */
+export function nombreCorto(respuesta: string): string {
+  const t = respuesta.trim().split(/[\n.,;]/)[0]?.trim() ?? "";
+  return t.length > 40 ? `${t.slice(0, 39).trimEnd()}…` : t;
+}
+
+/** Sustituye {critico} por el nombre que dio el usuario, o «esa persona» si aún no hay. */
+export function personalizar(texto: string, critico?: string): string {
+  if (!texto.includes("{critico}")) return texto;
+  const nombre = nombreCorto(critico ?? "") || "esa persona";
+  return texto
+    .replaceAll("{critico}", nombre)
+    .replace(/(^|[.!?¿¡]\s+)([a-záéíóúñ])/g, (_m, pre: string, c: string) => pre + c.toUpperCase());
 }
 
 export function recorteEscenario(texto: string, max = 52): string {
@@ -79,7 +94,7 @@ export function capituloVisibleDe(
 export function pasosDelCapitulo(
   capitulo: CapituloId,
   puntero: PunteroGimnasio,
-  opts: { sellado?: boolean } = {},
+  opts: { sellado?: boolean; critico?: string } = {},
 ): PasoCapitulo[] {
   const items = CANON.filter((p) => p.capitulo === capitulo);
   const actual = ordinalPaso(puntero.subcodigo, puntero.indice);
@@ -105,7 +120,7 @@ export function pasosDelCapitulo(
       etiquetaSubcodigo: etiquetaSubcodigo(p.capitulo, p.subcodigo),
       etiquetaCapitulo: ETIQUETA_CAPITULO[p.capitulo],
       estado,
-      recorteEscenario: estado === "hecho" ? recorteEscenario(p.escenario) : null,
+      recorteEscenario: estado === "hecho" ? recorteEscenario(personalizar(p.escenario, opts.critico)) : null,
     };
   });
 }
@@ -250,50 +265,53 @@ const C2: PreguntaCanon[] = [
     subcodigo: 2,
     indice: 1,
     escenario:
-      "Ahora, de tus conocidos: una persona que piensas que no le gustaría tu producto o que está lejos de comprártelo.",
-    pregunta: "¿Quién sería esta persona?",
-    criterioMotor: "¿Hay un nombre más lejos o se escondió («esa persona no es para mí»)?",
+      "Ahora, entre tus conocidos, eliges a una persona que no te compraría.",
+    pregunta: "¿Quién es esta persona?",
+    criterioMotor: "¿Hay un nombre real y lejano o se escondió («esa persona no es para mí»)?",
   },
   {
     capitulo: 2,
     subcodigo: 2,
     indice: 2,
-    escenario: "Insistís. El campo social se calienta.",
-    pregunta: "En la insistencia, ¿qué te dice que ya se salió de casillas?",
-    criterioMotor: "¿Sintió la fricción o se fue del escenario?",
+    escenario:
+      "{critico} te mira desde arriba. Lo conversan y termina diciéndote que eres tonto.",
+    pregunta:
+      "¿Por qué {critico} dice que eres tonto, y qué haces o dices tú para cambiar esa creencia sobre ti?",
+    criterioMotor: "¿Sintió el golpe y actuó desde su identidad o se fue del escenario?",
   },
   {
     capitulo: 2,
     subcodigo: 2,
     indice: 3,
-    escenario: "Esa persona ya se salió de casillas. Seguís ahí.",
-    pregunta: "¿Cómo consigues voltear ese escenario para terminar vendiéndole?",
-    criterioMotor: "¿Se quedó bajo la mirada o se escondió? El pitch no se califica.",
+    escenario:
+      "Le expusiste a {critico} por qué no debe verte inferior y estaba a punto de creerte. Entonces llega otra persona que también te ve inferior y, con total convicción, derrumba tu argumento a punta de preguntas.",
+    pregunta: "¿Quién es esta persona y qué haces tú para ganar este debate?",
+    criterioMotor: "¿Se sostuvo bajo las preguntas o se escondió? El argumento no se califica.",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 1,
     escenario:
-      "Ahora no es un encuentro. Esa persona que se salió de casillas la vuelves a ver: trabajo, familia, barrio. Eso es sacar tu semana social.",
-    pregunta: "¿Cómo te sostienes en esa exposición más de una vez?",
-    criterioMotor: "¿Hay secuencia o «ya no le hablo»?",
+      "{critico} no desaparece: está en tu trabajo, tu familia o tu barrio. Cada día de esta semana puedes cruzarte con esa mirada.",
+    pregunta: "¿Cómo te planificas para sostener tu semana con la mirada de {critico} encima?",
+    criterioMotor: "¿Sintió la secuencia de la semana social o se fue a «ya no le hablo»?",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 2,
-    escenario: "Ya te vieron insistir.",
-    pregunta: "¿Qué nivel de esfuerzo le pones a insistir cuando ya te vieron?",
-    criterioMotor: "¿Nombró el esfuerzo social o pidió que se termine?",
+    escenario: "La semana ya pesa. Cada mirada de {critico} es un paso más.",
+    pregunta: "¿Qué nivel de esfuerzo le pones a sostener esa crítica?",
+    criterioMotor: "¿Nombró el esfuerzo emocional o pidió que se termine?",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 3,
-    escenario: "El cuerpo pide esconderte.",
+    escenario: "Todavía hay más peso. El cuerpo pide esconderse de {critico}.",
     pregunta:
-      "¿Cuál es tu máximo esfuerzo social — el punto donde el cuerpo pide esconderte y tú sigues ahí?",
+      "¿Cuál es tu máximo esfuerzo: el punto donde quieres esconderte y sigues ahí?",
     criterioMotor: "¿Hay máximo o confort?",
   },
   {
@@ -301,25 +319,25 @@ const C2: PreguntaCanon[] = [
     subcodigo: 4,
     indice: 1,
     escenario:
-      "En medio de esa insistencia ocurre lo que ya temías.",
-    pregunta: "Sin flor: ¿qué hecho queda cuando eso ya pasó?",
-    criterioMotor: "¿Hay hecho o cubrió?",
+      "A pesar de todo ese esfuerzo, ocurre lo que no esperabas: fracasas frente a {critico}.",
+    pregunta: "¿Qué pasa en ti cuando eso sucede? ¿Te detienes o sigues, y por qué?",
+    criterioMotor: "¿Hay tajo (me detengo / sigo) y un porqué concreto, o slogan?",
   },
   {
     capitulo: 2,
     subcodigo: 4,
     indice: 2,
-    escenario: "El miedo ya está en el cuarto.",
-    pregunta: "¿Te quedas en el escenario o lo cubres?",
-    criterioMotor: "¿Se quedó o cubrió?",
+    escenario: "Se apaga la idea de ser superior. Y detrás del fracaso aparece algo.",
+    pregunta: "¿Qué esperanza ves ahí que antes no veías?",
+    criterioMotor: "¿Hay esperanza concreta o flor / «todo va a estar bien»?",
   },
   {
     capitulo: 2,
     subcodigo: 4,
     indice: 3,
-    escenario: "Los tres canales del encuentro siguen abiertos.",
-    pregunta: "Sin flor: ¿qué sostienes ahora?",
-    criterioMotor: "¿Sello o flor?",
+    escenario: "Imagina que esa esperanza ya es real: nivel 10.",
+    pregunta: "¿Qué escena de tu vida cambiaría si ya fuera así?",
+    criterioMotor: "¿Hay escena concreta o flor?",
   },
 ];
 

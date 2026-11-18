@@ -34,6 +34,8 @@ export interface RecursosGimnasio {
   miedo: string;
   familia: string;
   gustos: string;
+  /** Quién no le compraría (respuesta 2.2.1); se nombra en las preguntas siguientes. */
+  critico?: string;
 }
 
 export interface TurnoGimnasio {
