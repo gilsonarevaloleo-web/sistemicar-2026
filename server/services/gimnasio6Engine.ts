@@ -85,10 +85,18 @@ function userIdDe(body: unknown, headerUserId?: string): string {
   return String(raw.userId ?? raw.uid ?? headerUserId ?? "").trim();
 }
 
+/** La marca interna conAyuda nunca sale al cliente. */
+function libroPublico(libro: LibroGimnasio): LibroGimnasio {
+  return {
+    ...libro,
+    turnos: libro.turnos.map(({ conAyuda: _omitido, ...resto }) => resto),
+  };
+}
+
 function payloadVivo(libro: LibroGimnasio) {
   const pregunta: PreguntaViva | null = preguntaVivaDe(libro);
   return {
-    libro,
+    libro: libroPublico(libro),
     pregunta: libro.estado === "ABIERTO" ? pregunta : null,
     copia: textoCopiaLibro(libro),
     topeDiario: libro.estado === "TOPE_DIARIO",
@@ -320,7 +328,7 @@ export async function listarLibrosGimnasio(
   const uid = userId.trim();
   if (!uid) return { ok: false, status: 400, error: "Falta userId.", codigo: "FALTA_USER" };
   const store = deps.store ?? createDefaultGimnasio6Store();
-  return { ok: true, libros: await store.listByUser(uid) };
+  return { ok: true, libros: (await store.listByUser(uid)).map(libroPublico) };
 }
 
 export async function leerLibroGimnasio(
