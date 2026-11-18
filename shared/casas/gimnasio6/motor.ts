@@ -279,10 +279,11 @@ export function fluidezVariante(
 ): string {
   const recorte = respuesta.trim().replace(/\s+/g, " ").slice(0, 120);
   const dicho = recorte ? `Dijiste: «${recorte}».` : "Eso no llenó el cuarto.";
+  // Escalera de ayuda: 1 acerca la escena; 2 baja al cuerpo y pide solo un trozo.
   if (variante === 1) {
     return `${pregunta.escenario} ${dicho} El mismo cuarto. Más cerca.`;
   }
-  return `${pregunta.escenario} ${dicho} Otra vez, con gente de tu vida. No teatro.`;
+  return `${pregunta.escenario} ${dicho} Ahora en el cuerpo: ¿qué sientes y dónde? Empieza por una sola frase, con gente de tu vida. No teatro.`;
 }
 
 function nuevoTurnoId(libro: LibroGimnasio): string {

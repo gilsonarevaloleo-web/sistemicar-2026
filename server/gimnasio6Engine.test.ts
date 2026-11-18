@@ -177,6 +177,25 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
     );
   });
 
+  it("tras 3 fallos deja seguir y no expone la marca interna al cliente", async () => {
+    await withServer(
+      async (base, userId) => {
+        const abierto = await abrirLibroListo(base, userId);
+        let ultimo: { libro: LibroGimnasio } | null = null;
+        for (let i = 0; i < 3; i += 1) {
+          ultimo = await fetch(`${base}/api/casas/gimnasio6/responder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, libroId: abierto.libro.id, respuesta: "no sé" }),
+          }).then((r) => r.json());
+        }
+        assert.equal(ultimo!.libro.puntero.indice, 2);
+        assert.ok(!JSON.stringify(ultimo).includes("conAyuda"));
+      },
+      { callGemini: () => Promise.reject(new Error("sin gemini")) },
+    );
+  });
+
   it("si el store perdió el libro, lo recupera del snapshot y avanza", async () => {
     const snapshot: LibroGimnasio = {
       id: "lib-perdido",
