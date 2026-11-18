@@ -7,7 +7,10 @@ import type { SegmentoV5, Vehicle } from "@/lib/persistence";
 import { useJornada4Tick } from "@/hooks/useJornada4Tick";
 import { getSegmentCalendarDayStartMs } from "@/lib/segmentTime";
 import { PUERTA_TIMELINE_COLORS } from "@/jornada4/puertaTimelineVisual";
-import { buildSecuenciaJornadaNodes } from "@/jornada4/secuenciaJornada";
+import {
+  buildPanoramaJornada,
+  buildSecuenciaJornadaNodes,
+} from "@/jornada4/secuenciaJornada";
 import { J4_NEON, J4_UI } from "./jornada4Ui";
 
 const { BLOOD, GOLD, EMERALD, MUTED } = PUERTA_TIMELINE_COLORS;
@@ -33,6 +36,11 @@ export function Jornada4CoberturaTimeline({ segmentos, vehicles }: Props) {
         dayStartMs,
       }),
     [segmentos, vehicles, nowMs, dayStartMs]
+  );
+
+  const panorama = useMemo(
+    () => buildPanoramaJornada({ segmentos, nowMs, dayStartMs }),
+    [segmentos, nowMs, dayStartMs]
   );
 
   if (nodes.length === 0) {
@@ -62,7 +70,35 @@ export function Jornada4CoberturaTimeline({ segmentos, vehicles }: Props) {
         }
       `}</style>
       <p className={J4_UI.label}>Secuencia de la jornada</p>
-      <p className="text-[8px] mt-1 mb-3 leading-snug" style={{ color: MUTED }}>
+      {panorama ? (
+        <div
+          className="mt-2 rounded-lg px-2.5 py-2"
+          style={{
+            border: `1px solid ${panorama.proxima?.enVentana ? GOLD : "rgba(255,255,255,0.1)"}`,
+            backgroundColor: "rgba(255,255,255,0.03)",
+          }}
+          data-testid="jornada4-panorama"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: MUTED }}>
+              Disciplina hoy
+            </span>
+            <span
+              className="text-sm font-black tabular-nums"
+              style={{ color: panorama.perdidoPct > 0 ? GOLD : EMERALD }}
+            >
+              {panorama.porcentajeDia}%
+            </span>
+          </div>
+          <p className="text-[10px] mt-1 leading-snug" style={{ color: J4_NEON.ink }}>
+            {panorama.mensaje}
+          </p>
+          <p className="text-[8px] mt-1 leading-snug" style={{ color: MUTED }}>
+            {panorama.resumen.headline}
+          </p>
+        </div>
+      ) : null}
+      <p className="text-[8px] mt-2 mb-3 leading-snug" style={{ color: MUTED }}>
         <span style={{ color: BLOOD }}>●</span> fracaso{" "}
         <span style={{ color: GOLD }}>●</span> foco{" "}
         <span style={{ color: EMERALD }}>●</span> logro
@@ -123,6 +159,26 @@ export function Jornada4CoberturaTimeline({ segmentos, vehicles }: Props) {
                     {node.timeLabel}
                   </p>
                 </div>
+                {node.puntualidadLabel ? (
+                  <p
+                    className="text-[9px] font-bold uppercase tracking-wider mt-0.5"
+                    style={{
+                      color:
+                        node.puntualidadKind === "a_tiempo"
+                          ? EMERALD
+                          : node.puntualidadKind === "tardia" ||
+                              node.puntualidadKind === "en_ventana"
+                            ? GOLD
+                            : node.puntualidadKind === "sin_entrada"
+                              ? BLOOD
+                              : MUTED,
+                    }}
+                    data-testid={`jornada4-puntualidad-${node.segmentoId}`}
+                  >
+                    ⏱ {node.puntualidadLabel}
+                    {node.contribucionPct > 0 ? ` · +${node.contribucionPct}%` : ""}
+                  </p>
+                ) : null}
                 <p
                   className="text-[10px] uppercase tracking-wider mt-0.5"
                   style={{ color }}

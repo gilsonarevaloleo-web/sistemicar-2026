@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { getSegmentCalendarDayStartMs } from "../lib/segmentTime.ts";
 import type { SegmentoV5, Vehicle } from "../lib/persistence.ts";
 import {
+  buildPanoramaJornada,
   buildSecuenciaJornadaNodes,
   formatSecuenciaStatusLabel,
 } from "./secuenciaJornada.ts";
@@ -81,5 +82,37 @@ describe("buildSecuenciaJornadaNodes", () => {
     assert.match(foco?.puerta.borderColor ?? "", /#D4AF37/i);
     assert.equal(foco?.puerta.pulse, true);
     assert.match(foco?.statusLabel ?? "", /Foco · Ahora/);
+  });
+});
+
+describe("puntualidad en la secuencia", () => {
+  const H = 60 * 60 * 1000;
+  const M = 60 * 1000;
+
+  it("etiqueta a tiempo vs tarde vs sin entrada y calcula panorama", () => {
+    const dayStart = getSegmentCalendarDayStartMs();
+    const segmentos = [
+      seg({ id: "a", nombre: "A", horaInicio: "06:00", horaFin: "08:00", estado: "cerrado_manual", activadoAt: dayStart + 6 * H }),
+      seg({ id: "b", nombre: "B", horaInicio: "08:00", horaFin: "10:00", estado: "cerrado_manual", activadoAt: dayStart + 8 * H + 20 * M }),
+      seg({ id: "c", nombre: "C", horaInicio: "10:00", horaFin: "12:00" }),
+      seg({ id: "d", nombre: "D", horaInicio: "14:00", horaFin: "16:00" }),
+    ];
+    const nowMs = dayStart + 12 * H + 30 * M;
+    const nodes = buildSecuenciaJornadaNodes({ segmentos, vehicles: [], nowMs, dayStartMs: dayStart });
+    const by = (id: string) => nodes.find(n => n.segmentoId === id);
+    assert.equal(by("a")?.puntualidadLabel, "a tiempo");
+    assert.equal(by("b")?.puntualidadLabel, "+20′");
+    assert.equal(by("c")?.puntualidadLabel, "sin entrada");
+    assert.equal(by("d")?.puntualidadLabel, null);
+
+    const p = buildPanoramaJornada({ segmentos, nowMs, dayStartMs: dayStart });
+    assert.equal(p?.rachaATiempo, 0);
+    assert.equal(p?.proxima?.nombre, "D");
+    assert.equal(p?.proxima?.enMin, 90);
+    assert.ok((p?.perdidoPct ?? 0) > 0);
+  });
+
+  it("sin plan no hay panorama", () => {
+    assert.equal(buildPanoramaJornada({ segmentos: [] }), null);
   });
 });

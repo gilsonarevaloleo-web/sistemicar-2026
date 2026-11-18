@@ -4,6 +4,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Jornada4DailyDisciplinaBar } from "@/components/jornada4/Jornada4DailyDisciplinaBar";
+import { Jornada4SemanaPuntualidadCard } from "@/components/jornada4/Jornada4SemanaPuntualidadCard";
 import { Jornada4DailyPsBar } from "@/components/jornada4/Jornada4DailyPsBar";
 import { Jornada4DisciplinaCard } from "@/components/jornada4/Jornada4DisciplinaCard";
 import { Jornada4Boveda } from "@/components/jornada4/Jornada4Boveda";
@@ -107,6 +108,7 @@ export default function Jornada4MetricasTab({
         todayPct={disciplinaModel.porcentajeDia}
         yesterdayPct={yesterdayDisciplinaPct}
       />
+      <Jornada4SemanaPuntualidadCard userId={userId} segmentos={segmentos} />
       <Jornada4DailyPsBar todayPs={todayPs} yesterdayPs={yesterdayPs} />
       <Jornada4Boveda />
       <EspejoSemanalCard userId={userId} tick={disciplinaTick} />
