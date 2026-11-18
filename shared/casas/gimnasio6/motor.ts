@@ -251,9 +251,11 @@ export function preguntaVivaDe(libro: LibroGimnasio): PreguntaViva | null {
     variante === 0
       ? canon.escenario
       : fluidezVariante(canon, ultimoTexto(libro), variante);
+  // El nombre solo vale en su cuarto (subcódigo 2 del capítulo 2).
+  const nombre = capitulo === 2 && subcodigo === 2 ? libro.recursos.critico : undefined;
   return {
-    escenario: personalizar(escenario, libro.recursos.critico),
-    pregunta: personalizar(canon.pregunta, libro.recursos.critico),
+    escenario: personalizar(escenario, nombre),
+    pregunta: personalizar(canon.pregunta, nombre),
     capitulo,
     subcodigo,
     indice,
