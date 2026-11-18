@@ -3,7 +3,7 @@
  * sello de capítulo, tope de un capítulo por día.
  */
 
-import { capituloPreparable, ETIQUETA_CAPITULO, preguntaCanon, siguientePuntero } from "./canon.ts";
+import { capituloPreparable, ETIQUETA_CAPITULO, personalizar, preguntaCanon, siguientePuntero } from "./canon.ts";
 import { copiarLibro } from "./prompt.ts";
 import type {
   CapituloId,
@@ -252,8 +252,8 @@ export function preguntaVivaDe(libro: LibroGimnasio): PreguntaViva | null {
       ? canon.escenario
       : fluidezVariante(canon, ultimoTexto(libro), variante);
   return {
-    escenario,
-    pregunta: canon.pregunta,
+    escenario: personalizar(escenario, libro.recursos.critico),
+    pregunta: personalizar(canon.pregunta, libro.recursos.critico),
     capitulo,
     subcodigo,
     indice,
@@ -375,7 +375,7 @@ function absorberRecursos(
     return { ...recursos, familia: recursos.familia || t };
   }
   if (pregunta.capitulo === 2 && pregunta.subcodigo === 2 && pregunta.indice === 1) {
-    return { ...recursos, familia: recursos.familia || t };
+    return { ...recursos, familia: recursos.familia || t, critico: t };
   }
   if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 1) {
     return { ...recursos, miedo: recursos.miedo || t };

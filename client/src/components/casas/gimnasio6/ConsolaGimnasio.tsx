@@ -4,6 +4,7 @@ import {
   ETIQUETA_CAPITULO,
   capituloVisibleDe,
   pasosDelCapitulo,
+  personalizar,
   preguntaCanon,
   type LibroGimnasio,
   type PreguntaViva,
@@ -50,7 +51,7 @@ export function ConsolaGimnasio({
     topeDiario ||
     libro.estado === "TOPE_DIARIO" ||
     libro.estado === "CAPITULO_SELLADO";
-  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado });
+  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado, critico: libro.recursos.critico });
   const pasoClave = `${capituloVista}.${libro.puntero.subcodigo}.${libro.puntero.indice}`;
   const etiqueta = ETIQUETA_CAPITULO[capituloVista];
   const punteroLabel = sellado
@@ -58,7 +59,7 @@ export function ConsolaGimnasio({
     : `${libro.puntero.subcodigo}.${libro.puntero.indice}`;
   const enCuarto = libro.estado === "ABIERTO" && !topeDiario;
   const turnosDelCanon = libro.turnos
-    .filter((t) => preguntaCanon(t.capitulo, t.subcodigo, t.indice)?.pregunta === t.pregunta)
+    .filter((t) => personalizar(preguntaCanon(t.capitulo, t.subcodigo, t.indice)?.pregunta ?? "", libro.recursos.critico) === t.pregunta)
     .slice(-3);
 
   useEffect(() => {

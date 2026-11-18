@@ -42,6 +42,7 @@ export {
   capituloVisibleDe,
   etiquetaSubcodigo,
   pasosDelCapitulo,
+  personalizar,
   preguntaCanon,
   recorteEscenario,
   siguientePuntero,
