@@ -78,6 +78,8 @@ export {
   parseEvaluacion,
   puedeAbrirCapitulo,
   preguntaVivaDe,
+  pasosConAyuda,
+  MAX_INTENTOS_PASO,
   recursosVacios,
   resolverEvaluacion,
   textoCopiaLibro,

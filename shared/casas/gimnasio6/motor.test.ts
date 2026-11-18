@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { preguntaCanon, siguientePuntero } from "./canon.ts";
 import {
   aplicarRespuesta,
+  pasosConAyuda,
   diaLima,
   evaluarRespuestaLocal,
   extraerEscala,
@@ -58,6 +59,19 @@ describe("Gimnasio 6 — motor", () => {
     const v = preguntaVivaDe(next);
     assert.match(v!.escenario, /más o menos bien/i);
     assert.doesNotMatch(v!.escenario, /fallaste/i);
+  });
+
+  it("tras agotar las ayudas deja seguir y marca el paso internamente", () => {
+    const ev = { pasa: false, motivo: "niebla" };
+    let libro = libroBase();
+    libro = aplicarRespuesta(libro, "no sé", ev);
+    libro = aplicarRespuesta(libro, "no sé", ev);
+    assert.equal(libro.puntero.indice, 1);
+    assert.equal(pasosConAyuda(libro).length, 0);
+    libro = aplicarRespuesta(libro, "no sé", ev);
+    assert.equal(libro.puntero.indice, 2);
+    assert.equal(libro.puntero.variante, 0);
+    assert.equal(pasosConAyuda(libro).length, 1);
   });
 
   it("un 7 pasa a la pregunta 2 del mismo subcódigo", () => {

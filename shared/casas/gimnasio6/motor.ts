@@ -289,6 +289,13 @@ function nuevoTurnoId(libro: LibroGimnasio): string {
   return `${libro.id}-t${libro.turnos.length + 1}`;
 }
 
+/** Intentos fallidos de un mismo paso tras los cuales se deja seguir con marca interna. */
+export const MAX_INTENTOS_PASO = 3;
+
+export function pasosConAyuda(libro: Pick<LibroGimnasio, "turnos">): TurnoGimnasio[] {
+  return libro.turnos.filter((t) => t.conAyuda);
+}
+
 export function aplicarRespuesta(
   libro: LibroGimnasio,
   respuesta: string,
@@ -318,10 +325,12 @@ export function aplicarRespuesta(
     creadoAt: iso,
   };
 
+  const agotado = !evaluacion.pasa && libro.puntero.variante + 1 >= MAX_INTENTOS_PASO;
+  if (agotado) turno.conAyuda = true;
   const turnos = [...libro.turnos, turno];
   const recursos = absorberRecursos(libro.recursos, canon, respuesta);
 
-  if (!evaluacion.pasa) {
+  if (!evaluacion.pasa && !agotado) {
     return {
       ...libro,
       recursos,
@@ -332,6 +341,7 @@ export function aplicarRespuesta(
     };
   }
 
+  // Pasa, o se agotaron las ayudas: avanza (en el segundo caso con conAyuda).
   const next = siguientePuntero(viva.capitulo, viva.subcodigo, viva.indice);
   if (next === "sellar") {
     const sellados = libro.capitulosSellados.includes(viva.capitulo)
