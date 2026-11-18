@@ -10,6 +10,8 @@ import {
 } from "@shared/casas/gimnasio6";
 import { UMBRAL5_ASH, UMBRAL5_BRONZE } from "../umbral5/LienzoLimite";
 import { PasosCapitulo } from "./PasosCapitulo";
+import { CuartoAmbiente } from "./CuartoAmbiente";
+import { vibrarPaso } from "../../../lib/casas/gimnasio6/ambiente.ts";
 import {
   playPasoCuarto,
   setCuartoMute,
@@ -87,6 +89,7 @@ export function ConsolaGimnasio({
     }
     if (pasoPrevio.current && pasoPrevio.current !== pasoClave) {
       playPasoCuarto();
+      if (!mute) vibrarPaso();
     }
     pasoPrevio.current = pasoClave;
   }, [pasoClave, enCuarto]);
@@ -129,6 +132,11 @@ export function ConsolaGimnasio({
       }}
       data-testid="gimnasio6-consola"
     >
+      <CuartoAmbiente
+        capitulo={capituloVista}
+        puntero={libro.puntero}
+        sellado={sellado}
+      />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -199,11 +207,12 @@ export function ConsolaGimnasio({
       {pregunta && !topeDiario && libro.estado === "ABIERTO" && (
         <form
           onSubmit={handleSubmit}
+          key={punteroClave}
           className="relative space-y-4"
           data-testid="gimnasio6-form"
         >
           <p
-            className="text-base font-light leading-relaxed md:text-lg"
+            className="g6-revela-escenario text-base font-light leading-relaxed md:text-lg"
             style={{
               color: pregunta.variante > 0 ? UMBRAL5_BRONZE : "rgba(255,255,255,0.72)",
             }}
@@ -212,12 +221,13 @@ export function ConsolaGimnasio({
             {pregunta.escenario}
           </p>
           <p
-            className="text-xl font-light leading-snug"
+            className="g6-revela-pregunta text-xl font-light leading-snug"
             style={{ color: UMBRAL5_BRONZE }}
             data-testid="gimnasio6-pregunta"
           >
             {pregunta.pregunta}
           </p>
+          <div className="g6-revela-form space-y-4">
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
@@ -242,6 +252,7 @@ export function ConsolaGimnasio({
           >
             {enviando ? "…" : "Entrar"}
           </button>
+          </div>
         </form>
       )}
 
