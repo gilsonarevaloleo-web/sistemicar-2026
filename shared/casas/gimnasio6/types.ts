@@ -47,6 +47,8 @@ export interface TurnoGimnasio {
   escenario: string;
   pregunta: string;
   respuesta: string | null;
+  /** Marca interna: el cuarto se dejó seguir tras agotar las ayudas sin pasar el criterio. No se muestra. */
+  conAyuda?: boolean;
   pasa: boolean | null;
   creadoAt: string;
 }
