@@ -306,6 +306,7 @@ function ModuleRoute({
 
     if (user?.uid) {
       let firstProgressionEmit = true;
+      let lastProgression: UserProgression | null = null;
       const verification = createAccessVerification();
       serverConfirmedRef.current = false;
       setVerificationUnavailable(false);
@@ -316,6 +317,7 @@ function ModuleRoute({
             ...prog,
             activeModules: mergeModuleIds(prog.activeModules, claimedModulesRef.current as ModuleId[]),
           };
+          lastProgression = merged;
           const accessCheck = verification.observe(source, hasAccess(merged));
           if (!accessCheck.shouldVerify) return;
           if (source === "confirmed") serverConfirmedRef.current = true;
@@ -425,11 +427,12 @@ function ModuleRoute({
                   claimedModulesRef.current,
                   unlocked,
                 );
-                setProgression((prev) =>
-                  prev
-                    ? { ...prev, activeModules: mergeModuleIds(prev.activeModules, unlocked) }
-                    : prev,
-                );
+                setProgression((prev) => {
+                  const current = prev ?? lastProgression;
+                  return current
+                    ? { ...current, activeModules: mergeModuleIds(current.activeModules, unlocked) }
+                    : current;
+                });
                 setCheckingTier(false);
                 return;
               }
