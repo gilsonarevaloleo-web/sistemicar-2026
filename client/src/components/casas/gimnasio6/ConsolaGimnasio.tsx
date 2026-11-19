@@ -28,6 +28,7 @@ export function ConsolaGimnasio({
   onResponder,
   onContinuar,
   onCopiar,
+  onFarmacia,
   enviando,
   aviso,
 }: {
@@ -37,6 +38,7 @@ export function ConsolaGimnasio({
   onResponder: (texto: string) => void;
   onContinuar?: () => void;
   onCopiar: () => void;
+  onFarmacia?: () => void;
   enviando: boolean;
   aviso?: string | null;
 }) {
@@ -168,6 +170,16 @@ export function ConsolaGimnasio({
               <Volume2 size={14} style={{ color: UMBRAL5_BRONZE }} />
             )}
           </button>
+          {onFarmacia && (
+            <button
+              type="button"
+              onClick={onFarmacia}
+              className="text-[10px] uppercase tracking-[0.18em] text-white/40 hover:text-white/70"
+              data-testid="gimnasio6-ir-farmacia"
+            >
+              Píldoras
+            </button>
+          )}
           <button
             type="button"
             onClick={onCopiar}

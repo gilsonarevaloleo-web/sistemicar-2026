@@ -68,6 +68,8 @@ export async function continuarGimnasio(input: {
   userId: string;
   libroId: string;
   libro?: LibroGimnasio;
+  /** Píldora elegida en la farmacia; sin él, abre el siguiente capítulo. */
+  capitulo?: number;
 }): Promise<GimnasioPayload> {
   const res = await fetch("/api/casas/gimnasio6/continuar", {
     method: "POST",

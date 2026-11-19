@@ -22,8 +22,13 @@ import {
   textoCopiaLibro,
 } from "../../shared/casas/gimnasio6/motor.ts";
 import { serializarPromptGimnasio6 } from "../../shared/casas/gimnasio6/prompt.ts";
-import { preguntaCanon } from "../../shared/casas/gimnasio6/canon.ts";
-import type { LibroGimnasio, PreguntaViva } from "../../shared/casas/gimnasio6/types.ts";
+import { capituloPreparable, preguntaCanon } from "../../shared/casas/gimnasio6/canon.ts";
+import {
+  bloqueoPildora,
+  elegirPildora,
+  puedeElegirPildora,
+} from "../../shared/casas/gimnasio6/pildoras.ts";
+import type { CapituloId, LibroGimnasio, PreguntaViva } from "../../shared/casas/gimnasio6/types.ts";
 import { hayPesoParaGimnasio } from "../../shared/casas/umbral5/peso.ts";
 import type { Umbral5SessionStore } from "./umbral5Store.ts";
 import { createDefaultUmbral5Store } from "./umbral5Store.ts";
@@ -299,6 +304,7 @@ export async function continuarCapituloGimnasio(
   deps: Gimnasio6EngineDeps = {},
   now: Date | string = new Date(),
   snapshot?: unknown,
+  capitulo?: number,
 ): Promise<{ ok: true } & ReturnType<typeof payloadVivo> | Gimnasio6EngineErr> {
   const uid = userId.trim();
   const lid = libroId.trim();
@@ -307,6 +313,23 @@ export async function continuarCapituloGimnasio(
   const libro = await cargarLibroVivo(store, uid, lid, snapshot);
   if (!libro || libro.userId !== uid) {
     return { ok: false, status: 404, error: "Libro no encontrado.", codigo: "LIBRO_NO_ENCONTRADO" };
+  }
+  if (capitulo != null) {
+    const cap = capitulo as CapituloId;
+    if (!puedeElegirPildora(libro, cap, now)) {
+      const topeo = capituloPreparable(cap) && bloqueoPildora(libro, cap, now) === "tope_diario";
+      return {
+        ok: false,
+        status: topeo ? 409 : 400,
+        error: topeo
+          ? "A lo mucho una píldora por día. Mañana puedes elegir otra."
+          : "Esa píldora no está disponible ahora.",
+        codigo: topeo ? "TOPE_DIARIO" : "CAPITULO_NO_PREPARADO",
+      };
+    }
+    const elegido = elegirPildora(libro, cap, now);
+    await store.save(elegido);
+    return { ok: true, ...payloadVivo(elegido) };
   }
   if (!puedeAbrirCapitulo(libro, now)) {
     return {
@@ -479,6 +502,7 @@ export function registerGimnasio6Routes(
         runtime,
         new Date(),
         raw.libro ?? raw.snapshot,
+        raw.capitulo == null ? undefined : Number(raw.capitulo),
       );
       if (!resultado.ok) return res.status(resultado.status).json(bodyError(resultado));
       return res.json({
