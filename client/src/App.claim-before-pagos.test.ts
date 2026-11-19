@@ -28,4 +28,12 @@ describe("ModuleRoute — no mandar a /pagos antes de reclamar el pago", () => {
     assert.match(moduleRoute, /confirmWithServer: true/);
     assert.match(moduleRoute, /verification\.dispose\(\)/);
   });
+
+  it("aísla la progresión y módulos de cada cuenta y espera la autenticación", () => {
+    const moduleRoute = src.slice(src.indexOf("function ModuleRoute"), src.indexOf("/** @deprecated"));
+    assert.match(moduleRoute, /claimedUserRef\.current !== user\.uid/);
+    assert.match(moduleRoute, /claimedModulesRef\.current = \[\]/);
+    assert.match(moduleRoute, /progressionUid !== user\.uid/);
+    assert.match(moduleRoute, /!checkingTier \|\| loading \|\| !user\?\.uid/);
+  });
 });

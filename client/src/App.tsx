@@ -225,12 +225,14 @@ function ModuleRoute({
   const { user, loading } = useAuthContext();
   const [, navigate] = useLocation();
   const [progression, setProgression] = useState<UserProgression | null>(null);
+  const [progressionUid, setProgressionUid] = useState<string | null>(null);
   const [checkingTier, setCheckingTier] = useState(true);
   const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
   const [startingTrial, setStartingTrial] = useState(false);
   const [verificationUnavailable, setVerificationUnavailable] = useState(false);
   const serverConfirmedRef = useRef(false);
   const claimedModulesRef = useRef<string[]>([]);
+  const claimedUserRef = useRef<string | null>(null);
 
   const ownerBypass = isOwnerEmail(user?.email);
   const previewBypass = previewOps || isPreviewOpsUnlocked();
@@ -307,7 +309,15 @@ function ModuleRoute({
     if (user?.uid) {
       let firstProgressionEmit = true;
       let lastProgression: UserProgression | null = null;
+      let disposed = false;
       const verification = createAccessVerification();
+      if (claimedUserRef.current !== user.uid) {
+        claimedUserRef.current = user.uid;
+        claimedModulesRef.current = [];
+        setProgression(null);
+        setProgressionUid(null);
+      }
+      setCheckingTier(true);
       serverConfirmedRef.current = false;
       setVerificationUnavailable(false);
       const unsub = subscribeToProgression(
@@ -324,6 +334,7 @@ function ModuleRoute({
           setVerificationUnavailable(false);
           setStartingTrial(false);
           setProgression(merged);
+          setProgressionUid(user.uid);
           if (requiredModule === "planificacion_base") {
             const regStep = resolveJornadaBaseRegistroStep({
               firebaseConfigured: isFirebaseConfigured(),
@@ -359,8 +370,8 @@ function ModuleRoute({
               setStartingTrial(true);
               setCheckingTier(true);
               void startJornadaBaseTrial(user.uid).then((result) => {
+                if (result.started && !disposed) trackJornadaStartTrial();
                 if (!accessCheck.isCurrent()) return;
-                if (result.started) trackJornadaStartTrial();
                 setProgression((prev) =>
                   prev
                     ? { ...prev, jornadaBaseTrialStartedAt: result.startedAt }
@@ -433,6 +444,7 @@ function ModuleRoute({
                     ? { ...current, activeModules: mergeModuleIds(current.activeModules, unlocked) }
                     : current;
                 });
+                setProgressionUid(user.uid);
                 setCheckingTier(false);
                 return;
               }
@@ -448,6 +460,7 @@ function ModuleRoute({
         { confirmWithServer: true },
       );
       return () => {
+        disposed = true;
         verification.dispose();
         unsub();
       };
@@ -455,7 +468,7 @@ function ModuleRoute({
   }, [user, loading, navigate, ownerBypass, previewBypass, requiredModule, previewOps]);
 
   useEffect(() => {
-    if (!checkingTier) return;
+    if (!checkingTier || loading || !user?.uid) return;
     const id = window.setTimeout(() => {
       setCheckingTier(false);
       if (isFirebaseConfigured() && !serverConfirmedRef.current) {
@@ -472,7 +485,7 @@ function ModuleRoute({
       }
     }, 8000);
     return () => clearTimeout(id);
-  }, [checkingTier, requiredModule, ownerBypass, progression, navigate]);
+  }, [checkingTier, loading, user?.uid, requiredModule, ownerBypass, progression, navigate]);
 
   const tierLoadingUi = loadingFallback ?? (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#020202" }}>
@@ -500,6 +513,10 @@ function ModuleRoute({
         </button>
       </div>
     );
+  }
+
+  if (user && progressionUid !== user.uid) {
+    return tierLoadingUi;
   }
 
   if (!user || !hasAccess(progression)) {
