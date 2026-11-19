@@ -345,9 +345,11 @@ export function aplicarRespuesta(
   // Pasa, o se agotaron las ayudas: avanza (en el segundo caso con conAyuda).
   const next = siguientePuntero(viva.capitulo, viva.subcodigo, viva.indice);
   if (next === "sellar") {
-    const sellados = libro.capitulosSellados.includes(viva.capitulo)
-      ? libro.capitulosSellados
-      : [...libro.capitulosSellados, viva.capitulo];
+    // El último sellado es el visible; al repetir una píldora pasa al final.
+    const sellados = [
+      ...libro.capitulosSellados.filter((c) => c !== viva.capitulo),
+      viva.capitulo,
+    ];
     const haySiguiente = (viva.capitulo + 1) as CapituloId;
     const siguienteExiste = haySiguiente <= 4 && capituloPreparable(haySiguiente);
     return {

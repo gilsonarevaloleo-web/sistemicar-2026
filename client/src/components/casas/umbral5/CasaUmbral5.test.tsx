@@ -12,6 +12,7 @@ import { BannerMapaOpcional } from "./BannerMapaOpcional.tsx";
 import { ModalSaldoInsuficiente } from "./ModalSaldoInsuficiente.tsx";
 import { HistorialLimite } from "./HistorialLimite.tsx";
 import { BifurcacionPractica } from "./BifurcacionPractica.tsx";
+import { FarmaciaGimnasio } from "../gimnasio6/FarmaciaGimnasio.tsx";
 import { HistorialLibros } from "../gimnasio6/HistorialLibros.tsx";
 import { recursosVacios } from "../../../../../shared/casas/gimnasio6/motor.ts";
 
@@ -218,6 +219,33 @@ describe("Casa 6 Umbral — UI", () => {
     assert.match(html, /Copiar libro/);
     assert.match(html, /Estoy en un 4 y no lo muestro/);
     assert.match(html, /gimnasio6-historial-select-lib-1/);
+  });
+
+  it("la farmacia lista las píldoras con nombre y estado", () => {
+    const html = renderToStaticMarkup(
+      createElement(FarmaciaGimnasio, {
+        libro: {
+          id: "lib-1",
+          userId: "u1",
+          sesionUmbral5Id: "s1",
+          modulo: "social_producto",
+          limiteOrigen: "x",
+          recursos: recursosVacios(),
+          puntero: { capitulo: 2, subcodigo: 1, indice: 1, variante: 0 },
+          estado: "ABIERTO",
+          capituloSelladoDia: null,
+          capitulosSellados: [1],
+          turnos: [],
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        onElegir: () => {},
+      }),
+    );
+    assert.match(html, /Recupera tu seguridad en tu producto/);
+    assert.match(html, /Vence la crítica social/);
+    assert.match(html, /data-estado="completada"/);
+    assert.match(html, /gimnasio6-pildora-elegir-2/);
   });
 
   it("el lienzo se limpia al sellar y el cobro no es peaje", () => {

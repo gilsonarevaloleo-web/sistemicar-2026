@@ -196,6 +196,24 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
     );
   });
 
+  it("elegir una píldora salta a ese capítulo y rechaza las no preparadas", async () => {
+    await withServer(async (base, userId) => {
+      const abierto = await abrirLibroListo(base, userId);
+      const post = (capitulo: number) =>
+        fetch(`${base}/api/casas/gimnasio6/continuar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, libroId: abierto.libro.id, capitulo }),
+        });
+      const ok = await post(2).then((r) => r.json());
+      assert.equal(ok.success, true);
+      assert.equal(ok.libro.puntero.capitulo, 2);
+      assert.equal(ok.pregunta.subcodigo, 1);
+      const mal = await post(3);
+      assert.equal(mal.status, 400);
+    });
+  });
+
   it("si el store perdió el libro, lo recupera del snapshot y avanza", async () => {
     const snapshot: LibroGimnasio = {
       id: "lib-perdido",
