@@ -4,6 +4,7 @@ import {
   ETIQUETA_CAPITULO,
   capituloVisibleDe,
   pasosDelCapitulo,
+  personalizar,
   preguntaCanon,
   type LibroGimnasio,
   type PreguntaViva,
@@ -27,6 +28,7 @@ export function ConsolaGimnasio({
   onResponder,
   onContinuar,
   onCopiar,
+  onFarmacia,
   enviando,
   aviso,
 }: {
@@ -36,6 +38,7 @@ export function ConsolaGimnasio({
   onResponder: (texto: string) => void;
   onContinuar?: () => void;
   onCopiar: () => void;
+  onFarmacia?: () => void;
   enviando: boolean;
   aviso?: string | null;
 }) {
@@ -50,7 +53,7 @@ export function ConsolaGimnasio({
     topeDiario ||
     libro.estado === "TOPE_DIARIO" ||
     libro.estado === "CAPITULO_SELLADO";
-  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado });
+  const pasos = pasosDelCapitulo(capituloVista, libro.puntero, { sellado, critico: libro.recursos.critico });
   const pasoClave = `${capituloVista}.${libro.puntero.subcodigo}.${libro.puntero.indice}`;
   const etiqueta = ETIQUETA_CAPITULO[capituloVista];
   const punteroLabel = sellado
@@ -58,7 +61,7 @@ export function ConsolaGimnasio({
     : `${libro.puntero.subcodigo}.${libro.puntero.indice}`;
   const enCuarto = libro.estado === "ABIERTO" && !topeDiario;
   const turnosDelCanon = libro.turnos
-    .filter((t) => preguntaCanon(t.capitulo, t.subcodigo, t.indice)?.pregunta === t.pregunta)
+    .filter((t) => personalizar(preguntaCanon(t.capitulo, t.subcodigo, t.indice)?.pregunta ?? "", libro.recursos.critico) === t.pregunta)
     .slice(-3);
 
   useEffect(() => {
@@ -167,6 +170,16 @@ export function ConsolaGimnasio({
               <Volume2 size={14} style={{ color: UMBRAL5_BRONZE }} />
             )}
           </button>
+          {onFarmacia && (
+            <button
+              type="button"
+              onClick={onFarmacia}
+              className="text-[10px] uppercase tracking-[0.18em] text-white/40 hover:text-white/70"
+              data-testid="gimnasio6-ir-farmacia"
+            >
+              Píldoras
+            </button>
+          )}
           <button
             type="button"
             onClick={onCopiar}

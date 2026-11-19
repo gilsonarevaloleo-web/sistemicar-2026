@@ -42,6 +42,7 @@ export {
   capituloVisibleDe,
   etiquetaSubcodigo,
   pasosDelCapitulo,
+  personalizar,
   preguntaCanon,
   recorteEscenario,
   siguientePuntero,
@@ -77,7 +78,22 @@ export {
   parseEvaluacion,
   puedeAbrirCapitulo,
   preguntaVivaDe,
+  pasosConAyuda,
+  MAX_INTENTOS_PASO,
   recursosVacios,
   resolverEvaluacion,
   textoCopiaLibro,
 } from "./motor.ts";
+
+export {
+  PILDORAS,
+  bloqueoPildora,
+  elegirPildora,
+  estadoPildora,
+  pildoraDe,
+  pildoraEnCurso,
+  puedeElegirPildora,
+  type BloqueoPildora,
+  type EstadoPildora,
+  type Pildora,
+} from "./pildoras.ts";

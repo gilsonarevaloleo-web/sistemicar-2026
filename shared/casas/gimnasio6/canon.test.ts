@@ -5,6 +5,7 @@ import {
   ETIQUETA_SUBCODIGO,
   capituloVisibleDe,
   pasosDelCapitulo,
+  personalizar,
   recorteEscenario,
 } from "./canon.ts";
 
@@ -30,7 +31,7 @@ describe("Gimnasio 6 — pasos del capítulo", () => {
     });
     assert.equal(c2.length, 12);
     assert.equal(c2[0]?.etiquetaSubcodigo, "Alguien de tu alrededor");
-    assert.equal(c2[9]?.etiquetaSubcodigo, "Lo temido");
+    assert.equal(c2[9]?.etiquetaSubcodigo, "Lo inesperado");
   });
 
   it("marca hecho / actual / pendiente sin adelantar el escenario futuro", () => {
@@ -85,5 +86,16 @@ describe("Gimnasio 6 — pasos del capítulo", () => {
     const recorte = recorteEscenario(largo, 40);
     assert.ok(recorte.endsWith("…"));
     assert.ok(recorte.length <= 40);
+  });
+});
+
+describe("personalizar", () => {
+  it("usa el nombre de la persona y cae a «esa persona» si no hay", () => {
+    assert.equal(
+      personalizar("{critico} te mira desde arriba.", "Marcos, mi cuñado"),
+      "Marcos te mira desde arriba.",
+    );
+    assert.equal(personalizar("{critico} te mira desde arriba.", ""), "Esa persona te mira desde arriba.");
+    assert.equal(personalizar("¿Por qué {critico} dice eso?"), "¿Por qué esa persona dice eso?");
   });
 });

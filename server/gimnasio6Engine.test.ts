@@ -177,6 +177,43 @@ describe("gimnasio6Engine — capa profunda del límite", () => {
     );
   });
 
+  it("tras 3 fallos deja seguir y no expone la marca interna al cliente", async () => {
+    await withServer(
+      async (base, userId) => {
+        const abierto = await abrirLibroListo(base, userId);
+        let ultimo: { libro: LibroGimnasio } | null = null;
+        for (let i = 0; i < 3; i += 1) {
+          ultimo = await fetch(`${base}/api/casas/gimnasio6/responder`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, libroId: abierto.libro.id, respuesta: "no sé" }),
+          }).then((r) => r.json());
+        }
+        assert.equal(ultimo!.libro.puntero.indice, 2);
+        assert.ok(!JSON.stringify(ultimo).includes("conAyuda"));
+      },
+      { callGemini: () => Promise.reject(new Error("sin gemini")) },
+    );
+  });
+
+  it("elegir una píldora salta a ese capítulo y rechaza las no preparadas", async () => {
+    await withServer(async (base, userId) => {
+      const abierto = await abrirLibroListo(base, userId);
+      const post = (capitulo: number) =>
+        fetch(`${base}/api/casas/gimnasio6/continuar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, libroId: abierto.libro.id, capitulo }),
+        });
+      const ok = await post(2).then((r) => r.json());
+      assert.equal(ok.success, true);
+      assert.equal(ok.libro.puntero.capitulo, 2);
+      assert.equal(ok.pregunta.subcodigo, 1);
+      const mal = await post(3);
+      assert.equal(mal.status, 400);
+    });
+  });
+
   it("si el store perdió el libro, lo recupera del snapshot y avanza", async () => {
     const snapshot: LibroGimnasio = {
       id: "lib-perdido",

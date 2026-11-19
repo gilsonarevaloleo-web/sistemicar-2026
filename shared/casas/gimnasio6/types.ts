@@ -34,6 +34,8 @@ export interface RecursosGimnasio {
   miedo: string;
   familia: string;
   gustos: string;
+  /** Quién no le compraría (respuesta 2.2.1); se nombra en las preguntas siguientes. */
+  critico?: string;
 }
 
 export interface TurnoGimnasio {
@@ -45,6 +47,8 @@ export interface TurnoGimnasio {
   escenario: string;
   pregunta: string;
   respuesta: string | null;
+  /** Marca interna: el cuarto se dejó seguir tras agotar las ayudas sin pasar el criterio. No se muestra. */
+  conAyuda?: boolean;
   pasa: boolean | null;
   creadoAt: string;
 }

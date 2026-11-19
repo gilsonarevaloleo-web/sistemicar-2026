@@ -3,7 +3,7 @@
  * sello de capítulo, tope de un capítulo por día.
  */
 
-import { capituloPreparable, ETIQUETA_CAPITULO, preguntaCanon, siguientePuntero } from "./canon.ts";
+import { capituloPreparable, ETIQUETA_CAPITULO, personalizar, preguntaCanon, siguientePuntero } from "./canon.ts";
 import { copiarLibro } from "./prompt.ts";
 import type {
   CapituloId,
@@ -251,9 +251,11 @@ export function preguntaVivaDe(libro: LibroGimnasio): PreguntaViva | null {
     variante === 0
       ? canon.escenario
       : fluidezVariante(canon, ultimoTexto(libro), variante);
+  // El nombre solo vale en su cuarto (subcódigo 2 del capítulo 2).
+  const nombre = capitulo === 2 && subcodigo === 2 ? libro.recursos.critico : undefined;
   return {
-    escenario,
-    pregunta: canon.pregunta,
+    escenario: personalizar(escenario, nombre),
+    pregunta: personalizar(canon.pregunta, nombre),
     capitulo,
     subcodigo,
     indice,
@@ -277,14 +279,22 @@ export function fluidezVariante(
 ): string {
   const recorte = respuesta.trim().replace(/\s+/g, " ").slice(0, 120);
   const dicho = recorte ? `Dijiste: «${recorte}».` : "Eso no llenó el cuarto.";
+  // Escalera de ayuda: 1 acerca la escena; 2 baja al cuerpo y pide solo un trozo.
   if (variante === 1) {
     return `${pregunta.escenario} ${dicho} El mismo cuarto. Más cerca.`;
   }
-  return `${pregunta.escenario} ${dicho} Otra vez, con gente de tu vida. No teatro.`;
+  return `${pregunta.escenario} ${dicho} Ahora en el cuerpo: ¿qué sientes y dónde? Empieza por una sola frase, con gente de tu vida. No teatro.`;
 }
 
 function nuevoTurnoId(libro: LibroGimnasio): string {
   return `${libro.id}-t${libro.turnos.length + 1}`;
+}
+
+/** Intentos fallidos de un mismo paso tras los cuales se deja seguir con marca interna. */
+export const MAX_INTENTOS_PASO = 3;
+
+export function pasosConAyuda(libro: Pick<LibroGimnasio, "turnos">): TurnoGimnasio[] {
+  return libro.turnos.filter((t) => t.conAyuda);
 }
 
 export function aplicarRespuesta(
@@ -316,10 +326,12 @@ export function aplicarRespuesta(
     creadoAt: iso,
   };
 
+  const agotado = !evaluacion.pasa && libro.puntero.variante + 1 >= MAX_INTENTOS_PASO;
+  if (agotado) turno.conAyuda = true;
   const turnos = [...libro.turnos, turno];
   const recursos = absorberRecursos(libro.recursos, canon, respuesta);
 
-  if (!evaluacion.pasa) {
+  if (!evaluacion.pasa && !agotado) {
     return {
       ...libro,
       recursos,
@@ -330,11 +342,14 @@ export function aplicarRespuesta(
     };
   }
 
+  // Pasa, o se agotaron las ayudas: avanza (en el segundo caso con conAyuda).
   const next = siguientePuntero(viva.capitulo, viva.subcodigo, viva.indice);
   if (next === "sellar") {
-    const sellados = libro.capitulosSellados.includes(viva.capitulo)
-      ? libro.capitulosSellados
-      : [...libro.capitulosSellados, viva.capitulo];
+    // El último sellado es el visible; al repetir una píldora pasa al final.
+    const sellados = [
+      ...libro.capitulosSellados.filter((c) => c !== viva.capitulo),
+      viva.capitulo,
+    ];
     const haySiguiente = (viva.capitulo + 1) as CapituloId;
     const siguienteExiste = haySiguiente <= 4 && capituloPreparable(haySiguiente);
     return {
@@ -375,7 +390,7 @@ function absorberRecursos(
     return { ...recursos, familia: recursos.familia || t };
   }
   if (pregunta.capitulo === 2 && pregunta.subcodigo === 2 && pregunta.indice === 1) {
-    return { ...recursos, familia: recursos.familia || t };
+    return { ...recursos, familia: recursos.familia || t, critico: t };
   }
   if (pregunta.capitulo === 1 && pregunta.subcodigo === 4 && pregunta.indice === 1) {
     return { ...recursos, miedo: recursos.miedo || t };

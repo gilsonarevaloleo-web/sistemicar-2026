@@ -16,6 +16,7 @@ import { BannerGimnasio } from "@/components/casas/umbral5/BannerGimnasio";
 import { BifurcacionPractica } from "@/components/casas/umbral5/BifurcacionPractica";
 import { ConsolaGimnasio } from "@/components/casas/gimnasio6/ConsolaGimnasio";
 import { HistorialLibros } from "@/components/casas/gimnasio6/HistorialLibros";
+import { FarmaciaGimnasio } from "@/components/casas/gimnasio6/FarmaciaGimnasio";
 import { copiarTexto } from "@/lib/casas/codigo4/copiar";
 import { ModalSaldoInsuficiente } from "@/components/casas/umbral5/ModalSaldoInsuficiente";
 import {
@@ -98,6 +99,8 @@ export default function CasaUmbral5() {
   const [libros, setLibros] = useState<LibroGimnasio[]>([]);
   const [abriendoGym, setAbriendoGym] = useState(false);
   const [enviandoGym, setEnviandoGym] = useState(false);
+  const [verFarmacia, setVerFarmacia] = useState(false);
+  const [eligiendoPildora, setEligiendoPildora] = useState<number | null>(null);
 
   const aplicarSesion = (sesion: SesionUmbral5) => {
     setSesionId(sesion.id);
@@ -282,7 +285,8 @@ export default function CasaUmbral5() {
     pregunta: PreguntaViva | null;
     copia: string;
     topeDiario: boolean;
-  }) => {
+  }, opts: { farmacia?: boolean } = {}) => {
+    setVerFarmacia(Boolean(opts.farmacia));
     setLibro(payload.libro);
     setPreguntaGym(payload.pregunta);
     setCopiaGym(payload.copia);
@@ -307,7 +311,7 @@ export default function CasaUmbral5() {
     try {
       await unlockCuartoAudio();
       const out = await abrirGimnasio({ userId, sesionUmbral5Id: sesionId });
-      aplicarGym(out);
+      aplicarGym(out, { farmacia: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo abrir el gimnasio.");
     } finally {
@@ -346,6 +350,21 @@ export default function CasaUmbral5() {
     }
   };
 
+  const elegirPildoraGym = async (capitulo: number) => {
+    if (!userId || !libro) return;
+    setError(null);
+    setEligiendoPildora(capitulo);
+    try {
+      await unlockCuartoAudio();
+      const out = await continuarGimnasio({ userId, libroId: libro.id, libro, capitulo });
+      aplicarGym(out);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo abrir la píldora.");
+    } finally {
+      setEligiendoPildora(null);
+    }
+  };
+
   const copiarGym = async () => {
     if (!copiaGym) return;
     await copiarTexto(copiaGym);
@@ -359,7 +378,7 @@ export default function CasaUmbral5() {
   };
 
   const elegirGimnasio = () => {
-    const target = libroContinuable;
+    const target = libroContinuable ?? libros[0] ?? null;
     if (!userId || !target) return;
     void unlockCuartoAudio();
     aplicarGym({
@@ -367,9 +386,9 @@ export default function CasaUmbral5() {
       pregunta: target.estado === "ABIERTO" ? preguntaVivaDe(target) : null,
       copia: textoCopiaLibro(target),
       topeDiario: target.estado === "TOPE_DIARIO",
-    });
+    }, { farmacia: true });
     void leerLibroGimnasio({ userId, libroId: target.id })
-      .then(aplicarGym)
+      .then((out) => aplicarGym(out, { farmacia: true }))
       .catch((err) => {
         setError(err instanceof Error ? err.message : "No se pudo abrir el libro.");
       });
@@ -419,54 +438,73 @@ export default function CasaUmbral5() {
         </div>
 
         <BifurcacionPractica
-          visible={Boolean(libroContinuable)}
+          visible={Boolean(libroContinuable) || libros.length > 0}
           modo={modo}
           onPuerta={elegirPuerta}
           onGimnasio={elegirGimnasio}
         />
 
-        <LienzoLimite
-          texto={texto}
-          onTexto={onTexto}
-          onSellar={() => void sellar()}
-          cargando={sellando}
-          deshabilitado={!userId || sellando}
-        />
+        {modo === "puerta" && (
+          <>
+            <LienzoLimite
+              texto={texto}
+              onTexto={onTexto}
+              onSellar={() => void sellar()}
+              cargando={sellando}
+              deshabilitado={!userId || sellando}
+            />
 
-        <HistorialLimite
-          sesiones={sesiones}
-          sesionActivaId={sesionId}
-          onSelect={(s) => {
-            aplicarSesion(s);
-          }}
-        />
+            <HistorialLimite
+              sesiones={sesiones}
+              sesionActivaId={sesionId}
+              onSelect={(s) => {
+                aplicarSesion(s);
+              }}
+            />
 
-        <BannerMapaOpcional
-          visible={Boolean(
-            sesionId &&
-              sesiones.find((s) => s.id === sesionId)?.estado !== "MAPA_PAGO",
-          )}
-          onLeer={() => void mapear()}
-          cargando={leyendo}
-        />
+            <BannerMapaOpcional
+              visible={Boolean(
+                sesionId &&
+                  sesiones.find((s) => s.id === sesionId)?.estado !== "MAPA_PAGO",
+              )}
+              onLeer={() => void mapear()}
+              cargando={leyendo}
+            />
 
-        {error && (
+            {error && (
+              <p className="text-sm text-red-400/80" data-testid="umbral5-error">
+                {error}
+              </p>
+            )}
+
+            {lectura && <PanelMapa lectura={lectura} />}
+
+            {lectura && modo === "puerta" && hayPesoParaGimnasio(sesiones) && (
+              <BannerGimnasio
+                modulo={lectura.moduloGimnasio ?? null}
+                onEntrar={() => void entrarGym()}
+                cargando={abriendoGym}
+              />
+            )}
+
+          </>
+        )}
+
+        {modo === "gimnasio" && libro && verFarmacia && (
+          <FarmaciaGimnasio
+            libro={libro}
+            onElegir={(c) => void elegirPildoraGym(c)}
+            cargandoCapitulo={eligiendoPildora}
+          />
+        )}
+
+        {modo === "gimnasio" && verFarmacia && error && (
           <p className="text-sm text-red-400/80" data-testid="umbral5-error">
             {error}
           </p>
         )}
 
-        {lectura && <PanelMapa lectura={lectura} />}
-
-        {lectura && modo === "puerta" && hayPesoParaGimnasio(sesiones) && (
-          <BannerGimnasio
-            modulo={lectura.moduloGimnasio ?? null}
-            onEntrar={() => void entrarGym()}
-            cargando={abriendoGym}
-          />
-        )}
-
-        {modo === "gimnasio" && libro && (
+        {modo === "gimnasio" && libro && !verFarmacia && (
           <ConsolaGimnasio
             libro={libro}
             pregunta={preguntaGym}
@@ -474,11 +512,13 @@ export default function CasaUmbral5() {
             onResponder={(t) => void responderGym(t)}
             onContinuar={() => void continuarGym()}
             onCopiar={() => void copiarGym()}
+            onFarmacia={() => setVerFarmacia(true)}
             enviando={enviandoGym}
             aviso={error}
           />
         )}
 
+        {modo === "gimnasio" && (
         <HistorialLibros
           libros={libros}
           libroActivoId={libro?.id ?? null}
@@ -490,14 +530,15 @@ export default function CasaUmbral5() {
               pregunta: l.estado === "ABIERTO" ? preguntaVivaDe(l) : null,
               copia: textoCopiaLibro(l),
               topeDiario: l.estado === "TOPE_DIARIO",
-            });
+            }, { farmacia: true });
             void leerLibroGimnasio({ userId, libroId: l.id })
-              .then(aplicarGym)
+              .then((out) => aplicarGym(out, { farmacia: true }))
               .catch((err) => {
                 setError(err instanceof Error ? err.message : "No se pudo abrir el libro.");
               });
           }}
         />
+        )}
 
         <Link
           href="/menu"
