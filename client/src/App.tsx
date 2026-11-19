@@ -10,6 +10,7 @@ import { Jornada4SuspenseFallback } from "@/components/jornada/Jornada4SuspenseF
 import { JornadaErrorBoundary } from "@/components/jornada/JornadaErrorBoundary";
 import { useAuth } from "@/hooks/useAuth";
 import { claimPendingPurchases } from "@/lib/claimPurchases";
+import { createAccessVerification } from "@/lib/accessVerification";
 import { isFirebaseConfigured, isUserAnonymous } from "@/lib/firebase";
 import { subscribeToProgression, UserProgression, verificarAccesoProspecto, registrarActividadProspecto, extrasFromProgression, hasPlanificacionBaseAccess, hasSoberaniaDiaAccess, hasOperativoAccess, hasUmbralAccess, resolveUserJornadaBaseAccess, startJornadaBaseTrial, mergeModuleIds, modulesGrantedByPlan } from "@/lib/persistence";
 import { identifyMetaUser, trackCompleteRegistration, trackJornadaStartTrial } from "@/lib/metaPixel";
@@ -227,6 +228,8 @@ function ModuleRoute({
   const [checkingTier, setCheckingTier] = useState(true);
   const [previewOps, setPreviewOps] = useState(() => isPreviewOpsUnlocked());
   const [startingTrial, setStartingTrial] = useState(false);
+  const [verificationUnavailable, setVerificationUnavailable] = useState(false);
+  const serverConfirmedRef = useRef(false);
   const claimedModulesRef = useRef<string[]>([]);
 
   const ownerBypass = isOwnerEmail(user?.email);
@@ -303,13 +306,21 @@ function ModuleRoute({
 
     if (user?.uid) {
       let firstProgressionEmit = true;
+      const verification = createAccessVerification();
+      serverConfirmedRef.current = false;
+      setVerificationUnavailable(false);
       const unsub = subscribeToProgression(
         user.uid,
-        (prog) => {
+        (prog, source) => {
           const merged: UserProgression = {
             ...prog,
             activeModules: mergeModuleIds(prog.activeModules, claimedModulesRef.current as ModuleId[]),
           };
+          const accessCheck = verification.observe(source, hasAccess(merged));
+          if (!accessCheck.shouldVerify) return;
+          if (source === "confirmed") serverConfirmedRef.current = true;
+          setVerificationUnavailable(false);
+          setStartingTrial(false);
           setProgression(merged);
           if (requiredModule === "planificacion_base") {
             const regStep = resolveJornadaBaseRegistroStep({
@@ -346,6 +357,7 @@ function ModuleRoute({
               setStartingTrial(true);
               setCheckingTier(true);
               void startJornadaBaseTrial(user.uid).then((result) => {
+                if (!accessCheck.isCurrent()) return;
                 if (result.started) trackJornadaStartTrial();
                 setProgression((prev) =>
                   prev
@@ -362,6 +374,7 @@ function ModuleRoute({
             setCheckingTier(true);
             void claimPendingPurchases()
               .then(({ grantedPlans }) => {
+                if (!accessCheck.isCurrent()) return;
                 if (grantedPlans.length > 0) {
                   const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
                   claimedModulesRef.current = mergeModuleIds(
@@ -392,6 +405,7 @@ function ModuleRoute({
                 }
               })
               .catch(() => {
+                if (!accessCheck.isCurrent()) return;
                 setCheckingTier(false);
                 navigate(pagosHrefForDeny(merged));
               });
@@ -400,32 +414,40 @@ function ModuleRoute({
           setCheckingTier(false);
         },
         () => {
+          const accessCheck = verification.observe("confirmed", false);
           setCheckingTier(true);
           void claimPendingPurchases()
             .then(({ grantedPlans }) => {
+              if (!accessCheck.isCurrent()) return;
               if (grantedPlans.length > 0) {
                 const unlocked = grantedPlans.flatMap((id) => modulesGrantedByPlan(id));
                 claimedModulesRef.current = mergeModuleIds(
                   claimedModulesRef.current,
                   unlocked,
                 );
+                setProgression((prev) =>
+                  prev
+                    ? { ...prev, activeModules: mergeModuleIds(prev.activeModules, unlocked) }
+                    : prev,
+                );
                 setCheckingTier(false);
                 return;
               }
               setCheckingTier(false);
-              if (!ownerBypass && !isPreviewOpsUnlocked()) {
-                navigate(pagosHrefForDeny(null));
-              }
+              setVerificationUnavailable(true);
             })
             .catch(() => {
+              if (!accessCheck.isCurrent()) return;
               setCheckingTier(false);
-              if (!ownerBypass && !isPreviewOpsUnlocked()) {
-                navigate(pagosHrefForDeny(null));
-              }
+              setVerificationUnavailable(true);
             });
-        }
+        },
+        { confirmWithServer: true },
       );
-      return () => unsub();
+      return () => {
+        verification.dispose();
+        unsub();
+      };
     }
   }, [user, loading, navigate, ownerBypass, previewBypass, requiredModule, previewOps]);
 
@@ -433,6 +455,10 @@ function ModuleRoute({
     if (!checkingTier) return;
     const id = window.setTimeout(() => {
       setCheckingTier(false);
+      if (isFirebaseConfigured() && !serverConfirmedRef.current) {
+        setVerificationUnavailable(true);
+        return;
+      }
       if (
         requiredModule === "planificacion_base" &&
         !ownerBypass &&
@@ -460,6 +486,17 @@ function ModuleRoute({
 
   if (loading || checkingTier || startingTrial) {
     return tierLoadingUi;
+  }
+
+  if (verificationUnavailable) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center" style={{ backgroundColor: "#020202" }}>
+        <p className="text-sm text-slate-300">No pudimos verificar tu acceso. Comprueba tu conexión e inténtalo de nuevo.</p>
+        <button type="button" className="text-sm text-sky-400 underline" onClick={() => window.location.reload()}>
+          Reintentar
+        </button>
+      </div>
+    );
   }
 
   if (!user || !hasAccess(progression)) {

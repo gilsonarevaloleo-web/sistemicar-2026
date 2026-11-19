@@ -19,4 +19,13 @@ describe("ModuleRoute — no mandar a /pagos antes de reclamar el pago", () => {
     assert.ok(claimIdx > 0, "ModuleRoute debe reclamar el pago");
     assert.ok(denyIdx > claimIdx, "el deny a /pagos va después del claim");
   });
+
+  it("espera al servidor y descarta resultados de comprobaciones antiguas", () => {
+    const moduleRoute = src.slice(src.indexOf("function ModuleRoute"), src.indexOf("/** @deprecated"));
+    assert.match(moduleRoute, /createAccessVerification\(\)/);
+    assert.match(moduleRoute, /if \(!accessCheck\.shouldVerify\) return/);
+    assert.match(moduleRoute, /if \(!accessCheck\.isCurrent\(\)\) return/g);
+    assert.match(moduleRoute, /confirmWithServer: true/);
+    assert.match(moduleRoute, /verification\.dispose\(\)/);
+  });
 });

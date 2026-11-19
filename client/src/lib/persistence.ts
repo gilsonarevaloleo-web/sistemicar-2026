@@ -3163,20 +3163,22 @@ function saveLocalProgression(prog: UserProgression): void {
 
 export function subscribeToProgression(
   userId: string,
-  onData: (prog: UserProgression) => void,
-  onError: (error: Error) => void
+  onData: (prog: UserProgression, source: import("./accessVerification").ProgressionSource) => void,
+  onError: (error: Error) => void,
+  options?: { confirmWithServer?: boolean },
 ): () => void {
   const emitLocal = () => {
     const local = reconcileProgressionFromLocalLog(userId);
     deactivateSovereignModeGlobal();
-    onData(local);
+    onData(local, isFirebaseConfigured() && db ? "local" : "confirmed");
   };
   emitLocal();
 
   if (isFirebaseConfigured() && db) {
     const path = getPrivatePath(userId, "progression");
     const q = query(collection(db, path));
-    const applySnapshot = async (snapshot: { empty: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
+    const applySnapshot = async (snapshot: { empty: boolean; metadata: { fromCache: boolean }; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => {
+      const source = snapshot.metadata.fromCache ? "cache" : "confirmed";
       if (snapshot.empty) {
         const defaultProg = getDefaultProgression(userId);
         const localProg = reconcileProgressionFromLocalLog(userId);
@@ -3196,9 +3198,9 @@ export function subscribeToProgression(
         if (localHasMeaningfulProgress) {
           deactivateSovereignModeGlobal();
           backupToLocal("progression", localProg);
-          onData(localProg);
+          onData(localProg, source);
         } else {
-          onData(defaultProg);
+          onData(defaultProg, source);
         }
       } else {
         if (snapshot.docs.length > 1) {
@@ -3206,7 +3208,7 @@ export function subscribeToProgression(
         }
         const d = pickLatestProgressionDoc(snapshot.docs);
         if (!d) {
-          onData(getDefaultProgression(userId));
+          onData(getDefaultProgression(userId), source);
           return;
         }
         const data = d.data();
@@ -3253,20 +3255,20 @@ export function subscribeToProgression(
         deactivateSovereignModeGlobal();
         backupToLocal("progression", prog);
         saveLocalProgression(prog);
-        onData(prog);
+        onData(prog, source);
       }
     };
-    const unsubFs = onSnapshot(q, (snapshot) => {
+    const unsubFs = onSnapshot(q, { includeMetadataChanges: options?.confirmWithServer ?? false }, (snapshot) => {
       void applySnapshot(snapshot);
     }, (error) => {
       console.error("Firebase Progression Error:", error);
       activateSovereignModeGlobal("Error de conexión. Usando datos locales.");
       const localProg = restoreFromLocal<UserProgression>("progression") || getLocalProgression(userId);
-      onData(localProg);
+      onData(localProg, "local");
       onError(error);
     });
     const onLocalProgressionRefresh = () => {
-      onData(reconcileProgressionFromLocalLog(userId));
+      onData(reconcileProgressionFromLocalLog(userId), "local");
     };
     window.addEventListener("progression-updated", onLocalProgressionRefresh);
     return () => {
@@ -3274,8 +3276,8 @@ export function subscribeToProgression(
       window.removeEventListener("progression-updated", onLocalProgressionRefresh);
     };
   } else {
-    onData(reconcileProgressionFromLocalLog(userId));
-    const handler = () => onData(reconcileProgressionFromLocalLog(userId));
+    onData(reconcileProgressionFromLocalLog(userId), "confirmed");
+    const handler = () => onData(reconcileProgressionFromLocalLog(userId), "confirmed");
     window.addEventListener("progression-updated", handler);
     return () => window.removeEventListener("progression-updated", handler);
   }
