@@ -193,7 +193,7 @@ export async function abrirLibroGimnasio(
     return {
       ok: false,
       status: 409,
-      error: "Todavía no hay peso. Seguí volcando el límite.",
+      error: "Todavía no hay peso. Sigue volcando el límite.",
       codigo: "SIN_PESO",
     };
   }

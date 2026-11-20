@@ -37,6 +37,8 @@ import { unlockCuartoAudio } from "@/lib/casas/gimnasio6/cuartoAudio";
 import {
   esLibroContinuable,
   ordenarLibrosPorCreacion,
+  pildoraDe,
+  pildoraEnCurso,
   preguntaVivaDe,
   textoCopiaLibro,
   type LibroGimnasio,
@@ -93,6 +95,7 @@ export default function CasaUmbral5() {
     null,
   );
   const [modo, setModo] = useState<"puerta" | "gimnasio">("puerta");
+  const [nuevoDiagnostico, setNuevoDiagnostico] = useState(false);
   const [preguntaGym, setPreguntaGym] = useState<PreguntaViva | null>(null);
   const [copiaGym, setCopiaGym] = useState("");
   const [topeDiario, setTopeDiario] = useState(false);
@@ -371,6 +374,7 @@ export default function CasaUmbral5() {
   };
 
   const elegirPuerta = () => {
+    setNuevoDiagnostico(true);
     setModo("puerta");
     setLibro(null);
     setPreguntaGym(null);
@@ -378,6 +382,7 @@ export default function CasaUmbral5() {
   };
 
   const elegirGimnasio = () => {
+    setNuevoDiagnostico(false);
     const target = libroContinuable ?? libros[0] ?? null;
     if (!userId || !target) return;
     void unlockCuartoAudio();
@@ -393,6 +398,16 @@ export default function CasaUmbral5() {
         setError(err instanceof Error ? err.message : "No se pudo abrir el libro.");
       });
   };
+
+  const capituloActivo = libroContinuable
+    ? (pildoraEnCurso(libroContinuable) ?? libroContinuable.puntero.capitulo)
+    : null;
+  const pildoraActiva = capituloActivo ? pildoraDe(capituloActivo) : undefined;
+  const mostrarTarjeta =
+    modo === "puerta" && Boolean(libroContinuable) && !nuevoDiagnostico;
+  const mostrarFormulario = modo === "puerta" && !mostrarTarjeta;
+  const errorVisible =
+    error && !(error === "Libro no encontrado." && !libro) ? error : null;
 
   return (
     <main
@@ -423,7 +438,7 @@ export default function CasaUmbral5() {
 
         <div
           className="sticky top-0 z-20 flex items-center justify-between border px-4 py-3"
-          style={{ borderColor: `${UMBRAL5_BRONZE}28`, backgroundColor: "#050505f2" }}
+          style={{ borderColor: `${UMBRAL5_BRONZE}28`, backgroundColor: "#000000" }}
           data-testid="umbral5-saldo"
         >
           <span
@@ -438,15 +453,34 @@ export default function CasaUmbral5() {
         </div>
 
         <BifurcacionPractica
-          visible={Boolean(libroContinuable) || libros.length > 0}
-          modo={modo}
-          onPuerta={elegirPuerta}
-          onGimnasio={elegirGimnasio}
+          visible={mostrarTarjeta}
+          titulo={pildoraActiva?.nombre ?? "Tu práctica de gimnasia"}
+          subtitulo={pildoraActiva?.promesa ?? ""}
+          onContinuar={elegirGimnasio}
+          onNuevo={elegirPuerta}
         />
 
-        {modo === "puerta" && (
+        {mostrarTarjeta && errorVisible && (
+          <p className="text-sm text-red-400/80" data-testid="umbral5-error">
+            {errorVisible}
+          </p>
+        )}
+
+        {modo === "gimnasio" && (
+          <button
+            type="button"
+            onClick={elegirPuerta}
+            className="block text-[10px] tracking-[0.18em] uppercase text-white/40 underline underline-offset-4 hover:text-white/70"
+            data-testid="umbral5-elegir-puerta"
+          >
+            Nuevo diagnóstico (10 volcados)
+          </button>
+        )}
+
+        {mostrarFormulario && (
           <>
             <LienzoLimite
+              numeroVolcado={sesiones.length + 1}
               texto={texto}
               onTexto={onTexto}
               onSellar={() => void sellar()}
@@ -471,9 +505,9 @@ export default function CasaUmbral5() {
               cargando={leyendo}
             />
 
-            {error && (
+            {errorVisible && (
               <p className="text-sm text-red-400/80" data-testid="umbral5-error">
-                {error}
+                {errorVisible}
               </p>
             )}
 
@@ -498,9 +532,9 @@ export default function CasaUmbral5() {
           />
         )}
 
-        {modo === "gimnasio" && verFarmacia && error && (
+        {modo === "gimnasio" && verFarmacia && errorVisible && (
           <p className="text-sm text-red-400/80" data-testid="umbral5-error">
-            {error}
+            {errorVisible}
           </p>
         )}
 
@@ -518,8 +552,8 @@ export default function CasaUmbral5() {
           />
         )}
 
-        {modo === "gimnasio" && (
         <HistorialLibros
+          inicialAbierto={false}
           libros={libros}
           libroActivoId={libro?.id ?? null}
           onSelect={(l) => {
@@ -538,7 +572,6 @@ export default function CasaUmbral5() {
               });
           }}
         />
-        )}
 
         <Link
           href="/menu"

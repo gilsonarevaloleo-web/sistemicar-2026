@@ -29,8 +29,8 @@ describe("Casa 6 Umbral — UI", () => {
         deshabilitado: false,
       }),
     );
-    assert.match(html, /¿Cuál es tu límite\?/);
-    assert.match(html, /Escribí el límite que ya sabés/);
+    assert.match(html, /Volcado 1 de 10/);
+    assert.match(html, /Escribe el límite que ya sabes/);
     assert.match(html, /Sellar volcado \(gratis\)/);
     assert.match(html, /umbral5-volcado/);
   });
@@ -151,27 +151,22 @@ describe("Casa 6 Umbral — UI", () => {
     assert.match(html, /umbral5-historial-texto-s1/);
   });
 
-  it("la bifurcación ofrece primera puerta o seguir gimnasia", () => {
-    const html = renderToStaticMarkup(
-      createElement(BifurcacionPractica, {
-        visible: true,
-        modo: "puerta",
-        onPuerta: () => {},
-        onGimnasio: () => {},
-      }),
-    );
+  it("la bifurcación muestra una sola tarjeta con la píldora activa", () => {
+    const props = {
+      visible: true,
+      titulo: "Vence la crítica social",
+      subtitulo: "Sostente cuando alguien te cuestiona.",
+      onContinuar: () => {},
+      onNuevo: () => {},
+    };
+    const html = renderToStaticMarkup(createElement(BifurcacionPractica, props));
     assert.match(html, /umbral5-bifurcacion/);
-    assert.match(html, /primera puerta/);
-    assert.match(html, /práctica de gimnasia/);
-    assert.match(html, /umbral5-elegir-puerta/);
-    assert.match(html, /umbral5-elegir-gimnasio/);
+    assert.match(html, /Vence la crítica social/);
+    assert.match(html, /Continuar píldora/);
+    assert.match(html, /Nuevo diagnóstico \(10 volcados\)/);
+    assert.doesNotMatch(html, /primera puerta|práctica de gimnasia/);
     const oculta = renderToStaticMarkup(
-      createElement(BifurcacionPractica, {
-        visible: false,
-        modo: "puerta",
-        onPuerta: () => {},
-        onGimnasio: () => {},
-      }),
+      createElement(BifurcacionPractica, { ...props, visible: false }),
     );
     assert.equal(oculta, "");
   });
