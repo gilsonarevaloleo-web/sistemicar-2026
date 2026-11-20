@@ -354,12 +354,18 @@ export default function CasaUmbral5() {
   };
 
   const elegirPildoraGym = async (capitulo: number) => {
-    if (!userId || !libro) return;
+    if (!userId) return;
+    const base = libro ?? libroContinuable ?? libros[0] ?? null;
+    if (!base) {
+      if (sesionId) await entrarGym();
+      else setError("Sella un volcado para abrir tu primera píldora.");
+      return;
+    }
     setError(null);
     setEligiendoPildora(capitulo);
     try {
       await unlockCuartoAudio();
-      const out = await continuarGimnasio({ userId, libroId: libro.id, libro, capitulo });
+      const out = await continuarGimnasio({ userId, libroId: base.id, libro: base, capitulo });
       aplicarGym(out);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo abrir la píldora.");
@@ -415,7 +421,7 @@ export default function CasaUmbral5() {
       style={{ backgroundColor: "#050505" }}
       data-testid="casa-umbral5-page"
     >
-      <div className="mx-auto max-w-3xl space-y-8">
+      <div className="mx-auto max-w-lg space-y-5">
         <header className="text-center">
           <div className="mb-3 flex items-center justify-center gap-2">
             <DoorOpen size={14} style={{ color: UMBRAL5_BRONZE }} aria-hidden />
@@ -437,7 +443,7 @@ export default function CasaUmbral5() {
         </header>
 
         <div
-          className="sticky top-0 z-20 flex items-center justify-between border px-4 py-3"
+          className="sticky top-0 z-20 flex items-center justify-between rounded-xl border px-4 py-3"
           style={{ borderColor: `${UMBRAL5_BRONZE}28`, backgroundColor: "#000000" }}
           data-testid="umbral5-saldo"
         >
@@ -475,6 +481,14 @@ export default function CasaUmbral5() {
           >
             Nuevo diagnóstico (10 volcados)
           </button>
+        )}
+
+        {modo === "puerta" && (
+          <FarmaciaGimnasio
+            libro={libroContinuable ?? libros[0] ?? null}
+            onElegir={(c) => void elegirPildoraGym(c)}
+            cargandoCapitulo={eligiendoPildora}
+          />
         )}
 
         {mostrarFormulario && (
