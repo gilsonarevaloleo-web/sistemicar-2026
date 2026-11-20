@@ -294,8 +294,8 @@ const C2: PreguntaCanon[] = [
     indice: 1,
     escenario:
       "Superar la fricción social se hace en pasos, y no tienes que darlos solo. Hay alguien de tus conocidos que podría acompañarte en el primero.",
-    pregunta: "¿A quién de tus conocidos elegirías como aliado y cuál sería ese primer paso de fricción?",
-    criterioMotor: "¿Eligió a una persona real y un paso concreto, o se quedó en «alguien»?",
+    pregunta: "¿A quién de tus conocidos elegirías como aliado? Dime su nombre. ¿Y cuál sería ese primer paso de fricción?",
+    criterioMotor: "¿Eligió a una persona y un paso concreto? El nombre activa el cuerpo, no se exige: sin nombre pasa igual.",
   },
   {
     capitulo: 2,
@@ -303,8 +303,8 @@ const C2: PreguntaCanon[] = [
     indice: 2,
     escenario: "Con tu aliado a tu lado, el paso crece: ahora toca abordar a un grupo.",
     pregunta:
-      "¿A qué 3 personas abordarían sobre tu producto o propósito, y cómo se organizan para prepararse con tu aliado?",
-    criterioMotor: "¿Hay 3 personas concretas y un reparto de roles, o un plan vago?",
+      "¿Quiénes serían esas 3 personas? Nómbralas una por una. ¿Y cómo se organizan con tu aliado para prepararse?",
+    criterioMotor: "¿Hay un reparto de roles o un plan vago? Los nombres activan el cuerpo, no se exigen.",
   },
   {
     capitulo: 2,
