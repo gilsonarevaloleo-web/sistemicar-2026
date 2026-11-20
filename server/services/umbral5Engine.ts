@@ -93,7 +93,7 @@ export function normalizarInputUmbral5(body: unknown): Umbral5Input | Umbral5Eng
     return {
       ok: false,
       status: 400,
-      error: "Falta limiteConocido: escribí el límite que ya sabés.",
+      error: "Falta limiteConocido: escribe el límite que ya sabes.",
       codigo: "VOLCADO_VACIO",
     };
   }

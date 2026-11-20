@@ -19,7 +19,7 @@ describe("Casa 6 Umbral — prompt", () => {
     assert.equal(CASA_UMBRAL5_VERSION, "1.2.0-umbral-limites");
     assert.equal(CASA_UMBRAL5_NOMBRE, "La Casa 6: Umbral");
     assert.equal(CASA_UMBRAL5_MARCA, "Umbral");
-    assert.match(CASA_UMBRAL5_FIRMA, /Sabés qué hacer/);
+    assert.match(CASA_UMBRAL5_FIRMA, /Sabes qué hacer/);
     assert.equal(CASA_UMBRAL5_RITUAL, "¿Cuál es tu límite?");
     assert.equal(CASA_UMBRAL5_AXIOMAS.length, 5);
   });

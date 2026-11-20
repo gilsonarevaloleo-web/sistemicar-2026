@@ -10,7 +10,7 @@ export const CASA_UMBRAL5_VERSION = "1.2.0-umbral-limites" as const;
 export const CASA_UMBRAL5_NOMBRE = "La Casa 6: Umbral";
 export const CASA_UMBRAL5_MARCA = "Umbral";
 export const CASA_UMBRAL5_FIRMA =
-  "Sabés qué hacer. No podés ejecutarlo. El origen no se habita.";
+  "Sabes qué hacer. No puedes ejecutarlo. El origen no se habita.";
 export const CASA_UMBRAL5_RITUAL = "¿Cuál es tu límite?";
 
 export const CASA_UMBRAL5_AXIOMAS = [

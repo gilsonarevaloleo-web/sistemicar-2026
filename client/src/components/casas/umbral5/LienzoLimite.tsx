@@ -1,10 +1,9 @@
 import React, { type FormEvent } from "react";
-import { CASA_UMBRAL5_RITUAL } from "@shared/casas/umbral5";
 
 export const UMBRAL5_BRONZE = "#C4A06A";
 export const UMBRAL5_ASH = "#7A6A52";
 export const PLACEHOLDER_LIMITE =
-  "Escribí el límite que ya sabés. No la queja. No el oficio.";
+  "Escribe el límite que ya sabes. No la queja. No el oficio.";
 
 export function LienzoLimite({
   texto,
@@ -12,12 +11,14 @@ export function LienzoLimite({
   onSellar,
   cargando,
   deshabilitado,
+  numeroVolcado = 1,
 }: {
   texto: string;
   onTexto: (value: string) => void;
   onSellar: () => void;
   cargando: boolean;
   deshabilitado: boolean;
+  numeroVolcado?: number;
 }) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -37,7 +38,7 @@ export function LienzoLimite({
           style={{ color: UMBRAL5_BRONZE }}
           data-testid="umbral5-pregunta-matriz"
         >
-          {CASA_UMBRAL5_RITUAL}
+          Volcado {Math.min(numeroVolcado, 10)} de 10
         </span>
         <textarea
           value={texto}

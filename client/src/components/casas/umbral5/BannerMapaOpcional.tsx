@@ -19,7 +19,7 @@ export function BannerMapaOpcional({
       data-testid="umbral5-banner-mapa"
     >
       <p className="text-[11px] leading-relaxed text-white/40">
-        El mapa pago es opcional. Seguí volcando: el peso del límite se ve en la
+        El mapa pago es opcional. Sigue volcando: el peso del límite se ve en la
         serie, no en un sello.
       </p>
       <button

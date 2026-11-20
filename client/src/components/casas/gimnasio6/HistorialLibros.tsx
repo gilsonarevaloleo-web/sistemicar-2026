@@ -14,12 +14,14 @@ export function HistorialLibros({
   libros,
   libroActivoId,
   onSelect,
+  inicialAbierto = true,
 }: {
   libros: LibroGimnasio[];
   libroActivoId: string | null;
   onSelect: (libro: LibroGimnasio) => void;
+  inicialAbierto?: boolean;
 }) {
-  const [abierto, setAbierto] = useState(true);
+  const [abierto, setAbierto] = useState(inicialAbierto);
   const numeros = numerosLibro(libros);
   if (libros.length === 0) return null;
 
@@ -28,6 +30,7 @@ export function HistorialLibros({
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
         className="flex w-full items-center justify-between border px-4 py-3 text-left"
         style={{ borderColor: `${UMBRAL5_BRONZE}28` }}
       >
