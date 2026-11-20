@@ -32,7 +32,7 @@ export const ETIQUETA_SUBCODIGO: Record<CapituloId, Record<SubcodigoId, string>>
   2: {
     1: "Alguien de tu alrededor",
     2: "Quien no compraría",
-    3: "La semana",
+    3: "El aliado",
     4: "Lo inesperado",
   },
   3: {
@@ -293,51 +293,53 @@ const C2: PreguntaCanon[] = [
     subcodigo: 3,
     indice: 1,
     escenario:
-      "Esa crítica no desaparece: está en tu trabajo, tu familia o tu barrio. Cada día de esta semana puedes cruzarte con esa mirada.",
-    pregunta: "¿Cómo te planificas para sostener tu semana con esa mirada encima?",
-    criterioMotor: "¿Sintió la secuencia de la semana social o se fue a «ya no le hablo»?",
+      "Superar la fricción social se hace en pasos, y no tienes que darlos solo. Hay alguien de tus conocidos que podría acompañarte en el primero.",
+    pregunta: "¿A quién de tus conocidos elegirías como aliado y cuál sería ese primer paso de fricción?",
+    criterioMotor: "¿Eligió a una persona real y un paso concreto, o se quedó en «alguien»?",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 2,
-    escenario: "La semana ya pesa. Cada mirada es un paso más.",
-    pregunta: "¿Qué nivel de esfuerzo le pones a sostener esa crítica?",
-    criterioMotor: "¿Nombró el esfuerzo emocional o pidió que se termine?",
+    escenario: "Con tu aliado a tu lado, el paso crece: ahora toca abordar a un grupo.",
+    pregunta:
+      "¿A qué 3 personas abordarían sobre tu producto o propósito, y cómo se organizan para prepararse con tu aliado?",
+    criterioMotor: "¿Hay 3 personas concretas y un reparto de roles, o un plan vago?",
   },
   {
     capitulo: 2,
     subcodigo: 3,
     indice: 3,
-    escenario: "Todavía hay más peso. El cuerpo pide esconderse.",
+    escenario:
+      "En el abordaje, la balanza se inclina hacia ellos y te impide dominar el debate. Hay algo que ellos no tomaron en cuenta y que ya jugaba a tu favor.",
     pregunta:
-      "¿Cuál es tu máximo esfuerzo: el punto donde quieres esconderte y sigues ahí?",
-    criterioMotor: "¿Hay máximo o confort?",
+      "¿Qué sabes tú de tu producto o de ti que ellos no consideraron, y cómo lo usas para inclinar la balanza y terminar dominando?",
+    criterioMotor: "¿Encontró una ventaja real y dominó el debate, o se quedó defendiéndose?",
   },
   {
     capitulo: 2,
     subcodigo: 4,
     indice: 1,
     escenario:
-      "A pesar de todo ese esfuerzo, ocurre lo que no esperabas: fracasas frente a los demás.",
-    pregunta: "¿Qué pasa en ti cuando eso sucede? ¿Te detienes o sigues, y por qué?",
-    criterioMotor: "¿Hay tajo (me detengo / sigo) y un porqué concreto, o slogan?",
+      "Llegas a esa persona que podría impulsarte y, sin que lo esperaras, te mira desde arriba o te ayuda por compasión.",
+    pregunta: "¿Qué sientes en ese momento y en qué parte del cuerpo lo sientes?",
+    criterioMotor: "¿Nombró la sensación y el lugar en el cuerpo, o racionalizó?",
   },
   {
     capitulo: 2,
     subcodigo: 4,
     indice: 2,
-    escenario: "Se apaga la idea de ser superior. Y detrás del fracaso aparece algo.",
-    pregunta: "¿Qué esperanza ves ahí que antes no veías?",
-    criterioMotor: "¿Hay esperanza concreta o flor / «todo va a estar bien»?",
+    escenario: "Te quedas con esa sensación sin huir de ella. Algo de lo que no te habías dado cuenta se vuelve visible.",
+    pregunta: "¿Qué ves ahora de ti que antes no veías?",
+    criterioMotor: "¿Hizo consciente algo inconsciente o dio un slogan?",
   },
   {
     capitulo: 2,
     subcodigo: 4,
     indice: 3,
-    escenario: "Imagina que esa esperanza ya es real: nivel 10.",
-    pregunta: "¿Qué escena de tu vida cambiaría si ya fuera así?",
-    criterioMotor: "¿Hay escena concreta o flor?",
+    escenario: "Esa mirada de arriba ya no te hunde: te muestra hasta dónde puedes llegar.",
+    pregunta: "¿Qué cambia en ti cuando dejas de ser alguien a quien ayudan por compasión?",
+    criterioMotor: "¿Hay un cambio concreto o una flor? No se pide estrategia ni cálculo.",
   },
 ];
 
