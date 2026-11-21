@@ -483,14 +483,6 @@ export default function CasaUmbral5() {
           </button>
         )}
 
-        {modo === "puerta" && (
-          <FarmaciaGimnasio
-            libro={libroContinuable ?? libros[0] ?? null}
-            onElegir={(c) => void elegirPildoraGym(c)}
-            cargandoCapitulo={eligiendoPildora}
-          />
-        )}
-
         {mostrarFormulario && (
           <>
             <LienzoLimite
