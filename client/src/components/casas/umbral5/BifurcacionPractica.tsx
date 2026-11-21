@@ -18,15 +18,15 @@ export function BifurcacionPractica({
 
   return (
     <section
-      className="space-y-4 border px-4 py-5"
+      className="space-y-4 rounded-xl border px-4 py-4"
       style={{
-        borderColor: `${UMBRAL5_BRONZE}55`,
-        backgroundColor: "#0a0a0a",
+        borderColor: `${UMBRAL5_BRONZE}66`,
+        backgroundColor: "rgba(255,255,255,0.02)",
       }}
       data-testid="umbral5-bifurcacion"
     >
       <p
-        className="text-[10px] tracking-[0.22em] uppercase"
+        className="text-[9px] font-black tracking-widest uppercase"
         style={{ color: UMBRAL5_ASH }}
       >
         Píldora en curso
@@ -48,7 +48,7 @@ export function BifurcacionPractica({
       <button
         type="button"
         onClick={onContinuar}
-        className="w-full px-4 py-3 text-[11px] font-semibold tracking-[0.14em] uppercase"
+        className="w-full rounded-lg px-4 py-3 text-[11px] font-black tracking-widest uppercase"
         style={{
           backgroundColor: UMBRAL5_BRONZE,
           color: "#0a0a0a",
