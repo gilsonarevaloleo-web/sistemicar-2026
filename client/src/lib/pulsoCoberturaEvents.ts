@@ -9,6 +9,8 @@ export type Jornada4OpenLaunchDetail = {
   oleadaPuntoId?: string;
   /** Prefiere desglose al abrir desde Hub. */
   modo?: "rapido" | "desglose";
+  /** Conquista pausada que este enfoque puentea: su título justifica la pausa. */
+  puentePausaVehicleId?: string;
 };
 
 export function requestJornada4OpenLaunch(detail?: Jornada4OpenLaunchDetail): void {

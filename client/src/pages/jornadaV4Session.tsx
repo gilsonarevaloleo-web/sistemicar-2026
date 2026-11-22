@@ -455,6 +455,7 @@ export default function JornadaV4Session() {
             />
             <Jornada4LaunchPanel
               onLaunch={handleLaunch}
+              onPuenteLanzado={(id, titulo) => void ops.labelPausaConquista(id, titulo)}
               segmentoHoraFin={planillaApi.segmentoActivo?.horaFin ?? null}
               segmentoActivoNombre={
                 planillaApi.segmentoActivo

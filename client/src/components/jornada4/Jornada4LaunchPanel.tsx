@@ -61,6 +61,8 @@ const V4_TIPOS = ["tiempo", "situacion"] as const;
 
 type Props = {
   onLaunch: (form: Jornada4LaunchForm) => Promise<string | null>;
+  /** Enfoque lanzado como puente de una conquista pausada: su título nombra la pausa. */
+  onPuenteLanzado?: (conquistaId: string, titulo: string) => void;
   disabled?: boolean;
   /** Hora fin del segmento activo → meta default del ring. */
   segmentoHoraFin?: string | null;
@@ -146,6 +148,7 @@ function useKeyboardInset(): number {
  */
 export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   onLaunch,
+  onPuenteLanzado,
   disabled = false,
   segmentoHoraFin = null,
   segmentoActivoNombre = null,
@@ -193,6 +196,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
   const tick = useJornada4Tick(open && tipo === "tiempo");
   /** Overflow previo del body — liberar al abrir <select> nativo (evita bloqueo móvil). */
   const bodyOverflowPrevRef = useRef<string | null>(null);
+  const puenteRef = useRef<string | null>(null);
   const nativePickerOpenRef = useRef(false);
 
   useEffect(() => {
@@ -237,7 +241,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
         peldanoId?: string;
         oleadaPuntoId?: string;
         modo?: FlotaLaunchModo;
+        puentePausaVehicleId?: string;
       }>).detail;
+      puenteRef.current = detail?.puentePausaVehicleId?.trim() || null;
       if (detail?.proyectoId?.trim()) setVehiculoProyectoId(detail.proyectoId.trim());
       if (detail?.peldanoId?.trim()) setPeldanoIdLaunch(detail.peldanoId.trim());
       if (detail?.oleadaPuntoId?.trim()) setOleadaPuntoIdLaunch(detail.oleadaPuntoId.trim());
@@ -319,6 +325,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     setActiveSubSugIdx(null);
     setModoEntrenamientoRing(false);
     setAncladoAlSegmento(false);
+    puenteRef.current = null;
     setOpen(false);
   }, [segmentoHoraFin, hubPeldanoId, hubOleadaPuntoId]);
 
@@ -469,8 +476,18 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
             : {}),
         });
       }
-      if (id) reset();
-      else if (gpsArmed) stopJ4GpsClips();
+      if (id) {
+        const puenteId = puenteRef.current;
+        puenteRef.current = null;
+        if (puenteId && onPuenteLanzado) {
+          const justificacion =
+            tipo === "tiempo"
+              ? validSubs[0]?.titulo.trim()
+              : filas.map(f => f.trim()).find(Boolean);
+          if (justificacion) onPuenteLanzado(puenteId, justificacion);
+        }
+        reset();
+      } else if (gpsArmed) stopJ4GpsClips();
     } catch {
       if (gpsArmed) stopJ4GpsClips();
     } finally {
@@ -482,6 +499,7 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
     saving,
     canLaunch,
     onLaunch,
+    onPuenteLanzado,
     titulo,
     subs,
     filas,

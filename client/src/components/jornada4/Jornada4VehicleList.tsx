@@ -11,6 +11,7 @@ import { findOtraConquistaPausa } from "@/lib/conquistaPausa";
 import { isPausedPresence } from "@/lib/vehiculoPausa";
 import type { ReorderDirection } from "@/lib/desglosadorReorder";
 import type { DestinoCierre } from "@/lib/destinoCierre";
+import { requestJornada4OpenLaunch } from "@/lib/pulsoCoberturaEvents";
 import { ConquistaCard } from "./ConquistaCard";
 import { SituacionCard } from "./SituacionCard";
 import { SituacionLibreCard } from "./SituacionLibreCard";
@@ -137,6 +138,10 @@ function renderVehicleCard(v: Vehicle, ops: Ops, pausaOcupadaPor?: Vehicle) {
         onAddSub={form => void ops.addConquistaSub(v.id, form)}
         onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
         onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
+        onPuenteInconveniente={async () => {
+          await ops.pausaInterrupcion(v.id);
+          requestJornada4OpenLaunch({ puentePausaVehicleId: v.id });
+        }}
         pausaBloqueadaPor={bloqueadaPor}
         onLabelPausa={
           ops.labelPausaConquista

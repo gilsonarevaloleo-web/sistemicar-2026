@@ -87,3 +87,30 @@ describe("conquista pausa — sello en el padre, sin vehículo hijo", () => {
     assert.equal(canOpenConquistaPausa([a, b], a.id).ok, true);
   });
 });
+
+describe("puente de enfoque sobre la pausa", () => {
+  it("pausa rápida es hueco; con un enfoque encima ya no", async () => {
+    const { unjustifiedPauseIntervals } = await import("./concienciaTriadaLinea.ts");
+    const now = Date.now();
+    const base = {
+      status: "activo",
+      userId: "u",
+      aperturaAt: now - 3_600_000,
+      tipoFlota: "tiempo",
+      tipoReloj: "desglosador",
+      pausas: [{ pausadoAt: now - 600_000 }],
+    } as unknown as Vehicle;
+    const rapida = unjustifiedPauseIntervals([base], now);
+    assert.ok(rapida.length > 0);
+    const enfoque = {
+      id: "f",
+      status: "activo",
+      userId: "u",
+      tipoFlota: "situacion",
+      aperturaAt: now - 590_000,
+    } as unknown as Vehicle;
+    const puente = unjustifiedPauseIntervals([base, enfoque], now);
+    const total = (l: { start: number; end: number }[]) => l.reduce((a, i) => a + i.end - i.start, 0);
+    assert.ok(total(puente) < total(rapida));
+  });
+});

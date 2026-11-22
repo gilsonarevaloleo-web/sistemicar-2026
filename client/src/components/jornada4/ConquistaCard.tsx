@@ -95,6 +95,8 @@ type Props = {
   onAddSub?: (form: AddSubForm) => void;
   onAddSubs?: (forms: AddSubForm[]) => void;
   onPausaInterrupcion?: (titulo?: string) => void;
+  /** Pausa la conquista y abre el lanzador: el enfoque lanzado justifica la pausa. */
+  onPuenteInconveniente?: () => void | Promise<void>;
   /** Título de la otra conquista que ya ocupa la única pausa. */
   pausaBloqueadaPor?: string;
   onLabelPausa?: (titulo: string) => void;
@@ -112,6 +114,7 @@ export function ConquistaCard({
   onAddSub,
   onAddSubs,
   onPausaInterrupcion,
+  onPuenteInconveniente,
   pausaBloqueadaPor,
   onLabelPausa,
   onResumeDesglosador,
@@ -743,6 +746,10 @@ export function ConquistaCard({
                       disabled={pausaEnviando || Boolean(pausaBloqueadaPor)}
                       onClick={() => {
                         if (pausaBloqueadaPor) return;
+                        if (onPuenteInconveniente) {
+                          void onPuenteInconveniente();
+                          return;
+                        }
                         setShowPausaForm(true);
                       }}
                       className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider touch-manipulation disabled:opacity-60"
