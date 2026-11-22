@@ -851,7 +851,13 @@ export function ConquistaCard({
                     !showLabelForm ? (
                       <button
                         type="button"
-                        onClick={() => setShowLabelForm(true)}
+                        onClick={() => {
+                    if (onPuenteInconveniente) {
+                      void onPuenteInconveniente();
+                      return;
+                    }
+                    setShowLabelForm(true);
+                  }}
                         className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
                         style={{
                           backgroundColor: "transparent",
@@ -1035,7 +1041,13 @@ export function ConquistaCard({
               !showLabelForm ? (
                 <button
                   type="button"
-                  onClick={() => setShowLabelForm(true)}
+                  onClick={() => {
+                    if (onPuenteInconveniente) {
+                      void onPuenteInconveniente();
+                      return;
+                    }
+                    setShowLabelForm(true);
+                  }}
                   className="w-full py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-wider"
                   style={{
                     backgroundColor: "transparent",

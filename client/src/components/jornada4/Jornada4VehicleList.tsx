@@ -139,7 +139,7 @@ function renderVehicleCard(v: Vehicle, ops: Ops, pausaOcupadaPor?: Vehicle) {
         onAddSubs={forms => void ops.addConquistaSubs(v.id, forms)}
         onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
         onPuenteInconveniente={async () => {
-          await ops.pausaInterrupcion(v.id);
+          if (!isPausedPresence(v)) await ops.pausaInterrupcion(v.id);
           requestJornada4OpenLaunch({ puentePausaVehicleId: v.id });
         }}
         pausaBloqueadaPor={bloqueadaPor}
