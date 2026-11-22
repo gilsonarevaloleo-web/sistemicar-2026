@@ -140,7 +140,11 @@ function renderVehicleCard(v: Vehicle, ops: Ops, pausaOcupadaPor?: Vehicle) {
         onPausaInterrupcion={titulo => void ops.pausaInterrupcion(v.id, titulo)}
         onPuenteInconveniente={async () => {
           if (!isPausedPresence(v)) await ops.pausaInterrupcion(v.id);
-          requestJornada4OpenLaunch({ puentePausaVehicleId: v.id });
+          requestJornada4OpenLaunch({
+            tipoFlota: "situacion",
+            modo: "rapido",
+            puentePausaVehicleId: v.id,
+          });
         }}
         pausaBloqueadaPor={bloqueadaPor}
         onLabelPausa={

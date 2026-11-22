@@ -249,6 +249,9 @@ export const Jornada4LaunchPanel = memo(function Jornada4LaunchPanel({
       if (detail?.oleadaPuntoId?.trim()) setOleadaPuntoIdLaunch(detail.oleadaPuntoId.trim());
       if (detail?.modo) setModo(detail.modo);
       setTipo(detail?.tipoFlota ?? null);
+      if (detail?.tipoFlota === "situacion") {
+        setTerminoDetalle(prev => (prev.trim() ? prev : "Al cerrar este bloque"));
+      }
       setOpen(true);
     };
     window.addEventListener(JORNADA4_OPEN_LAUNCH_EVENT, onOpen);
